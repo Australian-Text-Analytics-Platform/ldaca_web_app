@@ -19,6 +19,8 @@ wheels/
 *.egg
 MANIFEST
 
+.github/
+
 # Backend - Virtual environments
 .env
 .venv
