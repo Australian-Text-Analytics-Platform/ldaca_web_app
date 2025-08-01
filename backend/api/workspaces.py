@@ -1,0 +1,1267 @@
+"""
+Refactored workspace API endpoints - thin HTTP layer over DocWorkspace.
+
+These endpoints are now simple HTTP wrappers around DocWorkspace methods.
+All business logic is handled by the DocWorkspace library itself.
+"""
+
+from typing import Any, Dict, List, Optional, cast
+
+import polars as pl
+from core.auth import get_current_user
+from core.docworkspace_api import (
+    DocWorkspaceAPIUtils,
+    create_operation_result,
+    handle_api_error,
+)
+from core.utils import DOCWORKSPACE_AVAILABLE, get_user_data_folder, load_data_file
+from core.workspace import workspace_manager
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from models import (
+    ConcordanceRequest,
+    FilterRequest,
+    FrequencyAnalysisRequest,
+    SliceRequest,
+    WorkspaceCreateRequest,
+    WorkspaceInfo,
+)
+
+if DOCWORKSPACE_AVAILABLE:
+    try:
+        from docworkspace import Node
+    except ImportError:
+        Node = None
+else:
+    Node = None
+
+router = APIRouter(prefix="/workspaces", tags=["workspace_management"])
+
+
+# ============================================================================
+# HELPER FUNCTIONS
+# ============================================================================
+
+
+def _handle_operation_result(result):
+    """Handle both dictionary and OperationResult responses from workspace operations"""
+    # Handle dictionary response (fallback case)
+    if isinstance(result, dict):
+        success = result.get("success", False)
+        message = result.get("message", "Operation failed")
+        return success, message, result
+
+    # Handle OperationResult object (normal case)
+    elif hasattr(result, "success"):
+        return result.success, result.message, result
+
+    # Unknown response type
+    else:
+        return False, "Unknown operation result type", result
+
+
+# ============================================================================
+# WORKSPACE MANAGEMENT - Simple HTTP wrappers
+# ============================================================================
+
+
+@router.get("/")
+async def list_workspaces(current_user: dict = Depends(get_current_user)):
+    """List user's workspaces using DocWorkspace info methods"""
+    user_id = current_user["id"]
+
+    workspaces_dict = workspace_manager.list_user_workspaces(user_id)
+
+    workspace_list = []
+    for workspace_id, workspace in workspaces_dict.items():
+        # Get workspace info using DocWorkspace summary method
+        summary = workspace.summary()
+
+        workspace_list.append(
+            {
+                "workspace_id": workspace_id,
+                "name": workspace.name,
+                "description": workspace.get_metadata("description") or "",
+                "created_at": workspace.get_metadata("created_at") or "Unknown",
+                "modified_at": workspace.get_metadata("modified_at") or "Unknown",
+                "node_count": summary["total_nodes"],
+                "root_nodes": summary["root_nodes"],
+                "leaf_nodes": summary["leaf_nodes"],
+                "node_types": summary["node_types"],
+            }
+        )
+
+    return {"workspaces": workspace_list}
+
+
+@router.get("/current")
+async def get_current_workspace(current_user: dict = Depends(get_current_user)):
+    """Get user's current workspace"""
+    user_id = current_user["id"]
+    current_workspace_id = workspace_manager.get_current_workspace_id(user_id)
+
+    return {"current_workspace_id": current_workspace_id}
+
+
+@router.post("/current")
+async def set_current_workspace(
+    workspace_id: Optional[str] = None, current_user: dict = Depends(get_current_user)
+):
+    """Set user's current workspace"""
+    user_id = current_user["id"]
+
+    success = workspace_manager.set_current_workspace(user_id, workspace_id)
+    if not success and workspace_id is not None:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+
+    return {"success": True, "current_workspace_id": workspace_id}
+
+
+@router.post("/", response_model=WorkspaceInfo)
+async def create_workspace(
+    request: WorkspaceCreateRequest, current_user: dict = Depends(get_current_user)
+):
+    """Create workspace using DocWorkspace constructor"""
+    user_id = current_user["id"]
+
+    try:
+        # Handle initial data file if provided
+        data = None
+        data_name = None
+        if request.initial_data_file:
+            try:
+                user_data_folder = get_user_data_folder(user_id)
+                file_path = user_data_folder / request.initial_data_file
+
+                if file_path.exists():
+                    loaded_data = load_data_file(file_path)
+                    # Convert pandas DataFrame to Polars if needed
+                    if hasattr(loaded_data, "columns") and hasattr(loaded_data, "iloc"):
+                        # This is a pandas DataFrame, convert to Polars
+                        data = pl.DataFrame(loaded_data)
+                    else:
+                        # Already Polars or LazyFrame
+                        data = loaded_data
+                    data_name = request.initial_data_file.replace(".csv", "").replace(
+                        ".xlsx", ""
+                    )
+                else:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Initial data file not found: {request.initial_data_file}",
+                    )
+            except Exception as e:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Failed to load initial data file: {str(e)}",
+                )
+
+        # Use DocWorkspace to create workspace
+        workspace = workspace_manager.create_workspace(
+            user_id=user_id,
+            name=request.name,
+            description=request.description or "",
+            data=data,
+            data_name=data_name,
+        )
+
+        # Get workspace info using DocWorkspace method
+        workspace_id = workspace.get_metadata("id")
+        workspace_info = workspace_manager.get_workspace_info(user_id, workspace_id)
+
+        if not workspace_info:
+            raise HTTPException(status_code=500, detail="Failed to get workspace info")
+
+        return WorkspaceInfo(
+            workspace_id=workspace_id,
+            name=workspace_info["name"],
+            description=workspace_info.get("description", ""),
+            created_at=workspace_info.get("created_at", ""),
+            modified_at=workspace_info.get("modified_at", ""),
+            total_nodes=workspace_info.get(
+                "total_nodes", 0
+            ),  # Updated to use latest terminology
+        )
+
+    except HTTPException:
+        # Re-raise HTTPExceptions as-is
+        raise
+    except Exception as e:
+        # Log and convert unexpected errors to 500
+        import traceback
+
+        print(f"❌ Workspace creation error: {str(e)}")
+        print(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error during workspace creation: {str(e)}",
+        )
+
+
+@router.delete("/{workspace_id}")
+async def delete_workspace(
+    workspace_id: str, current_user: dict = Depends(get_current_user)
+):
+    """Delete workspace using manager"""
+    user_id = current_user["id"]
+
+    success = workspace_manager.delete_workspace(user_id, workspace_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+
+    return {
+        "success": True,
+        "message": f"Workspace {workspace_id} deleted successfully",
+    }
+
+
+@router.get("/{workspace_id}")
+async def get_workspace(
+    workspace_id: str, current_user: dict = Depends(get_current_user)
+):
+    """Get workspace details - cleaner endpoint naming"""
+    user_id = current_user["id"]
+
+    workspace_info = workspace_manager.get_workspace_info(user_id, workspace_id)
+    if not workspace_info:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+
+    return workspace_info
+
+
+@router.get("/{workspace_id}/info")
+async def get_workspace_info(
+    workspace_id: str, current_user: dict = Depends(get_current_user)
+):
+    """Get workspace info using DocWorkspace summary method"""
+    user_id = current_user["id"]
+
+    workspace_info = workspace_manager.get_workspace_info(user_id, workspace_id)
+    if not workspace_info:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+
+    return workspace_info
+
+
+# ============================================================================
+# GRAPH DATA - Direct delegation to DocWorkspace
+# ============================================================================
+
+
+@router.get("/{workspace_id}/graph")
+async def get_workspace_graph(
+    workspace_id: str, current_user: dict = Depends(get_current_user)
+):
+    """Get React Flow graph using DocWorkspace to_api_graph method"""
+    user_id = current_user["id"]
+
+    # Direct delegation to DocWorkspace
+    graph_data = workspace_manager.get_workspace_graph(user_id, workspace_id)
+    if not graph_data:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+
+    return graph_data
+
+
+@router.get("/{workspace_id}/nodes")
+async def get_workspace_nodes(
+    workspace_id: str, current_user: dict = Depends(get_current_user)
+):
+    """Get node summaries using DocWorkspace get_node_summaries method"""
+    user_id = current_user["id"]
+
+    # Direct delegation to DocWorkspace
+    node_summaries = workspace_manager.get_node_summaries(user_id, workspace_id)
+
+    return {"nodes": node_summaries}
+
+
+@router.post("/{workspace_id}/nodes")
+async def add_node_to_workspace(
+    workspace_id: str, filename: str, current_user: dict = Depends(get_current_user)
+):
+    """Add a data file as a new node to workspace"""
+    user_id = current_user["id"]
+
+    try:
+        # Load data file
+        user_data_folder = get_user_data_folder(user_id)
+        file_path = user_data_folder / filename
+
+        if not file_path.exists():
+            raise HTTPException(
+                status_code=400, detail=f"Data file not found: {filename}"
+            )
+
+        # Load the data
+        data = load_data_file(file_path)
+
+        # Convert pandas DataFrame to Polars if needed
+        if hasattr(data, "columns") and hasattr(data, "iloc"):
+            # This is a pandas DataFrame, convert to Polars
+            data = pl.DataFrame(data)
+
+        # Create node name from filename
+        node_name = (
+            filename.replace(".csv", "").replace(".xlsx", "").replace(".json", "")
+        )
+
+        # Add node to workspace using DocWorkspace
+        node = workspace_manager.add_node_to_workspace(
+            user_id=user_id, workspace_id=workspace_id, data=data, node_name=node_name
+        )
+
+        if not node:
+            raise HTTPException(
+                status_code=500, detail="Failed to add node to workspace"
+            )
+
+        # Return node info
+        return node.info(json=True)
+
+    except HTTPException:
+        # Re-raise HTTPExceptions as-is
+        raise
+    except Exception as e:
+        # Log and convert unexpected errors to 500
+        import traceback
+
+        print(f"❌ Add node error: {str(e)}")
+        print(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(
+            status_code=500, detail=f"Internal server error adding node: {str(e)}"
+        )
+
+
+# ============================================================================
+# NODE OPERATIONS - Thin wrappers around DocWorkspace methods
+# ============================================================================
+
+
+@router.get("/{workspace_id}/nodes/{node_id}")
+async def get_node_info(
+    workspace_id: str, node_id: str, current_user: dict = Depends(get_current_user)
+):
+    """Get node info using DocWorkspace Node.info method"""
+    user_id = current_user["id"]
+
+    node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
+    if not node:
+        raise HTTPException(status_code=404, detail="Node not found")
+
+    # Use DocWorkspace's latest info method with json=True for API compatibility
+    return node.info(json=True)
+
+
+@router.get("/{workspace_id}/nodes/{node_id}/data")
+async def get_node_data(
+    workspace_id: str,
+    node_id: str,
+    page: int = 1,
+    page_size: int = 100,
+    current_user: dict = Depends(get_current_user),
+):
+    """Get node data using DocWorkspace data access methods"""
+    user_id = current_user["id"]
+
+    node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
+    if not node:
+        raise HTTPException(status_code=404, detail="Node not found")
+
+    # Use DocWorkspace's latest data access pattern
+    try:
+        # Get data as DataFrame for pagination
+        if hasattr(node.data, "collect"):
+            # LazyFrame - collect for pagination
+            df = node.data.collect()
+        else:
+            # Already a DataFrame
+            df = node.data
+
+        # Calculate pagination
+        total_rows = len(df)
+        start_idx = (page - 1) * page_size
+        end_idx = min(start_idx + page_size, total_rows)
+
+        # Get paginated data
+        paginated_df = df.slice(start_idx, page_size)
+        data_rows = paginated_df.to_dicts()
+
+        return {
+            "data": data_rows,
+            "pagination": {
+                "page": page,
+                "page_size": page_size,
+                "total_rows": total_rows,
+                "total_pages": (total_rows + page_size - 1) // page_size,
+                "has_next": end_idx < total_rows,
+                "has_prev": page > 1,
+            },
+            "columns": list(df.columns),
+            "dtypes": {col: str(dtype) for col, dtype in df.schema.items()},
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get node data: {str(e)}"
+        )
+
+
+@router.get("/{workspace_id}/nodes/{node_id}/shape")
+async def get_node_shape(
+    workspace_id: str, node_id: str, current_user: dict = Depends(get_current_user)
+):
+    """Get the full shape (height, width) of a node by materializing if needed"""
+    user_id = current_user["id"]
+
+    node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
+    if not node:
+        raise HTTPException(status_code=404, detail="Node not found")
+
+    try:
+        if node.is_lazy:
+            # For lazy frames, calculate full shape by collecting
+            if hasattr(node.data, "collect") and hasattr(node.data, "collect_schema"):
+                # Get row count by collecting and counting
+                row_count = node.data.select(pl.count()).collect().item()
+                # Get column count from schema
+                column_count = len(node.data.collect_schema().names())
+                shape = [row_count, column_count]
+            else:
+                # Fallback
+                shape = [None, None]
+        else:
+            # For materialized DataFrames, get shape directly
+            if hasattr(node.data, "shape"):
+                shape = list(node.data.shape)
+            else:
+                shape = [None, None]
+
+        return {"shape": shape, "is_lazy": node.is_lazy, "calculated": True}
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to calculate node shape: {str(e)}"
+        )
+
+
+@router.delete("/{workspace_id}/nodes/{node_id}")
+async def delete_node(
+    workspace_id: str, node_id: str, current_user: dict = Depends(get_current_user)
+):
+    """Delete node using DocWorkspace method"""
+    user_id = current_user["id"]
+
+    success = workspace_manager.delete_node_from_workspace(
+        user_id, workspace_id, node_id
+    )
+    if not success:
+        raise HTTPException(status_code=404, detail="Node not found")
+
+    return {"success": True, "message": "Node deleted successfully"}
+
+
+@router.post("/{workspace_id}/nodes/{node_id}/rename")
+async def rename_node(
+    workspace_id: str,
+    node_id: str,
+    new_name: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Rename node using DocWorkspace safe_operation method"""
+    user_id = current_user["id"]
+
+    # Define operation function
+    def rename_operation():
+        node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
+        if not node:
+            raise ValueError("Node not found")
+        node.name = new_name
+        return node
+
+    # Use DocWorkspace's safe operation wrapper
+    result = workspace_manager.execute_safe_operation(
+        user_id, workspace_id, rename_operation
+    )
+
+    success, message, result_obj = _handle_operation_result(result)
+    if not success:
+        raise HTTPException(status_code=400, detail=message)
+
+    return result_obj
+
+
+# ============================================================================
+# FILE OPERATIONS - Upload and create nodes
+# ============================================================================
+
+
+@router.post("/{workspace_id}/upload")
+async def upload_file_to_workspace(
+    workspace_id: str,
+    file: UploadFile = File(...),
+    node_name: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+):
+    """Upload file and create node using DocWorkspace methods"""
+    user_id = current_user["id"]
+
+    try:
+        # Save uploaded file
+        user_folder = get_user_data_folder(user_id)
+        file_path = user_folder / (file.filename or "uploaded_file")
+
+        with open(file_path, "wb") as f:
+            content = await file.read()
+            f.write(content)
+
+        # Load data using utility function
+        data = load_data_file(file_path)
+
+        # Create node using DocWorkspace
+        node_name = node_name or file.filename or "uploaded_file"
+        node = workspace_manager.add_node_to_workspace(
+            user_id=user_id,
+            workspace_id=workspace_id,
+            node_name=node_name,
+            data=data,
+            operation=f"upload_file({file.filename})",
+        )
+
+        if not node:
+            raise HTTPException(status_code=404, detail="Workspace not found")
+
+        # Return node summary using DocWorkspace method
+        return {
+            "success": True,
+            "message": "File uploaded successfully",
+            "node": node.info(json=True),  # Use latest DocWorkspace method
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to upload file: {str(e)}")
+
+
+# ============================================================================
+# DATA OPERATIONS - Using DocWorkspace safe_operation wrapper
+# ============================================================================
+
+
+@router.post("/{workspace_id}/nodes/{node_id}/filter")
+async def filter_node(
+    workspace_id: str,
+    node_id: str,
+    request: FilterRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Filter node using DocWorkspace Node methods"""
+    user_id = current_user["id"]
+
+    # Define operation function using latest DocWorkspace design
+    def filter_operation():
+        node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
+        if not node:
+            raise ValueError("Node not found")
+
+        # Build filter expression from conditions
+        filter_expr = None
+        for condition in request.conditions:
+            column_expr = pl.col(condition.column)
+
+            if condition.operator == "equals":
+                expr = column_expr == condition.value
+            elif condition.operator == "contains":
+                expr = column_expr.str.contains(str(condition.value))
+            elif condition.operator == "greater_than":
+                expr = column_expr > float(condition.value)
+            elif condition.operator == "less_than":
+                expr = column_expr < float(condition.value)
+            else:
+                expr = column_expr.str.contains(str(condition.value))  # fallback
+
+            if filter_expr is None:
+                filter_expr = expr
+            else:
+                if request.logic == "or":
+                    filter_expr = filter_expr | expr
+                else:  # default to "and"
+                    filter_expr = filter_expr & expr
+
+        # Apply filter using DocWorkspace Node's data manipulation methods
+        if hasattr(node.data, "filter"):
+            # LazyFrame or DataFrame with filter method
+            filtered_data = node.data.filter(filter_expr)
+        else:
+            # Fallback: convert to LazyFrame and filter
+            filtered_data = node.data.lazy().filter(filter_expr)
+
+        # Create new node with filtered data using workspace method
+        new_node_name = request.new_node_name or f"{node.name}_filtered"
+
+        # Use workspace manager to add the filtered data as a new node
+        new_node = workspace_manager.add_node_to_workspace(
+            user_id=user_id,
+            workspace_id=workspace_id,
+            data=filtered_data,
+            node_name=new_node_name,
+            operation=f"filter({node.name})",
+        )
+        return new_node
+
+    # Use DocWorkspace's safe operation wrapper
+    result = workspace_manager.execute_safe_operation(
+        user_id, workspace_id, filter_operation
+    )
+
+    success, message, result_obj = _handle_operation_result(result)
+    if not success:
+        raise HTTPException(status_code=400, detail=message)
+
+    return result_obj
+
+
+@router.post("/{workspace_id}/nodes/{node_id}/slice")
+async def slice_node(
+    workspace_id: str,
+    node_id: str,
+    request: SliceRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Slice node using DocWorkspace Node methods"""
+    user_id = current_user["id"]
+
+    # Define operation function using latest DocWorkspace design
+    def slice_operation():
+        node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
+        if not node:
+            raise ValueError("Node not found")
+
+        # Apply slicing using DocWorkspace Node's data manipulation methods
+        sliced_data = node.data
+
+        # Apply row slicing if specified
+        if request.start_row is not None or request.end_row is not None:
+            start = request.start_row or 0
+            length = None
+            if request.end_row is not None:
+                length = request.end_row - start
+
+            if hasattr(sliced_data, "slice"):
+                sliced_data = sliced_data.slice(start, length)
+            else:
+                sliced_data = sliced_data.lazy().slice(start, length)
+
+        # Apply column selection if specified
+        if request.columns:
+            if hasattr(sliced_data, "select"):
+                sliced_data = sliced_data.select(request.columns)
+            else:
+                sliced_data = sliced_data.lazy().select(request.columns)
+
+        # Create new node with sliced data using workspace method
+        new_node_name = request.new_node_name or f"{node.name}_sliced"
+
+        # Use workspace manager to add the sliced data as a new node
+        new_node = workspace_manager.add_node_to_workspace(
+            user_id=user_id,
+            workspace_id=workspace_id,
+            data=sliced_data,
+            node_name=new_node_name,
+            operation=f"slice({node.name})",
+        )
+        return new_node
+
+    # Use DocWorkspace's safe operation wrapper
+    result = workspace_manager.execute_safe_operation(
+        user_id, workspace_id, slice_operation
+    )
+
+    success, message, result_obj = _handle_operation_result(result)
+    if not success:
+        raise HTTPException(status_code=400, detail=message)
+
+    return result_obj
+
+
+@router.post("/{workspace_id}/nodes/join")
+async def join_nodes(
+    workspace_id: str,
+    left_node_id: str,
+    right_node_id: str,
+    left_on: str,
+    right_on: str,
+    how: str = "inner",
+    new_node_name: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+):
+    """Join nodes using DocWorkspace safe_operation method"""
+    user_id = current_user["id"]
+
+    # Define operation function
+    def join_operation():
+        left_node = workspace_manager.get_node_from_workspace(
+            user_id, workspace_id, left_node_id
+        )
+        right_node = workspace_manager.get_node_from_workspace(
+            user_id, workspace_id, right_node_id
+        )
+
+        if not left_node or not right_node:
+            raise ValueError("One or both nodes not found")
+
+        # Use Polars join directly since we need to support different column names
+        import polars as pl
+
+        # Get the data from both nodes
+        left_data = left_node.data
+        right_data = right_node.data
+
+        # Ensure we have DataFrames for joining
+        if hasattr(left_data, "collect"):
+            left_df = left_data.collect()
+        else:
+            left_df = left_data
+
+        if hasattr(right_data, "collect"):
+            right_df = right_data.collect()
+        else:
+            right_df = right_data
+
+        # Perform the join
+        joined_df = left_df.join(right_df, left_on=left_on, right_on=right_on, how=how)
+
+        # Create new node with joined data
+        node_name = new_node_name or f"{left_node.name}_join_{right_node.name}"
+
+        # Add the joined data as a new node to the workspace
+        new_node = workspace_manager.add_node_to_workspace(
+            user_id=user_id,
+            workspace_id=workspace_id,
+            data=joined_df,
+            node_name=node_name,
+            operation=f"join({left_node.name}, {right_node.name})",
+        )
+
+        return new_node
+
+    # Use DocWorkspace's safe operation wrapper
+    result = workspace_manager.execute_safe_operation(
+        user_id, workspace_id, join_operation
+    )
+
+    success, message, result_obj = _handle_operation_result(result)
+    if not success:
+        raise HTTPException(status_code=400, detail=message)
+
+    return result_obj
+
+
+# ============================================================================
+# TEXT ANALYSIS - Using DocFrame integration if available
+# ============================================================================
+
+
+@router.post("/{workspace_id}/nodes/{node_id}/concordance")
+async def get_concordance(
+    workspace_id: str,
+    node_id: str,
+    request: ConcordanceRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Get concordance using DocFrame integration with pagination and sorting support"""
+    user_id = current_user["id"]
+
+    try:
+        # Get the node directly (don't use safe operation wrapper for concordance)
+        node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
+        if not node:
+            raise HTTPException(status_code=404, detail="Node not found")
+
+        # Check if the column exists in the data
+        if hasattr(node.data, "columns"):
+            available_columns = node.data.columns
+        elif hasattr(node.data, "schema"):
+            available_columns = list(node.data.schema.keys())
+        else:
+            available_columns = []
+
+        if available_columns and request.column not in available_columns:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Column '{request.column}' not found. Available columns: {available_columns}",
+            )
+
+        # Try to use DocFrame text methods if available
+        if hasattr(node.data, "text"):
+            # DocFrame integration - use text namespace
+            concordance_result = node.data.text.concordance(
+                column=request.column,
+                search_word=request.search_word,
+                num_left_tokens=request.num_left_tokens,
+                num_right_tokens=request.num_right_tokens,
+                regex=request.regex,
+                case_sensitive=request.case_sensitive,
+            )
+
+            # Apply sorting if requested
+            if request.sort_by and request.sort_by in concordance_result.columns:
+                import polars as pl
+
+                if request.sort_order.lower() == "desc":
+                    concordance_result = concordance_result.sort(
+                        pl.col(request.sort_by), descending=True
+                    )
+                else:
+                    concordance_result = concordance_result.sort(
+                        pl.col(request.sort_by)
+                    )
+
+            # Get total count before pagination
+            total_matches = len(concordance_result)
+
+            # Apply pagination
+            start_idx = (request.page - 1) * request.page_size
+            end_idx = start_idx + request.page_size
+            paginated_result = concordance_result.slice(start_idx, request.page_size)
+
+            # Convert concordance DataFrame to format expected by frontend
+            if hasattr(paginated_result, "to_dicts"):
+                return {
+                    "data": paginated_result.to_dicts(),
+                    "columns": list(concordance_result.columns),
+                    "total_matches": total_matches,
+                    "pagination": {
+                        "page": request.page,
+                        "page_size": request.page_size,
+                        "total_pages": (total_matches + request.page_size - 1)
+                        // request.page_size,
+                        "has_next": end_idx < total_matches,
+                        "has_prev": request.page > 1,
+                    },
+                    "sorting": {
+                        "sort_by": request.sort_by,
+                        "sort_order": request.sort_order,
+                    },
+                }
+            else:
+                return {
+                    "data": [],
+                    "columns": [],
+                    "total_matches": 0,
+                    "pagination": {
+                        "page": 1,
+                        "page_size": request.page_size,
+                        "total_pages": 0,
+                        "has_next": False,
+                        "has_prev": False,
+                    },
+                    "sorting": {
+                        "sort_by": request.sort_by,
+                        "sort_order": request.sort_order,
+                    },
+                }
+
+        else:
+            # Fallback to basic string search
+            import polars as pl
+
+            filtered = node.data.filter(
+                pl.col(request.column).str.contains(request.search_word)
+            )
+
+            # Apply sorting if requested
+            if request.sort_by and request.sort_by in filtered.columns:
+                if request.sort_order.lower() == "desc":
+                    filtered = filtered.sort(pl.col(request.sort_by), descending=True)
+                else:
+                    filtered = filtered.sort(pl.col(request.sort_by))
+
+            # Get total count before pagination
+            total_matches = len(filtered)
+
+            # Apply pagination
+            start_idx = (request.page - 1) * request.page_size
+            paginated_filtered = filtered.slice(start_idx, request.page_size)
+
+            # Convert filtered results to expected format
+            if hasattr(paginated_filtered, "to_dicts"):
+                return {
+                    "data": paginated_filtered.to_dicts(),
+                    "columns": list(filtered.columns),
+                    "total_matches": total_matches,
+                    "pagination": {
+                        "page": request.page,
+                        "page_size": request.page_size,
+                        "total_pages": (total_matches + request.page_size - 1)
+                        // request.page_size,
+                        "has_next": start_idx + request.page_size < total_matches,
+                        "has_prev": request.page > 1,
+                    },
+                    "sorting": {
+                        "sort_by": request.sort_by,
+                        "sort_order": request.sort_order,
+                    },
+                }
+            else:
+                return {
+                    "data": [],
+                    "columns": [],
+                    "total_matches": 0,
+                    "pagination": {
+                        "page": 1,
+                        "page_size": request.page_size,
+                        "total_pages": 0,
+                        "has_next": False,
+                        "has_prev": False,
+                    },
+                    "sorting": {
+                        "sort_by": request.sort_by,
+                        "sort_order": request.sort_order,
+                    },
+                }
+
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        # Log and handle unexpected errors
+        import traceback
+
+        print(f"❌ Unexpected concordance error: {str(e)}")
+        print(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+@router.get("/{workspace_id}/nodes/{node_id}/concordance/{document_idx}")
+async def get_concordance_detail(
+    workspace_id: str,
+    node_id: str,
+    document_idx: int,
+    text_column: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Get detailed information for a specific concordance match including full text and metadata"""
+    user_id = current_user["id"]
+
+    try:
+        # Get the node
+        node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
+        if not node:
+            raise HTTPException(status_code=404, detail="Node not found")
+
+        # Get the original data
+        data = node.data
+        if hasattr(data, "collect"):
+            data = data.collect()
+
+        # Validate document index
+        if document_idx < 0 or document_idx >= len(data):
+            raise HTTPException(status_code=404, detail="Document index not found")
+
+        # Get the specific record
+        record = data.slice(document_idx, 1).to_dicts()[0]
+
+        # Extract the full text from the specified column
+        full_text = record.get(text_column, "")
+
+        # Get all metadata (all other columns)
+        metadata = {k: v for k, v in record.items() if k != text_column}
+
+        # Get column information
+        available_columns = list(data.columns) if hasattr(data, "columns") else []
+
+        return {
+            "document_idx": document_idx,
+            "text_column": text_column,
+            "full_text": str(full_text),
+            "metadata": metadata,
+            "available_columns": available_columns,
+            "record": record,  # Full record for reference
+        }
+
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        # Log and handle unexpected errors
+        import traceback
+
+        print(f"❌ Unexpected concordance detail error: {str(e)}")
+        print(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+@router.post("/{workspace_id}/nodes/{node_id}/frequency-analysis")
+async def get_frequency_analysis(
+    workspace_id: str,
+    node_id: str,
+    request: FrequencyAnalysisRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Get frequency analysis using DocFrame integration"""
+    user_id = current_user["id"]
+
+    try:
+        # Get the node directly
+        node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
+        if not node:
+            raise HTTPException(status_code=404, detail="Node not found")
+
+        # Check if the time column exists in the data
+        if hasattr(node.data, "columns"):
+            available_columns = node.data.columns
+        elif hasattr(node.data, "schema"):
+            available_columns = list(node.data.schema.keys())
+        else:
+            available_columns = []
+
+        if available_columns and request.time_column not in available_columns:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Time column '{request.time_column}' not found. Available columns: {available_columns}",
+            )
+
+        # Validate group_by_columns if provided
+        if request.group_by_columns:
+            # Limit to 3 group by columns as requested
+            if len(request.group_by_columns) > 3:
+                raise HTTPException(
+                    status_code=400, detail="Maximum 3 group by columns allowed"
+                )
+
+            for col in request.group_by_columns:
+                if available_columns and col not in available_columns:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Group by column '{col}' not found. Available columns: {available_columns}",
+                    )
+
+        # Validate frequency
+        valid_frequencies = ["daily", "weekly", "monthly", "yearly"]
+        if request.frequency not in valid_frequencies:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid frequency '{request.frequency}'. Valid options: {valid_frequencies}",
+            )
+
+        # Try to use DocFrame text methods if available
+        if hasattr(node.data, "text"):
+            # DocFrame integration - use text namespace
+            frequency_result = node.data.text.frequency_analysis(
+                time_column=request.time_column,
+                group_by_columns=request.group_by_columns,
+                frequency=request.frequency,
+                sort_by_time=request.sort_by_time,
+            )
+
+            # Convert frequency DataFrame to format expected by frontend
+            if hasattr(frequency_result, "to_dicts"):
+                return {
+                    "success": True,
+                    "data": frequency_result.to_dicts(),
+                    "columns": list(frequency_result.columns),
+                    "total_records": len(frequency_result),
+                    "analysis_params": {
+                        "time_column": request.time_column,
+                        "group_by_columns": request.group_by_columns,
+                        "frequency": request.frequency,
+                        "sort_by_time": request.sort_by_time,
+                    },
+                }
+            else:
+                return {
+                    "success": True,
+                    "data": [],
+                    "columns": [],
+                    "total_records": 0,
+                    "analysis_params": {
+                        "time_column": request.time_column,
+                        "group_by_columns": request.group_by_columns,
+                        "frequency": request.frequency,
+                        "sort_by_time": request.sort_by_time,
+                    },
+                }
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail="Node data does not support text analysis. Please ensure the node contains proper text data.",
+            )
+
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        # Log and handle unexpected errors
+        import traceback
+
+        print(f"❌ Unexpected frequency analysis error: {str(e)}")
+        print(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+@router.post("/{workspace_id}/nodes/{node_id}/cast")
+async def cast_node(
+    workspace_id: str,
+    node_id: str,
+    cast_data: dict,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Cast a single column data type in a node using Polars casting methods (in-place operation).
+
+    Args:
+        workspace_id: The workspace identifier
+        node_id: The node identifier to cast
+        cast_data: Dictionary with casting specifications:
+            - column: str - name of the column to cast
+            - target_type: str - target data type (e.g., "number", "string", "datetime", "boolean")
+            - format: str (optional) - datetime format string for string to datetime conversion
+            Example: {"column": "date_col", "target_type": "datetime", "format": "%Y-%m-%d"}
+
+    Returns:
+        Dictionary with the updated node information after casting
+    """
+    try:
+        import polars as pl
+
+        user_id = current_user["id"]
+
+        # Validate cast_data structure
+        if not isinstance(cast_data, dict):
+            raise HTTPException(
+                status_code=400, detail="cast_data must be a dictionary"
+            )
+
+        if "column" not in cast_data or "target_type" not in cast_data:
+            raise HTTPException(
+                status_code=400,
+                detail="cast_data must contain 'column' and 'target_type' keys",
+            )
+
+        column_name = cast_data["column"]
+        target_type = cast_data["target_type"]
+        datetime_format = cast_data.get("format")  # Optional datetime format
+
+        if not isinstance(column_name, str) or not isinstance(target_type, str):
+            raise HTTPException(
+                status_code=400, detail="'column' and 'target_type' must be strings"
+            )
+
+        # Get node using the workspace manager
+        node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
+        if not node:
+            raise HTTPException(status_code=404, detail="Node not found")
+
+        # Get the current dataframe from the node
+        current_df = node.data
+        if current_df is None:
+            raise HTTPException(status_code=400, detail="Node has no data")
+
+        # Work directly with the node's data - preserve the original data type
+        # Don't convert between DataFrame/LazyFrame/DocDataFrame types
+
+        # Get original data type for logging
+        if hasattr(current_df, "collect"):
+            # LazyFrame - get schema without collecting (use collect_schema to avoid warning)
+            schema = current_df.collect_schema()
+            original_type = (
+                str(schema[column_name]) if column_name in schema else "unknown"
+            )
+            columns = list(schema.keys())
+        elif hasattr(current_df, "schema"):
+            # DataFrame or DocDataFrame with schema
+            original_type = (
+                str(current_df.schema[column_name])
+                if column_name in current_df.schema
+                else "unknown"
+            )
+            columns = list(current_df.schema.keys())
+        elif hasattr(current_df, "columns"):
+            # Direct columns access
+            columns = current_df.columns
+            try:
+                # Try to get dtype from the column
+                original_type = str(current_df[column_name].dtype)
+            except Exception:
+                original_type = "unknown"
+        else:
+            raise HTTPException(
+                status_code=400, detail="Cannot determine column structure"
+            )
+
+        if column_name not in columns:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Column '{column_name}' not found in data. Available columns: {columns}",
+            )
+
+        # Check if target_type is supported BEFORE trying the casting
+        if target_type.lower() != "datetime":
+            raise HTTPException(
+                status_code=400,
+                detail=f"Casting to '{target_type}' is not yet supported. Currently only 'datetime' casting is implemented.",
+            )
+
+        # Perform the casting using .with_columns() and expressions
+        try:
+            # Create the casting expression (we already validated it's datetime above)
+            if datetime_format:
+                # Use str.to_datetime with custom format - exactly as user specified
+                cast_expr = pl.col(column_name).str.to_datetime(format=datetime_format)
+            else:
+                # Use str.to_datetime with automatic format detection
+                cast_expr = pl.col(column_name).str.to_datetime()
+
+            # Apply the casting with .with_columns() - preserve original data type!
+            # If it was DocDataFrame, keep as DocDataFrame; if LazyFrame, keep as LazyFrame
+            casted_data = current_df.with_columns(cast_expr)
+
+            # Update the node data in-place (preserving the original type)
+            node.data = casted_data
+
+            # Save workspace to disk
+            workspace_manager._save_workspace_to_disk(
+                user_id,
+                workspace_id,
+                workspace_manager.get_workspace(user_id, workspace_id),
+            )
+
+            # Get new data type for response
+            if hasattr(casted_data, "collect"):
+                # LazyFrame - use collect_schema to avoid warning
+                new_schema = casted_data.collect_schema()
+                new_type = str(new_schema[column_name])
+            elif hasattr(casted_data, "schema"):
+                new_type = str(casted_data.schema[column_name])
+            else:
+                new_type = target_type
+
+            return {
+                "success": True,
+                "node_id": node_id,
+                "cast_info": {
+                    "column": column_name,
+                    "original_type": original_type,
+                    "new_type": new_type,
+                    "target_type": target_type,
+                    "format_used": datetime_format
+                    if target_type.lower() == "datetime"
+                    else None,
+                },
+                "message": f"Successfully cast column '{column_name}' from {original_type} to {new_type}",
+            }
+
+        except Exception as cast_error:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Error casting column '{column_name}' to {target_type}: {str(cast_error)}. "
+                f"Check that the target data type is valid and the data can be converted.",
+            )
+
+    except HTTPException:
+        # Re-raise HTTP exceptions (they already have proper error messages)
+        raise
+    except Exception as e:
+        # Handle unexpected errors
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unexpected error during casting operation: {str(e)}",
+        )
