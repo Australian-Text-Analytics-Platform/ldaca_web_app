@@ -19,8 +19,6 @@ wheels/
 *.egg
 MANIFEST
 
-.github/
-
 # Backend - Virtual environments
 .env
 .venv
@@ -38,9 +36,7 @@ uv.lock
 *.db
 *.sqlite
 *.sqlite3
-data/
 user_data/
-sample_data/
 backups/
 
 # Backend - Logs & Cache
@@ -178,9 +174,7 @@ $RECYCLE.BIN/
 # LDaCA Specific
 # Backend specific logs and data
 backend/backend.log
-backend/data/
-backend/user_data/
-backend/sample_data/
+backend/data/user*/
 
 # Frontend specific logs and builds  
 frontend/frontend.log
