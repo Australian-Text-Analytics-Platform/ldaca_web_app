@@ -80,6 +80,7 @@ frontend.log
 
 # Frontend - IDE/Editor specific
 .vscode/
+.github/
 .idea/
 *.swp
 *.swo
@@ -186,3 +187,4 @@ frontend/dist/
 *.joblib
 .spacy/
 nltk_data/
+

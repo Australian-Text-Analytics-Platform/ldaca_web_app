@@ -34,7 +34,7 @@ class Settings(BaseSettings):
 
     # CORS Configuration - using string field to avoid JSON parsing issues
     cors_allowed_origins_str: str = Field(
-        default="http://localhost:3000,https://ldaca.sguo.org,https://sguo0589.github.io",
+        default="http://localhost:3000,http://127.0.0.1:3000,https://ldaca.sguo.org,https://sguo0589.github.io",
         description="CORS allowed origins as comma-separated string",
     )
     cors_allow_credentials: bool = Field(
