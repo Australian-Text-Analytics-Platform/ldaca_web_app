@@ -273,6 +273,22 @@ class ConcordanceRequest(BaseModel):
     sort_order: str = "asc"  # "asc" or "desc"
 
 
+class MultiNodeConcordanceRequest(BaseModel):
+    node_ids: List[str]  # Support up to 2 nodes
+    node_columns: Dict[str, str]  # node_id -> column_name mapping
+    search_word: str
+    num_left_tokens: int = 10
+    num_right_tokens: int = 10
+    regex: bool = False
+    case_sensitive: bool = False
+    # Pagination parameters
+    page: int = 1
+    page_size: int = 50
+    # Sorting parameters
+    sort_by: Optional[str] = None  # column name to sort by
+    sort_order: str = "asc"  # "asc" or "desc"
+
+
 class FrequencyAnalysisRequest(BaseModel):
     time_column: str
     group_by_columns: Optional[List[str]] = None

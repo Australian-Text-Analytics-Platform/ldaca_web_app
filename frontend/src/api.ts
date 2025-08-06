@@ -561,6 +561,41 @@ export interface ConcordanceRequest {
   sort_order?: 'asc' | 'desc';
 }
 
+export interface MultiNodeConcordanceRequest {
+  node_ids: string[];
+  node_columns: Record<string, string>;  // node_id -> column_name mapping
+  search_word: string;
+  num_left_tokens?: number;
+  num_right_tokens?: number;
+  regex?: boolean;
+  case_sensitive?: boolean;
+  page?: number;
+  page_size?: number;
+  sort_by?: string;
+  sort_order?: 'asc' | 'desc';
+}
+
+export interface MultiNodeConcordanceResponse {
+  success: boolean;
+  message: string;
+  data: Record<string, {
+    data: any[];
+    columns: string[];
+    total_matches: number;
+    pagination: {
+      page: number;
+      page_size: number;
+      total_pages: number;
+      has_next: boolean;
+      has_prev: boolean;
+    };
+    sorting: {
+      sort_by?: string;
+      sort_order: string;
+    };
+  }>;
+}
+
 export interface FrequencyAnalysisRequest {
   time_column: string;
   group_by_columns?: string[] | null;
@@ -576,6 +611,21 @@ export async function concordanceSearch(
 ) {
   const res = await axios.post(
     `${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}/concordance`,
+    request,
+    {
+      headers: authHeaders
+    }
+  );
+  return res.data;
+}
+
+export async function multiNodeConcordanceSearch(
+  workspaceId: string,
+  request: MultiNodeConcordanceRequest,
+  authHeaders: Record<string, string> = {}
+): Promise<MultiNodeConcordanceResponse> {
+  const res = await axios.post(
+    `${API_BASE}/workspaces/${workspaceId}/concordance/multi-node`,
     request,
     {
       headers: authHeaders
