@@ -18,6 +18,7 @@ from core.utils import DOCWORKSPACE_AVAILABLE, get_user_data_folder, load_data_f
 from core.workspace import workspace_manager
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from models import (
+    ConcordanceDetachRequest,
     ConcordanceRequest,
     FilterRequest,
     FrequencyAnalysisRequest,
@@ -1630,4 +1631,122 @@ async def calculate_token_frequencies(
         # Handle unexpected errors
         raise HTTPException(
             status_code=500, detail=f"Error calculating token frequencies: {str(e)}"
+        )
+
+
+@router.post("/{workspace_id}/nodes/{node_id}/concordance/detach")
+async def detach_concordance(
+    workspace_id: str,
+    node_id: str,
+    request: ConcordanceDetachRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Detach concordance results by joining them with the original table to create a new node"""
+    user_id = current_user["id"]
+
+    try:
+        # Get the original node
+        node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
+        if not node:
+            raise HTTPException(status_code=404, detail="Node not found")
+
+        # Check if the column exists in the data
+        if hasattr(node.data, "columns"):
+            available_columns = node.data.columns
+        elif hasattr(node.data, "schema"):
+            available_columns = list(node.data.schema.keys())
+        else:
+            available_columns = []
+
+        if available_columns and request.column not in available_columns:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Column '{request.column}' not found. Available columns: {available_columns}",
+            )
+
+        # Get full concordance results (no pagination)
+        if hasattr(node.data, "text"):
+            # DocFrame integration - use text namespace
+            concordance_result = node.data.text.concordance(
+                column=request.column,
+                search_word=request.search_word,
+                num_left_tokens=request.num_left_tokens,
+                num_right_tokens=request.num_right_tokens,
+                regex=request.regex,
+                case_sensitive=request.case_sensitive,
+            )
+
+            # Add document index to concordance results for joining
+            import polars as pl
+
+            if "document_idx" not in concordance_result.columns:
+                # Create a document index based on row number in original data
+                concordance_with_idx = concordance_result.with_row_index("document_idx")
+            else:
+                concordance_with_idx = concordance_result
+
+            # Join concordance results with original data
+            # The original data should have a row index that matches document_idx
+            original_data_with_idx = node.data.with_row_index("document_idx")
+
+            # Perform left join: original data + concordance columns
+            joined_data = original_data_with_idx.join(
+                concordance_with_idx.select(
+                    [
+                        "document_idx",
+                        "left_context",
+                        "matched_text",
+                        "right_context",
+                        "l1",
+                        "r1",
+                        "l1_freq",
+                        "r1_freq",
+                    ]
+                ),
+                on="document_idx",
+                how="left",
+            )
+
+            # Remove the document_idx column as it's no longer needed
+            final_data = joined_data.drop("document_idx")
+
+            # Generate new node name if not provided
+            if request.new_node_name:
+                new_node_name = request.new_node_name
+            else:
+                original_name = (
+                    node.name if hasattr(node, "name") and node.name else node_id
+                )
+                new_node_name = f"{original_name}_conc_{request.search_word}"
+
+            # Create new node with joined data
+            new_node = workspace_manager.add_node_to_workspace(
+                user_id=user_id,
+                workspace_id=workspace_id,
+                data=final_data,
+                node_name=new_node_name,
+            )
+
+            return {
+                "success": True,
+                "message": f"Successfully created detached concordance node '{new_node_name}' with {len(final_data)} rows",
+                "new_node_id": new_node.id,
+                "new_node_name": new_node_name,
+                "total_rows": len(final_data),
+                "concordance_matches": len(concordance_result),
+            }
+
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail="This node does not support text analysis (DocFrame text namespace not available)",
+            )
+
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        print(f"❌ Error in detach concordance: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error detaching concordance results: {str(e)}"
         )

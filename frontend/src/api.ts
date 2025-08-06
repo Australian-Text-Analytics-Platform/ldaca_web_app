@@ -596,6 +596,26 @@ export interface MultiNodeConcordanceResponse {
   }>;
 }
 
+export interface ConcordanceDetachRequest {
+  node_id: string;
+  column: string;
+  search_word: string;
+  num_left_tokens?: number;
+  num_right_tokens?: number;
+  regex?: boolean;
+  case_sensitive?: boolean;
+  new_node_name?: string;
+}
+
+export interface ConcordanceDetachResponse {
+  success: boolean;
+  message: string;
+  new_node_id: string;
+  new_node_name: string;
+  total_rows: number;
+  concordance_matches: number;
+}
+
 export interface FrequencyAnalysisRequest {
   time_column: string;
   group_by_columns?: string[] | null;
@@ -645,6 +665,22 @@ export async function getConcordanceDetail(
     `${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}/concordance/${documentIdx}`,
     {
       params: { text_column: textColumn },
+      headers: authHeaders
+    }
+  );
+  return res.data;
+}
+
+export async function detachConcordance(
+  workspaceId: string,
+  nodeId: string,
+  request: ConcordanceDetachRequest,
+  authHeaders: Record<string, string> = {}
+): Promise<ConcordanceDetachResponse> {
+  const res = await axios.post(
+    `${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}/concordance/detach`,
+    request,
+    {
       headers: authHeaders
     }
   );

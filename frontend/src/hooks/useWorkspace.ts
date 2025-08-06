@@ -18,7 +18,9 @@ import {
   filterNode,
   FilterRequest,
   concordanceSearch,
+  detachConcordance,
   ConcordanceRequest,
+  ConcordanceDetachRequest,
   setCurrentWorkspace as apiSetCurrentWorkspace,
   createWorkspace as apiCreateWorkspace,
   deleteWorkspace as apiDeleteWorkspace,
@@ -360,6 +362,28 @@ export const useWorkspace = () => {
     },
   });
 
+  const detachConcordanceMutation = useMutation({
+    mutationFn: ({ workspaceId, nodeId, request }: {
+      workspaceId: string;
+      nodeId: string;
+      request: ConcordanceDetachRequest;
+    }) => {
+      return detachConcordance(workspaceId, nodeId, request, authHeaders);
+    },
+    onMutate: () => {
+      startOperation('detachConcordance');
+    },
+    onSuccess: () => {
+      // Invalidate the workspace graph to refresh the nodes
+      queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId!) });
+      endOperation('detachConcordance');
+    },
+    onError: (error: any) => {
+      setOperationError('detachConcordance', error.message);
+      endOperation('detachConcordance');
+    },
+  });
+
   const castNodeMutation = useMutation({
     mutationFn: ({ nodeId, column, targetType, format }: {
       nodeId: string;
@@ -450,6 +474,11 @@ export const useWorkspace = () => {
       if (!currentWorkspaceId) return Promise.reject(new Error('No workspace selected'));
       return concordanceMutation.mutateAsync({ workspaceId: currentWorkspaceId, nodeId, request });
     },
+
+    detachConcordance: (nodeId: string, request: ConcordanceDetachRequest) => {
+      if (!currentWorkspaceId) return Promise.reject(new Error('No workspace selected'));
+      return detachConcordanceMutation.mutateAsync({ workspaceId: currentWorkspaceId, nodeId, request });
+    },
     
     refreshNodeSchema: async (nodeId: string): Promise<NodeSchemaResponse | null> => {
       if (!currentWorkspaceId) return null;
@@ -495,6 +524,7 @@ export const useWorkspace = () => {
     joinNodesMutation,
     filterNodeMutation,
     concordanceMutation,
+    detachConcordanceMutation,
     castNodeMutation,
     getNodeShapeStable,
     currentWorkspaceId,

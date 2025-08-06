@@ -17,7 +17,8 @@ const ConcordanceTab: React.FC = () => {
   const { 
     selectedNodes,
     isLoading,
-    currentWorkspaceId
+    currentWorkspaceId,
+    detachConcordance
   } = useWorkspace();
 
   const { getAuthHeaders } = useAuth();
@@ -41,6 +42,9 @@ const ConcordanceTab: React.FC = () => {
   
   // Individual node loading states for pagination/sorting (separate from main search)
   const [nodeLoading, setNodeLoading] = useState<Record<string, boolean>>({});
+  
+  // Individual node detaching states
+  const [nodeDetaching, setNodeDetaching] = useState<Record<string, boolean>>({});
   
   // Global page size setting
   const [globalPageSize, setGlobalPageSize] = useState(20);
@@ -455,6 +459,44 @@ const ConcordanceTab: React.FC = () => {
     }
   };
 
+  const handleDetach = async (nodeId: string, column: string) => {
+    if (!currentWorkspaceId || !searchWord.trim()) {
+      return;
+    }
+
+    const node = selectedNodes.find(n => n.id === nodeId);
+    if (!node) {
+      return;
+    }
+
+    setNodeDetaching(prev => ({ ...prev, [nodeId]: true }));
+    
+    try {
+      const request = {
+        node_id: nodeId,
+        column: column,
+        search_word: searchWord.trim(),
+        num_left_tokens: numLeftTokens,
+        num_right_tokens: numRightTokens,
+        regex: regex,
+        case_sensitive: caseSensitive,
+        new_node_name: undefined // Let backend generate the name
+      };
+
+      await detachConcordance(nodeId, request);
+      
+      // The workspace will automatically refresh and show the new node
+      // No need for additional notifications
+      
+    } catch (error) {
+      console.error('Error detaching concordance:', error);
+      // Only show error messages, not success messages
+      alert(`Error detaching concordance: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setNodeDetaching(prev => ({ ...prev, [nodeId]: false }));
+    }
+  };
+
   const SortableHeader: React.FC<{ columnKey: string; label: string; nodeId: string }> = ({ columnKey, label, nodeId }) => {
     const nodeState = nodePagination[nodeId] || { sortBy: '', sortOrder: 'asc' as 'asc' | 'desc' };
     const isSorted = nodeState.sortBy === columnKey;
@@ -567,6 +609,44 @@ const ConcordanceTab: React.FC = () => {
               className="px-3 py-1 border border-gray-300 rounded text-sm disabled:bg-gray-100 disabled:text-gray-400 hover:bg-gray-50"
             >
               Next
+            </button>
+
+            {/* Detach button */}
+            <button
+              onClick={() => handleDetach(nodeId, column)}
+              disabled={nodeLoading[nodeId] || nodeDetaching[nodeId] || !searchWord.trim()}
+              className="px-3 py-1 bg-green-600 text-white rounded text-sm disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-green-700 transition-colors ml-2"
+              title="Create a new node with concordance results joined to the original table"
+            >
+              {nodeDetaching[nodeId] ? (
+                <span className="flex items-center">
+                  <div className="inline-block animate-spin rounded-full h-3 w-3 border-b border-white mr-2"></div>
+                  Detaching...
+                </span>
+              ) : (
+                'Detach'
+              )}
+            </button>
+          </div>
+        )}
+
+        {/* Pagination controls when only one page OR detach button for nodes without pagination */}
+        {(!nodeData.pagination || nodeData.pagination.total_pages <= 1) && searchWord.trim() && (
+          <div className="mt-4 flex justify-center">
+            <button
+              onClick={() => handleDetach(nodeId, column)}
+              disabled={nodeLoading[nodeId] || nodeDetaching[nodeId]}
+              className="px-4 py-2 bg-green-600 text-white rounded text-sm disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-green-700 transition-colors"
+              title="Create a new node with concordance results joined to the original table"
+            >
+              {nodeDetaching[nodeId] ? (
+                <span className="flex items-center">
+                  <div className="inline-block animate-spin rounded-full h-3 w-3 border-b border-white mr-2"></div>
+                  Detaching...
+                </span>
+              ) : (
+                'Detach Concordance'
+              )}
             </button>
           </div>
         )}

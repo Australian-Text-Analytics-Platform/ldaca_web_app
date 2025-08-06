@@ -289,6 +289,17 @@ class MultiNodeConcordanceRequest(BaseModel):
     sort_order: str = "asc"  # "asc" or "desc"
 
 
+class ConcordanceDetachRequest(BaseModel):
+    node_id: str
+    column: str
+    search_word: str
+    num_left_tokens: int = 10
+    num_right_tokens: int = 10
+    regex: bool = False
+    case_sensitive: bool = False
+    new_node_name: Optional[str] = None  # If not provided, will be auto-generated
+
+
 class FrequencyAnalysisRequest(BaseModel):
     time_column: str
     group_by_columns: Optional[List[str]] = None
