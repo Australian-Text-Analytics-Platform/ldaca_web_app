@@ -7,6 +7,8 @@ import {
   calculateTokenFrequencies,
   getDefaultStopWords
 } from '../api';
+import { Wordcloud } from '@visx/wordcloud';
+import { Text } from '@visx/text';
 
 interface NodeColumnSelection {
   nodeId: string;
@@ -177,6 +179,50 @@ const TokenFrequencyTab: React.FC = () => {
     }
   };
 
+  const renderWordCloud = (data: any[], width: number = 400, height: number = 200) => {
+    // Transform data for word cloud format
+    const words = data.map(item => ({
+      text: item.token,
+      value: item.frequency
+    }));
+
+    const fontScale = (datum: any) => Math.max(12, Math.min(48, datum.value / Math.max(...data.map(d => d.frequency)) * 36 + 12));
+    const fontSizeSetter = (datum: any) => fontScale(datum);
+
+    return (
+      <div className="flex justify-center mb-4">
+        <svg width={width} height={height}>
+          <Wordcloud
+            words={words}
+            width={width}
+            height={height}
+            fontSize={fontSizeSetter}
+            font="Segoe UI, Roboto, sans-serif"
+            padding={2}
+            spiral="archimedean"
+            rotate={0}
+            random={() => 0.5}
+          >
+            {(cloudWords) =>
+              cloudWords.map((w, i) => (
+                <Text
+                  key={w.text}
+                  fill="#3b82f6"
+                  textAnchor="middle"
+                  transform={`translate(${w.x}, ${w.y})`}
+                  fontSize={w.size}
+                  fontFamily={w.font}
+                >
+                  {w.text}
+                </Text>
+              ))
+            }
+          </Wordcloud>
+        </svg>
+      </div>
+    );
+  };
+
   const renderChart = (nodeName: string, data: any[]) => {
     // Find max frequency for bar width calculation
     const maxFreq = Math.max(...data.map(item => item.frequency));
@@ -186,6 +232,10 @@ const TokenFrequencyTab: React.FC = () => {
         <div className="h-16 mb-4 flex items-center">
           <h3 className="text-lg font-semibold text-gray-800 break-words leading-tight w-full">{nodeName}</h3>
         </div>
+        
+        {/* Word Cloud */}
+        {renderWordCloud(data)}
+        
         <div className="bg-white p-4 rounded-lg border">
           <div className="space-y-2">
             {data.map((item, index) => (

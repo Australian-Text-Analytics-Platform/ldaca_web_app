@@ -15,6 +15,8 @@
     "@types/node": "^24.0.8",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
+    "@visx/text": "^3.12.0",
+    "@visx/wordcloud": "^3.12.0",
     "@xyflow/react": "^12.8.1",
     "axios": "^1.10.0",
     "create-react-app": "^5.1.0",
