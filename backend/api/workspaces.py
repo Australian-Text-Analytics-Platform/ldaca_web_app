@@ -22,6 +22,9 @@ from models import (
     FilterRequest,
     FrequencyAnalysisRequest,
     SliceRequest,
+    TokenFrequencyData,
+    TokenFrequencyRequest,
+    TokenFrequencyResponse,
     WorkspaceCreateRequest,
     WorkspaceInfo,
 )
@@ -1264,4 +1267,218 @@ async def cast_node(
         raise HTTPException(
             status_code=500,
             detail=f"Unexpected error during casting operation: {str(e)}",
+        )
+
+
+# ============================================================================
+# TOKEN FREQUENCY ANALYSIS
+# ============================================================================
+
+
+@router.post(
+    "/{workspace_id}/token-frequencies",
+    response_model=TokenFrequencyResponse,
+    summary="Calculate token frequencies for selected nodes",
+    description="Calculate and compare token frequencies across one or two nodes using the docframe library",
+)
+async def calculate_token_frequencies(
+    workspace_id: str,
+    request: TokenFrequencyRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Calculate token frequencies for the specified nodes.
+
+    Returns frequency data for each node that can be displayed as horizontal bar charts.
+    """
+    try:
+        user_id = current_user["id"]
+
+        # Validate input
+        if not request.node_ids:
+            raise HTTPException(
+                status_code=400, detail="At least one node ID must be provided"
+            )
+
+        if len(request.node_ids) > 2:
+            raise HTTPException(
+                status_code=400, detail="Maximum of 2 nodes can be compared"
+            )
+
+        # Validate that node_columns are provided for all nodes (unless auto-detectable)
+        if not request.node_columns:
+            request.node_columns = {}
+
+        # Get workspace
+        workspace = workspace_manager.get_workspace(user_id, workspace_id)
+        if not workspace:
+            raise HTTPException(
+                status_code=404, detail=f"Workspace {workspace_id} not found"
+            )
+
+        # Import required classes
+        try:
+            import polars as pl
+
+            from docframe import DocDataFrame, DocLazyFrame
+        except ImportError as e:
+            raise HTTPException(
+                status_code=500, detail=f"Required libraries not available: {str(e)}"
+            )
+
+        # Get nodes and validate they exist, create frames with selected columns
+        frames_dict = {}
+
+        for node_id in request.node_ids:
+            node = workspace_manager.get_node_from_workspace(
+                user_id, workspace_id, node_id
+            )
+            if not node:
+                raise HTTPException(status_code=404, detail=f"Node {node_id} not found")
+
+            # Get the node's data
+            node_data = node.data if hasattr(node, "data") else node
+            node_name = node.name if hasattr(node, "name") and node.name else node_id
+
+            try:
+                # Determine what type of data we're working with
+                is_doc_frame = isinstance(node_data, (DocDataFrame, DocLazyFrame))
+                is_lazy = isinstance(node_data, (DocLazyFrame, pl.LazyFrame))
+
+                # Get available columns
+                if hasattr(node_data, "columns"):
+                    # For DataFrames and DocDataFrames
+                    available_columns = node_data.columns
+                elif hasattr(node_data, "collect_schema"):
+                    # For LazyFrames and DocLazyFrames - use efficient schema access
+                    available_columns = list(node_data.collect_schema().keys())
+                elif hasattr(node_data, "schema"):
+                    # Fallback for other types with schema
+                    available_columns = list(node_data.schema.keys())
+                else:
+                    available_columns = []
+
+                # Determine the column to use
+                column_name = request.node_columns.get(node_id)
+
+                if not column_name:
+                    if is_doc_frame:
+                        # Try to auto-detect document column for DocDataFrame/DocLazyFrame
+                        if (
+                            hasattr(node_data, "document_column")
+                            and node_data.document_column
+                        ):
+                            column_name = node_data.document_column
+                        else:
+                            # Look for common text column names
+                            text_columns = [
+                                "document",
+                                "text",
+                                "content",
+                                "body",
+                                "message",
+                            ]
+                            for col in text_columns:
+                                if col in available_columns:
+                                    column_name = col
+                                    break
+
+                            if not column_name:
+                                raise HTTPException(
+                                    status_code=400,
+                                    detail=f"Could not auto-detect text column for DocFrame node {node_id}. Available columns: {available_columns}. Please specify a column name.",
+                                )
+                    else:
+                        # For regular DataFrames/LazyFrames, column must be specified
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"Column specification required for node {node_id}. Available columns: {available_columns}",
+                        )
+
+                # Validate that the column exists
+                if column_name not in available_columns:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Column '{column_name}' not found in node {node_id}. Available columns: {available_columns}",
+                    )
+
+                # Create the processed frame
+                if is_doc_frame:
+                    # For DocDataFrame/DocLazyFrame, we can use them directly
+                    if column_name == "document":
+                        # Already has the right column name
+                        processed_frame = node_data
+                    else:
+                        # Select and rename the column to 'document'
+                        processed_frame = node_data.select(column_name).rename(
+                            {column_name: "document"}
+                        )
+                else:
+                    # For regular DataFrame/LazyFrame, convert to DocDataFrame/DocLazyFrame
+                    selected_data = node_data.select(column_name).rename(
+                        {column_name: "document"}
+                    )
+
+                    if is_lazy:
+                        # Convert LazyFrame to DocLazyFrame
+                        processed_frame = DocLazyFrame(selected_data)
+                    else:
+                        # Convert DataFrame to DocDataFrame
+                        if hasattr(selected_data, "collect"):
+                            # It's a LazyFrame, collect it first
+                            selected_data = selected_data.collect()
+                        processed_frame = DocDataFrame(selected_data)
+
+                frames_dict[node_name] = processed_frame
+
+            except HTTPException:
+                # Re-raise HTTP exceptions
+                raise
+            except Exception as e:
+                raise HTTPException(
+                    status_code=500, detail=f"Error processing node {node_id}: {str(e)}"
+                )
+
+        # Import the token frequency calculation function
+        try:
+            from docframe.core.text_utils import compute_token_frequencies
+        except ImportError:
+            raise HTTPException(
+                status_code=500,
+                detail="docframe library not available for token frequency calculation",
+            )
+
+        # Calculate token frequencies
+        frequency_results = compute_token_frequencies(
+            frames=frames_dict, stop_words=request.stop_words
+        )
+
+        # Convert to response format and apply limit
+        response_data = {}
+        for frame_name, freq_dict in frequency_results.items():
+            # Sort by frequency (descending) and apply limit
+            sorted_tokens = sorted(freq_dict.items(), key=lambda x: x[1], reverse=True)
+            if request.limit:
+                sorted_tokens = sorted_tokens[: request.limit]
+
+            # Convert to TokenFrequencyData objects
+            response_data[frame_name] = [
+                TokenFrequencyData(token=token, frequency=freq)
+                for token, freq in sorted_tokens
+                if freq > 0  # Only include tokens that actually appear
+            ]
+
+        return TokenFrequencyResponse(
+            success=True,
+            message=f"Successfully calculated token frequencies for {len(frames_dict)} node(s)",
+            data=response_data,
+        )
+
+    except HTTPException:
+        # Re-raise HTTP exceptions (they already have proper error messages)
+        raise
+    except Exception as e:
+        # Handle unexpected errors
+        raise HTTPException(
+            status_code=500, detail=f"Error calculating token frequencies: {str(e)}"
         )

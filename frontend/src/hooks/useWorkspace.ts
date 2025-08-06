@@ -127,11 +127,14 @@ export const useWorkspace = () => {
   // Get graph data first
   const workspaceGraph = graphQuery.data || null;
   
-  // Then compute dependent values
-  const nodes = workspaceGraph?.nodes || [];
+    // Then compute dependent values
+  const nodes = useMemo(() => workspaceGraph?.nodes || [], [workspaceGraph?.nodes]);
   const selectedNode = nodes.find((n: any) => n.id === selectedNodeId) || null;
   // Preserve selection order by mapping selectedNodeIds to their corresponding nodes
-  const selectedNodes = selectedNodeIds.map(id => nodes.find((n: any) => n.id === id)).filter(Boolean);
+  // Memoize selectedNodes to prevent infinite re-renders
+  const selectedNodes = useMemo(() => {
+    return selectedNodeIds.map(id => nodes.find((n: any) => n.id === id)).filter(Boolean);
+  }, [selectedNodeIds, nodes]);
   const nodeData = nodeDataQuery.data || { data: [], page: 0, total_pages: 0 };
 
   // Consolidated loading state

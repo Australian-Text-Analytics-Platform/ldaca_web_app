@@ -9,6 +9,7 @@ from contextlib import asynccontextmanager
 from api.admin import router as admin_router
 from api.auth import router as auth_router
 from api.files import router as files_router
+from api.text import router as text_router
 from api.users import router as users_router
 from api.workspaces import router as workspaces_router
 from config import settings
@@ -74,6 +75,7 @@ app.add_middleware(
 # Include API routers with /api prefix
 app.include_router(auth_router, prefix="/api", tags=["authentication"])
 app.include_router(files_router, prefix="/api", tags=["file_management"])
+app.include_router(text_router, prefix="/api", tags=["text_analysis"])
 app.include_router(workspaces_router, prefix="/api", tags=["workspace_management"])
 app.include_router(users_router, prefix="/api", tags=["user_management"])
 app.include_router(admin_router, prefix="/api", tags=["administration"])

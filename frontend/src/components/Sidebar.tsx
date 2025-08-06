@@ -2,8 +2,8 @@ import React from 'react';
 import { useWorkspace } from '../hooks/useWorkspace';
 
 interface SidebarProps {
-  activeTab: 'data-loader' | 'filter' | 'concordance' | 'analysis' | 'export';
-  onTabChange: (tab: 'data-loader' | 'filter' | 'concordance' | 'analysis' | 'export') => void;
+  activeTab: 'data-loader' | 'filter' | 'token-frequency' | 'concordance' | 'analysis' | 'export';
+  onTabChange: (tab: 'data-loader' | 'filter' | 'token-frequency' | 'concordance' | 'analysis' | 'export') => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
@@ -41,6 +41,16 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
           }`}
         >
           🔍 Filter/Slicing
+        </button>
+        <button
+          onClick={() => onTabChange('token-frequency')}
+          className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${
+            activeTab === 'token-frequency'
+              ? 'bg-blue-100 text-blue-700 font-medium'
+              : 'text-gray-600 hover:bg-gray-100'
+          }`}
+        >
+          📈 Token Frequency
         </button>
         <button
           onClick={() => onTabChange('concordance')}

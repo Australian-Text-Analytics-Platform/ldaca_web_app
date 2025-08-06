@@ -616,3 +616,50 @@ export async function frequencyAnalysis(
   );
   return res.data;
 }
+
+// Token Frequency Analysis Types and API
+
+export interface TokenFrequencyRequest {
+  node_ids: string[];
+  node_columns: Record<string, string>; // Maps node_id -> column_name
+  stop_words?: string[] | null;
+  limit?: number;
+}
+
+export interface TokenFrequencyData {
+  token: string;
+  frequency: number;
+}
+
+export interface TokenFrequencyResponse {
+  success: boolean;
+  message: string;
+  data?: Record<string, TokenFrequencyData[]> | null; // Maps node_name -> frequency data
+}
+
+export async function calculateTokenFrequencies(
+  workspaceId: string,
+  request: TokenFrequencyRequest,
+  authHeaders: Record<string, string> = {}
+): Promise<TokenFrequencyResponse> {
+  const res = await axios.post(
+    `${API_BASE}/workspaces/${workspaceId}/token-frequencies`,
+    request,
+    {
+      headers: authHeaders
+    }
+  );
+  return res.data;
+}
+
+export async function getDefaultStopWords(
+  authHeaders: Record<string, string> = {}
+): Promise<{ success: boolean; message: string; data: string[] }> {
+  const res = await axios.get(
+    `${API_BASE}/text/default-stop-words`,
+    {
+      headers: authHeaders
+    }
+  );
+  return res.data;
+}

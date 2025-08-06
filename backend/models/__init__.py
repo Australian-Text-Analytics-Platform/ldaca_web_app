@@ -388,3 +388,40 @@ class SliceRequest(BaseModel):
     end_row: Optional[int] = None
     columns: Optional[List[str]] = None
     new_node_name: Optional[str] = None
+
+
+# =============================================================================
+# TOKEN FREQUENCY MODELS
+# =============================================================================
+
+
+class TokenFrequencyRequest(BaseModel):
+    node_ids: List[str]  # 1 or 2 node IDs
+    node_columns: Optional[Dict[str, str]] = (
+        None  # Maps node_id -> column_name (optional for auto-detection)
+    )
+    stop_words: Optional[List[str]] = None
+    limit: Optional[int] = 50  # Limit number of tokens to display
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "node_ids": ["node1", "node2"],
+                "node_columns": {"node1": "text_column", "node2": "content_column"},
+                "stop_words": ["the", "and", "or"],
+                "limit": 50,
+            }
+        }
+
+
+class TokenFrequencyData(BaseModel):
+    token: str
+    frequency: int
+
+
+class TokenFrequencyResponse(BaseModel):
+    success: bool
+    message: str
+    data: Optional[Dict[str, List[TokenFrequencyData]]] = (
+        None  # Maps node_name -> frequency data
+    )
