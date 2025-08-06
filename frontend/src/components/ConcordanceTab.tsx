@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useWorkspace } from '../hooks/useWorkspace';
 import { useAuth } from '../hooks/useAuth';
 import { 
@@ -49,6 +49,9 @@ const ConcordanceTab: React.FC = () => {
   const [selectedDetail, setSelectedDetail] = useState<any>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  
+  // State for auto-triggering search from TokenFrequencyTab
+  const [shouldAutoSearch, setShouldAutoSearch] = useState(false);
 
   // Debug results changes
   useEffect(() => {
@@ -68,6 +71,46 @@ const ConcordanceTab: React.FC = () => {
   useEffect(() => {
     setResults(null);
   }, [selectedNodeIds]);
+
+  // Check for pending concordance search from TokenFrequencyTab
+  useEffect(() => {
+    const pendingSearch = localStorage.getItem('pendingConcordanceSearch');
+    if (pendingSearch) {
+      try {
+        const params = JSON.parse(pendingSearch);
+        console.log('Found pending concordance search:', params);
+        
+        // Set the search word
+        setSearchWord(params.searchWord);
+        
+        // Set node column selections if they match current selected nodes
+        if (params.nodeColumnSelections && params.selectedNodes) {
+          const matchingSelections = params.nodeColumnSelections.filter((sel: any) =>
+            selectedNodes.some((node: any) => node.id === sel.nodeId)
+          );
+          if (matchingSelections.length > 0) {
+            setNodeColumnSelections(matchingSelections);
+          }
+        }
+        
+        // Clear the pending search
+        localStorage.removeItem('pendingConcordanceSearch');
+        
+        // Auto-trigger search after a brief delay to ensure state is set
+        setTimeout(() => {
+          if (params.searchWord && selectedNodes.length > 0) {
+            console.log('Auto-triggering concordance search for:', params.searchWord);
+            // Trigger auto search
+            setShouldAutoSearch(true);
+          }
+        }, 500);
+        
+      } catch (error) {
+        console.error('Error parsing pending concordance search:', error);
+        localStorage.removeItem('pendingConcordanceSearch');
+      }
+    }
+  }, [selectedNodes]); // Re-run when selectedNodes changes
 
   // Memoize the getNodeColumns function to prevent re-renders
   const getNodeColumns = useMemo(() => {
@@ -132,13 +175,13 @@ const ConcordanceTab: React.FC = () => {
     );
   };
 
-  const handleSearch = async (resetPage = true, targetNodeId?: string) => {
+  const handleSearch = useCallback(async (resetPage = true, targetNodeId?: string) => {
     if (!currentWorkspaceId || selectedNodes.length === 0) {
       return;
     }
 
     if (!searchWord.trim()) {
-      alert('Please enter a search word or phrase');
+      alert('Please enter a search word.');
       return;
     }
 
@@ -149,7 +192,7 @@ const ConcordanceTab: React.FC = () => {
       return;
     }
 
-    // Initialize pagination for new nodes if not exists
+    // Reset or update pagination
     const updatedPagination = { ...nodePagination };
     selectedNodes.forEach(node => {
       const nodeId = node.id;
@@ -212,7 +255,16 @@ const ConcordanceTab: React.FC = () => {
     } finally {
       setIsSearching(false);
     }
-  };
+  }, [currentWorkspaceId, selectedNodes, searchWord, nodeColumnSelections, nodePagination, globalPageSize, numLeftTokens, numRightTokens, regex, caseSensitive, getAuthHeaders]);
+
+  // Effect to handle auto-search trigger from TokenFrequencyTab
+  useEffect(() => {
+    if (shouldAutoSearch && searchWord.trim() && selectedNodes.length > 0) {
+      console.log('Executing auto-search for:', searchWord);
+      handleSearch(true);
+      setShouldAutoSearch(false); // Reset the flag
+    }
+  }, [shouldAutoSearch, searchWord, selectedNodes, handleSearch]);
 
   const handleClearResults = () => {
     setResults(null);

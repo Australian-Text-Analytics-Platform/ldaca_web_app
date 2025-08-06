@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './App.css';
 import { useAuth } from './hooks/useAuth';
 import { QueryProvider } from './providers/QueryProvider';
@@ -18,6 +18,20 @@ import Sidebar from './components/Sidebar';
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'data-loader' | 'filter' | 'token-frequency' | 'concordance' | 'analysis' | 'export'>('data-loader');
   const { user, loginWithGoogle, logout, isAuthenticated, isMultiUserMode, isLoading, error } = useAuth();
+
+  // Listen for navigation events from TokenFrequencyTab
+  useEffect(() => {
+    const handleNavigateToConcordance = (event: CustomEvent) => {
+      console.log('Navigating to concordance with token:', event.detail.token);
+      setActiveTab('concordance');
+    };
+
+    window.addEventListener('navigateToConcordance', handleNavigateToConcordance as EventListener);
+
+    return () => {
+      window.removeEventListener('navigateToConcordance', handleNavigateToConcordance as EventListener);
+    };
+  }, []);
 
   // Show loading state while checking auth
   if (isLoading) {

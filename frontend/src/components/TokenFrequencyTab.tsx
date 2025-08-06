@@ -179,6 +179,30 @@ const TokenFrequencyTab: React.FC = () => {
     }
   };
 
+  const handleTokenClick = (token: string) => {
+    // Store concordance search parameters in localStorage for cross-tab communication
+    const concordanceParams = {
+      searchWord: token,
+      nodeColumnSelections: nodeColumnSelections,
+      selectedNodes: selectedNodes.map(node => ({
+        id: node.id,
+        name: node.data?.name || node.id
+      })),
+      timestamp: Date.now()
+    };
+    
+    localStorage.setItem('pendingConcordanceSearch', JSON.stringify(concordanceParams));
+    
+    // Navigate to concordance tab by dispatching a custom event
+    // The App component will need to listen for this event
+    window.dispatchEvent(new CustomEvent('navigateToConcordance', { 
+      detail: { token } 
+    }));
+    
+    // Also show a temporary notification
+    console.log(`Navigating to concordance with token: "${token}"`);
+  };
+
   const renderWordCloud = (data: any[], width: number = 400, height: number = 200) => {
     // Transform data for word cloud format
     const words = data.map(item => ({
@@ -212,8 +236,11 @@ const TokenFrequencyTab: React.FC = () => {
                   transform={`translate(${w.x}, ${w.y})`}
                   fontSize={w.size}
                   fontFamily={w.font}
+                  className="cursor-pointer hover:fill-blue-800 transition-colors"
+                  onClick={() => w.text && handleTokenClick(w.text)}
+                  style={{ cursor: 'pointer' }}
                 >
-                  {w.text}
+                  {w.text || ''}
                 </Text>
               ))
             }
@@ -240,8 +267,12 @@ const TokenFrequencyTab: React.FC = () => {
           <div className="space-y-2">
             {data.map((item, index) => (
               <div key={index} className="flex items-center space-x-3">
-                {/* Token label */}
-                <div className="w-20 text-right text-sm text-gray-700 font-medium">
+                {/* Token label - now clickable */}
+                <div 
+                  className="w-20 text-right text-sm text-gray-700 font-medium cursor-pointer hover:bg-blue-100 hover:text-blue-700 px-2 py-1 rounded-md transition-colors"
+                  onClick={() => handleTokenClick(item.token)}
+                  title={`Click to search "${item.token}" in concordance`}
+                >
                   {item.token}
                 </div>
                 
@@ -405,7 +436,18 @@ const TokenFrequencyTab: React.FC = () => {
           {results.success ? (
             <div>
               <h3 className="text-lg font-semibold text-gray-800 mb-4">Results</h3>
-              <div className="text-sm text-gray-600 mb-6">{results.message}</div>
+              <div className="text-sm text-gray-600 mb-4">{results.message}</div>
+              
+              {/* Instructions for clickable tokens */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-6">
+                <div className="flex items-start">
+                  <div className="text-blue-600 mr-2">💡</div>
+                  <div className="text-sm text-blue-800">
+                    <strong>Tip:</strong> Click on any token below to automatically search for it in the concordance tab. 
+                    This will switch to the concordance view and perform a search using the same node selections.
+                  </div>
+                </div>
+              </div>
               
               {results.data ? (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
