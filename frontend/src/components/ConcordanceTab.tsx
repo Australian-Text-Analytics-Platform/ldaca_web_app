@@ -878,7 +878,7 @@ const ConcordanceTab: React.FC = () => {
               <div className="text-sm text-gray-600 mb-6">{results.message}</div>
               
               {results.data && Object.keys(results.data).length > 0 ? (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className={`grid gap-6 ${Object.keys(results.data).length === 1 ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-2'}`}>
                   {Object.entries(results.data).map(([nodeName, nodeData]) => {
                     // Find the corresponding node and column for detail view
                     // Try multiple ways to match the node
