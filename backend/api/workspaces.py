@@ -1619,9 +1619,14 @@ async def calculate_token_frequencies(
                 if freq > 0  # Only include tokens that actually appear
             ]
 
-        # Convert statistics DataFrame to response format (if available)
+        # Convert statistics DataFrame to response format (if available and we have 2 nodes)
         statistics_data = None
-        if stats_df is not None and not stats_df.is_empty():
+        if (
+            len(request.node_ids) == 2
+            and stats_df is not None
+            and not stats_df.is_empty()
+        ):
+            # Only process statistics when comparing exactly 2 nodes
             # Convert Polars DataFrame to list of TokenStatisticsData
             statistics_data = []
             for row in stats_df.iter_rows(named=True):
