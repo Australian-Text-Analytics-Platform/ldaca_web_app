@@ -4,6 +4,7 @@ import { useAuth } from '../hooks/useAuth';
 import { 
   TokenFrequencyRequest, 
   TokenFrequencyResponse, 
+  TokenStatisticsData,
   calculateTokenFrequencies,
   getDefaultStopWords
 } from '../api';
@@ -450,9 +451,148 @@ const TokenFrequencyTab: React.FC = () => {
               </div>
               
               {results.data ? (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {Object.entries(results.data).map(([nodeName, frequencies]) => 
-                    renderChart(nodeName, frequencies)
+                <div>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                    {Object.entries(results.data).map(([nodeName, frequencies]) => 
+                      renderChart(nodeName, frequencies)
+                    )}
+                  </div>
+                  
+                  {/* Statistical Measures Table */}
+                  {results.statistics && results.statistics.length > 0 && (
+                    <div className="mt-8">
+                      <h3 className="text-lg font-semibold text-gray-800 mb-4">Statistical Measures</h3>
+                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4">
+                        <div className="text-sm text-gray-700">
+                          <strong>Statistical Analysis Key:</strong>
+                          <br />
+                          <strong>O1/O2:</strong> Observed frequencies in each dataset &nbsp;&nbsp;
+                          <strong>%1/%2:</strong> Percentage of total tokens in each dataset
+                          <br />
+                          <strong>LL:</strong> Log Likelihood G2 statistic (higher = more significant difference) &nbsp;&nbsp;
+                          <strong>%DIFF:</strong> Percentage point difference between datasets
+                          <br />
+                          <strong>Bayes:</strong> Bayes Factor (BIC) &nbsp;&nbsp;
+                          <strong>ELL:</strong> Effect Size for Log Likelihood &nbsp;&nbsp;
+                          <strong>RRisk:</strong> Relative Risk ratio
+                          <br />
+                          <strong>LogRatio:</strong> Log of relative frequencies &nbsp;&nbsp;
+                          <strong>OddsRatio:</strong> Odds ratio between datasets
+                          <br />
+                          <strong>Significance:</strong> **** p&lt;0.0001, *** p&lt;0.001, ** p&lt;0.01, * p&lt;0.05
+                        </div>
+                      </div>
+                      
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full bg-white border border-gray-200 rounded-lg">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100" onClick={() => handleTokenClick(results.statistics?.[0]?.token || '')}>
+                                Token
+                              </th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                O1
+                              </th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                %1
+                              </th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                O2
+                              </th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                %2
+                              </th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                LL
+                              </th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                %DIFF
+                              </th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Bayes
+                              </th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                ELL
+                              </th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                RRisk
+                              </th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                LogRatio
+                              </th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                OddsRatio
+                              </th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Significance
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {results.statistics
+                              .filter(stat => stat.log_likelihood_llv > 0) // Only show tokens with actual differences
+                              .sort((a, b) => b.log_likelihood_llv - a.log_likelihood_llv) // Sort by log likelihood descending
+                              .map((stat, index) => (
+                              <tr key={stat.token} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                                <td className="px-3 py-2 text-sm font-medium text-blue-600 cursor-pointer hover:text-blue-800 hover:bg-blue-50" onClick={() => handleTokenClick(stat.token)}>
+                                  {stat.token}
+                                </td>
+                                <td className="px-3 py-2 text-sm text-gray-900 font-mono text-center">
+                                  {stat.freq_corpus_0}
+                                </td>
+                                <td className="px-3 py-2 text-sm text-gray-900 font-mono text-center">
+                                  {stat.percent_corpus_0.toFixed(2)}%
+                                </td>
+                                <td className="px-3 py-2 text-sm text-gray-900 font-mono text-center">
+                                  {stat.freq_corpus_1}
+                                </td>
+                                <td className="px-3 py-2 text-sm text-gray-900 font-mono text-center">
+                                  {stat.percent_corpus_1.toFixed(2)}%
+                                </td>
+                                <td className="px-3 py-2 text-sm text-gray-900 font-mono text-center">
+                                  {stat.log_likelihood_llv.toFixed(2)}
+                                </td>
+                                <td className="px-3 py-2 text-sm text-gray-900 font-mono text-center">
+                                  {(stat.percent_diff * 100).toFixed(2)}%
+                                </td>
+                                <td className="px-3 py-2 text-sm text-gray-900 font-mono text-center">
+                                  {stat.bayes_factor_bic.toFixed(2)}
+                                </td>
+                                <td className="px-3 py-2 text-sm text-gray-900 font-mono text-center">
+                                  {stat.effect_size_ell !== null ? stat.effect_size_ell.toFixed(4) : 'N/A'}
+                                </td>
+                                <td className="px-3 py-2 text-sm text-gray-900 font-mono text-center">
+                                  {stat.relative_risk !== null ? stat.relative_risk.toFixed(2) : '∞'}
+                                </td>
+                                <td className="px-3 py-2 text-sm text-gray-900 font-mono text-center">
+                                  {stat.log_ratio !== null ? stat.log_ratio.toFixed(4) : 'N/A'}
+                                </td>
+                                <td className="px-3 py-2 text-sm text-gray-900 font-mono text-center">
+                                  {stat.odds_ratio !== null ? stat.odds_ratio.toFixed(2) : '∞'}
+                                </td>
+                                <td className="px-3 py-2 text-sm text-center">
+                                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                    stat.significance === '****' ? 'bg-red-100 text-red-800' :
+                                    stat.significance === '***' ? 'bg-orange-100 text-orange-800' :
+                                    stat.significance === '**' ? 'bg-yellow-100 text-yellow-800' :
+                                    stat.significance === '*' ? 'bg-green-100 text-green-800' :
+                                    'bg-gray-100 text-gray-800'
+                                  }`}>
+                                    {stat.significance || 'n.s.'}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      
+                      {results.statistics.filter(stat => stat.log_likelihood_llv > 0).length === 0 && (
+                        <div className="text-center py-8 text-gray-500">
+                          No significant differences found between the selected datasets.
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               ) : (

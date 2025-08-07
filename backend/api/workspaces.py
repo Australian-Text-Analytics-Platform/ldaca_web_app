@@ -27,6 +27,7 @@ from models import (
     TokenFrequencyData,
     TokenFrequencyRequest,
     TokenFrequencyResponse,
+    TokenStatisticsData,
     WorkspaceCreateRequest,
     WorkspaceInfo,
 )
@@ -1598,8 +1599,8 @@ async def calculate_token_frequencies(
                 detail="docframe library not available for token frequency calculation",
             )
 
-        # Calculate token frequencies
-        frequency_results = compute_token_frequencies(
+        # Calculate token frequencies (returns tuple: frequencies, stats)
+        frequency_results, stats_df = compute_token_frequencies(
             frames=frames_dict, stop_words=request.stop_words
         )
 
@@ -1618,10 +1619,57 @@ async def calculate_token_frequencies(
                 if freq > 0  # Only include tokens that actually appear
             ]
 
+        # Convert statistics DataFrame to response format (if available)
+        statistics_data = None
+        if stats_df is not None and not stats_df.is_empty():
+            # Convert Polars DataFrame to list of TokenStatisticsData
+            statistics_data = []
+            for row in stats_df.iter_rows(named=True):
+                statistics_data.append(
+                    TokenStatisticsData(
+                        token=row["token"],
+                        freq_corpus_0=int(row["freq_corpus_0"]),
+                        freq_corpus_1=int(row["freq_corpus_1"]),
+                        expected_0=float(row["expected_0"]),
+                        expected_1=float(row["expected_1"]),
+                        corpus_0_total=int(row["corpus_0_total"]),
+                        corpus_1_total=int(row["corpus_1_total"]),
+                        percent_corpus_0=float(row["percent_corpus_0"]),
+                        percent_corpus_1=float(row["percent_corpus_1"]),
+                        percent_diff=float(row["percent_diff"]),
+                        log_likelihood_llv=float(row["log_likelihood_llv"]),
+                        bayes_factor_bic=float(row["bayes_factor_bic"]),
+                        effect_size_ell=float(row["effect_size_ell"]),
+                        relative_risk=float(row["relative_risk"])
+                        if row["relative_risk"] is not None
+                        else None,
+                        log_ratio=float(row["log_ratio"])
+                        if row["log_ratio"] is not None
+                        else None,
+                        odds_ratio=float(row["odds_ratio"])
+                        if row["odds_ratio"] is not None
+                        else None,
+                        significance=str(row["significance"]),
+                    )
+                )
+
+            # Apply same limit to statistics as to frequency data
+            if request.limit and statistics_data:
+                # Get the tokens that were included in frequency data to maintain consistency
+                included_tokens = set()
+                for frame_data in response_data.values():
+                    included_tokens.update(item.token for item in frame_data)
+
+                # Filter statistics to only include tokens that are in the frequency results
+                statistics_data = [
+                    stat for stat in statistics_data if stat.token in included_tokens
+                ]
+
         return TokenFrequencyResponse(
             success=True,
             message=f"Successfully calculated token frequencies for {len(frames_dict)} node(s)",
             data=response_data,
+            statistics=statistics_data,
         )
 
     except HTTPException:

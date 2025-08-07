@@ -446,9 +446,36 @@ class TokenFrequencyData(BaseModel):
     frequency: int
 
 
+class TokenStatisticsData(BaseModel):
+    token: str
+    freq_corpus_0: int  # O1 - observed frequency in corpus 1
+    freq_corpus_1: int  # O2 - observed frequency in corpus 2
+    expected_0: float  # Expected frequency in corpus 1
+    expected_1: float  # Expected frequency in corpus 2
+    corpus_0_total: int  # Total tokens in corpus 1
+    corpus_1_total: int  # Total tokens in corpus 2
+    percent_corpus_0: float  # %1 - percentage in corpus 1
+    percent_corpus_1: float  # %2 - percentage in corpus 2
+    percent_diff: float  # %DIFF - percentage difference
+    log_likelihood_llv: float  # LL - log likelihood G2 statistic
+    bayes_factor_bic: float  # Bayes - Bayes factor (BIC)
+    effect_size_ell: float  # ELL - effect size for log likelihood
+    relative_risk: Optional[float] = (
+        None  # RRisk - relative risk ratio (can be None/infinite)
+    )
+    log_ratio: Optional[float] = (
+        None  # LogRatio - log of relative frequencies (can be None)
+    )
+    odds_ratio: Optional[float] = None  # OddsRatio - odds ratio (can be None/infinite)
+    significance: str  # Significance level indicator
+
+
 class TokenFrequencyResponse(BaseModel):
     success: bool
     message: str
     data: Optional[Dict[str, List[TokenFrequencyData]]] = (
         None  # Maps node_name -> frequency data
+    )
+    statistics: Optional[List[TokenStatisticsData]] = (
+        None  # Statistical measures (only when comparing 2 nodes)
     )

@@ -717,10 +717,31 @@ export interface TokenFrequencyData {
   frequency: number;
 }
 
+export interface TokenStatisticsData {
+  token: string;
+  freq_corpus_0: number;           // O1 - observed frequency in corpus 1
+  freq_corpus_1: number;           // O2 - observed frequency in corpus 2
+  expected_0: number;              // Expected frequency in corpus 1
+  expected_1: number;              // Expected frequency in corpus 2
+  corpus_0_total: number;          // Total tokens in corpus 1
+  corpus_1_total: number;          // Total tokens in corpus 2
+  percent_corpus_0: number;        // %1 - percentage in corpus 1
+  percent_corpus_1: number;        // %2 - percentage in corpus 2
+  percent_diff: number;            // %DIFF - percentage difference
+  log_likelihood_llv: number;      // LL - log likelihood G2 statistic
+  bayes_factor_bic: number;        // Bayes - Bayes factor (BIC)
+  effect_size_ell: number;         // ELL - effect size for log likelihood
+  relative_risk: number | null;    // RRisk - relative risk ratio (can be null when infinite)
+  log_ratio: number | null;        // LogRatio - log of relative frequencies (can be null)
+  odds_ratio: number | null;       // OddsRatio - odds ratio (can be null when infinite)
+  significance: string;            // Significance level indicator
+}
+
 export interface TokenFrequencyResponse {
   success: boolean;
   message: string;
   data?: Record<string, TokenFrequencyData[]> | null; // Maps node_name -> frequency data
+  statistics?: TokenStatisticsData[] | null; // Statistical measures (only when comparing 2 nodes)
 }
 
 export async function calculateTokenFrequencies(
