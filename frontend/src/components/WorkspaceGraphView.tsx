@@ -19,9 +19,10 @@ import { GraphLoadingSkeleton, EmptyState } from './LoadingStates';
 import CustomNode from './CustomNode';
 
 // Move nodeTypes outside component to prevent recreation
+// IMPORTANT: keep a distinct custom type so React Flow doesn't apply the
+// built-in "default" node chrome (which looked like a background card)
 const nodeTypes = {
   customNode: CustomNode,
-  default: CustomNode, // Fallback
 } as const;
 
 /**
@@ -90,7 +91,8 @@ export const WorkspaceGraphView: React.FC = memo(() => {
       
       return {
         id: node.id,
-        type: 'default', // Use 'default' instead of 'customNode'
+        // Use a true custom node type to avoid default node styling
+        type: 'customNode',
         position: { 
           x: index * 320, // Slightly wider spacing
           y: 50 // Move up a bit
@@ -113,26 +115,26 @@ export const WorkspaceGraphView: React.FC = memo(() => {
           onConvertToDocDataFrame: handleConvertToDocDataFrame,
           onConvertToDataFrame: handleConvertToDataFrame,
         },
-        // Ensure visibility with explicit styles and DISABLE ALL CONNECTION CAPABILITIES
+        // Keep interaction flags minimal and disable edge connections
         hidden: false,
         draggable: true,
         selectable: true,
-        connectable: false, // Prevent this node from being connectable
-        sourcePosition: undefined, // Remove source position to prevent connections
-        targetPosition: undefined, // Remove target position to prevent connections
-        style: {
-          opacity: 1,
-          visibility: 'visible',
-          zIndex: 1,
-        },
-        width: 256, // Explicit width
-        height: 120, // Explicit height
+        connectable: false,
       };
     });
   }, [workspaceGraph, handleDelete, handleRename, handleConvertToDocDataFrame, handleConvertToDataFrame]);
 
   // EDGES DISABLED: Force no edges to prevent self-loops and unwanted connections
-  // const initialEdges = useMemo(() => { ... }, [workspaceGraph]);
+  const initialEdges = useMemo(() => {
+    if (!workspaceGraph || !workspaceGraph.edges) return [];
+    return workspaceGraph.edges.map((e: any, idx: number) => ({
+      id: e.id || `edge-${idx}`,
+      source: e.source,
+      target: e.target,
+      type: (e.type as any) || 'smoothstep',
+      animated: !!e.animated,
+    }));
+  }, [workspaceGraph]);
   
     // Use React Flow state hooks properly
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
@@ -148,40 +150,21 @@ export const WorkspaceGraphView: React.FC = memo(() => {
     // Only update if the data has actually changed
     if (newNodeIds !== currentNodeIds || newEdgeIds !== currentEdgeIds) {
       console.log('WorkspaceGraphView: Updating React Flow with nodes:', initialNodes.length);
-      console.log('WorkspaceGraphView: FORCING edges to empty array');
+  console.log('WorkspaceGraphView: Applying edges from backend:', workspaceGraph?.edges?.length || 0);
       console.log('WorkspaceGraphView: Current React Flow nodes before update:', nodes);
       console.log('WorkspaceGraphView: Current React Flow edges before update:', edges);
       console.log('WorkspaceGraphView: Raw backend edges data:', workspaceGraph?.edges);
       if (initialNodes[0]) {
         console.log('WorkspaceGraphView: Node data sample:', initialNodes[0]);
       }
-      setNodes(initialNodes);
-      setEdges([]); // FORCE empty edges array
-      
-      console.log('WorkspaceGraphView: AFTER setEdges - edges should be empty');
+    setNodes(initialNodes);
+    setEdges(initialEdges);
+    console.log('WorkspaceGraphView: AFTER setEdges - edges count:', initialEdges.length);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [newNodeIds, newEdgeIds]);
 
-  // SAFEGUARD: Monitor edges state and clear any that appear
-  useEffect(() => {
-    if (edges.length > 0) {
-      console.log('WorkspaceGraphView: SAFEGUARD - Detected unwanted edges, clearing:', edges);
-      setEdges([]);
-    }
-  }, [edges, setEdges]);
-
-  // ADDITIONAL SAFEGUARD: Force edges to empty on any React Flow state change
-  useEffect(() => {
-    const clearEdgesTimer = setInterval(() => {
-      if (edges.length > 0) {
-        console.log('WorkspaceGraphView: PERIODIC SAFEGUARD - Clearing edges:', edges);
-        setEdges([]);
-      }
-    }, 100); // Check every 100ms
-
-    return () => clearInterval(clearEdgesTimer);
-  }, [edges, setEdges]);
+  // Removed edge-clearing safeguards so backend edges can render
 
   // Add effect to monitor actual React Flow state changes
   useEffect(() => {
@@ -240,18 +223,15 @@ export const WorkspaceGraphView: React.FC = memo(() => {
         nodesDraggable={true}
         nodesConnectable={false}
         elementsSelectable={true}
-        // Prevent any edge creation via handles
+        // Prevent any edge creation via handles, but don't clear existing edges
         onConnect={(connection: Connection) => {
-          console.log('WorkspaceGraphView: onConnect blocked - no edges should be created', connection);
-          setEdges([]); // Force clear any edges
+          console.log('WorkspaceGraphView: onConnect blocked - manual edges disabled', connection);
         }}
         onConnectStart={(event, params) => {
           console.log('WorkspaceGraphView: onConnectStart blocked', params);
-          setEdges([]); // Force clear any edges
         }}
         onConnectEnd={(event) => {
           console.log('WorkspaceGraphView: onConnectEnd blocked');
-          setEdges([]); // Force clear any edges
         }}
       >
         <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
