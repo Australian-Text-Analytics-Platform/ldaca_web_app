@@ -441,6 +441,38 @@ export async function convertToDataFrame(
   return res.data;
 }
 
+export async function convertToDocLazyFrame(
+  workspaceId: string,
+  nodeId: string,
+  documentColumn: string,
+  authHeaders: Record<string, string> = {}
+) {
+  const res = await axios.post(
+    `${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}/convert/to-doclazyframe`,
+    null,
+    {
+      params: { document_column: documentColumn },
+      headers: authHeaders
+    }
+  );
+  return res.data;
+}
+
+export async function convertToLazyFrame(
+  workspaceId: string,
+  nodeId: string,
+  authHeaders: Record<string, string> = {}
+) {
+  const res = await axios.post(
+    `${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}/convert/to-lazyframe`,
+    null,
+    {
+      headers: authHeaders
+    }
+  );
+  return res.data;
+}
+
 export interface JoinNodesRequest {
   left_node_id: string;
   right_node_id: string;

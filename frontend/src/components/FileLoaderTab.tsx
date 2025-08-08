@@ -124,10 +124,7 @@ const FileLoaderTab: React.FC<FileLoaderTabProps> = ({ onFileLoaded }) => {
         </div>
       )}
 
-      {/* Drag tip */}
-      <div className="text-xs text-gray-500 mb-1">
-        Tip: You can drag and drop files directly onto the list below to upload.
-      </div>
+  {/* Drag tip removed (instructions already provided above) */}
 
       {/* Unified File List View as a drop target */}
       <div

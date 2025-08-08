@@ -44,8 +44,16 @@ const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ filename, isOpen, o
 	};
 
 	return (
-		<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-			<div className="bg-white rounded-xl shadow-xl w-full max-w-5xl max-h-[85vh] flex flex-col">
+		<div
+			className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+			onClick={onClose}
+			role="dialog"
+			aria-modal="true"
+		>
+			<div
+				className="bg-white rounded-xl shadow-xl w-full max-w-5xl max-h-[85vh] flex flex-col"
+				onClick={(e) => e.stopPropagation()}
+			>
 				<div className="flex items-center justify-between px-5 py-3 border-b">
 					<h3 className="font-semibold text-gray-800 truncate">Preview: {filename}</h3>
 					<button onClick={onClose} className="text-gray-500 hover:text-gray-700">✕</button>

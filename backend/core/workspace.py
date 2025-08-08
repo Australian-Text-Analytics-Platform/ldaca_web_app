@@ -257,8 +257,14 @@ class WorkspaceManager:
         if workspace is None:
             return None
 
-        # Direct delegation to DocWorkspace API method
-        graph_result = workspace.to_api_graph()
+        # Prefer DocWorkspace API extension method; fall back to built-ins
+        if hasattr(workspace, "to_api_graph"):
+            graph_result = workspace.to_api_graph()
+        elif hasattr(workspace, "to_react_flow_json"):
+            graph_result = workspace.to_react_flow_json()
+        else:
+            # Last resort: use generic graph structure
+            graph_result = workspace.graph()  # type: ignore[attr-defined]
 
         # Convert Pydantic WorkspaceGraph object to dictionary for frontend compatibility
         if hasattr(graph_result, "model_dump"):
@@ -319,6 +325,12 @@ class WorkspaceManager:
         self._save_workspace_to_disk(user_id, workspace_id, workspace)
 
         return result
+
+    # Small public helper to persist after in-place mutations
+    def persist(self, user_id: str, workspace_id: str) -> None:
+        workspace = self.get_workspace(user_id, workspace_id)
+        if workspace is not None:
+            self._save_workspace_to_disk(user_id, workspace_id, workspace)
 
     # ============================================================================
     # DISK PERSISTENCE - Only other thing this class manages

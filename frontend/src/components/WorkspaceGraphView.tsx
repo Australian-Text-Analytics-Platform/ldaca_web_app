@@ -16,6 +16,8 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useWorkspace } from '../hooks/useWorkspace';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '../lib/queryKeys';
 import { GraphLoadingSkeleton, EmptyState } from './LoadingStates';
 import CustomNode from './CustomNode';
 
@@ -70,7 +72,8 @@ const computeDagreLayout = (
  * This replaces the graph-related logic from the monolithic WorkspaceView
  */
 export const WorkspaceGraphView: React.FC = memo(() => {
-  const { workspaceGraph, isLoading, deleteNode, renameNode, selectNode, toggleNodeSelection } = useWorkspace();
+  const { workspaceGraph, isLoading, deleteNode, renameNode, selectNode, toggleNodeSelection, convertToDocDataFrame, convertToDataFrame, convertToDocLazyFrame, convertToLazyFrame, currentWorkspaceId } = useWorkspace();
+  const queryClient = useQueryClient();
   
   // Track pending delete operations to prevent duplicates
   const pendingDeletes = useRef<Set<string>>(new Set());
@@ -92,14 +95,44 @@ export const WorkspaceGraphView: React.FC = memo(() => {
   }, [renameNode]);
 
   const handleConvertToDocDataFrame = useCallback((nodeId: string, documentColumn: string) => {
-    console.log('Convert to DocDataFrame:', nodeId, documentColumn);
-    // TODO: Implement conversion functionality
-  }, []);
+    if (convertToDocDataFrame) {
+      convertToDocDataFrame(nodeId, documentColumn);
+      if (currentWorkspaceId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.nodeData(currentWorkspaceId, nodeId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.nodeSchema(currentWorkspaceId, nodeId) });
+      }
+    }
+  }, [convertToDocDataFrame, currentWorkspaceId, queryClient]);
 
   const handleConvertToDataFrame = useCallback((nodeId: string) => {
-    console.log('Convert to DataFrame:', nodeId);
-    // TODO: Implement conversion functionality
-  }, []);
+    if (convertToDataFrame) {
+      convertToDataFrame(nodeId);
+      if (currentWorkspaceId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.nodeData(currentWorkspaceId, nodeId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.nodeSchema(currentWorkspaceId, nodeId) });
+      }
+    }
+  }, [convertToDataFrame, currentWorkspaceId, queryClient]);
+
+  const handleConvertToDocLazyFrame = useCallback((nodeId: string, documentColumn: string) => {
+    if (convertToDocLazyFrame) {
+      convertToDocLazyFrame(nodeId, documentColumn);
+      if (currentWorkspaceId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.nodeData(currentWorkspaceId, nodeId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.nodeSchema(currentWorkspaceId, nodeId) });
+      }
+    }
+  }, [convertToDocLazyFrame, currentWorkspaceId, queryClient]);
+
+  const handleConvertToLazyFrame = useCallback((nodeId: string) => {
+    if (convertToLazyFrame) {
+      convertToLazyFrame(nodeId);
+      if (currentWorkspaceId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.nodeData(currentWorkspaceId, nodeId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.nodeSchema(currentWorkspaceId, nodeId) });
+      }
+    }
+  }, [convertToLazyFrame, currentWorkspaceId, queryClient]);
 
   // Transform and layout nodes horizontally using a simple DAG layout
   const initialNodes = useMemo(() => {
@@ -158,6 +191,8 @@ export const WorkspaceGraphView: React.FC = memo(() => {
           onRename: handleRename,
           onConvertToDocDataFrame: handleConvertToDocDataFrame,
           onConvertToDataFrame: handleConvertToDataFrame,
+          onConvertToDocLazyFrame: handleConvertToDocLazyFrame,
+          onConvertToLazyFrame: handleConvertToLazyFrame,
         },
         // Keep interaction flags minimal and disable edge connections
         hidden: false,
@@ -166,7 +201,7 @@ export const WorkspaceGraphView: React.FC = memo(() => {
         connectable: false,
       };
     });
-  }, [workspaceGraph, handleDelete, handleRename, handleConvertToDocDataFrame, handleConvertToDataFrame]);
+  }, [workspaceGraph, handleDelete, handleRename, handleConvertToDocDataFrame, handleConvertToDataFrame, handleConvertToDocLazyFrame, handleConvertToLazyFrame]);
 
   // Build edges with bezier style for smooth curves
   const initialEdges = useMemo(() => {
@@ -189,10 +224,31 @@ export const WorkspaceGraphView: React.FC = memo(() => {
   const currentEdgeIds = edges.map((e: Edge) => `${e.source}-${e.target}`).join(',');
   const newNodeIds = workspaceGraph?.nodes?.map((n: any) => n.id).join(',') || '';
   const newEdgeIds = workspaceGraph?.edges?.map((e: any) => `${e.source}-${e.target}`).join(',') || '';
+
+  // Also compute a lightweight signature that includes data_type and laziness so
+  // in-place conversions (which keep the same IDs) still trigger an update
+  const currentNodesSignature = nodes
+    .map((n: any) => {
+      const dt = n?.data?.node?.data_type ?? 'unknown';
+      const lazy = n?.data?.node?.is_lazy ? '1' : '0';
+      return `${n.id}:${dt}:${lazy}`;
+    })
+    .join(',');
+  const newNodesSignature = (workspaceGraph?.nodes || [])
+    .map((gn: any) => {
+      const dt = gn?.data?.nodeType || gn?.data?.dataType || gn?.type || 'unknown';
+      const lazy = (gn?.data?.isLazy || gn?.data?.lazy) ? '1' : '0';
+      return `${gn.id}:${dt}:${lazy}`;
+    })
+    .join(',');
   
   useEffect(() => {
-    // Only update if the data has actually changed
-    if (newNodeIds !== currentNodeIds || newEdgeIds !== currentEdgeIds) {
+    // Only update if the graph topology or node properties changed
+    if (
+      newNodeIds !== currentNodeIds ||
+      newEdgeIds !== currentEdgeIds ||
+      newNodesSignature !== currentNodesSignature
+    ) {
       console.log('WorkspaceGraphView: Updating React Flow with nodes:', initialNodes.length);
   console.log('WorkspaceGraphView: Applying edges from backend:', workspaceGraph?.edges?.length || 0);
       console.log('WorkspaceGraphView: Current React Flow nodes before update:', nodes);
@@ -206,7 +262,7 @@ export const WorkspaceGraphView: React.FC = memo(() => {
     console.log('WorkspaceGraphView: AFTER setEdges - edges count:', initialEdges.length);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [newNodeIds, newEdgeIds]);
+  }, [newNodeIds, newEdgeIds, newNodesSignature, currentNodesSignature]);
 
   // Removed edge-clearing safeguards so backend edges can render
 

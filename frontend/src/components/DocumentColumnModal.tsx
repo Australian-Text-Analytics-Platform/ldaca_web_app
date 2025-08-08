@@ -16,17 +16,21 @@ const DocumentColumnModal: React.FC<DocumentColumnModalProps> = ({
   nodeName
 }) => {
   const [selectedColumn, setSelectedColumn] = useState<string>('');
+  const [submitting, setSubmitting] = useState<boolean>(false);
 
   const handleConfirm = () => {
+    if (submitting) return;
     if (selectedColumn) {
+      setSubmitting(true);
       onConfirm(selectedColumn);
       setSelectedColumn('');
-      onClose();
+      // Parent (CustomNode) handles closing the modal after confirm
     }
   };
 
   const handleCancel = () => {
-    setSelectedColumn('');
+  setSelectedColumn('');
+  setSubmitting(false);
     onClose();
   };
 
@@ -71,7 +75,7 @@ const DocumentColumnModal: React.FC<DocumentColumnModalProps> = ({
           </button>
           <button
             onClick={handleConfirm}
-            disabled={!selectedColumn}
+            disabled={!selectedColumn || submitting}
             className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Convert

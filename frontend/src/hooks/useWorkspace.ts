@@ -11,6 +11,10 @@ import {
   getNodeShape,
   getNodeSchema,
   castNode as apiCastNode,
+  convertToDocDataFrame as apiConvertToDocDataFrame,
+  convertToDataFrame as apiConvertToDataFrame,
+  convertToDocLazyFrame as apiConvertToDocLazyFrame,
+  convertToLazyFrame as apiConvertToLazyFrame,
   renameNode as apiRenameNode,
   deleteNode as apiDeleteNode,
   createNodeFromFile as apiCreateNodeFromFile,
@@ -291,13 +295,14 @@ export const useWorkspace = () => {
   });
 
   const joinNodesMutation = useMutation({
-    mutationFn: ({ workspaceId, leftNodeId, rightNodeId, joinType, leftColumns, rightColumns }: {
+    mutationFn: ({ workspaceId, leftNodeId, rightNodeId, joinType, leftColumns, rightColumns, newNodeName }: {
       workspaceId: string;
       leftNodeId: string;
       rightNodeId: string;
       joinType: string;
       leftColumns: string[];
       rightColumns: string[];
+      newNodeName?: string;
     }) => {
       const request = {
         left_node_id: leftNodeId,
@@ -305,6 +310,7 @@ export const useWorkspace = () => {
         left_on: leftColumns[0] || '',
         right_on: rightColumns[0] || '',
         how: joinType as 'inner' | 'left' | 'right' | 'outer',
+        new_node_name: newNodeName,
       };
       return apiJoinNodes(workspaceId, request, authHeaders);
     },
@@ -412,6 +418,83 @@ export const useWorkspace = () => {
     },
   });
 
+  // Conversions
+  const convertToDocDataFrameMutation = useMutation({
+    mutationFn: ({ nodeId, documentColumn }: { nodeId: string; documentColumn: string; }) => {
+      return apiConvertToDocDataFrame(currentWorkspaceId!, nodeId, documentColumn, authHeaders);
+    },
+    onMutate: () => startOperation('convertToDocDataFrame'),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId!) });
+      if (variables?.nodeId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.nodeData(currentWorkspaceId!, variables.nodeId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.nodeSchema(currentWorkspaceId!, variables.nodeId) });
+      }
+      endOperation('convertToDocDataFrame');
+    },
+    onError: (error: any) => {
+      setOperationError('convertToDocDataFrame', error.message);
+      endOperation('convertToDocDataFrame');
+    },
+  });
+
+  const convertToDataFrameMutation = useMutation({
+    mutationFn: ({ nodeId }: { nodeId: string; }) => {
+      return apiConvertToDataFrame(currentWorkspaceId!, nodeId, authHeaders);
+    },
+    onMutate: () => startOperation('convertToDataFrame'),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId!) });
+      if (variables?.nodeId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.nodeData(currentWorkspaceId!, variables.nodeId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.nodeSchema(currentWorkspaceId!, variables.nodeId) });
+      }
+      endOperation('convertToDataFrame');
+    },
+    onError: (error: any) => {
+      setOperationError('convertToDataFrame', error.message);
+      endOperation('convertToDataFrame');
+    },
+  });
+
+  const convertToDocLazyFrameMutation = useMutation({
+    mutationFn: ({ nodeId, documentColumn }: { nodeId: string; documentColumn: string; }) => {
+      return apiConvertToDocLazyFrame(currentWorkspaceId!, nodeId, documentColumn, authHeaders);
+    },
+    onMutate: () => startOperation('convertToDocLazyFrame'),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId!) });
+      if (variables?.nodeId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.nodeData(currentWorkspaceId!, variables.nodeId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.nodeSchema(currentWorkspaceId!, variables.nodeId) });
+      }
+      endOperation('convertToDocLazyFrame');
+    },
+    onError: (error: any) => {
+      setOperationError('convertToDocLazyFrame', error.message);
+      endOperation('convertToDocLazyFrame');
+    },
+  });
+
+  const convertToLazyFrameMutation = useMutation({
+    mutationFn: ({ nodeId }: { nodeId: string; }) => {
+      return apiConvertToLazyFrame(currentWorkspaceId!, nodeId, authHeaders);
+    },
+    onMutate: () => startOperation('convertToLazyFrame'),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId!) });
+      if (variables?.nodeId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.nodeData(currentWorkspaceId!, variables.nodeId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.nodeSchema(currentWorkspaceId!, variables.nodeId) });
+      }
+      endOperation('convertToLazyFrame');
+    },
+    onError: (error: any) => {
+      setOperationError('convertToLazyFrame', error.message);
+      endOperation('convertToLazyFrame');
+    },
+  });
+
   // Memoized action functions to prevent unnecessary re-renders
   const actions = useMemo(() => ({
     // Workspace actions
@@ -448,7 +531,7 @@ export const useWorkspace = () => {
       return createNodeMutation.mutateAsync({ workspaceId: currentWorkspaceId, filename });
     },
     
-    joinNodes: (leftNodeId: string, rightNodeId: string, joinType: string, leftColumns: string[], rightColumns: string[]) => {
+  joinNodes: (leftNodeId: string, rightNodeId: string, joinType: string, leftColumns: string[], rightColumns: string[], newNodeName?: string) => {
       if (!currentWorkspaceId) return Promise.reject(new Error('No workspace selected'));
       return joinNodesMutation.mutateAsync({
         workspaceId: currentWorkspaceId,
@@ -456,13 +539,34 @@ export const useWorkspace = () => {
         rightNodeId,
         joinType,
         leftColumns,
-        rightColumns,
+    rightColumns,
+    newNodeName,
       });
     },
     
     castColumn: (nodeId: string, column: string, targetType: string, format?: string) => {
       if (!currentWorkspaceId) return Promise.reject(new Error('No workspace selected'));
       return castNodeMutation.mutateAsync({ nodeId, column, targetType, format });
+    },
+
+    convertToDocDataFrame: (nodeId: string, documentColumn: string) => {
+      if (!currentWorkspaceId) return Promise.reject(new Error('No workspace selected'));
+      return convertToDocDataFrameMutation.mutateAsync({ nodeId, documentColumn });
+    },
+
+    convertToDataFrame: (nodeId: string) => {
+      if (!currentWorkspaceId) return Promise.reject(new Error('No workspace selected'));
+      return convertToDataFrameMutation.mutateAsync({ nodeId });
+    },
+
+    convertToDocLazyFrame: (nodeId: string, documentColumn: string) => {
+      if (!currentWorkspaceId) return Promise.reject(new Error('No workspace selected'));
+      return convertToDocLazyFrameMutation.mutateAsync({ nodeId, documentColumn });
+    },
+
+    convertToLazyFrame: (nodeId: string) => {
+      if (!currentWorkspaceId) return Promise.reject(new Error('No workspace selected'));
+      return convertToLazyFrameMutation.mutateAsync({ nodeId });
     },
     
     filterNode: (nodeId: string, request: FilterRequest) => {
@@ -526,6 +630,10 @@ export const useWorkspace = () => {
     concordanceMutation,
     detachConcordanceMutation,
     castNodeMutation,
+  convertToDocDataFrameMutation,
+  convertToDataFrameMutation,
+  convertToDocLazyFrameMutation,
+  convertToLazyFrameMutation,
     getNodeShapeStable,
     currentWorkspaceId,
     authHeaders,

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { getFilePreview } from '../api';
 import { useAuth } from './useAuth';
 
@@ -13,12 +13,16 @@ export const useFilePreview = () => {
 
   const { getAuthHeaders } = useAuth();
 
+  const pageRef = useRef(page);
+  useEffect(() => { pageRef.current = page; }, [page]);
+
   const fetchPreview = useCallback(async (fileName: string, nextPage?: number) => {
     setLoading(true);
     setError(null);
     try {
       const headers = getAuthHeaders();
-      const response = await getFilePreview(fileName, headers, { page: nextPage ?? page, pageSize });
+  const effectivePage = typeof nextPage === 'number' ? nextPage : pageRef.current;
+  const response = await getFilePreview(fileName, headers, { page: effectivePage, pageSize });
       const data = response.preview || response.dataframe || [];
       setPreviewData(data);
       setColumns(response.columns || Object.keys(data?.[0] || {}));
@@ -34,7 +38,7 @@ export const useFilePreview = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, getAuthHeaders]);
+  }, [pageSize, getAuthHeaders]);
 
   const clearPreview = useCallback(() => {
     setPreviewData([]);

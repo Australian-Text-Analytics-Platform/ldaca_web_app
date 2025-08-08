@@ -175,7 +175,6 @@ const DataLoaderTab: React.FC = () => {
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="font-medium text-gray-700">Available Files</h3>
-                  <span className="text-xs text-gray-500">Tip: You can also drop files onto this list to upload.</span>
                 </div>
                 <div
                   className="space-y-2 max-h-[28rem] overflow-y-auto border border-gray-200 rounded-md p-1"
@@ -214,7 +213,7 @@ const DataLoaderTab: React.FC = () => {
                         </p>
                       </div>
                       <button
-                        onClick={() => handleAddToWorkspace(file.filename)}
+                        onClick={(e) => { e.stopPropagation(); handleAddToWorkspace(file.filename); }}
                         disabled={addingToWorkspace === file.filename || isLoading.operations}
                         className="px-3 py-1 text-sm bg-green-100 text-green-700 rounded hover:bg-green-200 disabled:opacity-50 disabled:cursor-not-allowed"
                       >

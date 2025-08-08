@@ -12,13 +12,17 @@ interface CustomNodeData {
   onRename?: (nodeId: string, newName: string) => void;
   onConvertToDocDataFrame?: (nodeId: string, documentColumn: string) => void;
   onConvertToDataFrame?: (nodeId: string) => void;
+  onConvertToDocLazyFrame?: (nodeId: string, documentColumn: string) => void;
+  onConvertToLazyFrame?: (nodeId: string) => void;
 }
 
 const CustomNode: React.FC<NodeProps<any>> = ({ data, selected }) => {
-  const { node: initialNode, isMultiSelected = false, onDelete, onRename, onConvertToDocDataFrame, onConvertToDataFrame } = data as CustomNodeData;
+  const { node: initialNode, isMultiSelected = false, onDelete, onRename, onConvertToDocDataFrame, onConvertToDataFrame, onConvertToDocLazyFrame, onConvertToLazyFrame } = data as CustomNodeData;
+  // Keep a local state but always sync with props to prevent staleness after in-place updates
   const [node, setNode] = useState(initialNode);
   const [showMenu, setShowMenu] = useState(false);
   const [showDocColumnModal, setShowDocColumnModal] = useState(false);
+  const [docConversionTarget, setDocConversionTarget] = useState<'docdataframe' | 'doclazyframe' | null>(null);
   const [isRenaming, setIsRenaming] = useState(false);
   const [newName, setNewName] = useState('');
   const [isHoveringShape, setIsHoveringShape] = useState(false);
@@ -41,15 +45,15 @@ const CustomNode: React.FC<NodeProps<any>> = ({ data, selected }) => {
 
   const nodeName = node?.name || 'Loading...';
   const nodeShape = node?.shape;
-  const nodeDataType = node?.data_type || 'unknown';
+  const nodeDataType = node?.data_type || initialNode?.data_type || 'unknown';
   const nodeColumns = node?.columns || [];
 
   // Format the data type for better display
   const formattedType = formatDataType(nodeDataType);
 
   // Determine if conversion options should be shown - updated for complete module.class format
-  const isPolarsDataFrame = formattedType.category === 'polars' && formattedType.full.includes('DataFrame');
-  const isDocDataFrame = formattedType.category === 'docframe' && formattedType.full.includes('DocDataFrame');
+  const isPolarsDataFrameOrLazy = formattedType.category === 'polars' && (formattedType.full.includes('DataFrame') || formattedType.full.includes('LazyFrame'));
+  const isDocDataFrameOrLazy = formattedType.category === 'docframe' && (formattedType.full.includes('DocDataFrame') || formattedType.full.includes('DocLazyFrame'));
 
   // Handle shape hover for lazy frames with null first element
   const handleShapeMouseEnter = useCallback(async () => {
@@ -107,6 +111,7 @@ const CustomNode: React.FC<NodeProps<any>> = ({ data, selected }) => {
   const handleToDocDataFrameClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     setShowMenu(false);
+    setDocConversionTarget('docdataframe');
     setShowDocColumnModal(true);
   };
 
@@ -115,6 +120,21 @@ const CustomNode: React.FC<NodeProps<any>> = ({ data, selected }) => {
     setShowMenu(false);
     if (onConvertToDataFrame && node?.node_id) {
       onConvertToDataFrame(node.node_id);
+    }
+  };
+
+  const handleToDocLazyFrameClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowMenu(false);
+    setDocConversionTarget('doclazyframe');
+    setShowDocColumnModal(true);
+  };
+
+  const handleToLazyFrameClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowMenu(false);
+    if (onConvertToLazyFrame && node?.node_id) {
+      onConvertToLazyFrame(node.node_id);
     }
   };
 
@@ -152,9 +172,14 @@ const CustomNode: React.FC<NodeProps<any>> = ({ data, selected }) => {
   };
 
   const handleDocColumnConfirm = (documentColumn: string) => {
-    if (onConvertToDocDataFrame && node?.node_id) {
+    if (!node?.node_id) return;
+    if (docConversionTarget === 'docdataframe' && onConvertToDocDataFrame) {
       onConvertToDocDataFrame(node.node_id, documentColumn);
+    } else if (docConversionTarget === 'doclazyframe' && onConvertToDocLazyFrame) {
+      onConvertToDocLazyFrame(node.node_id, documentColumn);
     }
+  setShowDocColumnModal(false);
+  setDocConversionTarget(null);
   };
 
   const nodeClasses = `
@@ -249,24 +274,40 @@ const CustomNode: React.FC<NodeProps<any>> = ({ data, selected }) => {
                   Rename
                 </button>
                 
-                {/* Show conversion options for polars DataFrames/Series */}
-                {isPolarsDataFrame && (
-                  <button
-                    onClick={handleToDocDataFrameClick}
-                    className="w-full text-left px-3 py-2 text-xs hover:bg-gray-100 border-t border-gray-100"
-                  >
-                    to DocDataFrame
-                  </button>
+                {/* Show conversion options for polars DataFrames/LazyFrames */}
+                {isPolarsDataFrameOrLazy && (
+                  <>
+                    <button
+                      onClick={handleToDocDataFrameClick}
+                      className="w-full text-left px-3 py-2 text-xs hover:bg-gray-100 border-t border-gray-100"
+                    >
+                      to DocDataFrame
+                    </button>
+                    <button
+                      onClick={handleToDocLazyFrameClick}
+                      className="w-full text-left px-3 py-2 text-xs hover:bg-gray-100 border-t border-gray-100"
+                    >
+                      to DocLazyFrame
+                    </button>
+                  </>
                 )}
                 
-                {/* Show conversion option for DocDataFrame */}
-                {isDocDataFrame && (
-                  <button
-                    onClick={handleToDataFrameClick}
-                    className="w-full text-left px-3 py-2 text-xs hover:bg-gray-100 border-t border-gray-100"
-                  >
-                    to DataFrame
-                  </button>
+                {/* Show conversion options for DocDataFrame/DocLazyFrame */}
+                {isDocDataFrameOrLazy && (
+                  <>
+                    <button
+                      onClick={handleToDataFrameClick}
+                      className="w-full text-left px-3 py-2 text-xs hover:bg-gray-100 border-t border-gray-100"
+                    >
+                      to DataFrame
+                    </button>
+                    <button
+                      onClick={handleToLazyFrameClick}
+                      className="w-full text-left px-3 py-2 text-xs hover:bg-gray-100 border-t border-gray-100"
+                    >
+                      to LazyFrame
+                    </button>
+                  </>
                 )}
               </div>
             )}
@@ -316,13 +357,7 @@ const CustomNode: React.FC<NodeProps<any>> = ({ data, selected }) => {
               return nodeShape[0];
             })()} × {nodeShape[1]})
             
-            {/* Show tooltip when hovering and shape is calculated */}
-            {isHoveringShape && hoveredShape && nodeShape[0] === null && (
-              <div className="absolute bottom-full left-0 mb-1 px-2 py-1 bg-gray-800 text-white text-xs rounded whitespace-nowrap z-10">
-                Calculated: {hoveredShape[0]} × {hoveredShape[1]}
-                <div className="absolute top-full left-2 w-0 h-0 border-l-2 border-r-2 border-t-2 border-transparent border-t-gray-800"></div>
-              </div>
-            )}
+            {/* Tooltip removed per UX request; inline value update remains */}
           </div>
         ) : (
           <div className="font-mono text-xs text-gray-400 italic mt-1">No data preview</div>
@@ -336,7 +371,7 @@ const CustomNode: React.FC<NodeProps<any>> = ({ data, selected }) => {
       {/* Modal for selecting document column */}
       <DocumentColumnModal
         isOpen={showDocColumnModal}
-        onClose={() => setShowDocColumnModal(false)}
+  onClose={() => { setShowDocColumnModal(false); setDocConversionTarget(null); }}
         onConfirm={handleDocColumnConfirm}
         columns={nodeColumns}
         nodeName={nodeName}

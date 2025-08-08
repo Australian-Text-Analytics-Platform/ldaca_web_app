@@ -18,6 +18,14 @@ from db import cleanup_expired_sessions, init_db
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+# Ensure DocWorkspace classes are extended with API methods (e.g., to_api_graph)
+# Importing this module applies monkey patches when DOCWORKSPACE is available.
+try:  # Import for side effects; ignore if unavailable during certain test setups
+    import core.docworkspace_api  # noqa: F401
+except Exception:
+    # Non-fatal: workspace graph endpoint will fall back to legacy shapes
+    pass
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

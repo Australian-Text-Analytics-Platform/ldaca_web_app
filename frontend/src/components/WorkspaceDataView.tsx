@@ -126,7 +126,8 @@ export const WorkspaceDataView: React.FC = memo(() => {
           rightNodeId,
           joinType,
           [joinColumns.left],
-          [joinColumns.right]
+          [joinColumns.right],
+          newNodeName
         );
         return result;
       };
