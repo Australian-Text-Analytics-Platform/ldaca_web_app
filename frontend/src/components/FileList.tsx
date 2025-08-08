@@ -179,14 +179,27 @@ const FileList: React.FC<FileListProps> = ({
                   <div className={`font-medium truncate ${
                     selectedFile === file.filename ? 'text-blue-800' : 'text-gray-700'
                   }`}>
-                    {file.filename}
+                    {file.full_path || file.filename}
                   </div>
+                  {(file.folder || file.display_name) && (
+                    <div className="text-[11px] text-gray-400 truncate">
+                      {file.folder ? `${file.folder}/` : ''}{file.display_name || ''}
+                    </div>
+                  )}
                   <div className="text-xs text-gray-500 flex items-center space-x-2">
                     <span>{formatFileSize(file.size)}</span>
                     <span>•</span>
                     <span>{formatDate(String(file.created_at || file.modified || ''))}</span>
                     <span>•</span>
                     <span className="uppercase">{file.file_type || file.type || 'unknown'}</span>
+                    {typeof file.is_sample !== 'undefined' && (
+                      <>
+                        <span>•</span>
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${file.is_sample ? 'bg-purple-100 text-purple-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                          {file.is_sample ? 'SAMPLE' : 'USER'}
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>

@@ -18,6 +18,10 @@ export interface FileInfo {
   created_at: number;
   file_type: string;
   folder?: string;
+  // New metadata for distinguishing sample vs user files and full path display
+  full_path?: string;
+  is_sample?: boolean;
+  path_type?: 'sample' | 'user';
   // Keep old field names for backward compatibility
   modified?: string;
   type?: string;

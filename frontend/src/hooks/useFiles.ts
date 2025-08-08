@@ -44,8 +44,6 @@ export const useFiles = ({ authHeaders = {} }: UseFilesProps = {}) => {
   }, [authHeaders]);
 
   const handleUploadFile = useCallback(async (file: File) => {
-    if (!authHeaders?.Authorization) return false;
-    
     setUploading(true);
     try {
       await uploadFile(file, authHeaders);
@@ -60,8 +58,6 @@ export const useFiles = ({ authHeaders = {} }: UseFilesProps = {}) => {
   }, [authHeaders, fetchFiles]);
 
   const handleDeleteFile = useCallback(async (filename: string) => {
-    if (!authHeaders?.Authorization) return false;
-    
     try {
       await deleteFile(filename, authHeaders);
       await fetchFiles(); // Refresh file list
@@ -79,8 +75,6 @@ export const useFiles = ({ authHeaders = {} }: UseFilesProps = {}) => {
   }, [authHeaders, fetchFiles, selectedFile, loadedFile]);
 
   const handleDownloadFile = useCallback(async (filename: string) => {
-    if (!authHeaders?.Authorization) return false;
-    
     try {
       const blob = await downloadFile(filename, authHeaders);
       const url = window.URL.createObjectURL(new Blob([blob]));

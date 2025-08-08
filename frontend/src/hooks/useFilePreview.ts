@@ -10,9 +10,10 @@ export const useFilePreview = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await getFilePreview(fileName);
-      setPreviewData(response.dataframe || []);
-      return response.dataframe || [];
+  const response = await getFilePreview(fileName);
+  const data = response.preview || response.dataframe || [];
+  setPreviewData(data);
+  return data;
     } catch (err) {
       setError('Failed to load preview');
       setPreviewData([]);

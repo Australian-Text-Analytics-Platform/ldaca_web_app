@@ -30,26 +30,17 @@ const DataLoaderTab: React.FC = () => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [addingToWorkspace, setAddingToWorkspace] = useState<string | null>(null);
 
-  // File upload with automatic workspace creation
-  const handleFileUploadWithWorkspace = useCallback(async (files: FileList) => {
+  // File upload only (workspace linking is a separate explicit action)
+  const handleFileInputUpload = useCallback(async (files: FileList) => {
     if (!files.length) return;
-
     try {
-      // Create new workspace
-      const workspaceName = newWorkspaceName || `Workspace ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`;
-      await createWorkspace(workspaceName, 'Auto-created from file upload');
-      
-      // Upload files and create nodes
       for (const file of Array.from(files)) {
         await handleUploadFile(file);
-        await createNodeFromFile(file.name);
       }
-      
-      setNewWorkspaceName('');
     } catch (error) {
-      console.error('Failed to upload files with workspace:', error);
+      console.error('Failed to upload files:', error);
     }
-  }, [newWorkspaceName, createWorkspace, handleUploadFile, createNodeFromFile]);
+  }, [handleUploadFile]);
 
   // Add file to workspace (create new workspace if none exists)
   const handleAddToWorkspace = useCallback(async (filename: string) => {
@@ -122,16 +113,11 @@ const DataLoaderTab: React.FC = () => {
     
     const droppedFiles = e.dataTransfer.files;
     if (droppedFiles.length > 0) {
-      if (activeLoader === 'file') {
-        await handleFileUploadWithWorkspace(droppedFiles);
-      } else {
-        // Just upload files without workspace creation
-        for (const file of Array.from(droppedFiles)) {
-          await handleUploadFile(file);
-        }
+      for (const file of Array.from(droppedFiles)) {
+        await handleUploadFile(file);
       }
     }
-  }, [activeLoader, handleFileUploadWithWorkspace, handleUploadFile]);
+  }, [handleUploadFile]);
 
   return (
     <div className="space-y-6">
@@ -188,7 +174,7 @@ const DataLoaderTab: React.FC = () => {
               <div className="space-y-2">
                 <div className="text-4xl">📄</div>
                 <p className="text-lg font-medium text-gray-700">
-                  Drop files here or click to upload
+                  Drag & drop here to upload, or click to browse
                 </p>
                 <p className="text-sm text-gray-500">
                   Supports CSV, JSON, and text files
@@ -196,7 +182,7 @@ const DataLoaderTab: React.FC = () => {
                 <input
                   type="file"
                   multiple
-                  onChange={(e) => e.target.files && handleFileUploadWithWorkspace(e.target.files)}
+                  onChange={(e) => e.target.files && handleFileInputUpload(e.target.files)}
                   className="hidden"
                   id="file-upload"
                   accept=".csv,.json,.txt,.tsv"
@@ -222,17 +208,43 @@ const DataLoaderTab: React.FC = () => {
             {/* Available Files for Adding to Workspace */}
             {files.length > 0 && (
               <div>
-                <h3 className="font-medium text-gray-700 mb-3">Available Files</h3>
-                <div className="space-y-2 max-h-48 overflow-y-auto">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-medium text-gray-700">Available Files</h3>
+                  <span className="text-xs text-gray-500">Tip: You can also drop files onto this list to upload.</span>
+                </div>
+                <div
+                  className="space-y-2 max-h-48 overflow-y-auto border border-gray-200 rounded-md p-1"
+                  onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                  onDrop={async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const dropped = e.dataTransfer?.files;
+                    if (dropped && dropped.length) {
+                      for (const f of Array.from(dropped)) {
+                        await handleUploadFile(f);
+                      }
+                    }
+                  }}
+                >
                   {files.map((file) => (
                     <div
                       key={file.filename}
                       className="flex items-center justify-between p-2 border border-gray-200 rounded hover:bg-gray-50"
                     >
                       <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-800">{file.display_name || file.filename}</p>
+                        <p className="text-sm font-medium text-gray-800">{file.full_path || file.filename}</p>
+                        {(file.folder || file.display_name) && (
+                          <p className="text-[11px] text-gray-400 truncate">
+                            {file.folder ? `${file.folder}/` : ''}{file.display_name || ''}
+                          </p>
+                        )}
                         <p className="text-xs text-gray-500">
                           {(file.size / 1024).toFixed(1)} KB • {file.file_type}
+                          {typeof file.is_sample !== 'undefined' && (
+                            <span className={`ml-2 px-1.5 py-0.5 rounded text-[10px] font-semibold ${file.is_sample ? 'bg-purple-100 text-purple-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                              {file.is_sample ? 'SAMPLE' : 'USER'}
+                            </span>
+                          )}
                         </p>
                       </div>
                       <button
