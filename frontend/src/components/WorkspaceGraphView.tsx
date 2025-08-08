@@ -25,6 +25,74 @@ const nodeTypes = {
   customNode: CustomNode,
 } as const;
 
+// Simple horizontal DAG layout helper (left-to-right)
+const computeHorizontalLayout = (
+  nodes: any[] = [],
+  edges: any[] = [],
+  opts: { xSpacing?: number; ySpacing?: number } = {}
+) => {
+  const X = opts.xSpacing ?? 320;
+  const Y = opts.ySpacing ?? 160;
+
+  const ids = nodes.map((n) => n.id);
+  const indegree = new Map<string, number>(ids.map((id: string) => [id, 0]));
+  const out = new Map<string, string[]>();
+
+  edges.forEach((e: any) => {
+    indegree.set(e.target, (indegree.get(e.target) || 0) + 1);
+    const arr = out.get(e.source) || [];
+    arr.push(e.target);
+    out.set(e.source, arr);
+  });
+
+  // Kahn's algorithm to compute levels (layer per node)
+  const level = new Map<string, number>();
+  const q: string[] = [];
+  ids.forEach((id) => {
+    if ((indegree.get(id) || 0) === 0) {
+      level.set(id, 0);
+      q.push(id);
+    }
+  });
+
+  while (q.length) {
+    const u = q.shift()!;
+    const uLevel = level.get(u) || 0;
+    const outs = out.get(u) || [];
+    outs.forEach((v) => {
+      // longest-path layering
+      level.set(v, Math.max(level.get(v) || 0, uLevel + 1));
+      indegree.set(v, (indegree.get(v) || 1) - 1);
+      if ((indegree.get(v) || 0) === 0) {
+        q.push(v);
+      }
+    });
+  }
+
+  // Any nodes left without a level (cycles/islands) -> 0
+  ids.forEach((id) => {
+    if (!level.has(id)) level.set(id, 0);
+  });
+
+  // Group by level, assign y based on order in each level
+  const layers = new Map<number, string[]>();
+  ids.forEach((id) => {
+    const l = level.get(id) || 0;
+    const arr = layers.get(l) || [];
+    arr.push(id);
+    layers.set(l, arr);
+  });
+
+  const positions = new Map<string, { x: number; y: number }>();
+  layers.forEach((arr: string[], l: number) => {
+    arr.forEach((id: string, idx: number) => {
+      positions.set(id, { x: l * X, y: idx * Y });
+    });
+  });
+
+  return positions;
+};
+
 /**
  * Separated graph view component focused only on ReactFlow rendering
  * This replaces the graph-related logic from the monolithic WorkspaceView
@@ -61,11 +129,17 @@ export const WorkspaceGraphView: React.FC = memo(() => {
     // TODO: Implement conversion functionality
   }, []);
 
-  // Transform and layout nodes horizontally
+  // Transform and layout nodes horizontally using a simple DAG layout
   const initialNodes = useMemo(() => {
     if (!workspaceGraph || !workspaceGraph.nodes) {
       return [];
     }
+
+    const positions = computeHorizontalLayout(
+      workspaceGraph.nodes,
+      workspaceGraph.edges || [],
+      { xSpacing: 320, ySpacing: 160 }
+    );
 
     return workspaceGraph.nodes.map((node: any, index: number) => {
       // Debug: Log the raw node data to understand the structure
@@ -89,14 +163,12 @@ export const WorkspaceGraphView: React.FC = memo(() => {
       const dataType = node.data?.nodeType || node.data?.dataType || node.data?.type || node.type || 'unknown';
       console.log('WorkspaceGraphView: Final dataType:', dataType);
       
+      const pos = positions.get(node.id) || { x: index * 320, y: 50 };
       return {
         id: node.id,
         // Use a true custom node type to avoid default node styling
         type: 'customNode',
-        position: { 
-          x: index * 320, // Slightly wider spacing
-          y: 50 // Move up a bit
-        },
+        position: pos,
         data: {
           node: {
             node_id: node.id,
@@ -124,14 +196,14 @@ export const WorkspaceGraphView: React.FC = memo(() => {
     });
   }, [workspaceGraph, handleDelete, handleRename, handleConvertToDocDataFrame, handleConvertToDataFrame]);
 
-  // EDGES DISABLED: Force no edges to prevent self-loops and unwanted connections
+  // Build edges with bezier style for smooth curves
   const initialEdges = useMemo(() => {
     if (!workspaceGraph || !workspaceGraph.edges) return [];
     return workspaceGraph.edges.map((e: any, idx: number) => ({
       id: e.id || `edge-${idx}`,
       source: e.source,
       target: e.target,
-      type: (e.type as any) || 'smoothstep',
+      type: 'bezier',
       animated: !!e.animated,
     }));
   }, [workspaceGraph]);
@@ -211,7 +283,8 @@ export const WorkspaceGraphView: React.FC = memo(() => {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeClick={onNodeClick}
-        connectionLineType={ConnectionLineType.SmoothStep}
+  connectionLineType={ConnectionLineType.Bezier}
+  defaultEdgeOptions={{ type: 'bezier' }}
         fitView
         fitViewOptions={{ padding: 0.2, includeHiddenNodes: false }}
         attributionPosition="bottom-left"
