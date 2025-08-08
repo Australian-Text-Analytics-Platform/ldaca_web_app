@@ -1,4 +1,5 @@
 import React, { memo, useCallback, useMemo, useEffect, useRef } from 'react';
+import dagre from 'dagre';
 import {
   ReactFlow,
   Controls,
@@ -25,69 +26,40 @@ const nodeTypes = {
   customNode: CustomNode,
 } as const;
 
-// Simple horizontal DAG layout helper (left-to-right)
-const computeHorizontalLayout = (
-  nodes: any[] = [],
-  edges: any[] = [],
-  opts: { xSpacing?: number; ySpacing?: number } = {}
+// Dagre-based auto-layout (left-to-right) respecting edges and grouping branches
+const computeDagreLayout = (
+  nodes: Array<{ id: string }>,
+  edges: Array<{ source: string; target: string }>,
+  opts: { rankdir?: 'LR' | 'TB'; ranksep?: number; nodesep?: number } = {}
 ) => {
-  const X = opts.xSpacing ?? 320;
-  const Y = opts.ySpacing ?? 160;
-
-  const ids = nodes.map((n) => n.id);
-  const indegree = new Map<string, number>(ids.map((id: string) => [id, 0]));
-  const out = new Map<string, string[]>();
-
-  edges.forEach((e: any) => {
-    indegree.set(e.target, (indegree.get(e.target) || 0) + 1);
-    const arr = out.get(e.source) || [];
-    arr.push(e.target);
-    out.set(e.source, arr);
+  const g = new dagre.graphlib.Graph();
+  g.setGraph({
+    rankdir: opts.rankdir ?? 'LR',
+    ranksep: opts.ranksep ?? 120,
+    nodesep: opts.nodesep ?? 80,
+    ranker: 'longest-path',
   });
+  g.setDefaultEdgeLabel(() => ({}));
 
-  // Kahn's algorithm to compute levels (layer per node)
-  const level = new Map<string, number>();
-  const q: string[] = [];
-  ids.forEach((id) => {
-    if ((indegree.get(id) || 0) === 0) {
-      level.set(id, 0);
-      q.push(id);
-    }
-  });
+  // Estimate node dimensions for layout; React Flow will render precisely
+  const DEFAULT_W = 320;
+  const DEFAULT_H = 140;
 
-  while (q.length) {
-    const u = q.shift()!;
-    const uLevel = level.get(u) || 0;
-    const outs = out.get(u) || [];
-    outs.forEach((v) => {
-      // longest-path layering
-      level.set(v, Math.max(level.get(v) || 0, uLevel + 1));
-      indegree.set(v, (indegree.get(v) || 1) - 1);
-      if ((indegree.get(v) || 0) === 0) {
-        q.push(v);
-      }
-    });
-  }
+  nodes.forEach((n) => g.setNode(n.id, { width: DEFAULT_W, height: DEFAULT_H }));
+  edges.forEach((e) => g.setEdge(e.source, e.target));
 
-  // Any nodes left without a level (cycles/islands) -> 0
-  ids.forEach((id) => {
-    if (!level.has(id)) level.set(id, 0);
-  });
-
-  // Group by level, assign y based on order in each level
-  const layers = new Map<number, string[]>();
-  ids.forEach((id) => {
-    const l = level.get(id) || 0;
-    const arr = layers.get(l) || [];
-    arr.push(id);
-    layers.set(l, arr);
-  });
+  dagre.layout(g);
 
   const positions = new Map<string, { x: number; y: number }>();
-  layers.forEach((arr: string[], l: number) => {
-    arr.forEach((id: string, idx: number) => {
-      positions.set(id, { x: l * X, y: idx * Y });
-    });
+  nodes.forEach((n) => {
+    const p = g.node(n.id);
+    if (p) {
+      positions.set(n.id, {
+        // Dagre returns centers; shift to top-left for React Flow
+        x: p.x - DEFAULT_W / 2,
+        y: p.y - DEFAULT_H / 2,
+      });
+    }
   });
 
   return positions;
@@ -135,10 +107,10 @@ export const WorkspaceGraphView: React.FC = memo(() => {
       return [];
     }
 
-    const positions = computeHorizontalLayout(
-      workspaceGraph.nodes,
-      workspaceGraph.edges || [],
-      { xSpacing: 320, ySpacing: 160 }
+    const positions = computeDagreLayout(
+      (workspaceGraph.nodes || []).map((n: any) => ({ id: n.id })),
+      (workspaceGraph.edges || []).map((e: any) => ({ source: e.source, target: e.target })),
+      { rankdir: 'LR', ranksep: 140, nodesep: 100 }
     );
 
     return workspaceGraph.nodes.map((node: any, index: number) => {

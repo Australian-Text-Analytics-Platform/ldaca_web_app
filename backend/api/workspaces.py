@@ -1778,7 +1778,14 @@ async def detach_concordance(
                 workspace_id=workspace_id,
                 data=final_data,
                 node_name=new_node_name,
+                operation="concordance_detach",
+                parents=[node],
             )
+
+            if not new_node:
+                raise HTTPException(
+                    status_code=500, detail="Failed to create detached concordance node"
+                )
 
             return {
                 "success": True,

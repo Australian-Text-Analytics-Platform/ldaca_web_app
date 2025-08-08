@@ -69,11 +69,18 @@ const ConcordanceTab: React.FC = () => {
     }
   }, [results]);
 
-  // Clear results when node selection changes  
-  // Use a more stable dependency by checking the actual node IDs
+  // Preserve results across transient graph refetches: only clear when the actual set of selected IDs changes
   const selectedNodeIds = useMemo(() => selectedNodes.map(node => node.id).sort(), [selectedNodes]);
+  const prevSelectedNodeIdsRef = React.useRef<string[] | null>(null);
   useEffect(() => {
-    setResults(null);
+    const prev = prevSelectedNodeIdsRef.current;
+    const curr = selectedNodeIds;
+    const changed = !prev || prev.length !== curr.length || prev.some((id, i) => id !== curr[i]);
+    if (changed) {
+      // Only clear if selection truly changed; keep tables if selection is stable
+      setResults(null);
+    }
+    prevSelectedNodeIdsRef.current = curr;
   }, [selectedNodeIds]);
 
   // Check for pending concordance search from TokenFrequencyTab
