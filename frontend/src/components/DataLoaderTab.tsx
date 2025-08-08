@@ -2,6 +2,7 @@ import React, { useState, useCallback, useMemo } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useWorkspace } from '../hooks/useWorkspace';
 import { useFiles } from '../hooks/useFiles';
+import FilePreviewModal from './FilePreviewModal';
 
 const DataLoaderTab: React.FC = () => {
   const { getAuthHeaders } = useAuth();
@@ -27,7 +28,7 @@ const DataLoaderTab: React.FC = () => {
 
   const [activeLoader, setActiveLoader] = useState<'file' | 'workspace' | 'filter'>('file');
   const [newWorkspaceName, setNewWorkspaceName] = useState('');
-  const [isDragOver, setIsDragOver] = useState(false);
+  const [previewFile, setPreviewFile] = useState<string | null>(null);
   const [addingToWorkspace, setAddingToWorkspace] = useState<string | null>(null);
 
   // File upload only (workspace linking is a separate explicit action)
@@ -96,28 +97,7 @@ const DataLoaderTab: React.FC = () => {
     console.log('Workspace unloaded');
   }, [setCurrentWorkspace]);
 
-  // Drag and drop handlers
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(true);
-  }, []);
-
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
-  }, []);
-
-  const handleDrop = useCallback(async (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
-    
-    const droppedFiles = e.dataTransfer.files;
-    if (droppedFiles.length > 0) {
-      for (const file of Array.from(droppedFiles)) {
-        await handleUploadFile(file);
-      }
-    }
-  }, [handleUploadFile]);
+  // Standalone global DnD removed; list handles DnD directly
 
   return (
     <div className="space-y-6">
@@ -161,39 +141,24 @@ const DataLoaderTab: React.FC = () => {
               />
             </div>
             
-            <div
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-                isDragOver
-                  ? 'border-blue-500 bg-blue-50'
-                  : 'border-gray-300 hover:border-gray-400'
-              }`}
-            >
-              <div className="space-y-2">
-                <div className="text-4xl">📄</div>
-                <p className="text-lg font-medium text-gray-700">
-                  Drag & drop here to upload, or click to browse
-                </p>
-                <p className="text-sm text-gray-500">
-                  Supports CSV, JSON, and text files
-                </p>
-                <input
-                  type="file"
-                  multiple
-                  onChange={(e) => e.target.files && handleFileInputUpload(e.target.files)}
-                  className="hidden"
-                  id="file-upload"
-                  accept=".csv,.json,.txt,.tsv"
-                />
-                <label
-                  htmlFor="file-upload"
-                  className="inline-block px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 cursor-pointer"
-                >
-                  Choose Files
+            {/* Standalone drop-zone removed; users can drop directly onto the list below */}
+            <div className="flex items-center justify-between text-sm text-gray-600">
+              <div>
+                Drag & drop files onto the list below to upload, or
+                <label className="text-blue-600 hover:text-blue-700 cursor-pointer ml-1">
+                  browse
+                  <input
+                    type="file"
+                    multiple
+                    onChange={(e) => e.target.files && handleFileInputUpload(e.target.files)}
+                    className="hidden"
+                    accept=".csv,.json,.txt,.tsv,.parquet"
+                  />
                 </label>
               </div>
+              {uploading && (
+                <span className="text-blue-600">Uploading…</span>
+              )}
             </div>
             
             {uploading && (
@@ -213,7 +178,7 @@ const DataLoaderTab: React.FC = () => {
                   <span className="text-xs text-gray-500">Tip: You can also drop files onto this list to upload.</span>
                 </div>
                 <div
-                  className="space-y-2 max-h-48 overflow-y-auto border border-gray-200 rounded-md p-1"
+                  className="space-y-2 max-h-[28rem] overflow-y-auto border border-gray-200 rounded-md p-1"
                   onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
                   onDrop={async (e) => {
                     e.preventDefault();
@@ -229,7 +194,8 @@ const DataLoaderTab: React.FC = () => {
                   {files.map((file) => (
                     <div
                       key={file.filename}
-                      className="flex items-center justify-between p-2 border border-gray-200 rounded hover:bg-gray-50"
+                      className="flex items-center justify-between p-2 border border-gray-200 rounded hover:bg-gray-50 cursor-pointer"
+                      onClick={() => setPreviewFile(file.filename)}
                     >
                       <div className="flex-1">
                         <p className="text-sm font-medium text-gray-800">{file.full_path || file.filename}</p>
@@ -262,6 +228,11 @@ const DataLoaderTab: React.FC = () => {
                     </div>
                   ))}
                 </div>
+                <FilePreviewModal
+                  filename={previewFile}
+                  isOpen={!!previewFile}
+                  onClose={() => setPreviewFile(null)}
+                />
               </div>
             )}
           </div>

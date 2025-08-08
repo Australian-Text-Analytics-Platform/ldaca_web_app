@@ -1,6 +1,5 @@
 import { 
   User, 
-  AuthMethod, 
   AuthInfoResponse, 
   GoogleAuthResponse 
 } from '../types';

@@ -11,7 +11,6 @@ import TimelineTab from './components/TimelineTab';
 import TokenFrequencyTab from './components/TokenFrequencyTab';
 import WorkspaceView from './components/WorkspaceView';
 import Sidebar from './components/Sidebar';
-import GlobalFileDrop from './components/GlobalFileDrop';
 
 /**
  * Improved App component with proper error boundaries and loading states
@@ -71,7 +70,7 @@ const App: React.FC = () => {
     <QueryProvider>
       <ErrorBoundary>
         <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-          <GlobalFileDrop />
+          {/* Global drag-and-drop overlay removed; users can drop directly onto the file list */}
           {/* Header */}
           <header className="bg-white border-b border-gray-200 px-6 py-4 relative">
             <div className="flex items-center justify-between">

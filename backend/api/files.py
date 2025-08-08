@@ -147,9 +147,16 @@ async def delete_file(filename: str, current_user: dict = Depends(get_current_us
 
 @router.get("/{filename}/preview")
 async def get_file_preview(
-    filename: str, current_user: dict = Depends(get_current_user)
+    filename: str,
+    page: int = 0,
+    page_size: int = 20,
+    current_user: dict = Depends(get_current_user),
 ):
-    """Get file preview (first 10 rows)"""
+    """Get file preview using Polars with simple pagination.
+
+    Note: For large files, we use lazy scanning when possible and only collect the requested slice.
+    Total rows may not be computed cheaply; we return 0 in that case and let the UI page optimistically.
+    """
     user_id = current_user["id"]
     data_folder = get_user_data_folder(user_id)
     file_path = data_folder / filename
@@ -166,22 +173,32 @@ async def get_file_preview(
     try:
         file_type = detect_file_type(file_path.name)
 
+        # Normalize pagination inputs
+        page = max(0, int(page))
+        page_size = max(1, min(500, int(page_size)))
+        offset = page * page_size
+
         # Build a lightweight preview using Polars where possible
         df = None
         if file_type == "csv":
-            df = pl.read_csv(file_path, n_rows=10)
+            # Use lazy scan to avoid full file read
+            df = pl.scan_csv(file_path).slice(offset, page_size).collect()
         elif file_type == "tsv":
-            df = pl.read_csv(file_path, separator="\t", n_rows=10)
+            df = (
+                pl.scan_csv(file_path, separator="\t")
+                .slice(offset, page_size)
+                .collect()
+            )
         elif file_type == "parquet":
-            df = pl.scan_parquet(file_path).head(10).collect()
+            df = pl.scan_parquet(file_path).slice(offset, page_size).collect()
         elif file_type == "jsonl":
-            # Newline-delimited JSON
+            # No lazy for ndjson currently; read a window by skipping lines is non-trivial
+            # Fallback: read and then slice in memory (acceptable for small files)
             df = pl.read_ndjson(file_path)
-            df = df.head(10)
+            df = df.slice(offset, page_size)
         elif file_type == "json":
-            # Regular JSON (may read whole file depending on structure)
             df = pl.read_json(file_path)
-            df = df.head(10)
+            df = df.slice(offset, page_size)
         else:
             # Unsupported types for preview (e.g., excel, text)
             df = pl.DataFrame()
@@ -197,7 +214,7 @@ async def get_file_preview(
         except Exception:
             preview_data, columns = [], []
 
-        # Unknown without full scan; frontend treats 0 as unknown
+        # Unknown without expensive count; return 0 to indicate unknown
         total_rows = 0
 
         return {

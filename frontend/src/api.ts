@@ -136,9 +136,17 @@ export async function downloadFile(fileName: string, authHeaders: Record<string,
   return res.data;
 }
 
-export async function getFilePreview(fileName: string, authHeaders: Record<string, string> = {}) {
+export async function getFilePreview(
+  fileName: string,
+  authHeaders: Record<string, string> = {},
+  opts?: { page?: number; pageSize?: number }
+) {
   const res = await axios.get(`${API_BASE}/files/${encodeURIComponent(fileName)}/preview`, {
-    headers: authHeaders
+    headers: authHeaders,
+    params: {
+      page: opts?.page ?? 0,
+      page_size: opts?.pageSize ?? 20,
+    }
   });
   return res.data;
 }

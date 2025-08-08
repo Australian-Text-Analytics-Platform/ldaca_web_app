@@ -95,7 +95,7 @@ const FileLoaderTab: React.FC<FileLoaderTabProps> = ({ onFileLoaded }) => {
         </div>
       )}
 
-  {/* File Upload Controls (global window DnD handled by GlobalFileDrop) */}
+  {/* File Upload Controls */}
       {isAuthenticated && (
         <div className="mb-4">
           <div className="flex items-center justify-between">
@@ -131,7 +131,7 @@ const FileLoaderTab: React.FC<FileLoaderTabProps> = ({ onFileLoaded }) => {
 
       {/* Unified File List View as a drop target */}
       <div
-        className="border border-gray-300 rounded-lg h-60 overflow-y-auto mb-4 bg-gray-50 shadow-inner"
+        className="border border-gray-300 rounded-lg h-96 overflow-y-auto mb-4 bg-gray-50 shadow-inner"
         onDragOver={(e) => {
           e.preventDefault();
           e.stopPropagation();
