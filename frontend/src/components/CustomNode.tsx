@@ -1,5 +1,5 @@
 import React, { memo, useState, useEffect, useRef, useCallback } from 'react';
-import { NodeProps } from '@xyflow/react';
+import { NodeProps, Handle, Position } from '@xyflow/react';
 import { WorkspaceNode } from '../types';
 import DocumentColumnModal from './DocumentColumnModal';
 import { formatDataType, getTypeStyleClass } from '../utils/typeFormatting';
@@ -329,9 +329,9 @@ const CustomNode: React.FC<NodeProps<any>> = ({ data, selected }) => {
         )}
       </div>
 
-      {/* Handles removed - No connections needed for this graph */}
-      {/* <Handle type="target" position={Position.Left} className="!w-2 !h-2 !bg-gray-500" />
-      <Handle type="source" position={Position.Right} className="!w-2 !h-2 !bg-gray-500" /> */}
+  {/* Passive handles so backend edges can attach; UI connections remain disabled by parent ReactFlow props */}
+  <Handle type="target" position={Position.Left} className="!w-2 !h-2 !bg-gray-400 opacity-0 pointer-events-none" />
+  <Handle type="source" position={Position.Right} className="!w-2 !h-2 !bg-gray-400 opacity-0 pointer-events-none" />
 
       {/* Modal for selecting document column */}
       <DocumentColumnModal

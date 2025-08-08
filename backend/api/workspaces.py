@@ -609,6 +609,7 @@ async def filter_node(
             data=filtered_data,
             node_name=new_node_name,
             operation=f"filter({node.name})",
+            parents=[node],
         )
         return new_node
 
@@ -672,6 +673,7 @@ async def slice_node(
             data=sliced_data,
             node_name=new_node_name,
             operation=f"slice({node.name})",
+            parents=[node],
         )
         return new_node
 
@@ -713,9 +715,6 @@ async def join_nodes(
         if not left_node or not right_node:
             raise ValueError("One or both nodes not found")
 
-        # Use Polars join directly since we need to support different column names
-        import polars as pl
-
         # Get the data from both nodes
         left_data = left_node.data
         right_data = right_node.data
@@ -744,6 +743,7 @@ async def join_nodes(
             data=joined_df,
             node_name=node_name,
             operation=f"join({left_node.name}, {right_node.name})",
+            parents=[left_node, right_node],
         )
 
         return new_node

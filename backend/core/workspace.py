@@ -97,7 +97,7 @@ class WorkspaceManager:
         data_name: Optional[str] = None,
     ) -> Any:
         """Create workspace using DocWorkspace constructor"""
-        if not DOCWORKSPACE_AVAILABLE:
+        if not DOCWORKSPACE_AVAILABLE or Workspace is None:
             raise RuntimeError("DocWorkspace not available")
 
         # Use DocWorkspace constructor directly
@@ -185,8 +185,14 @@ class WorkspaceManager:
         data: Union[pl.DataFrame, pl.LazyFrame],
         node_name: str,
         operation: str = "manual_add",
+        parents: Optional[list[Any]] = None,
     ) -> Optional[Any]:
-        """Add node to workspace using DocWorkspace methods"""
+        """Add node to workspace using DocWorkspace methods.
+
+        parents: Optional list of parent Node(s) to establish graph relationships.
+        When provided, the created node will be connected to these parents and
+        edges will be visible in the workspace graph API.
+        """
         workspace = self.get_workspace(user_id, workspace_id)
 
         if workspace is None or Node is None:
@@ -195,7 +201,11 @@ class WorkspaceManager:
         try:
             # Use DocWorkspace Node constructor directly
             node = Node(
-                data=data, name=node_name, workspace=workspace, operation=operation
+                data=data,
+                name=node_name,
+                workspace=workspace,
+                parents=parents or [],
+                operation=operation,
             )
 
             # DocWorkspace automatically handles adding to workspace
