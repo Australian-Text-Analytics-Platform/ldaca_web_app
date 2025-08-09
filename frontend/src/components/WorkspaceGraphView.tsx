@@ -72,7 +72,7 @@ const computeDagreLayout = (
  * This replaces the graph-related logic from the monolithic WorkspaceView
  */
 export const WorkspaceGraphView: React.FC = memo(() => {
-  const { workspaceGraph, isLoading, deleteNode, renameNode, selectNode, toggleNodeSelection, convertToDocDataFrame, convertToDataFrame, convertToDocLazyFrame, convertToLazyFrame, currentWorkspaceId } = useWorkspace();
+  const { workspaceGraph, isLoading, deleteNode, renameNode, toggleNodeSelection, convertToDocDataFrame, convertToDataFrame, convertToDocLazyFrame, convertToLazyFrame, currentWorkspaceId, selectedNodeIds } = useWorkspace();
   const queryClient = useQueryClient();
   
   // Track pending delete operations to prevent duplicates
@@ -146,7 +146,7 @@ export const WorkspaceGraphView: React.FC = memo(() => {
       { rankdir: 'LR', ranksep: 140, nodesep: 100 }
     );
 
-    return workspaceGraph.nodes.map((node: any, index: number) => {
+  return workspaceGraph.nodes.map((node: any, index: number) => {
       // Debug: Log the raw node data to understand the structure
       console.log('WorkspaceGraphView: Raw node data:', node);
       console.log('WorkspaceGraphView: node.data:', node.data);
@@ -169,7 +169,7 @@ export const WorkspaceGraphView: React.FC = memo(() => {
       console.log('WorkspaceGraphView: Final dataType:', dataType);
       
       const pos = positions.get(node.id) || { x: index * 320, y: 50 };
-      return {
+  return {
         id: node.id,
         // Use a true custom node type to avoid default node styling
         type: 'customNode',
@@ -198,10 +198,11 @@ export const WorkspaceGraphView: React.FC = memo(() => {
         hidden: false,
         draggable: true,
         selectable: true,
+    selected: selectedNodeIds?.includes?.(node.id) ?? false,
         connectable: false,
       };
     });
-  }, [workspaceGraph, handleDelete, handleRename, handleConvertToDocDataFrame, handleConvertToDataFrame, handleConvertToDocLazyFrame, handleConvertToLazyFrame]);
+  }, [workspaceGraph, handleDelete, handleRename, handleConvertToDocDataFrame, handleConvertToDataFrame, handleConvertToDocLazyFrame, handleConvertToLazyFrame, selectedNodeIds]);
 
   // Build edges with bezier style for smooth curves
   const initialEdges = useMemo(() => {
@@ -274,15 +275,30 @@ export const WorkspaceGraphView: React.FC = memo(() => {
 
   // Handle node selection
   const onNodeClick: NodeMouseHandler = useCallback((event: React.MouseEvent, node: Node) => {
+    event.preventDefault();
+    event.stopPropagation();
     if (node && node.id) {
-      // Check for Command key (Mac) or Ctrl key (Windows/Linux) for multi-selection
-      if (event.metaKey || event.ctrlKey) {
-        toggleNodeSelection(node.id);
-      } else {
-        selectNode(node.id);
-      }
+      // Toggle selection without requiring Command/Ctrl
+      toggleNodeSelection(node.id);
     }
-  }, [selectNode, toggleNodeSelection]);
+  }, [toggleNodeSelection]);
+
+  // Keep React Flow node 'selected' flags in sync with our store selection
+  useEffect(() => {
+    setNodes((ns) => ns.map((n) => ({ ...n, selected: selectedNodeIds?.includes?.(n.id) ?? false })) as any);
+  }, [selectedNodeIds, setNodes]);
+
+  // Normalize selection changes coming from React Flow so pane clicks don't clear highlights
+  const handleNodesChange = useCallback((changes: any) => {
+    const normalized = (changes || []).map((c: any) => {
+      if (c.type === 'select') {
+        // Force selection to reflect our store, ignoring pane-clearing behavior
+        return { ...c, selected: selectedNodeIds?.includes?.(c.id) ?? false };
+      }
+      return c;
+    });
+    onNodesChange(normalized);
+  }, [onNodesChange, selectedNodeIds]);
 
   if (isLoading.graph) {
     return <GraphLoadingSkeleton />;
@@ -308,9 +324,13 @@ export const WorkspaceGraphView: React.FC = memo(() => {
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes as any}
-        onNodesChange={onNodesChange}
+  onNodesChange={handleNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeClick={onNodeClick}
+        onPaneClick={() => {
+          // React Flow clears selection on pane click; immediately restore it from our store
+          setNodes((ns) => ns.map((n) => ({ ...n, selected: selectedNodeIds?.includes?.(n.id) ?? false })) as any);
+        }}
   connectionLineType={ConnectionLineType.Bezier}
   defaultEdgeOptions={{ type: 'bezier' }}
         fitView
