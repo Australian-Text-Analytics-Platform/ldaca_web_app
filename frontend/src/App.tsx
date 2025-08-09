@@ -25,25 +25,52 @@ const App: React.FC = () => {
   const [isRightCollapsed, setIsRightCollapsed] = useState<boolean>(false);
   const [isResizing, setIsResizing] = useState(false);
   const layoutRef = useRef<HTMLDivElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
+  const asideRef = useRef<HTMLElement>(null);
+  const rightWidthLiveRef = useRef<number>(rightWidth);
   const onStartResize = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     if (isRightCollapsed) return; // don't resize when collapsed
     setIsResizing(true);
+    let rafId: number | null = null;
+    // Capture starting state to compute deltas (prevents jump on first move)
+    const startX = e.clientX;
+    const startPct = rightWidth;
     const onMove = (ev: MouseEvent) => {
       if (!layoutRef.current) return;
-      const rect = layoutRef.current.getBoundingClientRect();
-      const offsetX = ev.clientX - rect.left;
-      const pctRight = Math.min(80, Math.max(20, ((rect.width - offsetX) / rect.width) * 100));
-      setRightWidth(pctRight);
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        if (!layoutRef.current) return;
+        const rect = layoutRef.current.getBoundingClientRect();
+        // Compute delta from initial drag position to avoid any jump
+        const dx = ev.clientX - startX;
+        const deltaPct = -(dx / rect.width) * 100; // moving right shrinks right panel
+        const pctRight = Math.min(80, Math.max(20, startPct + deltaPct));
+        rightWidthLiveRef.current = pctRight;
+        // Apply widths directly to avoid React rerenders during drag
+        const mainEl = mainRef.current;
+        const asideEl = asideRef.current;
+        if (mainEl && !isRightCollapsed) {
+          mainEl.style.width = `${100 - pctRight}%`;
+        }
+        if (asideEl && !isRightCollapsed) {
+          asideEl.style.width = `${pctRight}%`;
+        }
+      });
     };
     const onUp = () => {
       setIsResizing(false);
+      // flush any pending frame
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      // Commit the final width to state once
+      const finalPct = rightWidthLiveRef.current ?? rightWidth;
+      setRightWidth(finalPct);
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
     };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
-  }, [isRightCollapsed, setIsResizing, setRightWidth, layoutRef]);
+  }, [isRightCollapsed, rightWidth, setIsResizing, setRightWidth, layoutRef]);
 
   // Collapse/expand the entire right panel (Outlook-like behavior)
   const toggleRightPanel = useCallback(() => {
@@ -137,7 +164,8 @@ const App: React.FC = () => {
 
             {/* Middle Panel - Operation UI */}
             <main
-              className="p-6 overflow-y-auto relative transition-all duration-300 ease-in-out"
+              ref={mainRef}
+              className={`p-6 overflow-y-auto relative ${isResizing ? 'transition-none' : 'transition-all duration-300 ease-in-out'}`}
               style={{ width: isRightCollapsed ? '100%' : `${100 - rightWidth}%`, minWidth: 280 }}
             >
               <div className={`${isRightCollapsed ? 'w-full max-w-none mx-0' : 'w-full max-w-4xl mx-auto'}`}>
@@ -170,7 +198,8 @@ const App: React.FC = () => {
 
             {/* Right Panel - Workspace View */}
             <aside
-              className={`bg-white border-l border-gray-200 relative overflow-hidden transition-all duration-300 ease-in-out ${
+              ref={asideRef}
+              className={`bg-white border-l border-gray-200 relative overflow-hidden ${isResizing ? 'transition-none' : 'transition-all duration-300 ease-in-out'} ${
                 isRightCollapsed ? 'min-w-0' : 'min-w-[320px]'
               }`}
               style={{ width: isRightCollapsed ? 0 : `${rightWidth}%` }}

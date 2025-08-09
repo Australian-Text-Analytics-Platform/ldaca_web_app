@@ -678,20 +678,23 @@ const ConcordanceTab: React.FC = () => {
               Hold Cmd/Ctrl to select multiple nodes.
             </div>
           ) : (
-            <div className="space-y-3">
+            <>
+            {/* Horizontal list; enable horizontal scroll only when >2 nodes */}
+            <div className={`flex space-x-3 pb-2 ${selectedNodes.length > 2 ? 'overflow-x-auto' : 'overflow-x-hidden'}`}>
               {selectedNodes.map((node: any) => {
                 const columns = getNodeColumns(node);
                 const selection = nodeColumnSelections.find(sel => sel.nodeId === node.id);
-                
+                const nodeDisplayName = node.name || node.data?.name || (node as any).label || node.data?.label || node.id;
                 return (
-                  <div key={node.id} className="bg-gray-50 p-3 rounded-md">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-medium text-gray-700">
-                        {node.data?.name || node.id}
-                      </span>
-                      <span className="text-xs text-gray-500">
-                        {node.data?.shape && `${node.data.shape.rows} rows`}
-                      </span>
+                  <div
+                    key={node.id}
+                    className={`bg-gray-50 p-3 rounded-md ${selectedNodes.length > 2 ? 'flex-none min-w-[50%]' : 'flex-1 min-w-0'}`}
+                  >
+                    <div className="mb-2">
+                      <div className="font-medium text-gray-800 break-words">
+                        {nodeDisplayName}
+                      </div>
+                      <div className="text-xs text-gray-500 break-all">{node.id}</div>
                     </div>
                     
                     {columns.length > 0 ? (
@@ -721,6 +724,7 @@ const ConcordanceTab: React.FC = () => {
                 );
               })}
             </div>
+            </>
           )}
           
           {selectedNodes.length > 2 && (
