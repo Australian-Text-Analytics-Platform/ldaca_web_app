@@ -24,7 +24,7 @@ const DataLoaderTab: React.FC = () => {
     files, 
     uploading, 
     handleUploadFile
-  } = useFiles({ authHeaders });
+  , handleDeleteFile, refetchFiles } = useFiles({ authHeaders });
 
   const [activeLoader, setActiveLoader] = useState<'file' | 'workspace' | 'filter'>('file');
   const [newWorkspaceName, setNewWorkspaceName] = useState('');
@@ -212,18 +212,40 @@ const DataLoaderTab: React.FC = () => {
                           )}
                         </p>
                       </div>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleAddToWorkspace(file.filename); }}
-                        disabled={addingToWorkspace === file.filename || isLoading.operations}
-                        className="px-3 py-1 text-sm bg-green-100 text-green-700 rounded hover:bg-green-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {addingToWorkspace === file.filename 
-                          ? 'Adding...' 
-                          : currentWorkspace 
-                            ? 'Add to Workspace' 
-                            : 'Create Workspace & Add'
-                        }
-                      </button>
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleAddToWorkspace(file.filename); }}
+                          disabled={addingToWorkspace === file.filename || isLoading.operations}
+                          className="px-3 py-1 text-sm bg-green-100 text-green-700 rounded hover:bg-green-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {addingToWorkspace === file.filename 
+                            ? 'Adding...' 
+                            : currentWorkspace 
+                              ? 'Add to Workspace' 
+                              : 'Create Workspace & Add'
+                          }
+                        </button>
+                        {!file.is_sample && (
+                          <button
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              const confirm = window.confirm(`Delete file "${file.filename}"? This cannot be undone.`);
+                              if (!confirm) return;
+                              const ok = await handleDeleteFile(file.filename);
+                              if (!ok) {
+                                console.error('Failed to delete file');
+                              } else {
+                                // Refresh list to reflect deletion
+                                refetchFiles();
+                              }
+                            }}
+                            className="px-2 py-1 text-sm bg-red-50 text-red-600 rounded hover:bg-red-100"
+                            title="Delete file"
+                          >
+                            Delete
+                          </button>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>

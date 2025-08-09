@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './App.css';
 import { useAuth } from './hooks/useAuth';
 import { QueryProvider } from './providers/QueryProvider';
@@ -18,6 +18,46 @@ import Sidebar from './components/Sidebar';
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'data-loader' | 'filter' | 'token-frequency' | 'concordance' | 'analysis' | 'export'>('data-loader');
   const { user, loginWithGoogle, logout, isAuthenticated, isMultiUserMode, isLoading, error } = useAuth();
+
+  // Right panel width and resize handlers must be declared before any early returns (React Hooks rule)
+  const [rightWidth, setRightWidth] = useState<number>(50); // percentage of total width
+  const [lastRightWidth, setLastRightWidth] = useState<number>(50); // remember last width when collapsing
+  const [isRightCollapsed, setIsRightCollapsed] = useState<boolean>(false);
+  const [isResizing, setIsResizing] = useState(false);
+  const layoutRef = useRef<HTMLDivElement>(null);
+  const onStartResize = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    if (isRightCollapsed) return; // don't resize when collapsed
+    setIsResizing(true);
+    const onMove = (ev: MouseEvent) => {
+      if (!layoutRef.current) return;
+      const rect = layoutRef.current.getBoundingClientRect();
+      const offsetX = ev.clientX - rect.left;
+      const pctRight = Math.min(80, Math.max(20, ((rect.width - offsetX) / rect.width) * 100));
+      setRightWidth(pctRight);
+    };
+    const onUp = () => {
+      setIsResizing(false);
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }, [isRightCollapsed, setIsResizing, setRightWidth, layoutRef]);
+
+  // Collapse/expand the entire right panel (Outlook-like behavior)
+  const toggleRightPanel = useCallback(() => {
+    setIsRightCollapsed((prev) => {
+      const next = !prev;
+      if (next) {
+        setLastRightWidth(rightWidth);
+      } else {
+        // restore previous width
+        setRightWidth((w) => (w === 0 ? lastRightWidth || 40 : w));
+      }
+      return next;
+    });
+  }, [rightWidth, lastRightWidth]);
 
   // Listen for navigation events from TokenFrequencyTab
   useEffect(() => {
@@ -66,6 +106,8 @@ const App: React.FC = () => {
     );
   }
 
+  // (removed duplicate resize hook block)
+
   return (
     <QueryProvider>
       <ErrorBoundary>
@@ -87,15 +129,18 @@ const App: React.FC = () => {
             </div>
           </header>
 
-          <div className="flex h-[calc(100vh-73px)]">
+          <div className="flex h-[calc(100vh-73px)] relative" ref={layoutRef}>
             {/* Left Sidebar */}
             <ErrorBoundary>
               <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
             </ErrorBoundary>
 
             {/* Middle Panel - Operation UI */}
-            <main className="flex-1 p-6 overflow-y-auto relative">
-              <div className="max-w-4xl mx-auto">
+            <main
+              className="p-6 overflow-y-auto relative transition-all duration-300 ease-in-out"
+              style={{ width: isRightCollapsed ? '100%' : `${100 - rightWidth}%`, minWidth: 280 }}
+            >
+              <div className={`${isRightCollapsed ? 'w-full max-w-none mx-0' : 'w-full max-w-4xl mx-auto'}`}>
                 <ErrorBoundary>
                   {activeTab === 'data-loader' && <DataLoaderTab />}
                   {activeTab === 'filter' && <FilterTab />}
@@ -112,12 +157,53 @@ const App: React.FC = () => {
               </div>
             </main>
 
+            {/* Vertical drag handle between main and right panel */}
+            {!isRightCollapsed && (
+              <div
+                className={`w-1 ${isResizing ? 'bg-gray-300' : 'bg-gray-200 hover:bg-gray-300'} cursor-col-resize`}
+                onMouseDown={onStartResize}
+                role="separator"
+                aria-orientation="vertical"
+                aria-label="Resize right panel"
+              />
+            )}
+
             {/* Right Panel - Workspace View */}
-            <aside className="flex-1 bg-white border-l border-gray-200 min-w-0 relative">
+            <aside
+              className={`bg-white border-l border-gray-200 relative overflow-hidden transition-all duration-300 ease-in-out ${
+                isRightCollapsed ? 'min-w-0' : 'min-w-[320px]'
+              }`}
+              style={{ width: isRightCollapsed ? 0 : `${rightWidth}%` }}
+            >
+              {/* Outlook-like collapse button at top-right of the right panel */}
+              {!isRightCollapsed && (
+                <button
+                  onClick={toggleRightPanel}
+                  className="group absolute top-2 right-2 z-20 rounded-md border border-gray-300 bg-white/80 backdrop-blur px-2 py-1 text-gray-700 hover:bg-gray-50 shadow-sm flex items-center"
+                  aria-label="Collapse right panel"
+                  title="Collapse"
+                >
+                  <span className="overflow-hidden whitespace-nowrap transition-all duration-200 max-w-0 group-hover:max-w-[120px] mr-1">Collapse</span>
+                  <span aria-hidden>❯</span>
+                </button>
+              )}
               <ErrorBoundary>
-                <WorkspaceView />
+                {!isRightCollapsed && <WorkspaceView />}
               </ErrorBoundary>
             </aside>
+
+            {/* Floating expand button when panel is collapsed (top-right), Outlook style */}
+            {isRightCollapsed && (
+              <button
+                onClick={toggleRightPanel}
+                className="group absolute top-2 right-2 z-30 rounded-md border border-gray-300 bg-white/90 backdrop-blur px-2 py-1 text-gray-700 hover:bg-gray-50 shadow flex items-center"
+                aria-label="Expand right panel"
+                title="Expand"
+              >
+                <span className="overflow-hidden whitespace-nowrap transition-all duration-200 max-w-0 group-hover:max-w-[90px] mr-1">Show</span>
+                <span aria-hidden>❮</span>
+              </button>
+            )}
           </div>
         </div>
       </ErrorBoundary>
