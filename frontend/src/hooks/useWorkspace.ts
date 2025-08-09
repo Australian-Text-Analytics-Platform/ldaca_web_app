@@ -255,7 +255,21 @@ export const useWorkspace = () => {
   const saveWorkspaceAsMutation = useMutation({
     mutationFn: (filename: string) => apiSaveWorkspaceAs(currentWorkspaceId!, filename, authHeaders),
     onMutate: () => startOperation('saveWorkspaceAs'),
-    onSuccess: () => {
+    onSuccess: (data: any) => {
+      // If backend returned the new workspace info, merge it into cache so UI updates immediately
+      const newWs = data?.new_workspace;
+      if (newWs) {
+        queryClient.setQueryData(queryKeys.workspaces, (old: any) => {
+          if (!old) return [newWs];
+          const exists = old.some((w: any) => w.workspace_id === newWs.workspace_id);
+          return exists ? old : [...old, newWs];
+        });
+        // Optionally set as current (commented out; enable if desired)
+        // queryClient.setQueryData(queryKeys.currentWorkspace, newWs.workspace_id);
+      } else {
+        // Fallback: invalidate list if structure unexpected
+        queryClient.invalidateQueries({ queryKey: queryKeys.workspaces });
+      }
       endOperation('saveWorkspaceAs');
     },
     onError: (error: any) => {

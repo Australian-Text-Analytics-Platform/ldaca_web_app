@@ -16,7 +16,8 @@ const WorkspaceView: React.FC = memo(() => {
   const bottomRef = useRef<HTMLDivElement>(null);
   const [split, setSplit] = useState<number>(50); // percentage for top panel height
   const isDraggingRef = useRef(false);
-  const { clearSelection, selectedNodeIds } = useWorkspace();
+  // Selection actions now handled within graph controls
+  useWorkspace();
 
   const onStartDrag = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -71,14 +72,8 @@ const WorkspaceView: React.FC = memo(() => {
           <div ref={topRef} className="border-b border-gray-200 flex flex-col min-h-[120px]" style={topStyle}>
             <div className="p-2 bg-gray-50 border-b border-gray-200 flex-shrink-0 flex items-center justify-between">
               <h3 className="text-sm font-medium text-gray-700">Graph View</h3>
-              <button
-                className="text-xs px-2 py-1 border rounded text-gray-600 hover:text-gray-800 hover:bg-white disabled:opacity-40"
-                onClick={clearSelection}
-                disabled={!selectedNodeIds || selectedNodeIds.length === 0}
-                title="Deselect all selected nodes"
-              >
-                Deselect all
-              </button>
+              {/* Deselect all moved into built-in controls menu */}
+              <div />
             </div>
             <div className="flex-1 min-h-0">
               <WorkspaceGraphView />

@@ -254,6 +254,125 @@ async def get_workspace(
     return workspace_info
 
 
+@router.put("/{workspace_id}/name")
+async def rename_workspace(
+    workspace_id: str,
+    new_name: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Rename a workspace (frontend expects this endpoint).
+
+    Thin wrapper that updates the workspace name via workspace manager and persists to disk.
+    """
+    user_id = current_user["id"]
+    workspace = workspace_manager.get_workspace(user_id, workspace_id)
+    if not workspace:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+
+    try:
+        workspace.name = new_name
+        # Persist change
+        workspace_manager._save_workspace_to_disk(user_id, workspace_id, workspace)
+        # Return updated info similar to other endpoints
+        info = workspace_manager.get_workspace_info(user_id, workspace_id)
+        if not info:
+            raise HTTPException(
+                status_code=500, detail="Failed to fetch updated workspace info"
+            )
+        return info
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to rename workspace: {str(e)}"
+        )
+
+
+@router.post("/{workspace_id}/save")
+async def save_workspace(
+    workspace_id: str, current_user: dict = Depends(get_current_user)
+):
+    """Persist the current in-memory workspace state to disk.
+
+    Frontend triggers this for explicit user save operations.
+    """
+    user_id = current_user["id"]
+    workspace = workspace_manager.get_workspace(user_id, workspace_id)
+    if not workspace:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    try:
+        workspace_manager._save_workspace_to_disk(user_id, workspace_id, workspace)
+        return {"success": True, "message": "Workspace saved"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to save workspace: {str(e)}"
+        )
+
+
+@router.post("/{workspace_id}/save-as")
+async def save_workspace_as(
+    workspace_id: str,
+    filename: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Save a copy of the workspace under a new filename (ID remains original).
+
+    Creates a brand new workspace (new ID) cloned from the existing one so it
+    shows up separately in the workspace manager. The provided filename becomes
+    the new workspace name; a .json copy is written for persistence.
+    """
+    user_id = current_user["id"]
+    source_workspace = workspace_manager.get_workspace(user_id, workspace_id)
+    if not source_workspace:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    try:
+        # Collect nodes/data from source workspace via summary & graph
+        # Simpler approach: serialize original to temp, deserialize new, change name & id
+        user_folder = get_user_data_folder(user_id)
+        tmp_path = user_folder / f"_tmp_clone_{workspace_id}.json"
+        source_workspace.serialize(tmp_path)
+
+        # Deserialize new workspace object
+        from core.utils import generate_workspace_id
+
+        from docworkspace import Workspace as DWWorkspace  # type: ignore
+
+        new_workspace = DWWorkspace.deserialize(tmp_path)  # type: ignore
+        new_id = generate_workspace_id()
+        # Update metadata
+        new_workspace.set_metadata("id", new_id)
+        new_workspace.set_metadata(
+            "created_at", source_workspace.get_metadata("created_at")
+        )
+        new_workspace.set_metadata(
+            "modified_at", source_workspace.get_metadata("modified_at")
+        )
+        # Set new name from filename (strip extension)
+        clean_name = filename.replace(".json", "")
+        new_workspace.name = clean_name
+
+        # Register in manager session
+        session = workspace_manager._get_user_session(user_id)  # type: ignore[attr-defined]
+        session[new_id] = new_workspace
+
+        # Persist new workspace
+        workspace_manager._save_workspace_to_disk(user_id, new_id, new_workspace)
+
+        # Optionally remove temp file
+        try:
+            if tmp_path.exists():
+                tmp_path.unlink()
+        except Exception:
+            pass
+
+        info = workspace_manager.get_workspace_info(user_id, new_id)
+        return {"success": True, "message": "Workspace cloned", "new_workspace": info}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to save workspace copy: {str(e)}"
+        )
+
+
 @router.get("/{workspace_id}/info")
 async def get_workspace_info(
     workspace_id: str, current_user: dict = Depends(get_current_user)

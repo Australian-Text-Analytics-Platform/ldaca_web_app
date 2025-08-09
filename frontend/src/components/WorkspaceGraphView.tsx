@@ -1,4 +1,4 @@
-import React, { memo, useCallback, useMemo, useEffect, useRef } from 'react';
+import React, { memo, useCallback, useMemo, useEffect, useRef, useState } from 'react';
 import dagre from 'dagre';
 import {
   ReactFlow,
@@ -72,7 +72,9 @@ const computeDagreLayout = (
  * This replaces the graph-related logic from the monolithic WorkspaceView
  */
 export const WorkspaceGraphView: React.FC = memo(() => {
-  const { workspaceGraph, isLoading, deleteNode, renameNode, toggleNodeSelection, convertToDocDataFrame, convertToDataFrame, convertToDocLazyFrame, convertToLazyFrame, currentWorkspaceId, selectedNodeIds } = useWorkspace();
+  // Minimap hidden by default; user can toggle via custom control button
+  const [showOverview, setShowOverview] = useState(false);
+  const { workspaceGraph, isLoading, deleteNode, renameNode, toggleNodeSelection, convertToDocDataFrame, convertToDataFrame, convertToDocLazyFrame, convertToLazyFrame, currentWorkspaceId, selectedNodeIds, clearSelection } = useWorkspace();
   const queryClient = useQueryClient();
   
   // Track pending delete operations to prevent duplicates
@@ -356,12 +358,35 @@ export const WorkspaceGraphView: React.FC = memo(() => {
         }}
       >
         <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
-        <Controls position="top-right" />
-        <MiniMap
-          position="bottom-right"
-          nodeColor="#e2e8f0"
-          maskColor="rgba(255, 255, 255, 0.8)"
-        />
+        <Controls position="top-right">
+          {/* Overview toggle */}
+          <button
+            type="button"
+            className="react-flow__controls-button"
+            onClick={() => setShowOverview(v => !v)}
+            title={showOverview ? 'Hide overview' : 'Show overview'}
+          >
+            {showOverview ? '▣' : '□'}
+          </button>
+          {/* Deselect all */}
+          <button
+            type="button"
+            className="react-flow__controls-button"
+            onClick={() => clearSelection?.()}
+            disabled={!selectedNodeIds || selectedNodeIds.length === 0}
+            title="Deselect all selected nodes"
+            style={{ opacity: !selectedNodeIds || selectedNodeIds.length === 0 ? 0.5 : 1 }}
+          >
+            ⊘
+          </button>
+        </Controls>
+        {showOverview && (
+          <MiniMap
+            position="bottom-right"
+            nodeColor="#e2e8f0"
+            maskColor="rgba(255, 255, 255, 0.8)"
+          />
+        )}
       </ReactFlow>
     </div>
   );
