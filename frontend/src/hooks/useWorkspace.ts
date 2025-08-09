@@ -28,6 +28,9 @@ import {
   setCurrentWorkspace as apiSetCurrentWorkspace,
   createWorkspace as apiCreateWorkspace,
   deleteWorkspace as apiDeleteWorkspace,
+  saveWorkspace as apiSaveWorkspace,
+  saveWorkspaceAs as apiSaveWorkspaceAs,
+  updateWorkspaceName as apiUpdateWorkspaceName,
 } from '../api';
 import { queryKeys } from '../lib/queryKeys';
 
@@ -156,7 +159,7 @@ export const useWorkspace = () => {
     currentWorkspaceQuery.isLoading,
     graphQuery.isLoading,
     nodeDataQuery.isLoading,
-    loading.operations.length,
+  loading.operations.length,
   ]);
 
   // Stable getNodeShape function to prevent infinite loops
@@ -234,6 +237,44 @@ export const useWorkspace = () => {
     onError: (error: any) => {
       setOperationError('deleteWorkspace', error.message);
       endOperation('deleteWorkspace');
+    },
+  });
+
+  const saveWorkspaceMutation = useMutation({
+    mutationFn: () => apiSaveWorkspace(currentWorkspaceId!, authHeaders),
+    onMutate: () => startOperation('saveWorkspace'),
+    onSuccess: () => {
+      endOperation('saveWorkspace');
+    },
+    onError: (error: any) => {
+      setOperationError('saveWorkspace', error.message);
+      endOperation('saveWorkspace');
+    },
+  });
+
+  const saveWorkspaceAsMutation = useMutation({
+    mutationFn: (filename: string) => apiSaveWorkspaceAs(currentWorkspaceId!, filename, authHeaders),
+    onMutate: () => startOperation('saveWorkspaceAs'),
+    onSuccess: () => {
+      endOperation('saveWorkspaceAs');
+    },
+    onError: (error: any) => {
+      setOperationError('saveWorkspaceAs', error.message);
+      endOperation('saveWorkspaceAs');
+    },
+  });
+
+  const updateWorkspaceNameMutation = useMutation({
+    mutationFn: (newName: string) => apiUpdateWorkspaceName(currentWorkspaceId!, newName, authHeaders),
+    onMutate: () => startOperation('updateWorkspaceName'),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.workspaces });
+      queryClient.invalidateQueries({ queryKey: queryKeys.currentWorkspace });
+      endOperation('updateWorkspaceName');
+    },
+    onError: (error: any) => {
+      setOperationError('updateWorkspaceName', error.message);
+      endOperation('updateWorkspaceName');
     },
   });
 
@@ -510,6 +551,21 @@ export const useWorkspace = () => {
       return deleteWorkspaceMutation.mutateAsync(workspaceId);
     },
 
+    saveWorkspace: () => {
+      if (!currentWorkspaceId) return Promise.reject(new Error('No workspace selected'));
+      return saveWorkspaceMutation.mutateAsync();
+    },
+
+    saveWorkspaceAs: (filename: string) => {
+      if (!currentWorkspaceId) return Promise.reject(new Error('No workspace selected'));
+      return saveWorkspaceAsMutation.mutateAsync(filename);
+    },
+
+    renameWorkspace: (newName: string) => {
+      if (!currentWorkspaceId) return Promise.reject(new Error('No workspace selected'));
+      return updateWorkspaceNameMutation.mutateAsync(newName);
+    },
+
     // Node actions
     selectNode: setSelectedNode,
     selectNodes: setSelectedNodes,
@@ -634,6 +690,9 @@ export const useWorkspace = () => {
   convertToDataFrameMutation,
   convertToDocLazyFrameMutation,
   convertToLazyFrameMutation,
+  saveWorkspaceMutation,
+  saveWorkspaceAsMutation,
+  updateWorkspaceNameMutation,
     getNodeShapeStable,
     currentWorkspaceId,
     authHeaders,
