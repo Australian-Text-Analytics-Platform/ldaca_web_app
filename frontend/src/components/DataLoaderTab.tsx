@@ -49,20 +49,20 @@ const DataLoaderTab: React.FC = () => {
     
     try {
       if (!currentWorkspace) {
-        console.log('No current workspace, creating new workspace with file:', filename);
+  if (localStorage.getItem('debugApp') === '1') console.log('No current workspace, creating new workspace with file:', filename);
         
         // Create new workspace with initial file in single API call
         const workspaceName = `Workspace ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`;
         const workspace = await createWorkspace(workspaceName, 'Auto-created from file', filename);
-        console.log('Created new workspace with initial file, workspace ID:', workspace.workspace_id);
+  if (localStorage.getItem('debugApp') === '1') console.log('Created new workspace with initial file, workspace ID:', workspace.workspace_id);
         
         // Set the new workspace as current (the file is already added via initial_data_file)
         await setCurrentWorkspace(workspace.workspace_id);
-        console.log('Successfully created workspace and added file in single operation');
+  if (localStorage.getItem('debugApp') === '1') console.log('Successfully created workspace and added file in single operation');
       } else {
         // Add file to existing workspace  
         await createNodeFromFile(filename);
-        console.log('Successfully added file to existing workspace');
+  if (localStorage.getItem('debugApp') === '1') console.log('Successfully added file to existing workspace');
       }
     } catch (error) {
       console.error('Failed to add file to workspace:', error);
@@ -75,7 +75,7 @@ const DataLoaderTab: React.FC = () => {
   const handleLoadWorkspace = useCallback(async (workspaceId: string) => {
     try {
       await setCurrentWorkspace(workspaceId);
-      console.log('Workspace loaded successfully');
+  if (localStorage.getItem('debugApp') === '1') console.log('Workspace loaded successfully');
     } catch (error) {
       console.error('Failed to load workspace:', error);
     }
@@ -85,7 +85,7 @@ const DataLoaderTab: React.FC = () => {
   const handleDeleteWorkspace = useCallback(async (workspaceId: string) => {
     try {
       await deleteWorkspace(workspaceId);
-      console.log('Workspace deleted successfully');
+  if (localStorage.getItem('debugApp') === '1') console.log('Workspace deleted successfully');
     } catch (error) {
       console.error('Failed to delete workspace:', error);
     }
@@ -94,7 +94,7 @@ const DataLoaderTab: React.FC = () => {
   // Unload current workspace
   const handleUnloadWorkspace = useCallback(() => {
     setCurrentWorkspace(null);
-    console.log('Workspace unloaded');
+  if (localStorage.getItem('debugApp') === '1') console.log('Workspace unloaded');
   }, [setCurrentWorkspace]);
 
   // Standalone global DnD removed; list handles DnD directly

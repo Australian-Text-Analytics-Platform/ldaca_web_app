@@ -1,12 +1,13 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { getFiles, loadFile, downloadFile, uploadFile, deleteFile } from '../api';
 import { FileInfo, FileListResponse } from '../types';
 
 interface UseFilesProps {
   authHeaders?: Record<string, string>;
+  enabled?: boolean; // allow caller to defer initial fetch until ready (e.g., after auth)
 }
 
-export const useFiles = ({ authHeaders = {} }: UseFilesProps = {}) => {
+export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {}) => {
   const [files, setFiles] = useState<FileInfo[]>([]);
   const [fileListResponse, setFileListResponse] = useState<FileListResponse | null>(null);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
@@ -15,6 +16,7 @@ export const useFiles = ({ authHeaders = {} }: UseFilesProps = {}) => {
   const [loadedFile, setLoadedFile] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
 
+  const hasFetchedRef = useRef(false);
   const fetchFiles = useCallback(async () => {
     setLoadingFiles(true);
     try {
@@ -93,8 +95,12 @@ export const useFiles = ({ authHeaders = {} }: UseFilesProps = {}) => {
   }, [authHeaders]);
 
   useEffect(() => {
+    if (!enabled) return; // do not fetch until enabled
+    // Avoid duplicate initial fetches (e.g., React StrictMode double-mount or auth state transition immediately after mount)
+    if (hasFetchedRef.current) return;
+    hasFetchedRef.current = true;
     fetchFiles();
-  }, [fetchFiles]);
+  }, [enabled, fetchFiles]);
 
   return {
     files,
@@ -109,6 +115,6 @@ export const useFiles = ({ authHeaders = {} }: UseFilesProps = {}) => {
     handleUploadFile,
     handleDeleteFile,
     handleDownloadFile,
-    refetchFiles: fetchFiles
+  refetchFiles: fetchFiles
   };
 };

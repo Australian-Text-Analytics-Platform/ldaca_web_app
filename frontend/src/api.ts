@@ -5,7 +5,8 @@ const getApiBase = () => {
   const hostname = window.location.hostname;
   const origin = window.location.origin;
   
-  console.log('API Detection:', {
+  // Debug gated
+  if (localStorage.getItem('debugApp') === '1') console.log('API Detection:', {
     hostname,
     origin,
     NODE_ENV: process.env.NODE_ENV,
@@ -30,7 +31,7 @@ const getApiBase = () => {
 
 const API_BASE = getApiBase();
 
-console.log('Final API_BASE:', API_BASE);
+if (localStorage.getItem('debugApp') === '1') console.log('Final API_BASE:', API_BASE);
 
 export interface GoogleAuthRequest {
   id_token: string;

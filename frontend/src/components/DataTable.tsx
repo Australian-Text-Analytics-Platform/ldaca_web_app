@@ -50,7 +50,7 @@ const DataTable: React.FC<DataTableProps> = ({
     targetType: string;
   }>({ isOpen: false, column: '', targetType: '' });
   
-  console.log('DataTable received data:', data, 'loading:', loading);
+  if (localStorage.getItem('debugDataTable') === '1') console.log('DataTable received data:', data, 'loading:', loading);
 
   // Load column schema when component mounts or when nodeId changes
   useEffect(() => {
@@ -73,7 +73,7 @@ const DataTable: React.FC<DataTableProps> = ({
             columnTypeMapping = schema.schema;
           }
           
-          console.log('DataTable: Loaded column types:', columnTypeMapping);
+          if (localStorage.getItem('debugDataTable') === '1') console.log('DataTable: Loaded column types:', columnTypeMapping);
           setColumnTypes(columnTypeMapping);
         }
       });
@@ -157,7 +157,7 @@ const DataTable: React.FC<DataTableProps> = ({
             columnTypeMapping = schema.schema;
           }
           
-          console.log('DataTable: Refreshed column types after cast:', columnTypeMapping);
+          if (localStorage.getItem('debugDataTable') === '1') console.log('DataTable: Refreshed column types after cast:', columnTypeMapping);
           setColumnTypes(columnTypeMapping);
         }
       }

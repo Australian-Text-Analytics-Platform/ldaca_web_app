@@ -16,7 +16,7 @@ from db import cleanup_expired_sessions, create_user_session, get_or_create_user
 from fastapi import APIRouter, Depends, Header, HTTPException
 from google.auth.transport import requests as grequests
 from google.oauth2 import id_token
-from models import AuthInfoResponse, AuthMethod, GoogleIn, GoogleOut, User, UserResponse
+from models import AuthInfoResponse, GoogleIn, GoogleOut, User, UserResponse
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 logger = logging.getLogger(__name__)
@@ -37,10 +37,7 @@ async def get_auth_info(authorization: Optional[str] = Header(None)):
         logger.debug("Single-user mode: returning root user info")
 
         # Ensure root user folders and sample data are set up
-        from core.utils import copy_sample_data_to_user
-
         user_folders = setup_user_folders(settings.single_user_id)
-        copy_sample_data_to_user(settings.single_user_id)
         logger.debug(f"Root user folders ensured at: {user_folders['user_folder']}")
 
         return AuthInfoResponse(
@@ -142,11 +139,7 @@ async def google_auth(payload: GoogleIn):
 
         await update_user_folder_path(user["id"], str(user_folders["user_folder"]))
 
-        # Ensure sample data is copied to user folder on every login
-        from core.utils import copy_sample_data_to_user
-
-        copy_sample_data_to_user(user["id"])
-        logger.info(f"Sample data refreshed for user: {user['id']}")
+        # Sample data already copied inside setup_user_folders; avoid duplicate copy/log
 
         # Create session token
         session = await create_user_session(user["id"], payload.id_token)

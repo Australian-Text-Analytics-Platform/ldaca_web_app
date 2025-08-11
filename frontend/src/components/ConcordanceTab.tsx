@@ -89,11 +89,13 @@ const ConcordanceTab: React.FC = () => {
   // Debug results changes
   useEffect(() => {
     if (results) {
-      console.log('Concordance results updated:', results);
-      console.log('Results success:', results.success);
-      console.log('Results data:', results.data);
+      if (localStorage.getItem('debugConc') === '1') {
+        console.log('Concordance results updated:', results);
+        console.log('Results success:', results.success);
+        console.log('Results data:', results.data);
+      }
       if (results.data) {
-        console.log('Data entries:', Object.entries(results.data));
+  if (localStorage.getItem('debugConc') === '1') console.log('Data entries:', Object.entries(results.data));
       }
     }
   }, [results]);
@@ -118,7 +120,7 @@ const ConcordanceTab: React.FC = () => {
     if (pendingSearch) {
       try {
         const params = JSON.parse(pendingSearch);
-        console.log('Found pending concordance search:', params);
+  if (localStorage.getItem('debugConc') === '1') console.log('Found pending concordance search:', params);
         
         // Set the search word
         setSearchWord(params.searchWord);
@@ -143,7 +145,7 @@ const ConcordanceTab: React.FC = () => {
         // Auto-trigger search after a brief delay to ensure state is set
         setTimeout(() => {
           if (params.searchWord && selectedNodes.length > 0) {
-            console.log('Auto-triggering concordance search for:', params.searchWord);
+            if (localStorage.getItem('debugConc') === '1') console.log('Auto-triggering concordance search for:', params.searchWord);
             // Trigger auto search
             setShouldAutoSearch(true);
           }
@@ -313,7 +315,7 @@ const ConcordanceTab: React.FC = () => {
         getAuthHeaders()
       );
 
-      console.log('Multi-Node Concordance Response:', response);
+  if (localStorage.getItem('debugConc') === '1') console.log('Multi-Node Concordance Response:', response);
       setResults(response);
     } catch (error) {
       console.error('Error performing concordance search:', error);
@@ -330,7 +332,7 @@ const ConcordanceTab: React.FC = () => {
   // Effect to handle auto-search trigger from TokenFrequencyTab
   useEffect(() => {
     if (shouldAutoSearch && searchWord.trim() && selectedNodes.length > 0) {
-      console.log('Executing auto-search for:', searchWord);
+  if (localStorage.getItem('debugConc') === '1') console.log('Executing auto-search for:', searchWord);
       handleSearch(true);
       setShouldAutoSearch(false); // Reset the flag
     }
@@ -449,7 +451,7 @@ const ConcordanceTab: React.FC = () => {
         getAuthHeaders()
       );
 
-      console.log('Single Node Concordance Response:', response);
+  if (localStorage.getItem('debugConc') === '1') console.log('Single Node Concordance Response:', response);
 
       // Update results with this node's new data
       if (results && results.data) {
@@ -481,7 +483,7 @@ const ConcordanceTab: React.FC = () => {
           }
         }
         
-        console.log('Updating existing key:', existingKey, 'for nodeId:', nodeId);
+  if (localStorage.getItem('debugConc') === '1') console.log('Updating existing key:', existingKey, 'for nodeId:', nodeId);
         
         if (existingKey) {
           const updatedResults = {
@@ -1047,8 +1049,8 @@ const ConcordanceTab: React.FC = () => {
                   {Object.entries(results.data).filter(([k]) => viewMode==='combined' ? k==='__COMBINED__' : k !== '__COMBINED__').map(([nodeName, nodeData]) => {
                     // Find the corresponding node and column for detail view
                     // Try multiple ways to match the node
-                    console.log('Trying to match nodeName:', nodeName);
-                    console.log('Available nodes:', selectedNodes.map(n => ({ id: n.id, name: n.data?.name, nodeName: n.name })));
+                    if (localStorage.getItem('debugConc') === '1') console.log('Trying to match nodeName:', nodeName);
+                    if (localStorage.getItem('debugConc') === '1') console.log('Available nodes:', selectedNodes.map(n => ({ id: n.id, name: n.data?.name, nodeName: n.name })));
                     
                     let node = selectedNodes.find(n => (n.data?.name || n.id) === nodeName);
                     if (!node) {
@@ -1070,7 +1072,7 @@ const ConcordanceTab: React.FC = () => {
                     const selection = nodeColumnSelections.find(sel => sel.nodeId === nodeId);
                     const column = selection?.column || '';
                     
-                    console.log('Final match - nodeId:', nodeId, 'column:', column);
+                    if (localStorage.getItem('debugConc') === '1') console.log('Final match - nodeId:', nodeId, 'column:', column);
                     
                     return renderConcordanceTable(nodeName, nodeData, nodeId, column);
                   })}

@@ -28,7 +28,7 @@ const FileLoaderTab: React.FC<FileLoaderTabProps> = ({ onFileLoaded }) => {
     handleUploadFile,
     handleDeleteFile,
     handleDownloadFile
-  } = useFiles({ authHeaders });
+  } = useFiles({ authHeaders, enabled: isAuthenticated });
 
   const [showModal, setShowModal] = React.useState(false);
   const [modalMessage, setModalMessage] = React.useState('');

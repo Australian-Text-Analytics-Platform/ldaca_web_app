@@ -8,8 +8,10 @@ import { GoogleOAuthProvider } from '@react-oauth/google';
 // Use environment variable or fallback to hardcoded client ID
 const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || "460163662698-lof601jcnsk9ugjjr3dpjqn31bv6krem.apps.googleusercontent.com";
 
-console.log('Google Client ID:', GOOGLE_CLIENT_ID);
-console.log('Current origin:', window.location.origin);
+if (localStorage.getItem('debugApp') === '1') {
+  console.log('Google Client ID:', GOOGLE_CLIENT_ID);
+  console.log('Current origin:', window.location.origin);
+}
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement

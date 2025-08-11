@@ -91,8 +91,9 @@ export const useWorkspace = () => {
     queryKey: currentWorkspaceId ? queryKeys.workspaceGraph(currentWorkspaceId) : ['workspaces', 'graph'],
     queryFn: async () => {
       const result = await getWorkspaceGraph(currentWorkspaceId!, authHeaders);
-      console.log('=== API Response Success ===');
-      console.log('API response structure:', {
+      if (localStorage.getItem('debugGraph') === '1') {
+        console.log('=== API Response Success ===');
+        console.log('API response structure:', {
         nodes: result?.nodes?.length || 0,
         edges: result?.edges?.length || 0,
         workspace_info: !!result?.workspace_info
@@ -100,7 +101,7 @@ export const useWorkspace = () => {
       
       if (result?.nodes && result.nodes.length > 0) {
         const sampleNode = result.nodes[0];
-        console.log('Sample node structure:', {
+  console.log('Sample node structure:', {
           id: sampleNode.id,
           type: sampleNode.type,
           position: sampleNode.position,
@@ -108,8 +109,8 @@ export const useWorkspace = () => {
           sampleData: sampleNode.data
         });
       }
-      
-      return result;
+  } // end debugGraph logging block
+  return result;
     },
     enabled: isAuthenticated && !!currentWorkspaceId,
     refetchOnWindowFocus: false,
@@ -560,13 +561,20 @@ export const useWorkspace = () => {
       if (!currentWorkspaceId) return;
       await queryClient.cancelQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
       const previous = queryClient.getQueryData(queryKeys.workspaceGraph(currentWorkspaceId));
-      queryClient.setQueryData(queryKeys.workspaceGraph(currentWorkspaceId), (old: any) => {
-        if (!old?.nodes) return old;
-        return {
-          ...old,
-            nodes: old.nodes.map((n: any) => n.id === nodeId ? { ...n, data: { ...n.data, documentColumn: documentColumn || n.data?.documentColumn } } : n)
-        };
-      });
+      queryClient.setQueryData(
+        queryKeys.workspaceGraph(currentWorkspaceId),
+        (old: any) => {
+          if (!old?.nodes) return old;
+          return {
+            ...old,
+            nodes: old.nodes.map((n: any) =>
+              n.id === nodeId
+                ? { ...n, data: { ...n.data, documentColumn: documentColumn || n.data?.documentColumn } }
+                : n
+            ),
+          };
+        }
+      );
       return { previous };
     },
     onSuccess: (_data, variables) => {
@@ -706,7 +714,7 @@ export const useWorkspace = () => {
       const nodeExists = currentNodes.some((node: any) => node.id === nodeId);
       
       if (!nodeExists) {
-        console.log(`Node ${nodeId} no longer exists, skipping schema refresh`);
+  if (localStorage.getItem('debugGraph') === '1') console.log(`Node ${nodeId} no longer exists, skipping schema refresh`);
         return null;
       }
       

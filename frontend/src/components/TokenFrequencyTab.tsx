@@ -82,11 +82,13 @@ const TokenFrequencyTab: React.FC = () => {
   // Debug results changes
   useEffect(() => {
     if (results) {
-      console.log('Results updated:', results);
-      console.log('Results success:', results.success);
-      console.log('Results data:', results.data);
+      if (localStorage.getItem('debugTF') === '1') {
+        console.log('Results updated:', results);
+        console.log('Results success:', results.success);
+        console.log('Results data:', results.data);
+      }
       if (results.data) {
-        console.log('Data entries:', Object.entries(results.data));
+  if (localStorage.getItem('debugTF') === '1') console.log('Data entries:', Object.entries(results.data));
       }
     }
   }, [results]);
@@ -214,7 +216,7 @@ const TokenFrequencyTab: React.FC = () => {
         getAuthHeaders()
       );
 
-  console.log('Token Frequency Response:', response);
+  if (localStorage.getItem('debugTF') === '1') console.log('Token Frequency Response:', response);
   setResults(response);
   setLastCompareNodeIds(request.node_ids);
     } catch (error) {
@@ -251,7 +253,7 @@ const TokenFrequencyTab: React.FC = () => {
     }));
     
     // Also show a temporary notification
-    console.log(`Navigating to concordance with token: "${token}"`);
+  if (localStorage.getItem('debugTF') === '1') console.log(`Navigating to concordance with token: "${token}"`);
   };
 
   const getColorForNodeId = (nodeId: string, idx: number) => nodeColors[nodeId] || defaultPalette[idx % defaultPalette.length];
