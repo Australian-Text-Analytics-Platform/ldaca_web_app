@@ -15,6 +15,7 @@ import {
   convertToDataFrame as apiConvertToDataFrame,
   convertToDocLazyFrame as apiConvertToDocLazyFrame,
   convertToLazyFrame as apiConvertToLazyFrame,
+  resetDocumentColumn as apiResetDocumentColumn,
   renameNode as apiRenameNode,
   deleteNode as apiDeleteNode,
   createNodeFromFile as apiCreateNodeFromFile,
@@ -550,6 +551,43 @@ export const useWorkspace = () => {
     },
   });
 
+  const resetDocumentColumnMutation = useMutation({
+    mutationFn: ({ nodeId, documentColumn }: { nodeId: string; documentColumn?: string; }) => {
+      return apiResetDocumentColumn(currentWorkspaceId!, nodeId, documentColumn, authHeaders);
+    },
+    onMutate: async ({ nodeId, documentColumn }) => {
+      startOperation('resetDocumentColumn');
+      if (!currentWorkspaceId) return;
+      await queryClient.cancelQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
+      const previous = queryClient.getQueryData(queryKeys.workspaceGraph(currentWorkspaceId));
+      queryClient.setQueryData(queryKeys.workspaceGraph(currentWorkspaceId), (old: any) => {
+        if (!old?.nodes) return old;
+        return {
+          ...old,
+            nodes: old.nodes.map((n: any) => n.id === nodeId ? { ...n, data: { ...n.data, documentColumn: documentColumn || n.data?.documentColumn } } : n)
+        };
+      });
+      return { previous };
+    },
+    onSuccess: (_data, variables) => {
+      if (currentWorkspaceId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
+        if (variables?.nodeId) {
+          queryClient.invalidateQueries({ queryKey: queryKeys.nodeData(currentWorkspaceId, variables.nodeId) });
+          queryClient.invalidateQueries({ queryKey: queryKeys.nodeSchema(currentWorkspaceId, variables.nodeId) });
+        }
+      }
+      endOperation('resetDocumentColumn');
+    },
+    onError: (error: any, _vars, context: any) => {
+      setOperationError('resetDocumentColumn', error.message);
+      if (context?.previous && currentWorkspaceId) {
+        queryClient.setQueryData(queryKeys.workspaceGraph(currentWorkspaceId), context.previous);
+      }
+      endOperation('resetDocumentColumn');
+    },
+  });
+
   // Memoized action functions to prevent unnecessary re-renders
   const actions = useMemo(() => ({
     // Workspace actions
@@ -638,6 +676,11 @@ export const useWorkspace = () => {
       if (!currentWorkspaceId) return Promise.reject(new Error('No workspace selected'));
       return convertToLazyFrameMutation.mutateAsync({ nodeId });
     },
+
+    resetDocumentColumn: (nodeId: string, documentColumn?: string) => {
+      if (!currentWorkspaceId) return Promise.reject(new Error('No workspace selected'));
+      return resetDocumentColumnMutation.mutateAsync({ nodeId, documentColumn });
+    },
     
     filterNode: (nodeId: string, request: FilterRequest) => {
       if (!currentWorkspaceId) return Promise.reject(new Error('No workspace selected'));
@@ -704,6 +747,7 @@ export const useWorkspace = () => {
   convertToDataFrameMutation,
   convertToDocLazyFrameMutation,
   convertToLazyFrameMutation,
+  resetDocumentColumnMutation,
   saveWorkspaceMutation,
   saveWorkspaceAsMutation,
   updateWorkspaceNameMutation,

@@ -30,6 +30,9 @@ from models import (
     WorkspaceInfo,
 )
 
+# Router for workspace endpoints (was accidentally removed during edits)
+router = APIRouter(prefix="/workspaces", tags=["workspace"])
+
 if DOCWORKSPACE_AVAILABLE:
     try:
         from docworkspace import Node
@@ -38,70 +41,57 @@ if DOCWORKSPACE_AVAILABLE:
 else:
     Node = None
 
-# Optional imports for docframe conversions
-try:
-    from docframe.core.docframe import DocDataFrame, DocLazyFrame  # type: ignore
-except Exception:  # pragma: no cover - docframe may not be installed in some envs
+# Optional docframe types (DocDataFrame / DocLazyFrame) used in conversions
+try:  # pragma: no cover - optional dependency handling
+    from docframe import DocDataFrame, DocLazyFrame  # type: ignore
+except Exception:  # pragma: no cover
     DocDataFrame = None  # type: ignore
     DocLazyFrame = None  # type: ignore
 
-router = APIRouter(prefix="/workspaces", tags=["workspace_management"])
 logger = logging.getLogger(__name__)
 
 
-# ============================================================================
-# HELPER FUNCTIONS
-# ============================================================================
+def _handle_operation_result(result: Any):
+    """Utility to unpack safe_operation results.
 
-
-def _handle_operation_result(result):
-    """Handle both dictionary and OperationResult responses from workspace operations"""
-    # Handle dictionary response (fallback case)
-    if isinstance(result, dict):
-        success = result.get("success", False)
-        message = result.get("message", "Operation failed")
-        return success, message, result
-
-    # Handle OperationResult object (normal case)
-    elif hasattr(result, "success"):
-        return result.success, result.message, result
-
-    # Unknown response type
-    else:
-        return False, "Unknown operation result type", result
-
-
-# ============================================================================
-# WORKSPACE MANAGEMENT - Simple HTTP wrappers
-# ============================================================================
+    Expected result formats:
+    - (True, message, obj)
+    - (False, error_message, None)
+    - Direct object (treated as success)
+    """
+    try:
+        if isinstance(result, tuple) and len(result) == 3:
+            return result  # already in (success, message, obj)
+        # Fallback interpret
+        return True, "ok", result
+    except Exception as e:  # pragma: no cover
+        return False, f"Unexpected result format: {e}", None
 
 
 @router.get("/")
 async def list_workspaces(current_user: dict = Depends(get_current_user)):
-    """List user's workspaces using DocWorkspace info methods"""
+    """List all workspaces for the current user (restored endpoint)."""
     user_id = current_user["id"]
-
     workspaces_dict = workspace_manager.list_user_workspaces(user_id)
-
     workspace_list = []
-    for workspace_id, workspace in workspaces_dict.items():
-        # Get workspace info using DocWorkspace summary method
-        summary = workspace.summary()
-
-        workspace_list.append(
-            {
-                "workspace_id": workspace_id,
-                "name": workspace.name,
-                "description": workspace.get_metadata("description") or "",
-                "created_at": workspace.get_metadata("created_at") or "Unknown",
-                "modified_at": workspace.get_metadata("modified_at") or "Unknown",
-                "node_count": summary["total_nodes"],
-                "root_nodes": summary["root_nodes"],
-                "leaf_nodes": summary["leaf_nodes"],
-                "node_types": summary["node_types"],
-            }
-        )
-
+    for wid, ws in workspaces_dict.items():
+        try:
+            summary = ws.summary()
+            workspace_list.append(
+                {
+                    "workspace_id": wid,
+                    "name": ws.name,
+                    "description": ws.get_metadata("description") or "",
+                    "created_at": ws.get_metadata("created_at") or "Unknown",
+                    "modified_at": ws.get_metadata("modified_at") or "Unknown",
+                    "node_count": summary.get("total_nodes"),
+                    "root_nodes": summary.get("root_nodes"),
+                    "leaf_nodes": summary.get("leaf_nodes"),
+                    "node_types": summary.get("node_types"),
+                }
+            )
+        except Exception:
+            logger.exception("Failed summarizing workspace %s", wid)
     return {"workspaces": workspace_list}
 
 
@@ -237,6 +227,30 @@ async def delete_workspace(
     return {
         "success": True,
         "message": f"Workspace {workspace_id} deleted successfully",
+    }
+
+
+@router.post("/{workspace_id}/unload")
+async def unload_workspace(
+    workspace_id: str,
+    save: bool = True,
+    current_user: dict = Depends(get_current_user),
+):
+    """Unload a workspace from memory (optionally saving first).
+
+    This persists the workspace (unless save=False) then removes it from the
+    in-memory session cache so that a subsequent access triggers a lazy load
+    from disk. Useful for freeing memory when working with many large
+    workspaces.
+    """
+    user_id = current_user["id"]
+    existed = workspace_manager.unload_workspace(user_id, workspace_id, save=save)
+    if not existed:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    return {
+        "success": True,
+        "message": f"Workspace {workspace_id} unloaded",
+        "workspace_id": workspace_id,
     }
 
 
@@ -500,15 +514,15 @@ async def add_node_to_workspace(
 async def get_node_info(
     workspace_id: str, node_id: str, current_user: dict = Depends(get_current_user)
 ):
-    """Get node info using DocWorkspace Node.info method"""
     user_id = current_user["id"]
-
     node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
     if not node:
         raise HTTPException(status_code=404, detail="Node not found")
 
-    # Use DocWorkspace's latest info method with json=True for API compatibility
-    return node.info(json=True)
+    try:
+        return node.info(json=True)
+    except Exception as e:  # pragma: no cover
+        raise HTTPException(status_code=500, detail=f"Failed to get node info: {e}")
 
 
 @router.get("/{workspace_id}/nodes/{node_id}/data")
@@ -519,86 +533,128 @@ async def get_node_data(
     page_size: int = 100,
     current_user: dict = Depends(get_current_user),
 ):
-    """Get node data using DocWorkspace data access methods"""
+    """Get node data rows with simple pagination."""
     user_id = current_user["id"]
-
     node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
     if not node:
         raise HTTPException(status_code=404, detail="Node not found")
 
-    # Use DocWorkspace's latest data access pattern
     try:
-        # Get data as DataFrame for pagination
-        if hasattr(node.data, "collect"):
-            # LazyFrame - collect for pagination
-            df = node.data.collect()
+        data_obj = node.data
+        if hasattr(data_obj, "collect"):
+            df = data_obj.collect()
         else:
-            # Already a DataFrame
-            df = node.data
+            df = data_obj
 
-        # Calculate pagination
         total_rows = len(df)
         start_idx = (page - 1) * page_size
-        end_idx = min(start_idx + page_size, total_rows)
-
-        # Get paginated data
         paginated_df = df.slice(start_idx, page_size)
-        data_rows = paginated_df.to_dicts()
 
         return {
-            "data": data_rows,
+            "data": paginated_df.to_dicts(),
             "pagination": {
                 "page": page,
                 "page_size": page_size,
                 "total_rows": total_rows,
                 "total_pages": (total_rows + page_size - 1) // page_size,
-                "has_next": end_idx < total_rows,
+                "has_next": start_idx + page_size < total_rows,
                 "has_prev": page > 1,
             },
             "columns": list(df.columns),
             "dtypes": {col: str(dtype) for col, dtype in df.schema.items()},
         }
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get node data: {str(e)}"
-        )
+    except Exception as e:  # pragma: no cover
+        raise HTTPException(status_code=500, detail=f"Failed to get node data: {e}")
 
 
 @router.get("/{workspace_id}/nodes/{node_id}/shape")
 async def get_node_shape(
     workspace_id: str, node_id: str, current_user: dict = Depends(get_current_user)
 ):
-    """Get the full shape (height, width) of a node by materializing if needed"""
+    """Return shape [rows, columns] for node data (lazy or eager) with minimal work."""
     user_id = current_user["id"]
-
     node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
     if not node:
         raise HTTPException(status_code=404, detail="Node not found")
 
     try:
-        if node.is_lazy:
-            # For lazy frames, calculate full shape by collecting
-            if hasattr(node.data, "collect") and hasattr(node.data, "collect_schema"):
-                # Get row count by collecting and counting
-                row_count = node.data.select(pl.count()).collect().item()
-                # Get column count from schema
-                column_count = len(node.data.collect_schema().names())
-                shape = [row_count, column_count]
-            else:
-                # Fallback
-                shape = [None, None]
+        data_obj = node.data
+        # Detect docframe wrapper (optional informational flag)
+        try:  # pragma: no cover
+            from docframe import DocDataFrame, DocLazyFrame  # type: ignore
+
+            doc_wrapper = isinstance(data_obj, (DocDataFrame, DocLazyFrame))
+        except Exception:  # pragma: no cover
+            doc_wrapper = False
+
+        if (
+            node.is_lazy
+            and hasattr(data_obj, "select")
+            and hasattr(data_obj, "collect")
+        ):
+            # Row count via pl.len()
+            try:
+                count_df = data_obj.select(pl.len().alias("_len"))
+                collected = count_df.collect()
+                polars_df = (
+                    collected.to_polars()
+                    if hasattr(collected, "to_polars")
+                    else collected
+                )
+                row_count = polars_df.to_series(0).item()
+            except Exception:
+                try:
+                    full = data_obj.collect()
+                    polars_full = (
+                        full.to_polars() if hasattr(full, "to_polars") else full
+                    )
+                    row_count = (
+                        polars_full.shape[0] if hasattr(polars_full, "shape") else None
+                    )
+                except Exception:
+                    row_count = None
+
+            # Column count via schema (cheap)
+            try:
+                if hasattr(data_obj, "collect_schema"):
+                    schema = data_obj.collect_schema()
+                    names = schema.names() if hasattr(schema, "names") else []
+                    column_count = len(names)
+                else:
+                    # Fallback minimal collect
+                    minimal = data_obj.collect()
+                    polars_min = (
+                        minimal.to_polars()
+                        if hasattr(minimal, "to_polars")
+                        else minimal
+                    )
+                    column_count = (
+                        polars_min.shape[1] if hasattr(polars_min, "shape") else None
+                    )
+            except Exception:
+                column_count = None
+            shape = [row_count, column_count]
         else:
-            # For materialized DataFrames, get shape directly
-            if hasattr(node.data, "shape"):
-                shape = list(node.data.shape)
+            # Eager path
+            if hasattr(data_obj, "shape"):
+                try:
+                    shape_tuple = data_obj.shape
+                    shape = [shape_tuple[0], shape_tuple[1]]
+                except Exception:
+                    shape = [None, None]
             else:
                 shape = [None, None]
 
-        return {"shape": shape, "is_lazy": node.is_lazy, "calculated": True}
-
-    except Exception as e:
+        return {
+            "shape": shape,
+            "is_lazy": node.is_lazy,
+            "calculated": True,
+            "doc_wrapper": doc_wrapper,
+        }
+    except Exception as e:  # pragma: no cover
         raise HTTPException(
-            status_code=500, detail=f"Failed to calculate node shape: {str(e)}"
+            status_code=500,
+            detail=f"Failed to calculate node shape: {type(e).__name__}: {str(e)}",
         )
 
 
@@ -995,6 +1051,127 @@ async def convert_node_to_lazyframe(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Conversion failed: {str(e)}")
+
+
+@router.post("/{workspace_id}/nodes/{node_id}/reset-document")
+async def reset_node_document_column(
+    workspace_id: str,
+    node_id: str,
+    document_column: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+):
+    """Reset (change) the active document column for DocDataFrame / DocLazyFrame nodes.
+
+    If document_column is omitted the backend will attempt to auto-detect using
+    the same heuristic as DocDataFrame.guess_document_column / DocLazyFrame.guess_document_column.
+    """
+    user_id = current_user["id"]
+
+    if DocDataFrame is None or DocLazyFrame is None:
+        raise HTTPException(
+            status_code=500, detail="docframe library not available on backend"
+        )
+
+    src_node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
+    if not src_node:
+        logger.warning(
+            "reset-document: node not found (workspace=%s node=%s)",
+            workspace_id,
+            node_id,
+        )
+        raise HTTPException(status_code=404, detail="Node not found")
+
+    data = getattr(src_node, "data", None)
+    if data is None:
+        raise HTTPException(status_code=400, detail="Node has no data")
+
+    import polars as pl
+
+    try:
+        new_data = None
+
+        # DocDataFrame -> use set_document (returns new instance but we reassign in-place)
+        if isinstance(data, DocDataFrame):  # type: ignore[arg-type]
+            current_col = data.document_column  # type: ignore[attr-defined]
+            target_col = document_column
+            if not target_col:
+                target_col = DocDataFrame.guess_document_column(data.dataframe)  # type: ignore[attr-defined]
+            if not target_col:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Unable to auto-detect document column; please provide document_column",
+                )
+            if target_col not in data.dataframe.columns:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Document column '{target_col}' not found. Available: {data.dataframe.columns}",
+                )
+            if target_col == current_col:
+                logger.info(
+                    "reset-document: no-op (DocDataFrame already using '%s')",
+                    target_col,
+                )
+                return src_node.info(json=True)
+            new_data = data.set_document(target_col)
+
+        # DocLazyFrame -> rebuild wrapper with new column
+        elif isinstance(data, DocLazyFrame):  # type: ignore[arg-type]
+            current_col = data.document_column  # type: ignore[attr-defined]
+            target_col = document_column
+            if not target_col:
+                target_col = DocLazyFrame.guess_document_column(data.lazyframe)  # type: ignore[attr-defined]
+            if not target_col:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Unable to auto-detect document column; please provide document_column",
+                )
+            # Validate column exists in schema
+            schema = data.lazyframe.collect_schema()
+            if target_col not in schema:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Document column '{target_col}' not found in schema. Available: {list(schema.keys())}",
+                )
+            # Validate type
+            if schema[target_col] not in (pl.Utf8, pl.String):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Column '{target_col}' is not a string column (dtype={schema[target_col]})",
+                )
+            if target_col == current_col:
+                logger.info(
+                    "reset-document: no-op (DocLazyFrame already using '%s')",
+                    target_col,
+                )
+                return src_node.info(json=True)
+            new_data = DocLazyFrame(data.lazyframe, document_column=target_col)
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail="Reset document column only supported for DocDataFrame or DocLazyFrame nodes",
+            )
+
+        # In-place update
+        src_node.data = new_data  # type: ignore[assignment]
+        try:
+            src_node.operation = "reset_document"
+        except Exception:
+            pass
+
+        workspace = workspace_manager.get_workspace(user_id, workspace_id)
+        if workspace is not None:
+            workspace_manager._save_workspace_to_disk(user_id, workspace_id, workspace)
+
+        return src_node.info(json=True)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(
+            "Reset document column failed for workspace=%s node=%s",
+            workspace_id,
+            node_id,
+        )
+        raise HTTPException(status_code=500, detail=f"Reset document failed: {str(e)}")
 
 
 @router.post("/{workspace_id}/nodes/{node_id}/rename")
@@ -2125,15 +2302,57 @@ async def calculate_token_frequencies(
 
                 # Create the processed frame
                 if is_doc_frame:
-                    # For DocDataFrame/DocLazyFrame, we can use them directly
-                    if column_name == "document":
-                        # Already has the right column name
-                        processed_frame = node_data
-                    else:
-                        # Select and alias the column to 'document'
-                        processed_frame = node_data.select(
-                            pl.col(column_name).alias("document")
+                    # For DocDataFrame/DocLazyFrame, ensure the result stays a Doc*Frame.
+                    # Previous implementation relied on delegation .select which (after
+                    # recent delegation change) returns a raw polars frame when the
+                    # original document column is dropped, causing compute_token_frequencies
+                    # to raise a TypeError. We now explicitly re-wrap.
+                    try:  # Local import to avoid mandatory dependency at module load
+                        from docframe import DocDataFrame as _DDF  # type: ignore
+                        from docframe import DocLazyFrame as _DLF
+                    except Exception as _e:  # pragma: no cover
+                        raise HTTPException(
+                            status_code=500,
+                            detail=f"docframe not available for token frequency: {_e}",
                         )
+
+                    if isinstance(node_data, _DLF):
+                        if column_name == node_data.document_column:
+                            processed_frame = node_data
+                        else:
+                            base_lazy = node_data.to_lazyframe()
+                            selected_lazy = base_lazy.select(
+                                pl.col(column_name).alias("document")
+                            )
+                            processed_frame = _DLF(
+                                selected_lazy, document_column="document"
+                            )
+                    else:  # DocDataFrame
+                        if column_name == node_data.document_column:  # type: ignore[attr-defined]
+                            processed_frame = node_data
+                        else:
+                            # node_data.select(...) may return raw DataFrame; that's fine we re-wrap
+                            selected_df_any = node_data.select(  # type: ignore[call-arg]
+                                pl.col(column_name).alias("document")
+                            )
+                            # Ensure we have a concrete DataFrame (collect if lazy just in case)
+                            if not isinstance(
+                                selected_df_any, pl.DataFrame
+                            ) and hasattr(selected_df_any, "collect"):
+                                try:  # type: ignore[call-arg]
+                                    selected_df_any = selected_df_any.collect()  # type: ignore[assignment]
+                                except Exception:  # pragma: no cover
+                                    pass
+                            if not isinstance(
+                                selected_df_any, pl.DataFrame
+                            ):  # pragma: no cover
+                                raise HTTPException(
+                                    status_code=500,
+                                    detail="Failed to materialize DataFrame for token frequency calculation",
+                                )
+                            processed_frame = _DDF(
+                                selected_df_any, document_column="document"
+                            )
                 else:
                     # For regular DataFrame/LazyFrame, convert to DocDataFrame/DocLazyFrame
                     selected_data = node_data.select(
@@ -2307,30 +2526,44 @@ async def detach_concordance(
             else:
                 concordance_with_idx = concordance_result
 
-            # Join concordance results with original data
-            # The original data should have a row index that matches document_idx
-            original_data_with_idx = node.data.with_row_index("document_idx")
+            # Simplified eager path: always materialize underlying data, perform join eagerly.
+            import polars as pl
 
-            # Perform left join: original data + concordance columns
-            joined_data = original_data_with_idx.join(
-                concordance_with_idx.select(
-                    [
-                        "document_idx",
-                        "left_context",
-                        "matched_text",
-                        "right_context",
-                        "l1",
-                        "r1",
-                        "l1_freq",
-                        "r1_freq",
-                    ]
-                ),
-                on="document_idx",
-                how="left",
+            if "DocLazyFrame" in type(node.data).__name__ and hasattr(
+                node.data, "to_lazyframe"
+            ):
+                underlying_df = node.data.to_lazyframe().collect()  # type: ignore[call-arg]
+            elif "DocDataFrame" in type(node.data).__name__ and hasattr(
+                node.data, "_df"
+            ):
+                underlying_df = node.data._df  # type: ignore[attr-defined]
+            elif isinstance(node.data, pl.LazyFrame):
+                underlying_df = node.data.collect()
+            else:
+                underlying_df = node.data
+            if isinstance(underlying_df, pl.LazyFrame):  # safeguard
+                underlying_df = underlying_df.collect()
+            if not isinstance(underlying_df, pl.DataFrame):
+                raise HTTPException(
+                    status_code=500,
+                    detail="Failed to materialize underlying data for concordance detach",
+                )
+            original_with_idx = underlying_df.with_row_index("document_idx")
+            other_df = concordance_with_idx.select(
+                [
+                    "document_idx",
+                    "left_context",
+                    "matched_text",
+                    "right_context",
+                    "l1",
+                    "r1",
+                    "l1_freq",
+                    "r1_freq",
+                ]
             )
-
-            # Remove the document_idx column as it's no longer needed
-            final_data = joined_data.drop("document_idx")
+            final_data = original_with_idx.join(
+                other_df, on="document_idx", how="left"
+            ).drop("document_idx")
 
             # Generate new node name if not provided
             if request.new_node_name:
@@ -2341,11 +2574,37 @@ async def detach_concordance(
                 )
                 new_node_name = f"{original_name}_conc_{request.search_word}"
 
-            # Create new node with joined data
+            # Wrap back as DocDataFrame if original was Doc*Frame and original doc column still present
+            try:  # pragma: no cover (optional wrapping for client use)
+                from docframe import DocDataFrame as _DDF  # type: ignore
+                from docframe import DocLazyFrame as _DLF
+
+                if isinstance(node.data, (_DDF, _DLF)):
+                    doc_col = getattr(node.data, "document_column", None)
+                    if doc_col and doc_col in final_data.columns:
+                        _ = _DDF(
+                            final_data, document_column=doc_col
+                        )  # constructed for potential future use
+            except Exception:
+                pass
+
+            data_for_node = final_data
+            # If original was Doc type, wrap result as DocDataFrame preserving document column
+            try:  # pragma: no cover (best-effort wrapping)
+                from docframe import DocDataFrame as _DDF  # type: ignore
+                from docframe import DocLazyFrame as _DLF  # type: ignore
+
+                if isinstance(node.data, (_DDF, _DLF)):
+                    doc_col = getattr(node.data, "document_column", None)
+                    if doc_col and doc_col in final_data.columns:
+                        data_for_node = _DDF(final_data, document_column=doc_col)
+            except Exception:
+                pass
+
             new_node = workspace_manager.add_node_to_workspace(
                 user_id=user_id,
                 workspace_id=workspace_id,
-                data=final_data,
+                data=data_for_node,
                 node_name=new_node_name,
                 operation="concordance_detach",
                 parents=[node],
@@ -2356,12 +2615,14 @@ async def detach_concordance(
                     status_code=500, detail="Failed to create detached concordance node"
                 )
 
+            total_rows = final_data.height if hasattr(final_data, "height") else -1
+
             return {
                 "success": True,
-                "message": f"Successfully created detached concordance node '{new_node_name}' with {len(final_data)} rows",
+                "message": f"Successfully created detached concordance node '{new_node_name}' with {total_rows if total_rows >= 0 else 'unknown'} rows",
                 "new_node_id": new_node.id,
                 "new_node_name": new_node_name,
-                "total_rows": len(final_data),
+                "total_rows": total_rows,
                 "concordance_matches": len(concordance_result),
             }
 

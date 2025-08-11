@@ -473,6 +473,23 @@ export async function convertToLazyFrame(
   return res.data;
 }
 
+export async function resetDocumentColumn(
+  workspaceId: string,
+  nodeId: string,
+  documentColumn?: string,
+  authHeaders: Record<string, string> = {}
+) {
+  const res = await axios.post(
+    `${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}/reset-document`,
+    null,
+    {
+      params: documentColumn ? { document_column: documentColumn } : {},
+      headers: authHeaders,
+    }
+  );
+  return res.data;
+}
+
 export interface JoinNodesRequest {
   left_node_id: string;
   right_node_id: string;

@@ -18,6 +18,7 @@ dependencies = [
     "uvicorn>=0.35.0",
     "docframe",
     "docworkspace",
+    "pytest-asyncio>=0.23.0",
 ]
 
 [tool.setuptools.packages.find]

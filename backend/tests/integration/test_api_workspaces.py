@@ -5,7 +5,6 @@ Integration tests for workspace API endpoints
 from unittest.mock import Mock, patch
 
 import pytest
-from fastapi.testclient import TestClient
 
 
 @pytest.mark.integration
@@ -157,6 +156,24 @@ class TestWorkspaceAPI:
 
             response = self.client.delete("/api/workspaces/nonexistent-123")
 
+            assert response.status_code == 404
+
+    def test_unload_workspace(self):
+        """Test unloading an existing workspace"""
+        with patch("api.workspaces.workspace_manager.unload_workspace") as mock_unload:
+            mock_unload.return_value = True
+            response = self.client.post("/api/workspaces/workspace-123/unload")
+            assert response.status_code == 200
+            data = response.json()
+            assert data["success"] is True
+            assert data["workspace_id"] == "workspace-123"
+            mock_unload.assert_called_once_with("test-user", "workspace-123", save=True)
+
+    def test_unload_workspace_not_found(self):
+        """Test unloading non-existent workspace returns 404"""
+        with patch("api.workspaces.workspace_manager.unload_workspace") as mock_unload:
+            mock_unload.return_value = False
+            response = self.client.post("/api/workspaces/missing-999/unload")
             assert response.status_code == 404
 
     def test_upload_data_file(self):

@@ -78,41 +78,25 @@ const JoinInterface: React.FC<JoinInterfaceProps> = ({
   };
 
   return (
-    <div className="p-6 bg-white border border-gray-200 rounded-lg">
-      <div className="flex items-center space-x-2 mb-4">
+  <div className="p-6 bg-white border border-gray-200 rounded-lg flex flex-col max-h-[80vh] relative">
+      <div className="flex items-center space-x-2 mb-4 flex-shrink-0">
         <div className="text-lg font-semibold text-gray-800">Join Nodes</div>
         <div className="text-sm text-gray-500">
           {leftNode.name} ⟷ {rightNode.name}
         </div>
       </div>
-      
-      {/* Auto-selection message */}
-      {findCommonColumns(leftNode.columns, rightNode.columns).length > 0 && leftOn && rightOn && (
-        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md">
-          <div className="flex items-center">
-            <div className="text-sm text-green-800">
-              <span className="font-medium">✓ Auto-selected:</span> Found common column "{leftOn}" for joining
-              {findCommonColumns(leftNode.columns, rightNode.columns).length > 1 && (
-                <span className="ml-2 text-xs">
-                  (+{findCommonColumns(leftNode.columns, rightNode.columns).length - 1} other common column{findCommonColumns(leftNode.columns, rightNode.columns).length > 2 ? 's' : ''} available)
-                </span>
-              )}
+      <div className="overflow-y-auto pr-2 flex-1 pb-24">
+        {findCommonColumns(leftNode.columns, rightNode.columns).length === 0 && (
+          <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+            <div className="flex items-center">
+              <div className="text-sm text-yellow-800">
+                <span className="font-medium">⚠ No common columns found.</span> Please select columns manually to join on.
+              </div>
             </div>
           </div>
-        </div>
-      )}
-      
-      {findCommonColumns(leftNode.columns, rightNode.columns).length === 0 && (
-        <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-          <div className="flex items-center">
-            <div className="text-sm text-yellow-800">
-              <span className="font-medium">⚠ No common columns found.</span> Please select columns manually to join on.
-            </div>
-          </div>
-        </div>
-      )}
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Left Node */}
         <div className="space-y-3">
           <div className="text-sm font-medium text-gray-700">
@@ -196,8 +180,8 @@ const JoinInterface: React.FC<JoinInterfaceProps> = ({
         </div>
       </div>
 
-      {/* Join Options */}
-      <div className="mt-6 space-y-4">
+  {/* Join Options */}
+  <div className="mt-6 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -230,28 +214,13 @@ const JoinInterface: React.FC<JoinInterfaceProps> = ({
             />
           </div>
         </div>
+        </div>
+
+        {/* Join preview removed per request */}
       </div>
 
-      {/* Join Description */}
-      {leftOn && rightOn && (
-        <div className="mt-4 p-3 bg-blue-50 rounded-md">
-          <div className="text-sm text-blue-800">
-            <strong>Join Preview:</strong> Performing {how} join between{' '}
-            <code className="bg-blue-100 px-1 rounded">{leftNode.name}.{leftOn}</code> and{' '}
-            <code className="bg-blue-100 px-1 rounded">{rightNode.name}.{rightOn}</code>
-          </div>
-        </div>
-      )}
-
-      {/* Action Buttons */}
-      <div className="mt-6 flex justify-end space-x-3">
-        <button
-          onClick={onCancel}
-          disabled={isLoading}
-          className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          Cancel
-        </button>
+      {/* Action Button (sticky) */}
+      <div className="mt-4 pt-3 border-t flex justify-end bg-white sticky bottom-0 left-0 right-0">
         <button
           onClick={handleJoin}
           disabled={!leftOn || !rightOn || loading || isLoading}

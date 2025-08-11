@@ -74,7 +74,7 @@ const computeDagreLayout = (
 export const WorkspaceGraphView: React.FC = memo(() => {
   // Minimap hidden by default; user can toggle via custom control button
   const [showOverview, setShowOverview] = useState(false);
-  const { workspaceGraph, isLoading, deleteNode, renameNode, toggleNodeSelection, convertToDocDataFrame, convertToDataFrame, convertToDocLazyFrame, convertToLazyFrame, currentWorkspaceId, selectedNodeIds, clearSelection } = useWorkspace();
+  const { workspaceGraph, isLoading, deleteNode, renameNode, toggleNodeSelection, convertToDocDataFrame, convertToDataFrame, convertToDocLazyFrame, convertToLazyFrame, resetDocumentColumn, currentWorkspaceId, selectedNodeIds, clearSelection } = useWorkspace();
   const queryClient = useQueryClient();
   
   // Track pending delete operations to prevent duplicates
@@ -136,6 +136,17 @@ export const WorkspaceGraphView: React.FC = memo(() => {
     }
   }, [convertToLazyFrame, currentWorkspaceId, queryClient]);
 
+  const handleResetDocument = useCallback((nodeId: string, documentColumn?: string) => {
+    if (resetDocumentColumn) {
+      resetDocumentColumn(nodeId, documentColumn);
+      if (currentWorkspaceId) {
+  queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.nodeData(currentWorkspaceId, nodeId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.nodeSchema(currentWorkspaceId, nodeId) });
+      }
+    }
+  }, [resetDocumentColumn, currentWorkspaceId, queryClient]);
+
   // Transform and layout nodes horizontally using a simple DAG layout
   const initialNodes = useMemo(() => {
     if (!workspaceGraph || !workspaceGraph.nodes) {
@@ -176,7 +187,7 @@ export const WorkspaceGraphView: React.FC = memo(() => {
         // Use a true custom node type to avoid default node styling
         type: 'customNode',
         position: pos,
-        data: {
+    data: {
           node: {
             node_id: node.id,
             name: node.data?.nodeName || node.data?.label || `Node ${index + 1}`,
@@ -185,6 +196,7 @@ export const WorkspaceGraphView: React.FC = memo(() => {
             preview: [], // TODO: Extract from node.data if available
             is_text_data: node.data?.dataType?.includes('Doc') || false,
             data_type: dataType,
+      document_column: node.data?.documentColumn || null,
             column_schema: node.data?.schema ? 
               Object.fromEntries(node.data.schema.map((col: any) => [col.name, col.js_type])) : {},
             is_lazy: node.data?.isLazy || node.data?.lazy || false,
@@ -195,6 +207,7 @@ export const WorkspaceGraphView: React.FC = memo(() => {
           onConvertToDataFrame: handleConvertToDataFrame,
           onConvertToDocLazyFrame: handleConvertToDocLazyFrame,
           onConvertToLazyFrame: handleConvertToLazyFrame,
+          onResetDocument: handleResetDocument,
         },
         // Keep interaction flags minimal and disable edge connections
         hidden: false,
@@ -204,7 +217,7 @@ export const WorkspaceGraphView: React.FC = memo(() => {
         connectable: false,
       };
     });
-  }, [workspaceGraph, handleDelete, handleRename, handleConvertToDocDataFrame, handleConvertToDataFrame, handleConvertToDocLazyFrame, handleConvertToLazyFrame, selectedNodeIds]);
+  }, [workspaceGraph, handleDelete, handleRename, handleConvertToDocDataFrame, handleConvertToDataFrame, handleConvertToDocLazyFrame, handleConvertToLazyFrame, handleResetDocument, selectedNodeIds]);
 
   // Build edges with bezier style for smooth curves
   const initialEdges = useMemo(() => {
@@ -234,14 +247,16 @@ export const WorkspaceGraphView: React.FC = memo(() => {
     .map((n: any) => {
       const dt = n?.data?.node?.data_type ?? 'unknown';
       const lazy = n?.data?.node?.is_lazy ? '1' : '0';
-      return `${n.id}:${dt}:${lazy}`;
+  const docc = n?.data?.node?.document_column || '';
+  return `${n.id}:${dt}:${lazy}:${docc}`;
     })
     .join(',');
   const newNodesSignature = (workspaceGraph?.nodes || [])
     .map((gn: any) => {
       const dt = gn?.data?.nodeType || gn?.data?.dataType || gn?.type || 'unknown';
       const lazy = (gn?.data?.isLazy || gn?.data?.lazy) ? '1' : '0';
-      return `${gn.id}:${dt}:${lazy}`;
+  const docc = gn?.data?.documentColumn || '';
+  return `${gn.id}:${dt}:${lazy}:${docc}`;
     })
     .join(',');
   

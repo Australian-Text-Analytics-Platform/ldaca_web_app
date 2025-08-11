@@ -255,6 +255,7 @@ class DocWorkspaceAPIUtils:
                     "isLazy": node.is_lazy,
                     "shape": shape,
                     "columns": getattr(node, "columns", []),
+                    "documentColumn": getattr(node, "document_column", None),
                 },
                 connectable=True,
             )
@@ -361,8 +362,9 @@ def extend_node_with_api_methods():
                 self, page, page_size, columns
             )
 
-        Node.to_api_summary = to_api_summary
-        Node.get_paginated_data = get_paginated_data
+    # Dynamic monkey patching (acceptable here) - ignore type checker
+    Node.to_api_summary = to_api_summary  # type: ignore[attr-defined]
+    Node.get_paginated_data = get_paginated_data  # type: ignore[attr-defined]
 
 
 def extend_workspace_with_api_methods():
@@ -386,7 +388,8 @@ def extend_workspace_with_api_methods():
             """Execute operation safely and return result."""
             try:
                 result = operation_func(*args, **kwargs)
-                if isinstance(result, Node):
+                # Node can be None at import time; guard before isinstance
+                if Node is not None and isinstance(result, Node):  # type: ignore[arg-type]
                     return create_operation_result(
                         success=True,
                         message="Operation completed successfully",
@@ -410,9 +413,9 @@ def extend_workspace_with_api_methods():
                     errors=[error_response.error],
                 )
 
-        Workspace.to_api_graph = to_api_graph
-        Workspace.get_node_summaries = get_node_summaries
-        Workspace.safe_operation = safe_operation
+    Workspace.to_api_graph = to_api_graph  # type: ignore[attr-defined]
+    Workspace.get_node_summaries = get_node_summaries  # type: ignore[attr-defined]
+    Workspace.safe_operation = safe_operation  # type: ignore[attr-defined]
 
 
 # Auto-extend classes when module is imported

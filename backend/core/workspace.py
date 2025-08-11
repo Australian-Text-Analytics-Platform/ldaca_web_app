@@ -174,6 +174,51 @@ class WorkspaceManager:
 
         return False
 
+    def unload_workspace(
+        self, user_id: str, workspace_id: str, save: bool = True
+    ) -> bool:
+        """Persist (optional) then remove a workspace from in-memory session.
+
+        After unloading, subsequent access will lazy-load from disk via
+        get_workspace(). This helps reduce memory footprint for large
+        workspaces while keeping on-disk state authoritative.
+
+        Returns True if the workspace was in memory (and is now removed) or
+        if it was already absent but a persisted file exists. Returns False
+        only if neither an in-memory instance nor a persisted file exists.
+        """
+        session = self._get_user_session(user_id)
+
+        # If workspace currently in memory, optionally save then drop
+        if workspace_id in session:
+            workspace = session[workspace_id]
+            if save:
+                try:
+                    self._save_workspace_to_disk(user_id, workspace_id, workspace)
+                except Exception:
+                    # Don't block unload on save failure; still attempt removal
+                    import traceback
+
+                    print(
+                        f"Warning: failed to save workspace {workspace_id} before unload"
+                    )
+                    traceback.print_exc()
+            del session[workspace_id]
+            # Clear current pointer if it referenced this workspace
+            if self.get_current_workspace_id(user_id) == workspace_id:
+                self.set_current_workspace(user_id, None)
+            return True
+
+        # Not in memory: treat as success if on-disk file exists
+        user_folder = get_user_workspace_folder(user_id)
+        workspace_file = user_folder / f"workspace_{workspace_id}.json"
+        if workspace_file.exists():
+            # Already effectively unloaded
+            if self.get_current_workspace_id(user_id) == workspace_id:
+                self.set_current_workspace(user_id, None)
+            return True
+        return False
+
     # ============================================================================
     # NODE OPERATIONS - Direct delegation to DocWorkspace methods
     # ============================================================================
@@ -182,7 +227,7 @@ class WorkspaceManager:
         self,
         user_id: str,
         workspace_id: str,
-        data: Union[pl.DataFrame, pl.LazyFrame],
+        data: Any,
         node_name: str,
         operation: str = "manual_add",
         parents: Optional[list[Any]] = None,
@@ -201,7 +246,7 @@ class WorkspaceManager:
         try:
             # Use DocWorkspace Node constructor directly
             node = Node(
-                data=data,
+                data=data,  # Node itself validates supported types (incl. Doc*Frame)
                 name=node_name,
                 workspace=workspace,
                 parents=parents or [],

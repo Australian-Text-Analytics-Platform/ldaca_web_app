@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface DocumentColumnModalProps {
   isOpen: boolean;
@@ -18,13 +18,25 @@ const DocumentColumnModal: React.FC<DocumentColumnModalProps> = ({
   const [selectedColumn, setSelectedColumn] = useState<string>('');
   const [submitting, setSubmitting] = useState<boolean>(false);
 
+  // Ensure modal always starts in a fresh, enabled state when (re)opened.
+  // Without this, submitting could remain true after a previous confirm,
+  // leaving the Convert button permanently disabled on subsequent opens.
+  useEffect(() => {
+    if (isOpen) {
+      setSubmitting(false);
+      // Do not auto-clear selectedColumn here; keep prior choice cleared already in confirm/cancel.
+      // If we ever want to persist last selection across opens, remove the line below.
+      // setSelectedColumn(''); // optional reset; currently confirm path already clears it.
+    }
+  }, [isOpen]);
+
   const handleConfirm = () => {
     if (submitting) return;
     if (selectedColumn) {
       setSubmitting(true);
       onConfirm(selectedColumn);
       setSelectedColumn('');
-      // Parent (CustomNode) handles closing the modal after confirm
+      // Parent (CustomNode) handles closing; submitting reset handled by useEffect on reopen.
     }
   };
 
