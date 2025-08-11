@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import ReactDOM from 'react-dom';
 import { useWorkspace } from '../hooks/useWorkspace';
 import { useAuth } from '../hooks/useAuth';
 import { 
@@ -30,6 +31,71 @@ const TokenFrequencyTab: React.FC = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isLoadingStopWords, setIsLoadingStopWords] = useState(false);
   const [results, setResults] = useState<TokenFrequencyResponse | null>(null);
+  // Dynamic color management for selected nodes
+  const [nodeColors, setNodeColors] = useState<Record<string, string>>({});
+  const [lastCompareNodeIds, setLastCompareNodeIds] = useState<string[]>([]); // preserves order used in last analysis
+  const defaultPalette = useMemo(
+    () => [
+      '#2563eb', // vivid blue
+      '#dc2626', // vivid red
+      '#16a34a', // green
+      '#9333ea', // purple
+      '#d97706', // orange/amber
+      '#0d9488', // teal
+      '#db2777', // pink
+      '#4f46e5', // indigo
+      '#65a30d', // lime
+      '#0891b2', // cyan
+      '#92400e', // brown
+      '#6b7280', // gray
+    ],
+    []
+  );
+  const [openColorPickerNode, setOpenColorPickerNode] = useState<string | null>(null);
+  const colorPopoverRef = useRef<HTMLDivElement | null>(null);
+  const colorAnchorRef = useRef<HTMLElement | null>(null);
+  const [colorPopoverPos, setColorPopoverPos] = useState<{top:number; left:number} | null>(null);
+
+  // Ensure every currently selected node has a color
+  useEffect(() => {
+    if (!selectedNodes.length) return;
+    setNodeColors(prev => {
+      const updated = { ...prev };
+      let paletteIndex = 0;
+      selectedNodes.forEach(n => {
+        if (!updated[n.id]) {
+          // find first palette color not already used (simple pass)
+          while (Object.values(updated).includes(defaultPalette[paletteIndex % defaultPalette.length]) && paletteIndex < defaultPalette.length * 2) {
+            paletteIndex++;
+          }
+          updated[n.id] = defaultPalette[paletteIndex % defaultPalette.length];
+          paletteIndex++;
+        }
+      });
+      return updated;
+    });
+  }, [selectedNodes, defaultPalette]);
+
+  const handleColorChange = (nodeId: string, color: string) => {
+    setNodeColors(prev => ({ ...prev, [nodeId]: color }));
+  };
+
+  // Close popover when clicking outside
+  useEffect(() => {
+    if (!openColorPickerNode) return;
+    const handler = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (colorPopoverRef.current?.contains(target)) return;
+      if (colorAnchorRef.current?.contains(target as Node)) return;
+      setOpenColorPickerNode(null);
+    };
+    window.addEventListener('mousedown', handler);
+    window.addEventListener('scroll', () => setOpenColorPickerNode(null), true);
+    return () => {
+      window.removeEventListener('mousedown', handler);
+      window.removeEventListener('scroll', () => setOpenColorPickerNode(null), true);
+    };
+  }, [openColorPickerNode]);
 
   // Debug results changes
   useEffect(() => {
@@ -165,8 +231,9 @@ const TokenFrequencyTab: React.FC = () => {
         getAuthHeaders()
       );
 
-      console.log('Token Frequency Response:', response);
-      setResults(response);
+  console.log('Token Frequency Response:', response);
+  setResults(response);
+  setLastCompareNodeIds(request.node_ids);
     } catch (error) {
       console.error('Error calculating token frequencies:', error);
       setResults({
@@ -203,7 +270,9 @@ const TokenFrequencyTab: React.FC = () => {
     console.log(`Navigating to concordance with token: "${token}"`);
   };
 
-  const renderWordCloud = (data: any[], width: number = 400, height: number = 200) => {
+  const getColorForNodeId = (nodeId: string, idx: number) => nodeColors[nodeId] || defaultPalette[idx % defaultPalette.length];
+
+  const renderWordCloud = (data: any[], width: number = 400, height: number = 200, color: string) => {
     // Transform data for word cloud format
     const words = data.map(item => ({
       text: item.token,
@@ -231,7 +300,7 @@ const TokenFrequencyTab: React.FC = () => {
               cloudWords.map((w, i) => (
                 <Text
                   key={w.text}
-                  fill="#3b82f6"
+                  fill={color}
                   textAnchor="middle"
                   transform={`translate(${w.x}, ${w.y})`}
                   fontSize={w.size}
@@ -250,7 +319,7 @@ const TokenFrequencyTab: React.FC = () => {
     );
   };
 
-  const renderChart = (nodeName: string, data: any[]) => {
+  const renderChart = (nodeName: string, data: any[], color: string) => {
     // Find max frequency for bar width calculation
     const maxFreq = Math.max(...data.map(item => item.frequency));
 
@@ -260,8 +329,8 @@ const TokenFrequencyTab: React.FC = () => {
           <h3 className="text-lg font-semibold text-gray-800 break-words leading-tight w-full">{nodeName}</h3>
         </div>
         
-        {/* Word Cloud */}
-        {renderWordCloud(data)}
+  {/* Word Cloud */}
+  {renderWordCloud(data, 400, 200, color)}
         
         <div className="bg-white p-4 rounded-lg border">
           <div className="space-y-2">
@@ -280,10 +349,11 @@ const TokenFrequencyTab: React.FC = () => {
                 <div className="flex-1 relative">
                   <div className="h-6 bg-gray-100 rounded-full relative overflow-hidden">
                     <div 
-                      className="h-full bg-blue-500 rounded-full transition-all duration-300"
+                      className="h-full rounded-full transition-all duration-300"
                       style={{ 
                         width: `${(item.frequency / maxFreq) * 100}%`,
-                        minWidth: '2px' // Ensure small bars are still visible
+                        minWidth: '2px', // Ensure small bars are still visible
+                        backgroundColor: color
                       }}
                     />
                   </div>
@@ -321,18 +391,99 @@ const TokenFrequencyTab: React.FC = () => {
             <>
             {/* Horizontal list; enable horizontal scroll only when >2 nodes */}
             <div className={`flex space-x-3 pb-2 ${selectedNodes.length > 2 ? 'overflow-x-auto' : 'overflow-x-hidden'}`}>
-              {selectedNodes.map((node: any) => {
+              {selectedNodes.map((node: any, idx: number) => {
                 const columns = getNodeColumns(node);
                 const selection = nodeColumnSelections.find(sel => sel.nodeId === node.id);
                 const nodeDisplayName = node.name || node.data?.name || (node as any).label || node.data?.label || node.id;
+                const nodeColor = getColorForNodeId(node.id, idx);
                 return (
                   <div
                     key={node.id}
                     className={`bg-gray-50 p-3 rounded-md ${selectedNodes.length > 2 ? 'flex-none min-w-[50%]' : 'flex-1 min-w-0'}`}
                   >
                     <div className="mb-2">
-                      <div className="font-medium text-gray-800 break-words">
-                        {nodeDisplayName}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="font-medium break-words pr-2" style={{ color: nodeColor }}>
+                          {nodeDisplayName}
+                        </div>
+                        <div className="relative">
+                          <button
+                            type="button"
+                            aria-label="Select color"
+                            ref={el => { if (el && openColorPickerNode === node.id) colorAnchorRef.current = el; }}
+                            onClick={(e) => {
+                              if (openColorPickerNode === node.id) {
+                                setOpenColorPickerNode(null);
+                                return;
+                              }
+                              const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                              const bodyWidth = window.innerWidth;
+                              const desiredWidth = 180;
+                              let left = rect.left + rect.width / 2 - desiredWidth / 2;
+                              left = Math.max(8, Math.min(bodyWidth - desiredWidth - 8, left));
+                              const top = rect.bottom + 8 + window.scrollY;
+                              setColorPopoverPos({ top, left });
+                              setOpenColorPickerNode(node.id);
+                            }}
+                            className="w-8 h-8 rounded-full ring-2 ring-offset-1 ring-gray-300 hover:ring-blue-400 focus:outline-none focus:ring-blue-500 transition-shadow shadow-sm"
+                            style={{ backgroundColor: nodeColor }}
+                          />
+                        </div>
+                        {openColorPickerNode === node.id && colorPopoverPos && ReactDOM.createPortal(
+                          <div
+                            ref={colorPopoverRef}
+                            className="z-[9999] w-56 p-3 rounded-lg border border-gray-200 bg-white shadow-xl animate-fade-in"
+                            style={{ position: 'absolute', top: colorPopoverPos.top, left: colorPopoverPos.left }}
+                          >
+                            <div className="text-xs font-medium text-gray-600 mb-2 flex items-center justify-between">
+                              <span>Pick Color</span>
+                              <button
+                                type="button"
+                                onClick={() => setOpenColorPickerNode(null)}
+                                className="text-gray-400 hover:text-gray-600"
+                                aria-label="Close color picker"
+                              >×</button>
+                            </div>
+                            <div className="grid grid-cols-6 gap-1 mb-3">
+                              {defaultPalette.map(p => (
+                                <button
+                                  key={p}
+                                  type="button"
+                                  className={`w-6 h-6 rounded-full border border-white shadow-sm hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 transition-transform ${p === nodeColor ? 'ring-2 ring-blue-500 ring-offset-1' : ''}`}
+                                  style={{ backgroundColor: p }}
+                                  onClick={() => handleColorChange(node.id, p)}
+                                  aria-label={`Set color ${p}`}
+                                />
+                              ))}
+                            </div>
+                            <div className="flex items-stretch gap-2 mt-1">
+                              <div className="flex flex-col items-center">
+                                <input
+                                  type="color"
+                                  value={nodeColor}
+                                  onChange={(e) => handleColorChange(node.id, e.target.value)}
+                                  className="w-9 h-9 p-0 border border-gray-300 rounded cursor-pointer bg-transparent"
+                                  aria-label="Custom color"
+                                />
+                              </div>
+                              <input
+                                type="text"
+                                value={nodeColor.toUpperCase()}
+                                onChange={(e) => {
+                                  const val = e.target.value.trim();
+                                  if (/^#?[0-9A-Fa-f]{0,7}$/.test(val)) { // allow # and up to 6 hex chars while typing
+                                    const normalized = val.startsWith('#') ? val : `#${val}`;
+                                    if (/^#[0-9A-Fa-f]{6}$/.test(normalized)) handleColorChange(node.id, normalized);
+                                  }
+                                }}
+                                className="flex-1 px-2 py-2 text-xs border border-gray-300 rounded font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                aria-label="Hex color"
+                                placeholder="#000000"
+                                maxLength={7}
+                              />
+                            </div>
+                          </div>, document.body
+                        )}
                       </div>
                       <div className="text-xs text-gray-500 break-all">{node.id}</div>
                     </div>
@@ -456,10 +607,136 @@ const TokenFrequencyTab: React.FC = () => {
               {results.data ? (
                 <div>
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                    {Object.entries(results.data).map(([nodeName, frequencies]) => 
-                      renderChart(nodeName, frequencies)
-                    )}
+                    {Object.entries(results.data).map(([nodeName, frequencies], idx) => {
+                      const nodeId = lastCompareNodeIds[idx];
+                      const color = getColorForNodeId(nodeId, idx);
+                      return renderChart(nodeName, frequencies, color);
+                    })}
                   </div>
+
+                  {/* Unified Comparative Word Cloud */}
+                  {Object.keys(results.data).length === 2 && lastCompareNodeIds.length === 2 && (() => {
+                    const entries = Object.entries(results.data);
+                    const [nodeAName, dataA] = entries[0];
+                    const [nodeBName, dataB] = entries[1];
+                    const nodeAId = lastCompareNodeIds[0];
+                    const nodeBId = lastCompareNodeIds[1];
+                    const nodeAColor = getColorForNodeId(nodeAId, 0);
+                    const nodeBColor = getColorForNodeId(nodeBId, 1);
+                    const freqMap: Record<string, { a: number; b: number }> = {};
+                    for (const item of dataA) {
+                      freqMap[item.token] = { a: item.frequency, b: 0 };
+                    }
+                    for (const item of dataB) {
+                      if (!freqMap[item.token]) freqMap[item.token] = { a: 0, b: 0 };
+                      freqMap[item.token].b = item.frequency;
+                    }
+                    const combined = Object.entries(freqMap).map(([token, vals]) => ({
+                      token,
+                      freqA: vals.a,
+                      freqB: vals.b,
+                      total: vals.a + vals.b
+                    })).filter(w => w.total > 0);
+                    if (combined.length === 0) return null;
+                    const maxTotal = Math.max(...combined.map(w => w.total));
+
+                    // Simple hex interpolation
+                    const hexToRgb = (hex: string) => {
+                      const h = hex.replace('#', '');
+                      return {
+                        r: parseInt(h.substring(0, 2), 16),
+                        g: parseInt(h.substring(2, 4), 16),
+                        b: parseInt(h.substring(4, 6), 16)
+                      };
+                    };
+                    const rgbToHex = (r: number, g: number, b: number) => '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
+                    const colorA = hexToRgb(nodeAColor);
+                    const colorB = hexToRgb(nodeBColor);
+                    const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+                    const blend = (t: number) => {
+                      const r = Math.round(lerp(colorB.r, colorA.r, t)); // t=1 -> nodeA
+                      const g = Math.round(lerp(colorB.g, colorA.g, t));
+                      const b = Math.round(lerp(colorB.b, colorA.b, t));
+                      return rgbToHex(r, g, b);
+                    };
+
+                    // Index statistics for percentage-based coloring (avoid corpus size bias)
+                    const statIndex = new Map((results.statistics || []).map(s => [s.token, s]));
+                    // Prepare words list; size = raw combined frequency; color proportion = relative percentage share
+                    const words = combined.map(w => {
+                      const stat = statIndex.get(w.token);
+                      if (stat) {
+                        const pA = stat.percent_corpus_0; // already percentage 0-100
+                        const pB = stat.percent_corpus_1;
+                        const denom = pA + pB;
+                        return {
+                          text: w.token,
+                          value: w.total,
+                          proportion: denom > 0 ? (pA / denom) : 0.5,
+                        };
+                      }
+                      // Fallback to frequency-based proportion if no stats entry
+                      return {
+                        text: w.token,
+                        value: w.total,
+                        proportion: w.total > 0 ? (w.freqA / w.total) : 0.5,
+                      };
+                    });
+
+                    const fontScale = (datum: any) => Math.max(12, Math.min(54, datum.value / maxTotal * 42 + 12));
+                    const fontSizeSetter = (datum: any) => fontScale(datum);
+
+                    return (
+                      <div className="mb-10">
+                        <div className="flex items-center justify-between mb-3 flex-wrap gap-4">
+                          <h3 className="text-lg font-semibold text-gray-800">Unified Word Cloud</h3>
+                          <div className="flex items-center space-x-4 text-sm">
+                            <div className="flex items-center space-x-1"><span className="w-4 h-4 inline-block rounded" style={{ background: nodeAColor }}></span><span className="text-gray-700 truncate max-w-[140px]" title={nodeAName}>{nodeAName}</span></div>
+                            <div className="flex items-center space-x-1"><span className="w-4 h-4 inline-block rounded" style={{ background: nodeBColor }}></span><span className="text-gray-700 truncate max-w-[140px]" title={nodeBName}>{nodeBName}</span></div>
+                            <div className="flex items-center space-x-2">
+                              <span className="text-gray-500">Gradient:</span>
+                              <div className="h-3 w-32 rounded bg-gradient-to-r" style={{ background: `linear-gradient(to right, ${nodeAColor}, ${nodeBColor})` }}></div>
+                              <span className="text-gray-500">A → B</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex justify-center">
+                          <svg width={860} height={260}>
+                            <Wordcloud
+                              words={words}
+                              width={860}
+                              height={260}
+                              fontSize={fontSizeSetter}
+                              font="Segoe UI, Roboto, sans-serif"
+                              padding={2}
+                              spiral="archimedean"
+                              rotate={0}
+                              random={() => 0.5}
+                            >
+                              {(cloudWords) =>
+                                cloudWords.map((w: any) => (
+                                  <Text
+                                    key={w.text}
+                                    fill={blend(w.proportion)}
+                                    textAnchor="middle"
+                                    transform={`translate(${w.x}, ${w.y})`}
+                                    fontSize={w.size}
+                                    fontFamily={w.font}
+                                    className="cursor-pointer transition-colors"
+                                    onClick={() => w.text && handleTokenClick(w.text)}
+                                    style={{ cursor: 'pointer' }}
+                                  >
+                                    {w.text || ''}
+                                  </Text>
+                                ))
+                              }
+                            </Wordcloud>
+                          </svg>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-2 text-center">Size = sum of raw frequencies. Color uses relative percentage share (%1 vs %2) so differing corpus sizes don't bias color; shifts toward {nodeAName} (left) or {nodeBName} (right).</p>
+                      </div>
+                    );
+                  })()}
                   
                   {/* Statistical Measures Table */}
                   {results.statistics && results.statistics.length > 0 && (
