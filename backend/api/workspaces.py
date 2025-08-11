@@ -6,7 +6,8 @@ All business logic is handled by the DocWorkspace library itself.
 """
 
 import logging
-from typing import Any, Optional, cast
+import time
+from typing import Any, Dict, Optional, Tuple, cast
 
 import polars as pl
 from core.auth import get_current_user
@@ -49,6 +50,57 @@ except Exception:  # pragma: no cover
     DocLazyFrame = None  # type: ignore
 
 logger = logging.getLogger(__name__)
+
+# -----------------------------------------------------------------------------
+# Concordance In-Memory Cache
+# -----------------------------------------------------------------------------
+# Keyed by (user_id, workspace_id, node_id, column, search_word, num_left, num_right,
+#           regex, case_sensitive) -> stored unsorted Polars DataFrame
+CONCORDANCE_CACHE: Dict[Tuple[str, str, str, str, str, int, int, bool, bool], dict] = {}
+
+
+def _concordance_cache_key(
+    user_id: str,
+    workspace_id: str,
+    node_id: str,
+    column: str,
+    search_word: str,
+    num_left: int,
+    num_right: int,
+    regex: bool,
+    case_sensitive: bool,
+):
+    return (
+        user_id,
+        workspace_id,
+        node_id,
+        column,
+        search_word,
+        num_left,
+        num_right,
+        bool(regex),
+        bool(case_sensitive),
+    )
+
+
+def _get_cached_concordance_df(key):  # pragma: no cover - simple accessor
+    entry = CONCORDANCE_CACHE.get(key)
+    if entry:
+        return entry.get("df")
+    return None
+
+
+def _store_concordance_df(key, df):  # pragma: no cover
+    CONCORDANCE_CACHE[key] = {"df": df, "created": time.time()}
+
+
+def _clear_concordance_cache_for(user_id: str, workspace_id: str):  # pragma: no cover
+    to_delete = [
+        k for k in CONCORDANCE_CACHE if k[0] == user_id and k[1] == workspace_id
+    ]
+    for k in to_delete:
+        CONCORDANCE_CACHE.pop(k, None)
+    return len(to_delete)
 
 
 def _handle_operation_result(result: Any):
@@ -1702,148 +1754,148 @@ async def get_multi_node_concordance(
 ):
     """Get concordance results for multiple nodes (up to 2) with side-by-side comparison"""
     user_id = current_user["id"]
-
     try:
+        # Validate number of nodes
         if len(request.node_ids) == 0:
             raise HTTPException(
                 status_code=400, detail="At least one node ID must be provided"
             )
-
         if len(request.node_ids) > 2:
             raise HTTPException(
                 status_code=400, detail="Maximum 2 nodes supported for comparison"
             )
+
         results = {}
-        # Keep full (unpaginated) dataframes if combined requested
-        full_dfs = []
+        full_dfs = []  # store full cached dfs for combined view
 
         for node_id in request.node_ids:
-            # Get the node
+            # Fetch node
             node = workspace_manager.get_node_from_workspace(
                 user_id, workspace_id, node_id
             )
             if not node:
                 raise HTTPException(status_code=404, detail=f"Node {node_id} not found")
 
-            # Get the column for this node
+            # Resolve column
             column = request.node_columns.get(node_id)
             if not column:
                 raise HTTPException(
                     status_code=400, detail=f"No column specified for node {node_id}"
                 )
 
-            # Check if the column exists in the data
+            # Validate column existence if we can introspect
             if hasattr(node.data, "columns"):
                 available_columns = node.data.columns
             elif hasattr(node.data, "schema"):
                 available_columns = list(node.data.schema.keys())
             else:
                 available_columns = []
-
             if available_columns and column not in available_columns:
                 raise HTTPException(
                     status_code=400,
                     detail=f"Column '{column}' not found in node {node_id}. Available columns: {available_columns}",
                 )
 
-            # Try to use DocFrame text methods if available
-            if hasattr(node.data, "text"):
-                # DocFrame integration - use text namespace
-                concordance_result = node.data.text.concordance(
-                    column=column,
-                    search_word=request.search_word,
-                    num_left_tokens=request.num_left_tokens,
-                    num_right_tokens=request.num_right_tokens,
-                    regex=request.regex,
-                    case_sensitive=request.case_sensitive,
-                )
+            # Build cache key & fetch
+            cache_key = _concordance_cache_key(
+                user_id,
+                workspace_id,
+                node_id,
+                column,
+                request.search_word,
+                request.num_left_tokens,
+                request.num_right_tokens,
+                request.regex,
+                request.case_sensitive,
+            )
+            concordance_result = _get_cached_concordance_df(cache_key)
 
-                # Apply sorting if requested
-                if request.sort_by and request.sort_by in concordance_result.columns:
-                    import polars as pl
-
-                    if request.sort_order.lower() == "desc":
-                        concordance_result = concordance_result.sort(
-                            pl.col(request.sort_by), descending=True
-                        )
-                    else:
-                        concordance_result = concordance_result.sort(
-                            pl.col(request.sort_by)
-                        )
-
-                # Get total count before pagination
-                total_matches = len(concordance_result)
-
-                # Apply pagination for individual tables
-                start_idx = (request.page - 1) * request.page_size
-                end_idx = start_idx + request.page_size
-                paginated_result = concordance_result.slice(
-                    start_idx, request.page_size
-                )
-
-                # Convert concordance DataFrame to format expected by frontend
-                if hasattr(paginated_result, "to_dicts"):
-                    node_name = (
-                        node.name if hasattr(node, "name") and node.name else node_id
+            # Compute if not cached
+            if concordance_result is None:
+                if hasattr(node.data, "text"):
+                    concordance_result = node.data.text.concordance(
+                        column=column,
+                        search_word=request.search_word,
+                        num_left_tokens=request.num_left_tokens,
+                        num_right_tokens=request.num_right_tokens,
+                        regex=request.regex,
+                        case_sensitive=request.case_sensitive,
                     )
-                    results[node_name] = {
-                        "data": paginated_result.to_dicts(),
-                        "columns": list(concordance_result.columns),
-                        "total_matches": total_matches,
-                        "pagination": {
-                            "page": request.page,
-                            "page_size": request.page_size,
-                            "total_pages": (total_matches + request.page_size - 1)
-                            // request.page_size,
-                            "has_next": end_idx < total_matches,
-                            "has_prev": request.page > 1,
-                        },
-                        "sorting": {
-                            "sort_by": request.sort_by,
-                            "sort_order": request.sort_order,
-                        },
-                    }
-                    if request.combined:
-                        # Store full dataframe with a source node column for combined view
-                        import polars as pl
+                else:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Node {node_id} does not support text operations",
+                    )
+                _store_concordance_df(cache_key, concordance_result)  # store unsorted
 
+            # Work on a non-mutating sorted view for this request
+            working_df = concordance_result
+            if (
+                request.sort_by
+                and hasattr(working_df, "columns")
+                and request.sort_by in working_df.columns
+            ):  # type: ignore
+                if request.sort_order.lower() == "desc":
+                    working_df = working_df.sort(
+                        pl.col(request.sort_by), descending=True
+                    )  # type: ignore
+                else:
+                    working_df = working_df.sort(pl.col(request.sort_by))  # type: ignore
+
+            total_matches = len(working_df)
+            start_idx = (request.page - 1) * request.page_size
+            end_idx = start_idx + request.page_size
+            paginated_result = working_df.slice(start_idx, request.page_size)
+
+            node_name = node.name if hasattr(node, "name") and node.name else node_id
+            if hasattr(paginated_result, "to_dicts"):
+                results[node_name] = {
+                    "data": paginated_result.to_dicts(),
+                    "columns": list(working_df.columns),
+                    "total_matches": total_matches,
+                    "pagination": {
+                        "page": request.page,
+                        "page_size": request.page_size,
+                        "total_pages": (total_matches + request.page_size - 1)
+                        // request.page_size,
+                        "has_next": end_idx < total_matches,
+                        "has_prev": request.page > 1,
+                    },
+                    "sorting": {
+                        "sort_by": request.sort_by,
+                        "sort_order": request.sort_order,
+                    },
+                }
+                if request.combined:
+                    try:
                         df_with_source = concordance_result.with_columns(
                             pl.lit(node_name).alias("__source_node")
-                        )
+                        )  # type: ignore
                         full_dfs.append(df_with_source)
-                else:
-                    node_name = (
-                        node.name if hasattr(node, "name") and node.name else node_id
-                    )
-                    results[node_name] = {
-                        "data": [],
-                        "columns": [],
-                        "total_matches": 0,
-                        "pagination": {
-                            "page": 1,
-                            "page_size": request.page_size,
-                            "total_pages": 0,
-                            "has_next": False,
-                            "has_prev": False,
-                        },
-                        "sorting": {
-                            "sort_by": request.sort_by,
-                            "sort_order": request.sort_order,
-                        },
-                    }
+                    except Exception:
+                        pass
             else:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Node {node_id} does not support text operations",
-                )
+                results[node_name] = {
+                    "data": [],
+                    "columns": [],
+                    "total_matches": 0,
+                    "pagination": {
+                        "page": 1,
+                        "page_size": request.page_size,
+                        "total_pages": 0,
+                        "has_next": False,
+                        "has_prev": False,
+                    },
+                    "sorting": {
+                        "sort_by": request.sort_by,
+                        "sort_order": request.sort_order,
+                    },
+                }
 
-        # Build combined view if requested and at least 2 nodes present
+        # Build combined view dynamically (uncached)
         if request.combined and len(full_dfs) >= 2:
             try:
-                import polars as pl
-
                 combined_df = pl.concat(full_dfs, how="vertical")
-                # Ensure document_idx exists before sorting; if missing skip sort
                 if "document_idx" in combined_df.columns:
                     combined_df = combined_df.sort(pl.col("document_idx"))
                 total_combined = len(combined_df)
@@ -1877,12 +1929,24 @@ async def get_multi_node_concordance(
             "data": results,
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         import traceback
 
         print(f"❌ Unexpected multi-node concordance error: {str(e)}")
         print(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+@router.post("/{workspace_id}/concordance/cache/clear")
+async def clear_concordance_cache(
+    workspace_id: str, current_user: dict = Depends(get_current_user)
+):
+    """Clear in-memory concordance cache for this user's workspace (called when leaving tab)."""
+    user_id = current_user["id"]
+    removed = _clear_concordance_cache_for(user_id, workspace_id)
+    return {"success": True, "removed": removed}
 
 
 @router.get("/{workspace_id}/nodes/{node_id}/concordance/{document_idx}")

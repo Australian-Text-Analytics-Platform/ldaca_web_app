@@ -13,6 +13,7 @@ import {
   Node,
   Edge,
   Connection,
+  BezierEdge,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useWorkspace } from '../hooks/useWorkspace';
@@ -21,12 +22,9 @@ import { queryKeys } from '../lib/queryKeys';
 import { GraphLoadingSkeleton, EmptyState } from './LoadingStates';
 import CustomNode from './CustomNode';
 
-// Move nodeTypes outside component to prevent recreation
-// IMPORTANT: keep a distinct custom type so React Flow doesn't apply the
-// built-in "default" node chrome (which looked like a background card)
-const nodeTypes = {
-  customNode: CustomNode,
-} as const;
+// Static registrations to avoid re-creation
+const nodeTypes = { customNode: CustomNode } as const;
+const edgeTypes = { bezier: BezierEdge } as const;
 
 // Dagre-based auto-layout (left-to-right) respecting edges and grouping branches
 const computeDagreLayout = (
@@ -72,6 +70,10 @@ const computeDagreLayout = (
  * This replaces the graph-related logic from the monolithic WorkspaceView
  */
 export const WorkspaceGraphView: React.FC = memo(() => {
+  // Lightweight runtime toggle for verbose graph logging
+  const DEBUG_GRAPH = (typeof window !== 'undefined' && (window as any).__LDACA_DEBUG_GRAPH) ||
+    (typeof window !== 'undefined' && localStorage.getItem('debugGraph') === '1');
+  const dlog = useCallback((...args: any[]) => { if (DEBUG_GRAPH) console.log(...args); }, [DEBUG_GRAPH]);
   // Minimap hidden by default; user can toggle via custom control button
   const [showOverview, setShowOverview] = useState(false);
   const { workspaceGraph, isLoading, deleteNode, renameNode, toggleNodeSelection, convertToDocDataFrame, convertToDataFrame, convertToDocLazyFrame, convertToLazyFrame, resetDocumentColumn, currentWorkspaceId, selectedNodeIds, clearSelection } = useWorkspace();
@@ -159,12 +161,13 @@ export const WorkspaceGraphView: React.FC = memo(() => {
       { rankdir: 'LR', ranksep: 140, nodesep: 100 }
     );
 
-  return workspaceGraph.nodes.map((node: any, index: number) => {
-      // Debug: Log the raw node data to understand the structure
-      console.log('WorkspaceGraphView: Raw node data:', node);
-      console.log('WorkspaceGraphView: node.data:', node.data);
-      console.log('WorkspaceGraphView: node.data.dataType:', node.data?.dataType);
-      console.log('WorkspaceGraphView: node.data.type:', node.data?.type);
+    return workspaceGraph.nodes.map((node: any, index: number) => {
+      dlog('WorkspaceGraphView: Raw node data (condensed):', {
+        id: node.id,
+        nodeType: node.data?.nodeType,
+        isLazy: node.data?.isLazy || node.data?.lazy,
+        documentColumn: node.data?.documentColumn
+      });
       
       // Extract shape information from backend data - backend returns shape directly as tuple
       const backendShape = node.data?.shape;
@@ -178,8 +181,8 @@ export const WorkspaceGraphView: React.FC = memo(() => {
       }
       
       // Better data type detection - backend sends it in nodeType field
-      const dataType = node.data?.nodeType || node.data?.dataType || node.data?.type || node.type || 'unknown';
-      console.log('WorkspaceGraphView: Final dataType:', dataType);
+  const dataType = node.data?.nodeType || node.data?.dataType || node.data?.type || node.type || 'unknown';
+  dlog('WorkspaceGraphView: Resolved dataType:', node.id, dataType);
       
       const pos = positions.get(node.id) || { x: index * 320, y: 50 };
   return {
@@ -217,7 +220,7 @@ export const WorkspaceGraphView: React.FC = memo(() => {
         connectable: false,
       };
     });
-  }, [workspaceGraph, handleDelete, handleRename, handleConvertToDocDataFrame, handleConvertToDataFrame, handleConvertToDocLazyFrame, handleConvertToLazyFrame, handleResetDocument, selectedNodeIds]);
+  }, [workspaceGraph, handleDelete, handleRename, handleConvertToDocDataFrame, handleConvertToDataFrame, handleConvertToDocLazyFrame, handleConvertToLazyFrame, handleResetDocument, selectedNodeIds, dlog]);
 
   // Build edges with bezier style for smooth curves
   const initialEdges = useMemo(() => {
@@ -228,6 +231,7 @@ export const WorkspaceGraphView: React.FC = memo(() => {
       target: e.target,
       type: 'bezier',
       animated: !!e.animated,
+      label: e.label,
     }));
   }, [workspaceGraph]);
   
@@ -262,25 +266,30 @@ export const WorkspaceGraphView: React.FC = memo(() => {
     })
     .join(',');
   
+  const updateRafRef = useRef<number | null>(null);
   useEffect(() => {
-    // Only update if the graph topology or node properties changed
     if (
-      newNodeIds !== currentNodeIds ||
-      newEdgeIds !== currentEdgeIds ||
-      newNodesSignature !== currentNodesSignature
+      newNodeIds === currentNodeIds &&
+      newEdgeIds === currentEdgeIds &&
+      newNodesSignature === currentNodesSignature
     ) {
-      console.log('WorkspaceGraphView: Updating React Flow with nodes:', initialNodes.length);
-  console.log('WorkspaceGraphView: Applying edges from backend:', workspaceGraph?.edges?.length || 0);
-      console.log('WorkspaceGraphView: Current React Flow nodes before update:', nodes);
-      console.log('WorkspaceGraphView: Current React Flow edges before update:', edges);
-      console.log('WorkspaceGraphView: Raw backend edges data:', workspaceGraph?.edges);
-      if (initialNodes[0]) {
-        console.log('WorkspaceGraphView: Node data sample:', initialNodes[0]);
-      }
-    setNodes(initialNodes);
-    setEdges(initialEdges);
-    console.log('WorkspaceGraphView: AFTER setEdges - edges count:', initialEdges.length);
+      return; // No meaningful change
     }
+    // Debounce into next animation frame; coalesce rapid successive triggers
+    if (updateRafRef.current) {
+      cancelAnimationFrame(updateRafRef.current);
+    }
+    updateRafRef.current = requestAnimationFrame(() => {
+      dlog('WorkspaceGraphView: Applying graph update', {
+        nodeCount: initialNodes.length,
+        edgeCount: initialEdges.length,
+      });
+      setNodes(initialNodes);
+      setEdges(initialEdges);
+    });
+    return () => {
+      if (updateRafRef.current) cancelAnimationFrame(updateRafRef.current);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [newNodeIds, newEdgeIds, newNodesSignature, currentNodesSignature]);
 
@@ -288,9 +297,11 @@ export const WorkspaceGraphView: React.FC = memo(() => {
 
   // Add effect to monitor actual React Flow state changes
   useEffect(() => {
-    console.log('WorkspaceGraphView: React Flow nodes state changed:', nodes);
-    console.log('WorkspaceGraphView: React Flow edges state changed:', edges);
-  }, [nodes, edges]);
+    dlog('WorkspaceGraphView: React Flow state changed', {
+      nodes: nodes.length,
+      edges: edges.length,
+    });
+  }, [nodes, edges, dlog]);
 
   // Handle node selection
   const onNodeClick: NodeMouseHandler = useCallback((event: React.MouseEvent, node: Node) => {
@@ -342,7 +353,8 @@ export const WorkspaceGraphView: React.FC = memo(() => {
       <ReactFlow
         nodes={nodes}
         edges={edges}
-        nodeTypes={nodeTypes as any}
+  nodeTypes={nodeTypes as any}
+  edgeTypes={edgeTypes as any}
   onNodesChange={handleNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeClick={onNodeClick}
@@ -351,9 +363,15 @@ export const WorkspaceGraphView: React.FC = memo(() => {
           setNodes((ns) => ns.map((n) => ({ ...n, selected: selectedNodeIds?.includes?.(n.id) ?? false })) as any);
         }}
   connectionLineType={ConnectionLineType.Bezier}
-  defaultEdgeOptions={{ type: 'bezier' }}
-        fitView
-        fitViewOptions={{ padding: 0.2, includeHiddenNodes: false }}
+        defaultEdgeOptions={{ type: 'bezier' }}
+        // One-time fit handled in onInit to avoid repeated resize-triggered layout loops
+        onInit={(instance) => {
+          try {
+            instance.fitView({ padding: 0.2, includeHiddenNodes: false });
+          } catch (e) {
+            dlog('WorkspaceGraphView: fitView error (ignored)', e);
+          }
+        }}
         attributionPosition="bottom-left"
         className="bg-gray-50"
         style={{ width: '100%', height: '100%' }}
@@ -365,13 +383,13 @@ export const WorkspaceGraphView: React.FC = memo(() => {
         elementsSelectable={true}
         // Prevent any edge creation via handles, but don't clear existing edges
         onConnect={(connection: Connection) => {
-          console.log('WorkspaceGraphView: onConnect blocked - manual edges disabled', connection);
+          dlog('WorkspaceGraphView: onConnect blocked - manual edges disabled', connection);
         }}
         onConnectStart={(event, params) => {
-          console.log('WorkspaceGraphView: onConnectStart blocked', params);
+          dlog('WorkspaceGraphView: onConnectStart blocked', params);
         }}
         onConnectEnd={(event) => {
-          console.log('WorkspaceGraphView: onConnectEnd blocked');
+          dlog('WorkspaceGraphView: onConnectEnd blocked');
         }}
       >
         <Background variant={BackgroundVariant.Dots} gap={20} size={1} />

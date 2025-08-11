@@ -34,15 +34,19 @@ const CustomNode: React.FC<NodeProps<any>> = ({ data, selected }) => {
 
   const { getNodeShape } = useWorkspace();
 
+  const DEBUG_GRAPH = (typeof window !== 'undefined' && (window as any).__LDACA_DEBUG_GRAPH) ||
+    (typeof window !== 'undefined' && localStorage.getItem('debugGraph') === '1');
+  const dlog = React.useCallback((...args: any[]) => { if (DEBUG_GRAPH) console.log(...args); }, [DEBUG_GRAPH]);
+
   useEffect(() => {
-    console.log('CustomNode: node updated', {
+    dlog('CustomNode: node updated', {
       nodeId: initialNode?.node_id,
       dataType: initialNode?.data_type,
       nodeName: initialNode?.name,
       isRendering: true
     });
     setNode(initialNode);
-  }, [initialNode]);
+  }, [initialNode, dlog]);
 
   const nodeName = node?.name || 'Loading...';
   const nodeShape = node?.shape;
@@ -232,7 +236,7 @@ const CustomNode: React.FC<NodeProps<any>> = ({ data, selected }) => {
     }
   `;
 
-  console.log('CustomNode rendering:', {
+  dlog('CustomNode rendering:', {
     nodeId: node?.node_id,
     nodeName,
     selected,

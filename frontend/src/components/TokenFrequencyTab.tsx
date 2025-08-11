@@ -130,13 +130,14 @@ const TokenFrequencyTab: React.FC = () => {
           return existing;
         }
         
-        // Auto-select document column if available, otherwise first column
+        // Only auto-select for DocType nodes using explicit documentColumn; leave blank otherwise
         const columns = getNodeColumns(node);
-        const defaultColumn = columns.find((col: string) => 
-          col.toLowerCase().includes('document') || 
-          col.toLowerCase().includes('text') ||
-          col.toLowerCase().includes('content')
-        ) || columns[0] || '';
+        let defaultColumn = '';
+        const isDocType = !!(node.data?.nodeType && node.data.nodeType.includes('Doc'));
+        const documentColumn = node.data?.documentColumn;
+        if (isDocType && documentColumn && columns.includes(documentColumn)) {
+          defaultColumn = documentColumn;
+        }
         
         return {
           nodeId: node.id,
