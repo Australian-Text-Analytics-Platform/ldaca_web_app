@@ -247,16 +247,18 @@ export const WorkspaceGraphView: React.FC = memo(() => {
     .map((n: any) => {
       const dt = n?.data?.node?.data_type ?? 'unknown';
       const lazy = n?.data?.node?.is_lazy ? '1' : '0';
-  const docc = n?.data?.node?.document_column || '';
-  return `${n.id}:${dt}:${lazy}:${docc}`;
+      const docc = n?.data?.node?.document_column || '';
+      const name = n?.data?.node?.name || '';
+      return `${n.id}:${dt}:${lazy}:${docc}:${name}`;
     })
     .join(',');
   const newNodesSignature = (workspaceGraph?.nodes || [])
     .map((gn: any) => {
       const dt = gn?.data?.nodeType || gn?.data?.dataType || gn?.type || 'unknown';
       const lazy = (gn?.data?.isLazy || gn?.data?.lazy) ? '1' : '0';
-  const docc = gn?.data?.documentColumn || '';
-  return `${gn.id}:${dt}:${lazy}:${docc}`;
+      const docc = gn?.data?.documentColumn || '';
+      const name = gn?.data?.nodeName || gn?.data?.label || '';
+      return `${gn.id}:${dt}:${lazy}:${docc}:${name}`;
     })
     .join(',');
   

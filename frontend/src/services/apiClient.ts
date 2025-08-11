@@ -300,10 +300,9 @@ class APIClient {
   }
 
   async renameNode(workspaceId: string, nodeId: string, newName: string, headers: Record<string, string>): Promise<void> {
-    await this.request<void>(`/workspaces/${workspaceId}/nodes/${nodeId}/rename`, {
-      method: 'POST',
+    await this.request<void>(`/workspaces/${workspaceId}/nodes/${nodeId}/name?new_name=${encodeURIComponent(newName)}`, {
+      method: 'PUT',
       headers,
-      body: { new_name: newName },
     });
   }
 

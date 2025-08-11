@@ -282,15 +282,20 @@ export async function deleteNode(
 }
 
 export async function renameNode(
-  workspaceId: string, 
-  nodeId: string, 
+  workspaceId: string,
+  nodeId: string,
   newName: string,
   authHeaders: Record<string, string> = {}
 ) {
-  const res = await axios.put(`${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}/name`, null, {
-    headers: authHeaders,
-    params: { new_name: newName }
-  });
+  // RESTful endpoint only
+  const res = await axios.put(
+    `${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}/name`,
+    null,
+    {
+      headers: authHeaders,
+      params: { new_name: newName },
+    }
+  );
   return res.data;
 }
 

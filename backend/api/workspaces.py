@@ -1174,34 +1174,45 @@ async def reset_node_document_column(
         raise HTTPException(status_code=500, detail=f"Reset document failed: {str(e)}")
 
 
-@router.post("/{workspace_id}/nodes/{node_id}/rename")
-async def rename_node(
+@router.put("/{workspace_id}/nodes/{node_id}/name")
+async def update_node_name(
     workspace_id: str,
     node_id: str,
     new_name: str,
     current_user: dict = Depends(get_current_user),
 ):
-    """Rename node using DocWorkspace safe_operation method"""
+    """RESTful node rename endpoint (preferred).
+
+    Update a node's name (preferred RESTful endpoint).
+    Accepts new_name as a query parameter (same pattern as workspace rename).
+    """
     user_id = current_user["id"]
+    node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
+    if not node:
+        raise HTTPException(status_code=404, detail="Node not found")
 
-    # Define operation function
-    def rename_operation():
-        node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
-        if not node:
-            raise ValueError("Node not found")
+    try:
         node.name = new_name
-        return node
-
-    # Use DocWorkspace's safe operation wrapper
-    result = workspace_manager.execute_safe_operation(
-        user_id, workspace_id, rename_operation
-    )
-
-    success, message, result_obj = _handle_operation_result(result)
-    if not success:
-        raise HTTPException(status_code=400, detail=message)
-
-    return result_obj
+        # Persist workspace after rename
+        workspace = workspace_manager.get_workspace(user_id, workspace_id)
+        if workspace is not None:
+            try:  # noqa: SIM105
+                workspace_manager._save_workspace_to_disk(
+                    user_id, workspace_id, workspace
+                )  # type: ignore[attr-defined]
+            except Exception:  # pragma: no cover
+                logger.exception("Failed to persist workspace after node rename")
+        # Return updated node info (consistent shape for frontend)
+        if hasattr(node, "info"):
+            try:
+                return node.info(json=True)  # type: ignore[call-arg]
+            except Exception:
+                pass
+        return {"id": getattr(node, "id", node_id), "name": new_name}
+    except HTTPException:
+        raise
+    except Exception as e:  # pragma: no cover
+        raise HTTPException(status_code=500, detail=f"Failed to rename node: {e}")
 
 
 # ============================================================================
