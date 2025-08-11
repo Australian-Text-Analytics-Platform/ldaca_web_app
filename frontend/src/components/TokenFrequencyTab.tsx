@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import ReactDOM from 'react-dom';
+import React, { useState, useEffect, useMemo } from 'react';
+import ColorSwatchPicker from './ColorSwatchPicker';
 import { useWorkspace } from '../hooks/useWorkspace';
 import { useAuth } from '../hooks/useAuth';
 import { 
@@ -51,10 +51,7 @@ const TokenFrequencyTab: React.FC = () => {
     ],
     []
   );
-  const [openColorPickerNode, setOpenColorPickerNode] = useState<string | null>(null);
-  const colorPopoverRef = useRef<HTMLDivElement | null>(null);
-  const colorAnchorRef = useRef<HTMLElement | null>(null);
-  const [colorPopoverPos, setColorPopoverPos] = useState<{top:number; left:number} | null>(null);
+  // Color picker handled by shared component now
 
   // Ensure every currently selected node has a color
   useEffect(() => {
@@ -80,22 +77,7 @@ const TokenFrequencyTab: React.FC = () => {
     setNodeColors(prev => ({ ...prev, [nodeId]: color }));
   };
 
-  // Close popover when clicking outside
-  useEffect(() => {
-    if (!openColorPickerNode) return;
-    const handler = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (colorPopoverRef.current?.contains(target)) return;
-      if (colorAnchorRef.current?.contains(target as Node)) return;
-      setOpenColorPickerNode(null);
-    };
-    window.addEventListener('mousedown', handler);
-    window.addEventListener('scroll', () => setOpenColorPickerNode(null), true);
-    return () => {
-      window.removeEventListener('mousedown', handler);
-      window.removeEventListener('scroll', () => setOpenColorPickerNode(null), true);
-    };
-  }, [openColorPickerNode]);
+  // Removed legacy popover logic
 
   // Debug results changes
   useEffect(() => {
@@ -255,6 +237,7 @@ const TokenFrequencyTab: React.FC = () => {
         id: node.id,
         name: node.data?.name || node.id
       })),
+  nodeColors,
       timestamp: Date.now()
     };
     
@@ -406,84 +389,7 @@ const TokenFrequencyTab: React.FC = () => {
                         <div className="font-medium break-words pr-2" style={{ color: nodeColor }}>
                           {nodeDisplayName}
                         </div>
-                        <div className="relative">
-                          <button
-                            type="button"
-                            aria-label="Select color"
-                            ref={el => { if (el && openColorPickerNode === node.id) colorAnchorRef.current = el; }}
-                            onClick={(e) => {
-                              if (openColorPickerNode === node.id) {
-                                setOpenColorPickerNode(null);
-                                return;
-                              }
-                              const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                              const bodyWidth = window.innerWidth;
-                              const desiredWidth = 180;
-                              let left = rect.left + rect.width / 2 - desiredWidth / 2;
-                              left = Math.max(8, Math.min(bodyWidth - desiredWidth - 8, left));
-                              const top = rect.bottom + 8 + window.scrollY;
-                              setColorPopoverPos({ top, left });
-                              setOpenColorPickerNode(node.id);
-                            }}
-                            className="w-8 h-8 rounded-full ring-2 ring-offset-1 ring-gray-300 hover:ring-blue-400 focus:outline-none focus:ring-blue-500 transition-shadow shadow-sm"
-                            style={{ backgroundColor: nodeColor }}
-                          />
-                        </div>
-                        {openColorPickerNode === node.id && colorPopoverPos && ReactDOM.createPortal(
-                          <div
-                            ref={colorPopoverRef}
-                            className="z-[9999] w-56 p-3 rounded-lg border border-gray-200 bg-white shadow-xl animate-fade-in"
-                            style={{ position: 'absolute', top: colorPopoverPos.top, left: colorPopoverPos.left }}
-                          >
-                            <div className="text-xs font-medium text-gray-600 mb-2 flex items-center justify-between">
-                              <span>Pick Color</span>
-                              <button
-                                type="button"
-                                onClick={() => setOpenColorPickerNode(null)}
-                                className="text-gray-400 hover:text-gray-600"
-                                aria-label="Close color picker"
-                              >×</button>
-                            </div>
-                            <div className="grid grid-cols-6 gap-1 mb-3">
-                              {defaultPalette.map(p => (
-                                <button
-                                  key={p}
-                                  type="button"
-                                  className={`w-6 h-6 rounded-full border border-white shadow-sm hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 transition-transform ${p === nodeColor ? 'ring-2 ring-blue-500 ring-offset-1' : ''}`}
-                                  style={{ backgroundColor: p }}
-                                  onClick={() => handleColorChange(node.id, p)}
-                                  aria-label={`Set color ${p}`}
-                                />
-                              ))}
-                            </div>
-                            <div className="flex items-stretch gap-2 mt-1">
-                              <div className="flex flex-col items-center">
-                                <input
-                                  type="color"
-                                  value={nodeColor}
-                                  onChange={(e) => handleColorChange(node.id, e.target.value)}
-                                  className="w-9 h-9 p-0 border border-gray-300 rounded cursor-pointer bg-transparent"
-                                  aria-label="Custom color"
-                                />
-                              </div>
-                              <input
-                                type="text"
-                                value={nodeColor.toUpperCase()}
-                                onChange={(e) => {
-                                  const val = e.target.value.trim();
-                                  if (/^#?[0-9A-Fa-f]{0,7}$/.test(val)) { // allow # and up to 6 hex chars while typing
-                                    const normalized = val.startsWith('#') ? val : `#${val}`;
-                                    if (/^#[0-9A-Fa-f]{6}$/.test(normalized)) handleColorChange(node.id, normalized);
-                                  }
-                                }}
-                                className="flex-1 px-2 py-2 text-xs border border-gray-300 rounded font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                aria-label="Hex color"
-                                placeholder="#000000"
-                                maxLength={7}
-                              />
-                            </div>
-                          </div>, document.body
-                        )}
+                        <ColorSwatchPicker color={nodeColor} palette={defaultPalette} onChange={(c)=>handleColorChange(node.id,c)} size={7} />
                       </div>
                       <div className="text-xs text-gray-500 break-all">{node.id}</div>
                     </div>

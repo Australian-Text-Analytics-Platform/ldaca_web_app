@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import ColorSwatchPicker from './ColorSwatchPicker';
 import { useWorkspace } from '../hooks/useWorkspace';
 import { useAuth } from '../hooks/useAuth';
 import { 
@@ -31,6 +32,34 @@ const ConcordanceTab: React.FC = () => {
   const [caseSensitive, setCaseSensitive] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [results, setResults] = useState<MultiNodeConcordanceResponse | null>(null);
+  // Color management & view mode
+  const [nodeColors, setNodeColors] = useState<Record<string,string>>({});
+  const defaultPalette = useMemo(() => [
+    '#2563eb', '#dc2626', '#16a34a', '#9333ea', '#d97706', '#0d9488', '#db2777', '#4f46e5', '#65a30d', '#0891b2', '#92400e', '#6b7280'
+  ], []);
+  // legacy inline picker state removed in favor of shared component
+  const [viewMode, setViewMode] = useState<'separated'|'combined'>('separated');
+  const [combinedPage, setCombinedPage] = useState(1);
+  const [combinedPageSize] = useState(20);
+  const [combinedLoading, setCombinedLoading] = useState(false);
+
+  // Map any node's id/name variants to its assigned color (used in combined table)
+  const sourceColorMap = useMemo(() => {
+    // Build a CASE-INSENSITIVE lookup of every plausible identifier for a node
+    const map: Record<string,string> = {};
+    selectedNodes.forEach((n, idx) => {
+      const assigned = nodeColors[n.id] || defaultPalette[idx % defaultPalette.length];
+      const variants = new Set<string>();
+      if (n.id) variants.add(n.id);
+      if ((n as any).name) variants.add((n as any).name);
+      if (n.name) variants.add(n.name);
+      if (n.data?.name) variants.add(n.data.name);
+      if ((n as any).label) variants.add((n as any).label);
+      if (n.data?.label) variants.add(n.data.label);
+      variants.forEach(v => { if (v) map[v.toString().toLowerCase()] = assigned; });
+    });
+    return map;
+  }, [selectedNodes, nodeColors, defaultPalette]);
   
   // Pagination and sorting state - separate for each node
   const [nodePagination, setNodePagination] = useState<Record<string, {
@@ -102,6 +131,10 @@ const ConcordanceTab: React.FC = () => {
           if (matchingSelections.length > 0) {
             setNodeColumnSelections(matchingSelections);
           }
+        }
+
+        if (params.nodeColors) {
+          setNodeColors((prev) => ({ ...params.nodeColors, ...prev }));
         }
         
         // Clear the pending search
@@ -178,6 +211,30 @@ const ConcordanceTab: React.FC = () => {
     });
   }, [selectedNodeIds, selectedNodes, getNodeColumns]); // Include all dependencies
 
+  // Ensure every selected node has a color
+  useEffect(() => {
+    if (!selectedNodes.length) return;
+    setNodeColors(prev => {
+      const updated = { ...prev };
+      let paletteIndex = 0;
+      selectedNodes.forEach(n => {
+        if (!updated[n.id]) {
+          while (Object.values(updated).includes(defaultPalette[paletteIndex % defaultPalette.length]) && paletteIndex < defaultPalette.length * 2) {
+            paletteIndex++;
+          }
+          updated[n.id] = defaultPalette[paletteIndex % defaultPalette.length];
+          paletteIndex++;
+        }
+      });
+      return updated;
+    });
+  }, [selectedNodes, defaultPalette]);
+
+  // Removed old color popover logic (centralized in ColorSwatchPicker)
+
+  const handleColorChange = (nodeId: string, color: string) => setNodeColors(prev => ({ ...prev, [nodeId]: color }));
+  const getColorForNodeId = (nodeId: string, idx: number) => nodeColors[nodeId] || defaultPalette[idx % defaultPalette.length];
+
   const handleColumnChange = (nodeId: string, column: string) => {
     setNodeColumnSelections(prev => 
       prev.map(sel => 
@@ -186,7 +243,7 @@ const ConcordanceTab: React.FC = () => {
     );
   };
 
-  const handleSearch = useCallback(async (resetPage = true, targetNodeId?: string) => {
+  const handleSearch = useCallback(async (resetPage = true, targetNodeId?: string, forceMode?: 'separated'|'combined') => {
     if (!currentWorkspaceId || selectedNodes.length === 0) {
       return;
     }
@@ -234,6 +291,7 @@ const ConcordanceTab: React.FC = () => {
       const firstNodeId = selectedNodes[0].id;
       const firstNodePagination = updatedPagination[firstNodeId];
 
+      const effectiveMode = forceMode || viewMode;
       const request: MultiNodeConcordanceRequest = {
         node_ids: selectedNodes.slice(0, 2).map(node => node.id), // Limit to 2 nodes
         node_columns: nodeColumns,
@@ -242,11 +300,12 @@ const ConcordanceTab: React.FC = () => {
         num_right_tokens: numRightTokens,
         regex: regex,
         case_sensitive: caseSensitive,
-        page: firstNodePagination.currentPage,
-        page_size: firstNodePagination.pageSize,
+        page: effectiveMode === 'combined' ? combinedPage : firstNodePagination.currentPage,
+        page_size: effectiveMode === 'combined' ? combinedPageSize : firstNodePagination.pageSize,
         sort_by: firstNodePagination.sortBy || undefined,
         sort_order: firstNodePagination.sortOrder
       };
+      if (effectiveMode === 'combined') request.combined = true;
 
       const response = await multiNodeConcordanceSearch(
         currentWorkspaceId,
@@ -266,7 +325,7 @@ const ConcordanceTab: React.FC = () => {
     } finally {
       setIsSearching(false);
     }
-  }, [currentWorkspaceId, selectedNodes, searchWord, nodeColumnSelections, nodePagination, globalPageSize, numLeftTokens, numRightTokens, regex, caseSensitive, getAuthHeaders]);
+  }, [currentWorkspaceId, selectedNodes, searchWord, nodeColumnSelections, nodePagination, globalPageSize, numLeftTokens, numRightTokens, regex, caseSensitive, getAuthHeaders, viewMode, combinedPage, combinedPageSize]);
 
   // Effect to handle auto-search trigger from TokenFrequencyTab
   useEffect(() => {
@@ -280,7 +339,17 @@ const ConcordanceTab: React.FC = () => {
   const handleClearResults = () => {
     setResults(null);
     setNodePagination({});
+  setCombinedPage(1);
   };
+
+  // Refetch combined results when combined page changes
+  useEffect(() => {
+    if (viewMode === 'combined' && results) {
+      // Only refetch when user explicitly navigates pages (not initial setResults loop)
+      handleSearch(false, undefined, 'combined');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [combinedPage]);
 
   const handleSort = (columnName: string, nodeId: string) => {
     setNodePagination(prev => {
@@ -525,6 +594,93 @@ const ConcordanceTab: React.FC = () => {
   };
 
   const renderConcordanceTable = (nodeName: string, nodeData: any, nodeId: string, column: string) => {
+    if (nodeName === '__COMBINED__') {
+      const rows = nodeData.data || [];
+      const columns = nodeData.columns || [];
+      return (
+        <div key="__COMBINED__" className="mb-6">
+          <div className="flex items-center mb-4">
+            <h3 className="text-lg font-semibold text-gray-800">Combined Results</h3>
+            <div className="ml-auto flex items-center space-x-2">
+              <span className="text-xs text-gray-500">Rows colored by source node</span>
+              <button
+                onClick={async () => {
+                  if (selectedNodes.length === 0 || !searchWord.trim()) return;
+                  setCombinedLoading(true);
+                  try {
+                    for (const n of selectedNodes.slice(0,2)) {
+                      const sel = nodeColumnSelections.find(s => s.nodeId === n.id);
+                      if (!sel) continue;
+                      await handleDetach(n.id, sel.column);
+                    }
+                  } finally { setCombinedLoading(false); }
+                }}
+                disabled={combinedLoading || !searchWord.trim()}
+                className="px-3 py-1 bg-green-600 text-white rounded text-sm disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-green-700 transition-colors"
+              >Detach Both</button>
+            </div>
+          </div>
+          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <div className="max-h-96 overflow-y-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50 sticky top-0">
+                  <tr>
+                    {columns.map((c: string) => <th key={c} className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{c}</th>)}
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {rows.map((row:any, idx:number) => {
+                    const rawSrc = row.__source_node;
+                    const normalized = rawSrc ? rawSrc.toString().toLowerCase() : undefined;
+                    let color = normalized ? sourceColorMap[normalized] : undefined;
+                    if (!color && rawSrc) {
+                      // Fallback: attempt partial / loose match (startsWith) if exact failed
+                      const entry = Object.entries(sourceColorMap).find(([k]) => k.includes(normalized!));
+                      color = entry ? entry[1] : undefined;
+                    }
+                    if (!color) {
+                      // Final fallback: deterministic by hashing source string
+                      if (rawSrc) {
+                        const chars = Array.from(rawSrc.toString()) as string[];
+                        const hash = chars.reduce((a, c) => a + c.charCodeAt(0), 0);
+                        color = defaultPalette[hash % defaultPalette.length];
+                      } else {
+                        color = '#ffffff';
+                      }
+                    }
+                    const bg = `${color}20`; // light tint
+                    return (
+                      <tr key={idx} className="cursor-pointer hover:bg-blue-50" style={{ backgroundColor: bg }} onClick={() => {
+                        if (rawSrc) {
+                          const nodeObj = selectedNodes.find(n => {
+                            const candidates = [n.id, n.name, (n as any).name, n.data?.name, (n as any).label, n.data?.label].filter(Boolean).map(v=>v.toString().toLowerCase());
+                            return candidates.includes(rawSrc.toString().toLowerCase());
+                          });
+                          const sel = nodeObj && nodeColumnSelections.find(s => s.nodeId === nodeObj.id);
+                          if (nodeObj && sel) handleRowClick(row, nodeObj.id, sel.column);
+                        }
+                      }}>
+                        {columns.map((c: string, i: number) => <td key={i} className="px-4 py-2 text-sm text-gray-900">{row[c] !== undefined && row[c] !== null ? String(row[c]) : ''}</td>)}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            {nodeData.pagination && (
+              <div className="mt-2 text-sm text-gray-600 text-center p-2">{nodeData.pagination.total_matches} total matches</div>
+            )}
+            {nodeData.pagination && nodeData.pagination.total_pages > 1 && (
+              <div className="mt-4 flex justify-center items-center space-x-2 p-4 pt-0">
+                <button onClick={() => combinedPage > 1 && setCombinedPage(p => p-1)} disabled={combinedPage <= 1} className="px-3 py-1 border border-gray-300 rounded text-sm disabled:bg-gray-100 disabled:text-gray-400 hover:bg-gray-50">Previous</button>
+                <div className="text-sm text-gray-600">Page {combinedPage} of {nodeData.pagination.total_pages}</div>
+                <button onClick={() => combinedPage < nodeData.pagination.total_pages && setCombinedPage(p => p+1)} disabled={combinedPage >= nodeData.pagination.total_pages} className="px-3 py-1 border border-gray-300 rounded text-sm disabled:bg-gray-100 disabled:text-gray-400 hover:bg-gray-50">Next</button>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
     if (!nodeData.data || nodeData.data.length === 0) {
       return (
         <div key={nodeName} className="mb-6">
@@ -681,27 +837,23 @@ const ConcordanceTab: React.FC = () => {
             <>
             {/* Horizontal list; enable horizontal scroll only when >2 nodes */}
             <div className={`flex space-x-3 pb-2 ${selectedNodes.length > 2 ? 'overflow-x-auto' : 'overflow-x-hidden'}`}>
-              {selectedNodes.map((node: any) => {
+              {selectedNodes.map((node: any, idx: number) => {
                 const columns = getNodeColumns(node);
                 const selection = nodeColumnSelections.find(sel => sel.nodeId === node.id);
                 const nodeDisplayName = node.name || node.data?.name || (node as any).label || node.data?.label || node.id;
+                const color = getColorForNodeId(node.id, idx);
                 return (
-                  <div
-                    key={node.id}
-                    className={`bg-gray-50 p-3 rounded-md ${selectedNodes.length > 2 ? 'flex-none min-w-[50%]' : 'flex-1 min-w-0'}`}
-                  >
+                  <div key={node.id} className={`bg-gray-50 p-3 rounded-md ${selectedNodes.length > 2 ? 'flex-none min-w-[50%]' : 'flex-1 min-w-0'}`}>
                     <div className="mb-2">
-                      <div className="font-medium text-gray-800 break-words">
-                        {nodeDisplayName}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="font-medium break-words pr-2" style={{ color }}>{nodeDisplayName}</div>
+                        <ColorSwatchPicker color={color} palette={defaultPalette} onChange={(c)=>handleColorChange(node.id,c)} size={7} />
                       </div>
                       <div className="text-xs text-gray-500 break-all">{node.id}</div>
                     </div>
-                    
                     {columns.length > 0 ? (
                       <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">
-                          Text Column:
-                        </label>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Text Column:</label>
                         <select
                           value={selection?.column || ''}
                           onChange={(e) => handleColumnChange(node.id, e.target.value)}
@@ -709,16 +861,12 @@ const ConcordanceTab: React.FC = () => {
                         >
                           <option value="">Select a column...</option>
                           {columns.map((column: string) => (
-                            <option key={column} value={column}>
-                              {column}
-                            </option>
+                            <option key={column} value={column}>{column}</option>
                           ))}
                         </select>
                       </div>
                     ) : (
-                      <div className="text-xs text-red-500">
-                        No columns available for this node
-                      </div>
+                      <div className="text-xs text-red-500">No columns available for this node</div>
                     )}
                   </div>
                 );
@@ -853,8 +1001,8 @@ const ConcordanceTab: React.FC = () => {
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex space-x-2">
+        {/* Action Buttons (view mode toggle now in results section) */}
+        <div className="flex flex-wrap gap-3 items-center">
           <button
             onClick={() => handleSearch(true)}
             disabled={
@@ -885,12 +1033,18 @@ const ConcordanceTab: React.FC = () => {
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
           {results.success ? (
             <div>
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Search Results</h3>
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-2">
+                <h3 className="text-lg font-semibold text-gray-800">Search Results</h3>
+                <div className="flex items-center bg-gray-100 rounded-md overflow-hidden self-start md:self-auto">
+                  <button type="button" onClick={() => { if(viewMode!=='separated'){ setViewMode('separated'); setCombinedPage(1); handleSearch(true, undefined, 'separated'); } }} className={`px-3 py-2 text-sm font-medium ${viewMode==='separated' ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:text-gray-800'}`}>Separated</button>
+                  <button type="button" onClick={() => { if(viewMode!=='combined'){ setViewMode('combined'); setCombinedPage(1); handleSearch(true, undefined, 'combined'); } }} className={`px-3 py-2 text-sm font-medium border-l ${viewMode==='combined' ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:text-gray-800'}`}>Combined</button>
+                </div>
+              </div>
               <div className="text-sm text-gray-600 mb-6">{results.message}</div>
               
               {results.data && Object.keys(results.data).length > 0 ? (
-                <div className={`grid gap-6 ${Object.keys(results.data).length === 1 ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-2'}`}>
-                  {Object.entries(results.data).map(([nodeName, nodeData]) => {
+                <div className={`grid gap-6 ${viewMode==='combined' ? 'grid-cols-1' : (Object.keys(results.data).length === 1 ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-2')}`}>
+                  {Object.entries(results.data).filter(([k]) => viewMode==='combined' ? k==='__COMBINED__' : k !== '__COMBINED__').map(([nodeName, nodeData]) => {
                     // Find the corresponding node and column for detail view
                     // Try multiple ways to match the node
                     console.log('Trying to match nodeName:', nodeName);

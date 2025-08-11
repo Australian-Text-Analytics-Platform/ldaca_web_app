@@ -1713,8 +1713,9 @@ async def get_multi_node_concordance(
             raise HTTPException(
                 status_code=400, detail="Maximum 2 nodes supported for comparison"
             )
-
         results = {}
+        # Keep full (unpaginated) dataframes if combined requested
+        full_dfs = []
 
         for node_id in request.node_ids:
             # Get the node
@@ -1773,7 +1774,7 @@ async def get_multi_node_concordance(
                 # Get total count before pagination
                 total_matches = len(concordance_result)
 
-                # Apply pagination
+                # Apply pagination for individual tables
                 start_idx = (request.page - 1) * request.page_size
                 end_idx = start_idx + request.page_size
                 paginated_result = concordance_result.slice(
@@ -1802,6 +1803,14 @@ async def get_multi_node_concordance(
                             "sort_order": request.sort_order,
                         },
                     }
+                    if request.combined:
+                        # Store full dataframe with a source node column for combined view
+                        import polars as pl
+
+                        df_with_source = concordance_result.with_columns(
+                            pl.lit(node_name).alias("__source_node")
+                        )
+                        full_dfs.append(df_with_source)
                 else:
                     node_name = (
                         node.name if hasattr(node, "name") and node.name else node_id
@@ -1827,6 +1836,40 @@ async def get_multi_node_concordance(
                     status_code=400,
                     detail=f"Node {node_id} does not support text operations",
                 )
+
+        # Build combined view if requested and at least 2 nodes present
+        if request.combined and len(full_dfs) >= 2:
+            try:
+                import polars as pl
+
+                combined_df = pl.concat(full_dfs, how="vertical")
+                # Ensure document_idx exists before sorting; if missing skip sort
+                if "document_idx" in combined_df.columns:
+                    combined_df = combined_df.sort(pl.col("document_idx"))
+                total_combined = len(combined_df)
+                start_idx = (request.page - 1) * request.page_size
+                paginated = combined_df.slice(start_idx, request.page_size)
+                results["__COMBINED__"] = {
+                    "data": paginated.to_dicts(),
+                    "columns": list(combined_df.columns),
+                    "total_matches": total_combined,
+                    "pagination": {
+                        "page": request.page,
+                        "page_size": request.page_size,
+                        "total_pages": (total_combined + request.page_size - 1)
+                        // request.page_size,
+                        "has_next": (start_idx + request.page_size) < total_combined,
+                        "has_prev": request.page > 1,
+                    },
+                    "sorting": {
+                        "sort_by": "document_idx"
+                        if "document_idx" in combined_df.columns
+                        else None,
+                        "sort_order": "asc",
+                    },
+                }
+            except Exception as ce:
+                print(f"⚠️ Failed to build combined concordance view: {ce}")
 
         return {
             "success": True,

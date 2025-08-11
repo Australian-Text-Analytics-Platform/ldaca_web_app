@@ -635,6 +635,7 @@ export interface MultiNodeConcordanceRequest {
   page_size?: number;
   sort_by?: string;
   sort_order?: 'asc' | 'desc';
+  combined?: boolean; // request combined concatenated view in addition to per-node results
 }
 
 export interface MultiNodeConcordanceResponse {

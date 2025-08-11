@@ -281,6 +281,9 @@ class MultiNodeConcordanceRequest(BaseModel):
     num_right_tokens: int = 10
     regex: bool = False
     case_sensitive: bool = False
+    combined: bool = (
+        False  # if true, backend will also build a combined view across nodes
+    )
     # Pagination parameters
     page: int = 1
     page_size: int = 50
