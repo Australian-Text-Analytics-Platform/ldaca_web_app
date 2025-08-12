@@ -93,7 +93,7 @@ const JoinInterface: React.FC<JoinInterfaceProps> = ({
   const nodeColors: Record<string,string> = {};
   const noop = () => {};
   return (
-  <div className="p-6 bg-white border border-gray-200 rounded-lg flex flex-col max-h-[80vh] relative">
+  <div className="flex flex-col max-h-[80vh] relative">
       <div className="flex items-center space-x-2 mb-4 flex-shrink-0">
         <div className="text-lg font-semibold text-gray-800">Join Nodes</div>
         <div className="text-sm text-gray-500">

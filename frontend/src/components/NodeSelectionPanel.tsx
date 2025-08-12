@@ -73,7 +73,7 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
       )}
       {selectedNodes.length === 0 ? (
         <div className="text-sm text-gray-500 italic bg-gray-50 p-3 rounded-md">
-          No nodes selected. Click on nodes in the workspace view to select them (max {maxCompare} for comparison). Hold Cmd/Ctrl to select multiple nodes.
+          No nodes selected. Single click on nodes in the workspace view to select them (max {maxCompare} for comparison).
         </div>
       ) : (
         <div className={`flex space-x-3 pb-2 ${selectedNodes.length > maxCompare ? 'overflow-x-auto' : 'overflow-x-hidden'}`}>
