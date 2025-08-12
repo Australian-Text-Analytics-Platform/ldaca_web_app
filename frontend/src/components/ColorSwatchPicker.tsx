@@ -39,7 +39,9 @@ export const ColorSwatchPicker: React.FC<ColorSwatchPickerProps> = ({
     };
   }, [open]);
 
-  const sizeClass = `w-${size} h-${size}`; // relies on Tailwind predefined sizes
+  // Map of allowed sizes to Tailwind classes; dynamic template strings would be purged
+  const sizeMap: Record<number,string> = {4:'w-4 h-4',5:'w-5 h-5',6:'w-6 h-6',7:'w-7 h-7',8:'w-8 h-8',9:'w-9 h-9',10:'w-10 h-10',11:'w-11 h-11',12:'w-12 h-12'};
+  const sizeClass = sizeMap[size] || '';
 
   const openPicker = () => {
     if (!anchorRef.current) return;
@@ -60,7 +62,7 @@ export const ColorSwatchPicker: React.FC<ColorSwatchPickerProps> = ({
         aria-label={ariaLabel}
         onClick={() => (open ? setOpen(false) : openPicker())}
         className={`${sizeClass} rounded-full ring-2 ring-offset-1 ring-gray-300 hover:ring-blue-400 focus:outline-none focus:ring-blue-500 transition-shadow shadow-sm`}
-        style={{ backgroundColor: color }}
+        style={{ backgroundColor: color, ...(sizeClass ? {} : { width: size*4, height: size*4 }) }}
       />
       {open && pos &&
         ReactDOM.createPortal(

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import ColorSwatchPicker from './ColorSwatchPicker';
+import NodeSelectionPanel from './NodeSelectionPanel';
 import { useWorkspace } from '../hooks/useWorkspace';
 import { useAuth } from '../hooks/useAuth';
 import { 
@@ -362,77 +362,17 @@ const TokenFrequencyTab: React.FC = () => {
       <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
         <h2 className="text-xl font-semibold text-gray-800 mb-4">Token Frequency Analysis</h2>
         
-        {/* Node Selection Status */}
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Selected Nodes ({selectedNodes.length}/2)
-          </label>
-          
-          {selectedNodes.length === 0 ? (
-            <div className="text-sm text-gray-500 italic bg-gray-50 p-3 rounded-md">
-              No nodes selected. Click on nodes in the workspace view to select them (max 2 for comparison).
-              Hold Cmd/Ctrl to select multiple nodes.
-            </div>
-          ) : (
-            <>
-            {/* Horizontal list; enable horizontal scroll only when >2 nodes */}
-            <div className={`flex space-x-3 pb-2 ${selectedNodes.length > 2 ? 'overflow-x-auto' : 'overflow-x-hidden'}`}>
-              {selectedNodes.map((node: any, idx: number) => {
-                const columns = getNodeColumns(node);
-                const selection = nodeColumnSelections.find(sel => sel.nodeId === node.id);
-                const nodeDisplayName = node.name || node.data?.name || (node as any).label || node.data?.label || node.id;
-                const nodeColor = getColorForNodeId(node.id, idx);
-                return (
-                  <div
-                    key={node.id}
-                    className={`bg-gray-50 p-3 rounded-md ${selectedNodes.length > 2 ? 'flex-none min-w-[50%]' : 'flex-1 min-w-0'}`}
-                  >
-                    <div className="mb-2">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="font-medium break-words pr-2" style={{ color: nodeColor }}>
-                          {nodeDisplayName}
-                        </div>
-                        <ColorSwatchPicker color={nodeColor} palette={defaultPalette} onChange={(c)=>handleColorChange(node.id,c)} size={7} />
-                      </div>
-                      <div className="text-xs text-gray-500 break-all">{node.id}</div>
-                    </div>
-                    
-                    {columns.length > 0 ? (
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">
-                          Text Column:
-                        </label>
-                        <select
-                          value={selection?.column || ''}
-                          onChange={(e) => handleColumnChange(node.id, e.target.value)}
-                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        >
-                          <option value="">Select a column...</option>
-                          {columns.map((column: string) => (
-                            <option key={column} value={column}>
-                              {column}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    ) : (
-                      <div className="text-xs text-red-500">
-                        No columns available for this node
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-            </>
-          )}
-          
-          {selectedNodes.length > 2 && (
-            <div className="text-sm text-orange-600 mt-2">
-              ⚠️ Only the first 2 selected nodes will be used for comparison.
-            </div>
-          )}
-        </div>
+        <NodeSelectionPanel
+          selectedNodes={selectedNodes}
+          nodeColumnSelections={nodeColumnSelections}
+          onColumnChange={handleColumnChange}
+          nodeColors={nodeColors}
+          onColorChange={handleColorChange}
+          getNodeColumns={getNodeColumns}
+          defaultPalette={defaultPalette}
+          maxCompare={2}
+          className="mb-6"
+        />
 
         {/* Configuration */}
         <div className="space-y-4 mb-6">
