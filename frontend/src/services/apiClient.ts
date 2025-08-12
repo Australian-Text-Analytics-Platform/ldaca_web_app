@@ -20,10 +20,31 @@ import {
   UploadProgress
 } from '../types/api';
 
-// API Configuration
-const API_BASE_URL = process.env.NODE_ENV === 'production' 
-  ? '/api' 
-  : `http://localhost:8001/api`;
+// API Configuration (proxy-aware for JupyterLab/Binder)
+const detectApiBase = (): string => {
+  if (typeof window === 'undefined') {
+    return '/api';
+  }
+
+  const { origin, hostname, port, pathname } = window.location;
+
+  // Local dev: frontend on 3000 (or Vite 5173) talks directly to backend 8001
+  if (hostname === 'localhost' && (port === '3000' || port === '5173')) {
+    return 'http://localhost:8001/api';
+  }
+
+  // JupyterHub/Binder: preserve any base like /user/<name>/ and rewrite /proxy/<port>/ to backend port 8001
+  const m = pathname.match(/^(.*\/proxy\/)(\d+)(\/|$)/);
+  if (m) {
+    const prefix = m[1]; // includes any /user/<id>/proxy/
+    return `${origin}${prefix}8001/api`;
+  }
+
+  // Fallback: same origin under /api
+  return `${origin}/api`;
+};
+
+const API_BASE_URL = detectApiBase();
 
 // Enhanced error class for API errors
 export class APIError extends Error {
