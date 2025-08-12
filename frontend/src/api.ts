@@ -2,8 +2,8 @@ import axios from 'axios';
 
 // Determine API base URL based on current hostname and environment
 const getApiBase = () => {
-  const hostname = window.location.hostname;
-  const origin = window.location.origin;
+  if (typeof window === 'undefined') return '/api';
+  const { origin, hostname, port, pathname } = window.location;
   
   console.log('API Detection:', {
     hostname,
@@ -21,7 +21,14 @@ const getApiBase = () => {
   if (hostname === 'localhost' && window.location.port === '3000') {
     return 'http://localhost:8001/api';
   }
-  
+
+  // JupyterHub/Binder: preserve any base (/user/<name>/) and rewrite the proxied frontend port to backend 8001
+  const m = pathname.match(/^(.*\/proxy\/)(\d+)(\/|$)/);
+  if (m) {
+    const prefix = m[1]; // e.g. /user/abc/proxy/
+    return `${origin}${prefix}8001/api`;
+  }
+
   // Default fallback
   return process.env.NODE_ENV === 'production' 
     ? `${origin}/api`

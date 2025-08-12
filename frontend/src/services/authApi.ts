@@ -6,20 +6,24 @@ import {
 
 // Import the API base URL configuration
 const getApiBase = () => {
-  const hostname = window.location.hostname;
-  const origin = window.location.origin;
-  
-  if (hostname === 'ldaca.sguo.org') {
-    return `${origin}/api`;
-  }
-  
-  if (hostname === 'localhost' && window.location.port === '3000') {
+  if (typeof window === 'undefined') return '/api';
+
+  const { origin, hostname, port, pathname } = window.location;
+
+  // Local dev direct backend
+  if (hostname === 'localhost' && (port === '3000' || port === '5173')) {
     return 'http://localhost:8001/api';
   }
-  
-  return process.env.NODE_ENV === 'production' 
-    ? `${origin}/api`
-    : 'http://localhost:8001/api';
+
+  // JupyterHub/Binder proxy: preserve base and map to backend 8001
+  const m = pathname.match(/^(.*\/proxy\/)(\d+)(\/|$)/);
+  if (m) {
+    const prefix = m[1];
+    return `${origin}${prefix}8001/api`;
+  }
+
+  // Fallback
+  return `${origin}/api`;
 };
 
 const API_BASE = getApiBase();

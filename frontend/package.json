@@ -2,6 +2,7 @@
   "name": "ldaca-web-app-frontend",
   "version": "0.1.0",
   "private": true,
+   "homepage": ".",
   "dependencies": {
     "@react-oauth/google": "^0.12.2",
     "@tanstack/react-query": "^5.83.0",
