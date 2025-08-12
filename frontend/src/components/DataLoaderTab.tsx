@@ -31,6 +31,23 @@ const DataLoaderTab: React.FC = () => {
   const [newWorkspaceName, setNewWorkspaceName] = useState('');
   const [previewFile, setPreviewFile] = useState<string | null>(null);
   const [addingToWorkspace, setAddingToWorkspace] = useState<string | null>(null);
+  const downloadFile = useCallback(async (filename: string) => {
+    try {
+      const resp = await fetch(`/api/files/${encodeURIComponent(filename)}`, { headers: authHeaders });
+      if (!resp.ok) throw new Error('Download failed');
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename.split('/').pop() || filename;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 0);
+    } catch (e) {
+      console.error(e);
+      alert('Failed to download file');
+    }
+  }, [authHeaders]);
 
   // File upload only (workspace linking is a separate explicit action)
   const handleFileInputUpload = useCallback(async (files: FileList) => {
@@ -217,6 +234,13 @@ const DataLoaderTab: React.FC = () => {
                               ? 'Add to Workspace' 
                               : 'Create Workspace & Add'
                           }
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); downloadFile(file.filename); }}
+                          className="px-2 py-1 text-sm bg-blue-50 text-blue-600 rounded hover:bg-blue-100"
+                          title="Download file"
+                        >
+                          Download
                         </button>
                         {!file.is_sample && (
                           <button

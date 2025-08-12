@@ -8,6 +8,7 @@ import DataLoaderTab from './components/DataLoaderTab';
 import FilterTab from './components/FilterTab';
 import ConcordanceTab from './components/ConcordanceTab';
 import TimelineTab from './components/TimelineTab';
+import ExportTab from './components/ExportTab';
 import TokenFrequencyTab from './components/TokenFrequencyTab';
 import WorkspaceView from './components/WorkspaceView';
 import Sidebar from './components/Sidebar';
@@ -175,12 +176,7 @@ const App: React.FC = () => {
                   {activeTab === 'concordance' && <ConcordanceTab />}
                   {activeTab === 'token-frequency' && <TokenFrequencyTab />}
                   {activeTab === 'analysis' && <TimelineTab />}
-                  {activeTab === 'export' && (
-                    <div className="text-center py-12">
-                      <h2 className="text-xl font-semibold text-gray-700">Export Tools</h2>
-                      <p className="text-gray-500 mt-2">Coming soon...</p>
-                    </div>
-                  )}
+                  {activeTab === 'export' && <ExportTab />}
                 </ErrorBoundary>
               </div>
             </main>

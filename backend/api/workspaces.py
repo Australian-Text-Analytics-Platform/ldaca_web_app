@@ -2758,3 +2758,117 @@ async def detach_concordance(
         raise HTTPException(
             status_code=500, detail=f"Error detaching concordance results: {str(e)}"
         )
+
+
+@router.get("/{workspace_id}/export")
+async def export_nodes(
+    workspace_id: str,
+    node_ids: str,  # comma separated list
+    format: str = "csv",
+    current_user: dict = Depends(get_current_user),
+):
+    """Export one or more workspace nodes as downloadable file(s).
+
+    If multiple node_ids are provided, a ZIP archive is returned.
+    Supported formats (mapped to Polars write_* APIs): csv, json, parquet, ipc, ndjson.
+    """
+    import io
+    import zipfile
+
+    from fastapi import Response
+    from fastapi.responses import StreamingResponse
+
+    user_id = current_user["id"]
+    fmt = format.lower()
+    supported = {"csv", "json", "parquet", "ipc", "ndjson"}
+    if fmt not in supported:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported format '{format}'. Supported: {sorted(supported)}",
+        )
+
+    ids = [nid.strip() for nid in node_ids.split(",") if nid.strip()]
+    if not ids:
+        raise HTTPException(status_code=400, detail="No node_ids provided")
+
+    # Helper to materialize node data as Polars DataFrame
+    def node_to_df(node):
+        data = getattr(node, "data", None)
+        if data is None:
+            return pl.DataFrame()
+        try:
+            if hasattr(data, "collect"):
+                collected = data.collect()
+            else:
+                collected = data
+        except Exception as e:  # pragma: no cover
+            raise HTTPException(
+                status_code=500, detail=f"Failed to materialize node data: {e}"
+            )
+
+        # If it's a docframe wrapper unwrap _df attribute
+        if hasattr(collected, "_df"):
+            try:
+                collected = collected._df  # type: ignore[attr-defined]
+            except Exception:
+                pass
+        if not isinstance(collected, pl.DataFrame):
+            try:
+                collected = pl.DataFrame(collected)
+            except Exception:
+                raise HTTPException(
+                    status_code=500, detail="Could not convert node data to DataFrame"
+                )
+        return collected
+
+    exported: list[tuple[str, bytes]] = []
+    for nid in ids:
+        node = workspace_manager.get_node_from_workspace(user_id, workspace_id, nid)
+        if not node:
+            raise HTTPException(status_code=404, detail=f"Node '{nid}' not found")
+        df = node_to_df(node)
+        buf = io.BytesIO()
+        # Dispatch by format
+        if fmt == "csv":
+            df.write_csv(buf)
+            ext = "csv"
+        elif fmt == "json":
+            # write_json writes entire df JSON lines by default; use to_json if available else manual
+            try:
+                df.write_json(buf)
+            except Exception:
+                buf.write(df.to_pandas().to_json().encode())  # fallback
+            ext = "json"
+        elif fmt == "parquet":
+            df.write_parquet(buf)
+            ext = "parquet"
+        elif fmt == "ipc":
+            df.write_ipc(buf)
+            ext = "arrow"
+        elif fmt == "ndjson":
+            df.write_ndjson(buf)
+            ext = "ndjson"
+        else:  # pragma: no cover - already validated
+            raise HTTPException(status_code=400, detail="Unsupported format")
+        exported.append((f"{getattr(node, 'name', nid) or nid}.{ext}", buf.getvalue()))
+
+    if len(exported) == 1:
+        filename, data_bytes = exported[0]
+        return Response(
+            content=data_bytes,
+            media_type="application/octet-stream",
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
+        )
+    # Zip multiple
+    zip_buf = io.BytesIO()
+    with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for fname, data_bytes in exported:
+            zf.writestr(fname, data_bytes)
+    zip_buf.seek(0)
+    return StreamingResponse(
+        zip_buf,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f"attachment; filename=export_{workspace_id}.{fmt}.zip"
+        },
+    )

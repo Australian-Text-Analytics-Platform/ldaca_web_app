@@ -42,7 +42,11 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
   showShape = false,
   getNodeShapeFn,
 }) => {
-  const getColorForNodeId = (nodeId: string, idx: number) => nodeColors[nodeId] || defaultPalette[idx % defaultPalette.length];
+  const getColorForNodeId = (nodeId: string, idx: number) => {
+    if (nodeColors[nodeId]) return nodeColors[nodeId];
+    if (!defaultPalette.length) return '#000000';
+    return defaultPalette[idx % defaultPalette.length];
+  };
   const getColumnLabel = (node: any, idx: number) => (columnLabelFn ? columnLabelFn(node, idx) : 'Text Column:');
   const [shapes, setShapes] = useState<Record<string,string>>({});
 
