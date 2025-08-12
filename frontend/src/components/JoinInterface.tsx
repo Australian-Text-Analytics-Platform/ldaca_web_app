@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { WorkspaceNode } from '../types';
+import { useWorkspace } from '../hooks/useWorkspace';
+import NodeSelectionPanel, { NodeColumnSelection } from './NodeSelectionPanel';
 
 interface JoinInterfaceProps {
   leftNode: WorkspaceNode;
@@ -16,6 +18,7 @@ const JoinInterface: React.FC<JoinInterfaceProps> = ({
   onCancel,
   loading = false
 }) => {
+  const { getNodeShape } = useWorkspace();
   const [leftOn, setLeftOn] = useState<string>('');
   const [rightOn, setRightOn] = useState<string>('');
   const [how, setHow] = useState<'inner' | 'left' | 'right' | 'outer'>('left');
@@ -77,6 +80,18 @@ const JoinInterface: React.FC<JoinInterfaceProps> = ({
     }
   };
 
+  // Prepare props for NodeSelectionPanel reusing its UI (without color picker)
+  const selectedNodes = [leftNode, rightNode];
+  const nodeColumnSelections: NodeColumnSelection[] = [
+    { nodeId: leftNode.node_id, column: leftOn || '' },
+    { nodeId: rightNode.node_id, column: rightOn || '' },
+  ];
+  const handleColumnChange = (nodeId: string, column: string) => {
+    if (nodeId === leftNode.node_id) setLeftOn(column); else if (nodeId === rightNode.node_id) setRightOn(column);
+  };
+  const getNodeColumns = (node: any) => node.columns || [];
+  const nodeColors: Record<string,string> = {};
+  const noop = () => {};
   return (
   <div className="p-6 bg-white border border-gray-200 rounded-lg flex flex-col max-h-[80vh] relative">
       <div className="flex items-center space-x-2 mb-4 flex-shrink-0">
@@ -88,135 +103,59 @@ const JoinInterface: React.FC<JoinInterfaceProps> = ({
       <div className="overflow-y-auto pr-2 flex-1 pb-24">
         {findCommonColumns(leftNode.columns, rightNode.columns).length === 0 && (
           <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-            <div className="flex items-center">
-              <div className="text-sm text-yellow-800">
-                <span className="font-medium">⚠ No common columns found.</span> Please select columns manually to join on.
-              </div>
+            <div className="text-sm text-yellow-800">
+              <span className="font-medium">⚠ No common columns found.</span> Please select columns manually to join on.
             </div>
           </div>
         )}
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Left Node */}
-        <div className="space-y-3">
-          <div className="text-sm font-medium text-gray-700">
-            Left Node: {leftNode.name}
-          </div>
-          <div className="text-xs text-gray-500 mb-2">
-            Shape: {leftNode.shape[0]} × {leftNode.shape[1]}
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Left Column
-            </label>
-            <select
-              value={leftOn}
-              onChange={(e) => setLeftOn(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              disabled={loading}
-            >
-              <option value="">Select column...</option>
-              {/* Show common columns first with special styling */}
-              {findCommonColumns(leftNode.columns, rightNode.columns).map((col) => (
-                <option key={`common-${col}`} value={col}>
-                  {col} (common)
-                </option>
-              ))}
-              {/* Show separator if there are common columns */}
-              {findCommonColumns(leftNode.columns, rightNode.columns).length > 0 && (
-                <option disabled value="">──────────</option>
-              )}
-              {/* Show remaining columns */}
-              {leftNode.columns
-                .filter(col => !findCommonColumns(leftNode.columns, rightNode.columns).includes(col))
-                .map((col) => (
-                  <option key={col} value={col}>
-                    {col}
-                  </option>
-                ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Right Node */}
-        <div className="space-y-3">
-          <div className="text-sm font-medium text-gray-700">
-            Right Node: {rightNode.name}
-          </div>
-          <div className="text-xs text-gray-500 mb-2">
-            Shape: {rightNode.shape[0]} × {rightNode.shape[1]}
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Right Column
-            </label>
-            <select
-              value={rightOn}
-              onChange={(e) => setRightOn(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              disabled={loading}
-            >
-              <option value="">Select column...</option>
-              {/* Show common columns first with special styling */}
-              {findCommonColumns(leftNode.columns, rightNode.columns).map((col) => (
-                <option key={`common-${col}`} value={col}>
-                  {col} (common)
-                </option>
-              ))}
-              {/* Show separator if there are common columns */}
-              {findCommonColumns(leftNode.columns, rightNode.columns).length > 0 && (
-                <option disabled value="">──────────</option>
-              )}
-              {/* Show remaining columns */}
-              {rightNode.columns
-                .filter(col => !findCommonColumns(leftNode.columns, rightNode.columns).includes(col))
-                .map((col) => (
-                  <option key={col} value={col}>
-                    {col}
-                  </option>
-                ))}
-            </select>
-          </div>
-        </div>
-      </div>
-
-  {/* Join Options */}
-  <div className="mt-6 space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Join Type
-            </label>
-            <select
-              value={how}
-              onChange={(e) => setHow(e.target.value as 'inner' | 'left' | 'right' | 'outer')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              disabled={loading}
-            >
-              <option value="inner">Inner Join</option>
-              <option value="left">Left Join</option>
-              <option value="right">Right Join</option>
-              <option value="outer">Outer Join</option>
-            </select>
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              New Node Name (optional)
-            </label>
-            <input
-              type="text"
-              value={newNodeName}
-              onChange={(e) => setNewNodeName(e.target.value)}
-              placeholder={`${leftNode.name}_${how}_join_${rightNode.name}`}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              disabled={loading || isLoading}
+        <div className="flex flex-col lg:flex-row gap-6">
+          {/* Left: node & column selectors in one horizontal panel */}
+          <div className="flex-1 min-w-0">
+            <NodeSelectionPanel
+              selectedNodes={selectedNodes}
+              nodeColumnSelections={nodeColumnSelections}
+              onColumnChange={handleColumnChange}
+              nodeColors={nodeColors}
+              onColorChange={noop}
+              getNodeColumns={getNodeColumns}
+              defaultPalette={["#2563eb","#dc2626"]}
+              maxCompare={2}
+              showHeaderLabel={false}
+              showColorPicker={false}
+              columnLabelFn={(node) => node.node_id === leftNode.node_id ? 'Left Column:' : 'Right Column:'}
+              showShape
+              getNodeShapeFn={getNodeShape}
             />
           </div>
+          {/* Right: join options (two rows) */}
+          <div className="w-full lg:w-72 flex flex-col gap-4 flex-shrink-0">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Join Type</label>
+              <select
+                value={how}
+                onChange={(e) => setHow(e.target.value as 'inner' | 'left' | 'right' | 'outer')}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                disabled={loading}
+              >
+                <option value="inner">Inner Join</option>
+                <option value="left">Left Join</option>
+                <option value="right">Right Join</option>
+                <option value="outer">Outer Join</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">New Node Name (optional)</label>
+              <input
+                type="text"
+                value={newNodeName}
+                onChange={(e) => setNewNodeName(e.target.value)}
+                placeholder={`${leftNode.name}_${how}_join_${rightNode.name}`}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                disabled={loading || isLoading}
+              />
+            </div>
+          </div>
         </div>
-        </div>
-
-        {/* Join preview removed per request */}
       </div>
 
       {/* Action Button (sticky) */}

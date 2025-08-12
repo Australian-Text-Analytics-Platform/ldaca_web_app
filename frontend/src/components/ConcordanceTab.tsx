@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import NodeSelectionPanel from './NodeSelectionPanel';
+import SegmentedControl from './SegmentedControl';
 import { useWorkspace } from '../hooks/useWorkspace';
 import { useAuth } from '../hooks/useAuth';
 import { 
@@ -15,11 +16,14 @@ interface NodeColumnSelection {
 }
 
 const ConcordanceTab: React.FC = () => {
+  // Anchor ref for results container to stabilize scroll on view mode toggle
+  const resultsRef = useRef<HTMLDivElement | null>(null);
   const { 
     selectedNodes,
     isLoading,
     currentWorkspaceId,
-    detachConcordance
+  detachConcordance,
+  getNodeShape
   } = useWorkspace();
 
   const { getAuthHeaders } = useAuth();
@@ -835,6 +839,8 @@ const ConcordanceTab: React.FC = () => {
           defaultPalette={defaultPalette}
           maxCompare={2}
           className="mb-6"
+          showShape
+          getNodeShapeFn={getNodeShape}
         />
 
         {/* Search Configuration */}
@@ -985,15 +991,51 @@ const ConcordanceTab: React.FC = () => {
 
       {/* Results */}
       {results && (
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+        <div ref={resultsRef} className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
           {results.success ? (
             <div>
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-2">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
                 <h3 className="text-lg font-semibold text-gray-800">Search Results</h3>
-                <div className="flex items-center bg-gray-100 rounded-md overflow-hidden self-start md:self-auto">
-                  <button type="button" onClick={() => { if(viewMode!=='separated'){ setViewMode('separated'); setCombinedPage(1); handleSearch(true, undefined, 'separated'); } }} className={`px-3 py-2 text-sm font-medium ${viewMode==='separated' ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:text-gray-800'}`}>Separated</button>
-                  <button type="button" onClick={() => { if(viewMode!=='combined'){ setViewMode('combined'); setCombinedPage(1); handleSearch(true, undefined, 'combined'); } }} className={`px-3 py-2 text-sm font-medium border-l ${viewMode==='combined' ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:text-gray-800'}`}>Combined</button>
-                </div>
+                <SegmentedControl
+                  options={[{ value: 'separated', label: 'Separated' }, { value: 'combined', label: 'Combined' }]}
+                  value={viewMode}
+                  onChange={(val) => {
+                    if (val !== viewMode) {
+                      const mode = val as 'separated'|'combined';
+                      const anchorEl = resultsRef.current;
+                      const prevTop = anchorEl ? anchorEl.getBoundingClientRect().top : 0;
+                      const prevScrollY = window.scrollY;
+                      setViewMode(mode);
+                      setCombinedPage(1);
+                      // Lock current height to reduce layout shift during async fetch
+                      if (anchorEl) {
+                        const h = anchorEl.getBoundingClientRect().height;
+                        anchorEl.style.minHeight = h + 'px';
+                      }
+                      Promise.resolve(handleSearch(true, undefined, mode)).finally(() => {
+                        // After results update and paint, compensate scroll so anchor stays put
+                        requestAnimationFrame(() => {
+                          requestAnimationFrame(() => {
+                            const newAnchor = resultsRef.current;
+                            if (newAnchor) {
+                              const newTop = newAnchor.getBoundingClientRect().top;
+                              const delta = newTop - prevTop;
+                              if (Math.abs(delta) > 1) {
+                                window.scrollTo({ top: prevScrollY + delta });
+                              }
+                              // Remove temporary minHeight lock
+                              newAnchor.style.minHeight = '';
+                            } else {
+                              // Fallback to original position
+                              window.scrollTo({ top: prevScrollY });
+                            }
+                          });
+                        });
+                      });
+                    }
+                  }}
+                  ariaLabel="Concordance view mode"
+                />
               </div>
               <div className="text-sm text-gray-600 mb-6">{results.message}</div>
               

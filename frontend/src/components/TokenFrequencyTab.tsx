@@ -17,10 +17,11 @@ interface NodeColumnSelection {
 }
 
 const TokenFrequencyTab: React.FC = () => {
-  const { 
+  const {
     selectedNodes,
     isLoading,
-    currentWorkspaceId
+    currentWorkspaceId,
+    getNodeShape,
   } = useWorkspace();
 
   const { getAuthHeaders } = useAuth();
@@ -40,7 +41,6 @@ const TokenFrequencyTab: React.FC = () => {
       '#dc2626', // vivid red
       '#16a34a', // green
       '#9333ea', // purple
-      '#d97706', // orange/amber
       '#0d9488', // teal
       '#db2777', // pink
       '#4f46e5', // indigo
@@ -372,6 +372,8 @@ const TokenFrequencyTab: React.FC = () => {
           defaultPalette={defaultPalette}
           maxCompare={2}
           className="mb-6"
+          showShape
+          getNodeShapeFn={getNodeShape}
         />
 
         {/* Configuration */}
