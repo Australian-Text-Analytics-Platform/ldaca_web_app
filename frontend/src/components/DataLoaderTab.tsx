@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
+import SegmentedControl from './SegmentedControl';
 import { useAuth } from '../hooks/useAuth';
 import { useWorkspace } from '../hooks/useWorkspace';
 import { useFiles } from '../hooks/useFiles';
@@ -52,12 +53,13 @@ const DataLoaderTab: React.FC = () => {
   if (localStorage.getItem('debugApp') === '1') console.log('No current workspace, creating new workspace with file:', filename);
         
         // Create new workspace with initial file in single API call
-        const workspaceName = `Workspace ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`;
+  const workspaceName = newWorkspaceName.trim() || `Workspace ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`;
         const workspace = await createWorkspace(workspaceName, 'Auto-created from file', filename);
   if (localStorage.getItem('debugApp') === '1') console.log('Created new workspace with initial file, workspace ID:', workspace.workspace_id);
         
         // Set the new workspace as current (the file is already added via initial_data_file)
-        await setCurrentWorkspace(workspace.workspace_id);
+  await setCurrentWorkspace(workspace.workspace_id);
+  setNewWorkspaceName('');
   if (localStorage.getItem('debugApp') === '1') console.log('Successfully created workspace and added file in single operation');
       } else {
         // Add file to existing workspace  
@@ -69,7 +71,7 @@ const DataLoaderTab: React.FC = () => {
     } finally {
       setAddingToWorkspace(null);
     }
-  }, [currentWorkspace, createWorkspace, createNodeFromFile, setCurrentWorkspace]);
+  }, [currentWorkspace, createWorkspace, createNodeFromFile, setCurrentWorkspace, newWorkspaceName]);
 
   // Load workspace
   const handleLoadWorkspace = useCallback(async (workspaceId: string) => {
@@ -105,41 +107,32 @@ const DataLoaderTab: React.FC = () => {
         <h2 className="text-xl font-semibold text-gray-800 mb-4">Data Loader</h2>
         
         {/* Loader Type Selector */}
-        <div className="flex space-x-1 mb-6">
-          <button
-            onClick={() => setActiveLoader('file')}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              activeLoader === 'file'
-                ? 'bg-blue-500 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            📁 File Upload
-          </button>
-          <button
-            onClick={() => setActiveLoader('workspace')}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              activeLoader === 'workspace'
-                ? 'bg-blue-500 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            💼 Workspace Manager
-          </button>
+        <div className="mb-6">
+          <SegmentedControl
+            options={[
+              { value: 'file', label: 'File Upload' },
+              { value: 'workspace', label: 'Workspace Manager' }
+            ]}
+            value={activeLoader}
+            onChange={(val: string)=> setActiveLoader(val as 'file'|'workspace')}
+            ariaLabel="Data loader mode"
+          />
         </div>
 
         {/* File Upload Tab */}
         {activeLoader === 'file' && (
           <div className="space-y-4">
-            <div className="flex space-x-4 mb-4">
-              <input
-                type="text"
-                value={newWorkspaceName}
-                onChange={(e) => setNewWorkspaceName(e.target.value)}
-                placeholder="Workspace name (optional)"
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
+            {!currentWorkspace && (
+              <div className="flex space-x-4 mb-4">
+                <input
+                  type="text"
+                  value={newWorkspaceName}
+                  onChange={(e) => setNewWorkspaceName(e.target.value)}
+                  placeholder="Workspace name (optional)"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            )}
             
             {/* Standalone drop-zone removed; users can drop directly onto the list below */}
             <div className="flex items-center justify-between text-sm text-gray-600">
