@@ -204,6 +204,8 @@ export const WorkspaceGraphView: React.FC = memo(() => {
               Object.fromEntries(node.data.schema.map((col: any) => [col.name, col.js_type])) : {},
             is_lazy: node.data?.isLazy || node.data?.lazy || false,
           },
+          // Derive multi-select flag directly from single source of truth selection array
+          isMultiSelected: (selectedNodeIds?.length || 0) > 1 && selectedNodeIds.includes(node.id),
           onDelete: handleDelete,
           onRename: handleRename,
           onConvertToDocDataFrame: handleConvertToDocDataFrame,
@@ -315,7 +317,26 @@ export const WorkspaceGraphView: React.FC = memo(() => {
 
   // Keep React Flow node 'selected' flags in sync with our store selection
   useEffect(() => {
-    setNodes((ns) => ns.map((n) => ({ ...n, selected: selectedNodeIds?.includes?.(n.id) ?? false })) as any);
+    // Single Source of Truth: derive both selected and multi-selected flags here
+    setNodes((ns) => ns.map((n: any) => ({
+      ...n,
+      selected: selectedNodeIds?.includes?.(n.id) ?? false,
+      data: {
+        ...n.data,
+        isMultiSelected: (selectedNodeIds?.length || 0) > 1 && selectedNodeIds?.includes?.(n.id),
+      }
+    })) as any);
+  }, [selectedNodeIds, setNodes]);
+
+  // When selection is cleared (length 0) ensure any residual React Flow internal selection state is flushed.
+  useEffect(() => {
+    if (!selectedNodeIds || selectedNodeIds.length === 0) {
+      setNodes((ns) => ns.map((n: any) => ({
+        ...n,
+        selected: false,
+        data: { ...n.data, isMultiSelected: false }
+      })) as any);
+    }
   }, [selectedNodeIds, setNodes]);
 
   // Normalize selection changes coming from React Flow so pane clicks don't clear highlights

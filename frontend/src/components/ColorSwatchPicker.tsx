@@ -61,8 +61,8 @@ export const ColorSwatchPicker: React.FC<ColorSwatchPickerProps> = ({
         ref={anchorRef}
         aria-label={ariaLabel}
         onClick={() => (open ? setOpen(false) : openPicker())}
-        className={`${sizeClass} rounded-full ring-2 ring-offset-1 ring-gray-300 hover:ring-blue-400 focus:outline-none focus:ring-blue-500 transition-shadow shadow-sm`}
-        style={{ backgroundColor: color, ...(sizeClass ? {} : { width: size*4, height: size*4 }) }}
+        className={`${sizeClass} rounded-full aspect-square flex-shrink-0 ring-2 ring-offset-1 ring-gray-300 hover:ring-blue-400 focus:outline-none focus:ring-blue-500 transition-shadow shadow-sm`}
+        style={{ backgroundColor: color, lineHeight: 0, padding: 0, ...(sizeClass ? {} : { width: size*4, height: size*4 }), borderRadius: '9999px' }}
       />
       {open && pos &&
         ReactDOM.createPortal(

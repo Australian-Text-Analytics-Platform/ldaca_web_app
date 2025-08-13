@@ -71,7 +71,8 @@ const JoinInterface: React.FC<JoinInterfaceProps> = ({
       setRightOn('');
       setHow('left');
       setNewNodeName('');
-      onCancel(); // Close the join interface
+  // Do NOT call onCancel here; selection will be updated by join mutation to the new node
+  // which collapses the join interface naturally (selectedNodes length becomes 1).
     } catch (error) {
       console.error('Error joining nodes:', error);
       alert('Failed to join nodes. Please try again.');

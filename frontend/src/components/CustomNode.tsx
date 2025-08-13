@@ -226,14 +226,13 @@ const CustomNode: React.FC<NodeProps<any>> = ({ data, selected }) => {
   setDocConversionTarget(null);
   };
 
+  // Unified highlight style: apply the multi-select (green) style for any selection (single or multi)
+  const isHighlighted = selected || isMultiSelected;
   const nodeClasses = `
     w-64 rounded-lg border-2 bg-white text-sm transition-all duration-150 ease-in-out
-    ${isMultiSelected 
-      ? 'border-green-500 bg-green-50 shadow-lg ring-2 ring-green-200' 
-      : selected 
-        ? 'border-blue-500 shadow-lg' 
-        : 'border-gray-400 shadow-md'
-    }
+    ${isHighlighted
+      ? 'border-green-500 bg-green-50 shadow-lg ring-2 ring-green-200'
+      : 'border-gray-400 shadow-md'}
   `;
 
   dlog('CustomNode rendering:', {
@@ -250,11 +249,14 @@ const CustomNode: React.FC<NodeProps<any>> = ({ data, selected }) => {
     <div className={nodeClasses} style={{ minWidth: '256px', minHeight: '120px', position: 'relative' }}>
       {/* Node Header */}
       <div className={`flex items-start justify-between p-2 rounded-t-lg border-b-2 min-h-fit relative ${
-        isMultiSelected ? 'bg-green-100 border-green-300' : 'bg-gray-100 border-gray-200'
+        isHighlighted ? 'bg-green-100 border-green-300' : 'bg-gray-100 border-gray-200'
       }`}>
         <div className="flex items-center flex-1 mr-2">
-          {isMultiSelected && (
-            <div className="w-2 h-2 bg-green-500 rounded-full mr-2 flex-shrink-0" title="Selected for joining"></div>
+          {isHighlighted && (
+            <div
+              className="w-2 h-2 bg-green-500 rounded-full mr-2 flex-shrink-0"
+              title={isMultiSelected ? 'Selected for joining' : 'Selected'}
+            ></div>
           )}
           {isRenaming ? (
             <form onSubmit={handleRenameSubmit} className="flex-1">

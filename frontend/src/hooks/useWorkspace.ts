@@ -371,11 +371,44 @@ export const useWorkspace = () => {
       };
       return apiJoinNodes(workspaceId, request, authHeaders);
     },
-    onMutate: () => {
+    onMutate: async () => {
       startOperation('joinNodes');
+      // Snapshot current node ids so we can diff later if API response omits id
+      let previousNodeIds: string[] = [];
+      try {
+        if (currentWorkspaceId) {
+          const prevGraph: any = queryClient.getQueryData(queryKeys.workspaceGraph(currentWorkspaceId));
+          previousNodeIds = (prevGraph?.nodes || []).map((n: any) => n.id);
+        }
+      } catch (_) { /* ignore */ }
+      // Proactively clear existing selection so parent nodes lose highlight immediately
+      clearSelection();
+      return { previousNodeIds };
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId!) });
+    onSuccess: async (createdNode: any, _vars, context: any) => {
+      // Single Source of Truth: ensure visual highlight follows selection state.
+      // Clear prior selection (original two nodes) and auto-select the newly created join node.
+      try {
+        let newId = createdNode?.node_id || createdNode?.id;
+        if (!newId && currentWorkspaceId) {
+          // Await graph refetch to diff node ids
+          await queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
+          const freshGraph: any = queryClient.getQueryData(queryKeys.workspaceGraph(currentWorkspaceId));
+          if (freshGraph?.nodes) {
+            const prevIds: string[] = context?.previousNodeIds || [];
+            const diff = freshGraph.nodes.map((n: any) => n.id).filter((id: string) => !prevIds.includes(id));
+            if (diff.length === 1) newId = diff[0];
+          }
+        }
+        if (newId) setSelectedNodes([newId]); else clearSelection();
+      } catch (_) {
+        // Non-fatal; proceed with graph refresh
+        clearSelection();
+      }
+      // Ensure graph is invalidated (if not already done above during diff)
+      if (currentWorkspaceId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
+      }
       endOperation('joinNodes');
     },
     onError: (error: any) => {
