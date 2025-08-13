@@ -19,6 +19,7 @@ dependencies = [
     "docframe",
     "docworkspace",
     "pytest-asyncio>=0.23.0",
+    "pyarrow>=21.0.0",
 ]
 
 [tool.setuptools.packages.find]
@@ -41,8 +42,8 @@ filterwarnings = [
     "ignore::UserWarning",
     "ignore::DeprecationWarning",
     "ignore::PendingDeprecationWarning",
-    "ignore::sqlalchemy.exc.SADeprecationWarning",
-    "ignore::sqlalchemy.exc.SAWarning"
+    # "ignore::sqlalchemy.exc.SADeprecationWarning",
+    # "ignore::sqlalchemy.exc.SAWarning"
 ]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",

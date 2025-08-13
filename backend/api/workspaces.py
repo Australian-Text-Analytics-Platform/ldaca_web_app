@@ -13,7 +13,12 @@ import polars as pl
 from core.auth import get_current_user
 
 # Note: DocWorkspace API helpers are not used directly in this HTTP layer
-from core.utils import DOCWORKSPACE_AVAILABLE, get_user_data_folder, load_data_file
+from core.utils import (
+    DOCWORKSPACE_AVAILABLE,
+    get_user_data_folder,
+    get_user_workspace_folder,
+    load_data_file,
+)
 from core.workspace import workspace_manager
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from models import (
@@ -122,29 +127,10 @@ def _handle_operation_result(result: Any):
 
 @router.get("/")
 async def list_workspaces(current_user: dict = Depends(get_current_user)):
-    """List all workspaces for the current user (restored endpoint)."""
+    """List ALL persisted workspaces (summaries) using manager single-load policy."""
     user_id = current_user["id"]
-    workspaces_dict = workspace_manager.list_user_workspaces(user_id)
-    workspace_list = []
-    for wid, ws in workspaces_dict.items():
-        try:
-            summary = ws.summary()
-            workspace_list.append(
-                {
-                    "workspace_id": wid,
-                    "name": ws.name,
-                    "description": ws.get_metadata("description") or "",
-                    "created_at": ws.get_metadata("created_at") or "Unknown",
-                    "modified_at": ws.get_metadata("modified_at") or "Unknown",
-                    "node_count": summary.get("total_nodes"),
-                    "root_nodes": summary.get("root_nodes"),
-                    "leaf_nodes": summary.get("leaf_nodes"),
-                    "node_types": summary.get("node_types"),
-                }
-            )
-        except Exception:
-            logger.exception("Failed summarizing workspace %s", wid)
-    return {"workspaces": workspace_list}
+    summaries = workspace_manager.list_user_workspaces_summaries(user_id)
+    return {"workspaces": list(summaries.values())}
 
 
 @router.get("/current")
@@ -338,7 +324,7 @@ async def rename_workspace(
     try:
         workspace.name = new_name
         # Persist change
-        workspace_manager._save_workspace_to_disk(user_id, workspace_id, workspace)
+        workspace_manager.persist(user_id, workspace_id)
         # Return updated info similar to other endpoints
         info = workspace_manager.get_workspace_info(user_id, workspace_id)
         if not info:
@@ -367,7 +353,7 @@ async def save_workspace(
     if not workspace:
         raise HTTPException(status_code=404, detail="Workspace not found")
     try:
-        workspace_manager._save_workspace_to_disk(user_id, workspace_id, workspace)
+        workspace_manager.persist(user_id, workspace_id)
         return {"success": True, "message": "Workspace saved"}
     except Exception as e:
         raise HTTPException(
@@ -391,21 +377,17 @@ async def save_workspace_as(
     source_workspace = workspace_manager.get_workspace(user_id, workspace_id)
     if not source_workspace:
         raise HTTPException(status_code=404, detail="Workspace not found")
+    # Collect nodes/data from source workspace via summary & graph
+    user_folder = get_user_data_folder(user_id)
+    tmp_path = user_folder / f"_tmp_clone_{workspace_id}.json"
     try:
-        # Collect nodes/data from source workspace via summary & graph
-        # Simpler approach: serialize original to temp, deserialize new, change name & id
-        user_folder = get_user_data_folder(user_id)
-        tmp_path = user_folder / f"_tmp_clone_{workspace_id}.json"
         source_workspace.serialize(tmp_path)
-
-        # Deserialize new workspace object
         from core.utils import generate_workspace_id
 
         from docworkspace import Workspace as DWWorkspace  # type: ignore
 
         new_workspace = DWWorkspace.deserialize(tmp_path)  # type: ignore
         new_id = generate_workspace_id()
-        # Update metadata
         new_workspace.set_metadata("id", new_id)
         new_workspace.set_metadata(
             "created_at", source_workspace.get_metadata("created_at")
@@ -413,30 +395,22 @@ async def save_workspace_as(
         new_workspace.set_metadata(
             "modified_at", source_workspace.get_metadata("modified_at")
         )
-        # Set new name from filename (strip extension)
-        clean_name = filename.replace(".json", "")
-        new_workspace.name = clean_name
-
-        # Register in manager session
-        session = workspace_manager._get_user_session(user_id)  # type: ignore[attr-defined]
-        session[new_id] = new_workspace
-
-        # Persist new workspace
-        workspace_manager._save_workspace_to_disk(user_id, new_id, new_workspace)
-
-        # Optionally remove temp file
+        new_workspace.name = filename.replace(".json", "")
+        target_folder = get_user_workspace_folder(user_id)
+        target_folder.mkdir(parents=True, exist_ok=True)
+        new_workspace.serialize(target_folder / f"workspace_{new_id}.json")
+        info = workspace_manager.get_workspace_info(user_id, new_id)
+        return {"success": True, "message": "Workspace cloned", "new_workspace": info}
+    except Exception as e:  # pragma: no cover
+        raise HTTPException(
+            status_code=500, detail=f"Failed to save workspace copy: {e}"
+        )
+    finally:
         try:
             if tmp_path.exists():
                 tmp_path.unlink()
         except Exception:
             pass
-
-        info = workspace_manager.get_workspace_info(user_id, new_id)
-        return {"success": True, "message": "Workspace cloned", "new_workspace": info}
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to save workspace copy: {str(e)}"
-        )
 
 
 @router.get("/{workspace_id}/info")
@@ -826,7 +800,7 @@ async def convert_node_to_docdataframe(
         # Persist workspace
         workspace = workspace_manager.get_workspace(user_id, workspace_id)
         if workspace is not None:
-            workspace_manager._save_workspace_to_disk(user_id, workspace_id, workspace)
+            workspace_manager.persist(user_id, workspace_id)
 
         return src_node.info(json=True)
 
@@ -898,7 +872,7 @@ async def convert_node_to_dataframe(
 
         workspace = workspace_manager.get_workspace(user_id, workspace_id)
         if workspace is not None:
-            workspace_manager._save_workspace_to_disk(user_id, workspace_id, workspace)
+            workspace_manager.persist(user_id, workspace_id)
 
         return src_node.info(json=True)
 
@@ -1041,7 +1015,7 @@ async def convert_node_to_doclazyframe(
 
         workspace = workspace_manager.get_workspace(user_id, workspace_id)
         if workspace is not None:
-            workspace_manager._save_workspace_to_disk(user_id, workspace_id, workspace)
+            workspace_manager.persist(user_id, workspace_id)
 
         return src_node.info(json=True)
 
@@ -1095,7 +1069,7 @@ async def convert_node_to_lazyframe(
 
         workspace = workspace_manager.get_workspace(user_id, workspace_id)
         if workspace is not None:
-            workspace_manager._save_workspace_to_disk(user_id, workspace_id, workspace)
+            workspace_manager.persist(user_id, workspace_id)
 
         return src_node.info(json=True)
 
@@ -1212,7 +1186,7 @@ async def reset_node_document_column(
 
         workspace = workspace_manager.get_workspace(user_id, workspace_id)
         if workspace is not None:
-            workspace_manager._save_workspace_to_disk(user_id, workspace_id, workspace)
+            workspace_manager.persist(user_id, workspace_id)
 
         return src_node.info(json=True)
     except HTTPException:
@@ -1249,9 +1223,7 @@ async def update_node_name(
         workspace = workspace_manager.get_workspace(user_id, workspace_id)
         if workspace is not None:
             try:  # noqa: SIM105
-                workspace_manager._save_workspace_to_disk(
-                    user_id, workspace_id, workspace
-                )  # type: ignore[attr-defined]
+                workspace_manager.persist(user_id, workspace_id)
             except Exception:  # pragma: no cover
                 logger.exception("Failed to persist workspace after node rename")
         # Return updated node info (consistent shape for frontend)
@@ -1295,10 +1267,15 @@ async def upload_file_to_workspace(
         data = load_data_file(file_path)
 
         # Normalize to Polars types
-        # If pandas, convert to Polars
-        if hasattr(data, "columns") and hasattr(data, "iloc"):
+        # If pandas, convert to Polars (check for pandas specifically)
+        if (
+            hasattr(data, "iloc")
+            and hasattr(data, "dtypes")
+            and not isinstance(data, (pl.DataFrame, pl.LazyFrame))
+        ):
+            # This is pandas - convert to Polars
             data = pl.DataFrame(data)
-        # Prefer LazyFrame
+        # Prefer LazyFrame for Polars DataFrames
         try:
             if isinstance(data, pl.DataFrame):
                 data = data.lazy()
@@ -2237,11 +2214,8 @@ async def cast_node(
             node.data = casted_data
 
             # Save workspace to disk
-            workspace_manager._save_workspace_to_disk(
-                user_id,
-                workspace_id,
-                workspace_manager.get_workspace(user_id, workspace_id),
-            )
+            # Ensure current workspace is persisted after casting
+            workspace_manager.persist(user_id, workspace_id)
 
             # Get new data type for response
             if hasattr(casted_data, "collect"):

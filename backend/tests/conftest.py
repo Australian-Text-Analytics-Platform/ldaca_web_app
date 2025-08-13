@@ -30,27 +30,37 @@ def event_loop():
 async def init_test_db():
     """Initialize test database with tables for all tests"""
     # Import after setting up the path
-    import config
     import db
 
-    # Use in-memory database for tests
-    original_url = config.config.database_url
-    config.config.database_url = "sqlite+aiosqlite:///:memory:"
-
-    # Recreate engine with test database
+    # Use in-memory database for tests without modifying the global config
     from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-    db.engine = create_async_engine(config.config.database_url)
-    db.async_session_maker = async_sessionmaker(db.engine, expire_on_commit=False)
+    # Create a test-specific database engine
+    test_db_url = "sqlite+aiosqlite:///:memory:"
+    test_engine = create_async_engine(test_db_url)
+    test_session_maker = async_sessionmaker(test_engine, expire_on_commit=False)
 
-    # Create tables
+    # Store the original for restoration
+    original_engine = getattr(db, "engine", None)
+    original_session_maker = getattr(db, "async_session_maker", None)
+
+    # Replace with test versions
+    db.engine = test_engine
+    db.async_session_maker = test_session_maker
+
+    # Create tables in the test database
     await db.create_db_and_tables()
 
     yield
 
     # Cleanup
-    await db.engine.dispose()
-    config.config.database_url = original_url
+    await test_engine.dispose()
+
+    # Restore original if they existed
+    if original_engine:
+        db.engine = original_engine
+    if original_session_maker:
+        db.async_session_maker = original_session_maker
 
 
 @pytest.fixture
@@ -67,12 +77,11 @@ def authenticated_client():
     """Provide a test client with mocked authentication"""
     # Mock user that will be returned by the authentication dependency
     from datetime import datetime
-    from unittest.mock import patch
 
     from fastapi.testclient import TestClient
 
     mock_user = {
-        "id": "test-user-123",
+        "id": "test",
         "email": "test@example.com",
         "name": "Test User",
         "picture": "https://example.com/avatar.jpg",
@@ -82,63 +91,103 @@ def authenticated_client():
         "is_verified": True,
     }
 
-    # Import and setup the app with mocked config
-    with patch("config.settings") as mock_config:
-        mock_config.cors_allowed_origins = ["http://localhost:3000"]
-        mock_config.allowed_origins = ["http://localhost:3000"]
-        mock_config.cors_allow_credentials = True
-        mock_config.google_client_id = "test-client-id"
-        mock_config.database_url = "sqlite+aiosqlite:///:memory:"
+    # Create a mock settings object with test values
+    mock_settings = MagicMock()
+    mock_settings.cors_allowed_origins = ["http://localhost:3000"]
+    mock_settings.allowed_origins = ["http://localhost:3000"]
+    mock_settings.cors_allow_credentials = True
+    mock_settings.multi_user = False
+    mock_settings.single_user_id = "test"
+    mock_settings.single_user_name = "Test User"
+    mock_settings.single_user_email = "test@localhost"
+    mock_settings.google_client_id = ""  # Empty for single-user mode
+    mock_settings.database_url = "sqlite+aiosqlite:///:memory:"
 
-        # Mock the data_folder as a MagicMock that has mkdir
-        mock_data_folder = MagicMock()
-        mock_data_folder.mkdir = MagicMock()
-        mock_config.data_folder = mock_data_folder
+    # Mock the data_folder as a MagicMock that has mkdir
+    mock_data_folder = MagicMock()
+    mock_data_folder.mkdir = MagicMock()
+    mock_settings.data_folder = mock_data_folder
 
-        # Mock database functions to avoid initialization issues
-        with patch("db.init_db"), patch("db.cleanup_expired_sessions"):
-            from core.auth import get_current_user
+    # Patch all the different ways settings can be imported
+    with (
+        patch("config.settings", mock_settings),
+        patch("main.settings", mock_settings),
+        patch("api.auth.settings", mock_settings),
+        patch("core.auth.settings", mock_settings),
+        patch("db.init_db"),
+        patch("db.cleanup_expired_sessions"),
+        patch("main.lifespan") as mock_lifespan,
+    ):
+        # Create a simple async context manager for the mock lifespan
+        from contextlib import asynccontextmanager
 
-            from main import app
+        @asynccontextmanager
+        async def mock_lifespan_func(app):
+            yield
 
-            # Override the dependency with our mock user
-            def mock_get_current_user():
-                return mock_user
+        mock_lifespan.side_effect = mock_lifespan_func
 
-            app.dependency_overrides[get_current_user] = mock_get_current_user
+        from core.auth import get_current_user
+        from main import app
 
-            client = TestClient(app)
-            yield client
+        # Override the dependency with our mock user
+        def mock_get_current_user():
+            return mock_user
 
-            # Clean up the override after the test
-            app.dependency_overrides.clear()
+        app.dependency_overrides[get_current_user] = mock_get_current_user
+
+        client = TestClient(app)
+        yield client
+
+        # Clean up the override after the test
+        app.dependency_overrides.clear()
 
 
 @pytest.fixture
 def test_client():
     """Provide a test client without authentication"""
-    from unittest.mock import patch
-
     from fastapi.testclient import TestClient
 
-    with patch("config.settings") as mock_config:
-        mock_config.cors_allowed_origins = ["http://localhost:3000"]
-        mock_config.allowed_origins = ["http://localhost:3000"]
-        mock_config.cors_allow_credentials = True
-        mock_config.google_client_id = "test-client-id"
-        mock_config.database_url = "sqlite+aiosqlite:///:memory:"
+    # Create a mock settings object with test values
+    mock_settings = MagicMock()
+    mock_settings.cors_allowed_origins = ["http://localhost:3000"]
+    mock_settings.allowed_origins = ["http://localhost:3000"]
+    mock_settings.cors_allow_credentials = True
+    mock_settings.multi_user = False
+    mock_settings.single_user_id = "test"
+    mock_settings.single_user_name = "Test User"
+    mock_settings.single_user_email = "test@localhost"
+    mock_settings.google_client_id = ""  # Empty for single-user mode
+    mock_settings.database_url = "sqlite+aiosqlite:///:memory:"
 
-        # Mock the data_folder as a MagicMock that has mkdir
-        mock_data_folder = MagicMock()
-        mock_data_folder.mkdir = MagicMock()
-        mock_config.data_folder = mock_data_folder
+    # Mock the data_folder as a MagicMock that has mkdir
+    mock_data_folder = MagicMock()
+    mock_data_folder.mkdir = MagicMock()
+    mock_settings.data_folder = mock_data_folder
 
-        # Mock database functions to avoid initialization issues
-        with patch("db.init_db"), patch("db.cleanup_expired_sessions"):
-            from main import app
+    # Patch all the different ways settings can be imported
+    with (
+        patch("config.settings", mock_settings),
+        patch("main.settings", mock_settings),
+        patch("api.auth.settings", mock_settings),
+        patch("core.auth.settings", mock_settings),
+        patch("db.init_db"),
+        patch("db.cleanup_expired_sessions"),
+        patch("main.lifespan") as mock_lifespan,
+    ):
+        # Create a simple async context manager for the mock lifespan
+        from contextlib import asynccontextmanager
 
-            client = TestClient(app)
-            yield client
+        @asynccontextmanager
+        async def mock_lifespan_func(app):
+            yield
+
+        mock_lifespan.side_effect = mock_lifespan_func
+
+        from main import app
+
+        client = TestClient(app)
+        yield client
 
 
 @pytest.fixture
@@ -162,7 +211,11 @@ def mock_settings():
         mock_config.debug = True
         mock_config.cors_allowed_origins = ["http://localhost:3000"]
         mock_config.cors_allow_credentials = True
-        mock_config.google_client_id = "test-client-id"
+        mock_config.multi_user = False
+        mock_config.single_user_id = "test"
+        mock_config.single_user_name = "Test User"
+        mock_config.single_user_email = "test@localhost"
+        mock_config.google_client_id = ""  # Empty for single-user mode
         mock_config.token_expire_hours = 1
         mock_config.secret_key = "test-secret-key"
         mock_config.log_level = "DEBUG"
@@ -214,7 +267,7 @@ def sample_dataframe_data():
 def sample_user_data():
     """Sample user data for testing"""
     return {
-        "id": "test-user-123",
+        "id": "test",
         "email": "test@example.com",
         "name": "Test User",
         "picture": "https://example.com/avatar.jpg",
@@ -261,7 +314,7 @@ def sample_json_file(temp_dir):
 def mock_user():
     """Mock user data for testing"""
     return {
-        "id": "test-user-123",
+        "id": "test",
         "email": "test@example.com",
         "name": "Test User",
         "picture": "https://example.com/avatar.jpg",
@@ -314,13 +367,14 @@ def cleanup_test_user_folders():
 
     # List of test user folder patterns to clean up
     test_patterns = [
-        "user_fresh_user_*",
+        "user_test-user*",  # Primary test user pattern
         "user_test_user*",
-        "user_test-user-*",
+        "user_fresh_user_*",
         "user_new_user_*",
         "user_user1_*",
         "user_user2_*",
         "user_12345678-1234-5678-*",  # Test UUID pattern
+        "user_test*",  # General test pattern
     ]
 
     for pattern in test_patterns:

@@ -19,48 +19,41 @@ class TestWorkspaceAPI:
 
     def test_list_workspaces_empty(self):
         """Test listing workspaces when user has none"""
-        with patch("api.workspaces.workspace_manager.list_user_workspaces") as mock_get:
+        with patch(
+            "api.workspaces.workspace_manager.list_user_workspaces_summaries"
+        ) as mock_get:
             mock_get.return_value = {}
-
             response = self.client.get("/api/workspaces/")
-
             assert response.status_code == 200
             data = response.json()
-            assert len(data["workspaces"]) == 0
+            assert data["workspaces"] == []
 
     def test_list_workspaces_with_data(self):
         """Test listing workspaces when user has workspaces"""
-        # Create mock workspace object that behaves like ATAPWorkspace
-        mock_workspace = Mock()
-        mock_workspace.name = "Test Workspace 1"
-        mock_workspace.summary.return_value = {
-            "total_nodes": 1,
-            "root_nodes": 1,
-            "leaf_nodes": 1,
-            "node_types": {"DataFrame": 1},
+        mock_summaries = {
+            "abc123": {
+                "workspace_id": "abc123",
+                "name": "Test Workspace 1",
+                "description": "Test description",
+                "created_at": "2024-01-01T00:00:00Z",
+                "modified_at": "2024-01-01T12:00:00Z",
+                "node_count": 1,
+                "root_nodes": 1,
+                "leaf_nodes": 1,
+                "node_types": {"DataFrame": 1},
+            }
         }
-        mock_workspace.get_metadata.side_effect = lambda key: {
-            "description": "Test description",
-            "created_at": "2024-01-01T00:00:00Z",
-            "modified_at": "2024-01-01T12:00:00Z",
-        }.get(key, "")
-
-        mock_workspaces = {"workspace-1": mock_workspace}
-
-        with patch("api.workspaces.workspace_manager.list_user_workspaces") as mock_get:
-            mock_get.return_value = mock_workspaces
-
+        with patch(
+            "api.workspaces.workspace_manager.list_user_workspaces_summaries"
+        ) as mock_get:
+            mock_get.return_value = mock_summaries
             response = self.client.get("/api/workspaces/")
-
             assert response.status_code == 200
             data = response.json()
             assert len(data["workspaces"]) == 1
             workspace = data["workspaces"][0]
-            assert workspace["workspace_id"] == "workspace-1"
-            assert workspace["name"] == "Test Workspace 1"
-            assert (
-                workspace["node_count"] == 1
-            )  # Updated to use latest ATAPWorkspace terminology
+            assert workspace["workspace_id"] == "abc123"
+            assert workspace["node_count"] == 1
 
     def test_create_workspace(self):
         """Test creating a new workspace"""
@@ -167,7 +160,7 @@ class TestWorkspaceAPI:
             data = response.json()
             assert data["success"] is True
             assert data["workspace_id"] == "workspace-123"
-            mock_unload.assert_called_once_with("test-user", "workspace-123", save=True)
+            mock_unload.assert_called_once_with("test", "workspace-123", save=True)
 
     def test_unload_workspace_not_found(self):
         """Test unloading non-existent workspace returns 404"""
@@ -207,9 +200,17 @@ class TestWorkspaceAPI:
                 "schema": {"id": "Int64", "name": "Utf8", "content": "Utf8"},
             }
 
-            with patch(
-                "api.workspaces.workspace_manager.add_node_to_workspace"
-            ) as mock_add:
+            with (
+                patch(
+                    "api.workspaces.workspace_manager.add_node_to_workspace"
+                ) as mock_add,
+                patch(
+                    "api.workspaces.workspace_manager.get_workspace"
+                ) as mock_get_workspace,
+            ):
+                # Mock workspace exists
+                mock_workspace = Mock()
+                mock_get_workspace.return_value = mock_workspace
                 mock_add.return_value = mock_node
 
                 # Prepare the file upload
@@ -260,9 +261,7 @@ class TestWorkspaceAPI:
             patch(
                 "api.workspaces.workspace_manager.get_node_from_workspace"
             ) as mock_get_node,
-            patch(
-                "api.workspaces.workspace_manager._save_workspace_to_disk"
-            ) as mock_save,
+            patch("api.workspaces.workspace_manager.persist") as mock_save,
             patch(
                 "api.workspaces.workspace_manager.get_workspace"
             ) as mock_get_workspace,
@@ -365,7 +364,7 @@ class TestWorkspaceAPI:
             patch(
                 "api.workspaces.workspace_manager.get_node_from_workspace"
             ) as mock_get_node,
-            patch("api.workspaces.workspace_manager._save_workspace_to_disk"),
+            patch("api.workspaces.workspace_manager.persist"),
             patch(
                 "api.workspaces.workspace_manager.get_workspace"
             ) as mock_get_workspace,

@@ -25,7 +25,7 @@ class TestMainApp:
         from main import app
 
         assert app is not None
-        assert app.title == "Enhanced ATAP Web App API"
+        assert app.title == "Enhanced LDaCA Web App API"
         assert app.version == "3.0.0"
 
     def test_health_endpoint_structure(self):
@@ -84,7 +84,7 @@ class TestMainApp:
             try:
                 response = loop.run_until_complete(status())
 
-                assert response["system"] == "Enhanced ATAP Web App API"
+                assert response["system"] == "Enhanced LDaCA Web App API"
                 assert response["version"] == "3.0.0"
                 assert response["status"] == "operational"
                 assert "components" in response
@@ -133,7 +133,7 @@ class TestMainApp:
             try:
                 response = loop.run_until_complete(root())
 
-                assert response["message"] == "Enhanced ATAP Web App API"
+                assert response["message"] == "Enhanced LDaCA Web App API"
                 assert response["version"] == "3.0.0"
                 assert "features" in response
                 assert "endpoints" in response

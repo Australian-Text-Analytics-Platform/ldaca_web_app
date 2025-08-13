@@ -47,7 +47,7 @@ class TestSettings:
 
         assert isinstance(origins, list)
         assert "http://localhost:3000" in origins
-        assert "https://atap.sguo.org" in origins
+        assert "https://ldaca.sguo.org" in origins
 
     def test_path_methods(self):
         """Test path convenience methods"""

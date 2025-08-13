@@ -42,7 +42,7 @@ class Settings(BaseSettings):
     )
 
     # Authentication Configuration
-    multi_user: bool = Field(default=True, description="Multi-user mode enabled")
+    multi_user: bool = Field(default=False, description="Multi-user mode enabled")
 
     # Single user configuration (when multi_user=False)
     single_user_id: str = Field(default="root", description="Single user ID")

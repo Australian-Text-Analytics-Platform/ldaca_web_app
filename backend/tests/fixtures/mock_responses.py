@@ -21,7 +21,7 @@ MOCK_GOOGLE_TOKEN_INVALID = {
 
 # Mock user data
 MOCK_USER_DATA = {
-    "id": "test-user-123",
+    "id": "test",
     "email": "test@example.com",
     "name": "Test User",
     "picture": "https://example.com/avatar.jpg",
