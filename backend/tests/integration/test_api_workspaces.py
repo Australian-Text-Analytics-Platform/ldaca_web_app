@@ -399,8 +399,48 @@ class TestWorkspaceAPI:
             assert response_data["success"] is True
             assert response_data["cast_info"]["column"] == "created_at"
 
+    def test_cast_node_datetime_to_string(self):
+        """Test casting datetime column to string"""
+        from datetime import datetime
+
+        import polars as pl
+
+        mock_node = Mock()
+        test_df = pl.DataFrame(
+            {
+                "created_at": [
+                    datetime(2024, 1, 1, 10, 30, 15),
+                    datetime(2024, 1, 2, 14, 45, 30),
+                ],
+                "name": ["Alice", "Bob"],
+            }
+        )
+        mock_node.data = test_df
+
+        with (
+            patch(
+                "api.workspaces.workspace_manager.get_node_from_workspace"
+            ) as mock_get_node,
+            patch("api.workspaces.workspace_manager.persist") as mock_save,
+            patch(
+                "api.workspaces.workspace_manager.get_workspace"
+            ) as mock_get_workspace,
+        ):
+            mock_get_node.return_value = mock_node
+            mock_get_workspace.return_value = Mock()
+
+            cast_data = {"column": "created_at", "target_type": "string"}
+            response = self.client.post(
+                "/api/workspaces/test-workspace/nodes/test-node/cast", json=cast_data
+            )
+            assert response.status_code == 200
+            data = response.json()
+            assert data["success"] is True
+            assert data["cast_info"]["target_type"] == "string"
+            mock_save.assert_called_once()
+
     def test_cast_node_unsupported_type(self):
-        """Test that unsupported casting types raise appropriate errors"""
+        """Test that still-unsupported casting types raise errors (e.g., number)"""
         import polars as pl
 
         mock_node = Mock()
@@ -411,20 +451,13 @@ class TestWorkspaceAPI:
         ) as mock_get_node:
             mock_get_node.return_value = mock_node
 
-            # Test unsupported casting type
-            cast_data = {
-                "column": "test_col",
-                "target_type": "string",  # This should now be unsupported
-            }
-
+            cast_data = {"column": "test_col", "target_type": "number"}
             response = self.client.post(
                 "/api/workspaces/test-workspace/nodes/test-node/cast", json=cast_data
             )
-
             assert response.status_code == 400
             response_detail = response.json()["detail"]
             assert "not yet supported" in response_detail
-            assert "Currently only 'datetime' casting is implemented" in response_detail
 
     def test_join_nodes_success(self):
         """Test successful node joining with the updated parameter format"""

@@ -163,7 +163,20 @@ const DataTable: React.FC<DataTableProps> = ({
       }
     } catch (error) {
       console.error('Cast error:', error);
-      // You might want to show an error message to the user here
+      // Surface an immediate user-facing alert for failed casts (request from UX)
+      let message = 'Unknown error';
+      if (error instanceof Error) {
+        message = error.message;
+      } else if (typeof (error as any)?.toString === 'function') {
+        message = (error as any).toString();
+      }
+      // Basic alert for now (consistent with existing pattern in other tabs)
+      // Example: Failed to convert column "col" to datetime: <message>
+      try {
+        alert(`Failed to convert column "${column}" to ${targetType}: ${message}`);
+      } catch (_) {
+        // ignore if alert is blocked
+      }
     } finally {
       setLoadingCast(prev => ({ ...prev, [column]: false }));
     }
@@ -375,6 +388,7 @@ const DataTable: React.FC<DataTableProps> = ({
         onClose={() => setDatetimeModal({ isOpen: false, column: '', targetType: '' })}
         onConfirm={handleDatetimeFormatConfirm}
         columnName={datetimeModal.column}
+        sampleValues={(data || []).slice(0, 25).map((row: any) => String(row[datetimeModal.column] ?? '')).filter(v => v)}
       />
     </>
   );

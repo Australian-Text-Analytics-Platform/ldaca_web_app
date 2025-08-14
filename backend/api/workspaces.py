@@ -2131,10 +2131,14 @@ async def cast_node(
                 status_code=400,
                 detail="cast_data must contain 'column' and 'target_type' keys",
             )
-
         column_name = cast_data["column"]
         target_type = cast_data["target_type"]
         datetime_format = cast_data.get("format")  # Optional datetime format
+        # Optional strict flag (Polars defaults to strict=True). We default to False to avoid
+        # hard failures on a few malformed rows (frontend previously succeeded with strict=False).
+        strict_flag = (
+            cast_data.get("strict") if "strict" in cast_data else False
+        )  # default lenient
 
         if not isinstance(column_name, str) or not isinstance(target_type, str):
             raise HTTPException(
@@ -2189,25 +2193,71 @@ async def cast_node(
                 detail=f"Column '{column_name}' not found in data. Available columns: {columns}",
             )
 
-        # Check if target_type is supported BEFORE trying the casting
-        if target_type.lower() != "datetime":
-            raise HTTPException(
-                status_code=400,
-                detail=f"Casting to '{target_type}' is not yet supported. Currently only 'datetime' casting is implemented.",
-            )
+        # Determine operation based on target type
+        target_lower = target_type.lower()
 
         # Perform the casting using .with_columns() and expressions
         try:
-            # Create the casting expression (we already validated it's datetime above)
-            if datetime_format:
-                # Use str.to_datetime with custom format - exactly as user specified
-                cast_expr = pl.col(column_name).str.to_datetime(format=datetime_format)
-            else:
-                # Use str.to_datetime with automatic format detection
-                cast_expr = pl.col(column_name).str.to_datetime()
+            if target_lower == "datetime":
+                # Simplified: single to_datetime call mirroring notebook usage
+                # Default strict=False so rows that don't match become null instead of failing entire cast
+                try:
+                    if datetime_format:
+                        cast_expr = pl.col(column_name).str.to_datetime(
+                            format=datetime_format, strict=bool(strict_flag)
+                        )
+                    else:
+                        cast_expr = pl.col(column_name).str.to_datetime(
+                            strict=bool(strict_flag)
+                        )
+                except Exception as e:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            f"Error casting column '{column_name}' to {target_type}: {e}. "
+                            "This often occurs when some rows don't match the supplied format. "
+                            "Note your notebook example used .head() (sampling) which may hide later malformed rows. "
+                            "Either clean inconsistent rows or keep strict=False (default) to set them null."
+                        ),
+                    )
+            elif target_lower in ("string", "utf8", "str", "text"):
+                # Datetime -> string (optionally with format) or no-op if already string
+                # Detect current dtype (best effort)
+                try:
+                    if (
+                        hasattr(current_df, "schema")
+                        and column_name in current_df.schema
+                    ):  # DataFrame
+                        col_dtype = current_df.schema[column_name]
+                    elif hasattr(current_df, "collect_schema"):  # LazyFrame
+                        col_dtype = current_df.collect_schema().get(column_name, None)
+                    else:
+                        col_dtype = None
+                except Exception:
+                    col_dtype = None
 
-            # Apply the casting with .with_columns() - preserve original data type!
-            # If it was DocDataFrame, keep as DocDataFrame; if LazyFrame, keep as LazyFrame
+                if str(col_dtype).startswith("Datetime"):
+                    if datetime_format:
+                        # Use chrono-compatible formatting tokens
+                        cast_expr = (
+                            pl.col(column_name)
+                            .dt.strftime(datetime_format)
+                            .alias(column_name)
+                        )
+                    else:
+                        # Fallback: cast to Utf8 (ISO rendering)
+                        cast_expr = pl.col(column_name).cast(pl.Utf8).alias(column_name)
+                else:
+                    # Already string or unknown -> ensure Utf8
+                    cast_expr = pl.col(column_name).cast(pl.Utf8).alias(column_name)
+                # For string target we treat provided format as format_used if any
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Casting to '{target_type}' is not yet supported. Supported: datetime -> string, string -> datetime.",
+                )
+
+            # Apply the casting with .with_columns(); preserve original frame type
             casted_data = current_df.with_columns(cast_expr)
 
             # Update the node data in-place (preserving the original type)
@@ -2235,8 +2285,9 @@ async def cast_node(
                     "original_type": original_type,
                     "new_type": new_type,
                     "target_type": target_type,
-                    "format_used": datetime_format
-                    if target_type.lower() == "datetime"
+                    "format_used": datetime_format if datetime_format else None,
+                    "strict_used": bool(strict_flag)
+                    if target_lower == "datetime"
                     else None,
                 },
                 "message": f"Successfully cast column '{column_name}' from {original_type} to {new_type}",

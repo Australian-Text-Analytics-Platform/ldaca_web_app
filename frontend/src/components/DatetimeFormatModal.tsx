@@ -5,27 +5,42 @@ interface DatetimeFormatModalProps {
   onClose: () => void;
   onConfirm: (format?: string) => void;
   columnName: string;
+  sampleValues?: string[]; // preview values used for auto fill inference
 }
 
 const DatetimeFormatModal: React.FC<DatetimeFormatModalProps> = ({
   isOpen,
   onClose,
   onConfirm,
-  columnName
+  columnName,
+  sampleValues = []
 }) => {
   const [customFormat, setCustomFormat] = useState('');
   const [selectedFormat, setSelectedFormat] = useState<string | null>(null);
+  const [autoFillTried, setAutoFillTried] = useState(false);
+  const [autoFillError, setAutoFillError] = useState<string | null>(null);
 
-  // Common datetime formats
+  // Simplified options: only Auto-detect + Custom (with Auto Fill)
   const commonFormats = [
     { label: 'Auto-detect format', value: null, example: 'Auto-detect' },
-    { label: 'YYYY-MM-DD', value: '%Y-%m-%d', example: '2023-12-25' },
-    { label: 'DD/MM/YYYY', value: '%d/%m/%Y', example: '25/12/2023' },
-    { label: 'MM/DD/YYYY', value: '%m/%d/%Y', example: '12/25/2023' },
-    { label: 'YYYY-MM-DD HH:MM:SS', value: '%Y-%m-%d %H:%M:%S', example: '2023-12-25 14:30:00' },
-    { label: 'DD-MM-YYYY HH:MM', value: '%d-%m-%Y %H:%M', example: '25-12-2023 14:30' },
-    { label: 'ISO 8601', value: '%Y-%m-%dT%H:%M:%S', example: '2023-12-25T14:30:00' },
   ];
+
+  const handleAutoFill = async () => {
+    setAutoFillTried(true);
+    setAutoFillError(null);
+    try {
+      const { inferDatetimeFormat } = await import('../utils/datetimeFormatInfer');
+      const inferred = inferDatetimeFormat(sampleValues || []);
+      if (inferred) {
+        setSelectedFormat('custom');
+        setCustomFormat(inferred);
+      } else {
+        setAutoFillError('Could not infer format');
+      }
+    } catch (e) {
+      setAutoFillError('Inference error');
+    }
+  };
 
   const handleConfirm = () => {
     if (selectedFormat === 'custom') {
@@ -56,7 +71,7 @@ const DatetimeFormatModal: React.FC<DatetimeFormatModalProps> = ({
         </h3>
         
         <p className="text-sm text-gray-600 mb-4">
-          Select a datetime format or let the system auto-detect it:
+          Choose auto-detect or provide a custom strftime format. Use Auto Fill to guess from sample values.
         </p>
 
         <div className="space-y-3 mb-6">
@@ -76,28 +91,38 @@ const DatetimeFormatModal: React.FC<DatetimeFormatModalProps> = ({
               </div>
             </label>
           ))}
-          
-          <label className="flex items-center space-x-3 cursor-pointer">
+
+          <label className="flex items-start space-x-3 cursor-pointer">
             <input
               type="radio"
               name="datetime-format"
               value="custom"
               checked={selectedFormat === 'custom'}
               onChange={() => setSelectedFormat('custom')}
-              className="text-blue-600"
+              className="mt-1 text-blue-600"
             />
             <div className="flex-1">
-              <div className="font-medium text-sm text-gray-900">Custom format</div>
+              <div className="flex items-center justify-between">
+                <div className="font-medium text-sm text-gray-900">Custom format</div>
+                <button
+                  type="button"
+                  onClick={handleAutoFill}
+                  className="ml-2 px-2 py-0.5 text-xs font-medium bg-gray-200 hover:bg-gray-300 rounded border border-gray-300"
+                  title="Infer from sample values"
+                >Auto Fill</button>
+              </div>
               <input
                 type="text"
-                placeholder="e.g., %Y/%m/%d %H:%M"
+                placeholder="e.g., %Y-%m-%d %H:%M:%S"
                 value={customFormat}
                 onChange={(e) => setCustomFormat(e.target.value)}
                 disabled={selectedFormat !== 'custom'}
                 className="mt-1 w-full px-3 py-1 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
               />
               <div className="text-xs text-gray-500 mt-1">
-                Use Python strftime format codes
+                Use Python strftime codes.
+                {autoFillTried && autoFillError && <span className="ml-1 text-red-600">{autoFillError}</span>}
+                {autoFillTried && !autoFillError && customFormat && <span className="ml-1 text-green-600">Inferred.</span>}
               </div>
             </div>
           </label>

@@ -335,6 +335,15 @@ const CustomNode: React.FC<NodeProps<any>> = ({ data, selected }) => {
                     >
                       to DocLazyFrame
                     </button>
+                    {/* Add direct materialization for plain LazyFrame -> DataFrame (non-doc) */}
+                    {formattedType.full.includes('LazyFrame') && !formattedType.full.includes('Doc') && (
+                      <button
+                        onClick={handleToDataFrameClick}
+                        className="w-full text-left px-3 py-2 text-xs hover:bg-gray-100 border-t border-gray-100"
+                      >
+                        to DataFrame
+                      </button>
+                    )}
                   </>
                 )}
                 
