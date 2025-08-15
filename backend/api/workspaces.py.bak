@@ -875,7 +875,7 @@ async def convert_node_to_dataframe(
         if workspace is not None:
             workspace_manager.persist(user_id, workspace_id)
 
-        return DocWorkspaceAPIUtils.convert_node_info_for_api(src_node)
+        return src_node.info(json=True)
 
     except HTTPException:
         raise
@@ -1018,7 +1018,7 @@ async def convert_node_to_doclazyframe(
         if workspace is not None:
             workspace_manager.persist(user_id, workspace_id)
 
-        return DocWorkspaceAPIUtils.convert_node_info_for_api(src_node)
+        return src_node.info(json=True)
 
     except HTTPException:
         raise
@@ -1072,7 +1072,7 @@ async def convert_node_to_lazyframe(
         if workspace is not None:
             workspace_manager.persist(user_id, workspace_id)
 
-        return DocWorkspaceAPIUtils.convert_node_info_for_api(src_node)
+        return src_node.info(json=True)
 
     except HTTPException:
         raise
@@ -1138,7 +1138,7 @@ async def reset_node_document_column(
                     "reset-document: no-op (DocDataFrame already using '%s')",
                     target_col,
                 )
-                return DocWorkspaceAPIUtils.convert_node_info_for_api(src_node)
+                return src_node.info(json=True)
             new_data = data.set_document(target_col)
 
         # DocLazyFrame -> rebuild wrapper with new column
@@ -1170,7 +1170,7 @@ async def reset_node_document_column(
                     "reset-document: no-op (DocLazyFrame already using '%s')",
                     target_col,
                 )
-                return DocWorkspaceAPIUtils.convert_node_info_for_api(src_node)
+                return src_node.info(json=True)
             new_data = DocLazyFrame(data.lazyframe, document_column=target_col)
         else:
             raise HTTPException(
@@ -1189,7 +1189,7 @@ async def reset_node_document_column(
         if workspace is not None:
             workspace_manager.persist(user_id, workspace_id)
 
-        return DocWorkspaceAPIUtils.convert_node_info_for_api(src_node)
+        return src_node.info(json=True)
     except HTTPException:
         raise
     except Exception as e:
@@ -1230,7 +1230,7 @@ async def update_node_name(
         # Return updated node info (consistent shape for frontend)
         if hasattr(node, "info"):
             try:
-                return DocWorkspaceAPIUtils.convert_node_info_for_api(node)  # type: ignore[call-arg]
+                return node.info(json=True)  # type: ignore[call-arg]
             except Exception:
                 pass
         return {"id": getattr(node, "id", node_id), "name": new_name}
@@ -1304,9 +1304,7 @@ async def upload_file_to_workspace(
         return {
             "success": True,
             "message": "File uploaded successfully",
-            "node": DocWorkspaceAPIUtils.convert_node_info_for_api(
-                node
-            ),  # Use latest DocWorkspace method
+            "node": node.info(json=True),  # Use latest DocWorkspace method
         }
 
     except Exception as e:

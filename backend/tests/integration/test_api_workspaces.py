@@ -439,8 +439,56 @@ class TestWorkspaceAPI:
             assert data["cast_info"]["target_type"] == "string"
             mock_save.assert_called_once()
 
+    def test_cast_node_integer_type(self):
+        """Test casting to integer type"""
+        import polars as pl
+
+        mock_node = Mock()
+        mock_node.data = pl.DataFrame({"test_col": ["1", "2", "3"]})
+
+        with (
+            patch(
+                "api.workspaces.workspace_manager.get_node_from_workspace"
+            ) as mock_get_node,
+            patch("api.workspaces.workspace_manager.persist") as mock_save,
+        ):
+            mock_get_node.return_value = mock_node
+
+            cast_data = {"column": "test_col", "target_type": "integer"}
+            response = self.client.post(
+                "/api/workspaces/test-workspace/nodes/test-node/cast", json=cast_data
+            )
+            assert response.status_code == 200
+            data = response.json()
+            assert data["cast_info"]["target_type"] == "integer"
+            mock_save.assert_called_once()
+
+    def test_cast_node_float_type(self):
+        """Test casting to float type"""
+        import polars as pl
+
+        mock_node = Mock()
+        mock_node.data = pl.DataFrame({"test_col": ["1.5", "2.7", "3.14"]})
+
+        with (
+            patch(
+                "api.workspaces.workspace_manager.get_node_from_workspace"
+            ) as mock_get_node,
+            patch("api.workspaces.workspace_manager.persist") as mock_save,
+        ):
+            mock_get_node.return_value = mock_node
+
+            cast_data = {"column": "test_col", "target_type": "float"}
+            response = self.client.post(
+                "/api/workspaces/test-workspace/nodes/test-node/cast", json=cast_data
+            )
+            assert response.status_code == 200
+            data = response.json()
+            assert data["cast_info"]["target_type"] == "float"
+            mock_save.assert_called_once()
+
     def test_cast_node_unsupported_type(self):
-        """Test that still-unsupported casting types raise errors (e.g., number)"""
+        """Test that unsupported casting types raise errors"""
         import polars as pl
 
         mock_node = Mock()
@@ -451,7 +499,7 @@ class TestWorkspaceAPI:
         ) as mock_get_node:
             mock_get_node.return_value = mock_node
 
-            cast_data = {"column": "test_col", "target_type": "number"}
+            cast_data = {"column": "test_col", "target_type": "unsupported_type"}
             response = self.client.post(
                 "/api/workspaces/test-workspace/nodes/test-node/cast", json=cast_data
             )

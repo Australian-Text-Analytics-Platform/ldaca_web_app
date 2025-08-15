@@ -36,22 +36,133 @@ class DocWorkspaceAPIUtils:
     """Utility class for FastAPI integration with DocWorkspace."""
 
     @staticmethod
-    def polars_type_to_js_type(polars_type: str) -> str:
-        """Convert Polars data type to JavaScript-compatible type."""
-        type_str = str(polars_type).lower()
+    def polars_type_to_js_type(polars_type) -> str:
+        """Convert Polars data type to JavaScript-compatible type.
 
-        if any(x in type_str for x in ["int", "float", "double", "decimal"]):
-            return "number"
-        elif any(x in type_str for x in ["str", "string", "utf8"]):
+        Args:
+            polars_type: Polars data type object (e.g., pl.Int64, pl.Float32) or string representation
+
+        Returns:
+            JavaScript-compatible type string: 'integer', 'float', 'string', 'boolean', 'datetime', 'array'
+        """
+        # Handle string representations by falling back to old logic
+        if isinstance(polars_type, str):
+            type_str = polars_type.lower()
+            if (
+                any(
+                    x in type_str
+                    for x in [
+                        "int8",
+                        "int16",
+                        "int32",
+                        "int64",
+                        "uint8",
+                        "uint16",
+                        "uint32",
+                        "uint64",
+                    ]
+                )
+                or type_str == "int"
+            ):
+                return "integer"
+            elif (
+                any(x in type_str for x in ["float32", "float64", "double", "decimal"])
+                or type_str == "float"
+            ):
+                return "float"
+            elif any(x in type_str for x in ["str", "string", "utf8"]):
+                return "string"
+            elif any(x in type_str for x in ["bool", "boolean"]):
+                return "boolean"
+            elif any(x in type_str for x in ["date", "time", "datetime"]):
+                return "datetime"
+            elif "list" in type_str:
+                return "array"
+            else:
+                return "string"
+
+        # Handle actual Polars type objects with direct comparison
+        # Integer types
+        if polars_type in (
+            pl.Int8,
+            pl.Int16,
+            pl.Int32,
+            pl.Int64,
+            pl.UInt8,
+            pl.UInt16,
+            pl.UInt32,
+            pl.UInt64,
+        ):
+            return "integer"
+        # Float types
+        elif polars_type in (pl.Float32, pl.Float64):
+            return "float"
+        # String types
+        elif polars_type in (pl.String, pl.Utf8):
             return "string"
-        elif any(x in type_str for x in ["bool", "boolean"]):
+        # Boolean type
+        elif polars_type == pl.Boolean:
             return "boolean"
-        elif any(x in type_str for x in ["date", "time", "datetime"]):
+        # Date/time types
+        elif polars_type in (pl.Date, pl.Datetime, pl.Time):
             return "datetime"
-        elif "list" in type_str:
-            return "string"  # Simplified for now, could be enhanced
+        # List/array types (check if it's a List type)
+        elif (
+            hasattr(polars_type, "__name__") and "list" in polars_type.__name__.lower()
+        ):
+            return "array"
         else:
-            return "string"  # Default fallback
+            # Fallback for unknown types
+            return "string"
+
+    @staticmethod
+    def convert_schema_to_js_types(schema) -> Dict[str, str]:
+        """Convert a Polars schema to JavaScript-compatible types.
+
+        This function handles the conversion that was previously done in
+        docworkspace's schema_to_json function, but belongs in the API layer.
+        """
+        if schema is None:
+            return {}
+
+        # Handle both dict-like schemas and Polars Schema objects
+        if hasattr(schema, "items"):
+            # Polars Schema object or dict - pass the actual type objects
+            return {
+                col_name: DocWorkspaceAPIUtils.polars_type_to_js_type(col_type)
+                for col_name, col_type in schema.items()
+            }
+        elif isinstance(schema, dict):
+            # Already a dict - pass the values as-is (could be type objects or strings)
+            return {
+                col_name: DocWorkspaceAPIUtils.polars_type_to_js_type(col_type)
+                for col_name, col_type in schema.items()
+            }
+        else:
+            return {}
+
+    @staticmethod
+    def convert_node_info_for_api(node: "Node") -> Dict[str, Any]:
+        """Convert node info to API-compatible format with JS types.
+
+        This replaces the node.info(json=True) pattern by getting raw node info
+        and converting the schema to JS types in the API layer.
+        """
+        # Get raw node info (no JSON conversion in core library)
+        info = node.info()
+
+        # Convert schema to JS types if present
+        if "schema" in info and info["schema"] is not None:
+            info["schema"] = DocWorkspaceAPIUtils.convert_schema_to_js_types(
+                info["schema"]
+            )
+
+        # Ensure dtype is a string for JSON serialization
+        if "dtype" in info and not isinstance(info["dtype"], str):
+            dtype = info["dtype"]
+            info["dtype"] = f"{dtype.__module__}.{dtype.__name__}"
+
+        return info
 
     @staticmethod
     def get_node_schema(node: "Node") -> List[ColumnSchema]:
@@ -67,13 +178,18 @@ class DocWorkspaceAPIUtils:
                     data_schema = node.data.schema
                     for col_name in columns:
                         if col_name in data_schema:
-                            polars_type = str(data_schema[col_name])
+                            polars_type = data_schema[col_name]  # Keep as type object
+                            # Pass the actual type object, not string
                             js_type = DocWorkspaceAPIUtils.polars_type_to_js_type(
                                 polars_type
                             )
                             schema_data.append(
                                 ColumnSchema(
-                                    name=col_name, dtype=polars_type, js_type=js_type
+                                    name=col_name,
+                                    dtype=str(
+                                        polars_type
+                                    ),  # Convert to string for storage
+                                    js_type=js_type,
                                 )
                             )
         except Exception:

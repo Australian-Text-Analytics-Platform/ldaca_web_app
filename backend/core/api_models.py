@@ -22,7 +22,7 @@ class ColumnSchema(BaseModel):
     dtype: str
     js_type: str = Field(
         ...,
-        description="JavaScript-compatible type (string, number, boolean, datetime)",
+        description="JavaScript-compatible type (string, integer, float, boolean, datetime)",
     )
 
 

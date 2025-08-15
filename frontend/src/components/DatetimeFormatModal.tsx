@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
 interface DatetimeFormatModalProps {
   isOpen: boolean;
@@ -16,23 +16,16 @@ const DatetimeFormatModal: React.FC<DatetimeFormatModalProps> = ({
   sampleValues = []
 }) => {
   const [customFormat, setCustomFormat] = useState('');
-  const [selectedFormat, setSelectedFormat] = useState<string | null>(null);
   const [autoFillTried, setAutoFillTried] = useState(false);
   const [autoFillError, setAutoFillError] = useState<string | null>(null);
 
-  // Simplified options: only Auto-detect + Custom (with Auto Fill)
-  const commonFormats = [
-    { label: 'Auto-detect format', value: null, example: 'Auto-detect' },
-  ];
-
-  const handleAutoFill = async () => {
+  const handleAutoFill = useCallback(async () => {
     setAutoFillTried(true);
     setAutoFillError(null);
     try {
       const { inferDatetimeFormat } = await import('../utils/datetimeFormatInfer');
       const inferred = inferDatetimeFormat(sampleValues || []);
       if (inferred) {
-        setSelectedFormat('custom');
         setCustomFormat(inferred);
       } else {
         setAutoFillError('Could not infer format');
@@ -40,14 +33,17 @@ const DatetimeFormatModal: React.FC<DatetimeFormatModalProps> = ({
     } catch (e) {
       setAutoFillError('Inference error');
     }
-  };
+  }, [sampleValues]);
+
+  // Auto-fill when modal opens
+  useEffect(() => {
+    if (isOpen && sampleValues.length > 0 && !autoFillTried) {
+      handleAutoFill();
+    }
+  }, [isOpen, sampleValues.length, autoFillTried, handleAutoFill]);
 
   const handleConfirm = () => {
-    if (selectedFormat === 'custom') {
-      onConfirm(customFormat || undefined);
-    } else {
-      onConfirm(selectedFormat || undefined);
-    }
+    onConfirm(customFormat || undefined);
     resetForm();
   };
 
@@ -58,7 +54,8 @@ const DatetimeFormatModal: React.FC<DatetimeFormatModalProps> = ({
 
   const resetForm = () => {
     setCustomFormat('');
-    setSelectedFormat(null);
+    setAutoFillTried(false);
+    setAutoFillError(null);
   };
 
   if (!isOpen) return null;
@@ -71,61 +68,33 @@ const DatetimeFormatModal: React.FC<DatetimeFormatModalProps> = ({
         </h3>
         
         <p className="text-sm text-gray-600 mb-4">
-          Choose auto-detect or provide a custom strftime format. Use Auto Fill to guess from sample values.
+          Provide a custom strftime format. Use Auto Fill to guess from sample values.
         </p>
 
         <div className="space-y-3 mb-6">
-          {commonFormats.map((format, index) => (
-            <label key={index} className="flex items-center space-x-3 cursor-pointer">
-              <input
-                type="radio"
-                name="datetime-format"
-                value={format.value || 'auto'}
-                checked={selectedFormat === format.value}
-                onChange={() => setSelectedFormat(format.value)}
-                className="text-blue-600"
-              />
-              <div className="flex-1">
-                <div className="font-medium text-sm text-gray-900">{format.label}</div>
-                <div className="text-xs text-gray-500">Example: {format.example}</div>
-              </div>
-            </label>
-          ))}
-
-          <label className="flex items-start space-x-3 cursor-pointer">
-            <input
-              type="radio"
-              name="datetime-format"
-              value="custom"
-              checked={selectedFormat === 'custom'}
-              onChange={() => setSelectedFormat('custom')}
-              className="mt-1 text-blue-600"
-            />
-            <div className="flex-1">
-              <div className="flex items-center justify-between">
-                <div className="font-medium text-sm text-gray-900">Custom format</div>
-                <button
-                  type="button"
-                  onClick={handleAutoFill}
-                  className="ml-2 px-2 py-0.5 text-xs font-medium bg-gray-200 hover:bg-gray-300 rounded border border-gray-300"
-                  title="Infer from sample values"
-                >Auto Fill</button>
-              </div>
-              <input
-                type="text"
-                placeholder="e.g., %Y-%m-%d %H:%M:%S"
-                value={customFormat}
-                onChange={(e) => setCustomFormat(e.target.value)}
-                disabled={selectedFormat !== 'custom'}
-                className="mt-1 w-full px-3 py-1 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-              />
-              <div className="text-xs text-gray-500 mt-1">
-                Use Python strftime codes.
-                {autoFillTried && autoFillError && <span className="ml-1 text-red-600">{autoFillError}</span>}
-                {autoFillTried && !autoFillError && customFormat && <span className="ml-1 text-green-600">Inferred.</span>}
-              </div>
+          <div className="flex-1">
+            <div className="flex items-center justify-between mb-2">
+              <div className="font-medium text-sm text-gray-900">Custom format</div>
+              <button
+                type="button"
+                onClick={handleAutoFill}
+                className="ml-2 px-2 py-0.5 text-xs font-medium bg-gray-200 hover:bg-gray-300 rounded border border-gray-300"
+                title="Infer from sample values"
+              >Auto Fill</button>
             </div>
-          </label>
+            <input
+              type="text"
+              placeholder="e.g., %Y-%m-%d %H:%M:%S"
+              value={customFormat}
+              onChange={(e) => setCustomFormat(e.target.value)}
+              className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <div className="text-xs text-gray-500 mt-1">
+              Use Python strftime codes.
+              {autoFillTried && autoFillError && <span className="ml-1 text-red-600">{autoFillError}</span>}
+              {autoFillTried && !autoFillError && customFormat && <span className="ml-1 text-green-600">Inferred.</span>}
+            </div>
+          </div>
         </div>
 
         <div className="flex justify-end space-x-3">
@@ -139,7 +108,7 @@ const DatetimeFormatModal: React.FC<DatetimeFormatModalProps> = ({
           <button
             type="button"
             onClick={handleConfirm}
-            disabled={selectedFormat === 'custom' && !customFormat}
+            disabled={!customFormat}
             className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Convert

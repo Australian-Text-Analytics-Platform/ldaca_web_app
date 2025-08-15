@@ -1230,7 +1230,7 @@ async def update_node_name(
         # Return updated node info (consistent shape for frontend)
         if hasattr(node, "info"):
             try:
-                return DocWorkspaceAPIUtils.convert_node_info_for_api(node)  # type: ignore[call-arg]
+                return node.info(json=True)  # type: ignore[call-arg]
             except Exception:
                 pass
         return {"id": getattr(node, "id", node_id), "name": new_name}
@@ -1304,9 +1304,7 @@ async def upload_file_to_workspace(
         return {
             "success": True,
             "message": "File uploaded successfully",
-            "node": DocWorkspaceAPIUtils.convert_node_info_for_api(
-                node
-            ),  # Use latest DocWorkspace method
+            "node": node.info(json=True),  # Use latest DocWorkspace method
         }
 
     except Exception as e:

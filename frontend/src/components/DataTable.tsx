@@ -25,7 +25,8 @@ interface DataTableProps {
 // TypeScript-friendly data types (should match backend js_type mapping)
 const DATA_TYPES = [
   { value: 'string', label: 'string', category: 'Text' },
-  { value: 'number', label: 'number', category: 'Numeric' },
+  { value: 'integer', label: 'integer', category: 'Numeric' },
+  { value: 'float', label: 'float', category: 'Numeric' },
   { value: 'boolean', label: 'boolean', category: 'Boolean' },
   { value: 'datetime', label: 'datetime', category: 'Temporal' },
   { value: 'array', label: 'array', category: 'Array' },
@@ -197,10 +198,8 @@ const DataTable: React.FC<DataTableProps> = ({
     // Normalize various type representations to js_type compatible names
     const lowercaseType = type.toLowerCase();
     if (lowercaseType.includes('utf8') || lowercaseType.includes('string')) return 'string';
-    if (lowercaseType.includes('int64') || lowercaseType === 'i64') return 'number';
-    if (lowercaseType.includes('int32') || lowercaseType === 'i32') return 'number';
-    if (lowercaseType.includes('float64') || lowercaseType === 'f64') return 'number';
-    if (lowercaseType.includes('float32') || lowercaseType === 'f32') return 'number';
+    if (lowercaseType.includes('int64') || lowercaseType === 'i64' || lowercaseType.includes('int32') || lowercaseType === 'i32' || lowercaseType.includes('int')) return 'integer';
+    if (lowercaseType.includes('float64') || lowercaseType === 'f64' || lowercaseType.includes('float32') || lowercaseType === 'f32' || lowercaseType.includes('float')) return 'float';
     if (lowercaseType.includes('bool')) return 'boolean';
     if (lowercaseType.includes('datetime')) return 'datetime';
     if (lowercaseType.includes('date')) return 'datetime';

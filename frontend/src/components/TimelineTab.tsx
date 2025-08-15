@@ -30,7 +30,7 @@ const TimelineTab: React.FC = () => {
 
   const [timeColumn, setTimeColumn] = useState('');
   const [groupByColumns, setGroupByColumns] = useState<string[]>([]);
-  const [frequency, setFrequency] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('monthly');
+  const [frequency, setFrequency] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('daily');
   const [chartType, setChartType] = useState<'line' | 'bar' | 'area'>('line');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [results, setResults] = useState<any>(null);
