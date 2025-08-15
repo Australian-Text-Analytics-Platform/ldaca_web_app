@@ -87,6 +87,12 @@ export interface FileListResponse {
   user_folder: string;
 }
 
+export interface ColumnUniqueValuesResponse {
+  unique_count: number;
+  sample_values: any[];
+  has_more: boolean;
+}
+
 // =============================================================================
 // AUTHENTICATION API
 // =============================================================================
@@ -257,7 +263,7 @@ export async function getNodeData(
   workspaceId: string, 
   nodeId: string, 
   page: number = 0, 
-  pageSize: number = 50, 
+  pageSize: number = 20, 
   authHeaders: Record<string, string> = {}
 ) {
   const res = await axios.get(`${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}/data`, { 
@@ -274,6 +280,18 @@ export async function getNodeShape(
 ) {
   const res = await axios.get(`${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}/shape`, { 
     headers: authHeaders 
+  });
+  return res.data;
+}
+
+export async function getColumnUniqueValues(
+  workspaceId: string,
+  nodeId: string,
+  columnName: string,
+  authHeaders: Record<string, string> = {}
+): Promise<ColumnUniqueValuesResponse> {
+  const res = await axios.get(`${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}/columns/${columnName}/unique`, {
+    headers: authHeaders
   });
   return res.data;
 }

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useWorkspace } from '../hooks/useWorkspace';
 import { useAuth } from '../hooks/useAuth';
-import { FrequencyAnalysisRequest, frequencyAnalysis } from '../api';
+import { FrequencyAnalysisRequest, frequencyAnalysis, getColumnUniqueValues } from '../api';
 import {
   LineChart,
   Line,
@@ -16,6 +17,37 @@ import {
   AreaChart,
   Area,
 } from 'recharts';
+
+// Component to display unique value count for a column
+interface UniqueValueCountProps {
+  workspaceId: string;
+  nodeId: string;
+  columnName: string;
+}
+
+const UniqueValueCount: React.FC<UniqueValueCountProps> = ({ workspaceId, nodeId, columnName }) => {
+  const { getAuthHeaders } = useAuth();
+  
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['columnUniqueValues', workspaceId, nodeId, columnName],
+    queryFn: () => getColumnUniqueValues(workspaceId, nodeId, columnName, getAuthHeaders()),
+    enabled: !!workspaceId && !!nodeId && !!columnName,
+  });
+
+  if (isLoading) {
+    return <span className="text-xs text-gray-500 px-2">Loading...</span>;
+  }
+
+  if (error || !data) {
+    return <span className="text-xs text-red-500 px-2">Error</span>;
+  }
+
+  return (
+    <span className="text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded">
+      {data.unique_count} unique {data.has_more ? '(+)' : ''}
+    </span>
+  );
+};
 
 const TimelineTab: React.FC = () => {
   const { 
@@ -385,6 +417,13 @@ const TimelineTab: React.FC = () => {
                   <option key={col} value={col}>{col}</option>
                 ))}
               </select>
+              {column && (
+                <UniqueValueCount 
+                  workspaceId={currentWorkspaceId || ''} 
+                  nodeId={selectedNodeId || ''} 
+                  columnName={column} 
+                />
+              )}
               <button
                 onClick={() => handleRemoveGroupByColumn(index)}
                 className="px-3 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"

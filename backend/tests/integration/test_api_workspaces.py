@@ -57,7 +57,7 @@ class TestWorkspaceAPI:
 
     def test_create_workspace(self):
         """Test creating a new workspace"""
-        # Create mock workspace object that behaves like ATAPWorkspace
+        # Create mock workspace object that behaves like docworkspace
         mock_workspace = Mock()
         mock_workspace.get_metadata.side_effect = lambda key: {
             "id": "new-workspace-123",
@@ -90,7 +90,7 @@ class TestWorkspaceAPI:
             assert data["workspace_id"] == "new-workspace-123"
             assert data["name"] == "New Workspace"
             assert data["description"] == "New test workspace"
-            assert data["total_nodes"] == 0  # Use latest ATAPWorkspace terminology
+            assert data["total_nodes"] == 0  # Use latest docworkspace terminology
 
     def test_get_workspace_info(self):
         """Test getting specific workspace information"""
@@ -118,7 +118,7 @@ class TestWorkspaceAPI:
             data = response.json()
             assert data["workspace_id"] == "workspace-123"
             assert data["name"] == "Test Workspace"
-            assert data["total_nodes"] == 5  # Latest ATAPWorkspace terminology
+            assert data["total_nodes"] == 5  # Latest docworkspace terminology
 
     def test_get_workspace_not_found(self):
         """Test getting non-existent workspace"""

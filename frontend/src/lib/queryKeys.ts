@@ -8,10 +8,12 @@ export const queryKeys = {
   // Nodes
   workspaceNodes: (workspaceId: string) => ['workspaces', workspaceId, 'nodes'] as const,
   node: (workspaceId: string, nodeId: string) => ['workspaces', workspaceId, 'nodes', nodeId] as const,
-  nodeData: (workspaceId: string, nodeId: string, page?: number) => 
-    page !== undefined 
-      ? ['workspaces', workspaceId, 'nodes', nodeId, 'data', page] as const
-      : ['workspaces', workspaceId, 'nodes', nodeId, 'data'] as const,
+  nodeData: (workspaceId: string, nodeId: string, page?: number, pageSize?: number) => 
+    page !== undefined && pageSize !== undefined
+      ? ['workspaces', workspaceId, 'nodes', nodeId, 'data', page, pageSize] as const
+      : page !== undefined 
+        ? ['workspaces', workspaceId, 'nodes', nodeId, 'data', page] as const
+        : ['workspaces', workspaceId, 'nodes', nodeId, 'data'] as const,
   nodeSchema: (workspaceId: string, nodeId: string) => 
     ['workspaces', workspaceId, 'nodes', nodeId, 'schema'] as const,
   

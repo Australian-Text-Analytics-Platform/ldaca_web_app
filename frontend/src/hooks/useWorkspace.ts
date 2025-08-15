@@ -120,10 +120,15 @@ export const useWorkspace = () => {
 
   // Only fetch node data for selected node
   const nodeDataQuery = useQuery({
-    queryKey: queryKeys.nodeData(currentWorkspaceId!, selectedNodeId!, pagination[selectedNodeId!]?.currentPage || 1),
+    queryKey: queryKeys.nodeData(
+      currentWorkspaceId!, 
+      selectedNodeId!, 
+      pagination[selectedNodeId!]?.currentPage || 1,
+      pagination[selectedNodeId!]?.pageSize || 20
+    ),
     queryFn: () => {
       const currentPage = pagination[selectedNodeId!]?.currentPage || 1;
-      const pageSize = pagination[selectedNodeId!]?.pageSize || 50;
+      const pageSize = pagination[selectedNodeId!]?.pageSize || 20;
       return getNodeData(currentWorkspaceId!, selectedNodeId!, currentPage, pageSize, authHeaders);
     },
     enabled: isAuthenticated && !!currentWorkspaceId && !!selectedNodeId,
@@ -801,7 +806,7 @@ export const useWorkspace = () => {
   // Pagination management functions
   const handlePageChange = useCallback((page: number) => {
     if (selectedNodeId) {
-      const currentPageSize = pagination[selectedNodeId]?.pageSize || 50;
+      const currentPageSize = pagination[selectedNodeId]?.pageSize || 20;
       setPagination(selectedNodeId, {
         currentPage: page,
         pageSize: currentPageSize,
@@ -829,7 +834,7 @@ export const useWorkspace = () => {
     if (selectedNodeId && !pagination[selectedNodeId]) {
       setPagination(selectedNodeId, {
         currentPage: 1,
-        pageSize: 50,
+        pageSize: 20,
         totalPages: 1
       });
     }

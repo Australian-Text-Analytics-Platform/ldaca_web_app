@@ -557,7 +557,7 @@ async def get_node_data(
     workspace_id: str,
     node_id: str,
     page: int = 1,
-    page_size: int = 100,
+    page_size: int = 20,
     current_user: dict = Depends(get_current_user),
 ):
     """Get node data rows with simple pagination."""
@@ -683,6 +683,73 @@ async def get_node_shape(
             status_code=500,
             detail=f"Failed to calculate node shape: {type(e).__name__}: {str(e)}",
         )
+
+
+@router.get("/{workspace_id}/nodes/{node_id}/columns/{column_name}/unique")
+async def get_column_unique_values(
+    workspace_id: str,
+    node_id: str, 
+    column_name: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get unique values count for a specific column."""
+    user_id = current_user["id"]
+    node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
+    if not node:
+        raise HTTPException(status_code=404, detail="Node not found")
+
+    try:
+        data_obj = node.data
+        
+        # Check if column exists
+        if hasattr(data_obj, "columns"):
+            columns = list(data_obj.columns)
+        elif hasattr(data_obj, "schema"):
+            columns = list(data_obj.schema.keys())
+        else:
+            raise HTTPException(status_code=400, detail="Cannot determine columns")
+            
+        if column_name not in columns:
+            raise HTTPException(status_code=404, detail=f"Column '{column_name}' not found")
+        
+        # Get unique values - handle both lazy and eager data
+        if hasattr(data_obj, "collect"):
+            # Lazy frame
+            df = data_obj.collect()
+        else:
+            # Already materialized
+            df = data_obj
+            
+        # Get unique values using Polars
+        try:
+            unique_values = df.select(column_name).unique().to_series().to_list()
+            unique_count = len(unique_values)
+            
+            # Limit the actual values returned to avoid huge responses
+            max_values_to_return = 100
+            if len(unique_values) > max_values_to_return:
+                sample_values = unique_values[:max_values_to_return]
+            else:
+                sample_values = unique_values
+                
+            return {
+                "column_name": column_name,
+                "unique_count": unique_count,
+                "sample_values": sample_values,
+                "total_values_returned": len(sample_values),
+                "has_more": len(unique_values) > max_values_to_return
+            }
+            
+        except Exception as e:
+            raise HTTPException(
+                status_code=500, 
+                detail=f"Failed to get unique values for column '{column_name}': {str(e)}"
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to process column unique values: {e}")
 
 
 @router.delete("/{workspace_id}/nodes/{node_id}")

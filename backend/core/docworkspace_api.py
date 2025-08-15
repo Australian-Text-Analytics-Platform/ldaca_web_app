@@ -36,7 +36,7 @@ class DocWorkspaceAPIUtils:
     """Utility class for FastAPI integration with DocWorkspace."""
 
     @staticmethod
-    def polars_type_to_js_type(polars_type) -> str:
+    def polars_type_to_js_type(polars_type: pl.DataType) -> str:
         """Convert Polars data type to JavaScript-compatible type.
 
         Args:
@@ -45,44 +45,7 @@ class DocWorkspaceAPIUtils:
         Returns:
             JavaScript-compatible type string: 'integer', 'float', 'string', 'boolean', 'datetime', 'array'
         """
-        # Handle string representations by falling back to old logic
-        if isinstance(polars_type, str):
-            type_str = polars_type.lower()
-            if (
-                any(
-                    x in type_str
-                    for x in [
-                        "int8",
-                        "int16",
-                        "int32",
-                        "int64",
-                        "uint8",
-                        "uint16",
-                        "uint32",
-                        "uint64",
-                    ]
-                )
-                or type_str == "int"
-            ):
-                return "integer"
-            elif (
-                any(x in type_str for x in ["float32", "float64", "double", "decimal"])
-                or type_str == "float"
-            ):
-                return "float"
-            elif any(x in type_str for x in ["str", "string", "utf8"]):
-                return "string"
-            elif any(x in type_str for x in ["bool", "boolean"]):
-                return "boolean"
-            elif any(x in type_str for x in ["date", "time", "datetime"]):
-                return "datetime"
-            elif "list" in type_str:
-                return "array"
-            else:
-                return "string"
-
-        # Handle actual Polars type objects with direct comparison
-        # Integer types
+        # Identity-based classification (no pattern matching) to support wider runtime versions.
         if polars_type in (
             pl.Int8,
             pl.Int16,
@@ -94,26 +57,28 @@ class DocWorkspaceAPIUtils:
             pl.UInt64,
         ):
             return "integer"
-        # Float types
-        elif polars_type in (pl.Float32, pl.Float64):
+        if polars_type in (pl.Float32, pl.Float64):
             return "float"
-        # String types
-        elif polars_type in (pl.String, pl.Utf8):
-            return "string"
-        # Boolean type
-        elif polars_type == pl.Boolean:
+        if polars_type == pl.Boolean:
             return "boolean"
-        # Date/time types
-        elif polars_type in (pl.Date, pl.Datetime, pl.Time):
-            return "datetime"
-        # List/array types (check if it's a List type)
-        elif (
-            hasattr(polars_type, "__name__") and "list" in polars_type.__name__.lower()
-        ):
-            return "array"
-        else:
-            # Fallback for unknown types
+        if polars_type in (pl.Utf8, getattr(pl, "String", pl.Utf8)):
             return "string"
+        if polars_type in (pl.Date, pl.Datetime, pl.Time):
+            return "datetime"
+        # Detect list/struct types safely
+        cls_obj = getattr(polars_type, "__class__", None)
+        cls_name = getattr(cls_obj, "__name__", "") if cls_obj else ""
+        type_name = (
+            getattr(polars_type, "__name__", "")
+            if hasattr(polars_type, "__name__")
+            else ""
+        )
+        lowered_type = type_name.lower()
+        if cls_name == "List" or lowered_type == "list":
+            return "array"
+        if cls_name == "Struct" or lowered_type == "struct":
+            return "object"
+        return "string"
 
     @staticmethod
     def convert_schema_to_js_types(schema) -> Dict[str, str]:
@@ -142,7 +107,7 @@ class DocWorkspaceAPIUtils:
             return {}
 
     @staticmethod
-    def convert_node_info_for_api(node: "Node") -> Dict[str, Any]:
+    def convert_node_info_for_api(node: Any) -> Dict[str, Any]:
         """Convert node info to API-compatible format with JS types.
 
         This replaces the node.info(json=True) pattern by getting raw node info
@@ -165,7 +130,7 @@ class DocWorkspaceAPIUtils:
         return info
 
     @staticmethod
-    def get_node_schema(node: "Node") -> List[ColumnSchema]:
+    def get_node_schema(node: Any) -> List[ColumnSchema]:
         """Extract schema information from a Node."""
         schema_data = []
 
@@ -199,7 +164,7 @@ class DocWorkspaceAPIUtils:
         return schema_data
 
     @staticmethod
-    def get_data_type(node: "Node") -> DataType:
+    def get_data_type(node: Any) -> DataType:
         """Determine the DataType enum value for a node."""
         data_type_name = type(node.data).__name__
 
@@ -213,7 +178,7 @@ class DocWorkspaceAPIUtils:
             return DataType.POLARS_DATAFRAME
 
     @staticmethod
-    def node_to_summary(node: "Node") -> NodeSummary:
+    def node_to_summary(node: Any) -> NodeSummary:
         """Convert a Node to NodeSummary for API responses."""
         try:
             # Get basic node information
@@ -247,7 +212,7 @@ class DocWorkspaceAPIUtils:
                 operation=getattr(node, "operation", None),
                 shape=shape,
                 columns=columns,
-                node_schema=DocWorkspaceAPIUtils.get_node_schema(node),
+                schema=DocWorkspaceAPIUtils.get_node_schema(node),  # alias
                 document_column=getattr(node, "document_column", None),
                 parent_ids=[parent.id for parent in getattr(node, "parents", [])],
                 child_ids=[child.id for child in getattr(node, "children", [])],
@@ -258,17 +223,17 @@ class DocWorkspaceAPIUtils:
         except Exception:
             # Return minimal summary if detailed extraction fails
             return NodeSummary(
-                id=node.id,
-                name=node.name,
+                id=getattr(node, "id", "unknown"),
+                name=getattr(node, "name", "unknown"),
                 data_type=DataType.POLARS_DATAFRAME,  # Default fallback
                 is_lazy=getattr(node, "is_lazy", False),
                 columns=[],
-                node_schema=[],
+                schema=[],
             )
 
     @staticmethod
     def get_paginated_data(
-        node: "Node",
+        node: Any,
         page: int = 1,
         page_size: int = 100,
         columns: Optional[List[str]] = None,
@@ -309,7 +274,7 @@ class DocWorkspaceAPIUtils:
                     "has_previous": page > 1,
                 },
                 columns=node_columns,
-                data_schema=DocWorkspaceAPIUtils.get_node_schema(node),
+                schema=DocWorkspaceAPIUtils.get_node_schema(node),
             )
 
         except Exception:
@@ -325,12 +290,12 @@ class DocWorkspaceAPIUtils:
                     "has_previous": False,
                 },
                 columns=[],
-                data_schema=[],
+                schema=[],
             )
 
     @staticmethod
     def workspace_to_react_flow(
-        workspace: "Workspace", layout_algorithm: str = "grid", node_spacing: int = 250
+        workspace: Any, layout_algorithm: str = "grid", node_spacing: int = 250
     ) -> WorkspaceGraph:
         """Convert workspace to React Flow compatible graph."""
         nodes = []
