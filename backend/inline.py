@@ -17,7 +17,7 @@ _server_task: asyncio.Task | None = None
 _app_module = importlib.import_module("main")
 
 
-async def start_server_async(host='localhost', port=8001):
+async def start_server_async(host="localhost", port=8001):
     global _server, _server_task
     if _server and getattr(_server, "started", False):
         print(f"Server already running at http://{host}:{port}")
@@ -34,9 +34,9 @@ async def start_server_async(host='localhost', port=8001):
     _server = uvicorn.Server(config)
     loop = asyncio.get_running_loop()
     _server_task = loop.create_task(_server.serve())
-    
 
-def start_server(host='localhost', port=8001):
+
+def start_server(host="localhost", port=8001):
     # Schedule auto-start (fire-and-forget) if not already running; fully non-blocking for this cell
     _loop = asyncio.get_event_loop()
-    _loop.create_task(start_server_async(host, port))
+    return _loop.create_task(start_server_async(host, port))

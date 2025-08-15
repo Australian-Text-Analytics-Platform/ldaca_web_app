@@ -50,9 +50,10 @@ class WorkspaceManager:
         user_folder.mkdir(parents=True, exist_ok=True)
         workspace.set_metadata("modified_at", datetime.now().isoformat())
         workspace_file = user_folder / f"workspace_{workspace_id}.json"
+        print(workspace_file)
         workspace.serialize(workspace_file)
 
-    def _load(self, user_id: str, workspace_id: str) -> Optional[Any]:
+    def _load(self, user_id: str, workspace_id: str) -> Any | None:
         if not Workspace:
             return None
         user_folder = get_user_workspace_folder(user_id)

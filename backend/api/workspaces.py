@@ -2259,14 +2259,12 @@ async def cast_node(
 
             # Apply the casting with .with_columns(); preserve original frame type
             casted_data = current_df.with_columns(cast_expr)
-
             # Update the node data in-place (preserving the original type)
             node.data = casted_data
 
             # Save workspace to disk
             # Ensure current workspace is persisted after casting
             workspace_manager.persist(user_id, workspace_id)
-
             # Get new data type for response
             if hasattr(casted_data, "collect"):
                 # LazyFrame - use collect_schema to avoid warning
@@ -2276,7 +2274,6 @@ async def cast_node(
                 new_type = str(casted_data.schema[column_name])
             else:
                 new_type = target_type
-
             return {
                 "success": True,
                 "node_id": node_id,
