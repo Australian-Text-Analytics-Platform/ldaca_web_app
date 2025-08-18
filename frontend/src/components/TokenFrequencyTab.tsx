@@ -270,6 +270,20 @@ const TokenFrequencyTab: React.FC = () => {
   if (localStorage.getItem('debugTF') === '1') console.log(`Navigating to concordance with token: "${token}"`);
   };
 
+  // Right-click handler: add token to stop word list if not present
+  const handleTokenRightClick = (token: string, e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
+    const tokenNorm = token.trim().toLowerCase();
+    const current = stopWords
+      .split(',')
+      .map(w => w.trim())
+      .filter(Boolean);
+    if (!current.map(w => w.toLowerCase()).includes(tokenNorm)) {
+      const updated = [...current, token].join(', ');
+      setStopWords(updated);
+    }
+  };
+
   const getColorForNodeId = (nodeId: string, idx: number) => nodeColors[nodeId] || defaultPalette[idx % defaultPalette.length];
 
   const renderWordCloud = (data: any[], width: number = 400, height: number = 200, color: string) => {
@@ -307,6 +321,7 @@ const TokenFrequencyTab: React.FC = () => {
                   fontFamily={w.font}
                   className="cursor-pointer hover:fill-blue-800 transition-colors"
                   onClick={() => w.text && handleTokenClick(w.text)}
+                  onContextMenu={e => w.text && handleTokenRightClick(w.text, e)}
                   style={{ cursor: 'pointer' }}
                 >
                   {w.text || ''}
@@ -347,11 +362,12 @@ const TokenFrequencyTab: React.FC = () => {
           <div className="space-y-2">
             {data.map((item, index) => (
               <div key={index} className="flex items-center space-x-3">
-                {/* Token label - now clickable */}
+                {/* Token label - now clickable and right-clickable */}
                 <div 
                   className="w-20 text-right text-sm text-gray-700 font-medium cursor-pointer hover:bg-blue-100 hover:text-blue-700 px-2 py-1 rounded-md transition-colors"
                   onClick={() => handleTokenClick(item.token)}
-                  title={`Click to search "${item.token}" in concordance`}
+                  onContextMenu={e => handleTokenRightClick(item.token, e)}
+                  title={`Left click: concordance; Right click: add to stop words`}
                 >
                   {item.token}
                 </div>
@@ -645,6 +661,7 @@ const TokenFrequencyTab: React.FC = () => {
                                     fontFamily={w.font}
                                     className="cursor-pointer transition-colors"
                                     onClick={() => w.text && handleTokenClick(w.text)}
+                                    onContextMenu={e => w.text && handleTokenRightClick(w.text, e)}
                                     style={{ cursor: 'pointer' }}
                                   >
                                     {w.text || ''}
