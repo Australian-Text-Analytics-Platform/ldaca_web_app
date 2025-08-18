@@ -426,21 +426,6 @@ const TokenFrequencyTab: React.FC = () => {
             <div className="text-xs text-gray-500 mt-1">
               Optional: Enter words to exclude from analysis. Click "Fill Default" to load common English stop words.
             </div>
-            <div className="mt-2 flex items-center space-x-2">
-              <button
-                onClick={handleApplyLocalStopFilter}
-                disabled={!results}
-                className="px-3 py-1 text-xs bg-blue-50 text-blue-700 rounded hover:bg-blue-100 disabled:opacity-50 transition-colors"
-                title="Filter current results client-side without recalculation"
-              >
-                Apply Stop Words (no recompute)
-              </button>
-              {appliedStopSet.size > 0 && (
-                <span className="text-xs text-gray-500">
-                  Active filter: {appliedStopSet.size} word{appliedStopSet.size === 1 ? '' : 's'}
-                </span>
-              )}
-            </div>
           </div>
 
           <div>
@@ -461,19 +446,32 @@ const TokenFrequencyTab: React.FC = () => {
           </div>
         </div>
 
-        {/* Analyze Button */}
-        <button
-          onClick={handleAnalyze}
-          disabled={
-            selectedNodes.length === 0 || 
-            isAnalyzing || 
-            !currentWorkspaceId ||
-            nodeColumnSelections.some(sel => !sel.column)
-          }
-          className="w-full md:w-auto px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-        >
-          {isAnalyzing ? 'Analyzing...' : 'Calculate Token Frequencies'}
-        </button>
+        {/* Action Buttons */}
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={handleAnalyze}
+            disabled={
+              selectedNodes.length === 0 || 
+              isAnalyzing || 
+              !currentWorkspaceId ||
+              nodeColumnSelections.some(sel => !sel.column)
+            }
+            className="w-full md:w-auto px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+          >
+            {isAnalyzing ? 'Analyzing...' : 'Calculate Token Frequencies'}
+          </button>
+          <button
+            onClick={handleApplyLocalStopFilter}
+            disabled={!results}
+            className="w-full md:w-auto px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+            title="Filter current results client-side without recalculation"
+          >
+            Apply Stop Words (no recompute)
+          </button>
+          {appliedStopSet.size > 0 && (
+            <span className="text-xs text-gray-500">Active filter: {appliedStopSet.size} word{appliedStopSet.size === 1 ? '' : 's'}</span>
+          )}
+        </div>
       </div>
 
       {/* Results */}
