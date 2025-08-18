@@ -208,6 +208,9 @@ const TokenFrequencyTab: React.FC = () => {
         stopWords.split(',').map(word => word.trim()).filter(word => word) : 
         undefined;
 
+  // Fetch a larger pool so client-side stop-word filtering can supplement to the UI limit without recomputation
+  const fetchLimit = Math.min(1000, Math.max(200, (limit || 20) * 5));
+
       // Create node_columns mapping
       const nodeColumns: Record<string, string> = {};
       nodeColumnSelections.forEach(sel => {
@@ -218,7 +221,7 @@ const TokenFrequencyTab: React.FC = () => {
         node_ids: selectedNodes.slice(0, 2).map(node => node.id), // Limit to 2 nodes
         node_columns: nodeColumns,
         stop_words: stopWordsArray,
-        limit: limit
+  limit: fetchLimit
       };
 
       const response = await calculateTokenFrequencies(
@@ -498,7 +501,9 @@ const TokenFrequencyTab: React.FC = () => {
                     {Object.entries((filteredResultsData ?? results.data)).map(([nodeName, frequencies], idx) => {
                       const nodeId = lastCompareNodeIds[idx];
                       const color = getColorForNodeId(nodeId, idx);
-                      return renderChart(nodeName, frequencies, color);
+                      // Cap to UI limit after filtering to maintain a stable count
+                      const display = (frequencies as any[]).slice(0, Math.max(1, limit || 1));
+                      return renderChart(nodeName, display, color);
                     })}
                   </div>
 
