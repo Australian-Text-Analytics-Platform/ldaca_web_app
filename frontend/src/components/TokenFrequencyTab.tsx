@@ -482,12 +482,11 @@ const TokenFrequencyTab: React.FC = () => {
                       p1: s.percent_corpus_0,
                       p2: s.percent_corpus_1,
                       logratio: s.log_ratio ?? 0,
-                      ell: s.effect_size_ell ?? 0, // Ensure ell is always defined
                     }))
                     .map(s => ({
                       ...s,
                       total: s.o1 + s.o2,
-                      juxRank: (s.ell || 0) * (s.logratio || 0)
+                      juxRank: ((s.o1 + s.o2) > 0 ? Math.log10(s.o1 + s.o2) : 0) * (s.logratio || 0)
                     }))
                     .filter(s => s.total > 10);
 
@@ -519,15 +518,15 @@ const TokenFrequencyTab: React.FC = () => {
                     // Ensure we don't exceed limit
                     selected = selected.slice(0, Math.min(limit, selected.length));
 
-                    // Debug print of selected tokens with juxRank
-                    const debugOn = (typeof window !== 'undefined') && localStorage.getItem('debugTF') === '1';
-                    if (debugOn) {
-                      const dbg = [...selected]
-                        .sort((a, b) => a.juxRank - b.juxRank)
-                        .map(s => ({ token: s.token, juxRank: Number.isFinite(s.juxRank) ? Number(s.juxRank.toFixed(6)) : s.juxRank, O1: s.o1, O2: s.o2, LogRatio: Number(s.logratio.toFixed(6)) }));
-                      // eslint-disable-next-line no-console
-                      console.log('Unified Word Cloud selected tokens (by juxRank low→high):', dbg);
-                    }
+                    // // Debug print of selected tokens with juxRank
+                    // const debugOn = (typeof window !== 'undefined') && localStorage.getItem('debugTF') === '1';
+                    // if (debugOn) {
+                    //   const dbg = [...selected]
+                    //     .sort((a, b) => a.juxRank - b.juxRank)
+                    //     .map(s => ({ token: s.token, juxRank: Number.isFinite(s.juxRank) ? Number(s.juxRank.toFixed(6)) : s.juxRank, O1: s.o1, O2: s.o2, LogRatio: Number(s.logratio.toFixed(6)) }));
+                    //   // eslint-disable-next-line no-console
+                    //   console.log('Unified Word Cloud selected tokens (by juxRank low→high):', dbg);
+                    // }
 
                     const maxTotal = Math.max(...selected.map(w => w.total));
 
@@ -614,7 +613,7 @@ const TokenFrequencyTab: React.FC = () => {
                           </svg>
                         </div>
                         <p className="text-xs text-gray-500 mt-2 text-center">Selection uses juxRank = log10(O1+O2) × LogRatio: 50% lowest and 50% highest by juxRank. Size = (O1+O2). Color uses relative percentage share (%1 vs %2) so differing corpus sizes don't bias color; shifts toward {nodeAName} (left) or {nodeBName} (right).</p>
-                        {debugOn && (
+                        {/* {debugOn && (
                           <div className="mt-2 p-2 bg-gray-50 border border-gray-200 rounded">
                             <div className="text-[11px] text-gray-600 font-mono whitespace-pre-wrap">
                               {selected
@@ -624,7 +623,7 @@ const TokenFrequencyTab: React.FC = () => {
                                 .join('\n')}
                             </div>
                           </div>
-                        )}
+                        )} */}
                       </div>
                     );
                   })()}
