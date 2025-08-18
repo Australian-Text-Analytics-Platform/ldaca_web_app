@@ -120,12 +120,12 @@ class TestAuthenticationModes:
         mock_settings.single_user_email = "test@localhost"
 
         # Patch settings in the core.auth module
-        with patch("core.auth.settings", mock_settings):
+        with patch("ldaca_web_app_backend.core.auth.settings", mock_settings):
             yield mock_settings
 
     async def test_get_current_user_single_user_mode(self):
         """Test get_current_user function in single-user mode"""
-        from core.auth import get_current_user
+        from ldaca_web_app_backend.core.auth import get_current_user
 
         # In single-user mode, all calls should return the same user
         result1 = await get_current_user("Bearer test-token")
@@ -143,17 +143,17 @@ class TestAuthenticationModes:
 
     def test_auth_methods_single_user_mode(self):
         """Test available auth methods in single-user mode"""
-        from core.auth import get_available_auth_methods
+        from ldaca_web_app_backend.core.auth import get_available_auth_methods
 
         methods = get_available_auth_methods()
 
         # Single-user mode should have no auth methods
         assert methods == []
 
-    @patch("core.auth.settings")
+    @patch("ldaca_web_app_backend.core.auth.settings")
     async def test_single_user_mode_concept(self, mock_settings):
         """Test single-user mode concept with mocked settings"""
-        from core.auth import get_current_user
+        from ldaca_web_app_backend.core.auth import get_current_user
 
         # Mock single-user configuration
         mock_settings.multi_user = False
@@ -176,11 +176,11 @@ class TestAuthenticationModes:
             # Import caching may prevent mocking - the concept is still valid
             pass
 
-    @patch("core.auth.validate_access_token")
-    @patch("core.auth.settings")
+    @patch("ldaca_web_app_backend.core.auth.validate_access_token")
+    @patch("ldaca_web_app_backend.core.auth.settings")
     async def test_multi_user_mode_concept(self, mock_settings, mock_validate):
         """Test multi-user mode concept with mocked settings"""
-        from core.auth import get_current_user
+        from ldaca_web_app_backend.core.auth import get_current_user
 
         # Mock multi-user configuration
         mock_settings.multi_user = True
@@ -255,13 +255,13 @@ class TestAuthenticationConfiguration:
         mock_settings.database_url = "sqlite+aiosqlite:///:memory:"
 
         # Patch the settings in the config module
-        with patch("config.settings", mock_settings):
+        with patch("ldaca_web_app_backend.config.settings", mock_settings):
             yield mock_settings
 
     def test_current_configuration_values(self):
         """Document and test current configuration values"""
-        from config import settings
-        from core.auth import get_available_auth_methods
+        from ldaca_web_app_backend.config import settings
+        from ldaca_web_app_backend.core.auth import get_available_auth_methods
 
         # Test current configuration
         assert settings.multi_user is False  # Should be single-user mode

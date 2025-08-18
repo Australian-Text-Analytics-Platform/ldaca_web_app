@@ -6,28 +6,9 @@ Migrated from test_join_behavior.py with proper pytest structure.
 import polars as pl
 import pytest
 
-try:
-    import docframe as dc
-    from docframe import DocDataFrame
-
-    DOCFRAME_AVAILABLE = True
-except ImportError:
-    DOCFRAME_AVAILABLE = False
-    dc = None
-    DocDataFrame = None
-
-try:
-    from docworkspace import Node
-
-    DOCWORKSPACE_AVAILABLE = True
-except ImportError:
-    DOCWORKSPACE_AVAILABLE = False
-    Node = None
-
-pytestmark = pytest.mark.skipif(
-    not (DOCFRAME_AVAILABLE and DOCWORKSPACE_AVAILABLE),
-    reason="docframe or docworkspace not available",
-)
+import docframe as dc
+from docframe import DocDataFrame
+from docworkspace import Node
 
 
 class TestJoinBehavior:
@@ -36,9 +17,11 @@ class TestJoinBehavior:
     @pytest.fixture
     def regular_dataframe(self):
         """Create a regular polars DataFrame"""
-        return pl.DataFrame(
-            {"id": [1, 2, 3], "name": ["Alice", "Bob", "Charlie"], "age": [25, 30, 35]}
-        )
+        return pl.DataFrame({
+            "id": [1, 2, 3],
+            "name": ["Alice", "Bob", "Charlie"],
+            "age": [25, 30, 35],
+        })
 
     @pytest.fixture
     def doc_dataframe(self):
@@ -46,13 +29,11 @@ class TestJoinBehavior:
         if dc is None:
             pytest.skip("docframe not available")
 
-        data = pl.DataFrame(
-            {
-                "id": [1, 2, 3],
-                "text": ["Document 1", "Document 2", "Document 3"],
-                "score": [0.8, 0.9, 0.7],
-            }
-        )
+        data = pl.DataFrame({
+            "id": [1, 2, 3],
+            "text": ["Document 1", "Document 2", "Document 3"],
+            "score": [0.8, 0.9, 0.7],
+        })
         return DocDataFrame(data, document_column="text")  # type: ignore
 
     def test_join_returns_regular_dataframe(self, regular_dataframe, doc_dataframe):
@@ -102,12 +83,10 @@ class TestJoinBehavior:
             pytest.skip("Required dependencies not available")
 
         # Create a smaller DocDataFrame for left join testing
-        small_doc_data = pl.DataFrame(
-            {
-                "id": [1, 2],  # Missing id=3
-                "category": ["A", "B"],
-            }
-        )
+        small_doc_data = pl.DataFrame({
+            "id": [1, 2],  # Missing id=3
+            "category": ["A", "B"],
+        })
         small_doc_df = DocDataFrame(small_doc_data, document_column="category")  # type: ignore
 
         node1 = Node(regular_dataframe, name="regular_data")

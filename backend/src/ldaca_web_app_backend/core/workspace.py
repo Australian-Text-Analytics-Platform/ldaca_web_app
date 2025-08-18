@@ -13,29 +13,16 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
 import polars as pl
-from core.utils import (
-    DOCWORKSPACE_AVAILABLE,
-    generate_workspace_id,
-    get_user_workspace_folder,
-)
 
-if DOCWORKSPACE_AVAILABLE:  # pragma: no cover
-    try:
-        from docworkspace import Node, Workspace  # type: ignore
-    except Exception:  # pragma: no cover
-        Node = None  # type: ignore
-        Workspace = None  # type: ignore
-else:  # pragma: no cover
-    Node = None  # type: ignore
-    Workspace = None  # type: ignore
+from docworkspace import Node, Workspace  # type: ignore
+
+from .utils import generate_workspace_id, get_user_workspace_folder
 
 
 class WorkspaceManager:
     """Single-workspace-per-user in-memory manager."""
 
     def __init__(self) -> None:
-        if not DOCWORKSPACE_AVAILABLE:
-            raise ImportError("DocWorkspace library is required but not available")
         self._current: Dict[str, Dict[str, Any]] = {}
 
     # ---------------- Core helpers ----------------
@@ -45,15 +32,14 @@ class WorkspaceManager:
             return None, None
         return entry.get("id"), entry.get("ws")
 
-    def _save(self, user_id: str, workspace_id: str, workspace: Any) -> None:
+    def _save(self, user_id: str, workspace_id: str, workspace: Workspace) -> None:
         user_folder = get_user_workspace_folder(user_id)
         user_folder.mkdir(parents=True, exist_ok=True)
         workspace.set_metadata("modified_at", datetime.now().isoformat())
         workspace_file = user_folder / f"workspace_{workspace_id}.json"
-        print(workspace_file)
         workspace.serialize(workspace_file)
 
-    def _load(self, user_id: str, workspace_id: str) -> Any | None:
+    def _load(self, user_id: str, workspace_id: str) -> Workspace | None:
         if not Workspace:
             return None
         user_folder = get_user_workspace_folder(user_id)
@@ -108,8 +94,6 @@ class WorkspaceManager:
         data: Optional[Union[str, Path, pl.DataFrame, pl.LazyFrame]] = None,
         data_name: Optional[str] = None,
     ) -> Any:
-        if not DOCWORKSPACE_AVAILABLE or Workspace is None:
-            raise RuntimeError("DocWorkspace not available")
         cid, cws = self._get_current_entry(user_id)
         if cid is not None and cws is not None:
             self._save(user_id, cid, cws)

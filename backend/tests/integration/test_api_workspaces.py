@@ -20,7 +20,7 @@ class TestWorkspaceAPI:
     def test_list_workspaces_empty(self):
         """Test listing workspaces when user has none"""
         with patch(
-            "api.workspaces.workspace_manager.list_user_workspaces_summaries"
+            "ldaca_web_app_backend.api.workspaces.workspace_manager.list_user_workspaces_summaries"
         ) as mock_get:
             mock_get.return_value = {}
             response = self.client.get("/api/workspaces/")
@@ -44,7 +44,7 @@ class TestWorkspaceAPI:
             }
         }
         with patch(
-            "api.workspaces.workspace_manager.list_user_workspaces_summaries"
+            "ldaca_web_app_backend.api.workspaces.workspace_manager.list_user_workspaces_summaries"
         ) as mock_get:
             mock_get.return_value = mock_summaries
             response = self.client.get("/api/workspaces/")
@@ -68,8 +68,8 @@ class TestWorkspaceAPI:
 
         # Mock workspace_manager methods for create flow
         with (
-            patch("api.workspaces.workspace_manager.create_workspace") as mock_create,
-            patch("api.workspaces.workspace_manager.get_workspace_info") as mock_info,
+            patch("ldaca_web_app_backend.api.workspaces.workspace_manager.create_workspace") as mock_create,
+            patch("ldaca_web_app_backend.api.workspaces.workspace_manager.get_workspace_info") as mock_info,
         ):
             mock_create.return_value = mock_workspace
             mock_info.return_value = {
@@ -108,7 +108,7 @@ class TestWorkspaceAPI:
             "status_counts": {"lazy": 1, "materialized": 4},
         }
 
-        with patch("api.workspaces.workspace_manager.get_workspace_info") as mock_get:
+        with patch("ldaca_web_app_backend.api.workspaces.workspace_manager.get_workspace_info") as mock_get:
             mock_get.return_value = mock_workspace_info
 
             # Use the cleaner endpoint: GET /api/workspaces/{workspace_id}
@@ -122,7 +122,7 @@ class TestWorkspaceAPI:
 
     def test_get_workspace_not_found(self):
         """Test getting non-existent workspace"""
-        with patch("api.workspaces.workspace_manager.get_workspace_info") as mock_get:
+        with patch("ldaca_web_app_backend.api.workspaces.workspace_manager.get_workspace_info") as mock_get:
             mock_get.return_value = None
 
             # Use the cleaner endpoint: GET /api/workspaces/{workspace_id}
@@ -132,7 +132,7 @@ class TestWorkspaceAPI:
 
     def test_delete_workspace(self):
         """Test deleting a workspace"""
-        with patch("api.workspaces.workspace_manager.delete_workspace") as mock_delete:
+        with patch("ldaca_web_app_backend.api.workspaces.workspace_manager.delete_workspace") as mock_delete:
             mock_delete.return_value = True
 
             response = self.client.delete("/api/workspaces/workspace-123")
@@ -144,7 +144,7 @@ class TestWorkspaceAPI:
 
     def test_delete_workspace_not_found(self):
         """Test deleting non-existent workspace"""
-        with patch("api.workspaces.workspace_manager.delete_workspace") as mock_delete:
+        with patch("ldaca_web_app_backend.api.workspaces.workspace_manager.delete_workspace") as mock_delete:
             mock_delete.return_value = False
 
             response = self.client.delete("/api/workspaces/nonexistent-123")
@@ -153,7 +153,7 @@ class TestWorkspaceAPI:
 
     def test_unload_workspace(self):
         """Test unloading an existing workspace"""
-        with patch("api.workspaces.workspace_manager.unload_workspace") as mock_unload:
+        with patch("ldaca_web_app_backend.api.workspaces.workspace_manager.unload_workspace") as mock_unload:
             mock_unload.return_value = True
             response = self.client.post("/api/workspaces/workspace-123/unload")
             assert response.status_code == 200
@@ -164,7 +164,7 @@ class TestWorkspaceAPI:
 
     def test_unload_workspace_not_found(self):
         """Test unloading non-existent workspace returns 404"""
-        with patch("api.workspaces.workspace_manager.unload_workspace") as mock_unload:
+        with patch("ldaca_web_app_backend.api.workspaces.workspace_manager.unload_workspace") as mock_unload:
             mock_unload.return_value = False
             response = self.client.post("/api/workspaces/missing-999/unload")
             assert response.status_code == 404
@@ -202,10 +202,10 @@ class TestWorkspaceAPI:
 
             with (
                 patch(
-                    "api.workspaces.workspace_manager.add_node_to_workspace"
+                    "ldaca_web_app_backend.api.workspaces.workspace_manager.add_node_to_workspace"
                 ) as mock_add,
                 patch(
-                    "api.workspaces.workspace_manager.get_workspace"
+                    "ldaca_web_app_backend.api.workspaces.workspace_manager.get_workspace"
                 ) as mock_get_workspace,
             ):
                 # Mock workspace exists
@@ -259,11 +259,11 @@ class TestWorkspaceAPI:
 
         with (
             patch(
-                "api.workspaces.workspace_manager.get_node_from_workspace"
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_node_from_workspace"
             ) as mock_get_node,
-            patch("api.workspaces.workspace_manager.persist") as mock_save,
+            patch("ldaca_web_app_backend.api.workspaces.workspace_manager.persist") as mock_save,
             patch(
-                "api.workspaces.workspace_manager.get_workspace"
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_workspace"
             ) as mock_get_workspace,
         ):
             mock_get_node.return_value = mock_node
@@ -298,7 +298,7 @@ class TestWorkspaceAPI:
     def test_cast_node_not_found(self):
         """Test casting when node doesn't exist"""
         with patch(
-            "api.workspaces.workspace_manager.get_node_from_workspace"
+            "ldaca_web_app_backend.api.workspaces.workspace_manager.get_node_from_workspace"
         ) as mock_get_node:
             mock_get_node.return_value = None
 
@@ -320,7 +320,7 @@ class TestWorkspaceAPI:
         mock_node.data = pl.DataFrame({"existing_col": [1, 2, 3]})
 
         with patch(
-            "api.workspaces.workspace_manager.get_node_from_workspace"
+            "ldaca_web_app_backend.api.workspaces.workspace_manager.get_node_from_workspace"
         ) as mock_get_node:
             mock_get_node.return_value = mock_node
 
@@ -362,11 +362,11 @@ class TestWorkspaceAPI:
 
         with (
             patch(
-                "api.workspaces.workspace_manager.get_node_from_workspace"
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_node_from_workspace"
             ) as mock_get_node,
-            patch("api.workspaces.workspace_manager.persist"),
+            patch("ldaca_web_app_backend.api.workspaces.workspace_manager.persist"),
             patch(
-                "api.workspaces.workspace_manager.get_workspace"
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_workspace"
             ) as mock_get_workspace,
         ):
             mock_get_node.return_value = mock_node_lazy
@@ -419,11 +419,11 @@ class TestWorkspaceAPI:
 
         with (
             patch(
-                "api.workspaces.workspace_manager.get_node_from_workspace"
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_node_from_workspace"
             ) as mock_get_node,
-            patch("api.workspaces.workspace_manager.persist") as mock_save,
+            patch("ldaca_web_app_backend.api.workspaces.workspace_manager.persist") as mock_save,
             patch(
-                "api.workspaces.workspace_manager.get_workspace"
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_workspace"
             ) as mock_get_workspace,
         ):
             mock_get_node.return_value = mock_node
@@ -448,9 +448,9 @@ class TestWorkspaceAPI:
 
         with (
             patch(
-                "api.workspaces.workspace_manager.get_node_from_workspace"
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_node_from_workspace"
             ) as mock_get_node,
-            patch("api.workspaces.workspace_manager.persist") as mock_save,
+            patch("ldaca_web_app_backend.api.workspaces.workspace_manager.persist") as mock_save,
         ):
             mock_get_node.return_value = mock_node
 
@@ -472,9 +472,9 @@ class TestWorkspaceAPI:
 
         with (
             patch(
-                "api.workspaces.workspace_manager.get_node_from_workspace"
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_node_from_workspace"
             ) as mock_get_node,
-            patch("api.workspaces.workspace_manager.persist") as mock_save,
+            patch("ldaca_web_app_backend.api.workspaces.workspace_manager.persist") as mock_save,
         ):
             mock_get_node.return_value = mock_node
 
@@ -495,7 +495,7 @@ class TestWorkspaceAPI:
         mock_node.data = pl.DataFrame({"test_col": [1, 2, 3]})
 
         with patch(
-            "api.workspaces.workspace_manager.get_node_from_workspace"
+            "ldaca_web_app_backend.api.workspaces.workspace_manager.get_node_from_workspace"
         ) as mock_get_node:
             mock_get_node.return_value = mock_node
 
@@ -534,14 +534,14 @@ class TestWorkspaceAPI:
 
         with (
             patch(
-                "api.workspaces.workspace_manager.get_node_from_workspace"
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_node_from_workspace"
             ) as mock_get_node,
             patch(
-                "api.workspaces.workspace_manager.add_node_to_workspace",
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.add_node_to_workspace",
                 return_value=joined_node,
             ),
             patch(
-                "api.workspaces.workspace_manager.execute_safe_operation"
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.execute_safe_operation"
             ) as mock_safe_op,
         ):
             # Configure node retrieval

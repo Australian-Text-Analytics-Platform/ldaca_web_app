@@ -5,28 +5,10 @@ Migrated from test_datatype_fix.py with proper pytest structure.
 
 import polars as pl
 import pytest
+from ldaca_web_app_backend.core.utils import serialize_dataframe_for_json
 
-try:
-    from core.utils import serialize_dataframe_for_json
-
-    CORE_UTILS_AVAILABLE = True
-except ImportError:
-    CORE_UTILS_AVAILABLE = False
-    serialize_dataframe_for_json = None
-
-try:
-    import docframe as dc
-    from docframe import DocDataFrame
-
-    DOCFRAME_AVAILABLE = True
-except ImportError:
-    DOCFRAME_AVAILABLE = False
-    dc = None
-    DocDataFrame = None
-
-pytestmark = pytest.mark.skipif(
-    not CORE_UTILS_AVAILABLE, reason="core.utils not available"
-)
+import docframe as dc
+from docframe import DocDataFrame
 
 
 class TestDataTypeDetection:
@@ -35,15 +17,13 @@ class TestDataTypeDetection:
     @pytest.fixture
     def sample_dataframe(self):
         """Create a sample DataFrame with various data types"""
-        return pl.DataFrame(
-            {
-                "string_col": ["a", "b", "c"],
-                "int_col": [1, 2, 3],
-                "float_col": [1.1, 2.2, 3.3],
-                "bool_col": [True, False, True],
-                "null_col": [None, None, None],
-            }
-        )
+        return pl.DataFrame({
+            "string_col": ["a", "b", "c"],
+            "int_col": [1, 2, 3],
+            "float_col": [1.1, 2.2, 3.3],
+            "bool_col": [True, False, True],
+            "null_col": [None, None, None],
+        })
 
     @pytest.fixture
     def doc_dataframe(self):
@@ -51,13 +31,11 @@ class TestDataTypeDetection:
         if dc is None:
             pytest.skip("docframe not available")
 
-        data = pl.DataFrame(
-            {
-                "text": ["Document 1", "Document 2", "Document 3"],
-                "score": [0.8, 0.9, 0.7],
-                "category": ["news", "blog", "research"],
-            }
-        )
+        data = pl.DataFrame({
+            "text": ["Document 1", "Document 2", "Document 3"],
+            "score": [0.8, 0.9, 0.7],
+            "category": ["news", "blog", "research"],
+        })
         return DocDataFrame(data, document_column="text")  # type: ignore
 
     def test_regular_dataframe_serialization(self, sample_dataframe):
@@ -93,12 +71,8 @@ class TestDataTypeDetection:
         assert dtypes["float_col"] == "Float64"
         assert dtypes["bool_col"] == "Boolean"
 
-    @pytest.mark.skipif(not DOCFRAME_AVAILABLE, reason="docframe not available")
     def test_doc_dataframe_serialization(self, doc_dataframe):
         """Test serialization of DocDataFrame"""
-        if serialize_dataframe_for_json is None:
-            pytest.skip("serialize_dataframe_for_json not available")
-
         result = serialize_dataframe_for_json(doc_dataframe)
 
         # Should handle DocDataFrame properly
@@ -120,12 +94,10 @@ class TestDataTypeDetection:
         if serialize_dataframe_for_json is None:
             pytest.skip("serialize_dataframe_for_json not available")
 
-        empty_df = pl.DataFrame(
-            {
-                "col1": pl.Series([], dtype=pl.String),
-                "col2": pl.Series([], dtype=pl.Int64),
-            }
-        )
+        empty_df = pl.DataFrame({
+            "col1": pl.Series([], dtype=pl.String),
+            "col2": pl.Series([], dtype=pl.Int64),
+        })
 
         result = serialize_dataframe_for_json(empty_df)
 
@@ -140,13 +112,11 @@ class TestDataTypeDetection:
         if serialize_dataframe_for_json is None:
             pytest.skip("serialize_dataframe_for_json not available")
 
-        df_with_nulls = pl.DataFrame(
-            {
-                "mixed_col": [1, None, 3, None],
-                "all_null": [None, None, None, None],
-                "no_null": [1, 2, 3, 4],
-            }
-        )
+        df_with_nulls = pl.DataFrame({
+            "mixed_col": [1, None, 3, None],
+            "all_null": [None, None, None, None],
+            "no_null": [1, 2, 3, 4],
+        })
 
         result = serialize_dataframe_for_json(df_with_nulls)
 
@@ -161,13 +131,11 @@ class TestDataTypeDetection:
         if serialize_dataframe_for_json is None:
             pytest.skip("serialize_dataframe_for_json not available")
 
-        df_large = pl.DataFrame(
-            {
-                "large_int": [2**60, 2**61, 2**62],
-                "large_float": [1e100, 1e200, 1e300],
-                "small_float": [1e-100, 1e-200, 1e-300],
-            }
-        )
+        df_large = pl.DataFrame({
+            "large_int": [2**60, 2**61, 2**62],
+            "large_float": [1e100, 1e200, 1e300],
+            "small_float": [1e-100, 1e-200, 1e-300],
+        })
 
         result = serialize_dataframe_for_json(df_large)
 
@@ -181,18 +149,16 @@ class TestDataTypeDetection:
         if serialize_dataframe_for_json is None:
             pytest.skip("serialize_dataframe_for_json not available")
 
-        df_special = pl.DataFrame(
-            {
-                "special_strings": [
-                    "normal_string",
-                    "string with spaces",
-                    "string\nwith\nnewlines",
-                    "string\twith\ttabs",
-                    'string"with"quotes',
-                    "string'with'apostrophes",
-                ]
-            }
-        )
+        df_special = pl.DataFrame({
+            "special_strings": [
+                "normal_string",
+                "string with spaces",
+                "string\nwith\nnewlines",
+                "string\twith\ttabs",
+                'string"with"quotes',
+                "string'with'apostrophes",
+            ]
+        })
 
         result = serialize_dataframe_for_json(df_special)
 

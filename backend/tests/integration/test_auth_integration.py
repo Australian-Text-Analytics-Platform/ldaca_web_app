@@ -94,7 +94,7 @@ class TestAuthenticationEnvironment:
         # by checking that we can access test user data
 
         # Import should give us production config outside of fixtures
-        from config import settings as prod_settings
+        from ldaca_web_app_backend.config import settings as prod_settings
 
         # In production, this should be 'root'
         assert prod_settings.single_user_id == "root"
@@ -115,7 +115,7 @@ class TestAuthenticationCleanup:
 
     def test_no_test_artifacts_in_production(self):
         """Test that no test artifacts affect production config"""
-        from config import settings
+        from ldaca_web_app_backend.config import settings
 
         # Production config should remain unchanged
         assert settings.single_user_id == "root"

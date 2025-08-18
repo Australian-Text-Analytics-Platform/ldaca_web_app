@@ -9,16 +9,11 @@ import math
 from typing import Any, Dict, List, Optional
 
 import polars as pl
-from core.utils import DOCWORKSPACE_AVAILABLE
 
-if DOCWORKSPACE_AVAILABLE:
-    from docworkspace import Node, Workspace
-else:
-    Node = None
-    Workspace = None
+from docworkspace import Node, Workspace
 
 # Import API models
-from core.api_models import (
+from .api_models import (
     ColumnSchema,
     DataType,
     ErrorResponse,
@@ -500,6 +495,5 @@ def extend_workspace_with_api_methods():
 
 
 # Auto-extend classes when module is imported
-if DOCWORKSPACE_AVAILABLE:
-    extend_node_with_api_methods()
-    extend_workspace_with_api_methods()
+extend_node_with_api_methods()
+extend_workspace_with_api_methods()

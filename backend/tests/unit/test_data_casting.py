@@ -6,15 +6,7 @@ Migrated from test_cast_functionality.py with proper pytest structure.
 import polars as pl
 import pytest
 
-try:
-    import docframe as dc
-
-    DOCFRAME_AVAILABLE = True
-except ImportError:
-    DOCFRAME_AVAILABLE = False
-    dc = None
-
-pytestmark = pytest.mark.skipif(not DOCFRAME_AVAILABLE, reason="docframe not available")
+import docframe as dc
 
 
 class TestBasicCasting:
@@ -23,14 +15,12 @@ class TestBasicCasting:
     @pytest.fixture
     def sample_dataframe(self):
         """Sample DataFrame for casting tests"""
-        return pl.DataFrame(
-            {
-                "id": ["1", "2", "3"],
-                "age": ["25", "30", "35"],
-                "price": ["19.99", "25.50", "30.00"],
-                "date_str": ["2023-01-01", "2023-02-15", "2023-03-20"],
-            }
-        )
+        return pl.DataFrame({
+            "id": ["1", "2", "3"],
+            "age": ["25", "30", "35"],
+            "price": ["19.99", "25.50", "30.00"],
+            "date_str": ["2023-01-01", "2023-02-15", "2023-03-20"],
+        })
 
     def test_string_to_int_cast(self, sample_dataframe):
         """Test casting string column to integer"""
@@ -71,12 +61,10 @@ class TestDocDataFrameCasting:
         if dc is None:
             pytest.skip("docframe not available")
 
-        df = pl.DataFrame(
-            {
-                "text": ["Hello world", "Good morning", "How are you"],
-                "score": ["0.85", "0.92", "0.78"],
-            }
-        )
+        df = pl.DataFrame({
+            "text": ["Hello world", "Good morning", "How are you"],
+            "score": ["0.85", "0.92", "0.78"],
+        })
         return dc.DocDataFrame(df, document_column="text")  # type: ignore
 
     def test_cast_in_doc_dataframe(self, sample_doc_dataframe):

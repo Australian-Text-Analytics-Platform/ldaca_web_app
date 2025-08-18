@@ -9,10 +9,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 class TestDatabaseOperations:
     """Test database operation functions"""
 
-    @patch('db.async_session_maker')
+    @patch('ldaca_web_app_backend.db.async_session_maker')
     async def test_get_or_create_user_new_user(self, mock_session_maker):
         """Test creating a new user"""
-        from db import get_or_create_user
+        from ldaca_web_app_backend.db import get_or_create_user
 
         # Mock session and result
         mock_session = AsyncMock()
@@ -58,10 +58,10 @@ class TestDatabaseOperations:
         mock_session.commit.assert_called_once()
         mock_session.refresh.assert_called_once()
 
-    @patch('db.async_session_maker')
+    @patch('ldaca_web_app_backend.db.async_session_maker')
     async def test_get_or_create_user_existing_user(self, mock_session_maker):
         """Test retrieving an existing user"""
-        from db import get_or_create_user
+        from ldaca_web_app_backend.db import get_or_create_user
 
         # Mock session
         mock_session = AsyncMock()
@@ -95,11 +95,11 @@ class TestDatabaseOperations:
         assert mock_user.picture == "https://example.com/new-avatar.jpg"
         mock_session.commit.assert_called_once()
 
-    @patch('db.async_session_maker')
-    @patch('config.config')
+    @patch('ldaca_web_app_backend.db.async_session_maker')
+    @patch('ldaca_web_app_backend.config.config')
     async def test_create_user_session(self, mock_config, mock_session_maker):
         """Test creating a user session"""
-        from db import create_user_session
+        from ldaca_web_app_backend.db import create_user_session
 
         # Mock config with actual values
         mock_config.token_expire_hours = 24
@@ -133,10 +133,10 @@ class TestDatabaseOperations:
         assert 'expires_in' in result
         assert 'expires_at' in result
 
-    @patch('db.async_session_maker')
+    @patch('ldaca_web_app_backend.db.async_session_maker')
     async def test_validate_access_token_valid(self, mock_session_maker):
         """Test validating a valid access token"""
-        from db import validate_access_token
+        from ldaca_web_app_backend.db import validate_access_token
 
         # Mock session
         mock_session = AsyncMock()
@@ -176,10 +176,10 @@ class TestDatabaseOperations:
         assert 'access_token' in result
         assert 'expires_at' in result
 
-    @patch('db.async_session_maker')
+    @patch('ldaca_web_app_backend.db.async_session_maker')
     async def test_validate_access_token_expired(self, mock_session_maker):
         """Test validating an expired access token"""
-        from db import validate_access_token
+        from ldaca_web_app_backend.db import validate_access_token
 
         # Mock session
         mock_session = AsyncMock()
@@ -196,10 +196,10 @@ class TestDatabaseOperations:
         # Should return None for expired token
         assert result is None
 
-    @patch('db.async_session_maker')
+    @patch('ldaca_web_app_backend.db.async_session_maker')
     async def test_validate_access_token_invalid(self, mock_session_maker):
         """Test validating an invalid access token"""
-        from db import validate_access_token
+        from ldaca_web_app_backend.db import validate_access_token
 
         # Mock session
         mock_session = AsyncMock()
@@ -216,10 +216,10 @@ class TestDatabaseOperations:
         # Should return None for invalid token
         assert result is None
 
-    @patch('db.async_session_maker')
+    @patch('ldaca_web_app_backend.db.async_session_maker')
     async def test_cleanup_expired_sessions(self, mock_session_maker):
         """Test cleaning up expired sessions"""
-        from db import cleanup_expired_sessions
+        from ldaca_web_app_backend.db import cleanup_expired_sessions
 
         # Mock session
         mock_session = AsyncMock()
@@ -251,7 +251,7 @@ class TestDatabaseModels:
 
     def test_user_model_creation(self):
         """Test User model can be created"""
-        from db import User
+        from ldaca_web_app_backend.db import User
         
         user = User(
             email="test@example.com",
@@ -267,7 +267,7 @@ class TestDatabaseModels:
 
     def test_user_session_model_creation(self):
         """Test UserSession model can be created"""
-        from db import UserSession
+        from ldaca_web_app_backend.db import UserSession
         
         session = UserSession(
             user_id=1,
@@ -282,7 +282,7 @@ class TestDatabaseModels:
 
     def test_database_url_configuration(self):
         """Test database URL configuration"""
-        from db import engine
+        from ldaca_web_app_backend.db import engine
 
         # The engine should be created with the in-memory test database
         # Note: The actual URL might be the in-memory one set by the test fixtures

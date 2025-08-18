@@ -6,28 +6,9 @@ Migrated from test_complete_lazy_flow.py with proper pytest structure.
 import polars as pl
 import pytest
 
-try:
-    from docworkspace import Node, Workspace
-
-    DOCWORKSPACE_AVAILABLE = True
-except ImportError:
-    DOCWORKSPACE_AVAILABLE = False
-    Node = None
-    Workspace = None
-
-try:
-    import docframe as dc
-    from docframe import DocDataFrame
-
-    DOCFRAME_AVAILABLE = True
-except ImportError:
-    DOCFRAME_AVAILABLE = False
-    dc = None
-    DocDataFrame = None
-
-pytestmark = pytest.mark.skipif(
-    not DOCWORKSPACE_AVAILABLE, reason="docworkspace not available"
-)
+import docframe as dc
+from docframe import DocDataFrame
+from docworkspace import Node, Workspace
 
 
 class TestLazyFlowIntegration:
@@ -36,25 +17,21 @@ class TestLazyFlowIntegration:
     @pytest.fixture
     def sample_dataframe(self):
         """Create a sample DataFrame for testing"""
-        return pl.DataFrame(
-            {
-                "id": [1, 2, 3, 4, 5],
-                "name": ["Alice", "Bob", "Charlie", "David", "Eve"],
-                "age": [25, 30, 35, 40, 45],
-                "salary": [50000, 60000, 70000, 80000, 90000],
-            }
-        )
+        return pl.DataFrame({
+            "id": [1, 2, 3, 4, 5],
+            "name": ["Alice", "Bob", "Charlie", "David", "Eve"],
+            "age": [25, 30, 35, 40, 45],
+            "salary": [50000, 60000, 70000, 80000, 90000],
+        })
 
     @pytest.fixture
     def lazy_dataframe(self):
         """Create a lazy DataFrame for testing"""
-        return pl.DataFrame(
-            {
-                "id": [1, 2, 3, 4, 5, 6],
-                "department": ["IT", "HR", "Finance", "IT", "HR", "Finance"],
-                "budget": [100000, 80000, 120000, 110000, 85000, 125000],
-            }
-        ).lazy()
+        return pl.DataFrame({
+            "id": [1, 2, 3, 4, 5, 6],
+            "department": ["IT", "HR", "Finance", "IT", "HR", "Finance"],
+            "budget": [100000, 80000, 120000, 110000, 85000, 125000],
+        }).lazy()
 
     def test_node_info_includes_lazy_field(self, sample_dataframe):
         """Test that Node.info() method includes lazy field"""
@@ -159,19 +136,13 @@ class TestLazyFlowIntegration:
         # Should no longer be lazy
         assert collected_info["lazy"] is False
 
-    @pytest.mark.skipif(not DOCFRAME_AVAILABLE, reason="docframe not available")
     def test_lazy_with_doc_dataframe(self):
         """Test lazy state with DocDataFrame integration"""
-        if Node is None or dc is None:
-            pytest.skip("Required dependencies not available")
-
         # Create a lazy DataFrame
-        lazy_df = pl.DataFrame(
-            {
-                "text": ["Document 1", "Document 2", "Document 3"],
-                "score": [0.8, 0.9, 0.7],
-            }
-        ).lazy()
+        lazy_df = pl.DataFrame({
+            "text": ["Document 1", "Document 2", "Document 3"],
+            "score": [0.8, 0.9, 0.7],
+        }).lazy()
 
         # Create DocDataFrame (this will likely collect the lazy frame)
         doc_df = DocDataFrame(lazy_df.collect(), document_column="text")  # type: ignore

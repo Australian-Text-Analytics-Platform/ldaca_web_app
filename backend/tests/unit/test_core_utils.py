@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
-from core.utils import (
+from ldaca_web_app_backend.core.utils import (
     detect_file_type,
     generate_node_id,
     generate_workspace_id,
@@ -24,7 +24,7 @@ from core.utils import (
 class TestUserFolders:
     """Test user folder management functions"""
 
-    @patch("core.utils.config")
+    @patch("ldaca_web_app_backend.core.utils.config")
     def test_get_user_data_folder(self, mock_config, temp_dir):
         """Test getting user data folder"""
         mock_config.user_data_folder = temp_dir
@@ -36,7 +36,7 @@ class TestUserFolders:
         assert folder == expected_path
         assert folder.exists()
 
-    @patch("core.utils.config")
+    @patch("ldaca_web_app_backend.core.utils.config")
     def test_get_user_workspace_folder(self, mock_config, temp_dir):
         """Test getting user workspace folder"""
         mock_config.user_data_folder = temp_dir
@@ -48,7 +48,7 @@ class TestUserFolders:
         assert folder == expected_path
         assert folder.exists()
 
-    @patch("core.utils.config")
+    @patch("ldaca_web_app_backend.core.utils.config")
     def test_setup_user_folders(self, mock_config, temp_dir):
         """Test setting up complete user folder structure"""
         mock_config.user_data_folder = temp_dir
@@ -285,13 +285,11 @@ class TestDataFrameUtils:
 
     def test_serialize_dataframe_for_json(self):
         """Test DataFrame serialization for JSON"""
-        df = pd.DataFrame(
-            {
-                "name": ["Alice", "Bob", "Charlie"],
-                "age": [25, 30, 35],
-                "score": [95.5, 87.2, 92.1],
-            }
-        )
+        df = pd.DataFrame({
+            "name": ["Alice", "Bob", "Charlie"],
+            "age": [25, 30, 35],
+            "score": [95.5, 87.2, 92.1],
+        })
 
         result = serialize_dataframe_for_json(df)
 
@@ -323,7 +321,6 @@ class TestDataFrameUtils:
         assert result["columns"] == []
         assert result["preview"] == []
 
-    @patch("core.utils.DOCFRAME_AVAILABLE", True)
     def test_serialize_docframe_dataframe(self):
         """Test serialization detects DocDataFrame"""
         # Mock DocDataFrame with dataframe attribute

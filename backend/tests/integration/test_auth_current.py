@@ -85,11 +85,11 @@ class TestAuthFunctionBehavior:
         mock_settings.single_user_email = TEST_USER_EMAIL
 
         # Patch settings in the core.auth module
-        with patch("core.auth.settings", mock_settings):
+        with patch("ldaca_web_app_backend.core.auth.settings", mock_settings):
             yield mock_settings
 
     async def test_get_current_user_single_user_mode(self):
-        from core.auth import get_current_user
+        from ldaca_web_app_backend.core.auth import get_current_user
 
         result1 = await get_current_user("Bearer test-token")
         result2 = await get_current_user("different-token")
@@ -100,7 +100,7 @@ class TestAuthFunctionBehavior:
             assert result["name"] == TEST_USER_NAME
 
     def test_available_auth_methods_single_user(self):
-        from core.auth import get_available_auth_methods
+        from ldaca_web_app_backend.core.auth import get_available_auth_methods
 
         methods = get_available_auth_methods()
         assert methods == []

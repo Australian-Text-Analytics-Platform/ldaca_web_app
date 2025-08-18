@@ -1,5 +1,5 @@
 [project]
-name = "ldaca-backend"
+name = "ldaca-web-app-backend"
 version = "0.1.0"
 description = "LDaCA Web App Backend - FastAPI backend for the Language Data Commons of Australia"
 readme = "README.md"
@@ -22,9 +22,6 @@ dependencies = [
     "pyarrow>=21.0.0",
 ]
 
-[tool.setuptools.packages.find]
-where = ["src"]
-
 [tool.pytest.ini_options]
 minversion = "7.0"
 addopts = [
@@ -32,6 +29,7 @@ addopts = [
     "--strict-markers",
     "--strict-config",
 ]
+pythonpath = ["src"]
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]

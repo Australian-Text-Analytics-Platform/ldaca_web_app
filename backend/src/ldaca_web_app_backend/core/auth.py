@@ -5,9 +5,10 @@ Authentication utilities and dependencies
 import logging
 from typing import Optional
 
-from config import settings
-from db import validate_access_token
 from fastapi import Depends, Header, HTTPException
+
+from ..config import settings
+from ..db import validate_access_token
 
 logger = logging.getLogger(__name__)
 

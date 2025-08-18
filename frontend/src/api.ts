@@ -440,21 +440,37 @@ export const setCurrentWorkspace = async (workspaceId: string | null, headers: R
 // NODE CONVERSION API
 // =============================================================================
 
+export type ConversionTarget = 'docdataframe' | 'dataframe' | 'doclazyframe' | 'lazyframe';
+
+export async function convertNode(
+  workspaceId: string,
+  nodeId: string,
+  target: ConversionTarget,
+  documentColumn?: string,
+  authHeaders: Record<string, string> = {}
+) {
+  const res = await axios.post(
+    `${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}/convert`,
+    null,
+    {
+      params: {
+        target,
+        ...(documentColumn && { document_column: documentColumn })
+      },
+      headers: authHeaders
+    }
+  );
+  return res.data;
+}
+
+// Legacy functions for backward compatibility
 export async function convertToDocDataFrame(
   workspaceId: string,
   nodeId: string,
   documentColumn: string,
   authHeaders: Record<string, string> = {}
 ) {
-  const res = await axios.post(
-    `${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}/convert/to-docdataframe`,
-    null,
-    {
-      params: { document_column: documentColumn },
-      headers: authHeaders
-    }
-  );
-  return res.data;
+  return convertNode(workspaceId, nodeId, 'docdataframe', documentColumn, authHeaders);
 }
 
 export async function convertToDataFrame(
@@ -462,14 +478,7 @@ export async function convertToDataFrame(
   nodeId: string,
   authHeaders: Record<string, string> = {}
 ) {
-  const res = await axios.post(
-    `${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}/convert/to-dataframe`,
-    null,
-    {
-      headers: authHeaders
-    }
-  );
-  return res.data;
+  return convertNode(workspaceId, nodeId, 'dataframe', undefined, authHeaders);
 }
 
 export async function convertToDocLazyFrame(
@@ -478,15 +487,7 @@ export async function convertToDocLazyFrame(
   documentColumn: string,
   authHeaders: Record<string, string> = {}
 ) {
-  const res = await axios.post(
-    `${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}/convert/to-doclazyframe`,
-    null,
-    {
-      params: { document_column: documentColumn },
-      headers: authHeaders
-    }
-  );
-  return res.data;
+  return convertNode(workspaceId, nodeId, 'doclazyframe', documentColumn, authHeaders);
 }
 
 export async function convertToLazyFrame(
@@ -494,14 +495,7 @@ export async function convertToLazyFrame(
   nodeId: string,
   authHeaders: Record<string, string> = {}
 ) {
-  const res = await axios.post(
-    `${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}/convert/to-lazyframe`,
-    null,
-    {
-      headers: authHeaders
-    }
-  );
-  return res.data;
+  return convertNode(workspaceId, nodeId, 'lazyframe', undefined, authHeaders);
 }
 
 export async function resetDocumentColumn(

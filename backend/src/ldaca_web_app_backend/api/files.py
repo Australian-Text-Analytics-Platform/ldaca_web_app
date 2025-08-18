@@ -5,17 +5,18 @@ File management endpoints
 from typing import Any
 
 import polars as pl
-from core.auth import get_current_user
-from core.utils import (
+from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from fastapi.responses import StreamingResponse
+
+from ..core.auth import get_current_user
+from ..core.utils import (
     detect_file_type,
     get_user_data_folder,
     load_data_file,
     serialize_dataframe_for_json,
     validate_file_path,
 )
-from fastapi import APIRouter, Depends, HTTPException, UploadFile
-from fastapi.responses import StreamingResponse
-from models import FileUploadResponse
+from ..models import FileUploadResponse
 
 router = APIRouter(prefix="/files", tags=["file_management"])
 
@@ -64,21 +65,19 @@ async def get_user_files(current_user: dict = Depends(get_current_user)):
             relative_path = file_path.relative_to(data_folder)
             rel_str = str(relative_path)
             is_sample = rel_str.startswith("sample_data/")
-            files.append(
-                {
-                    "filename": rel_str,  # full path relative to user data root
-                    "full_path": rel_str,
-                    "display_name": file_path.name,
-                    "size": file_path.stat().st_size,
-                    "created_at": file_path.stat().st_ctime,
-                    "file_type": detect_file_type(file_path.name),
-                    "folder": str(relative_path.parent)
-                    if str(relative_path.parent) != "."
-                    else "",
-                    "is_sample": is_sample,
-                    "path_type": "sample" if is_sample else "user",
-                }
-            )
+            files.append({
+                "filename": rel_str,  # full path relative to user data root
+                "full_path": rel_str,
+                "display_name": file_path.name,
+                "size": file_path.stat().st_size,
+                "created_at": file_path.stat().st_ctime,
+                "file_type": detect_file_type(file_path.name),
+                "folder": str(relative_path.parent)
+                if str(relative_path.parent) != "."
+                else "",
+                "is_sample": is_sample,
+                "path_type": "sample" if is_sample else "user",
+            })
 
     return {
         "files": files,

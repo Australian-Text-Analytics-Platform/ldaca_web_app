@@ -5,18 +5,19 @@ Unified authentication endpoints following Single Source of Truth principle
 import logging
 from typing import Optional
 
-from config import settings
-from core.auth import (
+from fastapi import APIRouter, Depends, Header, HTTPException
+from google.auth.transport import requests as grequests
+from google.oauth2 import id_token
+
+from ..config import settings
+from ..core.auth import (
     get_available_auth_methods,
     get_current_user,
     get_current_user_from_token,
 )
-from core.utils import setup_user_folders
-from db import cleanup_expired_sessions, create_user_session, get_or_create_user
-from fastapi import APIRouter, Depends, Header, HTTPException
-from google.auth.transport import requests as grequests
-from google.oauth2 import id_token
-from models import AuthInfoResponse, GoogleIn, GoogleOut, User, UserResponse
+from ..core.utils import setup_user_folders
+from ..db import cleanup_expired_sessions, create_user_session, get_or_create_user
+from ..models import AuthInfoResponse, GoogleIn, GoogleOut, User, UserResponse
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 logger = logging.getLogger(__name__)
@@ -135,7 +136,7 @@ async def google_auth(payload: GoogleIn):
         )
 
         # Update user folder path in database
-        from db import update_user_folder_path
+        from ..db import update_user_folder_path
 
         await update_user_folder_path(user["id"], str(user_folders["user_folder"]))
 
@@ -229,7 +230,7 @@ async def debug_token_validation(authorization: str = Header(None)):
             else authorization
         )
 
-        from db import validate_access_token
+        from ..db import validate_access_token
 
         user = await validate_access_token(token)
 

@@ -10,19 +10,15 @@ import time
 from typing import Any, Dict, Optional, Tuple, cast
 
 import polars as pl
-from core.auth import get_current_user
-from core.docworkspace_api import DocWorkspaceAPIUtils
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+
+from ..core.auth import get_current_user
+from ..core.docworkspace_api import DocWorkspaceAPIUtils
 
 # Note: DocWorkspace API helpers are not used directly in this HTTP layer
-from core.utils import (
-    DOCWORKSPACE_AVAILABLE,
-    get_user_data_folder,
-    get_user_workspace_folder,
-    load_data_file,
-)
-from core.workspace import workspace_manager
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from models import (
+from ..core.utils import get_user_data_folder, get_user_workspace_folder, load_data_file
+from ..core.workspace import workspace_manager
+from ..models import (
     ConcordanceDetachRequest,
     ConcordanceRequest,
     FilterRequest,
@@ -39,14 +35,6 @@ from models import (
 
 # Router for workspace endpoints (was accidentally removed during edits)
 router = APIRouter(prefix="/workspaces", tags=["workspace"])
-
-if DOCWORKSPACE_AVAILABLE:
-    try:
-        from docworkspace import Node
-    except ImportError:
-        Node = None
-else:
-    Node = None
 
 # Optional docframe types (DocDataFrame / DocLazyFrame) used in conversions
 try:  # pragma: no cover - optional dependency handling
@@ -383,9 +371,9 @@ async def save_workspace_as(
     tmp_path = user_folder / f"_tmp_clone_{workspace_id}.json"
     try:
         source_workspace.serialize(tmp_path)
-        from core.utils import generate_workspace_id
-
         from docworkspace import Workspace as DWWorkspace  # type: ignore
+
+        from ..core.utils import generate_workspace_id
 
         new_workspace = DWWorkspace.deserialize(tmp_path)  # type: ignore
         new_id = generate_workspace_id()
@@ -624,8 +612,8 @@ async def get_node_shape(
                 count_df = data_obj.select(pl.len().alias("_len"))
                 collected = count_df.collect()
                 polars_df = (
-                    collected.to_polars()
-                    if hasattr(collected, "to_polars")
+                    collected.to_dataframe()
+                    if hasattr(collected, "to_dataframe")
                     else collected
                 )
                 row_count = polars_df.to_series(0).item()
@@ -633,7 +621,7 @@ async def get_node_shape(
                 try:
                     full = data_obj.collect()
                     polars_full = (
-                        full.to_polars() if hasattr(full, "to_polars") else full
+                        full.to_dataframe() if hasattr(full, "to_dataframe") else full
                     )
                     row_count = (
                         polars_full.shape[0] if hasattr(polars_full, "shape") else None
@@ -651,8 +639,8 @@ async def get_node_shape(
                     # Fallback minimal collect
                     minimal = data_obj.collect()
                     polars_min = (
-                        minimal.to_polars()
-                        if hasattr(minimal, "to_polars")
+                        minimal.to_dataframe()
+                        if hasattr(minimal, "to_dataframe")
                         else minimal
                     )
                     column_count = (
@@ -688,9 +676,9 @@ async def get_node_shape(
 @router.get("/{workspace_id}/nodes/{node_id}/columns/{column_name}/unique")
 async def get_column_unique_values(
     workspace_id: str,
-    node_id: str, 
+    node_id: str,
     column_name: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
 ):
     """Get unique values count for a specific column."""
     user_id = current_user["id"]
@@ -700,7 +688,7 @@ async def get_column_unique_values(
 
     try:
         data_obj = node.data
-        
+
         # Check if column exists
         if hasattr(data_obj, "columns"):
             columns = list(data_obj.columns)
@@ -708,10 +696,12 @@ async def get_column_unique_values(
             columns = list(data_obj.schema.keys())
         else:
             raise HTTPException(status_code=400, detail="Cannot determine columns")
-            
+
         if column_name not in columns:
-            raise HTTPException(status_code=404, detail=f"Column '{column_name}' not found")
-        
+            raise HTTPException(
+                status_code=404, detail=f"Column '{column_name}' not found"
+            )
+
         # Get unique values - handle both lazy and eager data
         if hasattr(data_obj, "collect"):
             # Lazy frame
@@ -719,37 +709,39 @@ async def get_column_unique_values(
         else:
             # Already materialized
             df = data_obj
-            
+
         # Get unique values using Polars
         try:
             unique_values = df.select(column_name).unique().to_series().to_list()
             unique_count = len(unique_values)
-            
+
             # Limit the actual values returned to avoid huge responses
             max_values_to_return = 100
             if len(unique_values) > max_values_to_return:
                 sample_values = unique_values[:max_values_to_return]
             else:
                 sample_values = unique_values
-                
+
             return {
                 "column_name": column_name,
                 "unique_count": unique_count,
                 "sample_values": sample_values,
                 "total_values_returned": len(sample_values),
-                "has_more": len(unique_values) > max_values_to_return
+                "has_more": len(unique_values) > max_values_to_return,
             }
-            
+
         except Exception as e:
             raise HTTPException(
-                status_code=500, 
-                detail=f"Failed to get unique values for column '{column_name}': {str(e)}"
+                status_code=500,
+                detail=f"Failed to get unique values for column '{column_name}': {str(e)}",
             )
-            
+
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to process column unique values: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to process column unique values: {e}"
+        )
 
 
 @router.delete("/{workspace_id}/nodes/{node_id}")
@@ -768,22 +760,42 @@ async def delete_node(
     return {"success": True, "message": "Node deleted successfully"}
 
 
-@router.post("/{workspace_id}/nodes/{node_id}/convert/to-docdataframe")
-async def convert_node_to_docdataframe(
+@router.post("/{workspace_id}/nodes/{node_id}/convert")
+async def convert_node(
     workspace_id: str,
     node_id: str,
-    document_column: Optional[str] = None,
+    target: str = Query(
+        ...,
+        description="Target type: docdataframe, dataframe, doclazyframe, or lazyframe",
+    ),
+    document_column: Optional[str] = Query(
+        None,
+        description="Document column for Doc* types (auto-detected if not specified)",
+    ),
     current_user: dict = Depends(get_current_user),
 ):
-    """Convert a node's data to a DocDataFrame in place.
+    """Convert a node's data to the specified target type in place.
 
-    If the source is a LazyFrame/DocLazyFrame, this will materialize as needed.
-    Requires specifying a document column when it cannot be auto-detected.
+    Supported target types:
+    - docdataframe: DocDataFrame (materialized, requires document column)
+    - dataframe: Polars DataFrame (materialized)
+    - doclazyframe: DocLazyFrame (lazy, requires document column)
+    - lazyframe: Polars LazyFrame (lazy)
     """
     user_id = current_user["id"]
 
-    # Validate docframe availability
-    if DocDataFrame is None:
+    # Validate target parameter
+    valid_targets = {"docdataframe", "dataframe", "doclazyframe", "lazyframe"}
+    if target not in valid_targets:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid target '{target}'. Must be one of: {', '.join(sorted(valid_targets))}",
+        )
+
+    # Check docframe availability for Doc* types
+    if target in {"docdataframe", "doclazyframe"} and (
+        DocDataFrame is None or DocLazyFrame is None
+    ):
         raise HTTPException(
             status_code=500, detail="docframe library not available on backend"
         )
@@ -799,69 +811,188 @@ async def convert_node_to_docdataframe(
 
     import polars as pl
 
-    # Convert to DocDataFrame according to source type
     try:
-        new_docdf = None
+        new_data = None
+        operation_name = f"convert_to_{target}"
 
-        # Already DocDataFrame
-        if DocDataFrame is not None and isinstance(data, DocDataFrame):  # type: ignore[arg-type]
-            if document_column and document_column != data.document_column:
-                new_docdf = data.set_document(document_column)
+        if target == "docdataframe":
+            # Convert to DocDataFrame
+            if isinstance(data, DocDataFrame):  # type: ignore[arg-type]
+                # If user specified a different document column, validate and update
+                if document_column and document_column != data.document_column:
+                    new_data = data.set_document(document_column)
+                else:
+                    new_data = data
+
+            elif isinstance(data, DocLazyFrame):  # type: ignore[arg-type]
+                # Materialize and wrap
+                collected = data.to_docdataframe()
+                if document_column and document_column != collected.document_column:
+                    new_data = collected.set_document(document_column)
+                else:
+                    new_data = collected
+
+            elif isinstance(data, pl.DataFrame):
+                # Wrap as DocDataFrame
+                doc_col = document_column
+                if not doc_col:
+                    try:
+                        doc_col = DocDataFrame.guess_document_column(data)  # type: ignore[attr-defined]
+                    except Exception:
+                        doc_col = None
+                    if not doc_col:
+                        raise HTTPException(
+                            status_code=400,
+                            detail=(
+                                "Unable to auto-detect a document column. Please specify document_column."
+                            ),
+                        )
+                new_data = DocDataFrame(data, document_column=doc_col)  # type: ignore[call-arg]
+
+            elif isinstance(data, pl.LazyFrame):
+                # Collect and wrap
+                doc_col = document_column
+                if not doc_col:
+                    try:
+                        doc_col = DocDataFrame.guess_document_column(data)  # type: ignore[attr-defined]
+                    except Exception:
+                        doc_col = None
+                    if not doc_col:
+                        raise HTTPException(
+                            status_code=400,
+                            detail=(
+                                "Unable to auto-detect a document column. Please specify document_column."
+                            ),
+                        )
+                new_data = DocDataFrame(data.collect(), document_column=doc_col)  # type: ignore[call-arg]
+
+        elif target == "dataframe":
+            # Convert to Polars DataFrame
+            if DocDataFrame is not None and isinstance(data, DocDataFrame):  # type: ignore[arg-type]
+                new_data = data.dataframe
+            elif DocLazyFrame is not None and isinstance(data, DocLazyFrame):  # type: ignore[arg-type]
+                new_data = data.to_docdataframe().dataframe
+            elif hasattr(data, "collect"):
+                new_data = data.collect()
+            elif isinstance(data, pl.DataFrame):
+                new_data = data
             else:
-                new_docdf = data
-
-        # DocLazyFrame
-        elif DocLazyFrame is not None and isinstance(data, DocLazyFrame):  # type: ignore[arg-type]
-            collected = data.to_docdataframe()
-            if document_column and document_column != collected.document_column:
-                new_docdf = collected.set_document(document_column)
-            else:
-                new_docdf = collected
-
-        # Polars LazyFrame
-        elif isinstance(data, pl.LazyFrame):
-            # Try to guess if not provided
-            doc_col = document_column
-            if not doc_col:
-                try:
-                    doc_col = DocDataFrame.guess_document_column(data)  # type: ignore[attr-defined]
-                except Exception:
-                    doc_col = None
-            if not doc_col:
                 raise HTTPException(
                     status_code=400,
-                    detail=(
-                        "Unable to auto-detect a document column. Please specify document_column."
-                    ),
+                    detail=f"Unsupported data type for conversion: {type(data).__name__}",
                 )
-            new_docdf = DocDataFrame(data.collect(), document_column=doc_col)  # type: ignore[call-arg]
 
-        # Polars DataFrame
-        elif isinstance(data, pl.DataFrame):
-            doc_col = document_column
-            if not doc_col:
-                try:
-                    doc_col = DocDataFrame.guess_document_column(data)  # type: ignore[attr-defined]
-                except Exception:
-                    doc_col = None
-            if not doc_col:
+        elif target == "doclazyframe":
+            # Convert to DocLazyFrame
+            if isinstance(data, DocLazyFrame):  # type: ignore[arg-type]
+                # If user specified a different document column, validate and update
+                if document_column and document_column != data.document_column:
+                    if document_column not in getattr(data, "columns", []):
+                        raise HTTPException(
+                            status_code=400,
+                            detail=(
+                                f"Document column '{document_column}' not found in node. "
+                                f"Available columns: {getattr(data, 'columns', [])}"
+                            ),
+                        )
+                    new_data = data.with_document_column(document_column)
+                else:
+                    new_data = data
+
+            elif isinstance(data, DocDataFrame):  # type: ignore[arg-type]
+                # Convert to lazy and wrap
+                lf = data.dataframe.lazy()
+                if document_column and document_column not in data.dataframe.columns:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            f"Document column '{document_column}' not found in node. "
+                            f"Available columns: {data.dataframe.columns}"
+                        ),
+                    )
+                doc_col = document_column or data.document_column
+                new_data = DocLazyFrame(lf, document_column=doc_col)  # type: ignore[misc]
+
+            elif isinstance(data, pl.LazyFrame):
+                # Wrap as DocLazyFrame
+                if document_column:
+                    if document_column not in data.collect_schema().keys():
+                        raise HTTPException(
+                            status_code=400,
+                            detail=(
+                                f"Document column '{document_column}' not found in node schema. "
+                                f"Available: {list(data.collect_schema().keys())}"
+                            ),
+                        )
+                    doc_col = document_column
+                else:
+                    try:
+                        doc_col = DocLazyFrame.guess_document_column(data)  # type: ignore[attr-defined]
+                    except Exception:
+                        doc_col = None
+                    if not doc_col:
+                        raise HTTPException(
+                            status_code=400,
+                            detail=(
+                                "Unable to auto-detect a document column. Please specify document_column."
+                            ),
+                        )
+                new_data = DocLazyFrame(data, document_column=doc_col)  # type: ignore[misc]
+
+            elif isinstance(data, pl.DataFrame):
+                # To lazy and wrap
+                lf = data.lazy()
+                if document_column:
+                    if document_column not in data.columns:
+                        raise HTTPException(
+                            status_code=400,
+                            detail=(
+                                f"Document column '{document_column}' not found in node. "
+                                f"Available columns: {data.columns}"
+                            ),
+                        )
+                    doc_col = document_column
+                else:
+                    try:
+                        doc_col = DocLazyFrame.guess_document_column(lf)  # type: ignore[attr-defined]
+                    except Exception:
+                        doc_col = None
+                    if not doc_col:
+                        raise HTTPException(
+                            status_code=400,
+                            detail=(
+                                "Unable to auto-detect a document column. Please specify document_column."
+                            ),
+                        )
+                new_data = DocLazyFrame(lf, document_column=doc_col)  # type: ignore[misc]
+
+        elif target == "lazyframe":
+            # Convert to Polars LazyFrame
+            if DocLazyFrame is not None and isinstance(data, DocLazyFrame):  # type: ignore[arg-type]
+                new_data = data.to_lazyframe()
+            elif DocDataFrame is not None and isinstance(data, DocDataFrame):  # type: ignore[arg-type]
+                new_data = data.dataframe.lazy()
+            elif isinstance(data, pl.DataFrame):
+                new_data = data.lazy()
+            elif isinstance(data, pl.LazyFrame):
+                new_data = data
+            else:
                 raise HTTPException(
                     status_code=400,
-                    detail=(
-                        "Unable to auto-detect a document column. Please specify document_column."
-                    ),
+                    detail=f"Unsupported data type for conversion: {type(data).__name__}",
                 )
-            new_docdf = DocDataFrame(data, document_column=doc_col)  # type: ignore[call-arg]
-        else:
+
+        # Validate conversion result
+        if new_data is None:
             raise HTTPException(
                 status_code=400,
                 detail=f"Unsupported data type for conversion: {type(data).__name__}",
             )
 
         # In-place update of the node's data
-        src_node.data = new_docdf  # type: ignore[assignment]
+        src_node.data = new_data  # type: ignore[assignment]
         try:
-            src_node.operation = "convert_to_docdataframe"
+            src_node.operation += "\n" + operation_name
         except Exception:
             pass
 
@@ -876,15 +1007,30 @@ async def convert_node_to_docdataframe(
         raise
     except ValueError as e:
         # Surface validation problems (e.g., wrong document_column) as 400s
-        logger.error("DocLazyFrame conversion validation error: %s", e)
+        logger.error("Node conversion validation error: %s", e)
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.exception(
-            "DocLazyFrame conversion failed for workspace=%s node=%s",
+            "Node conversion failed for workspace=%s node=%s target=%s",
             workspace_id,
             node_id,
+            target,
         )
         raise HTTPException(status_code=500, detail=f"Conversion failed: {str(e)}")
+
+
+# Legacy endpoints for backward compatibility
+@router.post("/{workspace_id}/nodes/{node_id}/convert/to-docdataframe")
+async def convert_node_to_docdataframe(
+    workspace_id: str,
+    node_id: str,
+    document_column: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+):
+    """Convert a node's data to a DocDataFrame in place. (Legacy endpoint - use /convert with target=docdataframe)"""
+    return await convert_node(
+        workspace_id, node_id, "docdataframe", document_column, current_user
+    )
 
 
 @router.post("/{workspace_id}/nodes/{node_id}/convert/to-dataframe")
@@ -893,61 +1039,8 @@ async def convert_node_to_dataframe(
     node_id: str,
     current_user: dict = Depends(get_current_user),
 ):
-    """Convert a node's data to a Polars DataFrame (materialized) in place."""
-    user_id = current_user["id"]
-
-    # Get source node
-    src_node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
-    if not src_node:
-        raise HTTPException(status_code=404, detail="Node not found")
-
-    data = getattr(src_node, "data", None)
-    if data is None:
-        raise HTTPException(status_code=400, detail="Node has no data")
-
-    import polars as pl
-
-    try:
-        new_df = None
-
-        # DocDataFrame -> unwrap
-        if DocDataFrame is not None and isinstance(data, DocDataFrame):  # type: ignore[arg-type]
-            new_df = data.dataframe
-
-        # DocLazyFrame -> collect then unwrap
-        elif DocLazyFrame is not None and isinstance(data, DocLazyFrame):  # type: ignore[arg-type]
-            new_df = data.to_docdataframe().dataframe
-
-        # Polars LazyFrame -> collect
-        elif hasattr(data, "collect"):
-            new_df = data.collect()
-
-        # Already DataFrame
-        elif isinstance(data, pl.DataFrame):
-            new_df = data
-        else:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Unsupported data type for conversion: {type(data).__name__}",
-            )
-
-        # In-place update
-        src_node.data = new_df
-        try:
-            src_node.operation = "convert_to_dataframe"
-        except Exception:
-            pass
-
-        workspace = workspace_manager.get_workspace(user_id, workspace_id)
-        if workspace is not None:
-            workspace_manager.persist(user_id, workspace_id)
-
-        return DocWorkspaceAPIUtils.convert_node_info_for_api(src_node)
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Conversion failed: {str(e)}")
+    """Convert a node's data to a Polars DataFrame in place. (Legacy endpoint - use /convert with target=dataframe)"""
+    return await convert_node(workspace_id, node_id, "dataframe", None, current_user)
 
 
 @router.post("/{workspace_id}/nodes/{node_id}/convert/to-doclazyframe")
@@ -957,140 +1050,10 @@ async def convert_node_to_doclazyframe(
     document_column: Optional[str] = None,
     current_user: dict = Depends(get_current_user),
 ):
-    """Convert a node's data to a DocLazyFrame in place.
-
-    Requires specifying a document column when it cannot be auto-detected.
-    """
-    user_id = current_user["id"]
-
-    if DocLazyFrame is None or DocDataFrame is None:
-        raise HTTPException(
-            status_code=500, detail="docframe library not available on backend"
-        )
-
-    src_node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
-    if not src_node:
-        raise HTTPException(status_code=404, detail="Node not found")
-
-    data = getattr(src_node, "data", None)
-    if data is None:
-        raise HTTPException(status_code=400, detail="Node has no data")
-
-    import polars as pl
-
-    try:
-        new_dlf = None
-
-        # Already DocLazyFrame
-        if isinstance(data, DocLazyFrame):  # type: ignore[arg-type]
-            # If user specified a different document column, validate it exists
-            if document_column and document_column != data.document_column:
-                if document_column not in getattr(data, "columns", []):
-                    raise HTTPException(
-                        status_code=400,
-                        detail=(
-                            f"Document column '{document_column}' not found in node. "
-                            f"Available columns: {getattr(data, 'columns', [])}"
-                        ),
-                    )
-                new_dlf = data.with_document_column(document_column)
-            else:
-                new_dlf = data
-
-        # DocDataFrame -> convert to lazy and wrap
-        elif isinstance(data, DocDataFrame):  # type: ignore[arg-type]
-            lf = data.dataframe.lazy()
-            # If user specified a column, ensure it exists; otherwise use existing document column
-            if document_column and document_column not in data.dataframe.columns:
-                raise HTTPException(
-                    status_code=400,
-                    detail=(
-                        f"Document column '{document_column}' not found in node. "
-                        f"Available columns: {data.dataframe.columns}"
-                    ),
-                )
-            doc_col = document_column or data.document_column
-            new_dlf = DocLazyFrame(lf, document_column=doc_col)
-
-        # Polars LazyFrame -> wrap as DocLazyFrame
-        elif isinstance(data, pl.LazyFrame):
-            # If user specified, ensure it exists in the schema
-            if document_column:
-                if document_column not in data.collect_schema().keys():
-                    raise HTTPException(
-                        status_code=400,
-                        detail=(
-                            f"Document column '{document_column}' not found in node schema. "
-                            f"Available: {list(data.collect_schema().keys())}"
-                        ),
-                    )
-                doc_col = document_column
-            else:
-                try:
-                    doc_col = DocLazyFrame.guess_document_column(data)  # type: ignore[attr-defined]
-                except Exception:
-                    doc_col = None
-                if not doc_col:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=(
-                            "Unable to auto-detect a document column. Please specify document_column."
-                        ),
-                    )
-            new_dlf = DocLazyFrame(data, document_column=doc_col)
-
-        # Polars DataFrame -> to lazy and wrap
-        elif isinstance(data, pl.DataFrame):
-            lf = data.lazy()
-            if document_column:
-                if document_column not in data.columns:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=(
-                            f"Document column '{document_column}' not found in node. "
-                            f"Available columns: {data.columns}"
-                        ),
-                    )
-                doc_col = document_column
-            else:
-                try:
-                    doc_col = DocLazyFrame.guess_document_column(lf)  # type: ignore[attr-defined]
-                except Exception:
-                    doc_col = None
-                if not doc_col:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=(
-                            "Unable to auto-detect a document column. Please specify document_column."
-                        ),
-                    )
-            new_dlf = DocLazyFrame(lf, document_column=doc_col)
-        else:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Unsupported data type for conversion: {type(data).__name__}",
-            )
-
-        # In-place update
-        if not isinstance(new_dlf, DocLazyFrame):  # type check guard
-            raise HTTPException(status_code=500, detail="Internal conversion error")
-
-        src_node.data = cast(Any, new_dlf)
-        try:
-            src_node.operation = "convert_to_doclazyframe"
-        except Exception:
-            pass
-
-        workspace = workspace_manager.get_workspace(user_id, workspace_id)
-        if workspace is not None:
-            workspace_manager.persist(user_id, workspace_id)
-
-        return DocWorkspaceAPIUtils.convert_node_info_for_api(src_node)
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Conversion failed: {str(e)}")
+    """Convert a node's data to a DocLazyFrame in place. (Legacy endpoint - use /convert with target=doclazyframe)"""
+    return await convert_node(
+        workspace_id, node_id, "doclazyframe", document_column, current_user
+    )
 
 
 @router.post("/{workspace_id}/nodes/{node_id}/convert/to-lazyframe")
@@ -1099,52 +1062,8 @@ async def convert_node_to_lazyframe(
     node_id: str,
     current_user: dict = Depends(get_current_user),
 ):
-    """Convert a node's data to a Polars LazyFrame in place."""
-    user_id = current_user["id"]
-
-    src_node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
-    if not src_node:
-        raise HTTPException(status_code=404, detail="Node not found")
-
-    data = getattr(src_node, "data", None)
-    if data is None:
-        raise HTTPException(status_code=400, detail="Node has no data")
-
-    import polars as pl
-
-    try:
-        # Unwrap/wrap into Polars LazyFrame
-        if DocLazyFrame is not None and isinstance(data, DocLazyFrame):  # type: ignore[arg-type]
-            new_lf = data.to_lazyframe()
-        elif DocDataFrame is not None and isinstance(data, DocDataFrame):  # type: ignore[arg-type]
-            new_lf = data.dataframe.lazy()
-        elif isinstance(data, pl.DataFrame):
-            new_lf = data.lazy()
-        elif isinstance(data, pl.LazyFrame):
-            new_lf = data
-        else:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Unsupported data type for conversion: {type(data).__name__}",
-            )
-
-        # In-place update
-        src_node.data = cast(pl.LazyFrame, new_lf)
-        try:
-            src_node.operation = "convert_to_lazyframe"
-        except Exception:
-            pass
-
-        workspace = workspace_manager.get_workspace(user_id, workspace_id)
-        if workspace is not None:
-            workspace_manager.persist(user_id, workspace_id)
-
-        return DocWorkspaceAPIUtils.convert_node_info_for_api(src_node)
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Conversion failed: {str(e)}")
+    """Convert a node's data to a Polars LazyFrame in place. (Legacy endpoint - use /convert with target=lazyframe)"""
+    return await convert_node(workspace_id, node_id, "lazyframe", None, current_user)
 
 
 @router.post("/{workspace_id}/nodes/{node_id}/reset-document")
@@ -2756,18 +2675,16 @@ async def detach_concordance(
                     detail="Failed to materialize underlying data for concordance detach",
                 )
             original_with_idx = underlying_df.with_row_index("document_idx")
-            other_df = concordance_with_idx.select(
-                [
-                    "document_idx",
-                    "left_context",
-                    "matched_text",
-                    "right_context",
-                    "l1",
-                    "r1",
-                    "l1_freq",
-                    "r1_freq",
-                ]
-            )
+            other_df = concordance_with_idx.select([
+                "document_idx",
+                "left_context",
+                "matched_text",
+                "right_context",
+                "l1",
+                "r1",
+                "l1_freq",
+                "r1_freq",
+            ])
             final_data = original_with_idx.join(
                 other_df, on="document_idx", how="left"
             ).drop("document_idx")

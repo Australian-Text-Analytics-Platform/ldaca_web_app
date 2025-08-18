@@ -1,17 +1,9 @@
-import pathlib
-import sys
-
 import polars as pl
 import pytest
-from core.auth import get_current_user
-from core.workspace import workspace_manager
 from fastapi.testclient import TestClient
-from main import app
-
-# Ensure backend package path (after initial imports for linter friendliness)
-backend_dir = pathlib.Path(__file__).parent.parent
-if str(backend_dir) not in sys.path:
-    sys.path.insert(0, str(backend_dir))
+from ldaca_web_app_backend.core.auth import get_current_user
+from ldaca_web_app_backend.core.workspace import workspace_manager
+from ldaca_web_app_backend.main import app
 
 try:
     from docframe import DocDataFrame

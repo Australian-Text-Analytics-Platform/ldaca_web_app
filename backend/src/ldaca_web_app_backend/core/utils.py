@@ -10,31 +10,10 @@ from typing import Any, Dict, Union
 import pandas as pd
 import polars as pl
 
-# Import optional dependencies
-try:
-    import docframe
-    from docframe import DocDataFrame, DocLazyFrame
+from ..config import config
 
-    DOCFRAME_AVAILABLE = True
-except ImportError:
-    DOCFRAME_AVAILABLE = False
-
-try:
-    from docworkspace import Node, Workspace
-
-    DOCWORKSPACE_AVAILABLE = True
-except ImportError:
-    DOCWORKSPACE_AVAILABLE = False
-
-    # Create dummy classes for type hints
-    class Workspace:
-        pass
-
-    class Node:
-        pass
-
-
-from config import config
+# Direct imports - assuming proper package installation
+# (Optional) Import heavy libs lazily where needed to reduce import cost.
 
 
 def get_user_data_folder(user_id: str) -> Path:

@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 from unittest.mock import patch
 
-from config import Settings, settings
+from ldaca_web_app_backend.config import Settings, settings
 
 
 class TestSettings:
@@ -103,6 +103,6 @@ class TestGlobalSettings:
 
     def test_config_backward_compatibility(self):
         """Test that config alias works"""
-        from config import config
+        from ldaca_web_app_backend.config import config
 
         assert config is settings

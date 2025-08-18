@@ -8,9 +8,9 @@ from unittest.mock import MagicMock, patch
 class TestMainApp:
     """Test cases for the main FastAPI application"""
 
-    @patch("main.settings")
-    @patch("main.init_db")
-    @patch("main.cleanup_expired_sessions")
+    @patch("ldaca_web_app_backend.main.settings")
+    @patch("ldaca_web_app_backend.main.init_db")
+    @patch("ldaca_web_app_backend.main.cleanup_expired_sessions")
     def test_app_creation(self, mock_cleanup, mock_init_db, mock_settings):
         """Test that the FastAPI app can be created"""
         # Mock config properties
@@ -22,7 +22,7 @@ class TestMainApp:
         mock_settings.data_folder.mkdir = MagicMock()
 
         # Import after mocking
-        from main import app
+        from ldaca_web_app_backend.main import app
 
         assert app is not None
         assert app.title == "Enhanced LDaCA Web App API"
@@ -31,9 +31,9 @@ class TestMainApp:
     def test_health_endpoint_structure(self):
         """Test health endpoint response structure"""
         with (
-            patch("main.settings") as mock_config,
-            patch("main.init_db"),
-            patch("main.cleanup_expired_sessions"),
+            patch("ldaca_web_app_backend.main.settings") as mock_config,
+            patch("ldaca_web_app_backend.main.init_db"),
+            patch("ldaca_web_app_backend.main.cleanup_expired_sessions"),
         ):
             mock_config.data_folder = MagicMock()
             mock_config.allowed_origins = ["http://localhost:3000"]
@@ -43,7 +43,7 @@ class TestMainApp:
 
             import asyncio
 
-            from main import health_check
+            from ldaca_web_app_backend.main import health_check
 
             # Run the async function
             loop = asyncio.new_event_loop()
@@ -63,9 +63,9 @@ class TestMainApp:
     def test_status_endpoint_structure(self):
         """Test status endpoint response structure"""
         with (
-            patch("main.settings") as mock_config,
-            patch("main.init_db"),
-            patch("main.cleanup_expired_sessions"),
+            patch("ldaca_web_app_backend.main.settings") as mock_config,
+            patch("ldaca_web_app_backend.main.init_db"),
+            patch("ldaca_web_app_backend.main.cleanup_expired_sessions"),
         ):
             mock_config.data_folder = MagicMock()
             mock_config.allowed_origins = ["http://localhost:3000"]
@@ -75,7 +75,7 @@ class TestMainApp:
 
             import asyncio
 
-            from main import status
+            from ldaca_web_app_backend.main import status
 
             # Run the async function
             loop = asyncio.new_event_loop()
@@ -112,9 +112,9 @@ class TestMainApp:
     def test_root_endpoint_structure(self):
         """Test root endpoint response structure"""
         with (
-            patch("main.settings") as mock_config,
-            patch("main.init_db"),
-            patch("main.cleanup_expired_sessions"),
+            patch("ldaca_web_app_backend.main.settings") as mock_config,
+            patch("ldaca_web_app_backend.main.init_db"),
+            patch("ldaca_web_app_backend.main.cleanup_expired_sessions"),
         ):
             mock_config.data_folder = MagicMock()
             mock_config.allowed_origins = ["http://localhost:3000"]
@@ -124,7 +124,7 @@ class TestMainApp:
 
             import asyncio
 
-            from main import root
+            from ldaca_web_app_backend.main import root
 
             # Run the async function
             loop = asyncio.new_event_loop()
@@ -162,28 +162,19 @@ class TestMainApp:
 class TestApplicationConfiguration:
     """Test application configuration and setup"""
 
-    @patch("core.utils.DOCFRAME_AVAILABLE", True)
-    @patch("core.utils.DOCWORKSPACE_AVAILABLE", True)
-    def test_feature_availability_flags(self):
-        """Test that feature availability flags are properly imported"""
-        # Check the actual values from core.utils module
-        from core.utils import DOCFRAME_AVAILABLE, DOCWORKSPACE_AVAILABLE
+    def test_feature_availability(self):
+        """Test that required features are properly imported and available"""
+        # These imports should work with proper package installation
+        import docframe
+        from docframe import DocDataFrame
+        from docworkspace import Node, Workspace
 
-        # These should be True based on our patches
-        assert DOCFRAME_AVAILABLE is True
-        assert DOCWORKSPACE_AVAILABLE is True
+        # Basic validation that classes exist
+        assert DocDataFrame is not None
+        assert Node is not None
+        assert Workspace is not None
 
-    @patch("core.utils.DOCFRAME_AVAILABLE", False)
-    @patch("core.utils.DOCWORKSPACE_AVAILABLE", False)
-    def test_feature_unavailable_flags(self):
-        """Test behavior when features are unavailable"""
-        # Check the patched values through the core.utils module
-        from core.utils import DOCFRAME_AVAILABLE, DOCWORKSPACE_AVAILABLE
-
-        assert DOCFRAME_AVAILABLE is False
-        assert DOCWORKSPACE_AVAILABLE is False
-
-    @patch("main.settings")
+    @patch("ldaca_web_app_backend.main.settings")
     def test_cors_configuration(self, mock_config):
         """Test CORS middleware configuration"""
         mock_config.cors_allowed_origins = [
@@ -200,16 +191,16 @@ class TestApplicationConfiguration:
     def test_api_router_inclusion(self):
         """Test that all API routers are included"""
         with (
-            patch("main.settings") as mock_config,
-            patch("main.init_db"),
-            patch("main.cleanup_expired_sessions"),
+            patch("ldaca_web_app_backend.main.settings") as mock_config,
+            patch("ldaca_web_app_backend.main.init_db"),
+            patch("ldaca_web_app_backend.main.cleanup_expired_sessions"),
         ):
             mock_config.data_folder = MagicMock()
             mock_config.allowed_origins = ["http://localhost:3000"]
             mock_config.get.return_value = True
             mock_config.data_folder.mkdir = MagicMock()
 
-            from main import app
+            from ldaca_web_app_backend.main import app
 
             # Check that routers are included by looking at the app's routes
             route_prefixes = {

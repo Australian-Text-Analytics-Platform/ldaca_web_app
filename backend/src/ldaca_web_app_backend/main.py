@@ -5,23 +5,23 @@ Modular, production-ready text analysis platform with multi-user support
 
 from contextlib import asynccontextmanager
 
-# Import API routers
-from api.admin import router as admin_router
-from api.auth import router as auth_router
-from api.files import router as files_router
-from api.text import router as text_router
-from api.users import router as users_router
-from api.workspaces import router as workspaces_router
-from config import settings
-from core.utils import DOCFRAME_AVAILABLE, DOCWORKSPACE_AVAILABLE
-from db import cleanup_expired_sessions, init_db
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+# Import API routers
+from .api.admin import router as admin_router
+from .api.auth import router as auth_router
+from .api.files import router as files_router
+from .api.text import router as text_router
+from .api.users import router as users_router
+from .api.workspaces import router as workspaces_router
+from .config import settings
+from .db import cleanup_expired_sessions, init_db
 
 # Ensure DocWorkspace classes are extended with API methods (e.g., to_api_graph)
 # Importing this module applies monkey patches when DOCWORKSPACE is available.
 try:  # Import for side effects; ignore if unavailable during certain test setups
-    import core.docworkspace_api  # noqa: F401
+    from .core import docworkspace_api  # noqa: F401
 except Exception:
     # Non-fatal: workspace graph endpoint will fall back to legacy shapes
     pass
@@ -33,10 +33,8 @@ async def lifespan(app: FastAPI):
     # Startup
     print("🚀 Starting LDaCA Web App...")
     print("=" * 50)
-    print(f"🔧 DocFrame: {'✅ Available' if DOCFRAME_AVAILABLE else '⚠️ Not available'}")
-    print(
-        f"🔧 DocWorkspace: {'✅ Available' if DOCWORKSPACE_AVAILABLE else '⚠️ Not available'}"
-    )
+    print("🔧 DocFrame: ✅ Available")
+    print("🔧 DocWorkspace: ✅ Available")
 
     # Initialize database
     await init_db()
@@ -105,9 +103,7 @@ async def root():
             "authentication": "Google OAuth 2.0",
             "workspaces": "Multi-user workspace management with node operations",
             "file_management": "Upload, preview, download with type detection",
-            "text_analysis": "DocFrame integration"
-            if DOCFRAME_AVAILABLE
-            else "Basic DataFrame support",
+            "text_analysis": "DocFrame integration",
             "data_operations": "Filter, slice, transform, aggregate operations",
             "user_isolation": "Per-user data folders and workspace separation",
         },
@@ -154,8 +150,8 @@ async def health_check():
         "system": "Enhanced LDaCA Web App API",
         "database": "connected",
         "features": {
-            "docframe": DOCFRAME_AVAILABLE,
-            "docworkspace": DOCWORKSPACE_AVAILABLE,
+            "docframe": True,
+            "docworkspace": True,
         },
         "config": {
             "data_folder": str(settings.data_folder),
@@ -189,12 +185,8 @@ async def status():
                 "description": "Filter, slice, transform, aggregate, join operations",
             },
             "text_analysis": {
-                "status": "✅ DocFrame ready"
-                if DOCFRAME_AVAILABLE
-                else "⚠️ DocFrame not available",
-                "description": "Advanced text analysis with DocFrame integration"
-                if DOCFRAME_AVAILABLE
-                else "Basic DataFrame text processing",
+                "status": "✅ DocFrame ready",
+                "description": "Advanced text analysis with DocFrame integration",
             },
             "database": {
                 "status": "✅ SQLAlchemy async",

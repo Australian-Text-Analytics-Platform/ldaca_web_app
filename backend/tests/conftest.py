@@ -6,16 +6,12 @@ Provides shared fixtures and setup for all tests
 import asyncio
 import glob
 import shutil
-import sys
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-
-# Add backend to Python path for imports
-backend_path = Path(__file__).parent.parent
-sys.path.insert(0, str(backend_path))
+from ldaca_web_app_backend import db
 
 
 @pytest.fixture(scope="session")
@@ -30,7 +26,6 @@ def event_loop():
 async def init_test_db():
     """Initialize test database with tables for all tests"""
     # Import after setting up the path
-    import db
 
     # Use in-memory database for tests without modifying the global config
     from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
@@ -110,13 +105,13 @@ def authenticated_client():
 
     # Patch all the different ways settings can be imported
     with (
-        patch("config.settings", mock_settings),
-        patch("main.settings", mock_settings),
-        patch("api.auth.settings", mock_settings),
-        patch("core.auth.settings", mock_settings),
-        patch("db.init_db"),
-        patch("db.cleanup_expired_sessions"),
-        patch("main.lifespan") as mock_lifespan,
+        patch("ldaca_web_app_backend.config.settings", mock_settings),
+        patch("ldaca_web_app_backend.main.settings", mock_settings),
+        patch("ldaca_web_app_backend.api.auth.settings", mock_settings),
+        patch("ldaca_web_app_backend.core.auth.settings", mock_settings),
+        patch("ldaca_web_app_backend.db.init_db"),
+        patch("ldaca_web_app_backend.db.cleanup_expired_sessions"),
+        patch("ldaca_web_app_backend.main.lifespan") as mock_lifespan,
     ):
         # Create a simple async context manager for the mock lifespan
         from contextlib import asynccontextmanager
@@ -127,8 +122,8 @@ def authenticated_client():
 
         mock_lifespan.side_effect = mock_lifespan_func
 
-        from core.auth import get_current_user
-        from main import app
+        from ldaca_web_app_backend.core.auth import get_current_user
+        from ldaca_web_app_backend.main import app
 
         # Override the dependency with our mock user
         def mock_get_current_user():
@@ -167,13 +162,13 @@ def test_client():
 
     # Patch all the different ways settings can be imported
     with (
-        patch("config.settings", mock_settings),
-        patch("main.settings", mock_settings),
-        patch("api.auth.settings", mock_settings),
-        patch("core.auth.settings", mock_settings),
-        patch("db.init_db"),
-        patch("db.cleanup_expired_sessions"),
-        patch("main.lifespan") as mock_lifespan,
+        patch("ldaca_web_app_backend.config.settings", mock_settings),
+        patch("ldaca_web_app_backend.main.settings", mock_settings),
+        patch("ldaca_web_app_backend.api.auth.settings", mock_settings),
+        patch("ldaca_web_app_backend.core.auth.settings", mock_settings),
+        patch("ldaca_web_app_backend.db.init_db"),
+        patch("ldaca_web_app_backend.db.cleanup_expired_sessions"),
+        patch("ldaca_web_app_backend.main.lifespan") as mock_lifespan,
     ):
         # Create a simple async context manager for the mock lifespan
         from contextlib import asynccontextmanager
@@ -184,7 +179,7 @@ def test_client():
 
         mock_lifespan.side_effect = mock_lifespan_func
 
-        from main import app
+        from ldaca_web_app_backend.main import app
 
         client = TestClient(app)
         yield client
@@ -201,7 +196,7 @@ def temp_dir():
 @pytest.fixture
 def mock_settings():
     """Mock the config module with test configuration"""
-    with patch("config.config") as mock_config:
+    with patch("ldaca_web_app_backend.config.config") as mock_config:
         # Core settings
         mock_config.database_url = "sqlite+aiosqlite:///:memory:"
         mock_config.user_data_folder = "./test_data"
@@ -240,7 +235,7 @@ def mock_settings():
 @pytest.fixture
 def mock_workspace_manager():
     """Mock workspace manager for testing"""
-    with patch("core.workspace.workspace_manager") as mock_manager:
+    with patch("ldaca_web_app_backend.core.workspace.workspace_manager") as mock_manager:
         mock_manager.get_user_workspaces.return_value = {}
         mock_manager.create_workspace.return_value = {
             "id": "test-workspace-123",
