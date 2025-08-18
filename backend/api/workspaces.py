@@ -2663,17 +2663,8 @@ async def calculate_token_frequencies(
                     )
                 )
 
-            # Apply same limit to statistics as to frequency data
-            if request.limit and statistics_data:
-                # Get the tokens that were included in frequency data to maintain consistency
-                included_tokens = set()
-                for frame_data in response_data.values():
-                    included_tokens.update(item.token for item in frame_data)
-
-                # Filter statistics to only include tokens that are in the frequency results
-                statistics_data = [
-                    stat for stat in statistics_data if stat.token in included_tokens
-                ]
+            # Do not limit or filter statistics by the per-node frequency results.
+            # Return the full statistics table so the frontend can derive selections from all vocabulary.
 
         return TokenFrequencyResponse(
             success=True,

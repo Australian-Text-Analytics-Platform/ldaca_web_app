@@ -468,28 +468,68 @@ const TokenFrequencyTab: React.FC = () => {
                   {/* Unified Comparative Word Cloud */}
                   {Object.keys(results.data).length === 2 && lastCompareNodeIds.length === 2 && (() => {
                     const entries = Object.entries(results.data);
-                    const [nodeAName, dataA] = entries[0];
-                    const [nodeBName, dataB] = entries[1];
+                    const [nodeAName] = entries[0];
+                    const [nodeBName] = entries[1];
                     const nodeAId = lastCompareNodeIds[0];
                     const nodeBId = lastCompareNodeIds[1];
                     const nodeAColor = getColorForNodeId(nodeAId, 0);
                     const nodeBColor = getColorForNodeId(nodeBId, 1);
-                    const freqMap: Record<string, { a: number; b: number }> = {};
-                    for (const item of dataA) {
-                      freqMap[item.token] = { a: item.frequency, b: 0 };
+                    // Build from statistics table with requested juxRank selection
+                    const stats = (results.statistics || []).map(s => ({
+                      token: s.token,
+                      o1: s.freq_corpus_0,
+                      o2: s.freq_corpus_1,
+                      p1: s.percent_corpus_0,
+                      p2: s.percent_corpus_1,
+                      logratio: s.log_ratio ?? 0,
+                      ell: s.effect_size_ell ?? 0, // Ensure ell is always defined
+                    }))
+                    .map(s => ({
+                      ...s,
+                      total: s.o1 + s.o2,
+                      juxRank: (s.ell || 0) * (s.logratio || 0)
+                    }))
+                    .filter(s => s.total > 10);
+
+                    if (stats.length === 0) return null;
+
+                    const sortedAsc = [...stats].sort((a, b) => a.juxRank - b.juxRank);
+                    const half = Math.floor(limit / 2);
+                    const low = sortedAsc.slice(0, Math.min(half, sortedAsc.length));
+                    const high = sortedAsc.slice(Math.max(sortedAsc.length - half, 0));
+                    let selected = [...low, ...high];
+
+                    // If limit is odd, add one more from the side with larger absolute extremum not already picked
+                    const remaining = Math.max(0, limit - selected.length);
+                    if (remaining > 0 && sortedAsc.length > selected.length) {
+                      const nextLow = sortedAsc[low.length] || null;
+                      const nextHigh = sortedAsc[sortedAsc.length - high.length - 1] || null;
+                      const pick = (() => {
+                        const al = nextLow ? Math.abs(nextLow.juxRank) : -1;
+                        const ah = nextHigh ? Math.abs(nextHigh.juxRank) : -1;
+                        return ah >= al ? nextHigh : nextLow;
+                      })();
+                      if (pick) selected.push(pick);
                     }
-                    for (const item of dataB) {
-                      if (!freqMap[item.token]) freqMap[item.token] = { a: 0, b: 0 };
-                      freqMap[item.token].b = item.frequency;
+
+                    // De-duplicate in case of overlap (when limit > unique items etc.)
+                    const seen = new Set<string>();
+                    selected = selected.filter(s => (seen.has(s.token) ? false : (seen.add(s.token), true)));
+
+                    // Ensure we don't exceed limit
+                    selected = selected.slice(0, Math.min(limit, selected.length));
+
+                    // Debug print of selected tokens with juxRank
+                    const debugOn = (typeof window !== 'undefined') && localStorage.getItem('debugTF') === '1';
+                    if (debugOn) {
+                      const dbg = [...selected]
+                        .sort((a, b) => a.juxRank - b.juxRank)
+                        .map(s => ({ token: s.token, juxRank: Number.isFinite(s.juxRank) ? Number(s.juxRank.toFixed(6)) : s.juxRank, O1: s.o1, O2: s.o2, LogRatio: Number(s.logratio.toFixed(6)) }));
+                      // eslint-disable-next-line no-console
+                      console.log('Unified Word Cloud selected tokens (by juxRank low→high):', dbg);
                     }
-                    const combined = Object.entries(freqMap).map(([token, vals]) => ({
-                      token,
-                      freqA: vals.a,
-                      freqB: vals.b,
-                      total: vals.a + vals.b
-                    })).filter(w => w.total > 0);
-                    if (combined.length === 0) return null;
-                    const maxTotal = Math.max(...combined.map(w => w.total));
+
+                    const maxTotal = Math.max(...selected.map(w => w.total));
 
                     // Simple hex interpolation
                     const hexToRgb = (hex: string) => {
@@ -511,26 +551,15 @@ const TokenFrequencyTab: React.FC = () => {
                       return rgbToHex(r, g, b);
                     };
 
-                    // Index statistics for percentage-based coloring (avoid corpus size bias)
-                    const statIndex = new Map((results.statistics || []).map(s => [s.token, s]));
-                    // Prepare words list; size = raw combined frequency; color proportion = relative percentage share
-                    const words = combined.map(w => {
-                      const stat = statIndex.get(w.token);
-                      if (stat) {
-                        const pA = stat.percent_corpus_0; // already percentage 0-100
-                        const pB = stat.percent_corpus_1;
-                        const denom = pA + pB;
-                        return {
-                          text: w.token,
-                          value: w.total,
-                          proportion: denom > 0 ? (pA / denom) : 0.5,
-                        };
-                      }
-                      // Fallback to frequency-based proportion if no stats entry
+                    // Prepare words list from selected stats; size = total (O1+O2); color proportion by percentage share
+                    const words = selected.map(s => {
+                      const pA = s.p1; // percent 0-100
+                      const pB = s.p2;
+                      const denom = pA + pB;
                       return {
-                        text: w.token,
-                        value: w.total,
-                        proportion: w.total > 0 ? (w.freqA / w.total) : 0.5,
+                        text: s.token,
+                        value: s.total,
+                        proportion: denom > 0 ? (pA / denom) : 0.5,
                       };
                     });
 
@@ -584,7 +613,18 @@ const TokenFrequencyTab: React.FC = () => {
                             </Wordcloud>
                           </svg>
                         </div>
-                        <p className="text-xs text-gray-500 mt-2 text-center">Size = sum of raw frequencies. Color uses relative percentage share (%1 vs %2) so differing corpus sizes don't bias color; shifts toward {nodeAName} (left) or {nodeBName} (right).</p>
+                        <p className="text-xs text-gray-500 mt-2 text-center">Selection uses juxRank = log10(O1+O2) × LogRatio: 50% lowest and 50% highest by juxRank. Size = (O1+O2). Color uses relative percentage share (%1 vs %2) so differing corpus sizes don't bias color; shifts toward {nodeAName} (left) or {nodeBName} (right).</p>
+                        {debugOn && (
+                          <div className="mt-2 p-2 bg-gray-50 border border-gray-200 rounded">
+                            <div className="text-[11px] text-gray-600 font-mono whitespace-pre-wrap">
+                              {selected
+                                .slice()
+                                .sort((a,b) => a.juxRank - b.juxRank)
+                                .map(s => `${s.token}\t${(Number.isFinite(s.juxRank) ? s.juxRank.toFixed(6) : s.juxRank)}\t(O1:${s.o1}, O2:${s.o2}, LR:${s.logratio.toFixed(6)})`) // eslint-disable-line @typescript-eslint/restrict-plus-operands
+                                .join('\n')}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })()}
