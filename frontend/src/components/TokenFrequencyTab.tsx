@@ -35,6 +35,8 @@ const TokenFrequencyTab: React.FC = () => {
   // Dynamic color management for selected nodes
   const [nodeColors, setNodeColors] = useState<Record<string, string>>({});
   const [lastCompareNodeIds, setLastCompareNodeIds] = useState<string[]>([]); // preserves order used in last analysis
+  // Locally-applied stop word filter (no recomputation)
+  const [appliedStopSet, setAppliedStopSet] = useState<Set<string>>(new Set());
   const defaultPalette = useMemo(
     () => [
       '#2563eb', // vivid blue
@@ -179,6 +181,15 @@ const TokenFrequencyTab: React.FC = () => {
     }
   };
 
+  // Apply local stop-word filter to current results without recomputation
+  const handleApplyLocalStopFilter = () => {
+    const words = stopWords
+      .split(',')
+      .map(w => w.trim().toLowerCase())
+      .filter(Boolean);
+    setAppliedStopSet(new Set(words));
+  };
+
   const handleAnalyze = async () => {
     if (!currentWorkspaceId || selectedNodes.length === 0) {
       return;
@@ -305,6 +316,17 @@ const TokenFrequencyTab: React.FC = () => {
     );
   };
 
+  // Derive filtered results data according to the applied stop-word set
+  const filteredResultsData = useMemo(() => {
+    if (!results?.data) return null;
+    if (!appliedStopSet || appliedStopSet.size === 0) return results.data;
+    const out: Record<string, any[]> = {};
+    for (const [nodeName, frequencies] of Object.entries(results.data)) {
+      out[nodeName] = (frequencies as any[]).filter(item => !appliedStopSet.has(String(item.token || '').toLowerCase()));
+    }
+    return out;
+  }, [results, appliedStopSet]);
+
   const renderChart = (nodeName: string, data: any[], color: string) => {
     // Find max frequency for bar width calculation
     const maxFreq = Math.max(...data.map(item => item.frequency));
@@ -401,6 +423,21 @@ const TokenFrequencyTab: React.FC = () => {
             <div className="text-xs text-gray-500 mt-1">
               Optional: Enter words to exclude from analysis. Click "Fill Default" to load common English stop words.
             </div>
+            <div className="mt-2 flex items-center space-x-2">
+              <button
+                onClick={handleApplyLocalStopFilter}
+                disabled={!results}
+                className="px-3 py-1 text-xs bg-blue-50 text-blue-700 rounded hover:bg-blue-100 disabled:opacity-50 transition-colors"
+                title="Filter current results client-side without recalculation"
+              >
+                Apply Stop Words (no recompute)
+              </button>
+              {appliedStopSet.size > 0 && (
+                <span className="text-xs text-gray-500">
+                  Active filter: {appliedStopSet.size} word{appliedStopSet.size === 1 ? '' : 's'}
+                </span>
+              )}
+            </div>
           </div>
 
           <div>
@@ -458,7 +495,7 @@ const TokenFrequencyTab: React.FC = () => {
               {results.data ? (
                 <div>
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                    {Object.entries(results.data).map(([nodeName, frequencies], idx) => {
+                    {Object.entries((filteredResultsData ?? results.data)).map(([nodeName, frequencies], idx) => {
                       const nodeId = lastCompareNodeIds[idx];
                       const color = getColorForNodeId(nodeId, idx);
                       return renderChart(nodeName, frequencies, color);
@@ -475,7 +512,9 @@ const TokenFrequencyTab: React.FC = () => {
                     const nodeAColor = getColorForNodeId(nodeAId, 0);
                     const nodeBColor = getColorForNodeId(nodeBId, 1);
                     // Build from statistics table with requested juxRank selection
-                    const stats = (results.statistics || []).map(s => ({
+                    const stats = (results.statistics || [])
+                    .filter(s => !appliedStopSet.has(String(s.token || '').toLowerCase()))
+                    .map(s => ({
                       token: s.token,
                       o1: s.freq_corpus_0,
                       o2: s.freq_corpus_1,
@@ -699,10 +738,11 @@ const TokenFrequencyTab: React.FC = () => {
                             </tr>
                           </thead>
                           <tbody className="bg-white divide-y divide-gray-200">
-                            {results.statistics
+                            {(results.statistics
+                              .filter(stat => !appliedStopSet.has(String(stat.token || '').toLowerCase()))
                               .filter(stat => stat.log_likelihood_llv > 0) // Only show tokens with actual differences
                               .sort((a, b) => b.log_likelihood_llv - a.log_likelihood_llv) // Sort by log likelihood descending
-                              .map((stat, index) => (
+                              ).map((stat, index) => (
                               <tr key={stat.token} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                                 <td className="px-3 py-2 text-sm font-medium text-blue-600 cursor-pointer hover:text-blue-800 hover:bg-blue-50" onClick={() => handleTokenClick(stat.token)}>
                                   {stat.token}
@@ -757,7 +797,9 @@ const TokenFrequencyTab: React.FC = () => {
                         </table>
                       </div>
                       
-                      {results.statistics.filter(stat => stat.log_likelihood_llv > 0).length === 0 && (
+                      {(results.statistics
+                        .filter(stat => !appliedStopSet.has(String(stat.token || '').toLowerCase()))
+                        .filter(stat => stat.log_likelihood_llv > 0).length === 0) && (
                         <div className="text-center py-8 text-gray-500">
                           No significant differences found between the selected datasets.
                         </div>
