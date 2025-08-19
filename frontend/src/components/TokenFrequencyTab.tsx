@@ -32,6 +32,12 @@ const TokenFrequencyTab: React.FC = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isLoadingStopWords, setIsLoadingStopWords] = useState(false);
   const [results, setResults] = useState<TokenFrequencyResponse | null>(null);
+  // Statistical table head/tail preview & sorting
+  const [headTailN, setHeadTailN] = useState<number>(10);
+  // Sorting state (supports tri-state: none -> desc -> asc -> none)
+  const [statsSortColumn, setStatsSortColumn] = useState<string>('log_likelihood_llv');
+  const [statsSortDirection, setStatsSortDirection] = useState<'asc'|'desc'>('desc');
+  const [showFullStatsModal, setShowFullStatsModal] = useState(false);
   // Dynamic color management for selected nodes
   const [nodeColors, setNodeColors] = useState<Record<string, string>>({});
   const [lastCompareNodeIds, setLastCompareNodeIds] = useState<string[]>([]); // preserves order used in last analysis
@@ -691,6 +697,22 @@ const TokenFrequencyTab: React.FC = () => {
                   {results.statistics && results.statistics.length > 0 && (
                     <div className="mt-8">
                       <h3 className="text-lg font-semibold text-gray-800 mb-4">Statistical Measures</h3>
+                      <div className="flex flex-wrap items-center gap-4 mb-4">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Head/Tail Rows (N)</label>
+                          <input
+                            type="number"
+                            min={1}
+                            max={200}
+                            value={headTailN}
+                            onChange={e => setHeadTailN(Math.max(1, Math.min(200, parseInt(e.target.value) || 1)))}
+                            className="w-28 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                          />
+                        </div>
+                        <div className="text-xs text-gray-500 max-w-xl">
+                          Showing first N and last N rows of the sorted table (with ellipsis if truncated). Sorting always applies to the full set before trimming.
+                        </div>
+                      </div>
                       <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4">
                         <div className="text-sm text-gray-700">
                           <strong>Statistical Analysis Key:</strong>
@@ -712,110 +734,288 @@ const TokenFrequencyTab: React.FC = () => {
                         </div>
                       </div>
                       
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full bg-white border border-gray-200 rounded-lg">
-                          <thead className="bg-gray-50">
-                            <tr>
-                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100" onClick={() => handleTokenClick(results.statistics?.[0]?.token || '')}>
-                                Token
-                              </th>
-                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                O1
-                              </th>
-                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                %1
-                              </th>
-                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                O2
-                              </th>
-                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                %2
-                              </th>
-                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                LL
-                              </th>
-                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                %DIFF
-                              </th>
-                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Bayes
-                              </th>
-                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                ELL
-                              </th>
-                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                RRisk
-                              </th>
-                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                LogRatio
-                              </th>
-                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                OddsRatio
-                              </th>
-                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Significance
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody className="bg-white divide-y divide-gray-200">
-                            {(results.statistics
-                              .filter(stat => !appliedStopSet.has(String(stat.token || '').toLowerCase()))
-                              .filter(stat => stat.log_likelihood_llv > 0) // Only show tokens with actual differences
-                              .sort((a, b) => b.log_likelihood_llv - a.log_likelihood_llv) // Sort by log likelihood descending
-                              ).map((stat, index) => (
-                              <tr key={stat.token} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                                <td className="px-3 py-2 text-sm font-medium text-blue-600 cursor-pointer hover:text-blue-800 hover:bg-blue-50" onClick={() => handleTokenClick(stat.token)}>
-                                  {stat.token}
-                                </td>
-                                <td className="px-3 py-2 text-sm text-gray-900 font-mono text-center">
-                                  {stat.freq_corpus_0}
-                                </td>
-                                <td className="px-3 py-2 text-sm text-gray-900 font-mono text-center">
-                                  {stat.percent_corpus_0.toFixed(2)}%
-                                </td>
-                                <td className="px-3 py-2 text-sm text-gray-900 font-mono text-center">
-                                  {stat.freq_corpus_1}
-                                </td>
-                                <td className="px-3 py-2 text-sm text-gray-900 font-mono text-center">
-                                  {stat.percent_corpus_1.toFixed(2)}%
-                                </td>
-                                <td className="px-3 py-2 text-sm text-gray-900 font-mono text-center">
-                                  {stat.log_likelihood_llv.toFixed(2)}
-                                </td>
-                                <td className="px-3 py-2 text-sm text-gray-900 font-mono text-center">
-                                  {(stat.percent_diff * 100).toFixed(2)}%
-                                </td>
-                                <td className="px-3 py-2 text-sm text-gray-900 font-mono text-center">
-                                  {stat.bayes_factor_bic.toFixed(2)}
-                                </td>
-                                <td className="px-3 py-2 text-sm text-gray-900 font-mono text-center">
-                                  {stat.effect_size_ell !== null ? stat.effect_size_ell.toFixed(4) : 'N/A'}
-                                </td>
-                                <td className="px-3 py-2 text-sm text-gray-900 font-mono text-center">
-                                  {stat.relative_risk !== null ? stat.relative_risk.toFixed(2) : '∞'}
-                                </td>
-                                <td className="px-3 py-2 text-sm text-gray-900 font-mono text-center">
-                                  {stat.log_ratio !== null ? stat.log_ratio.toFixed(4) : 'N/A'}
-                                </td>
-                                <td className="px-3 py-2 text-sm text-gray-900 font-mono text-center">
-                                  {stat.odds_ratio !== null ? stat.odds_ratio.toFixed(2) : '∞'}
-                                </td>
-                                <td className="px-3 py-2 text-sm text-center">
-                                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                    stat.significance === '****' ? 'bg-red-100 text-red-800' :
-                                    stat.significance === '***' ? 'bg-orange-100 text-orange-800' :
-                                    stat.significance === '**' ? 'bg-yellow-100 text-yellow-800' :
-                                    stat.significance === '*' ? 'bg-green-100 text-green-800' :
-                                    'bg-gray-100 text-gray-800'
-                                  }`}>
-                                    {stat.significance || 'n.s.'}
-                                  </span>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+                      {(() => {
+                        // Column definitions for sorting
+                        const columns: { key: string; label: string; accessor: (s: any) => any; isNumeric?: boolean; formatter?: (v: any, s: any) => React.ReactNode }[] = [
+                          { key: 'token', label: 'Token', accessor: s => s.token },
+                          { key: 'freq_corpus_0', label: 'O1', accessor: s => s.freq_corpus_0, isNumeric: true },
+                          { key: 'percent_corpus_0', label: '%1', accessor: s => s.percent_corpus_0, isNumeric: true, formatter: v => v.toFixed(2) + '%' },
+                          { key: 'freq_corpus_1', label: 'O2', accessor: s => s.freq_corpus_1, isNumeric: true },
+                          { key: 'percent_corpus_1', label: '%2', accessor: s => s.percent_corpus_1, isNumeric: true, formatter: v => v.toFixed(2) + '%' },
+                          { key: 'log_likelihood_llv', label: 'LL', accessor: s => s.log_likelihood_llv, isNumeric: true, formatter: v => v.toFixed(2) },
+                          { key: 'percent_diff', label: '%DIFF', accessor: s => s.percent_diff, isNumeric: true, formatter: v => (v * 100).toFixed(2) + '%' },
+                          { key: 'bayes_factor_bic', label: 'Bayes', accessor: s => s.bayes_factor_bic, isNumeric: true, formatter: v => v.toFixed(2) },
+                          { key: 'effect_size_ell', label: 'ELL', accessor: s => s.effect_size_ell, isNumeric: true, formatter: v => (v !== null ? v.toFixed(4) : 'N/A') },
+                          { key: 'relative_risk', label: 'RRisk', accessor: s => s.relative_risk, isNumeric: true, formatter: v => (v !== null ? v.toFixed(2) : '∞') },
+                          { key: 'log_ratio', label: 'LogRatio', accessor: s => s.log_ratio, isNumeric: true, formatter: v => (v !== null ? v.toFixed(4) : 'N/A') },
+                          { key: 'odds_ratio', label: 'OddsRatio', accessor: s => s.odds_ratio, isNumeric: true, formatter: v => (v !== null ? v.toFixed(2) : '∞') },
+                          { key: 'significance', label: 'Significance', accessor: s => s.significance || '', formatter: (_: any, s: any) => (
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              s.significance === '****' ? 'bg-red-100 text-red-800' :
+                              s.significance === '***' ? 'bg-orange-100 text-orange-800' :
+                              s.significance === '**' ? 'bg-yellow-100 text-yellow-800' :
+                              s.significance === '*' ? 'bg-green-100 text-green-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {s.significance || 'n.s.'}
+                            </span>) }
+                        ];
+
+                        const handleSort = (col: string) => {
+                          if (statsSortColumn === col) {
+                            setStatsSortDirection(d => d === 'asc' ? 'desc' : 'asc');
+                          } else {
+                            setStatsSortColumn(col);
+                            setStatsSortDirection(col === 'token' ? 'asc' : 'desc');
+                          }
+                        };
+
+                        const raw = results.statistics
+                          .filter(stat => !appliedStopSet.has(String(stat.token || '').toLowerCase()))
+                          .filter(stat => stat.log_likelihood_llv > 0);
+
+                        const sorted = (() => {
+                          const colActive = statsSortColumn || 'log_likelihood_llv';
+                          return [...raw].sort((a, b) => {
+                            const col = statsSortColumn;
+                            if (col === 'significance') {
+                              const rank = (s: any) => (s.significance || '').length; // more * = higher
+                              const va = rank(a); const vb = rank(b);
+                              return statsSortDirection === 'asc' ? va - vb : vb - va;
+                            }
+                            const def = columns.find(c => c.key === colActive);
+                            if (!def) return 0;
+                            const va = def.accessor(a);
+                            const vb = def.accessor(b);
+                            if (typeof va === 'string' || typeof vb === 'string') {
+                              const sa = (va ?? '').toString();
+                              const sb = (vb ?? '').toString();
+                              if (sa < sb) return statsSortDirection === 'asc' ? -1 : 1;
+                              if (sa > sb) return statsSortDirection === 'asc' ? 1 : -1;
+                              return 0;
+                            }
+                            const na = (va === null || va === undefined || Number.isNaN(va)) ? -Infinity : va;
+                            const nb = (vb === null || vb === undefined || Number.isNaN(vb)) ? -Infinity : vb;
+                            return statsSortDirection === 'asc' ? na - nb : nb - na;
+                          });
+                        })();
+
+                        const total = sorted.length;
+                        const n = headTailN;
+                        let display: any[] = [];
+                        let truncated = false;
+                        if (total <= n * 2) {
+                          display = sorted; // no truncation
+                        } else {
+                          truncated = true;
+                          const head = sorted.slice(0, n);
+                          const tail = sorted.slice(total - n);
+                          // Insert placeholder object to render a middle button instead of ellipsis
+                          display = [...head, { __showAllButton: true, key: '__showAllButton' }, ...tail];
+                        }
+
+                        // We'll return the truncated table; full modal redefines its own columns
+                        return (
+                          <div className="overflow-x-auto">
+                            <table className="min-w-full bg-white border border-gray-200 rounded-lg">
+                              <thead className="bg-gray-50">
+                                <tr>
+                                  {columns.map(col => {
+                                    const active = statsSortColumn === col.key;
+                                    const dir = active ? (statsSortDirection === 'asc' ? '▲' : '▼') : '';
+                                    return (
+                                      <th
+                                        key={col.key}
+                                        className={`px-3 py-2 text-left text-xs font-medium uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100 ${active ? 'text-blue-600' : 'text-gray-500'}`}
+                                        onClick={() => handleSort(col.key)}
+                                      >
+                                        <div className="flex items-center gap-1">
+                                          <span>{col.label}</span>
+                                          {dir && <span className="text-[10px]">{dir}</span>}
+                                        </div>
+                                      </th>
+                                    );
+                                  })}
+                                </tr>
+                              </thead>
+                              <tbody className="bg-white divide-y divide-gray-200">
+                                {display.map((stat, index) => {
+                                  if (stat.__showAllButton) {
+                                    return (
+                                      <tr key={`showall-${index}`}>
+                                        <td colSpan={columns.length} className="px-3 py-6">
+                                          <div className="w-full flex items-center justify-center">
+                                            <button
+                                              onClick={() => setShowFullStatsModal(true)}
+                                              className="px-5 py-2.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                                            >
+                                              Show complete table ({total} rows)
+                                            </button>
+                                          </div>
+                                        </td>
+                                      </tr>
+                                    );
+                                  }
+                                  return (
+                                    <tr key={stat.token} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                                      {columns.map(col => {
+                                        const rawVal = col.accessor(stat);
+                                        const content = col.formatter ? col.formatter(rawVal, stat) : rawVal;
+                                        const cellClasses = `px-3 py-2 text-sm ${col.key === 'token' ? 'font-medium text-blue-600 cursor-pointer hover:text-blue-800 hover:bg-blue-50' : 'text-gray-900 font-mono text-center'} `;
+                                        if (col.key === 'token') {
+                                          return (
+                                            <td key={col.key} className={cellClasses} onClick={() => handleTokenClick(stat.token)}>
+                                              {content}
+                                            </td>
+                                          );
+                                        }
+                                        return (
+                                          <td key={col.key} className={cellClasses}>{content}</td>
+                                        );
+                                      })}
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                            {truncated && (
+                              <div className="text-xs text-gray-500 mt-2">Showing first {n} and last {n} of {total} rows. Click a header to toggle descending/ascending.</div>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      {showFullStatsModal && (() => {
+                        // Reuse same filtering + sorting to show full table live
+                        const modalRaw = results.statistics
+                          .filter(stat => !appliedStopSet.has(String(stat.token || '').toLowerCase()))
+                          .filter(stat => stat.log_likelihood_llv > 0);
+                        // Rebuild columns with labels & formatters (duplicate of earlier definition to keep scope simple)
+                        const columns = [
+                          { key: 'token', label: 'Token', accessor: (s: any) => s.token },
+                          { key: 'freq_corpus_0', label: 'O1', accessor: (s: any) => s.freq_corpus_0, formatter: (v: any) => v },
+                          { key: 'percent_corpus_0', label: '%1', accessor: (s: any) => s.percent_corpus_0, formatter: (v: any) => v.toFixed(2) + '%' },
+                          { key: 'freq_corpus_1', label: 'O2', accessor: (s: any) => s.freq_corpus_1, formatter: (v: any) => v },
+                          { key: 'percent_corpus_1', label: '%2', accessor: (s: any) => s.percent_corpus_1, formatter: (v: any) => v.toFixed(2) + '%' },
+                          { key: 'log_likelihood_llv', label: 'LL', accessor: (s: any) => s.log_likelihood_llv, formatter: (v: any) => v.toFixed(2) },
+                          { key: 'percent_diff', label: '%DIFF', accessor: (s: any) => s.percent_diff, formatter: (v: any) => (v * 100).toFixed(2) + '%' },
+                          { key: 'bayes_factor_bic', label: 'Bayes', accessor: (s: any) => s.bayes_factor_bic, formatter: (v: any) => v.toFixed(2) },
+                          { key: 'effect_size_ell', label: 'ELL', accessor: (s: any) => s.effect_size_ell, formatter: (v: any) => (v !== null ? v.toFixed(4) : 'N/A') },
+                          { key: 'relative_risk', label: 'RRisk', accessor: (s: any) => s.relative_risk, formatter: (v: any) => (v !== null ? v.toFixed(2) : '∞') },
+                          { key: 'log_ratio', label: 'LogRatio', accessor: (s: any) => s.log_ratio, formatter: (v: any) => (v !== null ? v.toFixed(4) : 'N/A') },
+                          { key: 'odds_ratio', label: 'OddsRatio', accessor: (s: any) => s.odds_ratio, formatter: (v: any) => (v !== null ? v.toFixed(2) : '∞') },
+                          { key: 'significance', label: 'Significance', accessor: (s: any) => s.significance || '', formatter: (_: any, s: any) => (
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              s.significance === '****' ? 'bg-red-100 text-red-800' :
+                              s.significance === '***' ? 'bg-orange-100 text-orange-800' :
+                              s.significance === '**' ? 'bg-yellow-100 text-yellow-800' :
+                              s.significance === '*' ? 'bg-green-100 text-green-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {s.significance || 'n.s.'}
+                            </span>) }
+                        ];
+                        // Re-create columns definition to access inside this closure
+                        const modalColumns = [
+                          { key: 'token', accessor: (s: any) => s.token },
+                          { key: 'freq_corpus_0', accessor: (s: any) => s.freq_corpus_0 },
+                          { key: 'percent_corpus_0', accessor: (s: any) => s.percent_corpus_0 },
+                          { key: 'freq_corpus_1', accessor: (s: any) => s.freq_corpus_1 },
+                          { key: 'percent_corpus_1', accessor: (s: any) => s.percent_corpus_1 },
+                          { key: 'log_likelihood_llv', accessor: (s: any) => s.log_likelihood_llv },
+                          { key: 'percent_diff', accessor: (s: any) => s.percent_diff },
+                          { key: 'bayes_factor_bic', accessor: (s: any) => s.bayes_factor_bic },
+                          { key: 'effect_size_ell', accessor: (s: any) => s.effect_size_ell },
+                          { key: 'relative_risk', accessor: (s: any) => s.relative_risk },
+                          { key: 'log_ratio', accessor: (s: any) => s.log_ratio },
+                          { key: 'odds_ratio', accessor: (s: any) => s.odds_ratio },
+                          { key: 'significance', accessor: (s: any) => s.significance || '' }
+                        ];
+                        const modalSorted = (() => {
+                          const colActive = statsSortColumn || 'log_likelihood_llv';
+                          return [...modalRaw].sort((a, b) => {
+                            const col = statsSortColumn;
+                            if (col === 'significance') {
+                              const rank = (s: any) => (s.significance || '').length;
+                              const va = rank(a); const vb = rank(b);
+                              return statsSortDirection === 'asc' ? va - vb : vb - va;
+                            }
+                            const def = modalColumns.find(c => c.key === colActive);
+                            if (!def) return 0;
+                            const va = def.accessor(a);
+                            const vb = def.accessor(b);
+                            if (typeof va === 'string' || typeof vb === 'string') {
+                              const sa = (va ?? '').toString();
+                              const sb = (vb ?? '').toString();
+                              if (sa < sb) return statsSortDirection === 'asc' ? -1 : 1;
+                              if (sa > sb) return statsSortDirection === 'asc' ? 1 : -1;
+                              return 0;
+                            }
+                            const na = (va === null || va === undefined || Number.isNaN(va)) ? -Infinity : va;
+                            const nb = (vb === null || vb === undefined || Number.isNaN(vb)) ? -Infinity : vb;
+                            return statsSortDirection === 'asc' ? na - nb : nb - na;
+                          });
+                        })();
+                        return (
+                          <div className="fixed inset-0 z-50 flex items-center justify-center">
+                            <div className="absolute inset-0 bg-black/40" onClick={() => setShowFullStatsModal(false)}></div>
+                            <div className="relative bg-white rounded-lg shadow-xl max-w-[95vw] max-h-[90vh] w-full p-6 flex flex-col">
+                              <div className="flex items-center justify-between mb-4">
+                                <h4 className="text-lg font-semibold text-gray-800">Complete Statistical Table ({modalSorted.length} rows)</h4>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => setShowFullStatsModal(false)}
+                                    className="px-3 py-1 text-sm bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
+                                  >Close</button>
+                                </div>
+                              </div>
+                              <div className="overflow-auto border border-gray-200 rounded">
+                                <table className="min-w-full text-sm">
+                                  <thead className="bg-gray-50">
+                                    <tr>
+                                      {columns.map((col: any) => {
+                                        const active = statsSortColumn === col.key;
+                                        const dir = active ? (statsSortDirection === 'asc' ? '▲' : '▼') : '';
+                                        return (
+                                          <th
+                                            key={col.key}
+                                            className={`px-3 py-2 text-left font-medium uppercase tracking-wider cursor-pointer select-none whitespace-nowrap ${active ? 'text-blue-600' : 'text-gray-500'} hover:bg-gray-100`}
+                                            onClick={() => {
+                                              if (statsSortColumn === col.key) {
+                                                setStatsSortDirection(d => d === 'asc' ? 'desc' : 'asc');
+                                              } else {
+                                                setStatsSortColumn(col.key);
+                                                setStatsSortDirection(col.key === 'token' ? 'asc' : 'desc');
+                                              }
+                                            }}
+                                          >
+                                            <div className="flex items-center gap-1"><span>{col.label}</span>{dir && <span className="text-[10px]">{dir}</span>}</div>
+                                          </th>
+                                        );
+                                      })}
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-gray-100">
+                                    {modalSorted.map((stat, i) => (
+                                      <tr key={stat.token + i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                                        {columns.map((col: any) => {
+                                          const rawVal = col.accessor(stat);
+                                          const content = col.formatter ? col.formatter(rawVal, stat) : rawVal;
+                                          const cellClasses = `px-3 py-1.5 ${col.key === 'token' ? 'font-medium text-blue-600 cursor-pointer hover:text-blue-800 hover:bg-blue-50' : 'font-mono text-gray-900 text-center'} whitespace-nowrap`;
+                                          if (col.key === 'token') {
+                                            return <td key={col.key} className={cellClasses} onClick={() => handleTokenClick(stat.token)}>{content}</td>;
+                                          }
+                                          return <td key={col.key} className={cellClasses}>{content}</td>;
+                                        })}
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                              <div className="mt-3 text-xs text-gray-500">Click headers to sort; table updates live.</div>
+                            </div>
+                          </div>
+                        );
+                      })()}
                       
                       {(results.statistics
                         .filter(stat => !appliedStopSet.has(String(stat.token || '').toLowerCase()))
