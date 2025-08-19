@@ -1,10 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './App.css';
 import { useAuth } from './hooks/useAuth';
-import { useBackendHealth } from './hooks/useBackendHealth';
 import { QueryProvider } from './providers/QueryProvider';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import BackendLoadingScreen from './components/BackendLoadingScreen';
 import GoogleLogin from './components/GoogleLogin';
 import DataLoaderTab from './components/DataLoaderTab';
 import FilterTab from './components/FilterTab';
@@ -14,7 +12,6 @@ import ExportTab from './components/ExportTab';
 import TokenFrequencyTab from './components/TokenFrequencyTab';
 import WorkspaceView from './components/WorkspaceView';
 import Sidebar from './components/Sidebar';
-import logo from './logo.png';
 
 /**
  * Improved App component with proper error boundaries and loading states
@@ -22,12 +19,6 @@ import logo from './logo.png';
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'data-loader' | 'filter' | 'token-frequency' | 'concordance' | 'analysis' | 'export'>('data-loader');
   const { user, loginWithGoogle, logout, isAuthenticated, isMultiUserMode, isLoading, error } = useAuth();
-  
-  // Check backend health before showing the main app
-  const { isHealthy: isBackendHealthy, isChecking: isCheckingBackend, status: backendStatus, error: backendError, refetch: retryBackendConnection } = useBackendHealth({
-    enabled: true,
-    interval: isAuthenticated ? 30000 : 5000, // Check more frequently when not authenticated
-  });
 
   // Right panel width and resize handlers must be declared before any early returns (React Hooks rule)
   const [rightWidth, setRightWidth] = useState<number>(50); // percentage of total width
@@ -122,11 +113,6 @@ const App: React.FC = () => {
     );
   }
 
-  // Show backend loading screen while backend is not ready
-  if (isCheckingBackend || !isBackendHealthy) {
-    return <BackendLoadingScreen status={backendStatus} error={backendError} onRetry={retryBackendConnection} />;
-  }
-
   // Show login screen if not authenticated and in multi-user mode
   if (!isAuthenticated && isMultiUserMode) {
     return (
@@ -158,18 +144,7 @@ const App: React.FC = () => {
           {/* Header */}
           <header className="bg-white border-b border-gray-200 px-6 py-4 relative">
             <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <img 
-                  src={logo} 
-                  alt="LDaCA Logo" 
-                  className="h-8 w-auto"
-                  onError={(e) => {
-                    // Hide logo if it fails to load
-                    e.currentTarget.style.display = 'none';
-                  }}
-                />
-                <h1 className="text-xl font-bold text-gray-800">LDaCA Corpus Analysis</h1>
-              </div>
+              <h1 className="text-xl font-bold text-gray-800">LDaCA Corpus Analysis</h1>
               <div className="flex items-center space-x-4">
                 <span className="text-sm text-gray-600">Welcome, {user?.name}</span>
                 <button
