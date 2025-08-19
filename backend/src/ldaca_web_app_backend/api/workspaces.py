@@ -2451,13 +2451,22 @@ async def cast_node(
                 # Default strict=False so rows that don't match become null instead of failing entire cast
                 try:
                     if datetime_format:
-                        cast_expr = pl.col(column_name).str.to_datetime(
+                        parsed = pl.col(column_name).str.to_datetime(
                             format=datetime_format, strict=bool(strict_flag)
                         )
                     else:
-                        cast_expr = pl.col(column_name).str.to_datetime(
+                        parsed = pl.col(column_name).str.to_datetime(
                             strict=bool(strict_flag)
                         )
+
+                    # Ensure timezone-aware UTC. Polars returns naive datetimes by default.
+                    # If the parsed result is already timezone aware we convert to UTC, otherwise we set it.
+                    # We can't inspect the expression's dtype pre-execution, so we defensively apply replace_time_zone then convert.
+                    cast_expr = (
+                        parsed.dt.replace_time_zone("UTC")
+                        .dt.convert_time_zone("UTC")
+                        .alias(column_name)
+                    )
                 except Exception as e:
                     raise HTTPException(
                         status_code=400,
@@ -2541,7 +2550,10 @@ async def cast_node(
                     if target_lower == "datetime"
                     else None,
                 },
-                "message": f"Successfully cast column '{column_name}' from {original_type} to {new_type}",
+                "message": (
+                    f"Successfully cast column '{column_name}' from {original_type} to {new_type}"
+                    + (" (UTC timezone applied)" if target_lower == "datetime" else "")
+                ),
             }
 
         except Exception as cast_error:

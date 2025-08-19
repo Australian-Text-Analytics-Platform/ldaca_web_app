@@ -43,10 +43,14 @@ class TestBasicCasting:
     def test_string_to_datetime_cast(self, sample_dataframe):
         """Test casting string column to datetime"""
         casted_df = sample_dataframe.with_columns(
-            pl.col("date_str").str.to_datetime(format="%Y-%m-%d").alias("date_str")
+            pl.col("date_str")
+            .str.to_datetime(format="%Y-%m-%d")
+            .dt.replace_time_zone("UTC")
+            .dt.convert_time_zone("UTC")
+            .alias("date_str")
         )
-
-        assert casted_df.schema["date_str"] == pl.Datetime("us")
+        # Expect timezone-aware UTC
+        assert casted_df.schema["date_str"] == pl.Datetime("us", "UTC")
         # Verify dates are parsed correctly
         dates = casted_df["date_str"].to_list()
         assert len(dates) == 3

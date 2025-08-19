@@ -68,8 +68,12 @@ class TestWorkspaceAPI:
 
         # Mock workspace_manager methods for create flow
         with (
-            patch("ldaca_web_app_backend.api.workspaces.workspace_manager.create_workspace") as mock_create,
-            patch("ldaca_web_app_backend.api.workspaces.workspace_manager.get_workspace_info") as mock_info,
+            patch(
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.create_workspace"
+            ) as mock_create,
+            patch(
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_workspace_info"
+            ) as mock_info,
         ):
             mock_create.return_value = mock_workspace
             mock_info.return_value = {
@@ -108,7 +112,9 @@ class TestWorkspaceAPI:
             "status_counts": {"lazy": 1, "materialized": 4},
         }
 
-        with patch("ldaca_web_app_backend.api.workspaces.workspace_manager.get_workspace_info") as mock_get:
+        with patch(
+            "ldaca_web_app_backend.api.workspaces.workspace_manager.get_workspace_info"
+        ) as mock_get:
             mock_get.return_value = mock_workspace_info
 
             # Use the cleaner endpoint: GET /api/workspaces/{workspace_id}
@@ -122,7 +128,9 @@ class TestWorkspaceAPI:
 
     def test_get_workspace_not_found(self):
         """Test getting non-existent workspace"""
-        with patch("ldaca_web_app_backend.api.workspaces.workspace_manager.get_workspace_info") as mock_get:
+        with patch(
+            "ldaca_web_app_backend.api.workspaces.workspace_manager.get_workspace_info"
+        ) as mock_get:
             mock_get.return_value = None
 
             # Use the cleaner endpoint: GET /api/workspaces/{workspace_id}
@@ -132,7 +140,9 @@ class TestWorkspaceAPI:
 
     def test_delete_workspace(self):
         """Test deleting a workspace"""
-        with patch("ldaca_web_app_backend.api.workspaces.workspace_manager.delete_workspace") as mock_delete:
+        with patch(
+            "ldaca_web_app_backend.api.workspaces.workspace_manager.delete_workspace"
+        ) as mock_delete:
             mock_delete.return_value = True
 
             response = self.client.delete("/api/workspaces/workspace-123")
@@ -144,7 +154,9 @@ class TestWorkspaceAPI:
 
     def test_delete_workspace_not_found(self):
         """Test deleting non-existent workspace"""
-        with patch("ldaca_web_app_backend.api.workspaces.workspace_manager.delete_workspace") as mock_delete:
+        with patch(
+            "ldaca_web_app_backend.api.workspaces.workspace_manager.delete_workspace"
+        ) as mock_delete:
             mock_delete.return_value = False
 
             response = self.client.delete("/api/workspaces/nonexistent-123")
@@ -153,7 +165,9 @@ class TestWorkspaceAPI:
 
     def test_unload_workspace(self):
         """Test unloading an existing workspace"""
-        with patch("ldaca_web_app_backend.api.workspaces.workspace_manager.unload_workspace") as mock_unload:
+        with patch(
+            "ldaca_web_app_backend.api.workspaces.workspace_manager.unload_workspace"
+        ) as mock_unload:
             mock_unload.return_value = True
             response = self.client.post("/api/workspaces/workspace-123/unload")
             assert response.status_code == 200
@@ -164,7 +178,9 @@ class TestWorkspaceAPI:
 
     def test_unload_workspace_not_found(self):
         """Test unloading non-existent workspace returns 404"""
-        with patch("ldaca_web_app_backend.api.workspaces.workspace_manager.unload_workspace") as mock_unload:
+        with patch(
+            "ldaca_web_app_backend.api.workspaces.workspace_manager.unload_workspace"
+        ) as mock_unload:
             mock_unload.return_value = False
             response = self.client.post("/api/workspaces/missing-999/unload")
             assert response.status_code == 404
@@ -249,19 +265,19 @@ class TestWorkspaceAPI:
 
         # Create mock node with test data (use ISO format that Polars can auto-parse)
         mock_node = Mock()
-        test_df = pl.DataFrame(
-            {
-                "created_at": ["2024-01-01T10:30:15", "2024-01-02T14:45:30"],
-                "name": ["Alice", "Bob"],
-            }
-        )
+        test_df = pl.DataFrame({
+            "created_at": ["2024-01-01T10:30:15", "2024-01-02T14:45:30"],
+            "name": ["Alice", "Bob"],
+        })
         mock_node.data = test_df
 
         with (
             patch(
                 "ldaca_web_app_backend.api.workspaces.workspace_manager.get_node_from_workspace"
             ) as mock_get_node,
-            patch("ldaca_web_app_backend.api.workspaces.workspace_manager.persist") as mock_save,
+            patch(
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.persist"
+            ) as mock_save,
             patch(
                 "ldaca_web_app_backend.api.workspaces.workspace_manager.get_workspace"
             ) as mock_get_workspace,
@@ -290,6 +306,10 @@ class TestWorkspaceAPI:
             assert cast_info["format_used"] is None  # No format used for auto-detection
             assert "original_type" in cast_info
             assert "new_type" in cast_info
+            # Ensure UTC timezone applied (schema string contains UTC)
+            assert "UTC" in cast_info["new_type"], (
+                "Datetime cast should be timezone-aware UTC"
+            )
 
             # Verify the node data was updated (mock_node.data should be modified)
             assert mock_node.data is not None
@@ -352,12 +372,10 @@ class TestWorkspaceAPI:
 
         # Test with LazyFrame
         mock_node_lazy = Mock()
-        test_lazy_df = pl.DataFrame(
-            {
-                "created_at": ["2024-01-01T10:30:15", "2024-01-02T14:45:30"],
-                "name": ["Alice", "Bob"],
-            }
-        ).lazy()
+        test_lazy_df = pl.DataFrame({
+            "created_at": ["2024-01-01T10:30:15", "2024-01-02T14:45:30"],
+            "name": ["Alice", "Bob"],
+        }).lazy()
         mock_node_lazy.data = test_lazy_df
 
         with (
@@ -406,22 +424,22 @@ class TestWorkspaceAPI:
         import polars as pl
 
         mock_node = Mock()
-        test_df = pl.DataFrame(
-            {
-                "created_at": [
-                    datetime(2024, 1, 1, 10, 30, 15),
-                    datetime(2024, 1, 2, 14, 45, 30),
-                ],
-                "name": ["Alice", "Bob"],
-            }
-        )
+        test_df = pl.DataFrame({
+            "created_at": [
+                datetime(2024, 1, 1, 10, 30, 15),
+                datetime(2024, 1, 2, 14, 45, 30),
+            ],
+            "name": ["Alice", "Bob"],
+        })
         mock_node.data = test_df
 
         with (
             patch(
                 "ldaca_web_app_backend.api.workspaces.workspace_manager.get_node_from_workspace"
             ) as mock_get_node,
-            patch("ldaca_web_app_backend.api.workspaces.workspace_manager.persist") as mock_save,
+            patch(
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.persist"
+            ) as mock_save,
             patch(
                 "ldaca_web_app_backend.api.workspaces.workspace_manager.get_workspace"
             ) as mock_get_workspace,
@@ -450,7 +468,9 @@ class TestWorkspaceAPI:
             patch(
                 "ldaca_web_app_backend.api.workspaces.workspace_manager.get_node_from_workspace"
             ) as mock_get_node,
-            patch("ldaca_web_app_backend.api.workspaces.workspace_manager.persist") as mock_save,
+            patch(
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.persist"
+            ) as mock_save,
         ):
             mock_get_node.return_value = mock_node
 
@@ -474,7 +494,9 @@ class TestWorkspaceAPI:
             patch(
                 "ldaca_web_app_backend.api.workspaces.workspace_manager.get_node_from_workspace"
             ) as mock_get_node,
-            patch("ldaca_web_app_backend.api.workspaces.workspace_manager.persist") as mock_save,
+            patch(
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.persist"
+            ) as mock_save,
         ):
             mock_get_node.return_value = mock_node
 
@@ -513,15 +535,17 @@ class TestWorkspaceAPI:
 
         # Create test nodes
         left_node = Mock()
-        left_node.data = pl.DataFrame(
-            {"username": ["alice", "bob"], "left_data": [1, 2]}
-        )
+        left_node.data = pl.DataFrame({
+            "username": ["alice", "bob"],
+            "left_data": [1, 2],
+        })
         left_node.name = "left_node"
 
         right_node = Mock()
-        right_node.data = pl.DataFrame(
-            {"username": ["alice", "bob"], "right_data": [10, 20]}
-        )
+        right_node.data = pl.DataFrame({
+            "username": ["alice", "bob"],
+            "right_data": [10, 20],
+        })
         right_node.name = "right_node"
 
         # Mock joined result node
