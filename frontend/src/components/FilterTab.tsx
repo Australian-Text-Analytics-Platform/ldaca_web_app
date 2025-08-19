@@ -431,13 +431,40 @@ const FilterTab: React.FC = () => {
       <h3 className="text-lg font-medium text-gray-900 mb-4">Filter Data</h3>
       
       {/* Selected Node Info */}
-      <div className="bg-gray-50 p-3 rounded-lg">
-        <p className="text-sm text-gray-600">
-          <strong>Selected Node:</strong> {selectedNode?.data?.name || selectedNodeId}
-        </p>
-        <p className="text-sm text-gray-600">
-          <strong>Available Columns:</strong> {availableColumns.map(col => `${col.name} (${col.dataType})`).join(', ')}
-        </p>
+      <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+        <div>
+          {(() => {
+            const displayName = selectedNode ? (
+              selectedNode.data?.nodeName || selectedNode.data?.label || selectedNode.data?.name || selectedNode.label || selectedNode.id || selectedNodeId
+            ) : selectedNodeId;
+            return (
+              <>
+                <div className="text-sm font-medium text-gray-800 break-words">{displayName}</div>
+                <div className="text-xs text-gray-500 break-all">{selectedNodeId}</div>
+              </>
+            );
+          })()}
+        </div>
+        <div className="pt-1">
+          <div className="text-xs font-semibold text-gray-600 mb-1 tracking-wide">SCHEMA</div>
+          <div className="overflow-x-auto border border-gray-200 rounded-md bg-white">
+            <table className="text-[11px] font-mono border-collapse">
+              <tbody>
+                <tr className="align-top">
+                  {availableColumns.map(col => (
+                    <td key={col.name + '-name'} className="px-2 py-1 font-semibold text-gray-700 whitespace-nowrap border-b border-gray-100 min-w-[6rem]">{col.name}</td>
+                  ))}
+                </tr>
+                <tr className="align-top">
+                  {availableColumns.map(col => (
+                    <td key={col.name + '-type'} className="px-2 py-1 text-gray-500 whitespace-nowrap min-w-[6rem]">{col.dataType}</td>
+                  ))}
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div className="text-[10px] text-gray-400 mt-1">Scroll horizontally to view all {availableColumns.length} column(s).</div>
+        </div>
       </div>
 
       {/* Filter Conditions */}
