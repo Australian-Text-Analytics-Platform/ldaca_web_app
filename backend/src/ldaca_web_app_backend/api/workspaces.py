@@ -31,6 +31,8 @@ from ..models import (
     TokenFrequencyRequest,
     TokenFrequencyResponse,
     TokenStatisticsData,
+    TopicModelingRequest,
+    TopicModelingResponse,
     WorkspaceCreateRequest,
     WorkspaceInfo,
 )
@@ -84,6 +86,163 @@ def _get_cached_concordance_df(key):  # pragma: no cover - simple accessor
     if entry:
         return entry.get("df")
     return None
+
+
+# ============================================================================
+# TOPIC MODELING ENDPOINT
+# ============================================================================
+
+
+@router.post(
+    "/{workspace_id}/topic-modeling",
+    response_model=TopicModelingResponse,
+    summary="Run topic modeling (BERTopic) across one or two nodes",
+    description="Fits a single BERTopic model over concatenated documents from up to two nodes and returns per-topic sizes and 2D coordinates.",
+)
+async def run_topic_modeling(
+    workspace_id: str,
+    request: TopicModelingRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    user_id = current_user["id"]
+    try:
+        if not request.node_ids:
+            raise HTTPException(
+                status_code=400, detail="At least one node ID must be provided"
+            )
+        if len(request.node_ids) > 2:
+            raise HTTPException(
+                status_code=400, detail="Maximum of 2 nodes can be compared"
+            )
+
+        workspace = workspace_manager.get_workspace(user_id, workspace_id)
+        if not workspace:
+            raise HTTPException(
+                status_code=404, detail=f"Workspace {workspace_id} not found"
+            )
+
+        try:
+            import polars as pl  # noqa: F401
+
+            from docframe import DocDataFrame, DocLazyFrame  # type: ignore
+        except Exception as e:  # pragma: no cover
+            raise HTTPException(
+                status_code=500, detail=f"Required libraries unavailable: {e}"
+            )
+
+        corpora: list[list[str]] = []
+        node_names: list[str] = []
+        node_columns = request.node_columns or {}
+
+        for node_id in request.node_ids:
+            node = workspace_manager.get_node_from_workspace(
+                user_id, workspace_id, node_id
+            )
+            if not node:
+                raise HTTPException(status_code=404, detail=f"Node {node_id} not found")
+            node_data = getattr(node, "data", node)
+            node_name = getattr(node, "name", None) or node_id
+
+            if hasattr(node_data, "columns"):
+                available_columns = node_data.columns  # type: ignore[attr-defined]
+            elif hasattr(node_data, "collect_schema"):
+                available_columns = list(node_data.collect_schema().keys())  # type: ignore
+            elif hasattr(node_data, "schema"):
+                available_columns = list(node_data.schema.keys())  # type: ignore
+            else:
+                available_columns = []
+
+            column_name = node_columns.get(node_id)
+            if not column_name:
+                if isinstance(node_data, (DocDataFrame, DocLazyFrame)) and getattr(
+                    node_data, "document_column", None
+                ):
+                    column_name = node_data.document_column  # type: ignore[attr-defined]
+                else:
+                    common = [
+                        c
+                        for c in ["document", "text", "content", "body", "message"]
+                        if c in available_columns
+                    ]
+                    if common:
+                        column_name = common[0]
+            if not column_name:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Could not determine text column for node {node_id}. Available: {available_columns}",
+                )
+            if column_name not in available_columns:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Column '{column_name}' not in node {node_id}. Available: {available_columns}",
+                )
+
+            try:
+                if hasattr(node_data, "select"):
+                    selected = node_data.select(
+                        pl.col(column_name).alias("__doc_col__")
+                    )  # type: ignore
+                else:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Unsupported node data type for node {node_id}",
+                    )
+                if hasattr(selected, "collect"):
+                    try:
+                        selected = selected.collect()
+                    except Exception:  # pragma: no cover
+                        pass
+                docs = [
+                    str(v) if v is not None else ""
+                    for v in selected["__doc_col__"].to_list()
+                ]  # type: ignore[index]
+                corpora.append(docs)
+                node_names.append(node_name)
+            except HTTPException:
+                raise
+            except Exception as e:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Error extracting documents from node {node_id}: {e}",
+                )
+
+        try:
+            from docframe.core.text_utils import topic_visualization  # type: ignore
+        except Exception as e:  # pragma: no cover
+            raise HTTPException(
+                status_code=500, detail=f"topic_visualization unavailable: {e}"
+            )
+
+        try:
+            tv = topic_visualization(
+                corpora=corpora,
+                min_topic_size=request.min_topic_size or 5,
+                use_ctfidf=bool(request.use_ctfidf),
+            )
+        except ImportError as ie:
+            return TopicModelingResponse(success=False, message=str(ie), data=None)
+        except ValueError as ve:
+            raise HTTPException(status_code=400, detail=str(ve))
+        except Exception as e:  # pragma: no cover
+            raise HTTPException(
+                status_code=500, detail=f"Error running topic modeling: {e}"
+            )
+
+        response_data = {
+            "topics": tv["topics"],
+            "corpus_sizes": tv["corpus_sizes"],
+            "per_corpus_topic_counts": tv.get("per_corpus_topic_counts"),
+            "meta": {**tv.get("meta", {}), "node_names": node_names},
+        }
+        return TopicModelingResponse(
+            success=True,
+            message=f"Successfully modeled topics for {len(corpora)} corpus/corpora",
+            data=response_data,  # type: ignore[arg-type]
+        )
+    except HTTPException:
+        raise
+    except Exception as e:  # pragma: no cover
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {e}")
 
 
 def _store_concordance_df(key, df):  # pragma: no cover

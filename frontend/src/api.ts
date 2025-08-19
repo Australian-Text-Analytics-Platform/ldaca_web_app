@@ -854,3 +854,47 @@ export async function getDefaultStopWords(
   );
   return res.data;
 }
+
+// Topic Modeling Types & API
+
+export interface TopicModelingRequest {
+  node_ids: string[]; // up to 2
+  node_columns?: Record<string, string>;
+  min_topic_size?: number;
+  use_ctfidf?: boolean;
+}
+
+export interface TopicModelingTopic {
+  id: number;
+  label: string;
+  size: number[]; // per-corpus sizes
+  total_size: number;
+  x: number;
+  y: number;
+}
+
+export interface TopicModelingData {
+  topics: TopicModelingTopic[];
+  corpus_sizes: number[];
+  per_corpus_topic_counts?: Record<string, number>[]; // list of dicts (topic_id -> count)
+  meta: Record<string, any>;
+}
+
+export interface TopicModelingResponse {
+  success: boolean;
+  message: string;
+  data?: TopicModelingData | null;
+}
+
+export async function runTopicModeling(
+  workspaceId: string,
+  request: TopicModelingRequest,
+  authHeaders: Record<string, string> = {}
+): Promise<TopicModelingResponse> {
+  const res = await axios.post(
+    `${API_BASE}/workspaces/${workspaceId}/topic-modeling`,
+    request,
+    { headers: authHeaders }
+  );
+  return res.data;
+}

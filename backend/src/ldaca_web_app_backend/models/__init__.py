@@ -482,3 +482,47 @@ class TokenFrequencyResponse(BaseModel):
     statistics: Optional[List[TokenStatisticsData]] = (
         None  # Statistical measures (only when comparing 2 nodes)
     )
+
+
+# =============================================================================
+# TOPIC MODELING MODELS
+# =============================================================================
+
+
+class TopicModelingRequest(BaseModel):
+    node_ids: List[str]  # 1 or 2 node IDs
+    node_columns: Optional[Dict[str, str]] = None  # Maps node_id -> column_name
+    min_topic_size: Optional[int] = 5
+    use_ctfidf: Optional[bool] = False
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "node_ids": ["node1", "node2"],
+                "node_columns": {"node1": "text", "node2": "content"},
+                "min_topic_size": 5,
+                "use_ctfidf": False,
+            }
+        }
+
+
+class TopicModelingTopic(BaseModel):
+    id: int
+    label: str
+    size: List[int]  # per-corpus sizes aligned to request.node_ids order
+    total_size: int
+    x: float
+    y: float
+
+
+class TopicModelingData(BaseModel):
+    topics: List[TopicModelingTopic]
+    corpus_sizes: List[int]
+    per_corpus_topic_counts: Optional[List[Dict[int, int]]] = None
+    meta: Dict[str, Any]
+
+
+class TopicModelingResponse(BaseModel):
+    success: bool
+    message: str
+    data: Optional[TopicModelingData] = None

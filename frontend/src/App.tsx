@@ -8,6 +8,7 @@ import GoogleLogin from './components/GoogleLogin';
 import DataLoaderTab from './components/DataLoaderTab';
 import FilterTab from './components/FilterTab';
 import ConcordanceTab from './components/ConcordanceTab';
+import TopicModelingTab from './components/TopicModelingTab';
 import TimelineTab from './components/TimelineTab';
 import ExportTab from './components/ExportTab';
 import TokenFrequencyTab from './components/TokenFrequencyTab';
@@ -19,7 +20,7 @@ import logo from './logo.png';
  * Improved App component with proper error boundaries and loading states
  */
 const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'data-loader' | 'filter' | 'token-frequency' | 'concordance' | 'analysis' | 'export'>('data-loader');
+  const [activeTab, setActiveTab] = useState<'data-loader' | 'filter' | 'token-frequency' | 'topic-modeling' | 'concordance' | 'analysis' | 'export'>('data-loader');
   const { user, loginWithGoogle, logout, isAuthenticated, isMultiUserMode, isLoading, error } = useAuth();
   const { ready: backendReady } = useBackendHealth();
 
@@ -197,6 +198,7 @@ const App: React.FC = () => {
                   {activeTab === 'data-loader' && <DataLoaderTab />}
                   {activeTab === 'filter' && <FilterTab />}
                   {activeTab === 'concordance' && <ConcordanceTab />}
+                  {activeTab === 'topic-modeling' && <TopicModelingTab />}
                   {activeTab === 'token-frequency' && <TokenFrequencyTab />}
                   {activeTab === 'analysis' && <TimelineTab />}
                   {activeTab === 'export' && <ExportTab />}
