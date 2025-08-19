@@ -1,9 +1,10 @@
 import axios from 'axios';
 
 // Determine API base URL based on current hostname and environment
-const getApiBase = () => {
+// Exported so other utilities (e.g., health polling) can derive non-/api root.
+export const getApiBase = () => {
   if (typeof window === 'undefined') return '/api';
-  const { origin, hostname, port, pathname } = window.location;
+  const { origin, hostname, pathname } = window.location;
   
   // Debug gated
   if (localStorage.getItem('debugApp') === '1') console.log('API Detection:', {

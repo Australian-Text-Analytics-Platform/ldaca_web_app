@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './App.css';
 import { useAuth } from './hooks/useAuth';
+import { useBackendHealth } from './hooks/useBackendHealth';
 import { QueryProvider } from './providers/QueryProvider';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import GoogleLogin from './components/GoogleLogin';
@@ -12,6 +13,7 @@ import ExportTab from './components/ExportTab';
 import TokenFrequencyTab from './components/TokenFrequencyTab';
 import WorkspaceView from './components/WorkspaceView';
 import Sidebar from './components/Sidebar';
+import logo from './logo.png';
 
 /**
  * Improved App component with proper error boundaries and loading states
@@ -19,6 +21,7 @@ import Sidebar from './components/Sidebar';
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'data-loader' | 'filter' | 'token-frequency' | 'concordance' | 'analysis' | 'export'>('data-loader');
   const { user, loginWithGoogle, logout, isAuthenticated, isMultiUserMode, isLoading, error } = useAuth();
+  const { ready: backendReady } = useBackendHealth();
 
   // Right panel width and resize handlers must be declared before any early returns (React Hooks rule)
   const [rightWidth, setRightWidth] = useState<number>(50); // percentage of total width
@@ -113,6 +116,23 @@ const App: React.FC = () => {
     );
   }
 
+  // Wait for backend readiness before showing anything else (prevents empty file list due to race)
+  if (!backendReady) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
+        <div className="text-center flex flex-col items-center space-y-5 bg-white/80 backdrop-blur px-10 py-8 rounded-xl shadow-lg border border-gray-100">
+          <img src={logo} alt="LDaCA Logo" className="h-16 w-auto object-contain" />
+          <h1 className="text-2xl font-bold text-gray-800">LDaCA Corpus Analysis</h1>
+          <div className="flex flex-col items-center space-y-3">
+            <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-200 border-t-blue-600" />
+            <p className="text-gray-700 font-medium">Backend not ready yet</p>
+            <p className="text-xs text-gray-500">Waiting for API /health...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Show login screen if not authenticated and in multi-user mode
   if (!isAuthenticated && isMultiUserMode) {
     return (
@@ -144,7 +164,10 @@ const App: React.FC = () => {
           {/* Header */}
           <header className="bg-white border-b border-gray-200 px-6 py-4 relative">
             <div className="flex items-center justify-between">
-              <h1 className="text-xl font-bold text-gray-800">LDaCA Corpus Analysis</h1>
+              <div className="flex items-center space-x-3">
+                <img src={logo} alt="LDaCA Logo" className="h-8 w-auto object-contain" />
+                <h1 className="text-xl font-bold text-gray-800">LDaCA Corpus Analysis</h1>
+              </div>
               <div className="flex items-center space-x-4">
                 <span className="text-sm text-gray-600">Welcome, {user?.name}</span>
                 <button
