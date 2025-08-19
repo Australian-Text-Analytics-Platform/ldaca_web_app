@@ -234,17 +234,20 @@ export async function getWorkspaceNodes(workspaceId: string, authHeaders: Record
 }
 
 export async function createNodeFromFile(
-  workspaceId: string, 
-  filename: string, 
-  nodeName?: string, 
-  authHeaders: Record<string, string> = {}
+  workspaceId: string,
+  filename: string,
+  nodeName?: string,
+  authHeaders: Record<string, string> = {},
+  options?: { mode?: 'corpus' | 'metadata'; document_column?: string | null }
 ) {
   const res = await axios.post(`${API_BASE}/workspaces/${workspaceId}/nodes`, null, {
     params: {
       filename,
-      node_name: nodeName
+      node_name: nodeName,
+      mode: options?.mode ?? 'corpus',
+      document_column: options?.document_column ?? undefined
     },
-    headers: authHeaders 
+    headers: authHeaders
   });
   return res.data;
 }

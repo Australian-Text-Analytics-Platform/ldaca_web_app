@@ -4,6 +4,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useWorkspace } from '../hooks/useWorkspace';
 import { useFiles } from '../hooks/useFiles';
 import FilePreviewModal from './FilePreviewModal';
+import AddFileModal from './AddFileModal';
 
 const DataLoaderTab: React.FC = () => {
   const { getAuthHeaders } = useAuth();
@@ -31,6 +32,7 @@ const DataLoaderTab: React.FC = () => {
   const [newWorkspaceName, setNewWorkspaceName] = useState('');
   const [previewFile, setPreviewFile] = useState<string | null>(null);
   const [addingToWorkspace, setAddingToWorkspace] = useState<string | null>(null);
+  const [fileToAdd, setFileToAdd] = useState<string | null>(null);
   const downloadFile = useCallback(async (filename: string) => {
     try {
       const resp = await fetch(`/api/files/${encodeURIComponent(filename)}`, { headers: authHeaders });
@@ -62,33 +64,25 @@ const DataLoaderTab: React.FC = () => {
   }, [handleUploadFile]);
 
   // Add file to workspace (create new workspace if none exists)
-  const handleAddToWorkspace = useCallback(async (filename: string) => {
+  const handleConfirmedAdd = useCallback(async (filename: string, mode: 'corpus' | 'metadata', documentColumn?: string | null) => {
     setAddingToWorkspace(filename);
-    
     try {
       if (!currentWorkspace) {
-  if (localStorage.getItem('debugApp') === '1') console.log('No current workspace, creating new workspace with file:', filename);
-        
-        // Create new workspace with initial file in single API call
-  const workspaceName = newWorkspaceName.trim() || `Workspace ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`;
-        const workspace = await createWorkspace(workspaceName, 'Auto-created from file', filename);
-  if (localStorage.getItem('debugApp') === '1') console.log('Created new workspace with initial file, workspace ID:', workspace.workspace_id);
-        
-        // Set the new workspace as current (the file is already added via initial_data_file)
-  await setCurrentWorkspace(workspace.workspace_id);
-  setNewWorkspaceName('');
-  if (localStorage.getItem('debugApp') === '1') console.log('Successfully created workspace and added file in single operation');
+        const workspaceName = newWorkspaceName.trim() || `Workspace ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`;
+        // Create empty workspace first (no initial_data_file to allow mode/document control)
+        const workspace = await createWorkspace(workspaceName, 'Auto-created');
+        await setCurrentWorkspace(workspace.workspace_id);
+        setNewWorkspaceName('');
+        await createNodeFromFile(filename, { mode, documentColumn });
       } else {
-        // Add file to existing workspace  
-        await createNodeFromFile(filename);
-  if (localStorage.getItem('debugApp') === '1') console.log('Successfully added file to existing workspace');
+        await createNodeFromFile(filename, { mode, documentColumn });
       }
-    } catch (error) {
-      console.error('Failed to add file to workspace:', error);
+    } catch (e) {
+      console.error('Failed to add file:', e);
     } finally {
       setAddingToWorkspace(null);
     }
-  }, [currentWorkspace, createWorkspace, createNodeFromFile, setCurrentWorkspace, newWorkspaceName]);
+  }, [currentWorkspace, createWorkspace, setCurrentWorkspace, createNodeFromFile, newWorkspaceName]);
 
   // Load workspace
   const handleLoadWorkspace = useCallback(async (workspaceId: string) => {
@@ -224,7 +218,7 @@ const DataLoaderTab: React.FC = () => {
                       </div>
                       <div className="flex items-center space-x-2">
                         <button
-                          onClick={(e) => { e.stopPropagation(); handleAddToWorkspace(file.filename); }}
+                          onClick={(e) => { e.stopPropagation(); setFileToAdd(file.filename); }}
                           disabled={addingToWorkspace === file.filename || isLoading.operations}
                           className="px-3 py-1 text-sm bg-green-100 text-green-700 rounded hover:bg-green-200 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
@@ -270,6 +264,16 @@ const DataLoaderTab: React.FC = () => {
                   filename={previewFile}
                   isOpen={!!previewFile}
                   onClose={() => setPreviewFile(null)}
+                />
+                <AddFileModal
+                  filename={fileToAdd}
+                  isOpen={!!fileToAdd}
+                  onClose={() => setFileToAdd(null)}
+                  onConfirm={async ({ mode, documentColumn }) => {
+                    if (!fileToAdd) return;
+                    await handleConfirmedAdd(fileToAdd, mode, documentColumn);
+                    setFileToAdd(null);
+                  }}
                 />
               </div>
             )}

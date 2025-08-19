@@ -612,9 +612,24 @@ async def get_workspace_nodes(
 
 @router.post("/{workspace_id}/nodes")
 async def add_node_to_workspace(
-    workspace_id: str, filename: str, current_user: dict = Depends(get_current_user)
+    workspace_id: str,
+    filename: str,
+    mode: str = Query(
+        "corpus",
+        description="How to treat the file: 'corpus' (wrap as DocLazyFrame) or 'metadata' (plain LazyFrame)",
+    ),
+    document_column: Optional[str] = Query(
+        None, description="Explicit document/text column to use when mode=corpus"
+    ),
+    current_user: dict = Depends(get_current_user),
 ):
-    """Add a data file as a new node to workspace"""
+    """Add a data file as a new node to workspace.
+
+    Enhancements:
+    - mode=corpus: attempt to convert underlying data to DocLazyFrame (text-aware)
+      using provided document_column or guessing via DocDataFrame.guess_document_column
+    - mode=metadata: ensure a plain LazyFrame/DataFrame (no Doc* wrapper)
+    """
     user_id = current_user["id"]
 
     try:
@@ -641,6 +656,59 @@ async def add_node_to_workspace(
         except Exception:
             pass
 
+        # Content mode handling (corpus vs metadata)
+        if mode not in {"corpus", "metadata"}:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid mode. Expected 'corpus' or 'metadata'",
+            )
+
+        if mode == "corpus":
+            try:
+                import docframe  # noqa: F401
+                from docframe.core.docframe import DocDataFrame as _DDF
+            except Exception:  # pragma: no cover
+                raise HTTPException(
+                    status_code=500,
+                    detail="docframe library not available for corpus mode",
+                )
+
+            # Ensure lazy
+            try:
+                if isinstance(data, pl.DataFrame):
+                    data = data.lazy()
+            except Exception:
+                pass
+
+            if document_column is None:
+                try:
+                    guessed = _DDF.guess_document_column(data)  # type: ignore[arg-type]
+                    document_column = guessed
+                except Exception:
+                    document_column = None
+
+            # Attempt conversion using namespace (import docframe above registers it)
+            try:
+                if hasattr(data, "text"):
+                    data = data.text.to_doclazyframe(document_column=document_column)  # type: ignore[attr-defined]
+                else:
+                    from docframe.core.docframe import DocLazyFrame as _DLF
+
+                    if isinstance(data, pl.LazyFrame):
+                        data = _DLF(data, document_column=document_column)
+            except Exception as e:
+                print(f"⚠️ Failed to wrap as DocLazyFrame: {e}")
+        else:  # metadata
+            try:
+                if hasattr(data, "lazyframe"):
+                    data = data.lazyframe  # type: ignore[attr-defined]
+                elif hasattr(data, "dataframe"):
+                    df_inner = data.dataframe  # type: ignore[attr-defined]
+                    data = df_inner.lazy()
+            except Exception:
+                pass
+        # End mode handling
+
         # Create node name from filename
         node_name = (
             filename.replace(".csv", "").replace(".xlsx", "").replace(".json", "")
@@ -652,6 +720,7 @@ async def add_node_to_workspace(
             raise HTTPException(
                 status_code=400, detail="Unsupported data type loaded from file"
             )
+
         node = workspace_manager.add_node_to_workspace(
             user_id=user_id,
             workspace_id=workspace_id,
