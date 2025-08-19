@@ -401,7 +401,7 @@ class WorkspaceGraph(BaseModel):
 
 class FilterCondition(BaseModel):
     column: str
-    operator: str
+    operator: str  # Allow any string to support new operators like 'between'
     value: Any
     id: Optional[str] = None  # Frontend includes this for tracking
     dataType: Optional[str] = None  # Frontend includes this for UI

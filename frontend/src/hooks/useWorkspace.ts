@@ -11,7 +11,6 @@ import {
   getNodeShape,
   getNodeSchema,
   castNode as apiCastNode,
-  convertNode as apiConvertNode,
   convertToDocDataFrame as apiConvertToDocDataFrame,
   convertToDataFrame as apiConvertToDataFrame,
   convertToDocLazyFrame as apiConvertToDocLazyFrame,
@@ -33,7 +32,6 @@ import {
   saveWorkspace as apiSaveWorkspace,
   saveWorkspaceAs as apiSaveWorkspaceAs,
   updateWorkspaceName as apiUpdateWorkspaceName,
-  ConversionTarget,
 } from '../api';
 import { queryKeys } from '../lib/queryKeys';
 

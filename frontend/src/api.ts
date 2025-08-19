@@ -582,8 +582,8 @@ export async function getNodeSchema(
 
 export interface FilterCondition {
   column: string;
-  operator: 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'contains' | 'startswith' | 'endswith' | 'is_null' | 'is_not_null';
-  value: string | number | boolean;
+  operator: 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'contains' | 'startswith' | 'endswith' | 'is_null' | 'is_not_null' | 'between';
+  value: string | number | boolean | Date | { start: Date | null, end: Date | null } | { start: string | null, end: string | null } | null;
 }
 
 export interface FilterRequest {

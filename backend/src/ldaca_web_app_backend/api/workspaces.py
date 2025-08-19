@@ -6,7 +6,9 @@ All business logic is handled by the DocWorkspace library itself.
 """
 
 import logging
+import re
 import time
+from datetime import datetime
 from typing import Any, Dict, Optional, Tuple, cast
 
 import polars as pl
@@ -1321,20 +1323,118 @@ async def filter_node(
             raise ValueError("Node not found")
 
         # Build filter expression from conditions
+        iso_pattern = re.compile(
+            r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,6})?)?(Z|[+\-]\d{2}:?\d{2})$"
+        )
+
+        def parse_temporal(val):
+            """Parse ISO8601 preserving timezone.
+
+            If value matches ISO8601 with timezone or 'Z', convert to aware datetime.
+            Otherwise return original value.
+            """
+            if isinstance(val, str) and iso_pattern.match(val):
+                s = val
+                if s.endswith("Z"):
+                    s = s[:-1] + "+00:00"
+                # Normalize timezone without colon e.g. +0000 to +00:00
+                if re.search(r"([+\-]\d{2})(\d{2})$", s):
+                    s = re.sub(r"([+\-]\d{2})(\d{2})$", r"\1:\2", s)
+                try:
+                    dt = datetime.fromisoformat(s)
+                    return dt
+                except Exception:
+                    return val
+            return val
+
+        def coerce_scalar(v):
+            # Attempt numeric coercion if appropriate
+            if isinstance(v, str):
+                try:
+                    if "." in v:
+                        return float(v)
+                    return int(v)
+                except Exception:
+                    pass
+            return v
+
         filter_expr = None
         for condition in request.conditions:
             column_expr = pl.col(condition.column)
 
-            if condition.operator == "equals":
-                expr = column_expr == condition.value
-            elif condition.operator == "contains":
-                expr = column_expr.str.contains(str(condition.value))
-            elif condition.operator == "greater_than":
-                expr = column_expr > float(condition.value)
-            elif condition.operator == "less_than":
-                expr = column_expr < float(condition.value)
+            op = condition.operator
+            raw_value = condition.value
+
+            expr = None
+            if op in {
+                "eq",
+                "equals",
+                "ne",
+                "gt",
+                "greater_than",
+                "gte",
+                "lt",
+                "less_than",
+                "lte",
+            }:
+                value = parse_temporal(raw_value)
+                value = coerce_scalar(value)
+                # For aware datetimes ensure we compare with timezone aware columns; Polars expects same time unit & tz
+                lit_val = pl.lit(value) if isinstance(value, datetime) else value
+                if op in {"eq", "equals"}:
+                    expr = column_expr == lit_val
+                elif op == "ne":
+                    expr = column_expr != lit_val
+                elif op in {"gt", "greater_than"}:
+                    expr = column_expr > lit_val
+                elif op == "gte":
+                    expr = column_expr >= lit_val
+                elif op in {"lt", "less_than"}:
+                    expr = column_expr < lit_val
+                elif op == "lte":
+                    expr = column_expr <= lit_val
+            elif op == "contains":
+                expr = column_expr.str.contains(str(raw_value))
+            elif op == "startswith":
+                expr = column_expr.str.starts_with(str(raw_value))
+            elif op == "endswith":
+                expr = column_expr.str.ends_with(str(raw_value))
+            elif op == "is_null":
+                expr = column_expr.is_null()
+            elif op == "is_not_null":
+                expr = column_expr.is_not_null()
+            elif op == "between":
+                if isinstance(raw_value, dict):
+                    start_val = (
+                        parse_temporal(raw_value.get("start"))
+                        if raw_value.get("start") is not None
+                        else None
+                    )
+                    end_val = (
+                        parse_temporal(raw_value.get("end"))
+                        if raw_value.get("end") is not None
+                        else None
+                    )
+                    if start_val is not None and end_val is not None:
+                        if isinstance(start_val, datetime):
+                            start_val = pl.lit(start_val)
+                        if isinstance(end_val, datetime):
+                            end_val = pl.lit(end_val)
+                        expr = column_expr.is_between(start_val, end_val, closed="both")
+                    elif start_val is not None:
+                        if isinstance(start_val, datetime):
+                            start_val = pl.lit(start_val)
+                        expr = column_expr >= start_val
+                    elif end_val is not None:
+                        if isinstance(end_val, datetime):
+                            end_val = pl.lit(end_val)
+                        expr = column_expr <= end_val
+                    else:
+                        expr = pl.lit(True)
+                else:
+                    expr = pl.lit(True)
             else:
-                expr = column_expr.str.contains(str(condition.value))  # fallback
+                expr = column_expr.str.contains(str(raw_value))
 
             if filter_expr is None:
                 filter_expr = expr

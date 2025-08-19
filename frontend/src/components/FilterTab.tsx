@@ -1,11 +1,85 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
 import { useWorkspace } from '../hooks/useWorkspace';
 import { FilterCondition, FilterRequest } from '../api';
 
+// (Removed unused DATA_TYPES constant to satisfy lint)
+
+// Utility function to normalize type names
+const normalizeTypeName = (type: string): string => {
+  const lowercaseType = type.toLowerCase();
+  if (lowercaseType.includes('utf8') || lowercaseType.includes('string')) return 'string';
+  if (lowercaseType.includes('int') && !lowercaseType.includes('interval')) return 'integer';
+  if (lowercaseType.includes('float') || lowercaseType.includes('double')) return 'float';
+  if (lowercaseType.includes('bool')) return 'boolean';
+  if (lowercaseType.includes('datetime') || lowercaseType.includes('timestamp')) return 'datetime';
+  if (lowercaseType.includes('list') || lowercaseType.includes('array')) return 'array';
+  return 'string'; // Default fallback
+};
+
+// Get operators for each data type
+const getOperatorsForType = (dataType: string) => {
+  switch (dataType) {
+    case 'string':
+      return [
+        { value: 'eq', label: 'Equals' },
+        { value: 'ne', label: 'Not Equals' },
+        { value: 'contains', label: 'Contains' },
+        { value: 'startswith', label: 'Starts With' },
+        { value: 'endswith', label: 'Ends With' },
+        { value: 'is_null', label: 'Is Null' },
+        { value: 'is_not_null', label: 'Is Not Null' },
+      ];
+    case 'integer':
+    case 'float':
+      return [
+        { value: 'eq', label: 'Equals' },
+        { value: 'ne', label: 'Not Equals' },
+        { value: 'gt', label: 'Greater Than' },
+        { value: 'gte', label: 'Greater Than or Equal' },
+        { value: 'lt', label: 'Less Than' },
+        { value: 'lte', label: 'Less Than or Equal' },
+        { value: 'is_null', label: 'Is Null' },
+        { value: 'is_not_null', label: 'Is Not Null' },
+      ];
+    case 'boolean':
+      return [
+        { value: 'eq', label: 'Equals' },
+        { value: 'ne', label: 'Not Equals' },
+        { value: 'is_null', label: 'Is Null' },
+        { value: 'is_not_null', label: 'Is Not Null' },
+      ];
+    case 'datetime':
+      return [
+        { value: 'eq', label: 'Equals' },
+        { value: 'ne', label: 'Not Equals' },
+        { value: 'gt', label: 'After' },
+        { value: 'gte', label: 'After or Equal' },
+        { value: 'lt', label: 'Before' },
+        { value: 'lte', label: 'Before or Equal' },
+        { value: 'between', label: 'Between' },
+        { value: 'is_null', label: 'Is Null' },
+        { value: 'is_not_null', label: 'Is Not Null' },
+      ];
+    default:
+      return [
+        { value: 'eq', label: 'Equals' },
+        { value: 'ne', label: 'Not Equals' },
+        { value: 'is_null', label: 'Is Null' },
+        { value: 'is_not_null', label: 'Is Not Null' },
+      ];
+  }
+};
+
 // Extended interface for UI with tracking ID
-interface FilterConditionWithId extends FilterCondition {
+interface FilterConditionWithId extends Omit<FilterCondition, 'value'> {
   id: string;
+  dataType?: string;
+  value: string | number | boolean | Date | { start: Date | null, end: Date | null } | null;
 }
+
+// Removed DatePicker & custom time input: now using direct ISO8601 text input for timezone-aware datetime entry.
 
 const FilterTab: React.FC = () => {
   const { 
@@ -26,21 +100,35 @@ const FilterTab: React.FC = () => {
   const [newNodeName, setNewNodeName] = useState('');
   const [isFiltering, setIsFiltering] = useState(false);
 
-  // Get available columns from node data (which includes actual column names)
+  // Get available columns with their datatypes from node data
   const availableColumns = useMemo(() => {
+    const columns: Array<{name: string, dataType: string}> = [];
+    
     // First try to get columns from nodeData (which includes actual column names)
-    if (nodeData?.columns && Array.isArray(nodeData.columns)) {
-      return nodeData.columns;
+    if (nodeData?.columns && Array.isArray(nodeData.columns) && nodeData?.dtypes) {
+      nodeData.columns.forEach((colName: string) => {
+        const rawDataType = nodeData.dtypes[colName] || 'unknown';
+        const normalizedDataType = normalizeTypeName(rawDataType);
+        columns.push({ name: colName, dataType: normalizedDataType });
+      });
     }
     // Fallback to dtypes keys if available
-    if (nodeData?.dtypes && typeof nodeData.dtypes === 'object') {
-      return Object.keys(nodeData.dtypes);
+    else if (nodeData?.dtypes && typeof nodeData.dtypes === 'object') {
+      Object.keys(nodeData.dtypes).forEach(colName => {
+        const rawDataType = nodeData.dtypes[colName] || 'unknown';
+        const normalizedDataType = normalizeTypeName(rawDataType);
+        columns.push({ name: colName, dataType: normalizedDataType });
+      });
     }
     // Last fallback to schema if available
-    if (selectedNode?.data?.schema) {
-      return Object.keys(selectedNode.data.schema);
+    else if (selectedNode?.data?.schema) {
+      Object.keys(selectedNode.data.schema).forEach(colName => {
+        // Schema doesn't have types, so default to string
+        columns.push({ name: colName, dataType: 'string' });
+      });
     }
-    return [];
+    
+    return columns;
   }, [nodeData?.columns, nodeData?.dtypes, selectedNode?.data?.schema]);
 
   // Auto-generate node name based on selected node
@@ -51,11 +139,13 @@ const FilterTab: React.FC = () => {
   }, [selectedNode]);
 
   const handleAddCondition = () => {
+    const firstColumn = availableColumns[0];
     const newCondition: FilterConditionWithId = {
       id: Date.now().toString(),
-      column: availableColumns[0] || '',
+      column: firstColumn ? firstColumn.name : '',
       operator: 'eq',
-      value: ''
+      value: '',
+      dataType: firstColumn ? firstColumn.dataType : 'string'
     };
     setConditions([...conditions, newCondition]);
   };
@@ -67,9 +157,203 @@ const FilterTab: React.FC = () => {
   };
 
   const handleConditionChange = (id: string, field: keyof FilterConditionWithId, value: any) => {
-    setConditions(conditions.map(c => 
-      c.id === id ? { ...c, [field]: value } : c
-    ));
+    setConditions(conditions.map(c => {
+      if (c.id === id) {
+        const updated = { ...c, [field]: value };
+        
+        // If column changed, update dataType and reset operator
+        if (field === 'column') {
+          const columnInfo = availableColumns.find(col => col.name === value);
+          if (columnInfo) {
+            updated.dataType = columnInfo.dataType;
+            updated.operator = 'eq'; // Reset to default operator
+            updated.value = ''; // Reset value
+          }
+        }
+        
+        return updated;
+      }
+      return c;
+    }));
+  };
+
+  // Render appropriate input based on data type and operator
+  const renderValueInput = (condition: FilterConditionWithId) => {
+    const dataType = condition.dataType || 'string';
+
+    if (dataType === 'boolean') {
+      return (
+        <select
+          value={String(condition.value)}
+          onChange={(e) => handleConditionChange(condition.id, 'value', e.target.value === 'true')}
+          className="px-2 py-1 border border-gray-300 rounded text-sm flex-1"
+        >
+          <option value="">Select value</option>
+          <option value="true">True</option>
+          <option value="false">False</option>
+        </select>
+      );
+    }
+
+    if (dataType === 'datetime') {
+  const isoPlaceholder = 'YYYY-MM-DDTHH:MM:SS+00:00';
+      const parseIso = (s: string): Date | null => {
+        if (!s) return null;
+        // Accept missing seconds (add :00Z if only minutes and no tz)
+        let candidate = s.trim();
+        // If user entered just date, append T00:00:00Z
+    if (/^\d{4}-\d{2}-\d{2}$/.test(candidate)) {
+      candidate += 'T00:00:00+00:00';
+        }
+        // Add seconds if missing (pattern HH:MM(+tz) or HH:MMZ)
+        if (/T\d{2}:\d{2}(Z|[+-]\d{2}:?\d{2})?$/.test(candidate)) {
+          candidate = candidate.replace(/T(\d{2}:\d{2})(Z|[+-]\d{2}:?\d{2})?$/, (m, hm, tz) => `T${hm}:00${tz || '+00:00'}`);
+        }
+        // If no timezone specified, assume Z
+        if (/T\d{2}:\d{2}:\d{2}(\.\d+)?$/.test(candidate)) {
+          candidate += '+00:00';
+        }
+        // Normalize timezone without colon
+  candidate = candidate.replace(/([+-]\d{2})(\d{2})$/, '$1:$2');
+        const d = new Date(candidate);
+        if (isNaN(d.getTime())) return null;
+        // We want DatePicker to show the same HH:MM as the ISO value (which is UTC).
+        // Convert the UTC instant to a local wall date keeping the UTC components.
+        try {
+          const m = candidate.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/);
+          if (m) {
+            const [, Y, M, D, H, Min, S] = m;
+            return new Date(Number(Y), Number(M) - 1, Number(D), Number(H), Number(Min), Number(S));
+          }
+        } catch { /* ignore */ }
+        return d;
+      };
+
+      const buildPicker = (committedValue: string, commitValue: (v: string)=>void) => {
+        const committedDate = parseIso(committedValue);
+        // Buffered input component
+        // eslint-disable-next-line react/display-name
+        const IsoInput = React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>((props, ref) => {
+          const [draft, setDraft] = React.useState(committedValue);
+          const [focused, setFocused] = React.useState(false);
+          // Sync external committed value when not actively editing
+          React.useEffect(() => {
+            if (!focused) {
+              setDraft(committedValue);
+            }
+          // eslint-disable-next-line react-hooks/exhaustive-deps
+          }, [committedValue, focused]);
+
+          const normalize = (txt: string): string => {
+            let s = txt.trim();
+            if (!s) return s;
+            // If only date
+            if (/^\d{4}-\d{2}-\d{2}$/.test(s)) s += 'T00:00:00+00:00';
+            // If missing seconds but has HH:MM
+            if (/T\d{2}:\d{2}(\+00:00)?$/.test(s)) s = s.replace(/T(\d{2}:\d{2})(\+00:00)?$/, (m,_hm,_tz) => `T${_hm}:00+00:00`);
+            // Ensure timezone
+            if (/T\d{2}:\d{2}:\d{2}$/.test(s)) s += '+00:00';
+            // Canonicalize Z to +00:00
+            s = s.replace(/Z$/, '+00:00');
+            return s;
+          };
+
+            const commit = () => {
+              const normalized = normalize(draft);
+              commitValue(normalized || '');
+              setDraft(normalized);
+            };
+
+          return (
+            <input
+              {...props}
+              ref={ref}
+              type="text"
+              value={draft}
+              onFocus={() => setFocused(true)}
+              onBlur={() => { setFocused(false); commit(); }}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { commit(); (e.target as HTMLInputElement).blur(); } }}
+              placeholder={isoPlaceholder}
+              className="px-2 py-1 border border-gray-300 rounded text-sm font-mono"
+              size={28}
+              style={{ width: '28ch', minWidth: '28ch', maxWidth: '28ch', flex: 'none' }}
+            />
+          );
+        });
+
+        return (
+          <DatePicker
+            selected={committedDate || undefined}
+            onChange={(d) => {
+              if (d) {
+                const pad = (n:number) => String(n).padStart(2,'0');
+                const iso = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}+00:00`;
+                commitValue(iso);
+              }
+            }}
+            showTimeSelect
+            timeIntervals={15}
+            dateFormat="yyyy-MM-dd'T'HH:mm:ssXXX"
+            customInput={<IsoInput />}
+            popperClassName="z-50"
+          />
+        );
+      };
+      if (condition.operator === 'between') {
+        const rangeValue = (condition.value as { start?: string | Date | null; end?: string | Date | null }) || {};
+        const startStr =
+          typeof rangeValue.start === 'string'
+            ? rangeValue.start
+            : rangeValue.start instanceof Date
+              ? rangeValue.start.toISOString()
+              : '';
+        const endStr =
+          typeof rangeValue.end === 'string'
+            ? rangeValue.end
+            : rangeValue.end instanceof Date
+              ? rangeValue.end.toISOString()
+              : '';
+        return (
+          <div className="flex items-center space-x-2">
+            <div className="flex-none">{buildPicker(startStr, (v) => handleConditionChange(condition.id, 'value', { ...rangeValue, start: v }))}</div>
+            <div className="flex-none">{buildPicker(endStr, (v) => handleConditionChange(condition.id, 'value', { ...rangeValue, end: v }))}</div>
+          </div>
+        );
+      }
+      const singleVal =
+        typeof condition.value === 'string'
+          ? condition.value
+          : condition.value instanceof Date
+            ? condition.value.toISOString()
+            : '';
+      return buildPicker(singleVal, (v) => handleConditionChange(condition.id, 'value', v));
+    }
+
+    if (dataType === 'integer' || dataType === 'float') {
+      return (
+        <input
+          type="number"
+          step={dataType === 'float' ? 'any' : '1'}
+          value={String(condition.value)}
+          onChange={(e) => handleConditionChange(condition.id, 'value', 
+            dataType === 'integer' ? parseInt(e.target.value) || 0 : parseFloat(e.target.value) || 0)}
+          placeholder="Enter number"
+          className="px-2 py-1 border border-gray-300 rounded text-sm flex-1"
+        />
+      );
+    }
+
+    // Default: string input
+    return (
+      <input
+        type="text"
+        value={String(condition.value)}
+        onChange={(e) => handleConditionChange(condition.id, 'value', e.target.value)}
+        placeholder="Enter value"
+        className="px-2 py-1 border border-gray-300 rounded text-sm flex-1"
+      />
+    );
   };
 
   const handleApplyFilter = async () => {
@@ -78,17 +362,32 @@ const FilterTab: React.FC = () => {
       return;
     }
 
-    if (conditions.some(c => !c.column || c.value === '')) {
+    if (conditions.some(c => !c.column || (c.operator !== 'is_null' && c.operator !== 'is_not_null' && !c.value))) {
       alert('Please fill in all filter conditions');
       return;
     }
 
+    // Serialize conditions for API
+    const serializedConditions = conditions.map(c => {
+      let value: any;
+      if (c.operator === 'is_null' || c.operator === 'is_not_null') {
+        value = null;
+      } else if (c.value instanceof Date) {
+        value = c.value.toISOString();
+      } else if (c.value && typeof c.value === 'object' && 'start' in c.value) {
+        const range: any = c.value;
+        value = {
+          start: range.start instanceof Date ? range.start.toISOString() : (typeof range.start === 'string' ? range.start : null),
+          end: range.end instanceof Date ? range.end.toISOString() : (typeof range.end === 'string' ? range.end : null)
+        };
+      } else {
+        value = c.value;
+      }
+      return { column: c.column, operator: c.operator, value };
+    });
+
     const request: FilterRequest = {
-      conditions: conditions.map(c => ({
-        column: c.column,
-        operator: c.operator,
-        value: c.value
-      })),
+      conditions: serializedConditions,
       logic,
       new_node_name: newNodeName || undefined
     };
@@ -137,7 +436,7 @@ const FilterTab: React.FC = () => {
           <strong>Selected Node:</strong> {selectedNode?.data?.name || selectedNodeId}
         </p>
         <p className="text-sm text-gray-600">
-          <strong>Available Columns:</strong> {availableColumns.join(', ')}
+          <strong>Available Columns:</strong> {availableColumns.map(col => `${col.name} (${col.dataType})`).join(', ')}
         </p>
       </div>
 
@@ -154,7 +453,7 @@ const FilterTab: React.FC = () => {
         </div>
 
         {conditions.map((condition, index) => (
-          <div key={condition.id} className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg">
+          <div key={condition.id} className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg w-full">
             {index > 0 && (
               <select
                 value={logic}
@@ -169,40 +468,39 @@ const FilterTab: React.FC = () => {
             <select
               value={condition.column}
               onChange={(e) => handleConditionChange(condition.id, 'column', e.target.value)}
-              className="px-2 py-1 border border-gray-300 rounded text-sm flex-1"
+              className="px-2 py-1 border border-gray-300 rounded text-sm flex-grow min-w-[10rem]"
             >
               <option value="">Select Column</option>
-              {availableColumns.map((col: string) => (
-                <option key={col} value={col}>{col}</option>
+              {availableColumns.map((col) => (
+                <option key={col.name} value={col.name}>
+                  {col.name} ({col.dataType})
+                </option>
               ))}
             </select>
 
             <select
               value={condition.operator}
               onChange={(e) => handleConditionChange(condition.id, 'operator', e.target.value)}
-              className="px-2 py-1 border border-gray-300 rounded text-sm"
+              disabled={!condition.column}
+              className={`px-2 py-1 border border-gray-300 rounded text-sm flex-none w-32 text-ellipsis ${
+                !condition.column ? 'bg-gray-100 text-gray-500' : ''
+              }`}
             >
-              <option value="eq">Equals</option>
-              <option value="ne">Not Equals</option>
-              <option value="gt">Greater Than</option>
-              <option value="gte">Greater Than or Equal</option>
-              <option value="lt">Less Than</option>
-              <option value="lte">Less Than or Equal</option>
-              <option value="contains">Contains</option>
-              <option value="startswith">Starts With</option>
-              <option value="endswith">Ends With</option>
-              <option value="is_null">Is Null</option>
-              <option value="is_not_null">Is Not Null</option>
+              {!condition.column ? (
+                <option value="">Please select a column first</option>
+              ) : (
+                getOperatorsForType(condition.dataType || 'string').map((op) => (
+                  <option key={op.value} value={op.value}>
+                    {op.label}
+                  </option>
+                ))
+              )}
             </select>
 
             {condition.operator !== 'is_null' && condition.operator !== 'is_not_null' && (
-              <input
-                type="text"
-                value={String(condition.value)}
-                onChange={(e) => handleConditionChange(condition.id, 'value', e.target.value)}
-                placeholder="Filter value"
-                className="px-2 py-1 border border-gray-300 rounded text-sm flex-1"
-              />
+              <div className="flex-none">
+                {renderValueInput(condition)}
+              </div>
             )}
 
             {conditions.length > 1 && (
