@@ -2,6 +2,7 @@ import React, { useState, useCallback, useMemo } from 'react';
 import SegmentedControl from './SegmentedControl';
 import { useAuth } from '../hooks/useAuth';
 import { useWorkspace } from '../hooks/useWorkspace';
+import { downloadWorkspace } from '../api';
 import { useFiles } from '../hooks/useFiles';
 import FilePreviewModal from './FilePreviewModal';
 import AddFileModal from './AddFileModal';
@@ -15,8 +16,9 @@ const DataLoaderTab: React.FC = () => {
     errors,
     createWorkspace,
     setCurrentWorkspace,
-    createNodeFromFile,
-    deleteWorkspace
+  createNodeFromFile,
+  deleteWorkspace,
+  saveWorkspace
   } = useWorkspace();
 
   // Create stable auth headers object
@@ -308,6 +310,32 @@ const DataLoaderTab: React.FC = () => {
                         disabled={currentWorkspace?.workspace_id === workspace.workspace_id}
                       >
                         {currentWorkspace?.workspace_id === workspace.workspace_id ? 'Loaded' : 'Load'}
+                      </button>
+                      <button
+                        onClick={async () => {
+                          try {
+                            // If this is the currently loaded workspace and flagged unsaved, save first
+                            if (currentWorkspace?.workspace_id === workspace.workspace_id && !workspace.is_saved) {
+                              await saveWorkspace();
+                            }
+                            const blob = await downloadWorkspace(workspace.workspace_id, authHeaders);
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            const fname = `${workspace.name || 'workspace'}_${workspace.workspace_id}.json`;
+                            a.href = url;
+                            a.download = fname.replace(/\s+/g,'_');
+                            document.body.appendChild(a);
+                            a.click();
+                            setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 0);
+                          } catch (e) {
+                            console.error('Failed to download workspace', e);
+                            alert('Workspace download failed');
+                          }
+                        }}
+                        className="px-3 py-1 text-sm font-medium text-white bg-emerald-500 rounded-md hover:bg-emerald-600"
+                        title="Download workspace JSON"
+                      >
+                        Download
                       </button>
                       <button
                         onClick={() => handleDeleteWorkspace(workspace.workspace_id)}

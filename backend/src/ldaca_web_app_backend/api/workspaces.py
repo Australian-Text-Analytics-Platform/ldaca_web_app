@@ -13,6 +13,7 @@ from typing import Any, Dict, Optional, Tuple, cast
 
 import polars as pl
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi.responses import FileResponse
 
 from ..core.auth import get_current_user
 from ..core.docworkspace_api import DocWorkspaceAPIUtils
@@ -561,6 +562,34 @@ async def save_workspace_as(
                 tmp_path.unlink()
         except Exception:
             pass
+
+
+@router.get("/{workspace_id}/download")
+async def download_workspace(
+    workspace_id: str, current_user: dict = Depends(get_current_user)
+):
+    """Download the persisted JSON file for the workspace.
+
+    If the workspace is currently active, it's saved first to ensure latest state.
+    """
+    user_id = current_user["id"]
+    current_id = workspace_manager.get_current_workspace_id(user_id)
+    if current_id == workspace_id:
+        try:
+            ws = workspace_manager.get_workspace(user_id, workspace_id)
+            if ws:
+                workspace_manager.persist(user_id, workspace_id)
+        except Exception:
+            pass
+    user_folder = get_user_workspace_folder(user_id)
+    json_path = user_folder / f"workspace_{workspace_id}.json"
+    if not json_path.exists():
+        raise HTTPException(status_code=404, detail="Workspace file not found")
+    return FileResponse(
+        json_path,
+        media_type="application/json",
+        filename=f"workspace_{workspace_id}.json",
+    )
 
 
 @router.get("/{workspace_id}/info")

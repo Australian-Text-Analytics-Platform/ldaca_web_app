@@ -399,6 +399,17 @@ export async function saveWorkspaceAs(
   return res.data;
 }
 
+export async function downloadWorkspace(
+  workspaceId: string,
+  authHeaders: Record<string, string> = {}
+) {
+  const res = await axios.get(`${API_BASE}/workspaces/${workspaceId}/download`, {
+    responseType: 'blob',
+    headers: authHeaders
+  });
+  return res.data as Blob;
+}
+
 export async function updateWorkspaceName(
   workspaceId: string,
   newName: string,
