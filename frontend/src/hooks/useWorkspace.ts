@@ -341,7 +341,7 @@ export const useWorkspace = () => {
   });
 
   const createNodeMutation = useMutation({
-    mutationFn: ({ workspaceId, filename, mode, documentColumn }: { workspaceId: string; filename: string; mode?: 'corpus' | 'metadata'; documentColumn?: string | null }) =>
+    mutationFn: ({ workspaceId, filename, mode, documentColumn }: { workspaceId: string; filename: string; mode?: 'DocLazyFrame' | 'LazyFrame'; documentColumn?: string | null }) =>
       apiCreateNodeFromFile(workspaceId, filename, undefined, authHeaders, { mode, document_column: documentColumn ?? undefined }),
     onMutate: () => {
       startOperation('createNode');
@@ -680,7 +680,7 @@ export const useWorkspace = () => {
       return deleteNodeMutation.mutateAsync({ workspaceId: currentWorkspaceId, nodeId });
     },
     
-    createNodeFromFile: (filename: string, opts?: { mode?: 'corpus' | 'metadata'; documentColumn?: string | null }) => {
+  createNodeFromFile: (filename: string, opts?: { mode?: 'DocLazyFrame' | 'LazyFrame'; documentColumn?: string | null }) => {
       if (!currentWorkspaceId) return Promise.reject(new Error('No workspace selected'));
       return createNodeMutation.mutateAsync({ workspaceId: currentWorkspaceId, filename, mode: opts?.mode, documentColumn: opts?.documentColumn });
     },

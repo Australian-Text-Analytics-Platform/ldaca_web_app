@@ -67,34 +67,53 @@ const TimelineTab: React.FC = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [results, setResults] = useState<any>(null);
 
-  // Get available columns from node data - memoized to prevent useEffect dependency issues
+  // Utility function (duplicated from FilterTab) to normalize type names for consistent display
+  const normalizeTypeName = (type: string): string => {
+    const lowercaseType = type.toLowerCase();
+    if (lowercaseType.includes('utf8') || lowercaseType.includes('string')) return 'string';
+    if (lowercaseType.includes('int') && !lowercaseType.includes('interval')) return 'integer';
+    if (lowercaseType.includes('float') || lowercaseType.includes('double')) return 'float';
+    if (lowercaseType.includes('bool')) return 'boolean';
+    if (lowercaseType.includes('datetime') || lowercaseType.includes('timestamp')) return 'datetime';
+    if (lowercaseType.includes('list') || lowercaseType.includes('array')) return 'array';
+    return 'string';
+  };
+
+  // Get available columns from node data with normalized datatypes (mirrors FilterTab logic)
   const availableColumns = useMemo(() => {
-    // First try to get columns from nodeData (which includes actual column names)
-    if (nodeData?.columns && Array.isArray(nodeData.columns)) {
-      return nodeData.columns;
+    const columns: Array<{ name: string; dataType: string }> = [];
+    if (nodeData?.columns && Array.isArray(nodeData.columns) && nodeData?.dtypes) {
+      nodeData.columns.forEach((colName: string) => {
+        const rawDataType = nodeData.dtypes[colName] || 'unknown';
+        const normalizedDataType = normalizeTypeName(rawDataType);
+        columns.push({ name: colName, dataType: normalizedDataType });
+      });
+    } else if (nodeData?.dtypes && typeof nodeData.dtypes === 'object') {
+      Object.keys(nodeData.dtypes).forEach(colName => {
+        const rawDataType = nodeData.dtypes[colName] || 'unknown';
+        const normalizedDataType = normalizeTypeName(rawDataType);
+        columns.push({ name: colName, dataType: normalizedDataType });
+      });
+    } else if (selectedNode?.data?.schema) {
+      Object.keys(selectedNode.data.schema).forEach(colName => {
+        columns.push({ name: colName, dataType: 'string' });
+      });
     }
-    // Fallback to dtypes keys if available
-    if (nodeData?.dtypes && typeof nodeData.dtypes === 'object') {
-      return Object.keys(nodeData.dtypes);
-    }
-    // Last fallback to schema if available
-    if (selectedNode?.data?.schema) {
-      return Object.keys(selectedNode.data.schema);
-    }
-    return [];
+    return columns;
   }, [nodeData?.columns, nodeData?.dtypes, selectedNode?.data?.schema]);
 
   // Auto-select first datetime-like column
   useEffect(() => {
     if (availableColumns.length > 0 && !timeColumn) {
       // Try to find a column that might contain datetime
-      const dateColumn = availableColumns.find((col: string) => 
-        col.toLowerCase().includes('date') || 
-        col.toLowerCase().includes('time') || 
-        col.toLowerCase().includes('created') ||
-        col.toLowerCase().includes('timestamp')
+      const dateColumnObj = availableColumns.find((c) => 
+        c.name.toLowerCase().includes('date') ||
+        c.name.toLowerCase().includes('time') ||
+        c.name.toLowerCase().includes('created') ||
+        c.name.toLowerCase().includes('timestamp') ||
+        c.dataType === 'datetime'
       );
-      setTimeColumn(dateColumn || availableColumns[0]);
+      setTimeColumn(dateColumnObj?.name || availableColumns[0].name);
     }
   }, [availableColumns, timeColumn]);
 
@@ -342,14 +361,42 @@ const TimelineTab: React.FC = () => {
     <div className="p-4 space-y-4">
       <h3 className="text-lg font-medium text-gray-900 mb-4">Timeline Analysis</h3>
       
-      {/* Selected Node Info */}
-      <div className="bg-gray-50 p-3 rounded-lg">
-        <p className="text-sm text-gray-600">
-          <strong>Selected Node:</strong> {selectedNode?.data?.name || selectedNodeId}
-        </p>
-        <p className="text-sm text-gray-600">
-          <strong>Available Columns:</strong> {availableColumns.join(', ')}
-        </p>
+      {/* Selected Node Info (mirrors Filter/Slice tab style) */}
+      <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+        <div>
+          {(() => {
+            const displayName = selectedNode ? (
+              // Try multiple possible label/name fields
+              (selectedNode.data?.nodeName || selectedNode.data?.label || selectedNode.data?.name || selectedNode.label || selectedNode.id || selectedNodeId)
+            ) : selectedNodeId;
+            return (
+              <>
+                <div className="text-sm font-medium text-gray-800 break-words">{displayName}</div>
+                <div className="text-xs text-gray-500 break-all">{selectedNodeId}</div>
+              </>
+            );
+          })()}
+        </div>
+        <div className="pt-1">
+          <div className="text-xs font-semibold text-gray-600 mb-1 tracking-wide">SCHEMA</div>
+          <div className="overflow-x-auto border border-gray-200 rounded-md bg-white">
+            <table className="text-[11px] font-mono border-collapse">
+              <tbody>
+                <tr className="align-top">
+                  {availableColumns.map((col) => (
+                    <td key={col.name + '-name'} className="px-2 py-1 font-semibold text-gray-700 whitespace-nowrap border-b border-gray-100 min-w-[6rem]">{col.name}</td>
+                  ))}
+                </tr>
+                <tr className="align-top">
+                  {availableColumns.map((col) => (
+                    <td key={col.name + '-type'} className="px-2 py-1 text-gray-500 whitespace-nowrap min-w-[6rem]">{col.dataType}</td>
+                  ))}
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div className="text-[10px] text-gray-400 mt-1">Scroll horizontally to view all {availableColumns.length} column(s).</div>
+        </div>
       </div>
 
       {/* Analysis Configuration */}
@@ -366,8 +413,8 @@ const TimelineTab: React.FC = () => {
               className="w-full px-3 py-2 border border-gray-300 rounded-md"
             >
               <option value="">Select Time Column</option>
-              {availableColumns.map((col: string) => (
-                <option key={col} value={col}>{col}</option>
+              {availableColumns.map((col) => (
+                <option key={col.name} value={col.name}>{col.name} ({col.dataType})</option>
               ))}
             </select>
           </div>
@@ -413,8 +460,8 @@ const TimelineTab: React.FC = () => {
                 className="flex-1 px-3 py-2 border border-gray-300 rounded-md"
               >
                 <option value="">Select Column</option>
-                {availableColumns.map((col: string) => (
-                  <option key={col} value={col}>{col}</option>
+                {availableColumns.map((col) => (
+                  <option key={col.name} value={col.name}>{col.name} ({col.dataType})</option>
                 ))}
               </select>
               {column && (

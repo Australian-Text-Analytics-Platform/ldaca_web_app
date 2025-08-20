@@ -5,7 +5,7 @@ interface AddFileModalProps {
   filename: string | null;
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (opts: { mode: 'corpus' | 'metadata'; documentColumn?: string | null }) => Promise<void> | void;
+  onConfirm: (opts: { mode: 'DocLazyFrame' | 'LazyFrame'; documentColumn?: string | null }) => Promise<void> | void;
 }
 
 // Heuristic guess replicating backend (average length of string columns in preview slice)
@@ -25,7 +25,7 @@ function guessDocumentColumn(columns: string[], rows: any[]): string | null {
 
 const AddFileModal: React.FC<AddFileModalProps> = ({ filename, isOpen, onClose, onConfirm }) => {
   const { previewData, columns, fetchPreview, clearPreview, loading, error } = useFilePreview();
-  const [mode, setMode] = useState<'corpus' | 'metadata'>('corpus');
+  const [mode, setMode] = useState<'DocLazyFrame' | 'LazyFrame'>('DocLazyFrame');
   const [documentColumn, setDocumentColumn] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const guessed = useMemo(() => guessDocumentColumn(columns, previewData) , [columns, previewData]);
@@ -35,13 +35,13 @@ const AddFileModal: React.FC<AddFileModalProps> = ({ filename, isOpen, onClose, 
       fetchPreview(filename, 0);
     } else {
       clearPreview();
-      setMode('corpus');
+  setMode('DocLazyFrame');
       setDocumentColumn(null);
     }
   }, [isOpen, filename, fetchPreview, clearPreview]);
 
   useEffect(() => {
-    if (mode === 'corpus') {
+  if (mode === 'DocLazyFrame') {
       setDocumentColumn(prev => prev || guessed || null);
     } else {
       setDocumentColumn(null);
@@ -53,7 +53,7 @@ const AddFileModal: React.FC<AddFileModalProps> = ({ filename, isOpen, onClose, 
   const handleConfirm = async () => {
     try {
       setSubmitting(true);
-      await onConfirm({ mode, documentColumn: mode === 'corpus' ? documentColumn || undefined : undefined });
+  await onConfirm({ mode, documentColumn: mode === 'DocLazyFrame' ? documentColumn || undefined : undefined });
       onClose();
     } finally {
       setSubmitting(false);
@@ -72,18 +72,18 @@ const AddFileModal: React.FC<AddFileModalProps> = ({ filename, isOpen, onClose, 
             <label className="block text-sm font-medium text-gray-700 mb-2">Mode</label>
             <div className="flex space-x-4">
               <label className="flex items-center space-x-2 cursor-pointer">
-                <input type="radio" name="add-mode" value="corpus" checked={mode==='corpus'} onChange={() => setMode('corpus')} />
+                <input type="radio" name="add-mode" value="DocLazyFrame" checked={mode==='DocLazyFrame'} onChange={() => setMode('DocLazyFrame')} />
                 <span className="text-sm font-medium">Add as DocLazyFrame</span>
               </label>
               <label className="flex items-center space-x-2 cursor-pointer">
-                <input type="radio" name="add-mode" value="metadata" checked={mode==='metadata'} onChange={() => setMode('metadata')} />
+                <input type="radio" name="add-mode" value="LazyFrame" checked={mode==='LazyFrame'} onChange={() => setMode('LazyFrame')} />
                 <span className="text-sm font-medium">Add as LazyFrame</span>
               </label>
             </div>
             <p className="mt-1 text-xs text-gray-500">DocLazyFrame mode enables text-aware operations. LazyFrame adds the data without text semantics.</p>
           </div>
 
-          {mode === 'corpus' && (
+          {mode === 'DocLazyFrame' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Text / document column</label>
               {loading ? (

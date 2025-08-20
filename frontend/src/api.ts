@@ -238,13 +238,13 @@ export async function createNodeFromFile(
   filename: string,
   nodeName?: string,
   authHeaders: Record<string, string> = {},
-  options?: { mode?: 'corpus' | 'metadata'; document_column?: string | null }
+  options?: { mode?: 'DocLazyFrame' | 'LazyFrame'; document_column?: string | null }
 ) {
   const res = await axios.post(`${API_BASE}/workspaces/${workspaceId}/nodes`, null, {
     params: {
       filename,
       node_name: nodeName,
-      mode: options?.mode ?? 'corpus',
+  mode: options?.mode ?? 'DocLazyFrame',
       document_column: options?.document_column ?? undefined
     },
     headers: authHeaders

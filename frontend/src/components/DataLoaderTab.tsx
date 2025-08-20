@@ -66,7 +66,7 @@ const DataLoaderTab: React.FC = () => {
   }, [handleUploadFile]);
 
   // Add file to workspace (create new workspace if none exists)
-  const handleConfirmedAdd = useCallback(async (filename: string, mode: 'corpus' | 'metadata', documentColumn?: string | null) => {
+  const handleConfirmedAdd = useCallback(async (filename: string, mode: 'DocLazyFrame' | 'LazyFrame', documentColumn?: string | null) => {
     setAddingToWorkspace(filename);
     try {
       if (!currentWorkspace) {

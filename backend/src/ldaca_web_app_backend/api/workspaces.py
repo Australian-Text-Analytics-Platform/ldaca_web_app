@@ -644,8 +644,8 @@ async def add_node_to_workspace(
     workspace_id: str,
     filename: str,
     mode: str = Query(
-        "corpus",
-        description="How to treat the file: 'corpus' (wrap as DocLazyFrame) or 'metadata' (plain LazyFrame)",
+        "DocLazyFrame",
+        description="How to treat the file: 'DocLazyFrame' (wrap as DocLazyFrame) or 'LazyFrame' (plain Polars LazyFrame)",
     ),
     document_column: Optional[str] = Query(
         None, description="Explicit document/text column to use when mode=corpus"
@@ -685,21 +685,21 @@ async def add_node_to_workspace(
         except Exception:
             pass
 
-        # Content mode handling (corpus vs metadata)
-        if mode not in {"corpus", "metadata"}:
+        # Content mode handling (DocLazyFrame vs LazyFrame)
+        if mode not in {"DocLazyFrame", "LazyFrame"}:
             raise HTTPException(
                 status_code=400,
-                detail="Invalid mode. Expected 'corpus' or 'metadata'",
+                detail="Invalid mode. Expected 'DocLazyFrame' or 'LazyFrame'",
             )
 
-        if mode == "corpus":
+        if mode == "DocLazyFrame":
             try:
                 import docframe  # noqa: F401
                 from docframe.core.docframe import DocDataFrame as _DDF
             except Exception:  # pragma: no cover
                 raise HTTPException(
                     status_code=500,
-                    detail="docframe library not available for corpus mode",
+                    detail="docframe library not available for DocLazyFrame mode",
                 )
 
             # Ensure lazy
@@ -727,7 +727,7 @@ async def add_node_to_workspace(
                         data = _DLF(data, document_column=document_column)
             except Exception as e:
                 print(f"⚠️ Failed to wrap as DocLazyFrame: {e}")
-        else:  # metadata
+        else:  # LazyFrame
             try:
                 if hasattr(data, "lazyframe"):
                     data = data.lazyframe  # type: ignore[attr-defined]
@@ -743,11 +743,22 @@ async def add_node_to_workspace(
             filename.replace(".csv", "").replace(".xlsx", "").replace(".json", "")
         )
 
-        # Add node to workspace using DocWorkspace
-        # Ensure correct type for type checker
-        if not isinstance(data, (pl.DataFrame, pl.LazyFrame)):
+        # Accept docframe wrapper types as valid (unwrap not required for Node creation)
+        doc_wrappers: tuple[type, ...] = tuple()
+        try:  # pragma: no cover - optional dependency
+            from docframe import DocDataFrame as _DocDF  # type: ignore
+            from docframe import DocLazyFrame as _DocLF
+
+            doc_wrappers = (_DocDF, _DocLF)
+        except Exception:
+            pass
+
+        if not isinstance(data, (pl.DataFrame, pl.LazyFrame)) and not (
+            doc_wrappers and isinstance(data, doc_wrappers)  # type: ignore[arg-type]
+        ):
             raise HTTPException(
-                status_code=400, detail="Unsupported data type loaded from file"
+                status_code=400,
+                detail=f"Unsupported data type loaded from file: {type(data)}. Expected Polars (DataFrame/LazyFrame) or docframe wrappers.",
             )
 
         node = workspace_manager.add_node_to_workspace(
