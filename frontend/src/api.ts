@@ -181,6 +181,28 @@ export async function deleteFile(fileName: string, authHeaders: Record<string, s
 }
 
 // =============================================================================
+// FEEDBACK API
+// =============================================================================
+
+export interface FeedbackRequestBody {
+  subject: string;
+  comments: string;
+  email?: string;
+}
+
+export interface FeedbackResponseBody {
+  success: boolean;
+  message: string;
+  record_id?: string;
+  meta?: Record<string, any>;
+}
+
+export async function submitFeedback(body: FeedbackRequestBody, authHeaders: Record<string, string> = {}): Promise<FeedbackResponseBody> {
+  const res = await axios.post(`${API_BASE}/feedback/submit`, body, { headers: authHeaders });
+  return res.data;
+}
+
+// =============================================================================
 // WORKSPACE MANAGEMENT API (Future Use)
 // =============================================================================
 

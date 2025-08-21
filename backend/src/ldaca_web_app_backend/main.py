@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 # Import API routers
 from .api.admin import router as admin_router
 from .api.auth import router as auth_router
+from .api.feedback import router as feedback_router
 from .api.files import router as files_router
 from .api.text import router as text_router
 from .api.users import router as users_router
@@ -81,6 +82,7 @@ app.add_middleware(
 # Include API routers with /api prefix
 app.include_router(auth_router, prefix="/api", tags=["authentication"])
 app.include_router(files_router, prefix="/api", tags=["file_management"])
+app.include_router(feedback_router, prefix="/api", tags=["feedback"])
 app.include_router(text_router, prefix="/api", tags=["text_analysis"])
 app.include_router(workspaces_router, prefix="/api", tags=["workspace_management"])
 app.include_router(users_router, prefix="/api", tags=["user_management"])

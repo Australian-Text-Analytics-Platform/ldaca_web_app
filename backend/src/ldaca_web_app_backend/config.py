@@ -64,6 +64,22 @@ class Settings(BaseSettings):
     log_level: str = Field(default="INFO", description="Logging level")
     log_file: str = Field(default="./logs/app.log", description="Log file path")
 
+    # Feedback / Airtable Configuration
+    airtable_api_key: str | None = Field(default=None, description="Airtable API Key")
+    airtable_base_id: str | None = Field(default=None, description="Airtable Base ID")
+    airtable_table_id: str | None = Field(
+        default=None, description="Airtable Table ID or name"
+    )
+    airtable_field_reply_to_id: str | None = Field(
+        default=None, description="Airtable Field ID for Reply-To / email"
+    )
+    airtable_field_subject_id: str | None = Field(
+        default=None, description="Airtable Field ID for Subject"
+    )
+    airtable_field_comments_id: str | None = Field(
+        default=None, description="Airtable Field ID for Comments"
+    )
+
     # Model configuration
     model_config = SettingsConfigDict(
         env_file=".env",

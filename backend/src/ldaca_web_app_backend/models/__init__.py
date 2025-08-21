@@ -518,8 +518,25 @@ class TopicModelingTopic(BaseModel):
 class TopicModelingData(BaseModel):
     topics: List[TopicModelingTopic]
     corpus_sizes: List[int]
+
+
+# =============================================================================
+# FEEDBACK MODELS
+# =============================================================================
+
+
+class FeedbackRequest(BaseModel):
+    subject: str
+    comments: str
+    email: Optional[str] = None
+
+
+class FeedbackResponse(BaseModel):
+    success: bool
+    message: str
+    record_id: Optional[str] = None
     per_corpus_topic_counts: Optional[List[Dict[int, int]]] = None
-    meta: Dict[str, Any]
+    meta: Dict[str, Any] = {}
 
 
 class TopicModelingResponse(BaseModel):

@@ -20,6 +20,7 @@ dependencies = [
     "docworkspace",
     "pytest-asyncio>=0.23.0",
     "pyarrow>=21.0.0",
+    "pyairtable>=3.2.0",
 ]
 
 [tool.pytest.ini_options]
