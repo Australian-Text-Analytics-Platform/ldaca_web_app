@@ -2618,8 +2618,29 @@ async def cast_node(
                     cast_expr = pl.col(column_name).cast(pl.Utf8).alias(column_name)
                 # For string target we treat provided format as format_used if any
             elif target_lower == "integer":
-                # String -> number (integer) conversion
-                cast_expr = pl.col(column_name).cast(pl.Int64).alias(column_name)
+                # Integer casting improvements:
+                # 1. If source is float: truncate (floor) decimals deterministically.
+                # 2. If source is string: parse via float first (lenient), then truncate -> int.
+                # 3. Otherwise: direct int cast (lenient) to avoid whole-column failure.
+                col_expr = pl.col(column_name)
+                orig_lower = (original_type or "").lower()
+                if "float" in orig_lower:
+                    # Truncate decimals by casting directly (Polars truncates toward zero)
+                    cast_expr = (
+                        col_expr.cast(pl.Float64, strict=False)
+                        .cast(pl.Int64, strict=False)
+                        .alias(column_name)
+                    )
+                elif any(tok in orig_lower for tok in ["utf8", "string", "str"]):
+                    # Strip whitespace, attempt float parse (lenient) then truncate by casting to int
+                    cast_expr = (
+                        col_expr.str.strip()
+                        .cast(pl.Float64, strict=False)
+                        .cast(pl.Int64, strict=False)
+                        .alias(column_name)
+                    )
+                else:
+                    cast_expr = col_expr.cast(pl.Int64, strict=False).alias(column_name)
             elif target_lower == "float":
                 # String -> number (float) conversion
                 cast_expr = pl.col(column_name).cast(pl.Float64).alias(column_name)
@@ -2629,7 +2650,23 @@ async def cast_node(
                     detail=f"Casting to '{target_type}' is not yet supported. Supported: string, integer, float, datetime.",
                 )
 
-            # Apply the casting with .with_columns(); preserve original frame type
+            # For lazy data (or anything with collect) perform a small head() sample validation
+            # to surface conversion errors early without materializing the full dataset.
+            try:
+                if hasattr(current_df, "collect") and hasattr(current_df, "head"):
+                    # Validate on first 50 rows (arbitrary small sample)
+                    _sample = current_df.head(50).with_columns(cast_expr)
+                    # Collect sample (ignore result, just validating)
+                    _ = _sample.collect()
+            except Exception as sample_err:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"Sample validation failed when casting column '{column_name}' to {target_type}: {sample_err}"
+                    ),
+                )
+
+            # Apply the casting with .with_columns(); preserve original frame type after validation
             casted_data = current_df.with_columns(cast_expr)
             # Update the node data in-place (preserving the original type)
             node.data = casted_data
