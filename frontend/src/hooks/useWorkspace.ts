@@ -217,8 +217,8 @@ export const useWorkspace = () => {
   });
 
   const createWorkspaceMutation = useMutation({
-    mutationFn: ({ name, description, initialDataFile }: { name: string; description?: string; initialDataFile?: string }) =>
-      apiCreateWorkspace(name, description || '', authHeaders, initialDataFile),
+    mutationFn: ({ name, description }: { name: string; description?: string }) =>
+      apiCreateWorkspace(name, description || '', authHeaders),
     onMutate: () => {
       startOperation('createWorkspace');
     },
@@ -641,8 +641,8 @@ export const useWorkspace = () => {
       setCurrentWorkspaceMutation.mutate(workspaceId);
     },
     
-    createWorkspace: (name: string, description?: string, initialDataFile?: string) => {
-      return createWorkspaceMutation.mutateAsync({ name, description, initialDataFile });
+    createWorkspace: (name: string, description?: string) => {
+      return createWorkspaceMutation.mutateAsync({ name, description });
     },
     
     deleteWorkspace: (workspaceId: string) => {

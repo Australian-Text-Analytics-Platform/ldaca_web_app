@@ -315,58 +315,11 @@ async def create_workspace(
     user_id = current_user["id"]
 
     try:
-        # Handle initial data file if provided
-        data = None
-        data_name = None
-        if request.initial_data_file:
-            try:
-                user_data_folder = get_user_data_folder(user_id)
-                file_path = user_data_folder / request.initial_data_file
-
-                if file_path.exists():
-                    loaded_data = load_data_file(file_path)
-                    # Convert pandas DataFrame to Polars if needed
-                    if hasattr(loaded_data, "columns") and hasattr(loaded_data, "iloc"):
-                        # This is a pandas DataFrame, convert to Polars
-                        data = pl.DataFrame(loaded_data)
-                    else:
-                        # Already Polars or LazyFrame
-                        data = loaded_data
-                    # Prefer LazyFrame as the canonical internal representation
-                    try:
-                        if isinstance(data, pl.DataFrame):
-                            data = data.lazy()
-                    except Exception:
-                        pass
-                    data_name = request.initial_data_file.replace(".csv", "").replace(
-                        ".xlsx", ""
-                    )
-                else:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Initial data file not found: {request.initial_data_file}",
-                    )
-            except Exception as e:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Failed to load initial data file: {str(e)}",
-                )
-
-        # Use DocWorkspace to create workspace
-        # Narrow type for type checker
-        data_typed = None
-        try:
-            if isinstance(data, (pl.DataFrame, pl.LazyFrame)):
-                data_typed = data
-        except Exception:
-            data_typed = None
-
+        # Always create an empty workspace (data arguments removed)
         workspace = workspace_manager.create_workspace(
             user_id=user_id,
             name=request.name,
             description=request.description or "",
-            data=cast(Optional[pl.DataFrame | pl.LazyFrame], data_typed),
-            data_name=data_name,
         )
 
         # Get workspace info using DocWorkspace method

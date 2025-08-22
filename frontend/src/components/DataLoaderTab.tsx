@@ -65,26 +65,21 @@ const DataLoaderTab: React.FC = () => {
     }
   }, [handleUploadFile]);
 
-  // Add file to workspace (create new workspace if none exists)
+  // Add file to existing workspace only (workspace must be created beforehand)
   const handleConfirmedAdd = useCallback(async (filename: string, mode: 'DocLazyFrame' | 'LazyFrame', documentColumn?: string | null) => {
+    if (!currentWorkspace) {
+      console.warn('Attempted to add node without an active workspace.');
+      return;
+    }
     setAddingToWorkspace(filename);
     try {
-      if (!currentWorkspace) {
-        const workspaceName = newWorkspaceName.trim() || `Workspace ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`;
-        // Create empty workspace first (no initial_data_file to allow mode/document control)
-        const workspace = await createWorkspace(workspaceName, 'Auto-created');
-        await setCurrentWorkspace(workspace.workspace_id);
-        setNewWorkspaceName('');
-        await createNodeFromFile(filename, { mode, documentColumn });
-      } else {
-        await createNodeFromFile(filename, { mode, documentColumn });
-      }
+      await createNodeFromFile(filename, { mode, documentColumn });
     } catch (e) {
       console.error('Failed to add file:', e);
     } finally {
       setAddingToWorkspace(null);
     }
-  }, [currentWorkspace, createWorkspace, setCurrentWorkspace, createNodeFromFile, newWorkspaceName]);
+  }, [currentWorkspace, createNodeFromFile]);
 
   // Load workspace
   const handleLoadWorkspace = useCallback(async (workspaceId: string) => {
@@ -220,16 +215,31 @@ const DataLoaderTab: React.FC = () => {
                       </div>
                       <div className="flex items-center space-x-2">
                         <button
-                          onClick={(e) => { e.stopPropagation(); setFileToAdd(file.filename); }}
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            if (!currentWorkspace) {
+                              try {
+                                const workspaceName = newWorkspaceName.trim() || `Workspace ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`;
+                                const ws = await createWorkspace(workspaceName, 'Auto-created');
+                                await setCurrentWorkspace(ws.workspace_id);
+                                setNewWorkspaceName('');
+                                // Open modal AFTER workspace creation so user can pick column/type then explicitly add
+                                setFileToAdd(file.filename);
+                              } catch (err) {
+                                console.error('Workspace creation failed:', err);
+                              }
+                            } else {
+                              setFileToAdd(file.filename);
+                            }
+                          }}
                           disabled={addingToWorkspace === file.filename || isLoading.operations}
                           className="px-3 py-1 text-sm bg-green-100 text-green-700 rounded hover:bg-green-200 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          {addingToWorkspace === file.filename 
-                            ? 'Adding...' 
-                            : currentWorkspace 
-                              ? 'Add to Workspace' 
-                              : 'Create Workspace & Add'
-                          }
+                          {addingToWorkspace === file.filename
+                            ? 'Adding...'
+                            : currentWorkspace
+                              ? 'Add to Workspace'
+                              : 'Create Workspace'}
                         </button>
                         <button
                           onClick={(e) => { e.stopPropagation(); downloadFile(file.filename); }}

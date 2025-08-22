@@ -127,8 +127,7 @@ class WorkspaceStats(BaseModel):
 
 class WorkspaceCreateRequest(BaseModel):
     name: str
-    description: Optional[str] = None
-    initial_data_file: Optional[str] = None
+    description: Optional[str] = None  # initial data file support removed
 
 
 class WorkspaceSaveRequest(BaseModel):

@@ -9,10 +9,7 @@ Design Goals:
 """
 
 from datetime import datetime
-from pathlib import Path
-from typing import Any, Dict, Optional, Union
-
-import polars as pl
+from typing import Any, Dict, Optional
 
 from docworkspace import Node, Workspace  # type: ignore
 
@@ -91,13 +88,12 @@ class WorkspaceManager:
         user_id: str,
         name: str,
         description: str = "",
-        data: Optional[Union[str, Path, pl.DataFrame, pl.LazyFrame]] = None,
-        data_name: Optional[str] = None,
     ) -> Any:
         cid, cws = self._get_current_entry(user_id)
         if cid is not None and cws is not None:
             self._save(user_id, cid, cws)
-        ws = Workspace(name=name, data=data, data_name=data_name)
+        # Create an empty Workspace (initial data loading removed)
+        ws = Workspace(name=name, data=None, data_name=None)
         wid = generate_workspace_id()
         now = datetime.now().isoformat()
         ws.set_metadata("id", wid)

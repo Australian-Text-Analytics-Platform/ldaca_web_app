@@ -214,23 +214,12 @@ export async function getWorkspaces(authHeaders: Record<string, string> = {}) {
 }
 
 export async function createWorkspace(
-  name: string, 
-  description: string = '', 
-  authHeaders: Record<string, string> = {},
-  initialDataFile?: string
+  name: string,
+  description: string = '',
+  authHeaders: Record<string, string> = {}
 ) {
-  const requestBody: any = {
-    name,
-    description
-  };
-  
-  if (initialDataFile) {
-    requestBody.initial_data_file = initialDataFile;
-  }
-  
-  const res = await axios.post(`${API_BASE}/workspaces/`, requestBody, { 
-    headers: authHeaders 
-  });
+  const requestBody = { name, description };
+  const res = await axios.post(`${API_BASE}/workspaces/`, requestBody, { headers: authHeaders });
   return res.data;
 }
 
