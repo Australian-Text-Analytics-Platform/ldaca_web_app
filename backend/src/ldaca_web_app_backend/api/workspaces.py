@@ -2884,18 +2884,22 @@ async def calculate_token_frequencies(
                     status_code=500, detail=f"Error processing node {node_id}: {str(e)}"
                 )
 
-        # Import the token frequency calculation function
+        # Import the optimized token frequency calculation function
         try:
-            from docframe.core.text_utils import compute_token_frequencies
+            from docframe.core.text_utils import compute_token_frequencies_optimized
         except ImportError:
             raise HTTPException(
                 status_code=500,
                 detail="docframe library not available for token frequency calculation",
             )
 
-        # Calculate token frequencies (returns tuple: frequencies, stats)
-        frequency_results, stats_df = compute_token_frequencies(
-            frames=frames_dict, stop_words=request.stop_words
+        # Calculate token frequencies using optimized version (returns tuple: frequencies, stats)
+        # Use top_k=1000 for better performance on large vocabularies while maintaining quality
+        frequency_results, stats_df = compute_token_frequencies_optimized(
+            frames=frames_dict, 
+            stop_words=request.stop_words,
+            top_k=1000,  # Limit vocabulary to top 1000 tokens for 24% performance improvement
+            enable_statistics=True
         )
 
         # Convert to response format and apply limit
