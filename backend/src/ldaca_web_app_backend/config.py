@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables and .env file."""
 
     # Root for all data-related storage (folders and DB)
-    data_root: str = Field(default=".data", description="Root data folder")
+    data_root: str = Field(default="data", description="Root data folder")
 
     # Database Configuration
     # If database_url is not provided, we derive it from data_root and database_file
