@@ -46,7 +46,8 @@ class UserSession(Base):
 
 
 # Create async engine and session maker
-engine = create_async_engine(config.database_url)
+# Use derived URL which respects DATA_ROOT
+engine = create_async_engine(config.get_database_url())
 async_session_maker = async_sessionmaker(engine, expire_on_commit=False)
 
 
@@ -70,8 +71,11 @@ async def get_user_db(session: AsyncSession = Depends(get_async_session)):
 # Compatibility functions for existing code
 async def init_db():
     """Initialize database tables"""
+    # Ensure DATA_ROOT exists before creating/opening DB file
+    data_root = config.get_data_root()
+    data_root.mkdir(parents=True, exist_ok=True)
     await create_db_and_tables()
-    print(f"✅ Database initialized at: {config.database_url}")
+    print(f"✅ Database initialized at: {config.get_database_url()}")
 
 
 async def get_or_create_user(

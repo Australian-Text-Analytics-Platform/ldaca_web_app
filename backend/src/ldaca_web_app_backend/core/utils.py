@@ -24,7 +24,8 @@ def get_user_data_folder(user_id: str) -> Path:
     else:
         folder_name = f"user_{user_id}"
 
-    user_folder = Path(config.user_data_folder) / folder_name
+    # Base under DATA_ROOT/users/<folder_name>
+    user_folder = config.get_data_root() / config.user_data_folder / folder_name
     user_data_folder = user_folder / "user_data"
     user_data_folder.mkdir(parents=True, exist_ok=True)
     return user_data_folder
@@ -38,7 +39,8 @@ def get_user_workspace_folder(user_id: str) -> Path:
     else:
         folder_name = f"user_{user_id}"
 
-    user_folder = Path(config.user_data_folder) / folder_name
+    # Base under DATA_ROOT/users/<folder_name>
+    user_folder = config.get_data_root() / config.user_data_folder / folder_name
     workspace_folder = user_folder / "user_workspaces"
     workspace_folder.mkdir(parents=True, exist_ok=True)
     return workspace_folder
@@ -52,7 +54,8 @@ def setup_user_folders(user_id: str) -> Dict[str, Path]:
     else:
         folder_name = f"user_{user_id}"
 
-    user_folder = Path(config.user_data_folder) / folder_name
+    # Base under DATA_ROOT/users/<folder_name>
+    user_folder = config.get_data_root() / config.user_data_folder / folder_name
     user_data_folder = user_folder / "user_data"
     user_workspaces_folder = user_folder / "user_workspaces"
 
@@ -72,7 +75,8 @@ def setup_user_folders(user_id: str) -> Dict[str, Path]:
 
 def copy_sample_data_to_user(user_id: str) -> None:
     """Copy sample_data folder into user's data folder, resetting if it exists"""
-    source_sample_data = Path(config.sample_data_folder)
+    # Source sample data under DATA_ROOT/sample_data
+    source_sample_data = config.get_sample_data_folder()
     user_data_folder = get_user_data_folder(user_id)
     target_sample_data = user_data_folder / "sample_data"
 

@@ -37,12 +37,15 @@ async def lifespan(app: FastAPI):
     print("🔧 DocFrame: ✅ Available")
     print("🔧 DocWorkspace: ✅ Available")
 
+    # Ensure DATA_ROOT and data folders exist before DB init
+    settings.get_data_root().mkdir(parents=True, exist_ok=True)
+    settings.get_user_data_folder().mkdir(parents=True, exist_ok=True)
+    settings.get_sample_data_folder().mkdir(parents=True, exist_ok=True)
+    settings.get_database_backup_folder().mkdir(parents=True, exist_ok=True)
+
     # Initialize database
     await init_db()
     await cleanup_expired_sessions()
-
-    # Ensure data folders exist
-    settings.data_folder.mkdir(parents=True, exist_ok=True)
 
     print("✅ Enhanced API initialized successfully")
     print(

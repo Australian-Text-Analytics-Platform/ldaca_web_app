@@ -12,19 +12,28 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     """Application settings loaded from environment variables and .env file."""
 
+    # Root for all data-related storage (folders and DB)
+    data_root: str = Field(default=".data", description="Root data folder")
+
     # Database Configuration
-    database_url: str = Field(
-        default="sqlite+aiosqlite:///./data/users.db",
-        description="Database connection URL",
+    # If database_url is not provided, we derive it from data_root and database_file
+    database_url: str | None = Field(
+        default=None,
+        description="Database connection URL (optional; derived from data_root if omitted)",
+    )
+    database_file: str = Field(
+        default="users.db", description="SQLite database filename"
     )
     database_backup_folder: str = Field(
-        default="./data/backups", description="Database backup folder"
+        default="backups", description="Database backup folder (relative to data_root)"
     )
 
     # Data Folders
-    user_data_folder: str = Field(default="./data", description="User data folder")
+    user_data_folder: str = Field(
+        default="users", description="User data folder (relative to data_root)"
+    )
     sample_data_folder: str = Field(
-        default="./data/sample_data", description="Sample data folder"
+        default="sample_data", description="Sample data folder (relative to data_root)"
     )
 
     # Server Configuration
@@ -60,11 +69,8 @@ class Settings(BaseSettings):
         default="your-secret-key-here", description="Secret key for JWT tokens"
     )
 
-    # Logging Configuration
-    log_level: str = Field(default="INFO", description="Logging level")
-    log_file: str = Field(default="./logs/app.log", description="Log file path")
-
     # Feedback / Airtable Configuration
+    # NOTE: For security, do not hardcode real keys here. Provide them via .env
     airtable_api_key: str | None = Field(default=None, description="Airtable API Key")
     airtable_base_id: str | None = Field(default=None, description="Airtable Base ID")
     airtable_table_id: str | None = Field(
@@ -131,29 +137,37 @@ class Settings(BaseSettings):
     # Convenience properties for backward compatibility
     @property
     def data_folder(self) -> Path:
-        """Backward compatibility property."""
-        return Path(self.user_data_folder)
+        """Backward compatibility property for user data folder absolute path."""
+        return self.get_user_data_folder()
 
     @property
     def allowed_origins(self) -> List[str]:
         """Backward compatibility property."""
         return self.cors_allowed_origins
 
+    def get_data_root(self) -> Path:
+        """Get DATA_ROOT as absolute Path."""
+        return Path(self.data_root)
+
     def get_user_data_folder(self) -> Path:
-        """Get user data folder as Path object."""
-        return Path(self.user_data_folder)
+        """Get user data folder absolute path (DATA_ROOT/user_data_folder)."""
+        return self.get_data_root() / self.user_data_folder
 
     def get_sample_data_folder(self) -> Path:
-        """Get sample data folder as Path object."""
-        return Path(self.sample_data_folder)
+        """Get sample data folder absolute path (DATA_ROOT/sample_data_folder)."""
+        return self.get_data_root() / self.sample_data_folder
 
     def get_database_backup_folder(self) -> Path:
-        """Get database backup folder as Path object."""
-        return Path(self.database_backup_folder)
+        """Get database backup folder absolute path (DATA_ROOT/database_backup_folder)."""
+        return self.get_data_root() / self.database_backup_folder
 
-    def get_log_file(self) -> Path:
-        """Get log file as Path object."""
-        return Path(self.log_file)
+    def get_database_url(self) -> str:
+        """Return effective database URL, deriving from DATA_ROOT if not provided."""
+        if self.database_url and self.database_url.strip():
+            return self.database_url
+        # Construct a sqlite URL under DATA_ROOT/database_file
+        db_path = self.get_data_root() / self.database_file
+        return f"sqlite+aiosqlite:///{db_path}"
 
 
 # Global settings instance
