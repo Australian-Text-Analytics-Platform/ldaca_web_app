@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { useWorkspace } from '../hooks/useWorkspace';
 import NodeSelectionPanel from './NodeSelectionPanel';
 import { useAuth } from '../hooks/useAuth';
+import { getApiBase } from '../api';
 
 // Supported formats aligned with backend / Polars write_* methods
 const FORMATS = [
@@ -24,8 +25,9 @@ const ExportTab: React.FC = () => {
     if (!currentWorkspaceId || nodeIds.length === 0) return;
     setExporting(true);
     try {
-      const params = new URLSearchParams({ node_ids: nodeIds.join(','), format });
-      const resp = await fetch(`/api/workspaces/${currentWorkspaceId}/export?` + params.toString(), {
+  const params = new URLSearchParams({ node_ids: nodeIds.join(','), format });
+  const apiBase = getApiBase();
+  const resp = await fetch(`${apiBase}/workspaces/${currentWorkspaceId}/export?` + params.toString(), {
         headers: getAuthHeaders(),
       });
       if (!resp.ok) throw new Error('Export failed');

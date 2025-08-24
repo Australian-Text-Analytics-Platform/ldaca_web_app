@@ -2,7 +2,7 @@ import React, { useState, useCallback, useMemo } from 'react';
 import SegmentedControl from './SegmentedControl';
 import { useAuth } from '../hooks/useAuth';
 import { useWorkspace } from '../hooks/useWorkspace';
-import { downloadWorkspace } from '../api';
+import { downloadWorkspace, downloadFile as apiDownloadFile } from '../api';
 import { useFiles } from '../hooks/useFiles';
 import FilePreviewModal from './FilePreviewModal';
 import AddFileModal from './AddFileModal';
@@ -37,9 +37,8 @@ const DataLoaderTab: React.FC = () => {
   const [fileToAdd, setFileToAdd] = useState<string | null>(null);
   const downloadFile = useCallback(async (filename: string) => {
     try {
-      const resp = await fetch(`/api/files/${encodeURIComponent(filename)}`, { headers: authHeaders });
-      if (!resp.ok) throw new Error('Download failed');
-      const blob = await resp.blob();
+      // Route through backend API (proxy-aware) instead of relative /api path
+      const blob = await apiDownloadFile(filename, authHeaders);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
