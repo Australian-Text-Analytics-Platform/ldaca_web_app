@@ -177,19 +177,7 @@ export const WorkspaceDataView: React.FC = memo(() => {
     );
   }
 
-  if (!nodeData.data || nodeData.data.length === 0) {
-    return (
-      <EmptyState
-        title="No Data Available"
-        description="The selected node contains no data"
-        icon={
-          <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-          </svg>
-        }
-      />
-    );
-  }
+  // Do not short-circuit on empty data; allow DataTable to render headers only
 
   return (
     <div className="flex flex-col h-full">
@@ -204,6 +192,11 @@ export const WorkspaceDataView: React.FC = memo(() => {
             return `${rows} × ${cols}`;
           })()} | {nodeData.data.length} rows loaded
         </div>
+        {Array.isArray(nodeData.data) && nodeData.data.length === 0 && (
+          <div className="text-xs text-gray-500 mt-1">
+            Showing empty table (no rows), based on current schema.
+          </div>
+        )}
       </div>
 
       {/* Data table with column type casting */}

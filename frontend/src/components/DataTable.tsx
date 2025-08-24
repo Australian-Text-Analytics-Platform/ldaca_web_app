@@ -80,6 +80,15 @@ const DataTable: React.FC<DataTableProps> = ({
       });
     }
   }, [workspaceId, nodeId, onRefreshSchema]);
+
+  // Derive columns: prefer row keys when available; otherwise fall back to schema (columnTypes)
+  const columns = React.useMemo(() => {
+    if (Array.isArray(data) && data.length > 0 && typeof data[0] === 'object' && data[0] !== null) {
+      return Object.keys(data[0]);
+    }
+    // Fallback to schema-derived columns when data is empty
+    return Object.keys(columnTypes || {});
+  }, [data, columnTypes]);
   
   if (loading) {
     return (
@@ -95,16 +104,8 @@ const DataTable: React.FC<DataTableProps> = ({
     );
   }
 
-  if (!data || data.length === 0) {
-    return (
-      <div className="text-center py-8 text-gray-500">
-        No data available
-      </div>
-    );
-  }
-
-  // Check if first row exists and is a valid object
-  if (!data[0] || typeof data[0] !== 'object' || data[0] === null) {
+  // Check if first row exists and is a valid object (allow empty arrays)
+  if (Array.isArray(data) && data.length > 0 && (typeof data[0] !== 'object' || data[0] === null)) {
     return (
       <div className="text-center py-8 text-gray-500">
         Invalid data format
@@ -112,7 +113,6 @@ const DataTable: React.FC<DataTableProps> = ({
     );
   }
 
-  const columns = Object.keys(data[0]);
 
   const handleTypeChange = async (column: string, newType: string) => {
     if (!onCast) return;
