@@ -69,7 +69,4 @@ jobs:
         asset_name: frontend-build.tar.gz
         tag: frontend-latest
         release_name: Frontend latest
-        body: |
-          Automated frontend build.
-          ${{ github.event.inputs.reason }}
         overwrite: true
