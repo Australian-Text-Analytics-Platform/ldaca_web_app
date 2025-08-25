@@ -237,6 +237,18 @@ export async function deleteWorkspace(workspaceId: string, authHeaders: Record<s
   return res.data;
 }
 
+export async function importWorkspace(file: File, authHeaders: Record<string, string> = {}) {
+  const formData = new FormData();
+  formData.append('file', file);
+  const res = await axios.post(`${API_BASE}/workspaces/import`, formData, {
+    headers: {
+      ...authHeaders,
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+  return res.data;
+}
+
 export async function getWorkspaceNodes(workspaceId: string, authHeaders: Record<string, string> = {}) {
   const res = await axios.get(`${API_BASE}/workspaces/${workspaceId}/nodes`, { 
     headers: authHeaders 

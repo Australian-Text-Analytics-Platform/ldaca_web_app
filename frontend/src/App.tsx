@@ -20,7 +20,7 @@ import logo from './logo.png';
  * Improved App component with proper error boundaries and loading states
  */
 const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'data-loader' | 'filter' | 'token-frequency' | 'topic-modeling' | 'concordance' | 'analysis' | 'export'>('data-loader');
+  const [activeTab, setActiveTab] = useState<'data-loader' | 'filter' | 'token-frequency' | 'concordance' | 'analysis' | 'topic-modeling' | 'export'>('data-loader');
   const { user, loginWithGoogle, logout, isAuthenticated, isMultiUserMode, isLoading, error } = useAuth();
   const { ready: backendReady } = useBackendHealth();
 
@@ -197,10 +197,10 @@ const App: React.FC = () => {
                 <ErrorBoundary>
                   {activeTab === 'data-loader' && <DataLoaderTab />}
                   {activeTab === 'filter' && <FilterTab />}
-                  {activeTab === 'concordance' && <ConcordanceTab />}
-                  {activeTab === 'topic-modeling' && <TopicModelingTab />}
                   {activeTab === 'token-frequency' && <TokenFrequencyTab />}
+                  {activeTab === 'concordance' && <ConcordanceTab />}
                   {activeTab === 'analysis' && <TimelineTab />}
+                  {activeTab === 'topic-modeling' && <TopicModelingTab />}
                   {activeTab === 'export' && <ExportTab />}
                 </ErrorBoundary>
               </div>

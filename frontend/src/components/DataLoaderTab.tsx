@@ -1,14 +1,17 @@
 import React, { useState, useCallback, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import SegmentedControl from './SegmentedControl';
 import { useAuth } from '../hooks/useAuth';
 import { useWorkspace } from '../hooks/useWorkspace';
-import { downloadWorkspace, downloadFile as apiDownloadFile } from '../api';
+import { downloadWorkspace, downloadFile as apiDownloadFile, importWorkspace } from '../api';
+import { queryKeys } from '../lib/queryKeys';
 import { useFiles } from '../hooks/useFiles';
 import FilePreviewModal from './FilePreviewModal';
 import AddFileModal from './AddFileModal';
 
 const DataLoaderTab: React.FC = () => {
   const { getAuthHeaders } = useAuth();
+  const queryClient = useQueryClient();
   const { 
     currentWorkspace,
     workspaces,
@@ -295,27 +298,87 @@ const DataLoaderTab: React.FC = () => {
         {activeLoader === 'workspace' && (
           <div className="space-y-4">
             <h3 className="text-lg font-medium text-gray-700">Available Workspaces</h3>
+            {/* Workspace upload (import) */}
+            <div className="flex items-center justify-between text-sm text-gray-600">
+              <div>
+                Drag & drop files onto the list below to upload, or
+                <label className="text-blue-600 hover:text-blue-700 cursor-pointer ml-1">
+                  browse
+                  <input
+                    type="file"
+                    accept=".json,application/json"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const f = e.target.files?.[0];
+                      if (!f) return;
+                      try {
+                        await importWorkspace(f, authHeaders);
+                        // refresh workspaces list
+                        queryClient.invalidateQueries({ queryKey: queryKeys.workspaces });
+                      } catch (err) {
+                        console.error('Failed to import workspace:', err);
+                        alert('Failed to import workspace');
+                      } finally {
+                        // Invalidate workspace list via useWorkspace hook
+                        // We don't have direct access to query client here; rely on backend consistency
+                      }
+                    }}
+                  />
+                </label>
+              </div>
+            </div>
             {isLoading.workspaces ? (
               <p>Loading workspaces...</p>
-            ) : workspaces.length > 0 ? (
-              <ul className="space-y-2">
+            ) : (
+              <div
+                className="space-y-2 max-h-[28rem] overflow-y-auto border border-gray-200 rounded-md p-1"
+                onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                onDrop={async (e) => {
+                  e.preventDefault(); e.stopPropagation();
+                  const files = Array.from(e.dataTransfer.files || []);
+                  for (const f of files) {
+                    if (!f.name.toLowerCase().endsWith('.json')) continue;
+                    try {
+                      await importWorkspace(f, authHeaders);
+                      queryClient.invalidateQueries({ queryKey: queryKeys.workspaces });
+                    } catch (err) {
+                      console.error('Failed to import workspace:', err);
+                    }
+                  }
+                }}
+              >
+                {workspaces.length === 0 && (
+                  <div className="p-2 text-gray-500 text-sm">No workspaces available.</div>
+                )}
                 {workspaces.map((workspace: any) => (
-                  <li key={workspace.workspace_id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div
+                    key={workspace.workspace_id}
+                    className="flex items-center justify-between p-2 border border-gray-200 rounded hover:bg-gray-50"
+                  >
                     <div className="flex items-center">
                       <span className="mr-3 text-lg" title={workspace.is_saved ? 'Saved' : 'Not Saved'}>
                         {workspace.is_saved ? '💾' : '📝'}
                       </span>
                       <div>
-                        <p className="font-semibold text-gray-800">{workspace.name}</p>
-                        <p className="text-sm text-gray-500">
-                          {workspace.dataframe_count} nodes
+                        <p className="text-sm font-medium text-gray-800">{workspace.name}</p>
+                        <p className="text-xs text-gray-500">
+                          {typeof workspace.node_count !== 'undefined' ? `${workspace.node_count} nodes` : ''}
+                          {typeof workspace.file_size !== 'undefined' && (
+                            <span className="ml-2">• {(workspace.file_size / 1024).toFixed(1)} KB</span>
+                          )}
+                        </p>
+                        <p className="text-[11px] text-gray-400">
+                          {workspace.created_at ? `Created: ${new Date(workspace.created_at).toLocaleString()}` : ''}
+                          {workspace.modified_at && (
+                            <span className="ml-2">Updated: {new Date(workspace.modified_at).toLocaleString()}</span>
+                          )}
                         </p>
                       </div>
                     </div>
-                    <div className="flex space-x-2">
+                    <div className="flex items-center space-x-2">
                       <button
                         onClick={() => handleLoadWorkspace(workspace.workspace_id)}
-                        className="px-3 py-1 text-sm font-medium text-white bg-blue-500 rounded-md hover:bg-blue-600 disabled:bg-gray-400"
+                        className="px-3 py-1 text-sm bg-green-100 text-green-700 rounded hover:bg-green-200 disabled:opacity-50 disabled:cursor-not-allowed"
                         disabled={currentWorkspace?.workspace_id === workspace.workspace_id}
                       >
                         {currentWorkspace?.workspace_id === workspace.workspace_id ? 'Loaded' : 'Load'}
@@ -323,7 +386,6 @@ const DataLoaderTab: React.FC = () => {
                       <button
                         onClick={async () => {
                           try {
-                            // If this is the currently loaded workspace and flagged unsaved, save first
                             if (currentWorkspace?.workspace_id === workspace.workspace_id && !workspace.is_saved) {
                               await saveWorkspace();
                             }
@@ -332,32 +394,30 @@ const DataLoaderTab: React.FC = () => {
                             const a = document.createElement('a');
                             const fname = `${workspace.name || 'workspace'}_${workspace.workspace_id}.json`;
                             a.href = url;
-                            a.download = fname.replace(/\s+/g,'_');
+                            a.download = fname.replace(/\s+/g, '_');
                             document.body.appendChild(a);
                             a.click();
-                            setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 0);
+                            setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
                           } catch (e) {
                             console.error('Failed to download workspace', e);
                             alert('Workspace download failed');
                           }
                         }}
-                        className="px-3 py-1 text-sm font-medium text-white bg-emerald-500 rounded-md hover:bg-emerald-600"
+                        className="px-2 py-1 text-sm bg-blue-50 text-blue-600 rounded hover:bg-blue-100"
                         title="Download workspace JSON"
                       >
                         Download
                       </button>
                       <button
                         onClick={() => handleDeleteWorkspace(workspace.workspace_id)}
-                        className="px-3 py-1 text-sm font-medium text-white bg-red-500 rounded-md hover:bg-red-600"
+                        className="px-2 py-1 text-sm bg-red-50 text-red-600 rounded hover:bg-red-100"
                       >
                         Delete
                       </button>
                     </div>
-                  </li>
+                  </div>
                 ))}
-              </ul>
-            ) : (
-              <p className="text-gray-500">No workspaces available.</p>
+              </div>
             )}
 
             {currentWorkspace && (

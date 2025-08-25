@@ -51,16 +51,6 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
           📈 Token Frequency
         </button>
         <button
-          onClick={() => onTabChange('topic-modeling')}
-          className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${
-            activeTab === 'topic-modeling'
-              ? 'bg-blue-100 text-blue-700 font-medium'
-              : 'text-gray-600 hover:bg-gray-100'
-          }`}
-        >
-          🧩 Topic Modeling
-        </button>
-        <button
           onClick={() => onTabChange('concordance')}
           className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${
             activeTab === 'concordance'
@@ -78,7 +68,17 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
               : 'text-gray-600 hover:bg-gray-100'
           }`}
         >
-          📊 Timeline
+          � Timeline
+        </button>
+        <button
+          onClick={() => onTabChange('topic-modeling')}
+          className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${
+            activeTab === 'topic-modeling'
+              ? 'bg-blue-100 text-blue-700 font-medium'
+              : 'text-gray-600 hover:bg-gray-100'
+          }`}
+        >
+          🧩 Topic Modeling
         </button>
         <button
           onClick={() => onTabChange('export')}
