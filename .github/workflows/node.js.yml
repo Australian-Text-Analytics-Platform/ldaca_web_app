@@ -14,6 +14,10 @@ jobs:
 
     runs-on: ubuntu-latest
 
+    defaults:
+      run:
+        working-directory: ldaca_web_app/frontend
+
     strategy:
       matrix:
         node-version: [22.x]
@@ -26,6 +30,10 @@ jobs:
       with:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
-    - run: npm ci
-    - run: npm run build --if-present
-    - run: npm test
+        cache-dependency-path: ldaca_web_app/frontend/package-lock.json
+    - name: Install dependencies
+      run: npm ci
+    - name: Build
+      run: npm run build --if-present
+    - name: Test
+      run: npm test
