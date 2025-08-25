@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/logo.png" alt="LDaCA Logo" width="300"/>
+	<img src="https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/logo.png" alt="LDaCA Logo" width="300"/>
 </p>
 
 # LDaCA Web App Tutorial
@@ -11,24 +11,24 @@ Welcome! This guide walks you through the LDaCA web application—from first lau
 ## 1) Core concepts in simple terms
 
 - Workspace
-  - Think of a workspace as a project folder inside the app. It keeps your data files, the steps you take, and the results together. You can check the workspace in the graph view window. ![Graph view window](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/Jai2eY.png)
-  - You can have multiple workspaces and switch between them by going to **Data Loader**, and then **Workspace Manager**. ![Workspace list](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/ws_load.gif)
+	- Think of a workspace as a project folder inside the app. It keeps your data files, the steps you take, and the results together. You can check the workspace in the graph view window. ![Graph view window](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/Jai2eY.png)
+	- You can have multiple workspaces and switch between them by going to **Data Loader**, and then **Workspace Manager**. ![Workspace list](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/ws_load.gif)
 
 - Node
-  - A node is a box in the “graph” that represents a dataset (a table of rows and columns), they could be loaded from files by going to **Data Loader** and then **File Upload** and click **Add to Workspace** or **Create Workspace & Add**. ![File upload](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/file_upload.gif) Or they could also be created from existing nodes by applying transformations or analyses.
-  - When you add or transform data, the app creates new nodes and connects them with lines to show “this came from that.” ![join](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/join.gif)
-  - You can select nodes to view their data or run analyses. ![data view](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/data_view.gif)
+	- A node is a box in the “graph” that represents a dataset (a table of rows and columns), they could be loaded from files by going to **Data Loader** and then **File Upload** and click **Add to Workspace** or **Create Workspace & Add**. ![File upload](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/file_upload.gif) Or they could also be created from existing nodes by applying transformations or analyses.
+	- When you add or transform data, the app creates new nodes and connects them with lines to show “this came from that.” ![join](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/join.gif)
+	- You can select nodes to view their data or run analyses. ![data view](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/data_view.gif)
 
 - What powers a node behind the scenes
-  - Polars: a high‑performance data table engine (like a faster spreadsheet engine).
-  - docframe: built on top of Polars for text analytics; it adds text-aware features such as choosing a “document” column and text operations.
-  - docworkspace: manages a network of nodes and the steps between them; it remembers how your results were produced.
+	- Polars: a high‑performance data table engine (like a faster spreadsheet engine).
+	- docframe: built on top of Polars for text analytics; it adds text-aware features such as choosing a “document” column and text operations.
+	- docworkspace: manages a network of nodes and the steps between them; it remembers how your results were produced.
 
 - Lazy vs. non‑lazy (you’ll see a “lazy” badge sometimes)
-  - Lazy means “don’t compute everything yet—wait until needed.” This makes the app fast, especially with large data. Sometimes the “rows” count shows “?” until the app needs to compute it. ![lazy badge](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/uUQjOb.png)
+	- Lazy means “don’t compute everything yet—wait until needed.” This makes the app fast, especially with large data. Sometimes the “rows” count shows “?” until the app needs to compute it. ![lazy badge](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/uUQjOb.png)
 
 - Shapes (Rows × Columns)
-  - Every node shows a shape like “10 × 5” which means 10 rows and 5 columns. If the rows show “?” for a lazy node, hover or open the data view to let the app calculate it when needed. ![show shape](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/show_shape.gif)
+	- Every node shows a shape like “10 × 5” which means 10 rows and 5 columns. If the rows show “?” for a lazy node, hover or open the data view to let the app calculate it when needed. ![show shape](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/show_shape.gif)
 
 ---
 
@@ -38,8 +38,8 @@ Welcome! This guide walks you through the LDaCA web application—from first lau
 - Left Sidebar: tab buttons (Data Loader, Filter/Slicing, Token Frequency, Topic Modeling, Concordance, Timeline, Export) and a live list of nodes with checkboxes to select them. ![left side bar](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/Po2Uve.png)
 - Middle Panel: the main controls for the active tab. ![middle panel](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/8Reyp6.png)
 - Right Panel: the Workspace View with two stacked sections:
-  - Graph View (top): boxes and lines showing your workflow. ![graph view](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/sBUDUy.png)
-  - Data View (bottom): a table view of the selected node’s data. ![data view](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/SZpwpE.png)
+	- Graph View (top): boxes and lines showing your workflow. ![graph view](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/sBUDUy.png)
+	- Data View (bottom): a table view of the selected node’s data. ![data view](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/SZpwpE.png)
 - The right panel can be collapsed/expanded and resized vertically inside. ![flexi panels](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/flexi_panels.gif)
 
 ---
@@ -57,27 +57,27 @@ Welcome! This guide walks you through the LDaCA web application—from first lau
 Open the “Data Loader” tab.
 
 - Upload files
-  - "Drag & drop files onto the list below to upload, or browse"
-  - Supported types include CSV, ~~JSON, TXT, TSV, Parquet, and Arrow IPC~~ (not implemented yet).
-  - Files are labeled SAMPLE (provided by the app) or USER (your uploads).
+	- "Drag & drop files onto the list below to upload, or browse"
+	- Supported types include CSV, ~~JSON, TXT, TSV, Parquet, and Arrow IPC~~ (not implemented yet).
+	- Files are labeled SAMPLE (provided by the app) or USER (your uploads).
 
 ![upload panel](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/joiWQ9.png)
 
 - Create a workspace and add a file as a node
-  - If no workspace is active, type a workspace name (optional) and click “Create Workspace” on any file. The app creates the workspace, then lets you choose how to add the file. ![create button](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/Q5Pxek.png) ![load panel](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/MpvqU3.png)
-  - For text analytics, pick DocDataFrame/DocLazyFrame and choose the “document” column (the column that contains text). For general tables, pick DataFrame/LazyFrame.
+	- If no workspace is active, type a workspace name (optional) and click “Create Workspace” on any file. The app creates the workspace, then lets you choose how to add the file. ![create button](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/Q5Pxek.png) ![load panel](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/MpvqU3.png)
+	- For text analytics, pick DocDataFrame/DocLazyFrame and choose the “document” column (the column that contains text). For general tables, pick DataFrame/LazyFrame.
 
 - Preview, download, and delete files
-  - Click a file row to preview it. ![file preview](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/file_preview.gif)
-  - Use the “Download” button to save a copy. ![download button](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/qCVe2D.png)
-  - For your own files (USER), use “Delete” to remove them. ![delete button](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/1w7UL6.png)
+	- Click a file row to preview it. ![file preview](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/file_preview.gif)
+	- Use the “Download” button to save a copy. ![download button](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/qCVe2D.png)
+	- For your own files (USER), use “Delete” to remove them. ![delete button](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/1w7UL6.png)
 
 - Workspace Manager
-  - See all workspaces, Load one, Download it as JSON, or Delete it. ![ws overview](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/x2a5e8.png)
-  - Import a workspace JSON by dragging it onto the list or clicking browse — the workspace list itself is the drop target.
-  - Each workspace item shows basic info: node count, file size, created at, and last modified. ![ws info](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/Ayh5n5.png)
-  - Action buttons (Load, Download, Delete).
-  - “Unload Current Workspace” removes it from memory after saving without deleting from disk.
+	- See all workspaces, Load one, Download it as JSON, or Delete it. ![ws overview](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/x2a5e8.png)
+	- Import a workspace JSON by dragging it onto the list or clicking browse — the workspace list itself is the drop target.
+	- Each workspace item shows basic info: node count, file size, created at, and last modified. ![ws info](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/Ayh5n5.png)
+	- Action buttons (Load, Download, Delete).
+	- “Unload Current Workspace” removes it from memory after saving without deleting from disk.
 
 Tips:
 
@@ -89,23 +89,23 @@ Tips:
 ## 5) Workspace View: graph and data
 
 - Graph View (top)
-  - Each box is a node. Click a node to select it; click again to toggle selection. ![node select](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/node_select.gif)
-  - Use the controls in the top‑right of the graph to show/hide the overview map and “Deselect all.”
-  - Drag nodes to arrange them; the layout is automatically computed but you can reposition for your view. ![graph op](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/graph_op_1.gif)
+	- Each box is a node. Click a node to select it; click again to toggle selection. ![node select](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/node_select.gif)
+	- Use the controls in the top‑right of the graph to show/hide the overview map and “Deselect all.”
+	- Drag nodes to arrange them; the layout is automatically computed but you can reposition for your view. ![graph op](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/graph_op_1.gif)
 
 - Node menu (three dots on a node)
-  - Save: placeholder for saving node data (when enabled by your setup).
-  - Rename: change the node’s label.
-  - Convert types: switch between Polars and docframe flavors (DataFrame/LazyFrame vs. DocDataFrame/DocLazyFrame). Doc types prompt for the document column.
-  - Reset document column: choose a different text column for doc nodes.
-  - Delete: remove the node from the workspace.
+	- Save: placeholder for saving node data (when enabled by your setup).
+	- Rename: change the node’s label.
+	- Convert types: switch between Polars and docframe flavors (DataFrame/LazyFrame vs. DocDataFrame/DocLazyFrame). Doc types prompt for the document column.
+	- Reset document column: choose a different text column for doc nodes.
+	- Delete: remove the node from the workspace.
 
 ![node dropdown](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/NBRVi3.png)
 
 - Data View (bottom)
-  - Shows a table for the selected node.
-  - Pagination controls and page size let you explore large tables.
-  - Change a column’s type with the dropdown above each column (e.g., string → datetime). If converting to datetime, a small format helper appears. ![data view op](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/data_view_op.gif)
+	- Shows a table for the selected node.
+	- Pagination controls and page size let you explore large tables.
+	- Change a column’s type with the dropdown above each column (e.g., string → datetime). If converting to datetime, a small format helper appears. ![data view op](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/data_view_op.gif)
 
 Tip:
 

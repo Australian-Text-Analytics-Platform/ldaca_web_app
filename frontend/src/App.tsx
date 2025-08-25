@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './App.css';
+import TutorialView from './components/TutorialView';
 import { useAuth } from './hooks/useAuth';
 import { useBackendHealth } from './hooks/useBackendHealth';
 import { QueryProvider } from './providers/QueryProvider';
@@ -15,12 +16,14 @@ import TokenFrequencyTab from './components/TokenFrequencyTab';
 import WorkspaceView from './components/WorkspaceView';
 import Sidebar from './components/Sidebar';
 import logo from './logo.png';
+import FeedbackModal from './components/FeedbackModal';
 
 /**
  * Improved App component with proper error boundaries and loading states
  */
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'data-loader' | 'filter' | 'token-frequency' | 'concordance' | 'analysis' | 'topic-modeling' | 'export'>('data-loader');
+  const [isTutorial, setIsTutorial] = useState<boolean>(false);
   const { user, loginWithGoogle, logout, isAuthenticated, isMultiUserMode, isLoading, error } = useAuth();
   const { ready: backendReady } = useBackendHealth();
 
@@ -28,6 +31,7 @@ const App: React.FC = () => {
   const [rightWidth, setRightWidth] = useState<number>(50); // percentage of total width
   const [lastRightWidth, setLastRightWidth] = useState<number>(50); // remember last width when collapsing
   const [isRightCollapsed, setIsRightCollapsed] = useState<boolean>(false);
+  const [showFeedback, setShowFeedback] = useState<boolean>(false);
   const [isResizing, setIsResizing] = useState(false);
   const layoutRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLElement>(null);
@@ -105,6 +109,25 @@ const App: React.FC = () => {
     };
   }, []);
 
+  // Global event to open feedback from Sidebar footer
+  useEffect(() => {
+    const open = () => setShowFeedback(true);
+    window.addEventListener('openFeedback', open as EventListener);
+    return () => window.removeEventListener('openFeedback', open as EventListener);
+  }, []);
+
+  // Hash-based lightweight routing for tutorial page
+  useEffect(() => {
+    const check = () => setIsTutorial(window.location.hash.replace(/^#/, '') === '/tutorial');
+    check();
+    window.addEventListener('hashchange', check);
+    return () => window.removeEventListener('hashchange', check);
+  }, []);
+
+  if (isTutorial) {
+    return <TutorialView />;
+  }
+
   // Show loading state while checking auth
   if (isLoading) {
     return (
@@ -161,6 +184,7 @@ const App: React.FC = () => {
     <QueryProvider>
       <ErrorBoundary>
         <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+          <FeedbackModal isOpen={showFeedback} onClose={() => setShowFeedback(false)} />
           {/* Global drag-and-drop overlay removed; users can drop directly onto the file list */}
           {/* Header */}
           <header className="bg-white border-b border-gray-200 px-6 py-4 relative">

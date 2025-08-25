@@ -1,5 +1,4 @@
 import React from 'react';
-import FeedbackModal from './FeedbackModal';
 import { useWorkspace } from '../hooks/useWorkspace';
 
 interface SidebarProps {
@@ -51,6 +50,16 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
           📈 Token Frequency
         </button>
         <button
+          onClick={() => onTabChange('topic-modeling')}
+          className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${
+            activeTab === 'topic-modeling'
+              ? 'bg-blue-100 text-blue-700 font-medium'
+              : 'text-gray-600 hover:bg-gray-100'
+          }`}
+        >
+          🧩 Topic Modeling
+        </button>
+        <button
           onClick={() => onTabChange('concordance')}
           className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${
             activeTab === 'concordance'
@@ -68,17 +77,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
               : 'text-gray-600 hover:bg-gray-100'
           }`}
         >
-          � Timeline
-        </button>
-        <button
-          onClick={() => onTabChange('topic-modeling')}
-          className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${
-            activeTab === 'topic-modeling'
-              ? 'bg-blue-100 text-blue-700 font-medium'
-              : 'text-gray-600 hover:bg-gray-100'
-          }`}
-        >
-          🧩 Topic Modeling
+          📊 Timeline
         </button>
         <button
           onClick={() => onTabChange('export')}
@@ -95,7 +94,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
   <div className="mt-6" />
 
       {/* Node list (synced with graph selection) */}
-  <div className="mt-4 pt-3 border-t border-gray-200 flex-1 flex flex-col min-h-0">
+      <div className="mt-4 pt-3 border-t border-gray-200 flex-1 flex flex-col min-h-0">
         <div className="flex items-center justify-between mb-2">
           <h4 className="text-sm font-medium text-gray-700">Nodes</h4>
           <span className="text-xs text-gray-500">{nodeCount}</span>
@@ -124,34 +123,23 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
           )}
         </div>
       </div>
-      {/* Feedback button fixed at bottom */}
-      <div className="pt-3 mt-4 border-t border-gray-200">
-        <FeedbackButton />
+      {/* Footer actions */}
+      <div className="pt-3 mt-3 border-t border-gray-200">
+        <button
+          onClick={() => window.open('#/tutorial', '_blank', 'noopener,noreferrer')}
+          className="w-full text-left px-4 py-2 rounded-lg transition-colors text-gray-700 hover:bg-gray-100"
+        >
+          📘 Tutorial
+        </button>
+        <button
+          onClick={() => window.dispatchEvent(new CustomEvent('openFeedback'))}
+          className="w-full text-left px-4 py-2 rounded-lg transition-colors text-gray-700 hover:bg-gray-100"
+        >
+          💬 Feedback
+        </button>
       </div>
-      <FeedbackModalWrapper />
     </aside>
   );
 };
 
 export default Sidebar;
-
-// Local state wrapper components (placed after export for file locality)
-const FeedbackContext = React.createContext<{open:boolean; setOpen:(v:boolean)=>void}|null>(null);
-
-const FeedbackModalWrapper: React.FC = () => {
-  const ctx = React.useContext(FeedbackContext);
-  if (!ctx) return null;
-  return <FeedbackModal isOpen={ctx.open} onClose={()=>ctx.setOpen(false)} />;
-};
-
-const FeedbackButton: React.FC = () => {
-  const [open,setOpen] = React.useState(false);
-  return (
-    <FeedbackContext.Provider value={{open,setOpen}}>
-      <button onClick={()=>setOpen(true)} className="w-full px-4 py-2 text-sm rounded-lg border border-blue-300 text-blue-700 hover:bg-blue-50 transition-colors flex items-center justify-center gap-2" title="Send feedback or report an issue">
-        💬 Feedback
-      </button>
-      <FeedbackModalWrapper />
-    </FeedbackContext.Provider>
-  );
-};
