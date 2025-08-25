@@ -1919,18 +1919,43 @@ async def get_concordance(
                 case_sensitive=request.case_sensitive,
             )
 
-            # Apply sorting if requested
-            if request.sort_by and request.sort_by in concordance_result.columns:
-                import polars as pl
+            import polars as pl
 
-                if request.sort_order.lower() == "desc":
-                    concordance_result = concordance_result.sort(
-                        pl.col(request.sort_by), descending=True
-                    )
+            # Optionally join metadata (original row) by document_idx when requested
+            if request.show_metadata:
+                # Ensure document_idx exists in concordance_result for join
+                cdf = concordance_result
+                if "document_idx" not in cdf.columns:
+                    cdf = cdf.with_row_index("document_idx")
+                # Materialize original node data and add document_idx
+                base = node.data
+                if hasattr(base, "to_lazyframe"):
+                    base_df = base.to_lazyframe().collect()
+                elif hasattr(base, "_df"):
+                    base_df = base._df  # type: ignore[attr-defined]
+                elif hasattr(base, "collect"):
+                    base_df = base.collect()
                 else:
-                    concordance_result = concordance_result.sort(
-                        pl.col(request.sort_by)
-                    )
+                    base_df = base
+                if isinstance(base_df, pl.LazyFrame):
+                    base_df = base_df.collect()
+                # Align document_idx dtype across both sides before join
+                orig = base_df.with_row_index("document_idx")
+                try:
+                    idx_dtype = cdf.schema.get("document_idx")
+                    if idx_dtype is not None:
+                        orig = orig.with_columns(pl.col("document_idx").cast(idx_dtype))
+                except Exception:
+                    pass
+                # Join original metadata to the right
+                concordance_result = cdf.join(orig, on="document_idx", how="left")
+
+            # Apply sorting if requested (after join so metadata columns are sortable)
+            if request.sort_by and request.sort_by in concordance_result.columns:
+                concordance_result = concordance_result.sort(
+                    pl.col(request.sort_by),
+                    descending=request.sort_order.lower() == "desc",
+                )
 
             # Get total count before pagination
             total_matches = len(concordance_result)
@@ -1979,8 +2004,6 @@ async def get_concordance(
 
         else:
             # Fallback to basic string search
-            import polars as pl
-
             filtered = node.data.filter(
                 pl.col(request.column).str.contains(request.search_word)
             )
@@ -2069,6 +2092,7 @@ async def get_multi_node_concordance(
 
         results = {}
         full_dfs = []  # store full cached dfs for combined view
+        per_node_columns = {}
 
         for node_id in request.node_ids:
             # Fetch node
@@ -2132,17 +2156,36 @@ async def get_multi_node_concordance(
 
             # Work on a non-mutating sorted view for this request
             working_df = concordance_result
+            # If metadata requested, join original row by document_idx
+            if request.show_metadata:
+                try:
+                    cdf = working_df
+                    if "document_idx" not in cdf.columns:
+                        cdf = cdf.with_row_index("document_idx")
+                    base = node.data
+                    if hasattr(base, "to_lazyframe"):
+                        base_df = base.to_lazyframe().collect()
+                    elif hasattr(base, "_df"):
+                        base_df = base._df  # type: ignore[attr-defined]
+                    elif hasattr(base, "collect"):
+                        base_df = base.collect()
+                    else:
+                        base_df = base
+                    if isinstance(base_df, pl.LazyFrame):
+                        base_df = base_df.collect()
+                    orig = base_df.with_row_index("document_idx")
+                    working_df = cdf.join(orig, on="document_idx", how="left")
+                except Exception as je:
+                    logger.warning(f"Failed to join metadata for node {node_id}: {je}")
             if (
                 request.sort_by
                 and hasattr(working_df, "columns")
                 and request.sort_by in working_df.columns
             ):  # type: ignore
-                if request.sort_order.lower() == "desc":
-                    working_df = working_df.sort(
-                        pl.col(request.sort_by), descending=True
-                    )  # type: ignore
-                else:
-                    working_df = working_df.sort(pl.col(request.sort_by))  # type: ignore
+                working_df = working_df.sort(
+                    pl.col(request.sort_by),
+                    descending=request.sort_order.lower() == "desc",
+                )  # type: ignore
 
             total_matches = len(working_df)
             start_idx = (request.page - 1) * request.page_size
@@ -2150,6 +2193,7 @@ async def get_multi_node_concordance(
             paginated_result = working_df.slice(start_idx, request.page_size)
 
             node_name = node.name if hasattr(node, "name") and node.name else node_id
+            per_node_columns[node_name] = list(working_df.columns)
             if hasattr(paginated_result, "to_dicts"):
                 results[node_name] = {
                     "data": paginated_result.to_dicts(),
@@ -2170,7 +2214,7 @@ async def get_multi_node_concordance(
                 }
                 if request.combined:
                     try:
-                        df_with_source = concordance_result.with_columns(
+                        df_with_source = working_df.with_columns(
                             pl.lit(node_name).alias("__source_node")
                         )  # type: ignore
                         full_dfs.append(df_with_source)
@@ -2197,10 +2241,25 @@ async def get_multi_node_concordance(
         # Build combined view dynamically (uncached)
         if request.combined and len(full_dfs) >= 2:
             try:
+                # Only allow combined if schemas are identical when metadata requested
+                if request.show_metadata:
+                    # All per_node_columns must match
+                    col_sets = list(per_node_columns.values())
+                    if not col_sets or any(
+                        cols != col_sets[0] for cols in col_sets[1:]
+                    ):
+                        # Skip combined view by not adding __COMBINED__ key
+                        return {
+                            "success": True,
+                            "message": f"Found concordance results for search term '{request.search_word}'",
+                            "data": results,
+                        }
                 combined_df = pl.concat(full_dfs, how="vertical")
                 # Apply requested sorting when provided; fall back to document_idx asc
                 effective_sort_by = None
-                effective_sort_order = request.sort_order if request.sort_order else "asc"
+                effective_sort_order = (
+                    request.sort_order if request.sort_order else "asc"
+                )
                 if request.sort_by and request.sort_by in combined_df.columns:
                     effective_sort_by = request.sort_by
                     combined_df = combined_df.sort(

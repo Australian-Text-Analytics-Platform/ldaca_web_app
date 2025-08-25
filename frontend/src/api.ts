@@ -665,6 +665,7 @@ export interface ConcordanceRequest {
   num_right_tokens?: number;
   regex?: boolean;
   case_sensitive?: boolean;
+  show_metadata?: boolean;
   page?: number;
   page_size?: number;
   sort_by?: string;
@@ -684,6 +685,7 @@ export interface MultiNodeConcordanceRequest {
   sort_by?: string;
   sort_order?: 'asc' | 'desc';
   combined?: boolean; // request combined concatenated view in addition to per-node results
+  show_metadata?: boolean;
 }
 
 export interface MultiNodeConcordanceResponse {

@@ -15,10 +15,14 @@ from ..config import settings
 from ..core.auth import get_current_user
 from ..models import FeedbackRequest, FeedbackResponse
 
+# Avoid importing pyairtable at module import time; detect availability cheaply
 try:
-    from pyairtable import Table
-except Exception:  # pragma: no cover - library import issues
-    Table = None  # type: ignore
+    import importlib.util as _il_util
+
+    _HAS_PYAIRTABLE = _il_util.find_spec("pyairtable") is not None
+except Exception:  # pragma: no cover
+    _HAS_PYAIRTABLE = False
+Table = None  # type: ignore
 
 router = APIRouter(prefix="/feedback", tags=["feedback"])
 
@@ -31,7 +35,7 @@ def _airtable_available() -> bool:
         settings.airtable_api_key
         and settings.airtable_base_id
         and settings.airtable_table_id
-        and Table is not None
+        and _HAS_PYAIRTABLE
     )
 
 
@@ -59,8 +63,11 @@ async def submit_feedback(
         )
 
     try:
+        # Import only when needed
+        from pyairtable import Table as _Table  # type: ignore
+
         # pyairtable.Table signature: Table(api_key, base_id, table_name)
-        table = Table(  # type: ignore[call-arg]
+        table = _Table(  # type: ignore[call-arg]
             settings.airtable_api_key,  # type: ignore[arg-type]
             settings.airtable_base_id,  # type: ignore[arg-type]
             settings.airtable_table_id,  # type: ignore[arg-type] (we pass the table ID which is accepted as name)

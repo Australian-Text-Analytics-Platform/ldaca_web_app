@@ -34,6 +34,7 @@ const ConcordanceTab: React.FC = () => {
   const [numRightTokens, setNumRightTokens] = useState(10);
   const [regex, setRegex] = useState(false);
   const [caseSensitive, setCaseSensitive] = useState(false);
+  const [showMetadata, setShowMetadata] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [results, setResults] = useState<MultiNodeConcordanceResponse | null>(null);
   // Color management & view mode
@@ -313,6 +314,7 @@ const ConcordanceTab: React.FC = () => {
         num_right_tokens: numRightTokens,
         regex: regex,
         case_sensitive: caseSensitive,
+        show_metadata: showMetadata,
         page: effectiveMode === 'combined' ? combinedPage : firstNodePagination.currentPage,
         page_size: effectiveMode === 'combined' ? combinedPageSize : firstNodePagination.pageSize,
   sort_by: (overrideSortBy ?? firstNodePagination.sortBy) || undefined,
@@ -338,7 +340,7 @@ const ConcordanceTab: React.FC = () => {
     } finally {
       setIsSearching(false);
     }
-  }, [currentWorkspaceId, selectedNodes, searchWord, nodeColumnSelections, nodePagination, globalPageSize, numLeftTokens, numRightTokens, regex, caseSensitive, getAuthHeaders, viewMode, combinedPage, combinedPageSize]);
+  }, [currentWorkspaceId, selectedNodes, searchWord, nodeColumnSelections, nodePagination, globalPageSize, numLeftTokens, numRightTokens, regex, caseSensitive, showMetadata, getAuthHeaders, viewMode, combinedPage, combinedPageSize]);
 
   // Effect to handle auto-search trigger from TokenFrequencyTab
   useEffect(() => {
@@ -447,6 +449,7 @@ const ConcordanceTab: React.FC = () => {
         num_right_tokens: numRightTokens,
         regex: regex,
         case_sensitive: caseSensitive,
+        show_metadata: showMetadata,
         page: currentPage,
         page_size: nodeState.pageSize,
   sort_by: (overrideSortBy ?? nodeState.sortBy) || undefined,
@@ -647,9 +650,12 @@ const ConcordanceTab: React.FC = () => {
                 <thead className="bg-gray-50 sticky top-0">
                   <tr>
                     {columns.map((c: string) => {
-                      const isSorted = combinedSorting.sort_by === c;
+                      const lower = c.toLowerCase();
+                      const neverSortable = ['left_context','matched_text','right_context'];
+                      const sortable = !neverSortable.includes(lower);
+                      const isSorted = sortable && combinedSorting.sort_by === c;
                       const icon = isSorted ? (combinedSorting.sort_order === 'asc' ? '▲' : '▼') : '▲▼';
-                      return (
+                      return sortable ? (
                         <th
                           key={c}
                           className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
@@ -660,6 +666,8 @@ const ConcordanceTab: React.FC = () => {
                             <span className={`text-xs ${isSorted ? 'text-blue-600' : 'text-gray-400'}`}>{icon}</span>
                           </div>
                         </th>
+                      ) : (
+                        <th key={c} className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{c}</th>
                       );
                     })}
                   </tr>
@@ -744,9 +752,20 @@ const ConcordanceTab: React.FC = () => {
               <thead className="bg-gray-50 sticky top-0">
                 <tr>
                   {Object.keys(nodeData.data[0]).map(key => {
-                    // Make L1, R1, L1_FREQ, R1_FREQ, document_idx sortable
-                    const sortableColumns = ['l1', 'r1', 'l1_freq', 'r1_freq', 'document_idx'];
-                    const isSortable = sortableColumns.includes(key.toLowerCase());
+                    // Sorting rules: never sortable for core context columns; otherwise
+                    // - when metadata is shown, allow sorting by any other column
+                    // - when metadata is off, restrict to L/R tokens and frequencies and document_idx
+                    const neverSortable = ['left_context','matched_text','right_context'];
+                    const keyLower = key.toLowerCase();
+                    let isSortable: boolean;
+                    if (neverSortable.includes(keyLower)) {
+                      isSortable = false;
+                    } else if (showMetadata) {
+                      isSortable = true;
+                    } else {
+                      const allowed = ['l1','r1','l1_freq','r1_freq','document_idx'];
+                      isSortable = allowed.includes(keyLower);
+                    }
                     
                     return isSortable ? (
                       <SortableHeader key={key} columnKey={key} label={key} nodeId={nodeId} />
@@ -988,6 +1007,16 @@ const ConcordanceTab: React.FC = () => {
               />
               <span className="text-sm text-gray-700">Case Sensitive</span>
             </label>
+
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                checked={showMetadata}
+                onChange={(e) => setShowMetadata(e.target.checked)}
+                className="mr-2"
+              />
+              <span className="text-sm text-gray-700">Show Metadata</span>
+            </label>
           </div>
         </div>
 
@@ -1026,7 +1055,21 @@ const ConcordanceTab: React.FC = () => {
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
                 <h3 className="text-lg font-semibold text-gray-800">Search Results</h3>
                 <SegmentedControl
-                  options={[{ value: 'separated', label: 'Separated' }, { value: 'combined', label: 'Combined' }]}
+                  options={(() => {
+                    const base = [{ value: 'separated', label: 'Separated' }];
+                    // Gate combined option when showMetadata is on and schemas differ
+                    let canCombined = true;
+                    if (showMetadata && results && results.data) {
+                      const keys = Object.keys(results.data).filter(k => k !== '__COMBINED__');
+                      if (keys.length >= 2) {
+                        const colsA = (results.data as any)[keys[0]]?.columns || [];
+                        const colsB = (results.data as any)[keys[1]]?.columns || [];
+                        canCombined = JSON.stringify(colsA) === JSON.stringify(colsB);
+                      }
+                    }
+                    if (canCombined) base.push({ value: 'combined', label: 'Combined' } as const);
+                    return base;
+                  })()}
                   value={viewMode}
                   onChange={(val) => {
                     if (val !== viewMode) {
@@ -1069,7 +1112,7 @@ const ConcordanceTab: React.FC = () => {
               <div className="text-sm text-gray-600 mb-6">{results.message}</div>
               
               {results.data && Object.keys(results.data).length > 0 ? (
-                <div className={`grid gap-6 ${viewMode==='combined' ? 'grid-cols-1' : (Object.keys(results.data).length === 1 ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-2')}`}>
+                <div className={`grid gap-6 ${viewMode==='combined' ? 'grid-cols-1' : 'grid-cols-1'}`}>
                   {Object.entries(results.data).filter(([k]) => viewMode==='combined' ? k==='__COMBINED__' : k !== '__COMBINED__').map(([nodeName, nodeData]) => {
                     // Find the corresponding node and column for detail view
                     // Try multiple ways to match the node
