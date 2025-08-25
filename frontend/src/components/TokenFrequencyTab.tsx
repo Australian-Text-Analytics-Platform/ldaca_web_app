@@ -43,6 +43,15 @@ const TokenFrequencyTab: React.FC = () => {
   const [lastCompareNodeIds, setLastCompareNodeIds] = useState<string[]>([]); // preserves order used in last analysis
   // Locally-applied stop word filter (no recomputation)
   const [appliedStopSet, setAppliedStopSet] = useState<Set<string>>(new Set());
+
+  // Helper to compute and apply stop set from a comma-separated string
+  const applyStopSetFromText = (text: string) => {
+    const words = text
+      .split(',')
+      .map(w => w.trim().toLowerCase())
+      .filter(Boolean);
+    setAppliedStopSet(new Set(words));
+  };
   const defaultPalette = useMemo(
     () => [
       '#2563eb', // vivid blue
@@ -176,7 +185,10 @@ const TokenFrequencyTab: React.FC = () => {
     try {
       const response = await getDefaultStopWords(getAuthHeaders());
       if (response.success && response.data) {
-        setStopWords(response.data.join(', '));
+        const joined = response.data.join(', ');
+        setStopWords(joined);
+        // Auto-apply on fill default
+        applyStopSetFromText(joined);
       } else {
         console.error('Failed to get default stop words:', response.message);
       }
@@ -185,15 +197,6 @@ const TokenFrequencyTab: React.FC = () => {
     } finally {
       setIsLoadingStopWords(false);
     }
-  };
-
-  // Apply local stop-word filter to current results without recomputation
-  const handleApplyLocalStopFilter = () => {
-    const words = stopWords
-      .split(',')
-      .map(w => w.trim().toLowerCase())
-      .filter(Boolean);
-    setAppliedStopSet(new Set(words));
   };
 
   const handleAnalyze = async () => {
@@ -287,6 +290,8 @@ const TokenFrequencyTab: React.FC = () => {
     if (!current.map(w => w.toLowerCase()).includes(tokenNorm)) {
       const updated = [...current, token].join(', ');
       setStopWords(updated);
+      // Auto-apply when a word is added via right-click
+      applyStopSetFromText(updated);
     }
   };
 
@@ -441,6 +446,13 @@ const TokenFrequencyTab: React.FC = () => {
             <textarea
               value={stopWords}
               onChange={(e) => setStopWords(e.target.value)}
+              onBlur={() => applyStopSetFromText(stopWords)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  applyStopSetFromText(stopWords);
+                }
+              }}
               placeholder="the, and, or, but..."
               rows={4}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-vertical"
@@ -468,8 +480,8 @@ const TokenFrequencyTab: React.FC = () => {
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex flex-wrap items-center gap-3">
+  {/* Action Buttons */}
+  <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={handleAnalyze}
             disabled={
@@ -481,14 +493,6 @@ const TokenFrequencyTab: React.FC = () => {
             className="w-full md:w-auto px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
           >
             {isAnalyzing ? 'Analyzing...' : 'Calculate Token Frequencies'}
-          </button>
-          <button
-            onClick={handleApplyLocalStopFilter}
-            disabled={!results}
-            className="w-full md:w-auto px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-            title="Filter current results client-side without recalculation"
-          >
-            Apply Stop Words (no recompute)
           </button>
           {appliedStopSet.size > 0 && (
             <span className="text-xs text-gray-500">Active filter: {appliedStopSet.size} word{appliedStopSet.size === 1 ? '' : 's'}</span>

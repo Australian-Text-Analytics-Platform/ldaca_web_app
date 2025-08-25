@@ -607,8 +607,10 @@ export async function getNodeSchema(
 
 export interface FilterCondition {
   column: string;
-  operator: 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'contains' | 'startswith' | 'endswith' | 'is_null' | 'is_not_null' | 'between';
+  operator: 'eq' | 'gte' | 'lte' | 'contains' | 'startswith' | 'endswith' | 'is_null' | 'between';
   value: string | number | boolean | Date | { start: Date | null, end: Date | null } | { start: string | null, end: string | null } | null;
+  negate?: boolean; // apply .not_() on the predicate
+  regex?: boolean; // only applicable to string operators; default true for contains
 }
 
 export interface FilterRequest {

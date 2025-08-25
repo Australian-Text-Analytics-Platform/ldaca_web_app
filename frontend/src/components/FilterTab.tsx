@@ -18,56 +18,44 @@ const normalizeTypeName = (type: string): string => {
   return 'string'; // Default fallback
 };
 
-// Get operators for each data type
+// Get operators for each data type (simplified, lowercase labels)
+// Removed: not equal, is not null, greater than, less than
+// Kept: equals, contains/startswith/endswith (strings), is null, gte, lte, between
 const getOperatorsForType = (dataType: string) => {
   switch (dataType) {
     case 'string':
       return [
-        { value: 'eq', label: 'Equals' },
-        { value: 'ne', label: 'Not Equals' },
-        { value: 'contains', label: 'Contains' },
-        { value: 'startswith', label: 'Starts With' },
-        { value: 'endswith', label: 'Ends With' },
-        { value: 'is_null', label: 'Is Null' },
-        { value: 'is_not_null', label: 'Is Not Null' },
+  { value: 'eq', label: 'equals' },
+  { value: 'contains', label: 'contains' },
+  { value: 'startswith', label: 'starts with' },
+  { value: 'endswith', label: 'ends with' },
+  { value: 'is_null', label: 'is null' },
       ];
     case 'integer':
     case 'float':
       return [
-        { value: 'eq', label: 'Equals' },
-        { value: 'ne', label: 'Not Equals' },
-        { value: 'gt', label: 'Greater Than' },
-        { value: 'gte', label: 'Greater Than or Equal' },
-        { value: 'lt', label: 'Less Than' },
-        { value: 'lte', label: 'Less Than or Equal' },
-        { value: 'is_null', label: 'Is Null' },
-        { value: 'is_not_null', label: 'Is Not Null' },
+  { value: 'eq', label: 'equals' },
+  { value: 'gte', label: 'greater than or equal' },
+  { value: 'lte', label: 'less than or equal' },
+  { value: 'is_null', label: 'is null' },
       ];
     case 'boolean':
       return [
-        { value: 'eq', label: 'Equals' },
-        { value: 'ne', label: 'Not Equals' },
-        { value: 'is_null', label: 'Is Null' },
-        { value: 'is_not_null', label: 'Is Not Null' },
+  { value: 'eq', label: 'equals' },
+  { value: 'is_null', label: 'is null' },
       ];
     case 'datetime':
       return [
-        { value: 'eq', label: 'Equals' },
-        { value: 'ne', label: 'Not Equals' },
-        { value: 'gt', label: 'After' },
-        { value: 'gte', label: 'After or Equal' },
-        { value: 'lt', label: 'Before' },
-        { value: 'lte', label: 'Before or Equal' },
-        { value: 'between', label: 'Between' },
-        { value: 'is_null', label: 'Is Null' },
-        { value: 'is_not_null', label: 'Is Not Null' },
+  { value: 'eq', label: 'equals' },
+  { value: 'gte', label: 'after or equal' },
+  { value: 'lte', label: 'before or equal' },
+  { value: 'between', label: 'between' },
+  { value: 'is_null', label: 'is null' },
       ];
     default:
       return [
-        { value: 'eq', label: 'Equals' },
-        { value: 'ne', label: 'Not Equals' },
-        { value: 'is_null', label: 'Is Null' },
-        { value: 'is_not_null', label: 'Is Not Null' },
+  { value: 'eq', label: 'equals' },
+  { value: 'is_null', label: 'is null' },
       ];
   }
 };
@@ -77,6 +65,8 @@ interface FilterConditionWithId extends Omit<FilterCondition, 'value'> {
   id: string;
   dataType?: string;
   value: string | number | boolean | Date | { start: Date | null, end: Date | null } | null;
+  negate?: boolean;
+  regex?: boolean;
 }
 
 // Removed DatePicker & custom time input: now using direct ISO8601 text input for timezone-aware datetime entry.
@@ -94,7 +84,9 @@ const FilterTab: React.FC = () => {
     id: '1',
     column: '',
     operator: 'eq',
-    value: ''
+    value: '',
+    negate: false,
+    regex: true,
   }]);
   const [logic, setLogic] = useState<'and' | 'or'>('and');
   const [newNodeName, setNewNodeName] = useState('');
@@ -145,7 +137,9 @@ const FilterTab: React.FC = () => {
       column: firstColumn ? firstColumn.name : '',
       operator: 'eq',
       value: '',
-      dataType: firstColumn ? firstColumn.dataType : 'string'
+      dataType: firstColumn ? firstColumn.dataType : 'string',
+      negate: false,
+      regex: true,
     };
     setConditions([...conditions, newCondition]);
   };
@@ -362,7 +356,7 @@ const FilterTab: React.FC = () => {
       return;
     }
 
-    if (conditions.some(c => !c.column || (c.operator !== 'is_null' && c.operator !== 'is_not_null' && !c.value))) {
+  if (conditions.some(c => !c.column || (c.operator !== 'is_null' && !c.value))) {
       alert('Please fill in all filter conditions');
       return;
     }
@@ -370,7 +364,7 @@ const FilterTab: React.FC = () => {
     // Serialize conditions for API
     const serializedConditions = conditions.map(c => {
       let value: any;
-      if (c.operator === 'is_null' || c.operator === 'is_not_null') {
+  if (c.operator === 'is_null') {
         value = null;
       } else if (c.value instanceof Date) {
         value = c.value.toISOString();
@@ -383,7 +377,10 @@ const FilterTab: React.FC = () => {
       } else {
         value = c.value;
       }
-      return { column: c.column, operator: c.operator, value };
+  const payload: any = { column: c.column, operator: c.operator, value };
+  if ((c as any).negate !== undefined) payload.negate = Boolean((c as any).negate);
+  if ((c as any).regex !== undefined) payload.regex = Boolean((c as any).regex);
+  return payload;
     });
 
     const request: FilterRequest = {
@@ -491,6 +488,28 @@ const FilterTab: React.FC = () => {
                 <option value="or">OR</option>
               </select>
             )}
+
+            {/* Negate and Regex toggles at the front */}
+            <label className="flex items-center gap-1 text-xs text-gray-700">
+              <input
+                aria-label="negate condition"
+                type="checkbox"
+                checked={Boolean(condition.negate)}
+                onChange={(e) => handleConditionChange(condition.id, 'negate' as any, e.target.checked)}
+              />
+              negate
+            </label>
+            {(condition.dataType === 'string' && (condition.operator === 'contains' || condition.operator === 'startswith' || condition.operator === 'endswith')) && (
+              <label className="flex items-center gap-1 text-xs text-gray-700">
+                <input
+                  aria-label="use regex"
+                  type="checkbox"
+                  checked={Boolean(condition.regex ?? true)}
+                  onChange={(e) => handleConditionChange(condition.id, 'regex' as any, e.target.checked)}
+                />
+                regex
+              </label>
+            )}
             
             <select
               value={condition.column}
@@ -524,7 +543,7 @@ const FilterTab: React.FC = () => {
               )}
             </select>
 
-            {condition.operator !== 'is_null' && condition.operator !== 'is_not_null' && (
+            {condition.operator !== 'is_null' && (
               <div className="flex-none">
                 {renderValueInput(condition)}
               </div>
