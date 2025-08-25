@@ -96,6 +96,8 @@ export interface FilterCondition {
   column: string;
   operator: string;
   value: any;
+  negate?: boolean;
+  regex?: boolean;
   id?: string;
   dataType?: string;
 }
