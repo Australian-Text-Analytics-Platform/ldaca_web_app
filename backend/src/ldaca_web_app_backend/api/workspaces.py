@@ -2650,10 +2650,9 @@ async def cast_node(
                         .alias(column_name)
                     )
                 elif any(tok in orig_lower for tok in ["utf8", "string", "str"]):
-                    # Strip whitespace, attempt float parse (lenient) then truncate by casting to int
+                    # Attempt float parse (lenient) then truncate by casting to int
                     cast_expr = (
-                        col_expr.str.strip()
-                        .cast(pl.Float64, strict=False)
+                        col_expr.cast(pl.Float64, strict=False)
                         .cast(pl.Int64, strict=False)
                         .alias(column_name)
                     )
@@ -2668,14 +2667,16 @@ async def cast_node(
                     detail=f"Casting to '{target_type}' is not yet supported. Supported: string, integer, float, datetime.",
                 )
 
-            # For lazy data (or anything with collect) perform a small head() sample validation
-            # to surface conversion errors early without materializing the full dataset.
+            # Perform a small head() sample validation to surface conversion errors early
+            # Works for both LazyFrame (collect) and DataFrame (no collect needed).
             try:
-                if hasattr(current_df, "collect") and hasattr(current_df, "head"):
-                    # Validate on first 50 rows (arbitrary small sample)
+                if hasattr(current_df, "head"):
                     _sample = current_df.head(50).with_columns(cast_expr)
-                    # Collect sample (ignore result, just validating)
-                    _ = _sample.collect()
+                    if hasattr(_sample, "collect"):
+                        _ = _sample.collect()
+                    else:
+                        # DataFrame path: building the sample is sufficient to validate expression
+                        _ = _sample
             except Exception as sample_err:
                 raise HTTPException(
                     status_code=400,

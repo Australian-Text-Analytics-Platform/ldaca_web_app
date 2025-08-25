@@ -471,15 +471,24 @@ class TestWorkspaceAPI:
             patch(
                 "ldaca_web_app_backend.api.workspaces.workspace_manager.persist"
             ) as mock_save,
+            patch(
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_workspace"
+            ) as mock_get_workspace,
         ):
             mock_get_node.return_value = mock_node
+            mock_get_workspace.return_value = Mock()  # Mock workspace for persist call
 
             cast_data = {"column": "test_col", "target_type": "integer"}
             response = self.client.post(
                 "/api/workspaces/test-workspace/nodes/test-node/cast", json=cast_data
             )
+
+            if response.status_code != 200:
+                print(f"Error response: {response.json()}")
+
             assert response.status_code == 200
             data = response.json()
+            assert data["success"] is True
             assert data["cast_info"]["target_type"] == "integer"
             mock_save.assert_called_once()
 
@@ -564,9 +573,6 @@ class TestWorkspaceAPI:
                 "ldaca_web_app_backend.api.workspaces.workspace_manager.add_node_to_workspace",
                 return_value=joined_node,
             ),
-            patch(
-                "ldaca_web_app_backend.api.workspaces.workspace_manager.execute_safe_operation"
-            ) as mock_safe_op,
         ):
             # Configure node retrieval
             def get_node_side_effect(use_id, workspace_id, node_id):
@@ -577,7 +583,6 @@ class TestWorkspaceAPI:
                 return None
 
             mock_get_node.side_effect = get_node_side_effect
-            mock_safe_op.return_value = {"success": True, "node": joined_node.info()}
 
             # Test join with the new parameter format (matching frontend)
             response = self.client.post(
@@ -593,8 +598,9 @@ class TestWorkspaceAPI:
 
             assert response.status_code == 200
             result = response.json()
-            assert result["success"] is True
-            assert "node" in result
+            # Endpoint now returns node info directly (no {success,node} wrapper)
+            assert isinstance(result, dict)
+            assert result.get("name") == "left_node_join_right_node"
 
     def test_join_nodes_missing_parameters(self):
         """Test join endpoint validation with missing required parameters"""
