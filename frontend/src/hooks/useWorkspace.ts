@@ -371,7 +371,7 @@ export const useWorkspace = () => {
         right_node_id: rightNodeId,
         left_on: leftColumns[0] || '',
         right_on: rightColumns[0] || '',
-        how: joinType as 'inner' | 'left' | 'right' | 'outer',
+  how: joinType as 'inner' | 'left' | 'right' | 'full' | 'semi' | 'anti' | 'cross',
         new_node_name: newNodeName,
       };
       return apiJoinNodes(workspaceId, request, authHeaders);

@@ -546,7 +546,7 @@ export interface JoinNodesRequest {
   right_node_id: string;
   left_on: string;
   right_on: string;
-  how?: 'inner' | 'left' | 'right' | 'outer';
+  how?: 'inner' | 'left' | 'right' | 'full' | 'semi' | 'anti' | 'cross';
   new_node_name?: string;
 }
 

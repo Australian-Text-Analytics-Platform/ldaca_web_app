@@ -6,7 +6,7 @@ import NodeSelectionPanel, { NodeColumnSelection } from './NodeSelectionPanel';
 interface JoinInterfaceProps {
   leftNode: WorkspaceNode;
   rightNode: WorkspaceNode;
-  onJoin: (leftNodeId: string, rightNodeId: string, joinColumns: { left: string; right: string }, joinType: 'inner' | 'left' | 'right' | 'outer', newNodeName: string) => Promise<WorkspaceNode>;
+  onJoin: (leftNodeId: string, rightNodeId: string, joinColumns: { left: string; right: string }, joinType: 'inner' | 'left' | 'right' | 'full' | 'semi' | 'anti' | 'cross', newNodeName: string) => Promise<WorkspaceNode>;
   onCancel: () => void;
   loading?: boolean;
 }
@@ -21,7 +21,7 @@ const JoinInterface: React.FC<JoinInterfaceProps> = ({
   const { getNodeShape } = useWorkspace();
   const [leftOn, setLeftOn] = useState<string>('');
   const [rightOn, setRightOn] = useState<string>('');
-  const [how, setHow] = useState<'inner' | 'left' | 'right' | 'outer'>('left');
+  const [how, setHow] = useState<'inner' | 'left' | 'right' | 'full' | 'semi' | 'anti' | 'cross'>('left');
   const [newNodeName, setNewNodeName] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
@@ -134,14 +134,17 @@ const JoinInterface: React.FC<JoinInterfaceProps> = ({
               <label className="block text-sm font-medium text-gray-700 mb-1">Join Type</label>
               <select
                 value={how}
-                onChange={(e) => setHow(e.target.value as 'inner' | 'left' | 'right' | 'outer')}
+                onChange={(e) => setHow(e.target.value as 'inner' | 'left' | 'right' | 'full' | 'semi' | 'anti' | 'cross')}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 disabled={loading}
               >
-                <option value="inner">Inner Join</option>
-                <option value="left">Left Join</option>
-                <option value="right">Right Join</option>
-                <option value="outer">Outer Join</option>
+                <option value="inner">inner</option>
+                <option value="left">left</option>
+                <option value="right">right</option>
+                <option value="full">full</option>
+                <option value="semi">semi</option>
+                <option value="anti">anti</option>
+                <option value="cross">cross</option>
               </select>
             </div>
             <div>

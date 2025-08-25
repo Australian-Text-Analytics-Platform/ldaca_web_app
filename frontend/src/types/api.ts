@@ -111,7 +111,7 @@ export interface FilterRequest {
 export interface JoinRequest {
   left_node_id: string;
   right_node_id: string;
-  join_type: 'inner' | 'left' | 'right' | 'outer';
+  join_type: 'inner' | 'left' | 'right' | 'full' | 'semi' | 'anti' | 'cross';
   left_columns: string[];
   right_columns: string[];
   description?: string;

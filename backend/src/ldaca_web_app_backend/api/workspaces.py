@@ -1789,87 +1789,70 @@ async def join_nodes(
     new_node_name: Optional[str] = None,
     current_user: dict = Depends(get_current_user),
 ):
-    """Join nodes using DocWorkspace safe_operation method"""
-    user_id = current_user["id"]
+    """Join two nodes directly, delegating to docframe where available.
 
-    # Define operation function
-    def join_operation():
+    Allowed join strategies (Polars): 'inner', 'left', 'right', 'full', 'semi', 'anti', 'cross'
+    """
+    user_id = current_user["id"]
+    try:
+        # Lookup nodes
         left_node = workspace_manager.get_node_from_workspace(
             user_id, workspace_id, left_node_id
         )
         right_node = workspace_manager.get_node_from_workspace(
             user_id, workspace_id, right_node_id
         )
-
         if not left_node or not right_node:
-            raise ValueError("One or both nodes not found")
+            raise HTTPException(status_code=404, detail="One or both nodes not found")
 
-        # Get the data from both nodes
+        # Inputs
         left_data = left_node.data
         right_data = right_node.data
 
-        # Promote to LazyFrame for lazy join wherever possible
-        def to_lazy(x):
-            # If it's already a LazyFrame, return as-is
-            cls = getattr(x, "__class__", None)
-            if hasattr(x, "_ldf") or (
-                cls and getattr(cls, "__name__", "") == "LazyFrame"
-            ):
-                return x
-            # If it has lazy() method (e.g., DataFrame), use it
-            if hasattr(x, "lazy"):
-                return x.lazy()
-            # Fallback: wrap into polars DataFrame then lazy
-            return pl.DataFrame(x).lazy()
+        # Validate and pass-through Polars-supported join strategies only
+        allowed_hows = {"inner", "left", "right", "full", "semi", "anti", "cross"}
+        how_val = (how or "inner").lower()
+        if how_val not in allowed_hows:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Invalid join type. Allowed values: inner, left, right, full, semi, anti, cross"
+                ),
+            )
 
-        left_lf = to_lazy(left_data)
-        right_lf = to_lazy(right_data)
+        # Prefer docframe's realization via data.join; handle cross-join separately (no keys)
+        print(type(left_data))
+        print(type(right_data))
+        if how_val == "cross":
+            joined_data = left_data.join(
+                right_data,
+                how="cross",
+            )
+        else:
+            joined_data = left_data.join(
+                right_data,
+                left_on=left_on,
+                right_on=right_on,
+                how=how_val,
+            )
 
-        # Perform lazy join; map 'left_on'/'right_on' to a list per Polars API
-        left_on_cols = left_on if isinstance(left_on, list) else [left_on]
-        right_on_cols = right_on if isinstance(right_on, list) else [right_on]
-        # Normalize join strategy to Polars accepted values
-        how_norm = {
-            "inner": "inner",
-            "left": "left",
-            "right": "right",
-            "outer": "full",
-            "full": "full",
-            "semi": "semi",
-            "anti": "anti",
-            "cross": "cross",
-        }.get((how or "inner").lower(), "inner")
-
-        how_param: Any = how_norm
-        joined_lf = left_lf.join(
-            right_lf, left_on=left_on_cols, right_on=right_on_cols, how=how_param
-        )
-
-        # Create new node with joined data
+        # Create and add new node
         node_name = new_node_name or f"{left_node.name}_join_{right_node.name}"
-
-        # Add the joined data as a new node to the workspace
         new_node = workspace_manager.add_node_to_workspace(
             user_id=user_id,
             workspace_id=workspace_id,
-            data=joined_lf,
+            data=joined_data,
             node_name=node_name,
             operation=f"join({left_node.name}, {right_node.name})",
             parents=[left_node, right_node],
         )
 
-        return new_node
-
-    # Use DocWorkspace's safe operation wrapper
-    result = workspace_manager.execute_safe_operation(
-        user_id, workspace_id, join_operation
-    )
-
-    success, message, result_obj = _handle_operation_result(result)
-    if not success:
-        raise HTTPException(status_code=400, detail=message)
-
-    return result_obj
+        # Return stable API shape
+        return DocWorkspaceAPIUtils.convert_node_info_for_api(new_node)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Join failed: {e}")
 
 
 # ============================================================================

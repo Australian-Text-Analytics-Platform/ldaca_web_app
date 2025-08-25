@@ -118,7 +118,7 @@ export const WorkspaceDataView: React.FC = memo(() => {
         leftNodeId: string,
         rightNodeId: string,
         joinColumns: { left: string; right: string },
-        joinType: 'inner' | 'left' | 'right' | 'outer',
+        joinType: 'inner' | 'left' | 'right' | 'full' | 'semi' | 'anti' | 'cross',
         newNodeName: string
       ) => {
         const result = await joinNodes(
