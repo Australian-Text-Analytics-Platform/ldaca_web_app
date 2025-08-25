@@ -404,6 +404,9 @@ class FilterCondition(BaseModel):
     value: Any
     id: Optional[str] = None  # Frontend includes this for tracking
     dataType: Optional[str] = None  # Frontend includes this for UI
+    # New flags from frontend Filter UI
+    negate: Optional[bool] = False
+    regex: Optional[bool] = False
 
 
 class FilterRequest(BaseModel):

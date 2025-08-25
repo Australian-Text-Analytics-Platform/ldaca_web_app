@@ -1615,10 +1615,17 @@ async def filter_node(
                 elif op == "lte":
                     expr = column_expr <= lit_val
             elif op == "contains":
-                expr = column_expr.str.contains(str(raw_value))
+                # regex flag controls regex vs literal
+                pattern = str(raw_value)
+                if getattr(condition, "regex", False):
+                    expr = column_expr.str.contains(pattern)
+                else:
+                    expr = column_expr.str.contains(pl.lit(pattern), literal=True)
             elif op == "startswith":
+                # Always use Polars built-in; ignore regex flag per product requirement
                 expr = column_expr.str.starts_with(str(raw_value))
             elif op == "endswith":
+                # Always use Polars built-in; ignore regex flag per product requirement
                 expr = column_expr.str.ends_with(str(raw_value))
             elif op == "is_null":
                 expr = column_expr.is_null()
@@ -1656,6 +1663,14 @@ async def filter_node(
                     expr = pl.lit(True)
             else:
                 expr = column_expr.str.contains(str(raw_value))
+
+            # Apply negate flag if present
+            if getattr(condition, "negate", False) and expr is not None:
+                try:
+                    expr = expr.not_()
+                except Exception:
+                    # Fallback: invert via ~ operator
+                    expr = ~expr
 
             if filter_expr is None:
                 filter_expr = expr

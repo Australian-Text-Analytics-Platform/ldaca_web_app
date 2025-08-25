@@ -499,7 +499,7 @@ const FilterTab: React.FC = () => {
               />
               negate
             </label>
-            {(condition.dataType === 'string' && (condition.operator === 'contains' || condition.operator === 'startswith' || condition.operator === 'endswith')) && (
+            {(condition.dataType === 'string' && condition.operator === 'contains') && (
               <label className="flex items-center gap-1 text-xs text-gray-700">
                 <input
                   aria-label="use regex"
