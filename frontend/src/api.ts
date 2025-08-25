@@ -31,14 +31,6 @@ export const getApiBase = () => {
     return `${origin}${prefix}8001/api`;
   }
 
-  // Google Colab: ports are encoded in the hostname as `<port>-<id>.colab.dev`.
-  // If frontend is on 3000-*.colab.dev, backend will be on 8001-*.colab.dev.
-  const colab = hostname.match(/^(\d+)-.+\.colab\.dev$/);
-  if (colab) {
-    const backendHost = hostname.replace(/^(\d+)-/, '8001-');
-    return `${window.location.protocol}//${backendHost}/api`;
-  }
-
   // Default fallback
   return process.env.NODE_ENV === 'production' 
     ? `${origin}/api`
