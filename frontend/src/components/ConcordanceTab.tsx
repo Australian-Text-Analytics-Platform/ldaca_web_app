@@ -250,7 +250,13 @@ const ConcordanceTab: React.FC = () => {
     );
   };
 
-  const handleSearch = useCallback(async (resetPage = true, targetNodeId?: string, forceMode?: 'separated'|'combined') => {
+  const handleSearch = useCallback(async (
+    resetPage = true,
+    targetNodeId?: string,
+    forceMode?: 'separated'|'combined',
+    overrideSortBy?: string,
+    overrideSortOrder?: 'asc'|'desc'
+  ) => {
     if (!currentWorkspaceId || selectedNodes.length === 0) {
       return;
     }
@@ -296,7 +302,7 @@ const ConcordanceTab: React.FC = () => {
       // Use the first node's pagination settings for the API call
       // Note: This is a limitation of the current backend API that we'll work around
       const firstNodeId = selectedNodes[0].id;
-      const firstNodePagination = updatedPagination[firstNodeId];
+  const firstNodePagination = updatedPagination[firstNodeId];
 
       const effectiveMode = forceMode || viewMode;
       const request: MultiNodeConcordanceRequest = {
@@ -309,8 +315,8 @@ const ConcordanceTab: React.FC = () => {
         case_sensitive: caseSensitive,
         page: effectiveMode === 'combined' ? combinedPage : firstNodePagination.currentPage,
         page_size: effectiveMode === 'combined' ? combinedPageSize : firstNodePagination.pageSize,
-        sort_by: firstNodePagination.sortBy || undefined,
-        sort_order: firstNodePagination.sortOrder
+  sort_by: (overrideSortBy ?? firstNodePagination.sortBy) || undefined,
+  sort_order: overrideSortOrder ?? firstNodePagination.sortOrder
       };
       if (effectiveMode === 'combined') request.combined = true;
 
@@ -367,21 +373,21 @@ const ConcordanceTab: React.FC = () => {
         sortOrder: 'asc' as 'asc' | 'desc'
       };
 
-      const newSortOrder = currentNodePagination.sortBy === columnName ? 
-        (currentNodePagination.sortOrder === 'asc' ? 'desc' : 'asc') : 'asc';
+      const isSameColumn = currentNodePagination.sortBy === columnName;
+      const newSortOrder = isSameColumn ? (currentNodePagination.sortOrder === 'asc' ? 'desc' : 'asc') : 'asc';
 
       return {
         ...prev,
         [nodeId]: {
           ...currentNodePagination,
+          currentPage: 1, // reset to first page on new sort
           sortBy: columnName,
           sortOrder: newSortOrder
         }
       };
     });
-    
-    // For sorting, we'll search only this specific node
-    setTimeout(() => handleSingleNodeSearch(nodeId), 0);
+    // For sorting, search this specific node with page reset and current sort
+    setTimeout(() => handleSingleNodeSearch(nodeId, 1, columnName, undefined), 0);
   };
 
   const handlePageChange = (newPage: number, nodeId: string) => {
@@ -407,7 +413,7 @@ const ConcordanceTab: React.FC = () => {
   };
 
   // New function to search a single node (for pagination and sorting)
-  const handleSingleNodeSearch = async (nodeId: string, overridePage?: number) => {
+  const handleSingleNodeSearch = async (nodeId: string, overridePage?: number, overrideSortBy?: string, overrideSortOrder?: 'asc'|'desc') => {
     if (!currentWorkspaceId || !searchWord.trim()) {
       return;
     }
@@ -427,7 +433,7 @@ const ConcordanceTab: React.FC = () => {
     };
 
     // Use override page if provided, otherwise use state
-    const currentPage = overridePage !== undefined ? overridePage : nodeState.currentPage;
+  const currentPage = overridePage !== undefined ? overridePage : nodeState.currentPage;
 
     // Set loading for this specific node
     setNodeLoading(prev => ({ ...prev, [nodeId]: true }));
@@ -443,8 +449,8 @@ const ConcordanceTab: React.FC = () => {
         case_sensitive: caseSensitive,
         page: currentPage,
         page_size: nodeState.pageSize,
-        sort_by: nodeState.sortBy || undefined,
-        sort_order: nodeState.sortOrder
+  sort_by: (overrideSortBy ?? nodeState.sortBy) || undefined,
+  sort_order: overrideSortOrder ?? nodeState.sortOrder
       };
 
       // Import the single-node concordance search function
@@ -604,6 +610,14 @@ const ConcordanceTab: React.FC = () => {
     if (nodeName === '__COMBINED__') {
       const rows = nodeData.data || [];
       const columns = nodeData.columns || [];
+      const combinedSorting = nodeData.sorting || { sort_by: '', sort_order: 'asc' };
+      const handleCombinedSort = (col: string) => {
+        const isSame = combinedSorting.sort_by === col;
+        const nextOrder: 'asc'|'desc' = isSame && combinedSorting.sort_order === 'asc' ? 'desc' : 'asc';
+        // Reuse handleSearch with combined mode and sort overrides; reset to page 1
+        setCombinedPage(1);
+        handleSearch(true, undefined, 'combined', col, nextOrder);
+      };
       return (
         <div key="__COMBINED__" className="mb-6">
           <div className="flex items-center mb-4">
@@ -632,7 +646,22 @@ const ConcordanceTab: React.FC = () => {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50 sticky top-0">
                   <tr>
-                    {columns.map((c: string) => <th key={c} className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{c}</th>)}
+                    {columns.map((c: string) => {
+                      const isSorted = combinedSorting.sort_by === c;
+                      const icon = isSorted ? (combinedSorting.sort_order === 'asc' ? '▲' : '▼') : '▲▼';
+                      return (
+                        <th
+                          key={c}
+                          className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                          onClick={() => handleCombinedSort(c)}
+                        >
+                          <div className="flex items-center space-x-1">
+                            <span>{c}</span>
+                            <span className={`text-xs ${isSorted ? 'text-blue-600' : 'text-gray-400'}`}>{icon}</span>
+                          </div>
+                        </th>
+                      );
+                    })}
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">

@@ -2198,7 +2198,17 @@ async def get_multi_node_concordance(
         if request.combined and len(full_dfs) >= 2:
             try:
                 combined_df = pl.concat(full_dfs, how="vertical")
-                if "document_idx" in combined_df.columns:
+                # Apply requested sorting when provided; fall back to document_idx asc
+                effective_sort_by = None
+                effective_sort_order = request.sort_order if request.sort_order else "asc"
+                if request.sort_by and request.sort_by in combined_df.columns:
+                    effective_sort_by = request.sort_by
+                    combined_df = combined_df.sort(
+                        pl.col(request.sort_by),
+                        descending=effective_sort_order.lower() == "desc",
+                    )
+                elif "document_idx" in combined_df.columns:
+                    effective_sort_by = "document_idx"
                     combined_df = combined_df.sort(pl.col("document_idx"))
                 total_combined = len(combined_df)
                 start_idx = (request.page - 1) * request.page_size
@@ -2216,10 +2226,8 @@ async def get_multi_node_concordance(
                         "has_prev": request.page > 1,
                     },
                     "sorting": {
-                        "sort_by": "document_idx"
-                        if "document_idx" in combined_df.columns
-                        else None,
-                        "sort_order": "asc",
+                        "sort_by": effective_sort_by,
+                        "sort_order": effective_sort_order,
                     },
                 }
             except Exception as ce:
