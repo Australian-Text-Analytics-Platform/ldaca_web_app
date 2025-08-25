@@ -38,6 +38,9 @@ const TokenFrequencyTab: React.FC = () => {
   const [statsSortColumn, setStatsSortColumn] = useState<string>('log_likelihood_llv');
   const [statsSortDirection, setStatsSortDirection] = useState<'asc'|'desc'>('desc');
   const [showFullStatsModal, setShowFullStatsModal] = useState(false);
+  // Modal pagination (number_of_columns) and page state
+  const [modalPageSize, setModalPageSize] = useState<number>(50); // number_of_columns
+  const [modalPage, setModalPage] = useState<number>(1);
   // Dynamic color management for selected nodes
   const [nodeColors, setNodeColors] = useState<Record<string, string>>({});
   const [lastCompareNodeIds, setLastCompareNodeIds] = useState<string[]>([]); // preserves order used in last analysis
@@ -109,6 +112,13 @@ const TokenFrequencyTab: React.FC = () => {
       }
     }
   }, [results]);
+
+  // Reset modal page when sort/filter state changes or modal opens
+  useEffect(() => {
+    if (showFullStatsModal) {
+      setModalPage(1);
+    }
+  }, [showFullStatsModal, statsSortColumn, statsSortDirection, appliedStopSet]);
 
   // Clear results when node selection changes  
   // Use a more stable dependency by checking the actual node IDs
@@ -959,13 +969,79 @@ const TokenFrequencyTab: React.FC = () => {
                             return statsSortDirection === 'asc' ? na - nb : nb - na;
                           });
                         })();
+
+                        // Pagination over sorted rows (number_of_columns)
+                        const totalRows = modalSorted.length;
+                        const totalPages = Math.max(1, Math.ceil(totalRows / modalPageSize));
+                        const currentPage = Math.min(modalPage, totalPages);
+                        const startIndex = (currentPage - 1) * modalPageSize;
+                        const pageRows = modalSorted.slice(startIndex, startIndex + modalPageSize);
+
+                        // CSV download for full sorted table
+                        const handleDownloadCSV = () => {
+                          const headers = columns.map(c => c.label);
+                          const csvEscape = (val: any) => {
+                            const s = (val === null || val === undefined) ? '' : String(val);
+                            const needsQuotes = /[",\n]/.test(s);
+                            const escaped = s.replace(/"/g, '""');
+                            return needsQuotes ? `"${escaped}"` : escaped;
+                          };
+              const toCSVVal = (colKey: string, stat: any) => {
+                            switch (colKey) {
+                              case 'token': return stat.token;
+                              case 'freq_corpus_0': return stat.freq_corpus_0;
+                              case 'percent_corpus_0': return `${stat.percent_corpus_0.toFixed(2)}%`;
+                              case 'freq_corpus_1': return stat.freq_corpus_1;
+                              case 'percent_corpus_1': return `${stat.percent_corpus_1.toFixed(2)}%`;
+                              case 'log_likelihood_llv': return stat.log_likelihood_llv.toFixed(2);
+                              case 'percent_diff': return `${(stat.percent_diff * 100).toFixed(2)}%`;
+                              case 'bayes_factor_bic': return stat.bayes_factor_bic.toFixed(2);
+                              case 'effect_size_ell': return stat.effect_size_ell !== null ? stat.effect_size_ell.toFixed(4) : '';
+                case 'relative_risk': return stat.relative_risk !== null ? stat.relative_risk.toFixed(2) : 'inf';
+                              case 'log_ratio': return stat.log_ratio !== null ? stat.log_ratio.toFixed(4) : '';
+                case 'odds_ratio': return stat.odds_ratio !== null ? stat.odds_ratio.toFixed(2) : 'inf';
+                              case 'significance': return stat.significance || 'n.s.';
+                              default: return '';
+                            }
+                          };
+                          const rows = modalSorted.map(stat => columns.map(c => csvEscape(toCSVVal(c.key, stat))).join(','));
+                          const csv = [headers.join(','), ...rows].join('\n');
+                          const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                          const url = URL.createObjectURL(blob);
+                          const link = document.createElement('a');
+                          const ts = new Date().toISOString().replace(/[:.]/g, '-');
+                          link.href = url;
+                          link.download = `token_frequency_table_${ts}.csv`;
+                          link.click();
+                          URL.revokeObjectURL(url);
+                        };
                         return (
                           <div className="fixed inset-0 z-50 flex items-center justify-center">
                             <div className="absolute inset-0 bg-black/40" onClick={() => setShowFullStatsModal(false)}></div>
                             <div className="relative bg-white rounded-lg shadow-xl max-w-[95vw] max-h-[90vh] w-full p-6 flex flex-col">
                               <div className="flex items-center justify-between mb-4">
-                                <h4 className="text-lg font-semibold text-gray-800">Complete Statistical Table ({modalSorted.length} rows)</h4>
+                                <div className="flex items-center gap-3">
+                                  <h4 className="text-lg font-semibold text-gray-800">Complete Statistical Table ({modalSorted.length} rows)</h4>
+                                  <label className="text-sm text-gray-600 flex items-center gap-2">
+                                    <span className="font-mono">number_of_columns</span>
+                                    <select
+                                      className="border rounded px-2 py-1 text-sm"
+                                      value={modalPageSize}
+                                      onChange={(e) => { setModalPageSize(parseInt(e.target.value, 10)); setModalPage(1); }}
+                                    >
+                                      <option value={10}>10</option>
+                                      <option value={20}>20</option>
+                                      <option value={50}>50</option>
+                                      <option value={100}>100</option>
+                                      <option value={200}>200</option>
+                                    </select>
+                                  </label>
+                                </div>
                                 <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={handleDownloadCSV}
+                                    className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+                                  >Download CSV</button>
                                   <button
                                     onClick={() => setShowFullStatsModal(false)}
                                     className="px-3 py-1 text-sm bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
@@ -990,6 +1066,7 @@ const TokenFrequencyTab: React.FC = () => {
                                                 setStatsSortColumn(col.key);
                                                 setStatsSortDirection(col.key === 'token' ? 'asc' : 'desc');
                                               }
+                                              setModalPage(1);
                                             }}
                                           >
                                             <div className="flex items-center gap-1"><span>{col.label}</span>{dir && <span className="text-[10px]">{dir}</span>}</div>
@@ -999,8 +1076,8 @@ const TokenFrequencyTab: React.FC = () => {
                                     </tr>
                                   </thead>
                                   <tbody className="divide-y divide-gray-100">
-                                    {modalSorted.map((stat, i) => (
-                                      <tr key={stat.token + i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                                    {pageRows.map((stat, i) => (
+                                      <tr key={stat.token + i} className={((startIndex + i) % 2 === 0) ? 'bg-white' : 'bg-gray-50'}>
                                         {columns.map((col: any) => {
                                           const rawVal = col.accessor(stat);
                                           const content = col.formatter ? col.formatter(rawVal, stat) : rawVal;
@@ -1015,7 +1092,22 @@ const TokenFrequencyTab: React.FC = () => {
                                   </tbody>
                                 </table>
                               </div>
-                              <div className="mt-3 text-xs text-gray-500">Click headers to sort; table updates live.</div>
+                              <div className="mt-3 flex items-center justify-between">
+                                <div className="text-xs text-gray-500">Click headers to sort; table updates live.</div>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    className={`px-2 py-1 text-xs rounded ${currentPage <= 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'}`}
+                                    onClick={() => currentPage > 1 && setModalPage(currentPage - 1)}
+                                    disabled={currentPage <= 1}
+                                  >Prev</button>
+                                  <span className="text-xs text-gray-700">Page {currentPage} of {totalPages}</span>
+                                  <button
+                                    className={`px-2 py-1 text-xs rounded ${currentPage >= totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'}`}
+                                    onClick={() => currentPage < totalPages && setModalPage(currentPage + 1)}
+                                    disabled={currentPage >= totalPages}
+                                  >Next</button>
+                                </div>
+                              </div>
                             </div>
                           </div>
                         );
