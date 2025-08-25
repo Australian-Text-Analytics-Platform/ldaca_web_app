@@ -4,10 +4,15 @@
 name: Node.js CI
 
 on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Why are you building? (optional)"
+        required: false
+        type: string
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -56,3 +61,15 @@ jobs:
         path: frontend/dist/frontend-build.tar.gz
         if-no-files-found: error
         retention-days: 14
+    - name: Publish GitHub Release (frontend-latest)
+      uses: svenstaro/upload-release-action@v2
+      with:
+        repo_token: ${{ secrets.GITHUB_TOKEN }}
+        file: frontend/dist/frontend-build.tar.gz
+        asset_name: frontend-build.tar.gz
+        tag: frontend-latest
+        release_name: Frontend latest
+        body: |
+          Automated frontend build.
+          ${{ github.event.inputs.reason }}
+        overwrite: true
