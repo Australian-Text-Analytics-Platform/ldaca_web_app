@@ -67,7 +67,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
               : 'text-gray-600 hover:bg-gray-100'
           }`}
         >
-          � Timeline
+          📊 Timeline
         </button>
         <button
           onClick={() => onTabChange('topic-modeling')}
