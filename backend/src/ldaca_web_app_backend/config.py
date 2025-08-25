@@ -2,6 +2,7 @@
 Configuration management using pydantic-settings and .env files.
 """
 
+import os
 from pathlib import Path
 from typing import List
 
@@ -88,7 +89,7 @@ class Settings(BaseSettings):
 
     # Model configuration
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=os.environ.get("ENV_LOCATION", ".env"),
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
