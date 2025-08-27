@@ -9,12 +9,39 @@ from typing import List
 from pydantic import Field, computed_field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+PROJECT_ROOT = Path(__file__).parent.parent.parent
+
+# Determine which .env file to load for settings
+DEFAULT_EXAMPLE_ENV_PATH = PROJECT_ROOT / ".env.example"
+DEFAULT_PROD_ENV_PATH = PROJECT_ROOT / ".env"
+
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables and .env file."""
 
+    def _resolve_env_path():
+        """Resolve the environment file path in priority order (helper local to class body)."""
+        if "ENV_PATH" in os.environ:
+            env_path = Path(os.environ["ENV_PATH"]).resolve()
+        elif "ENV_LOCATION" in os.environ:
+            env_path = Path(os.environ["ENV_LOCATION"]).resolve()
+        elif DEFAULT_PROD_ENV_PATH.exists():
+            env_path = DEFAULT_PROD_ENV_PATH
+        elif DEFAULT_EXAMPLE_ENV_PATH.exists():
+            env_path = DEFAULT_EXAMPLE_ENV_PATH
+        else:
+            raise FileNotFoundError("No suitable .env file found")
+        if not env_path.exists():
+            raise FileNotFoundError(f"Specified .env file: {env_path} does not exist")
+        else:
+            print(f"Using environment file: {env_path}")
+            return env_path
+
     # Root for all data-related storage (folders and DB)
-    data_root: str = Field(default="data", description="Root data folder")
+    data_root: str | Path = Field(
+        default=PROJECT_ROOT / "data",
+        description="Root data folder",
+    )
 
     # Database Configuration
     # If database_url is not provided, we derive it from data_root and database_file
@@ -87,9 +114,8 @@ class Settings(BaseSettings):
         default=None, description="Airtable Field ID for Comments"
     )
 
-    # Model configuration
     model_config = SettingsConfigDict(
-        env_file=os.environ.get("ENV_LOCATION", ".env"),
+        env_file=_resolve_env_path(),
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
