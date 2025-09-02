@@ -27,6 +27,8 @@ from ..models import (
     FilterRequest,
     FrequencyAnalysisRequest,
     MultiNodeConcordanceRequest,
+    QuotationDetachRequest,
+    QuotationRequest,
     SliceRequest,
     TokenFrequencyData,
     TokenFrequencyRequest,
@@ -3420,3 +3422,272 @@ async def export_nodes(
             "Content-Disposition": f"attachment; filename=export_{workspace_id}.{fmt}.zip"
         },
     )
+
+
+# ============================================================================
+# QUOTATION ENDPOINTS (mirror concordance but without search params)
+# ============================================================================
+
+
+@router.post("/{workspace_id}/nodes/{node_id}/quotation")
+async def get_quotation(
+    workspace_id: str,
+    node_id: str,
+    request: QuotationRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Get quotation rows using DocFrame text namespace, with optional metadata join, sorting and pagination."""
+    user_id = current_user["id"]
+    try:
+        node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
+        if not node:
+            raise HTTPException(status_code=404, detail="Node not found")
+
+        # Validate column existence when possible
+        if hasattr(node.data, "columns"):
+            available_columns = node.data.columns
+        elif hasattr(node.data, "schema"):
+            available_columns = list(node.data.schema.keys())
+        else:
+            available_columns = []
+        if available_columns and request.column not in available_columns:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Column '{request.column}' not found. Available columns: {available_columns}",
+            )
+
+        if not hasattr(node.data, "text"):
+            raise HTTPException(
+                status_code=400,
+                detail="This node does not support text analysis (DocFrame text namespace not available)",
+            )
+
+        # Compute quotation exploded & unnested, preserving original document index
+        base_with_idx = None
+        try:
+            if hasattr(node.data, "with_row_index"):
+                base_with_idx = node.data.with_row_index("document_idx")
+        except Exception:
+            base_with_idx = None
+        if base_with_idx is not None:
+            qdf = base_with_idx.text.quotation(
+                column=request.column, explode=True, unnest=True
+            )
+        else:
+            qdf = node.data.text.quotation(
+                column=request.column, explode=True, unnest=True
+            )
+
+        import polars as pl  # local import for type
+
+        # Optionally join metadata by document_idx
+        if request.show_metadata:
+            cdf = qdf
+            base = node.data
+            if hasattr(base, "to_lazyframe"):
+                base_df = base.to_lazyframe().collect()
+            elif hasattr(base, "_df"):
+                base_df = base._df  # type: ignore[attr-defined]
+            elif hasattr(base, "collect"):
+                base_df = base.collect()
+            else:
+                base_df = base
+            if isinstance(base_df, pl.LazyFrame):
+                base_df = base_df.collect()
+            orig = base_df.with_row_index("document_idx")
+            qdf = cdf.join(orig, on="document_idx", how="left")
+
+        # Apply sorting if requested
+        if request.sort_by and request.sort_by in qdf.columns:
+            qdf = qdf.sort(
+                pl.col(request.sort_by),
+                descending=request.sort_order.lower() == "desc",
+            )
+
+        total_rows = len(qdf)
+        start_idx = (request.page - 1) * request.page_size
+        end_idx = start_idx + request.page_size
+        paginated = qdf.slice(start_idx, request.page_size)
+
+        return {
+            "data": paginated.to_dicts() if hasattr(paginated, "to_dicts") else [],
+            "columns": list(qdf.columns) if hasattr(qdf, "columns") else [],
+            "total_rows": total_rows,
+            "pagination": {
+                "page": request.page,
+                "page_size": request.page_size,
+                "total_pages": (total_rows + request.page_size - 1)
+                // request.page_size,
+                "has_next": end_idx < total_rows,
+                "has_prev": start_idx > 0,
+            },
+            "sorting": {
+                "sort_by": request.sort_by,
+                "sort_order": request.sort_order,
+            },
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+
+        print(f"❌ Unexpected quotation error: {str(e)}")
+        print(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+@router.post("/{workspace_id}/nodes/{node_id}/quotation/detach")
+async def detach_quotation(
+    workspace_id: str,
+    node_id: str,
+    request: QuotationDetachRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Detach quotation results (full-table) by joining exploded quotations with original table into a new node."""
+    user_id = current_user["id"]
+    try:
+        node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
+        if not node:
+            raise HTTPException(status_code=404, detail="Node not found")
+
+        # Validate column if possible
+        if hasattr(node.data, "columns"):
+            available_columns = node.data.columns
+        elif hasattr(node.data, "schema"):
+            available_columns = list(node.data.schema.keys())
+        else:
+            available_columns = []
+        if available_columns and request.column not in available_columns:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Column '{request.column}' not found. Available columns: {available_columns}",
+            )
+
+        if not hasattr(node.data, "text"):
+            raise HTTPException(
+                status_code=400,
+                detail="This node does not support text analysis (DocFrame text namespace not available)",
+            )
+
+        # Full quotation explode+unnest; preserve original row index before quotation so document_idx aligns
+        try:
+            base_with_idx = node.data.with_row_index("document_idx")
+        except Exception:
+            base_with_idx = None
+        if base_with_idx is not None and hasattr(base_with_idx, "text"):
+            quotation_df = base_with_idx.text.quotation(
+                column=request.column, explode=True, unnest=True
+            )
+        else:
+            quotation_df = node.data.text.quotation(
+                column=request.column, explode=True, unnest=True
+            )
+
+        # Ensure document_idx exists for join back
+        if "document_idx" not in quotation_df.columns:
+            quotation_with_idx = quotation_df.with_row_index("document_idx")
+        else:
+            quotation_with_idx = quotation_df
+
+        # Materialize original data with document_idx
+        try:
+            underlying_df = node.data
+            if hasattr(underlying_df, "to_lazyframe"):
+                underlying_df = underlying_df.to_lazyframe().collect()
+            elif hasattr(underlying_df, "_df"):
+                underlying_df = underlying_df._df  # type: ignore[attr-defined]
+            elif hasattr(underlying_df, "collect"):
+                underlying_df = underlying_df.collect()
+        except Exception:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to materialize underlying data for quotation detach",
+            )
+        if not isinstance(underlying_df, pl.DataFrame):
+            try:
+                underlying_df = pl.DataFrame(underlying_df)
+            except Exception:
+                raise HTTPException(
+                    status_code=500, detail="Underlying data is not a DataFrame"
+                )
+        original_with_idx = underlying_df.with_row_index("document_idx")
+
+        # Choose fields from quotation to join back (include all core quotation fields)
+        quote_cols = [
+            "document_idx",
+            "speaker",
+            "speaker_start_idx",
+            "speaker_end_idx",
+            "quote",
+            "quote_start_idx",
+            "quote_end_idx",
+            "verb",
+            "verb_start_idx",
+            "verb_end_idx",
+            "quote_type",
+        ]
+        # Add a per-quote index to avoid accidental aggregation on join consumers
+        if "quote_row_idx" not in quotation_with_idx.columns:
+            quotation_with_idx = quotation_with_idx.with_row_index("quote_row_idx")
+        other_df = quotation_with_idx.select([
+            c
+            for c in (quote_cols + ["quote_row_idx"])
+            if c in quotation_with_idx.columns
+        ])
+
+        # Left join preserves one-to-many (each quote becomes a separate row), no group/aggregation
+        final_data = original_with_idx.join(
+            other_df, on="document_idx", how="left"
+        ).drop("document_idx")
+
+        # Generate new node name
+        if request.new_node_name:
+            new_node_name = request.new_node_name
+        else:
+            original_name = (
+                node.name if hasattr(node, "name") and node.name else node_id
+            )
+            new_node_name = f"{original_name}_quotation"
+
+        data_for_node = final_data
+        # If original was Doc* type, attempt to wrap preserving doc column
+        try:  # pragma: no cover
+            from docframe import DocDataFrame as _DDF  # type: ignore
+            from docframe import DocLazyFrame as _DLF  # type: ignore
+
+            if isinstance(node.data, (_DDF, _DLF)):
+                doc_col = getattr(node.data, "document_column", None)
+                if doc_col and doc_col in final_data.columns:
+                    data_for_node = _DDF(final_data, document_column=doc_col)
+        except Exception:
+            pass
+
+        new_node = workspace_manager.add_node_to_workspace(
+            user_id=user_id,
+            workspace_id=workspace_id,
+            data=data_for_node,
+            node_name=new_node_name,
+            operation="quotation_detach",
+            parents=[node],
+        )
+        if not new_node:
+            raise HTTPException(
+                status_code=500, detail="Failed to create detached quotation node"
+            )
+
+        total_rows = final_data.height if hasattr(final_data, "height") else -1
+        return {
+            "success": True,
+            "message": f"Successfully created detached quotation node '{new_node_name}' with {total_rows if total_rows >= 0 else 'unknown'} rows",
+            "new_node_id": new_node.id,
+            "new_node_name": new_node_name,
+            "total_rows": total_rows,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error in detach quotation: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error detaching quotation results: {str(e)}"
+        )

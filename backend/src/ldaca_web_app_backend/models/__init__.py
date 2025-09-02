@@ -304,6 +304,24 @@ class ConcordanceDetachRequest(BaseModel):
     new_node_name: Optional[str] = None  # If not provided, will be auto-generated
 
 
+# Quotation requests (mirror concordance shape but without search parameters)
+class QuotationRequest(BaseModel):
+    column: str
+    show_metadata: bool = False
+    # Pagination parameters
+    page: int = 1
+    page_size: int = 50
+    # Sorting parameters
+    sort_by: Optional[str] = None  # column name to sort by
+    sort_order: str = "asc"  # "asc" or "desc"
+
+
+class QuotationDetachRequest(BaseModel):
+    node_id: str
+    column: str
+    new_node_name: Optional[str] = None  # If not provided, will be auto-generated
+
+
 class FrequencyAnalysisRequest(BaseModel):
     time_column: str
     group_by_columns: Optional[List[str]] = None

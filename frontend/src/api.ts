@@ -741,6 +741,22 @@ export interface ConcordanceDetachResponse {
   concordance_matches: number;
 }
 
+// Quotation API types
+export interface QuotationRequest {
+  column: string;
+  show_metadata?: boolean;
+  page?: number;
+  page_size?: number;
+  sort_by?: string | null;
+  sort_order?: 'asc' | 'desc';
+}
+
+export interface QuotationDetachRequest {
+  node_id: string;
+  column: string;
+  new_node_name?: string;
+}
+
 export interface FrequencyAnalysisRequest {
   time_column: string;
   group_by_columns?: string[] | null;
@@ -810,6 +826,34 @@ export async function detachConcordance(
     }
   );
   return res.data;
+}
+
+export async function quotationSearch(
+  workspaceId: string,
+  nodeId: string,
+  request: QuotationRequest,
+  headers: Record<string, string> = {}
+): Promise<any> {
+  const response = await axios.post(
+    `${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}/quotation`,
+    request,
+    { headers }
+  );
+  return response.data;
+}
+
+export async function detachQuotation(
+  workspaceId: string,
+  nodeId: string,
+  request: QuotationDetachRequest,
+  headers: Record<string, string> = {}
+): Promise<any> {
+  const response = await axios.post(
+    `${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}/quotation/detach`,
+    request,
+    { headers }
+  );
+  return response.data;
 }
 
 export async function frequencyAnalysis(

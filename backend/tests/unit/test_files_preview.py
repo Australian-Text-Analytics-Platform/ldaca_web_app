@@ -5,12 +5,15 @@ Tests for unified file preview endpoint
 from unittest.mock import patch
 
 import polars as pl
+
 # Skip these tests for now due to environment differences and optional Excel deps
 import pytest
 import pytest as _pytest
 from fastapi.testclient import TestClient
 
-pytestmark = _pytest.mark.skip(reason="Unified preview endpoint tests are environment-dependent; skipping in unit suite")
+pytestmark = _pytest.mark.skip(
+    reason="Unified preview endpoint tests are environment-dependent; skipping in unit suite"
+)
 
 
 @pytest.fixture()
@@ -74,6 +77,7 @@ def test_csv_preview_supported_types_and_preview(client, tmp_path):
 def test_excel_preview_sheet_names_and_selection(client, tmp_path):
     # Skip if polars lacks write_excel; construct via pandas
     import importlib
+
     if importlib.util.find_spec("openpyxl") is None:
         pytest.skip("openpyxl not installed; skipping excel preview test")
     import pandas as pd
@@ -81,8 +85,12 @@ def test_excel_preview_sheet_names_and_selection(client, tmp_path):
     user_root = tmp_path / "users" / "user_test_user" / "user_data"
     xlsx_path = user_root / "book.xlsx"
     with pd.ExcelWriter(xlsx_path) as writer:
-        pd.DataFrame({"t": ["a", "b"]}).to_excel(writer, sheet_name="SheetA", index=False)
-        pd.DataFrame({"t": ["c", "d"]}).to_excel(writer, sheet_name="SheetB", index=False)
+        pd.DataFrame({"t": ["a", "b"]}).to_excel(
+            writer, sheet_name="SheetA", index=False
+        )
+        pd.DataFrame({"t": ["c", "d"]}).to_excel(
+            writer, sheet_name="SheetB", index=False
+        )
 
     # No payload -> should pick first sheet and return sheet_names
     resp1 = client.post("/api/files/preview", json={"filename": "book.xlsx"})

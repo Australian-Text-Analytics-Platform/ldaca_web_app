@@ -96,8 +96,8 @@ def _excel_sheet_names(file_path) -> List[str]:
         pass
     # Final fallback: parse workbook.xml from xlsx zip
     try:
-        import zipfile
         import xml.etree.ElementTree as ET
+        import zipfile
 
         with zipfile.ZipFile(file_path) as z:
             with z.open("xl/workbook.xml") as f:
@@ -271,7 +271,9 @@ async def unified_file_preview(
             # Try polars first (engine xlsx2csv improves availability)
             try:
                 try:
-                    df = pl.read_excel(file_path, sheet_name=selected_sheet, engine="xlsx2csv")
+                    df = pl.read_excel(
+                        file_path, sheet_name=selected_sheet, engine="xlsx2csv"
+                    )
                 except Exception:
                     df = pl.read_excel(file_path, sheet_name=selected_sheet)
             except Exception:

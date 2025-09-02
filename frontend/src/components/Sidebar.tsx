@@ -2,8 +2,8 @@ import React from 'react';
 import { useWorkspace } from '../hooks/useWorkspace';
 
 interface SidebarProps {
-  activeTab: 'data-loader' | 'filter' | 'token-frequency' | 'topic-modeling' | 'concordance' | 'analysis' | 'export';
-  onTabChange: (tab: 'data-loader' | 'filter' | 'token-frequency' | 'topic-modeling' | 'concordance' | 'analysis' | 'export') => void;
+  activeTab: 'data-loader' | 'filter' | 'token-frequency' | 'topic-modeling' | 'concordance' | 'analysis' | 'quotation' | 'export';
+  onTabChange: (tab: 'data-loader' | 'filter' | 'token-frequency' | 'topic-modeling' | 'concordance' | 'analysis' | 'quotation' | 'export') => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
@@ -78,6 +78,16 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
           }`}
         >
           🧩 Topic Modeling
+        </button>
+        <button
+          onClick={() => onTabChange('quotation')}
+          className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${
+            activeTab === 'quotation'
+              ? 'bg-blue-100 text-blue-700 font-medium'
+              : 'text-gray-600 hover:bg-gray-100'
+          }`}
+        >
+          ❝ Quotation
         </button>
         <button
           onClick={() => onTabChange('export')}

@@ -26,6 +26,10 @@ import {
   detachConcordance,
   ConcordanceRequest,
   ConcordanceDetachRequest,
+  quotationSearch as apiQuotationSearch,
+  detachQuotation as apiDetachQuotation,
+  QuotationRequest,
+  QuotationDetachRequest,
   setCurrentWorkspace as apiSetCurrentWorkspace,
   createWorkspace as apiCreateWorkspace,
   deleteWorkspace as apiDeleteWorkspace,
@@ -485,6 +489,49 @@ export const useWorkspace = () => {
     },
   });
 
+  // Quotation mutations
+  const quotationMutation = useMutation({
+    mutationFn: ({ workspaceId, nodeId, request }: {
+      workspaceId: string;
+      nodeId: string;
+      request: QuotationRequest;
+    }) => {
+      return apiQuotationSearch(workspaceId, nodeId, request, authHeaders);
+    },
+    onMutate: () => {
+      startOperation('quotation');
+    },
+    onSuccess: () => {
+      endOperation('quotation');
+    },
+    onError: (error: any) => {
+      setOperationError('quotation', error.message);
+      endOperation('quotation');
+    },
+  });
+
+  const detachQuotationMutation = useMutation({
+    mutationFn: ({ workspaceId, nodeId, request }: {
+      workspaceId: string;
+      nodeId: string;
+      request: QuotationDetachRequest;
+    }) => {
+      return apiDetachQuotation(workspaceId, nodeId, request, authHeaders);
+    },
+    onMutate: () => {
+      startOperation('detachQuotation');
+    },
+    onSuccess: () => {
+      // Invalidate the workspace graph to refresh the nodes
+      queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId!) });
+      endOperation('detachQuotation');
+    },
+    onError: (error: any) => {
+      setOperationError('detachQuotation', error.message);
+      endOperation('detachQuotation');
+    },
+  });
+
   const castNodeMutation = useMutation({
     mutationFn: ({ nodeId, column, targetType, format }: {
       nodeId: string;
@@ -742,6 +789,16 @@ export const useWorkspace = () => {
       if (!currentWorkspaceId) return Promise.reject(new Error('No workspace selected'));
       return detachConcordanceMutation.mutateAsync({ workspaceId: currentWorkspaceId, nodeId, request });
     },
+
+    quotationSearch: (nodeId: string, request: QuotationRequest) => {
+      if (!currentWorkspaceId) return Promise.reject(new Error('No workspace selected'));
+      return quotationMutation.mutateAsync({ workspaceId: currentWorkspaceId, nodeId, request });
+    },
+
+    detachQuotation: (nodeId: string, request: QuotationDetachRequest) => {
+      if (!currentWorkspaceId) return Promise.reject(new Error('No workspace selected'));
+      return detachQuotationMutation.mutateAsync({ workspaceId: currentWorkspaceId, nodeId, request });
+    },
     
     refreshNodeSchema: async (nodeId: string): Promise<NodeSchemaResponse | null> => {
       if (!currentWorkspaceId) return null;
@@ -788,6 +845,8 @@ export const useWorkspace = () => {
     filterNodeMutation,
     concordanceMutation,
     detachConcordanceMutation,
+  quotationMutation,
+  detachQuotationMutation,
     castNodeMutation,
   convertToDocDataFrameMutation,
   convertToDataFrameMutation,
