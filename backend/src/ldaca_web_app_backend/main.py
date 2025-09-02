@@ -128,7 +128,7 @@ async def root():
                 "list": "/api/files/",
                 "upload": "/api/files/upload",
                 "download": "/api/files/{filename}",
-                "preview": "/api/files/{filename}/preview",
+                "preview": "/api/files/preview",
                 "info": "/api/files/{filename}/info",
                 "delete": "/api/files/{filename}",
             },

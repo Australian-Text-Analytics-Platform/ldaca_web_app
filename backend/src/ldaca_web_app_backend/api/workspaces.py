@@ -676,19 +676,23 @@ async def add_node_to_workspace(
     filename: str,
     mode: str = Query(
         "DocLazyFrame",
-        description="How to treat the file: 'DocLazyFrame' (wrap as DocLazyFrame) or 'LazyFrame' (plain Polars LazyFrame)",
+        description=(
+            "How to treat the file: 'DocLazyFrame' (wrap as DocLazyFrame), 'LazyFrame' (plain Polars LazyFrame), "
+            "'DocDataFrame' (wrap as DocDataFrame), or 'DataFrame' (plain Polars DataFrame)"
+        ),
     ),
     document_column: Optional[str] = Query(
-        None, description="Explicit document/text column to use when mode=corpus"
+        None, description="Explicit document/text column to use when mode is Doc*"
     ),
     current_user: dict = Depends(get_current_user),
 ):
     """Add a data file as a new node to workspace.
 
-    Enhancements:
-    - mode=corpus: attempt to convert underlying data to DocLazyFrame (text-aware)
-      using provided document_column or guessing via DocDataFrame.guess_document_column
-    - mode=metadata: ensure a plain LazyFrame/DataFrame (no Doc* wrapper)
+    Supported modes:
+    - DocLazyFrame: wrap underlying Polars as DocLazyFrame (lazy, text-aware)
+    - LazyFrame: use plain Polars LazyFrame
+    - DocDataFrame: wrap underlying Polars as DocDataFrame (eager, text-aware)
+    - DataFrame: use plain Polars DataFrame (eager)
     """
     user_id = current_user["id"]
 
@@ -705,60 +709,56 @@ async def add_node_to_workspace(
         # Load the data
         data = load_data_file(file_path)
 
-        # Convert pandas DataFrame to Polars if needed
+        # Normalize: convert pandas -> polars
         if hasattr(data, "columns") and hasattr(data, "iloc"):
-            # This is a pandas DataFrame, convert to Polars
+            # pandas DataFrame
             data = pl.DataFrame(data)
-        # Prefer LazyFrame for internal storage
-        try:
-            if isinstance(data, pl.DataFrame):
-                data = data.lazy()
-        except Exception:
-            pass
 
-        # Content mode handling (DocLazyFrame vs LazyFrame)
-        if mode not in {"DocLazyFrame", "LazyFrame"}:
+        # Validate requested mode
+        valid_modes = {"DocLazyFrame", "LazyFrame", "DocDataFrame", "DataFrame"}
+        if mode not in valid_modes:
             raise HTTPException(
                 status_code=400,
-                detail="Invalid mode. Expected 'DocLazyFrame' or 'LazyFrame'",
+                detail=f"Invalid mode '{mode}'. Expected one of {sorted(list(valid_modes))}",
             )
 
-        if mode == "DocLazyFrame":
+        # Import docframe only when needed
+        _DocDF = None
+        _DocLF = None
+        if mode in {"DocLazyFrame", "DocDataFrame"}:
             try:
                 import docframe  # noqa: F401
-                from docframe.core.docframe import DocDataFrame as _DDF
+                from docframe.core.docframe import DocDataFrame as _DocDF  # type: ignore
+                from docframe.core.docframe import DocLazyFrame as _DocLF  # type: ignore
             except Exception:  # pragma: no cover
                 raise HTTPException(
                     status_code=500,
-                    detail="docframe library not available for DocLazyFrame mode",
+                    detail="docframe library not available for Doc* modes",
                 )
 
-            # Ensure lazy
+        # Guess document column if needed (Doc* modes only)
+        if mode in {"DocLazyFrame", "DocDataFrame"} and document_column is None:
             try:
-                if isinstance(data, pl.DataFrame):
-                    data = data.lazy()
+                # _DocDF.guess_document_column works with both DataFrame and LazyFrame
+                document_column = _DocDF.guess_document_column(data)  # type: ignore[arg-type]
             except Exception:
-                pass
+                document_column = None
 
-            if document_column is None:
-                try:
-                    guessed = _DDF.guess_document_column(data)  # type: ignore[arg-type]
-                    document_column = guessed
-                except Exception:
-                    document_column = None
-
-            # Attempt conversion using namespace (import docframe above registers it)
+        # Apply mode
+        if mode == "DocLazyFrame":
+            # Ensure LazyFrame
+            if isinstance(data, pl.DataFrame):
+                data = data.lazy()
+            # Wrap as DocLazyFrame using namespace or constructor
             try:
-                if hasattr(data, "text"):
-                    data = data.text.to_doclazyframe(document_column=document_column)  # type: ignore[attr-defined]
-                else:
-                    from docframe.core.docframe import DocLazyFrame as _DLF
-
-                    if isinstance(data, pl.LazyFrame):
-                        data = _DLF(data, document_column=document_column)
-            except Exception as e:
-                print(f"⚠️ Failed to wrap as DocLazyFrame: {e}")
-        else:  # LazyFrame
+                # Namespace available when 'import docframe' succeeds
+                data = data.text.to_doclazyframe(document_column=document_column)  # type: ignore[attr-defined]
+            except Exception:
+                # Fallback to direct constructor
+                if isinstance(data, pl.LazyFrame):
+                    data = _DocLF(data, document_column=document_column)  # type: ignore[misc]
+        elif mode == "LazyFrame":
+            # If it's a Doc* wrapper, unwrap
             try:
                 if hasattr(data, "lazyframe"):
                     data = data.lazyframe  # type: ignore[attr-defined]
@@ -767,12 +767,47 @@ async def add_node_to_workspace(
                     data = df_inner.lazy()
             except Exception:
                 pass
-        # End mode handling
+            if isinstance(data, pl.DataFrame):
+                data = data.lazy()
+        elif mode == "DocDataFrame":
+            # Ensure eager DataFrame
+            if hasattr(data, "collect") and isinstance(data, pl.LazyFrame):
+                try:
+                    data = data.collect()
+                except Exception:
+                    # As a safe fallback, select all then collect
+                    data = pl.select([pl.all()]).collect()
+            # Wrap as DocDataFrame
+            try:
+                data = data.text.to_docdataframe(document_column=document_column)  # type: ignore[attr-defined]
+            except Exception:
+                if isinstance(data, pl.DataFrame):
+                    data = _DocDF(data, document_column=document_column)  # type: ignore[misc]
+        else:  # DataFrame
+            # Unwrap if Doc*, then ensure eager DataFrame
+            try:
+                if hasattr(data, "dataframe"):
+                    data = data.dataframe  # type: ignore[attr-defined]
+                elif hasattr(data, "lazyframe"):
+                    data = data.lazyframe.collect()  # type: ignore[attr-defined]
+            except Exception:
+                pass
+            if isinstance(data, pl.LazyFrame):
+                data = data.collect()
 
         # Create node name from filename
-        node_name = (
-            filename.replace(".csv", "").replace(".xlsx", "").replace(".json", "")
-        )
+        node_name = filename
+        for ext in [
+            ".csv",
+            ".tsv",
+            ".xlsx",
+            ".json",
+            ".jsonl",
+            ".parquet",
+        ]:
+            if node_name.endswith(ext):
+                node_name = node_name[: -len(ext)]
+                break
 
         # Accept docframe wrapper types as valid (unwrap not required for Node creation)
         doc_wrappers: tuple[type, ...] = tuple()
@@ -1872,6 +1907,7 @@ async def join_nodes(
     Allowed join strategies (Polars): 'inner', 'left', 'right', 'full', 'semi', 'anti', 'cross'
     """
     user_id = current_user["id"]
+
     try:
         # Lookup nodes
         left_node = workspace_manager.get_node_from_workspace(
@@ -1898,20 +1934,12 @@ async def join_nodes(
                 ),
             )
 
-        # Prefer docframe's realization via data.join; handle cross-join separately (no keys)
-        print(type(left_data))
-        print(type(right_data))
+        # Perform join; handle cross-join separately (no keys)
         if how_val == "cross":
-            joined_data = left_data.join(
-                right_data,
-                how="cross",
-            )
+            joined_data = left_data.join(right_data, how="cross")
         else:
             joined_data = left_data.join(
-                right_data,
-                left_on=left_on,
-                right_on=right_on,
-                how=how_val,
+                right_data, left_on=left_on, right_on=right_on, how=how_val
             )
 
         # Create and add new node
@@ -2038,7 +2066,7 @@ async def get_concordance(
                         "total_pages": (total_matches + request.page_size - 1)
                         // request.page_size,
                         "has_next": end_idx < total_matches,
-                        "has_prev": request.page > 1,
+                        "has_prev": start_idx > 0,
                     },
                     "sorting": {
                         "sort_by": request.sort_by,

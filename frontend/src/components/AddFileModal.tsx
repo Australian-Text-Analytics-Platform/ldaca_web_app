@@ -5,7 +5,7 @@ interface AddFileModalProps {
   filename: string | null;
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (opts: { mode: 'DocLazyFrame' | 'LazyFrame'; documentColumn?: string | null }) => Promise<void> | void;
+  onConfirm: (opts: { mode: 'DocLazyFrame' | 'LazyFrame' | 'DocDataFrame' | 'DataFrame'; documentColumn?: string | null }) => Promise<void> | void;
 }
 
 // Heuristic guess replicating backend (average length of string columns in preview slice)
@@ -24,15 +24,27 @@ function guessDocumentColumn(columns: string[], rows: any[]): string | null {
 }
 
 const AddFileModal: React.FC<AddFileModalProps> = ({ filename, isOpen, onClose, onConfirm }) => {
-  const { previewData, columns, fetchPreview, clearPreview, loading, error } = useFilePreview();
-  const [mode, setMode] = useState<'DocLazyFrame' | 'LazyFrame'>('DocLazyFrame');
+  const {
+    previewData,
+    columns,
+    fetchPreview,
+    clearPreview,
+    loading,
+    error,
+    fileType,
+    supportedTypes,
+    sheetNames,
+    selectedSheet,
+    setSelectedSheet,
+  } = useFilePreview();
+  const [mode, setMode] = useState<'DocLazyFrame' | 'LazyFrame' | 'DocDataFrame' | 'DataFrame'>('DocLazyFrame');
   const [documentColumn, setDocumentColumn] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const guessed = useMemo(() => guessDocumentColumn(columns, previewData) , [columns, previewData]);
 
   useEffect(() => {
     if (isOpen && filename) {
-      fetchPreview(filename, 0);
+  fetchPreview(filename, 0);
     } else {
       clearPreview();
   setMode('DocLazyFrame');
@@ -40,8 +52,17 @@ const AddFileModal: React.FC<AddFileModalProps> = ({ filename, isOpen, onClose, 
     }
   }, [isOpen, filename, fetchPreview, clearPreview]);
 
+  // When supported types arrive, pick a sensible default if current mode isn't supported
   useEffect(() => {
-  if (mode === 'DocLazyFrame') {
+    if (!supportedTypes || supportedTypes.length === 0) return;
+    if (!supportedTypes.includes(mode)) {
+      setMode(supportedTypes[0] as any);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supportedTypes, mode]);
+
+  useEffect(() => {
+  if (mode === 'DocLazyFrame' || mode === 'DocDataFrame') {
       setDocumentColumn(prev => prev || guessed || null);
     } else {
       setDocumentColumn(null);
@@ -53,7 +74,7 @@ const AddFileModal: React.FC<AddFileModalProps> = ({ filename, isOpen, onClose, 
   const handleConfirm = async () => {
     try {
       setSubmitting(true);
-  await onConfirm({ mode, documentColumn: mode === 'DocLazyFrame' ? documentColumn || undefined : undefined });
+  await onConfirm({ mode, documentColumn: (mode === 'DocLazyFrame' || mode === 'DocDataFrame') ? documentColumn || undefined : undefined });
       onClose();
     } finally {
       setSubmitting(false);
@@ -68,22 +89,47 @@ const AddFileModal: React.FC<AddFileModalProps> = ({ filename, isOpen, onClose, 
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700">✕</button>
         </div>
         <div className="p-5 space-y-6 overflow-auto">
+          {/* File info and supported types removed per request */}
+
+          {/* Excel sheet picker */}
+          {fileType === 'excel' && sheetNames && sheetNames.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Sheet</label>
+              <select
+                className="w-full border rounded px-3 py-2 text-sm"
+                value={selectedSheet || ''}
+                onChange={e => {
+                  const next = e.target.value || null;
+                  setSelectedSheet(next);
+                  // refresh preview for the chosen sheet
+                  fetchPreview(filename, 0, { sheetName: next || undefined });
+                }}
+              >
+                {sheetNames.map(n => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-gray-500">First sheet is selected by default. Pick another to update the preview.</p>
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Mode</label>
-            <div className="flex space-x-4">
-              <label className="flex items-center space-x-2 cursor-pointer">
-                <input type="radio" name="add-mode" value="DocLazyFrame" checked={mode==='DocLazyFrame'} onChange={() => setMode('DocLazyFrame')} />
-                <span className="text-sm font-medium">Add as DocLazyFrame</span>
-              </label>
-              <label className="flex items-center space-x-2 cursor-pointer">
-                <input type="radio" name="add-mode" value="LazyFrame" checked={mode==='LazyFrame'} onChange={() => setMode('LazyFrame')} />
-                <span className="text-sm font-medium">Add as LazyFrame</span>
-              </label>
+            <div className="grid grid-cols-4 gap-2 w-full">
+              {(supportedTypes?.length ? supportedTypes : ['DocLazyFrame','LazyFrame']).map(t => (
+                <label
+                  key={t}
+                  className="w-full flex items-center justify-center gap-2 cursor-pointer p-2 border rounded hover:bg-gray-50"
+                >
+                  <input type="radio" name="add-mode" value={t} checked={mode===t as any} onChange={() => setMode(t as any)} />
+                  <span className="text-sm font-medium">{t}</span>
+                </label>
+              ))}
             </div>
-            <p className="mt-1 text-xs text-gray-500">DocLazyFrame mode enables text-aware operations. LazyFrame adds the data without text semantics.</p>
+            <p className="mt-1 text-xs text-gray-500">Doc* modes enable text-aware operations; plain modes add data without text semantics.</p>
           </div>
 
-          {mode === 'DocLazyFrame' && (
+          {(mode === 'DocLazyFrame' || mode === 'DocDataFrame') && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Text / document column</label>
               {loading ? (
@@ -96,13 +142,12 @@ const AddFileModal: React.FC<AddFileModalProps> = ({ filename, isOpen, onClose, 
                   value={documentColumn || ''}
                   onChange={e => setDocumentColumn(e.target.value || null)}
                 >
-                  <option value="">{guessed ? `Auto (${guessed})` : 'Auto-detect'}</option>
                   {columns.map(c => (
                     <option key={c} value={c}>{c}{c===guessed ? ' (guessed)' : ''}</option>
                   ))}
                 </select>
               )}
-              <p className="mt-1 text-xs text-gray-500">Leave as Auto to let backend guess using column heuristics.</p>
+              <p className="mt-1 text-xs text-gray-500">A preferred column is pre-selected automatically; change it if needed.</p>
             </div>
           )}
 

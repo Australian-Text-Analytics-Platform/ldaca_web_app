@@ -68,7 +68,7 @@ const DataLoaderTab: React.FC = () => {
   }, [handleUploadFile]);
 
   // Add file to existing workspace only (workspace must be created beforehand)
-  const handleConfirmedAdd = useCallback(async (filename: string, mode: 'DocLazyFrame' | 'LazyFrame', documentColumn?: string | null) => {
+  const handleConfirmedAdd = useCallback(async (filename: string, mode: 'DocLazyFrame' | 'LazyFrame' | 'DocDataFrame' | 'DataFrame', documentColumn?: string | null) => {
     if (!currentWorkspace) {
       console.warn('Attempted to add node without an active workspace.');
       return;

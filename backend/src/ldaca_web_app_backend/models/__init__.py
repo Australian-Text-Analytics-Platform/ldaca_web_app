@@ -400,6 +400,31 @@ class WorkspaceGraph(BaseModel):
 # =============================================================================
 
 
+# =============================================================================
+# FILE PREVIEW MODELS (Unified endpoint)
+# =============================================================================
+
+
+class FilePreviewRequest(BaseModel):
+    filename: str
+    page: int = 0
+    page_size: int = 20
+    payload: Optional[Dict[str, Any]] = None  # e.g., {"sheet_name": "Sheet1"}
+
+
+class FilePreviewResponse(BaseModel):
+    filename: str
+    file_type: str
+    supported_types: List[
+        str
+    ]  # ["DocLazyFrame", "LazyFrame", "DocDataFrame", "DataFrame"]
+    columns: List[str]
+    preview: List[Dict[str, Any]]
+    total_rows: int
+    sheet_names: Optional[List[str]] = None
+    selected_sheet: Optional[str] = None
+
+
 class FilterCondition(BaseModel):
     column: str
     operator: str  # Allow any string to support new operators like 'between'

@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { getFilePreview } from '../api';
+import { getUnifiedFilePreview } from '../api';
 import { useAuth } from './useAuth';
 
 export const useFilePreview = () => {
@@ -8,6 +8,10 @@ export const useFilePreview = () => {
   const [totalRows, setTotalRows] = useState<number>(0);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(20);
+  const [fileType, setFileType] = useState<string | null>(null);
+  const [supportedTypes, setSupportedTypes] = useState<string[]>([]);
+  const [sheetNames, setSheetNames] = useState<string[] | null>(null);
+  const [selectedSheet, setSelectedSheet] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -16,17 +20,26 @@ export const useFilePreview = () => {
   const pageRef = useRef(page);
   useEffect(() => { pageRef.current = page; }, [page]);
 
-  const fetchPreview = useCallback(async (fileName: string, nextPage?: number) => {
+  const fetchPreview = useCallback(async (fileName: string, nextPage?: number, opts?: { sheetName?: string }) => {
     setLoading(true);
     setError(null);
     try {
       const headers = getAuthHeaders();
-  const effectivePage = typeof nextPage === 'number' ? nextPage : pageRef.current;
-  const response = await getFilePreview(fileName, headers, { page: effectivePage, pageSize });
-      const data = response.preview || response.dataframe || [];
+      const effectivePage = typeof nextPage === 'number' ? nextPage : pageRef.current;
+      const response = await getUnifiedFilePreview({
+        filename: fileName,
+        page: effectivePage,
+        page_size: pageSize,
+        payload: opts?.sheetName ? { sheet_name: opts.sheetName } : undefined,
+      }, headers);
+      const data = response.preview || [];
       setPreviewData(data);
       setColumns(response.columns || Object.keys(data?.[0] || {}));
       setTotalRows(response.total_rows ?? data.length);
+      setFileType(response.file_type || null);
+      setSupportedTypes(response.supported_types || []);
+      setSheetNames(response.sheet_names || null);
+      setSelectedSheet(response.selected_sheet || null);
       if (typeof nextPage === 'number') setPage(nextPage);
       return data;
     } catch (err) {
@@ -34,6 +47,10 @@ export const useFilePreview = () => {
       setPreviewData([]);
       setColumns([]);
       setTotalRows(0);
+      setFileType(null);
+      setSupportedTypes([]);
+      setSheetNames(null);
+      setSelectedSheet(null);
       return [];
     } finally {
       setLoading(false);
@@ -47,6 +64,10 @@ export const useFilePreview = () => {
     setColumns([]);
     setTotalRows(0);
     setPage(0);
+  setFileType(null);
+  setSupportedTypes([]);
+  setSheetNames(null);
+  setSelectedSheet(null);
   }, []);
 
   return {
@@ -60,6 +81,11 @@ export const useFilePreview = () => {
     fetchPreview,
     clearPreview,
     setPage,
-    setPageSize
+  setPageSize,
+  fileType,
+  supportedTypes,
+  sheetNames,
+  selectedSheet,
+  setSelectedSheet
   };
 };

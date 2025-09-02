@@ -151,18 +151,18 @@ export async function downloadFile(fileName: string, authHeaders: Record<string,
   return res.data;
 }
 
-export async function getFilePreview(
-  fileName: string,
-  authHeaders: Record<string, string> = {},
-  opts?: { page?: number; pageSize?: number }
+export interface UnifiedFilePreviewRequest {
+  filename: string;
+  page?: number;
+  page_size?: number;
+  payload?: { sheet_name?: string };
+}
+
+export async function getUnifiedFilePreview(
+  body: UnifiedFilePreviewRequest,
+  authHeaders: Record<string, string> = {}
 ) {
-  const res = await axios.get(`${API_BASE}/files/${encodeURIComponent(fileName)}/preview`, {
-    headers: authHeaders,
-    params: {
-      page: opts?.page ?? 0,
-      page_size: opts?.pageSize ?? 20,
-    }
-  });
+  const res = await axios.post(`${API_BASE}/files/preview`, body, { headers: authHeaders });
   return res.data;
 }
 
@@ -261,7 +261,7 @@ export async function createNodeFromFile(
   filename: string,
   nodeName?: string,
   authHeaders: Record<string, string> = {},
-  options?: { mode?: 'DocLazyFrame' | 'LazyFrame'; document_column?: string | null }
+  options?: { mode?: 'DocLazyFrame' | 'LazyFrame' | 'DocDataFrame' | 'DataFrame'; document_column?: string | null }
 ) {
   const res = await axios.post(`${API_BASE}/workspaces/${workspaceId}/nodes`, null, {
     params: {
@@ -377,7 +377,7 @@ export async function getUserStorage(authHeaders: Record<string, string> = {}) {
 export async function loadFile(fileName: string, authHeaders: Record<string, string> = {}) {
   // This endpoint might be deprecated in your new structure
   // For now, use file preview as a replacement
-  return getFilePreview(fileName, authHeaders);
+  return getUnifiedFilePreview({ filename: fileName, page: 0, page_size: 20 }, authHeaders);
 }
 
 export async function getDataFrame(pageIdx: number, authHeaders: Record<string, string> = {}) {
