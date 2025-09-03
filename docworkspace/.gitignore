@@ -1,0 +1,57 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+venv/
+ENV/
+env/
+.env
+
+# uv
+.python-version
+uv.lock
+
+# Pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDEs and editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Operating System
+.DS_Store
+.DS_Store?
+._*
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# MyPy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Testing
+.tox/
+.nox/
+.hypothesis/
+
+# Machine learning models
+*.pkl
+*.pickle
+*.joblib
+*.model

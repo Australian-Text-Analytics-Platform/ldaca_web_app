@@ -1,0 +1,20 @@
+[project]
+name = "docworkspace"
+version = "0.1.0"
+description = "A workspace library for managing DocDataFrames and DataFrames with parent-child relationships and lazy evaluation"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "polars",
+    "docframe",
+    "typing-extensions",
+]
+
+[project.optional-dependencies]
+cpu = [
+    "docframe[cpu]"
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
