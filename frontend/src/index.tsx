@@ -1,21 +1,25 @@
 import React from 'react';
-import ReactDOM from 'react-dom/client';
+import { createRoot } from 'react-dom/client';
 import './index.css';
 import App from './App';
-import reportWebVitals from './reportWebVitals';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 
-// Use environment variable or fallback to hardcoded client ID
-const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || "460163662698-lof601jcnsk9ugjjr3dpjqn31bv6krem.apps.googleusercontent.com";
+// Support both legacy REACT_APP_ and new VITE_ prefixes during transition
+const GOOGLE_CLIENT_ID =
+  import.meta.env.VITE_GOOGLE_CLIENT_ID ||
+  (import.meta.env.REACT_APP_GOOGLE_CLIENT_ID as string | undefined) ||
+  '460163662698-lof601jcnsk9ugjjr3dpjqn31bv6krem.apps.googleusercontent.com';
 
 if (localStorage.getItem('debugApp') === '1') {
-  console.log('Google Client ID:', GOOGLE_CLIENT_ID);
-  console.log('Current origin:', window.location.origin);
+  console.debug('[LDaCA] Google Client ID:', GOOGLE_CLIENT_ID);
+  console.debug('[LDaCA] Origin:', window.location.origin);
 }
 
-const root = ReactDOM.createRoot(
-  document.getElementById('root') as HTMLElement
-);
+const container = document.getElementById('root');
+if (!container) {
+  throw new Error('Root container #root not found');
+}
+const root = createRoot(container);
 root.render(
   <React.StrictMode>
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
@@ -23,8 +27,3 @@ root.render(
     </GoogleOAuthProvider>
   </React.StrictMode>
 );
-
-// If you want to start measuring performance in your app, pass a function
-// to log results (for example: reportWebVitals(console.log))
-// or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
-reportWebVitals();

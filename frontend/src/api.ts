@@ -1,4 +1,5 @@
-import axios from 'axios';
+// Replaced axios with lightweight fetch wrapper in request.ts
+import { apiRequest, getJson, postJson, putJson, deleteReq } from './request';
 
 // Determine API base URL based on current hostname and environment
 // Exported so other utilities (e.g., health polling) can derive non-/api root.
@@ -99,24 +100,15 @@ export interface ColumnUniqueValuesResponse {
 // =============================================================================
 
 export async function googleAuth(idToken: string): Promise<GoogleAuthResponse> {
-  const res = await axios.post(`${API_BASE}/auth/google`, {
-    id_token: idToken
-  });
-  return res.data;
+  return postJson(`${API_BASE}/auth/google`, { id_token: idToken }) as Promise<GoogleAuthResponse>;
 }
 
 export async function getAuthStatus(authHeaders: Record<string, string> = {}): Promise<UserMeResponse> {
-  const res = await axios.get(`${API_BASE}/auth/status`, {
-    headers: authHeaders
-  });
-  return res.data;
+  return getJson(`${API_BASE}/auth/status`, authHeaders) as Promise<UserMeResponse>;
 }
 
 export async function logout(authHeaders: Record<string, string> = {}) {
-  const res = await axios.post(`${API_BASE}/auth/logout`, {}, {
-    headers: authHeaders
-  });
-  return res.data;
+  return postJson(`${API_BASE}/auth/logout`, {}, authHeaders);
 }
 
 // =============================================================================
@@ -124,31 +116,17 @@ export async function logout(authHeaders: Record<string, string> = {}) {
 // =============================================================================
 
 export async function getFiles(authHeaders: Record<string, string> = {}): Promise<FileListResponse> {
-  const res = await axios.get(`${API_BASE}/files/`, {
-    headers: authHeaders
-  });
-  return res.data;
+  return getJson(`${API_BASE}/files/`, authHeaders) as Promise<FileListResponse>;
 }
 
 export async function uploadFile(file: File, authHeaders: Record<string, string> = {}) {
   const formData = new FormData();
   formData.append('file', file);
-  
-  const res = await axios.post(`${API_BASE}/files/upload`, formData, {
-    headers: {
-      ...authHeaders,
-      'Content-Type': 'multipart/form-data'
-    }
-  });
-  return res.data;
+  return apiRequest(`${API_BASE}/files/upload`, { method: 'POST', formData, headers: authHeaders });
 }
 
 export async function downloadFile(fileName: string, authHeaders: Record<string, string> = {}) {
-  const res = await axios.get(`${API_BASE}/files/${encodeURIComponent(fileName)}`, {
-    responseType: 'blob',
-    headers: authHeaders
-  });
-  return res.data;
+  return apiRequest(`${API_BASE}/files/${encodeURIComponent(fileName)}`, { method: 'GET', headers: authHeaders, expectBlob: true });
 }
 
 export interface UnifiedFilePreviewRequest {
@@ -158,26 +136,16 @@ export interface UnifiedFilePreviewRequest {
   payload?: { sheet_name?: string };
 }
 
-export async function getUnifiedFilePreview(
-  body: UnifiedFilePreviewRequest,
-  authHeaders: Record<string, string> = {}
-) {
-  const res = await axios.post(`${API_BASE}/files/preview`, body, { headers: authHeaders });
-  return res.data;
+export async function getUnifiedFilePreview(body: UnifiedFilePreviewRequest, authHeaders: Record<string, string> = {}) {
+  return postJson(`${API_BASE}/files/preview`, body, authHeaders);
 }
 
 export async function getFileInfo(fileName: string, authHeaders: Record<string, string> = {}) {
-  const res = await axios.get(`${API_BASE}/files/${encodeURIComponent(fileName)}/info`, {
-    headers: authHeaders
-  });
-  return res.data;
+  return getJson(`${API_BASE}/files/${encodeURIComponent(fileName)}/info`, authHeaders);
 }
 
 export async function deleteFile(fileName: string, authHeaders: Record<string, string> = {}) {
-  const res = await axios.delete(`${API_BASE}/files/${encodeURIComponent(fileName)}`, {
-    headers: authHeaders
-  });
-  return res.data;
+  return deleteReq(`${API_BASE}/files/${encodeURIComponent(fileName)}`, authHeaders);
 }
 
 // =============================================================================
@@ -198,8 +166,7 @@ export interface FeedbackResponseBody {
 }
 
 export async function submitFeedback(body: FeedbackRequestBody, authHeaders: Record<string, string> = {}): Promise<FeedbackResponseBody> {
-  const res = await axios.post(`${API_BASE}/feedback/submit`, body, { headers: authHeaders });
-  return res.data;
+  return postJson(`${API_BASE}/feedback/submit`, body, authHeaders) as Promise<FeedbackResponseBody>;
 }
 
 // =============================================================================
@@ -207,10 +174,8 @@ export async function submitFeedback(body: FeedbackRequestBody, authHeaders: Rec
 // =============================================================================
 
 export async function getWorkspaces(authHeaders: Record<string, string> = {}) {
-  const res = await axios.get(`${API_BASE}/workspaces/`, { 
-    headers: authHeaders 
-  });
-  return res.data.workspaces || [];
+  const data = await getJson(`${API_BASE}/workspaces/`, authHeaders) as any;
+  return data.workspaces || [];
 }
 
 export async function createWorkspace(
@@ -219,41 +184,26 @@ export async function createWorkspace(
   authHeaders: Record<string, string> = {}
 ) {
   const requestBody = { name, description };
-  const res = await axios.post(`${API_BASE}/workspaces/`, requestBody, { headers: authHeaders });
-  return res.data;
+  return postJson(`${API_BASE}/workspaces/`, requestBody, authHeaders);
 }
 
 export async function getWorkspaceInfo(workspaceId: string, authHeaders: Record<string, string> = {}) {
-  const res = await axios.get(`${API_BASE}/workspaces/${workspaceId}`, { 
-    headers: authHeaders 
-  });
-  return res.data;
+  return getJson(`${API_BASE}/workspaces/${workspaceId}`, authHeaders);
 }
 
 export async function deleteWorkspace(workspaceId: string, authHeaders: Record<string, string> = {}) {
-  const res = await axios.delete(`${API_BASE}/workspaces/${workspaceId}`, { 
-    headers: authHeaders 
-  });
-  return res.data;
+  return deleteReq(`${API_BASE}/workspaces/${workspaceId}`, authHeaders);
 }
 
 export async function importWorkspace(file: File, authHeaders: Record<string, string> = {}) {
   const formData = new FormData();
   formData.append('file', file);
-  const res = await axios.post(`${API_BASE}/workspaces/import`, formData, {
-    headers: {
-      ...authHeaders,
-      'Content-Type': 'multipart/form-data',
-    },
-  });
-  return res.data;
+  return apiRequest(`${API_BASE}/workspaces/import`, { method: 'POST', formData, headers: authHeaders });
 }
 
 export async function getWorkspaceNodes(workspaceId: string, authHeaders: Record<string, string> = {}) {
-  const res = await axios.get(`${API_BASE}/workspaces/${workspaceId}/nodes`, { 
-    headers: authHeaders 
-  });
-  return res.data.nodes || [];
+  const data = await getJson(`${API_BASE}/workspaces/${workspaceId}/nodes`, authHeaders) as any;
+  return data.nodes || [];
 }
 
 export async function createNodeFromFile(
@@ -263,16 +213,16 @@ export async function createNodeFromFile(
   authHeaders: Record<string, string> = {},
   options?: { mode?: 'DocLazyFrame' | 'LazyFrame' | 'DocDataFrame' | 'DataFrame'; document_column?: string | null }
 ) {
-  const res = await axios.post(`${API_BASE}/workspaces/${workspaceId}/nodes`, null, {
+  return apiRequest(`${API_BASE}/workspaces/${workspaceId}/nodes`, {
+    method: 'POST',
+    headers: authHeaders,
     params: {
       filename,
       node_name: nodeName,
-  mode: options?.mode ?? 'DocLazyFrame',
-      document_column: options?.document_column ?? undefined
+      mode: options?.mode ?? 'DocLazyFrame',
+      document_column: options?.document_column ?? undefined,
     },
-    headers: authHeaders
   });
-  return res.data;
 }
 
 export async function getNodeInfo(
@@ -280,10 +230,7 @@ export async function getNodeInfo(
   nodeId: string, 
   authHeaders: Record<string, string> = {}
 ) {
-  const res = await axios.get(`${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}`, { 
-    headers: authHeaders 
-  });
-  return res.data;
+  return getJson(`${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}`, authHeaders);
 }
 
 export async function getNodeData(
@@ -293,11 +240,11 @@ export async function getNodeData(
   pageSize: number = 20, 
   authHeaders: Record<string, string> = {}
 ) {
-  const res = await axios.get(`${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}/data`, { 
+  return apiRequest(`${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}/data`, {
+    method: 'GET',
+    headers: authHeaders,
     params: { page, page_size: pageSize },
-    headers: authHeaders 
   });
-  return res.data;
 }
 
 export async function getNodeShape(
@@ -305,10 +252,7 @@ export async function getNodeShape(
   nodeId: string, 
   authHeaders: Record<string, string> = {}
 ) {
-  const res = await axios.get(`${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}/shape`, { 
-    headers: authHeaders 
-  });
-  return res.data;
+  return getJson(`${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}/shape`, authHeaders);
 }
 
 export async function getColumnUniqueValues(
@@ -317,10 +261,7 @@ export async function getColumnUniqueValues(
   columnName: string,
   authHeaders: Record<string, string> = {}
 ): Promise<ColumnUniqueValuesResponse> {
-  const res = await axios.get(`${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}/columns/${columnName}/unique`, {
-    headers: authHeaders
-  });
-  return res.data;
+  return getJson(`${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}/columns/${columnName}/unique`, authHeaders) as Promise<ColumnUniqueValuesResponse>;
 }
 
 export async function deleteNode(
@@ -328,10 +269,7 @@ export async function deleteNode(
   nodeId: string, 
   authHeaders: Record<string, string> = {}
 ) {
-  const res = await axios.delete(`${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}`, { 
-    headers: authHeaders 
-  });
-  return res.data;
+  return deleteReq(`${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}`, authHeaders);
 }
 
 export async function renameNode(
@@ -341,15 +279,11 @@ export async function renameNode(
   authHeaders: Record<string, string> = {}
 ) {
   // RESTful endpoint only
-  const res = await axios.put(
-    `${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}/name`,
-    null,
-    {
-      headers: authHeaders,
-      params: { new_name: newName },
-    }
-  );
-  return res.data;
+  return apiRequest(`${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}/name`, {
+    method: 'PUT',
+    headers: authHeaders,
+    params: { new_name: newName },
+  });
 }
 
 // =============================================================================
@@ -357,17 +291,11 @@ export async function renameNode(
 // =============================================================================
 
 export async function getUserFolders(authHeaders: Record<string, string> = {}) {
-  const res = await axios.get(`${API_BASE}/user/folders`, {
-    headers: authHeaders
-  });
-  return res.data;
+  return getJson(`${API_BASE}/user/folders`, authHeaders);
 }
 
 export async function getUserStorage(authHeaders: Record<string, string> = {}) {
-  const res = await axios.get(`${API_BASE}/user/storage`, {
-    headers: authHeaders
-  });
-  return res.data;
+  return getJson(`${API_BASE}/user/storage`, authHeaders);
 }
 
 // =============================================================================
@@ -383,31 +311,21 @@ export async function loadFile(fileName: string, authHeaders: Record<string, str
 export async function getDataFrame(pageIdx: number, authHeaders: Record<string, string> = {}) {
   // This endpoint might be replaced by workspace node operations
   // For now, keeping for backward compatibility
-  const res = await axios.get(`${API_BASE}/dataframe`, { 
-    params: { page_idx: pageIdx },
-    headers: authHeaders
-  });
-  return res.data;
+  return apiRequest(`${API_BASE}/dataframe`, { method: 'GET', headers: authHeaders, params: { page_idx: pageIdx } });
 }
 
 export async function getWorkspaceGraph(
   workspaceId: string,
   authHeaders: Record<string, string> = {}
 ) {
-  const res = await axios.get(`${API_BASE}/workspaces/${workspaceId}/graph`, {
-    headers: authHeaders
-  });
-  return res.data;
+  return getJson(`${API_BASE}/workspaces/${workspaceId}/graph`, authHeaders);
 }
 
 export async function saveWorkspace(
   workspaceId: string,
   authHeaders: Record<string, string> = {}
 ) {
-  const res = await axios.post(`${API_BASE}/workspaces/${workspaceId}/save`, null, {
-    headers: authHeaders
-  });
-  return res.data;
+  return apiRequest(`${API_BASE}/workspaces/${workspaceId}/save`, { method: 'POST', headers: authHeaders });
 }
 
 export async function saveWorkspaceAs(
@@ -415,22 +333,14 @@ export async function saveWorkspaceAs(
   filename: string,
   authHeaders: Record<string, string> = {}
 ) {
-  const res = await axios.post(`${API_BASE}/workspaces/${workspaceId}/save-as`, null, {
-    params: { filename },
-    headers: authHeaders
-  });
-  return res.data;
+  return apiRequest(`${API_BASE}/workspaces/${workspaceId}/save-as`, { method: 'POST', headers: authHeaders, params: { filename } });
 }
 
 export async function downloadWorkspace(
   workspaceId: string,
   authHeaders: Record<string, string> = {}
 ) {
-  const res = await axios.get(`${API_BASE}/workspaces/${workspaceId}/download`, {
-    responseType: 'blob',
-    headers: authHeaders
-  });
-  return res.data as Blob;
+  return apiRequest(`${API_BASE}/workspaces/${workspaceId}/download`, { method: 'GET', headers: authHeaders, expectBlob: true }) as Promise<Blob>;
 }
 
 export async function updateWorkspaceName(
@@ -438,11 +348,7 @@ export async function updateWorkspaceName(
   newName: string,
   authHeaders: Record<string, string> = {}
 ) {
-  const res = await axios.put(`${API_BASE}/workspaces/${workspaceId}/name`, null, {
-    params: { new_name: newName },
-    headers: authHeaders
-  });
-  return res.data;
+  return apiRequest(`${API_BASE}/workspaces/${workspaceId}/name`, { method: 'PUT', headers: authHeaders, params: { new_name: newName } });
 }
 
 export async function deleteWorkspaceNode(
@@ -450,10 +356,7 @@ export async function deleteWorkspaceNode(
   nodeId: string,
   authHeaders: Record<string, string> = {}
 ) {
-  const res = await axios.delete(`${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}`, {
-    headers: authHeaders
-  });
-  return res.data;
+  return deleteReq(`${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}`, authHeaders);
 }
 
 // =============================================================================
@@ -461,17 +364,13 @@ export async function deleteWorkspaceNode(
 // =============================================================================
 
 export const getCurrentWorkspace = async (headers: Record<string, string>) => {
-  const response = await axios.get(`${API_BASE}/workspaces/current`, { headers });
-  return response.data.current_workspace_id || null;
+  const data = await getJson(`${API_BASE}/workspaces/current`, headers) as any;
+  return data.current_workspace_id || null;
 };
 
 export const setCurrentWorkspace = async (workspaceId: string | null, headers: Record<string, string>) => {
   const params = workspaceId ? `?workspace_id=${encodeURIComponent(workspaceId)}` : '';
-  const response = await axios.post(`${API_BASE}/workspaces/current${params}`, 
-    {}, 
-    { headers }
-  );
-  return response.data;
+  return apiRequest(`${API_BASE}/workspaces/current${params}`, { method: 'POST', headers });
 };
 
 // =============================================================================
@@ -487,18 +386,14 @@ export async function convertNode(
   documentColumn?: string,
   authHeaders: Record<string, string> = {}
 ) {
-  const res = await axios.post(
-    `${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}/convert`,
-    null,
-    {
-      params: {
-        target,
-        ...(documentColumn && { document_column: documentColumn })
-      },
-      headers: authHeaders
-    }
-  );
-  return res.data;
+  return apiRequest(`${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}/convert`, {
+    method: 'POST',
+    headers: authHeaders,
+    params: {
+      target,
+      ...(documentColumn && { document_column: documentColumn }),
+    },
+  });
 }
 
 // Legacy functions for backward compatibility
@@ -542,15 +437,11 @@ export async function resetDocumentColumn(
   documentColumn?: string,
   authHeaders: Record<string, string> = {}
 ) {
-  const res = await axios.post(
-    `${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}/reset-document`,
-    null,
-    {
-      params: documentColumn ? { document_column: documentColumn } : {},
-      headers: authHeaders,
-    }
-  );
-  return res.data;
+  return apiRequest(`${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}/reset-document`, {
+    method: 'POST',
+    headers: authHeaders,
+    params: documentColumn ? { document_column: documentColumn } : {},
+  });
 }
 
 export interface JoinNodesRequest {
@@ -567,15 +458,11 @@ export async function joinNodes(
   request: JoinNodesRequest,
   authHeaders: Record<string, string> = {}
 ) {
-  const res = await axios.post(
-    `${API_BASE}/workspaces/${workspaceId}/nodes/join`,
-    null,
-    {
-      params: request,
-      headers: authHeaders
-    }
-  );
-  return res.data;
+  return apiRequest(`${API_BASE}/workspaces/${workspaceId}/nodes/join`, {
+    method: 'POST',
+    headers: authHeaders,
+    params: request,
+  });
 }
 
 export interface CastNodeRequest {
@@ -590,14 +477,7 @@ export async function castNode(
   request: CastNodeRequest,
   authHeaders: Record<string, string> = {}
 ) {
-  const res = await axios.post(
-    `${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}/cast`,
-    request,
-    {
-      headers: authHeaders
-    }
-  );
-  return res.data;
+  return postJson(`${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}/cast`, request, authHeaders);
 }
 
 export async function getNodeSchema(
@@ -605,16 +485,8 @@ export async function getNodeSchema(
   nodeId: string,
   authHeaders: Record<string, string> = {}
 ): Promise<Record<string, string>> {
-  const res = await axios.get(
-    `${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}`,
-    {
-      headers: authHeaders
-    }
-  );
-  
-  // Extract schema from the node info response
-  // Backend returns node.info(json=True) which includes a schema field with js_type compatible values
-  return res.data.schema || {};
+  const data = await getJson(`${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}`, authHeaders) as any;
+  return data.schema || {};
 }
 
 export interface FilterCondition {
@@ -637,14 +509,7 @@ export async function filterNode(
   request: FilterRequest,
   authHeaders: Record<string, string> = {}
 ) {
-  const res = await axios.post(
-    `${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}/filter`,
-    request,
-    {
-      headers: authHeaders
-    }
-  );
-  return res.data;
+  return postJson(`${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}/filter`, request, authHeaders);
 }
 
 export interface SliceRequest {
@@ -660,14 +525,7 @@ export async function sliceNode(
   request: SliceRequest,
   authHeaders: Record<string, string> = {}
 ) {
-  const res = await axios.post(
-    `${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}/slice`,
-    request,
-    {
-      headers: authHeaders
-    }
-  );
-  return res.data;
+  return postJson(`${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}/slice`, request, authHeaders);
 }
 
 export interface ConcordanceRequest {
@@ -770,14 +628,7 @@ export async function concordanceSearch(
   request: ConcordanceRequest,
   authHeaders: Record<string, string> = {}
 ) {
-  const res = await axios.post(
-    `${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}/concordance`,
-    request,
-    {
-      headers: authHeaders
-    }
-  );
-  return res.data;
+  return postJson(`${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}/concordance`, request, authHeaders);
 }
 
 export async function multiNodeConcordanceSearch(
@@ -785,14 +636,7 @@ export async function multiNodeConcordanceSearch(
   request: MultiNodeConcordanceRequest,
   authHeaders: Record<string, string> = {}
 ): Promise<MultiNodeConcordanceResponse> {
-  const res = await axios.post(
-    `${API_BASE}/workspaces/${workspaceId}/concordance/multi-node`,
-    request,
-    {
-      headers: authHeaders
-    }
-  );
-  return res.data;
+  return postJson(`${API_BASE}/workspaces/${workspaceId}/concordance/multi-node`, request, authHeaders) as Promise<MultiNodeConcordanceResponse>;
 }
 
 export async function getConcordanceDetail(
@@ -802,14 +646,11 @@ export async function getConcordanceDetail(
   textColumn: string,
   authHeaders: Record<string, string> = {}
 ) {
-  const res = await axios.get(
-    `${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}/concordance/${documentIdx}`,
-    {
-      params: { text_column: textColumn },
-      headers: authHeaders
-    }
-  );
-  return res.data;
+  return apiRequest(`${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}/concordance/${documentIdx}`, {
+    method: 'GET',
+    headers: authHeaders,
+    params: { text_column: textColumn },
+  });
 }
 
 export async function detachConcordance(
@@ -818,14 +659,7 @@ export async function detachConcordance(
   request: ConcordanceDetachRequest,
   authHeaders: Record<string, string> = {}
 ): Promise<ConcordanceDetachResponse> {
-  const res = await axios.post(
-    `${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}/concordance/detach`,
-    request,
-    {
-      headers: authHeaders
-    }
-  );
-  return res.data;
+  return postJson(`${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}/concordance/detach`, request, authHeaders) as Promise<ConcordanceDetachResponse>;
 }
 
 export async function quotationSearch(
@@ -834,12 +668,7 @@ export async function quotationSearch(
   request: QuotationRequest,
   headers: Record<string, string> = {}
 ): Promise<any> {
-  const response = await axios.post(
-    `${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}/quotation`,
-    request,
-    { headers }
-  );
-  return response.data;
+  return postJson(`${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}/quotation`, request, headers);
 }
 
 export async function detachQuotation(
@@ -848,12 +677,7 @@ export async function detachQuotation(
   request: QuotationDetachRequest,
   headers: Record<string, string> = {}
 ): Promise<any> {
-  const response = await axios.post(
-    `${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}/quotation/detach`,
-    request,
-    { headers }
-  );
-  return response.data;
+  return postJson(`${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}/quotation/detach`, request, headers);
 }
 
 export async function frequencyAnalysis(
@@ -862,14 +686,7 @@ export async function frequencyAnalysis(
   request: FrequencyAnalysisRequest,
   authHeaders: Record<string, string> = {}
 ) {
-  const res = await axios.post(
-    `${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}/frequency-analysis`,
-    request,
-    {
-      headers: authHeaders
-    }
-  );
-  return res.data;
+  return postJson(`${API_BASE}/workspaces/${workspaceId}/nodes/${nodeId}/frequency-analysis`, request, authHeaders);
 }
 
 // Token Frequency Analysis Types and API
@@ -918,26 +735,13 @@ export async function calculateTokenFrequencies(
   request: TokenFrequencyRequest,
   authHeaders: Record<string, string> = {}
 ): Promise<TokenFrequencyResponse> {
-  const res = await axios.post(
-    `${API_BASE}/workspaces/${workspaceId}/token-frequencies`,
-    request,
-    {
-      headers: authHeaders
-    }
-  );
-  return res.data;
+  return postJson(`${API_BASE}/workspaces/${workspaceId}/token-frequencies`, request, authHeaders) as Promise<TokenFrequencyResponse>;
 }
 
 export async function getDefaultStopWords(
   authHeaders: Record<string, string> = {}
 ): Promise<{ success: boolean; message: string; data: string[] }> {
-  const res = await axios.get(
-    `${API_BASE}/text/default-stop-words`,
-    {
-      headers: authHeaders
-    }
-  );
-  return res.data;
+  return getJson(`${API_BASE}/text/default-stop-words`, authHeaders) as Promise<{ success: boolean; message: string; data: string[] }>;
 }
 
 // Topic Modeling Types & API
@@ -976,10 +780,5 @@ export async function runTopicModeling(
   request: TopicModelingRequest,
   authHeaders: Record<string, string> = {}
 ): Promise<TopicModelingResponse> {
-  const res = await axios.post(
-    `${API_BASE}/workspaces/${workspaceId}/topic-modeling`,
-    request,
-    { headers: authHeaders }
-  );
-  return res.data;
+  return postJson(`${API_BASE}/workspaces/${workspaceId}/topic-modeling`, request, authHeaders) as Promise<TopicModelingResponse>;
 }
