@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { getUnifiedFilePreview } from '../api';
+import { filesApi } from '../api/files';
 import { useAuth } from './useAuth';
 
 export const useFilePreview = () => {
@@ -26,7 +26,7 @@ export const useFilePreview = () => {
     try {
       const headers = getAuthHeaders();
       const effectivePage = typeof nextPage === 'number' ? nextPage : pageRef.current;
-      const response = await getUnifiedFilePreview({
+  const response = await filesApi.preview({
         filename: fileName,
         page: effectivePage,
         page_size: pageSize,

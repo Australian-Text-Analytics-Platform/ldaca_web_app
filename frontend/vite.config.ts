@@ -13,6 +13,20 @@ export default defineConfig({
     sourcemap: true,
     outDir: 'build', // keep previous CRA output folder name if backend expects it
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Group vendor libraries
+          'vendor-react': ['react', 'react-dom'],
+          'vendor-query': ['@tanstack/react-query'],
+          'vendor-ui': ['@xyflow/react', 'dagre'],
+          'vendor-charts': ['recharts'],
+          'vendor-markdown': ['react-markdown', 'rehype-raw'],
+          'vendor-auth': ['@react-oauth/google'],
+          'vendor-utils': ['zustand']
+        }
+      }
+    }
   },
   server: {
     port: 3000,
@@ -21,5 +35,5 @@ export default defineConfig({
   preview: {
     port: 3000,
   },
-  envPrefix: ['VITE_', 'REACT_APP_'], // support legacy REACT_APP_ vars during transition
+  envPrefix: 'VITE_', // Vite standard environment variable prefix
 });

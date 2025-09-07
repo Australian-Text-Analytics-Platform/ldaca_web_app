@@ -264,7 +264,6 @@ class ConcordanceRequest(BaseModel):
     num_right_tokens: int = 10
     regex: bool = False
     case_sensitive: bool = False
-    show_metadata: bool = False
     # Pagination parameters
     page: int = 1
     page_size: int = 50
@@ -284,7 +283,6 @@ class MultiNodeConcordanceRequest(BaseModel):
     combined: bool = (
         False  # if true, backend will also build a combined view across nodes
     )
-    show_metadata: bool = False
     # Pagination parameters
     page: int = 1
     page_size: int = 50
@@ -307,7 +305,6 @@ class ConcordanceDetachRequest(BaseModel):
 # Quotation requests (mirror concordance shape but without search parameters)
 class QuotationRequest(BaseModel):
     column: str
-    show_metadata: bool = False
     # Pagination parameters
     page: int = 1
     page_size: int = 50
@@ -590,3 +587,33 @@ class TopicModelingResponse(BaseModel):
     success: bool
     message: str
     data: Optional[TopicModelingData] = None
+
+
+# Concordance response models
+class ConcordanceMetadata(BaseModel):
+    """Metadata about concordance columns to help frontend display logic"""
+
+    concordance_columns: List[
+        str
+    ]  # Core concordance columns (left_context, matched_text, right_context, etc.)
+    metadata_columns: List[str]  # Original document metadata columns
+    all_columns: List[str]  # All available columns
+
+
+class ConcordanceResponse(BaseModel):
+    """Response for single node concordance with complete data and metadata info"""
+
+    data: List[Dict[str, Any]]
+    columns: List[str]
+    metadata: ConcordanceMetadata
+    total_matches: int
+    pagination: Dict[str, Any]
+    sorting: Dict[str, Any]
+
+
+class MultiNodeConcordanceResponse(BaseModel):
+    """Response for multi-node concordance with complete data and metadata info"""
+
+    results: Dict[str, Dict[str, Any]]  # node_name -> concordance response
+    combined: Optional[Dict[str, Any]] = None
+    metadata: Dict[str, ConcordanceMetadata]  # node_name -> metadata

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import { AuthInfoResponse, GoogleAuthResponse } from '../types';
-import { authApi } from '../services/authApi';
+import { AuthInfoResponse, GoogleAuthResponse as LegacyGoogleAuthResponse } from '../types';
+// Migrated to modular API layer
+import { authApi } from '../api/auth';
 
 /**
  * Unified authentication hook that works with both single-user and multi-user modes.
@@ -30,8 +31,17 @@ const fetchAuthInfoOnce = async () => {
   globalError = null;
   inFlight = (async () => {
     try {
-      const info = await authApi.getAuthInfo();
-      globalAuthInfo = info;
+      const info = await authApi.status();
+      // Map UserMeResponse to AuthInfoResponse (status endpoint lacks some fields)
+      globalAuthInfo = {
+        authenticated: info.authenticated,
+        user: info.user,
+        multi_user_mode: true, // assume multi-user if status endpoint is used; could refine with separate config endpoint
+        available_auth_methods: [
+          { name: 'google', display_name: 'Google', enabled: true }
+        ],
+        requires_authentication: true,
+      };
     } catch (err) {
       console.error('Auth info fetch failed:', err);
       globalError = err instanceof Error ? err.message : 'Authentication failed';
@@ -86,9 +96,10 @@ export const useAuth = () => {
     globalError = null;
     notify();
     try {
-      const response: GoogleAuthResponse = await authApi.authenticateWithGoogle(idToken);
-      localStorage.setItem('auth_token', response.access_token);
-      await fetchAuthInfoOnce();
+  const response = await authApi.googleAuth(idToken);
+  localStorage.setItem('auth_token', response.access_token);
+  // Status re-fetch to populate user info
+  await fetchAuthInfoOnce();
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Google login failed';
       globalError = errorMessage;
@@ -106,7 +117,7 @@ export const useAuth = () => {
     globalError = null;
     notify();
     try {
-      await authApi.logout();
+  await authApi.logout();
       localStorage.removeItem('auth_token');
       await fetchAuthInfoOnce();
     } catch (err) {

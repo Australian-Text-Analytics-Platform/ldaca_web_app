@@ -3,40 +3,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAppStore } from '../stores/appStore';
 import { useAuth } from './useAuth';
 import { NodeSchemaResponse } from '../types';
-import { 
-  getWorkspaces, 
-  getCurrentWorkspace, 
-  getWorkspaceGraph,
-  getNodeData,
-  getNodeShape,
-  getNodeSchema,
-  castNode as apiCastNode,
-  convertToDocDataFrame as apiConvertToDocDataFrame,
-  convertToDataFrame as apiConvertToDataFrame,
-  convertToDocLazyFrame as apiConvertToDocLazyFrame,
-  convertToLazyFrame as apiConvertToLazyFrame,
-  resetDocumentColumn as apiResetDocumentColumn,
-  renameNode as apiRenameNode,
-  deleteNode as apiDeleteNode,
-  createNodeFromFile as apiCreateNodeFromFile,
-  joinNodes as apiJoinNodes,
-  filterNode,
-  FilterRequest,
-  concordanceSearch,
-  detachConcordance,
-  ConcordanceRequest,
-  ConcordanceDetachRequest,
-  quotationSearch as apiQuotationSearch,
-  detachQuotation as apiDetachQuotation,
-  QuotationRequest,
-  QuotationDetachRequest,
-  setCurrentWorkspace as apiSetCurrentWorkspace,
-  createWorkspace as apiCreateWorkspace,
-  deleteWorkspace as apiDeleteWorkspace,
-  saveWorkspace as apiSaveWorkspace,
-  saveWorkspaceAs as apiSaveWorkspaceAs,
-  updateWorkspaceName as apiUpdateWorkspaceName,
-} from '../api';
+// New modular API imports
+import { workspacesApi } from '../api/workspaces';
+import { nodesApi, FilterRequest } from '../api/nodes';
+import { textApi, ConcordanceRequest, ConcordanceDetachRequest, QuotationRequest, QuotationDetachRequest } from '../api/text';
 import { queryKeys } from '../lib/queryKeys';
 
 /**
@@ -72,7 +42,7 @@ export const useWorkspace = () => {
   // Queries with proper stale time and caching
   const workspacesQuery = useQuery({
     queryKey: queryKeys.workspaces,
-    queryFn: () => getWorkspaces(authHeaders),
+  queryFn: () => workspacesApi.list(authHeaders),
     enabled: isAuthenticated,
     staleTime: 5 * 60 * 1000, // 5 minutes
     retry: false, // Don't retry auth errors
@@ -80,7 +50,7 @@ export const useWorkspace = () => {
 
   const currentWorkspaceQuery = useQuery({
     queryKey: queryKeys.currentWorkspace,
-    queryFn: () => getCurrentWorkspace(authHeaders),
+  queryFn: () => workspacesApi.current.get(authHeaders),
     enabled: isAuthenticated,
     staleTime: 1 * 60 * 1000, // 1 minute
     retry: false,
@@ -88,13 +58,10 @@ export const useWorkspace = () => {
 
   const currentWorkspaceId = currentWorkspaceQuery.data || null;
 
-  // Remove the redundant nodesQuery - use only graphQuery as single source of truth
-  // const nodesQuery = ... (REMOVED - using workspaceGraph.nodes instead)
-
   const graphQuery = useQuery({
     queryKey: currentWorkspaceId ? queryKeys.workspaceGraph(currentWorkspaceId) : ['workspaces', 'graph'],
     queryFn: async () => {
-      const result = await getWorkspaceGraph(currentWorkspaceId!, authHeaders);
+  const result = await workspacesApi.graph(currentWorkspaceId!, authHeaders);
       if (localStorage.getItem('debugGraph') === '1') {
         console.log('=== API Response Success ===');
         console.log('API response structure:', {
@@ -133,7 +100,7 @@ export const useWorkspace = () => {
     queryFn: () => {
       const currentPage = pagination[selectedNodeId!]?.currentPage || 1;
       const pageSize = pagination[selectedNodeId!]?.pageSize || 20;
-      return getNodeData(currentWorkspaceId!, selectedNodeId!, currentPage, pageSize, authHeaders);
+  return nodesApi.data(currentWorkspaceId!, selectedNodeId!, currentPage, pageSize, authHeaders);
     },
     enabled: isAuthenticated && !!currentWorkspaceId && !!selectedNodeId,
     staleTime: 30 * 1000, // 30 seconds
@@ -178,7 +145,7 @@ export const useWorkspace = () => {
     if (!currentWorkspaceId) return null;
     
     try {
-      const shapeData = await getNodeShape(currentWorkspaceId, nodeId, authHeaders);
+  const shapeData = await nodesApi.shape(currentWorkspaceId, nodeId, authHeaders);
       return shapeData;
     } catch (error) {
       console.error('Failed to get node shape:', error);
@@ -204,7 +171,7 @@ export const useWorkspace = () => {
 
   // Mutations with proper error handling and loading states
   const setCurrentWorkspaceMutation = useMutation({
-    mutationFn: (workspaceId: string | null) => apiSetCurrentWorkspace(workspaceId, authHeaders),
+    mutationFn: (workspaceId: string | null) => workspacesApi.current.set(workspaceId, authHeaders),
     onMutate: () => {
       startOperation('setCurrentWorkspace');
     },
@@ -222,7 +189,7 @@ export const useWorkspace = () => {
 
   const createWorkspaceMutation = useMutation({
     mutationFn: ({ name, description }: { name: string; description?: string }) =>
-      apiCreateWorkspace(name, description || '', authHeaders),
+      workspacesApi.create(name, description || '', authHeaders),
     onMutate: () => {
       startOperation('createWorkspace');
     },
@@ -237,7 +204,7 @@ export const useWorkspace = () => {
   });
 
   const deleteWorkspaceMutation = useMutation({
-    mutationFn: (workspaceId: string) => apiDeleteWorkspace(workspaceId, authHeaders),
+    mutationFn: (workspaceId: string) => workspacesApi.delete(workspaceId, authHeaders),
     onMutate: () => {
       startOperation('deleteWorkspace');
     },
@@ -252,7 +219,7 @@ export const useWorkspace = () => {
   });
 
   const saveWorkspaceMutation = useMutation({
-    mutationFn: () => apiSaveWorkspace(currentWorkspaceId!, authHeaders),
+    mutationFn: () => workspacesApi.save(currentWorkspaceId!, authHeaders),
     onMutate: () => startOperation('saveWorkspace'),
     onSuccess: () => {
       endOperation('saveWorkspace');
@@ -264,7 +231,7 @@ export const useWorkspace = () => {
   });
 
   const saveWorkspaceAsMutation = useMutation({
-    mutationFn: (filename: string) => apiSaveWorkspaceAs(currentWorkspaceId!, filename, authHeaders),
+    mutationFn: (filename: string) => workspacesApi.saveAs(currentWorkspaceId!, filename, authHeaders),
     onMutate: () => startOperation('saveWorkspaceAs'),
     onSuccess: (data: any) => {
       // If backend returned the new workspace info, merge it into cache so UI updates immediately
@@ -290,7 +257,7 @@ export const useWorkspace = () => {
   });
 
   const updateWorkspaceNameMutation = useMutation({
-    mutationFn: (newName: string) => apiUpdateWorkspaceName(currentWorkspaceId!, newName, authHeaders),
+    mutationFn: (newName: string) => workspacesApi.updateName(currentWorkspaceId!, newName, authHeaders),
     onMutate: () => startOperation('updateWorkspaceName'),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.workspaces });
@@ -305,7 +272,7 @@ export const useWorkspace = () => {
 
   const renameNodeMutation = useMutation({
     mutationFn: ({ workspaceId, nodeId, newName }: { workspaceId: string; nodeId: string; newName: string }) =>
-      apiRenameNode(workspaceId, nodeId, newName, authHeaders),
+      nodesApi.rename(workspaceId, nodeId, newName, authHeaders),
     onMutate: () => {
       startOperation('renameNode');
     },
@@ -321,7 +288,7 @@ export const useWorkspace = () => {
 
   const deleteNodeMutation = useMutation({
     mutationFn: ({ workspaceId, nodeId }: { workspaceId: string; nodeId: string }) =>
-      apiDeleteNode(workspaceId, nodeId, authHeaders),
+      nodesApi.delete(workspaceId, nodeId, authHeaders),
     onMutate: () => {
       startOperation('deleteNode');
     },
@@ -346,7 +313,7 @@ export const useWorkspace = () => {
 
   const createNodeMutation = useMutation({
     mutationFn: ({ workspaceId, filename, mode, documentColumn }: { workspaceId: string; filename: string; mode?: 'DocLazyFrame' | 'LazyFrame' | 'DocDataFrame' | 'DataFrame'; documentColumn?: string | null }) =>
-      apiCreateNodeFromFile(workspaceId, filename, undefined, authHeaders, { mode, document_column: documentColumn ?? undefined }),
+      nodesApi.createFromFile(workspaceId, filename, undefined, authHeaders, { mode, document_column: documentColumn ?? undefined }),
     onMutate: () => {
       startOperation('createNode');
     },
@@ -378,7 +345,7 @@ export const useWorkspace = () => {
   how: joinType as 'inner' | 'left' | 'right' | 'full' | 'semi' | 'anti' | 'cross',
         new_node_name: newNodeName,
       };
-      return apiJoinNodes(workspaceId, request, authHeaders);
+  return nodesApi.join(workspaceId, request as any, authHeaders);
     },
     onMutate: async () => {
       startOperation('joinNodes');
@@ -432,7 +399,7 @@ export const useWorkspace = () => {
       nodeId: string;
       request: FilterRequest;
     }) => {
-      return filterNode(workspaceId, nodeId, request, authHeaders);
+  return nodesApi.filter(workspaceId, nodeId, request, authHeaders);
     },
     onMutate: () => {
       startOperation('filterNode');
@@ -453,7 +420,7 @@ export const useWorkspace = () => {
       nodeId: string;
       request: ConcordanceRequest;
     }) => {
-      return concordanceSearch(workspaceId, nodeId, request, authHeaders);
+  return textApi.concordance(workspaceId, nodeId, request as any, authHeaders);
     },
     onMutate: () => {
       startOperation('concordance');
@@ -473,7 +440,7 @@ export const useWorkspace = () => {
       nodeId: string;
       request: ConcordanceDetachRequest;
     }) => {
-      return detachConcordance(workspaceId, nodeId, request, authHeaders);
+  return textApi.concordanceDetach(workspaceId, nodeId, request as any, authHeaders);
     },
     onMutate: () => {
       startOperation('detachConcordance');
@@ -496,7 +463,7 @@ export const useWorkspace = () => {
       nodeId: string;
       request: QuotationRequest;
     }) => {
-      return apiQuotationSearch(workspaceId, nodeId, request, authHeaders);
+  return textApi.quotation(workspaceId, nodeId, request as any, authHeaders);
     },
     onMutate: () => {
       startOperation('quotation');
@@ -516,7 +483,7 @@ export const useWorkspace = () => {
       nodeId: string;
       request: QuotationDetachRequest;
     }) => {
-      return apiDetachQuotation(workspaceId, nodeId, request, authHeaders);
+  return textApi.quotationDetach(workspaceId, nodeId, request as any, authHeaders);
     },
     onMutate: () => {
       startOperation('detachQuotation');
@@ -544,7 +511,7 @@ export const useWorkspace = () => {
         target_type: targetType,
         format,
       };
-      return apiCastNode(currentWorkspaceId!, nodeId, request, authHeaders);
+  return nodesApi.cast(currentWorkspaceId!, nodeId, request as any, authHeaders);
     },
     onMutate: () => {
       startOperation('castNode');
@@ -563,7 +530,7 @@ export const useWorkspace = () => {
   // Conversions
   const convertToDocDataFrameMutation = useMutation({
     mutationFn: ({ nodeId, documentColumn }: { nodeId: string; documentColumn: string; }) => {
-      return apiConvertToDocDataFrame(currentWorkspaceId!, nodeId, documentColumn, authHeaders);
+  return nodesApi.convert(currentWorkspaceId!, nodeId, 'docdataframe', documentColumn, authHeaders);
     },
     onMutate: () => startOperation('convertToDocDataFrame'),
     onSuccess: (_data, variables) => {
@@ -582,7 +549,7 @@ export const useWorkspace = () => {
 
   const convertToDataFrameMutation = useMutation({
     mutationFn: ({ nodeId }: { nodeId: string; }) => {
-      return apiConvertToDataFrame(currentWorkspaceId!, nodeId, authHeaders);
+  return nodesApi.convert(currentWorkspaceId!, nodeId, 'dataframe', undefined, authHeaders);
     },
     onMutate: () => startOperation('convertToDataFrame'),
     onSuccess: (_data, variables) => {
@@ -601,7 +568,7 @@ export const useWorkspace = () => {
 
   const convertToDocLazyFrameMutation = useMutation({
     mutationFn: ({ nodeId, documentColumn }: { nodeId: string; documentColumn: string; }) => {
-      return apiConvertToDocLazyFrame(currentWorkspaceId!, nodeId, documentColumn, authHeaders);
+  return nodesApi.convert(currentWorkspaceId!, nodeId, 'doclazyframe', documentColumn, authHeaders);
     },
     onMutate: () => startOperation('convertToDocLazyFrame'),
     onSuccess: (_data, variables) => {
@@ -620,7 +587,7 @@ export const useWorkspace = () => {
 
   const convertToLazyFrameMutation = useMutation({
     mutationFn: ({ nodeId }: { nodeId: string; }) => {
-      return apiConvertToLazyFrame(currentWorkspaceId!, nodeId, authHeaders);
+  return nodesApi.convert(currentWorkspaceId!, nodeId, 'lazyframe', undefined, authHeaders);
     },
     onMutate: () => startOperation('convertToLazyFrame'),
     onSuccess: (_data, variables) => {
@@ -639,7 +606,7 @@ export const useWorkspace = () => {
 
   const resetDocumentColumnMutation = useMutation({
     mutationFn: ({ nodeId, documentColumn }: { nodeId: string; documentColumn?: string; }) => {
-      return apiResetDocumentColumn(currentWorkspaceId!, nodeId, documentColumn, authHeaders);
+  return nodesApi.resetDocument(currentWorkspaceId!, nodeId, documentColumn, authHeaders);
     },
     onMutate: async ({ nodeId, documentColumn }) => {
       startOperation('resetDocumentColumn');
@@ -814,7 +781,7 @@ export const useWorkspace = () => {
       }
       
       try {
-        const schema = await getNodeSchema(currentWorkspaceId, nodeId, authHeaders);
+  const schema = await nodesApi.info(currentWorkspaceId, nodeId, authHeaders).then((d:any)=> d.schema || {});
         // Return in the format expected by DataTable component
         return {
           node_id: nodeId,

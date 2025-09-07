@@ -15,6 +15,14 @@ interface SelectionState {
   // Graph element selection (for React Flow)
   selectedGraphElements: string[];
   
+  // Node data pagination (keyed by nodeId)
+  nodePagination: Record<string, {
+    currentPage: number;
+    totalPages: number;
+    pageSize: number;
+    totalItems: number;
+  }>;
+  
   // Context for operations (remembers what was selected for modal operations)
   operationContext: {
     joinContext: {
@@ -58,6 +66,24 @@ interface SelectionActions {
   // Clear all selections
   clearAllSelections: () => void;
   
+  // Node pagination management
+  setNodePagination: (nodeId: string, pagination: {
+    currentPage: number;
+    totalPages: number;
+    pageSize: number;
+    totalItems: number;
+  }) => void;
+  updateNodePage: (nodeId: string, page: number) => void;
+  updateNodePageSize: (nodeId: string, pageSize: number) => void;
+  resetNodePagination: (nodeId: string) => void;
+  clearAllPagination: () => void;
+  getNodePagination: (nodeId: string) => {
+    currentPage: number;
+    totalPages: number;
+    pageSize: number;
+    totalItems: number;
+  };
+  
   // Operation context management
   setJoinContext: (leftNodeId: string | null, rightNodeId: string | null) => void;
   setFilterContext: (nodeId: string | null) => void;
@@ -81,6 +107,7 @@ export const useSelectionStore = create<SelectionStore>()(
       selectedNodeId: null,
       selectedNodeIds: [],
       selectedGraphElements: [],
+      nodePagination: {},
       operationContext: {
         joinContext: {
           leftNodeId: null,
@@ -205,6 +232,39 @@ export const useSelectionStore = create<SelectionStore>()(
           deleteContext: { nodeId: null, nodeName: null },
           documentColumnContext: { nodeId: null, availableColumns: [] },
         };
+      }),
+
+      // Node pagination management
+      setNodePagination: (nodeId, pagination) => set((state) => {
+        state.nodePagination[nodeId] = pagination;
+      }),
+      
+      updateNodePage: (nodeId, page) => set((state) => {
+        if (!state.nodePagination[nodeId]) {
+          state.nodePagination[nodeId] = { currentPage: 1, totalPages: 1, pageSize: 10, totalItems: 0 };
+        }
+        state.nodePagination[nodeId].currentPage = page;
+      }),
+      
+      updateNodePageSize: (nodeId, pageSize) => set((state) => {
+        if (!state.nodePagination[nodeId]) {
+          state.nodePagination[nodeId] = { currentPage: 1, totalPages: 1, pageSize: 10, totalItems: 0 };
+        }
+        state.nodePagination[nodeId].pageSize = pageSize;
+        state.nodePagination[nodeId].currentPage = 1; // Reset to first page when changing page size
+      }),
+      
+      resetNodePagination: (nodeId) => set((state) => {
+        delete state.nodePagination[nodeId];
+      }),
+      
+      getNodePagination: (nodeId) => {
+        const pagination = get().nodePagination[nodeId];
+        return pagination || { currentPage: 1, totalPages: 1, pageSize: 10, totalItems: 0 };
+      },
+      
+      clearAllPagination: () => set((state) => {
+        state.nodePagination = {};
       }),
 
       // Computed getters

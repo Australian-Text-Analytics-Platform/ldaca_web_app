@@ -1,7 +1,7 @@
 import React, { memo, useState, useEffect, useRef, useCallback } from 'react';
 import { NodeProps, Handle, Position } from '@xyflow/react';
 import { WorkspaceNode } from '../types';
-import DocumentColumnModal from './DocumentColumnModal';
+import DocumentColumnModal from './modals/DocumentColumnModal';
 import { formatDataType, getTypeStyleClass } from '../utils/typeFormatting';
 import { useWorkspace } from '../hooks/useWorkspace';
 

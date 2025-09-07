@@ -20,6 +20,14 @@ export const queryKeys = {
   // Graph
   workspaceGraph: (workspaceId: string) => ['workspaces', workspaceId, 'graph'] as const,
   
+  // Text Analysis
+  concordance: (workspaceId: string, nodeIds: string[], searchWord: string, leftTokens?: number, rightTokens?: number, regex?: boolean, caseSensitive?: boolean, combined?: boolean) =>
+    ['workspaces', workspaceId, 'concordance', nodeIds, searchWord, leftTokens, rightTokens, regex, caseSensitive, combined] as const,
+  tokenFrequencies: (workspaceId: string, nodeIds: string[], stopWords?: string[]) =>
+    ['workspaces', workspaceId, 'token-frequencies', nodeIds, stopWords] as const,
+  topicModeling: (workspaceId: string, nodeIds: string[]) =>
+    ['workspaces', workspaceId, 'topic-modeling', nodeIds] as const,
+  
   // Files
   files: ['files'] as const,
   file: (filename: string) => ['files', filename] as const,

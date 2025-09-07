@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getApiBase } from '../api';
+import { getApiBase } from '../api/env';
 
 /**
  * Polls the backend /health endpoint until it responds successfully.

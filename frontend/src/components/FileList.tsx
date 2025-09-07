@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useFilePreview } from '../hooks/useFilePreview';
-import FilePreviewTooltip from './FilePreviewTooltip';
+import FilePreviewTooltip from './ui/FilePreviewTooltip';
 import { FileInfo } from '../types';
 
 interface FileListProps {

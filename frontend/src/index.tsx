@@ -4,10 +4,9 @@ import './index.css';
 import App from './App';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 
-// Support both legacy REACT_APP_ and new VITE_ prefixes during transition
+// Get Google Client ID from environment
 const GOOGLE_CLIENT_ID =
   import.meta.env.VITE_GOOGLE_CLIENT_ID ||
-  (import.meta.env.REACT_APP_GOOGLE_CLIENT_ID as string | undefined) ||
   '460163662698-lof601jcnsk9ugjjr3dpjqn31bv6krem.apps.googleusercontent.com';
 
 if (localStorage.getItem('debugApp') === '1') {

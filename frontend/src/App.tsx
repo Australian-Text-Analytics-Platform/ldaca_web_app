@@ -1,23 +1,24 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, Suspense, lazy } from 'react';
 import './App.css';
-import TutorialView from './components/TutorialView';
 import { useAuth } from './hooks/useAuth';
 import { useBackendHealth } from './hooks/useBackendHealth';
 import { QueryProvider } from './providers/QueryProvider';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import GoogleLogin from './components/GoogleLogin';
-import DataLoaderTab from './components/DataLoaderTab';
-import FilterTab from './components/FilterTab';
-import ConcordanceTab from './components/ConcordanceTab';
-import QuotationTab from './components/QuotationTab';
-import TopicModelingTab from './components/TopicModelingTab';
-import TimelineTab from './components/TimelineTab';
-import ExportTab from './components/ExportTab';
-import TokenFrequencyTab from './components/TokenFrequencyTab';
-import WorkspaceView from './components/WorkspaceView';
-import Sidebar from './components/Sidebar';
+import { WorkspaceView, Sidebar } from './components/layout';
 import logo from './logo.png';
-import FeedbackModal from './components/FeedbackModal';
+import { FeedbackModal } from './components/modals';
+
+// Lazy load components for code splitting
+const TutorialView = lazy(() => import('./components/TutorialView'));
+const DataLoaderTab = lazy(() => import('./components/tabs/DataLoaderTab'));
+const FilterTab = lazy(() => import('./components/tabs/FilterTab'));
+const ConcordanceTab = lazy(() => import('./components/tabs/ConcordanceTab'));
+const QuotationTab = lazy(() => import('./components/tabs/QuotationTab'));
+const TopicModelingTab = lazy(() => import('./components/tabs/TopicModelingTab'));
+const TimelineTab = lazy(() => import('./components/tabs/TimelineTab'));
+const ExportTab = lazy(() => import('./components/tabs/ExportTab'));
+const TokenFrequencyTab = lazy(() => import('./components/tabs/TokenFrequencyTab'));
 
 /**
  * Improved App component with proper error boundaries and loading states
@@ -126,7 +127,18 @@ const App: React.FC = () => {
   }, []);
 
   if (isTutorial) {
-    return <TutorialView />;
+    return (
+      <Suspense fallback={
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading Tutorial...</p>
+          </div>
+        </div>
+      }>
+        <TutorialView />
+      </Suspense>
+    );
   }
 
   // Show loading state while checking auth
@@ -220,14 +232,23 @@ const App: React.FC = () => {
             >
               <div className={`${isRightCollapsed ? 'w-full max-w-none mx-0' : 'w-full max-w-4xl mx-auto'}`}>
                 <ErrorBoundary>
-                  {activeTab === 'data-loader' && <DataLoaderTab />}
-                  {activeTab === 'filter' && <FilterTab />}
-                  {activeTab === 'token-frequency' && <TokenFrequencyTab />}
-                  {activeTab === 'concordance' && <ConcordanceTab />}
-                  {activeTab === 'analysis' && <TimelineTab />}
-                  {activeTab === 'topic-modeling' && <TopicModelingTab />}
-                  {activeTab === 'quotation' && <QuotationTab />}
-                  {activeTab === 'export' && <ExportTab />}
+                  <Suspense fallback={
+                    <div className="flex items-center justify-center py-12">
+                      <div className="text-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-3"></div>
+                        <p className="text-gray-600 text-sm">Loading...</p>
+                      </div>
+                    </div>
+                  }>
+                    {activeTab === 'data-loader' && <DataLoaderTab />}
+                    {activeTab === 'filter' && <FilterTab />}
+                    {activeTab === 'token-frequency' && <TokenFrequencyTab />}
+                    {activeTab === 'concordance' && <ConcordanceTab />}
+                    {activeTab === 'analysis' && <TimelineTab />}
+                    {activeTab === 'topic-modeling' && <TopicModelingTab />}
+                    {activeTab === 'quotation' && <QuotationTab />}
+                    {activeTab === 'export' && <ExportTab />}
+                  </Suspense>
                 </ErrorBoundary>
               </div>
             </main>

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import ColorSwatchPicker from './ColorSwatchPicker';
+import ColorSwatchPicker from './ui/ColorSwatchPicker';
 
 export interface NodeColumnSelection {
   nodeId: string;

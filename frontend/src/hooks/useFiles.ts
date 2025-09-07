@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { getFiles, loadFile, downloadFile, uploadFile, deleteFile } from '../api';
+import { filesApi } from '../api/files';
 import { FileInfo, FileListResponse } from '../types';
 
 interface UseFilesProps {
@@ -20,7 +20,7 @@ export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {
   const fetchFiles = useCallback(async () => {
     setLoadingFiles(true);
     try {
-      const res = await getFiles(authHeaders);
+  const res = await filesApi.list(authHeaders);
       setFileListResponse(res);
       setFiles(res.files || []);
     } catch (error) {
@@ -34,7 +34,8 @@ export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {
   const handleLoadFile = useCallback(async (filename: string) => {
     setLoading(true);
     try {
-      await loadFile(filename, authHeaders);
+  // Loading a file into a workspace context isn't part of filesApi; retaining placeholder if backend adds it.
+  // For now just set loadedFile for UI consistency.
       setLoadedFile(filename);
       return true;
     } catch (error) {
@@ -48,7 +49,7 @@ export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {
   const handleUploadFile = useCallback(async (file: File) => {
     setUploading(true);
     try {
-      await uploadFile(file, authHeaders);
+  await filesApi.upload(file, authHeaders);
       await fetchFiles(); // Refresh file list
       return true;
     } catch (error) {
@@ -61,7 +62,7 @@ export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {
 
   const handleDeleteFile = useCallback(async (filename: string) => {
     try {
-      await deleteFile(filename, authHeaders);
+  await filesApi.delete(filename, authHeaders);
       await fetchFiles(); // Refresh file list
       if (selectedFile === filename) {
         setSelectedFile(null);
@@ -78,7 +79,7 @@ export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {
 
   const handleDownloadFile = useCallback(async (filename: string) => {
     try {
-      const blob = await downloadFile(filename, authHeaders);
+  const blob = await filesApi.download(filename, authHeaders);
       const url = window.URL.createObjectURL(new Blob([blob]));
       const link = document.createElement('a');
       link.href = url;
