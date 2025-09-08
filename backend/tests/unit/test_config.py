@@ -59,21 +59,6 @@ class TestSettings:
         assert isinstance(test_settings.get_sample_data_folder(), Path)
         assert isinstance(test_settings.get_database_backup_folder(), Path)
 
-    def test_backward_compatibility(self):
-        """Test backward compatibility properties"""
-        test_settings = Settings()
-
-        # Test data_folder property (Path object should normalize properly)
-        assert isinstance(test_settings.data_folder, Path)
-        # data_folder now returns absolute path DATA_ROOT/users
-        assert (
-            test_settings.data_folder
-            == Path(test_settings.data_root) / test_settings.user_data_folder
-        )
-
-        # Test allowed_origins property
-        assert test_settings.allowed_origins == test_settings.cors_allowed_origins
-
     def test_boolean_field_validation(self):
         """Test boolean field validation from strings"""
         with patch.dict(
@@ -106,9 +91,3 @@ class TestGlobalSettings:
         """Test that global settings instance is accessible"""
         assert settings is not None
         assert isinstance(settings, Settings)
-
-    def test_config_backward_compatibility(self):
-        """Test that config alias works"""
-        from ldaca_web_app_backend.config import config
-
-        assert config is settings

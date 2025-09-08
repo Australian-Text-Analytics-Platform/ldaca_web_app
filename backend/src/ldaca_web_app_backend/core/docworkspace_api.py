@@ -494,6 +494,7 @@ def extend_workspace_with_api_methods():
     Workspace.safe_operation = safe_operation  # type: ignore[attr-defined]
 
 
-# Auto-extend classes when module is imported
-extend_node_with_api_methods()
-extend_workspace_with_api_methods()
+# Note: We intentionally do NOT auto-extend core classes at import time.
+# This preserves the separation between the core docworkspace library and the backend API.
+# If extension methods are desired for an interactive session, call the functions
+# explicitly: extend_node_with_api_methods(); extend_workspace_with_api_methods().

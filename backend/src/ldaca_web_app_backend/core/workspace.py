@@ -17,6 +17,7 @@ import polars as pl
 from docworkspace import Node, Workspace  # type: ignore
 
 from .utils import generate_workspace_id, get_user_workspace_folder
+from .docworkspace_api import DocWorkspaceAPIUtils, handle_api_error, create_operation_result
 
 
 class WorkspaceManager:
@@ -235,12 +236,8 @@ class WorkspaceManager:
         ws = self.get_workspace(user_id, workspace_id)
         if ws is None:
             return None
-        if hasattr(ws, "to_api_graph"):
-            graph = ws.to_api_graph()
-        elif hasattr(ws, "to_react_flow_json"):
-            graph = ws.to_react_flow_json()
-        else:
-            graph = ws.graph()  # type: ignore[attr-defined]
+        # Always use backend utility to produce API graph (no core monkey patching)
+        graph = DocWorkspaceAPIUtils.workspace_to_react_flow(ws)
         if hasattr(graph, "model_dump"):
             return graph.model_dump()
         if hasattr(graph, "dict"):
@@ -251,7 +248,7 @@ class WorkspaceManager:
         ws = self.get_workspace(user_id, workspace_id)
         if ws is None:
             return []
-        return ws.get_node_summaries()
+        return [DocWorkspaceAPIUtils.node_to_summary(node) for node in ws.nodes.values()]
 
     def get_workspace_info(
         self, user_id: str, workspace_id: str
@@ -279,9 +276,34 @@ class WorkspaceManager:
         ws = self.get_workspace(user_id, workspace_id)
         if ws is None:
             return {"success": False, "message": "Workspace not found"}
-        result = ws.safe_operation(operation_func, *args, **kwargs)
+        try:
+            result = operation_func(*args, **kwargs)
+            # If operation produced a Node, include metadata; else, include stringified result
+            if Node is not None and isinstance(result, Node):  # type: ignore[arg-type]
+                op_result = create_operation_result(
+                    success=True,
+                    message="Operation completed successfully",
+                    node_id=result.id,
+                    data={
+                        "node_name": result.name,
+                        "data_type": type(result.data).__name__,
+                    },
+                )
+            else:
+                op_result = create_operation_result(
+                    success=True,
+                    message="Operation completed successfully",
+                    data={"result": str(result)},
+                )
+        except Exception as e:
+            error_response = handle_api_error(e)
+            op_result = create_operation_result(
+                success=False,
+                message=f"Operation failed: {error_response.message}",
+                errors=[error_response.error],
+            )
         self._save(user_id, workspace_id, ws)
-        return result
+        return op_result
 
     def persist(self, user_id: str, workspace_id: str) -> None:
         ws = self.get_workspace(user_id, workspace_id)

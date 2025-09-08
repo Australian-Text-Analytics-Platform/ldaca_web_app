@@ -12,23 +12,18 @@ import pytest
 class TestWorkspaceAPI:
     """Test cases for workspace management endpoints"""
 
-    @pytest.fixture(autouse=True)
-    def setup_client(self, authenticated_client):
-        """Set up test client with authentication"""
-        self.client = authenticated_client
-
-    def test_list_workspaces_empty(self):
+    async def test_list_workspaces_empty(self, authenticated_client):
         """Test listing workspaces when user has none"""
         with patch(
             "ldaca_web_app_backend.api.workspaces.workspace_manager.list_user_workspaces_summaries"
         ) as mock_get:
             mock_get.return_value = {}
-            response = self.client.get("/api/workspaces/")
+            response = await authenticated_client.get("/api/workspaces/")
             assert response.status_code == 200
             data = response.json()
             assert data["workspaces"] == []
 
-    def test_list_workspaces_with_data(self):
+    async def test_list_workspaces_with_data(self, authenticated_client):
         """Test listing workspaces when user has workspaces"""
         mock_summaries = {
             "abc123": {
@@ -47,7 +42,7 @@ class TestWorkspaceAPI:
             "ldaca_web_app_backend.api.workspaces.workspace_manager.list_user_workspaces_summaries"
         ) as mock_get:
             mock_get.return_value = mock_summaries
-            response = self.client.get("/api/workspaces/")
+            response = await authenticated_client.get("/api/workspaces/")
             assert response.status_code == 200
             data = response.json()
             assert len(data["workspaces"]) == 1
@@ -55,7 +50,7 @@ class TestWorkspaceAPI:
             assert workspace["workspace_id"] == "abc123"
             assert workspace["node_count"] == 1
 
-    def test_create_workspace(self):
+    async def test_create_workspace(self, authenticated_client):
         """Test creating a new workspace"""
         # Create mock workspace object that behaves like docworkspace
         mock_workspace = Mock()
@@ -87,7 +82,7 @@ class TestWorkspaceAPI:
 
             payload = {"name": "New Workspace", "description": "New test workspace"}
 
-            response = self.client.post("/api/workspaces/", json=payload)
+            response = await authenticated_client.post("/api/workspaces/", json=payload)
 
             assert response.status_code == 200
             data = response.json()
@@ -96,7 +91,7 @@ class TestWorkspaceAPI:
             assert data["description"] == "New test workspace"
             assert data["total_nodes"] == 0  # Use latest docworkspace terminology
 
-    def test_get_workspace_info(self):
+    async def test_get_workspace_info(self, authenticated_client):
         """Test getting specific workspace information"""
         # Mock workspace_manager.get_workspace_info to return proper data
         mock_workspace_info = {
@@ -118,7 +113,7 @@ class TestWorkspaceAPI:
             mock_get.return_value = mock_workspace_info
 
             # Use the cleaner endpoint: GET /api/workspaces/{workspace_id}
-            response = self.client.get("/api/workspaces/workspace-123")
+            response = await authenticated_client.get("/api/workspaces/workspace-123")
 
             assert response.status_code == 200
             data = response.json()
@@ -126,7 +121,7 @@ class TestWorkspaceAPI:
             assert data["name"] == "Test Workspace"
             assert data["total_nodes"] == 5  # Latest docworkspace terminology
 
-    def test_get_workspace_not_found(self):
+    async def test_get_workspace_not_found(self, authenticated_client):
         """Test getting non-existent workspace"""
         with patch(
             "ldaca_web_app_backend.api.workspaces.workspace_manager.get_workspace_info"
@@ -134,58 +129,66 @@ class TestWorkspaceAPI:
             mock_get.return_value = None
 
             # Use the cleaner endpoint: GET /api/workspaces/{workspace_id}
-            response = self.client.get("/api/workspaces/nonexistent-123")
+            response = await authenticated_client.get("/api/workspaces/nonexistent-123")
 
             assert response.status_code == 404
 
-    def test_delete_workspace(self):
+    async def test_delete_workspace(self, authenticated_client):
         """Test deleting a workspace"""
         with patch(
             "ldaca_web_app_backend.api.workspaces.workspace_manager.delete_workspace"
         ) as mock_delete:
             mock_delete.return_value = True
 
-            response = self.client.delete("/api/workspaces/workspace-123")
+            response = await authenticated_client.delete(
+                "/api/workspaces/workspace-123"
+            )
 
             assert response.status_code == 200
             data = response.json()
             assert data["message"] == "Workspace workspace-123 deleted successfully"
             assert data["success"] is True
 
-    def test_delete_workspace_not_found(self):
+    async def test_delete_workspace_not_found(self, authenticated_client):
         """Test deleting non-existent workspace"""
         with patch(
             "ldaca_web_app_backend.api.workspaces.workspace_manager.delete_workspace"
         ) as mock_delete:
             mock_delete.return_value = False
 
-            response = self.client.delete("/api/workspaces/nonexistent-123")
+            response = await authenticated_client.delete(
+                "/api/workspaces/nonexistent-123"
+            )
 
             assert response.status_code == 404
 
-    def test_unload_workspace(self):
+    async def test_unload_workspace(self, authenticated_client):
         """Test unloading an existing workspace"""
         with patch(
             "ldaca_web_app_backend.api.workspaces.workspace_manager.unload_workspace"
         ) as mock_unload:
             mock_unload.return_value = True
-            response = self.client.post("/api/workspaces/workspace-123/unload")
+            response = await authenticated_client.post(
+                "/api/workspaces/workspace-123/unload"
+            )
             assert response.status_code == 200
             data = response.json()
             assert data["success"] is True
             assert data["workspace_id"] == "workspace-123"
             mock_unload.assert_called_once_with("test", "workspace-123", save=True)
 
-    def test_unload_workspace_not_found(self):
+    async def test_unload_workspace_not_found(self, authenticated_client):
         """Test unloading non-existent workspace returns 404"""
         with patch(
             "ldaca_web_app_backend.api.workspaces.workspace_manager.unload_workspace"
         ) as mock_unload:
             mock_unload.return_value = False
-            response = self.client.post("/api/workspaces/missing-999/unload")
+            response = await authenticated_client.post(
+                "/api/workspaces/missing-999/unload"
+            )
             assert response.status_code == 404
 
-    def test_upload_data_file(self):
+    async def test_upload_data_file(self, authenticated_client):
         """Test uploading and creating a node from a data file"""
         import os
         import tempfile
@@ -234,7 +237,7 @@ class TestWorkspaceAPI:
                     files = {"file": ("test_data.csv", test_file, "text/csv")}
 
                     # Use the correct upload endpoint with node_name as a query param
-                    response = self.client.post(
+                    response = await authenticated_client.post(
                         "/api/workspaces/test-workspace-123/upload?node_name=test_data",
                         files=files,
                     )
@@ -259,7 +262,7 @@ class TestWorkspaceAPI:
             if os.path.exists(tmp_file_path):
                 os.unlink(tmp_file_path)
 
-    def test_cast_node_datetime(self):
+    async def test_cast_node_datetime(self, authenticated_client):
         """Test casting a column to datetime type"""
         import polars as pl
 
@@ -288,7 +291,7 @@ class TestWorkspaceAPI:
             # Test without format string (auto-detection)
             cast_data = {"column": "created_at", "target_type": "datetime"}
 
-            response = self.client.post(
+            response = await authenticated_client.post(
                 "/api/workspaces/test-workspace/nodes/test-node/cast", json=cast_data
             )
 
@@ -315,7 +318,7 @@ class TestWorkspaceAPI:
             assert mock_node.data is not None
             mock_save.assert_called_once()
 
-    def test_cast_node_not_found(self):
+    async def test_cast_node_not_found(self, authenticated_client):
         """Test casting when node doesn't exist"""
         with patch(
             "ldaca_web_app_backend.api.workspaces.workspace_manager.get_node_from_workspace"
@@ -324,7 +327,7 @@ class TestWorkspaceAPI:
 
             cast_data = {"column": "test_column", "target_type": "string"}
 
-            response = self.client.post(
+            response = await authenticated_client.post(
                 "/api/workspaces/test-workspace/nodes/nonexistent-node/cast",
                 json=cast_data,
             )
@@ -332,7 +335,7 @@ class TestWorkspaceAPI:
             assert response.status_code == 404
             assert "Node not found" in response.json()["detail"]
 
-    def test_cast_node_invalid_column(self):
+    async def test_cast_node_invalid_column(self, authenticated_client):
         """Test casting when column doesn't exist"""
         import polars as pl
 
@@ -346,17 +349,17 @@ class TestWorkspaceAPI:
 
             cast_data = {"column": "nonexistent_column", "target_type": "string"}
 
-            response = self.client.post(
+            response = await authenticated_client.post(
                 "/api/workspaces/test-workspace/nodes/test-node/cast", json=cast_data
             )
 
             assert response.status_code == 400
             assert "Column 'nonexistent_column' not found" in response.json()["detail"]
 
-    def test_cast_node_invalid_request_data(self):
+    async def test_cast_node_invalid_request_data(self, authenticated_client):
         """Test casting with invalid request data"""
         # Test missing required fields
-        response = self.client.post(
+        response = await authenticated_client.post(
             "/api/workspaces/test-workspace/nodes/test-node/cast",
             json={"column": "test_col"},  # Missing target_type
         )
@@ -366,7 +369,7 @@ class TestWorkspaceAPI:
             "must contain 'column' and 'target_type' keys" in response.json()["detail"]
         )
 
-    def test_cast_node_preserves_data_type(self):
+    async def test_cast_node_preserves_data_type(self, authenticated_client):
         """Test that casting preserves the original data type (DocDataFrame stays DocDataFrame, etc.)"""
         import polars as pl
 
@@ -392,7 +395,7 @@ class TestWorkspaceAPI:
 
             cast_data = {"column": "created_at", "target_type": "datetime"}
 
-            response = self.client.post(
+            response = await authenticated_client.post(
                 "/api/workspaces/test-workspace/nodes/test-node/cast", json=cast_data
             )
 
@@ -417,7 +420,7 @@ class TestWorkspaceAPI:
             assert response_data["success"] is True
             assert response_data["cast_info"]["column"] == "created_at"
 
-    def test_cast_node_datetime_to_string(self):
+    async def test_cast_node_datetime_to_string(self, authenticated_client):
         """Test casting datetime column to string"""
         from datetime import datetime
 
@@ -448,7 +451,7 @@ class TestWorkspaceAPI:
             mock_get_workspace.return_value = Mock()
 
             cast_data = {"column": "created_at", "target_type": "string"}
-            response = self.client.post(
+            response = await authenticated_client.post(
                 "/api/workspaces/test-workspace/nodes/test-node/cast", json=cast_data
             )
             assert response.status_code == 200
@@ -457,7 +460,7 @@ class TestWorkspaceAPI:
             assert data["cast_info"]["target_type"] == "string"
             mock_save.assert_called_once()
 
-    def test_cast_node_integer_type(self):
+    async def test_cast_node_integer_type(self, authenticated_client):
         """Test casting to integer type"""
         import polars as pl
 
@@ -479,7 +482,7 @@ class TestWorkspaceAPI:
             mock_get_workspace.return_value = Mock()  # Mock workspace for persist call
 
             cast_data = {"column": "test_col", "target_type": "integer"}
-            response = self.client.post(
+            response = await authenticated_client.post(
                 "/api/workspaces/test-workspace/nodes/test-node/cast", json=cast_data
             )
 
@@ -492,7 +495,7 @@ class TestWorkspaceAPI:
             assert data["cast_info"]["target_type"] == "integer"
             mock_save.assert_called_once()
 
-    def test_cast_node_float_type(self):
+    async def test_cast_node_float_type(self, authenticated_client):
         """Test casting to float type"""
         import polars as pl
 
@@ -510,7 +513,7 @@ class TestWorkspaceAPI:
             mock_get_node.return_value = mock_node
 
             cast_data = {"column": "test_col", "target_type": "float"}
-            response = self.client.post(
+            response = await authenticated_client.post(
                 "/api/workspaces/test-workspace/nodes/test-node/cast", json=cast_data
             )
             assert response.status_code == 200
@@ -518,7 +521,7 @@ class TestWorkspaceAPI:
             assert data["cast_info"]["target_type"] == "float"
             mock_save.assert_called_once()
 
-    def test_cast_node_unsupported_type(self):
+    async def test_cast_node_unsupported_type(self, authenticated_client):
         """Test that unsupported casting types raise errors"""
         import polars as pl
 
@@ -531,14 +534,14 @@ class TestWorkspaceAPI:
             mock_get_node.return_value = mock_node
 
             cast_data = {"column": "test_col", "target_type": "unsupported_type"}
-            response = self.client.post(
+            response = await authenticated_client.post(
                 "/api/workspaces/test-workspace/nodes/test-node/cast", json=cast_data
             )
             assert response.status_code == 400
             response_detail = response.json()["detail"]
             assert "not yet supported" in response_detail
 
-    def test_join_nodes_success(self):
+    async def test_join_nodes_success(self, authenticated_client):
         """Test successful node joining with the updated parameter format"""
         import polars as pl
 
@@ -585,7 +588,7 @@ class TestWorkspaceAPI:
             mock_get_node.side_effect = get_node_side_effect
 
             # Test join with the new parameter format (matching frontend)
-            response = self.client.post(
+            response = await authenticated_client.post(
                 "/api/workspaces/test-workspace/nodes/join",
                 params={
                     "left_node_id": "left-node-id",
@@ -602,10 +605,10 @@ class TestWorkspaceAPI:
             assert isinstance(result, dict)
             assert result.get("name") == "left_node_join_right_node"
 
-    def test_join_nodes_missing_parameters(self):
+    async def test_join_nodes_missing_parameters(self, authenticated_client):
         """Test join endpoint validation with missing required parameters"""
         # Missing 'right_on' parameter - should get 422 validation error
-        response = self.client.post(
+        response = await authenticated_client.post(
             "/api/workspaces/test-workspace/nodes/join",
             params={
                 "left_node_id": "left-node-id",

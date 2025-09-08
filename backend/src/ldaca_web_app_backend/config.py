@@ -161,17 +161,6 @@ class Settings(BaseSettings):
             return v.lower() in ("true", "1", "yes", "on")
         return v
 
-    # Convenience properties for backward compatibility
-    @property
-    def data_folder(self) -> Path:
-        """Backward compatibility property for user data folder absolute path."""
-        return self.get_user_data_folder()
-
-    @property
-    def allowed_origins(self) -> List[str]:
-        """Backward compatibility property."""
-        return self.cors_allowed_origins
-
     def get_data_root(self) -> Path:
         """Get DATA_ROOT as absolute Path."""
         return Path(self.data_root)
@@ -199,6 +188,3 @@ class Settings(BaseSettings):
 
 # Global settings instance
 settings = Settings()
-
-# For backward compatibility
-config = settings

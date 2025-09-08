@@ -76,7 +76,7 @@ app = FastAPI(
 # Setup CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.allowed_origins,
+    allow_origins=settings.cors_allowed_origins,
     allow_credentials=settings.cors_allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -159,7 +159,7 @@ async def health_check():
             "docworkspace": True,
         },
         "config": {
-            "data_folder": str(settings.data_folder),
+            "data_folder": str(settings.get_data_root()),
             "debug_mode": settings.debug,
         },
     }

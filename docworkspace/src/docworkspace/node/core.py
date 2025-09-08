@@ -299,7 +299,7 @@ class Node:
                 else self.data
             )
             try:
-                height = lf.select(pl.count()).collect().item()
+                height = lf.select(pl.len()).collect().item()
                 width = len(lf.collect_schema().names())
                 info_dict["shape"] = (height, width)
             except Exception:

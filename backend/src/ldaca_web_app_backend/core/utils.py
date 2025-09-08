@@ -10,7 +10,7 @@ from typing import Any, Dict, Union
 import pandas as pd
 import polars as pl
 
-from ..config import config
+from ..config import settings
 
 # Direct imports - assuming proper package installation
 # (Optional) Import heavy libs lazily where needed to reduce import cost.
@@ -19,13 +19,13 @@ from ..config import config
 def get_user_data_folder(user_id: str) -> Path:
     """Get user-specific data folder with proper structure"""
     # In single-user mode, always use 'user_root' folder
-    if not config.multi_user:
+    if not settings.multi_user:
         folder_name = "user_root"
     else:
         folder_name = f"user_{user_id}"
 
     # Base under DATA_ROOT/users/<folder_name>
-    user_folder = config.get_data_root() / config.user_data_folder / folder_name
+    user_folder = settings.get_data_root() / settings.user_data_folder / folder_name
     user_data_folder = user_folder / "user_data"
     user_data_folder.mkdir(parents=True, exist_ok=True)
     return user_data_folder
@@ -34,13 +34,13 @@ def get_user_data_folder(user_id: str) -> Path:
 def get_user_workspace_folder(user_id: str) -> Path:
     """Get user-specific workspace folder"""
     # In single-user mode, always use 'user_root' folder
-    if not config.multi_user:
+    if not settings.multi_user:
         folder_name = "user_root"
     else:
         folder_name = f"user_{user_id}"
 
     # Base under DATA_ROOT/users/<folder_name>
-    user_folder = config.get_data_root() / config.user_data_folder / folder_name
+    user_folder = settings.get_data_root() / settings.user_data_folder / folder_name
     workspace_folder = user_folder / "user_workspaces"
     workspace_folder.mkdir(parents=True, exist_ok=True)
     return workspace_folder
@@ -49,13 +49,13 @@ def get_user_workspace_folder(user_id: str) -> Path:
 def setup_user_folders(user_id: str) -> Dict[str, Path]:
     """Set up complete user folder structure and copy sample data"""
     # In single-user mode, always use 'user_root' folder
-    if not config.multi_user:
+    if not settings.multi_user:
         folder_name = "user_root"
     else:
         folder_name = f"user_{user_id}"
 
     # Base under DATA_ROOT/users/<folder_name>
-    user_folder = config.get_data_root() / config.user_data_folder / folder_name
+    user_folder = settings.get_data_root() / settings.user_data_folder / folder_name
     user_data_folder = user_folder / "user_data"
     user_workspaces_folder = user_folder / "user_workspaces"
 
@@ -76,7 +76,7 @@ def setup_user_folders(user_id: str) -> Dict[str, Path]:
 def copy_sample_data_to_user(user_id: str) -> None:
     """Copy sample_data folder into user's data folder, resetting if it exists"""
     # Source sample data under DATA_ROOT/sample_data
-    source_sample_data = config.get_sample_data_folder()
+    source_sample_data = settings.get_sample_data_folder()
     user_data_folder = get_user_data_folder(user_id)
     target_sample_data = user_data_folder / "sample_data"
 

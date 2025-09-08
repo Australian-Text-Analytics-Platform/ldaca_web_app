@@ -240,11 +240,24 @@ async def run_topic_modeling(
             "per_corpus_topic_counts": tv.get("per_corpus_topic_counts"),
             "meta": {**tv.get("meta", {}), "node_names": node_names},
         }
-        return TopicModelingResponse(
+        result = TopicModelingResponse(
             success=True,
             message=f"Successfully modeled topics for {len(corpora)} corpus/corpora",
             data=response_data,  # type: ignore[arg-type]
         )
+        try:  # pragma: no cover
+            from ldaca_web_app_backend.core.analysis_store import save_analysis
+
+            save_analysis(
+                user_id=user_id,
+                workspace_id=workspace_id,
+                task="topic_modeling",
+                request_dict=request.model_dump() if hasattr(request, "model_dump") else request.dict(),
+                result_dict=result.model_dump() if hasattr(result, "model_dump") else result.dict(),
+            )
+        except Exception as _e:  # pragma: no cover
+            print(f"[analysis_persist] topic_modeling save failed: {_e}")
+        return result
     except HTTPException:
         raise
     except Exception as e:  # pragma: no cover
@@ -345,6 +358,8 @@ async def create_workspace(
             ),  # Updated to use latest terminology
         )
 
+
+
     except HTTPException:
         # Re-raise HTTPExceptions as-is
         raise
@@ -358,6 +373,17 @@ async def create_workspace(
             status_code=500,
             detail=f"Internal server error during workspace creation: {str(e)}",
         )
+
+
+@router.post("", response_model=WorkspaceInfo)
+async def create_workspace_no_trailing_slash(
+    request: WorkspaceCreateRequest, current_user: dict = Depends(get_current_user)
+):
+    """Create workspace (alias without trailing slash).
+
+    Accepts the same payload as the canonical "/" route and delegates to it.
+    """
+    return await create_workspace(request, current_user)
 
 
 @router.delete("/{workspace_id}")
@@ -658,7 +684,22 @@ async def get_workspace_graph(
     graph_data = workspace_manager.get_workspace_graph(user_id, workspace_id)
     if not graph_data:
         raise HTTPException(status_code=404, detail="Workspace not found")
+    # Attach latest analyses (best-effort)
+    try:  # pragma: no cover - enrichment non-critical
+        from ldaca_web_app_backend.core.analysis_store import list_analyses
 
+        records = list_analyses(user_id, workspace_id)
+        graph_data["latest_analysis"] = {
+            r.task: {
+                "task": r.task,
+                "saved_at": r.saved_at,
+                "request": r.request,
+                "result": r.result,
+            }
+            for r in records
+        }
+    except Exception as _e:  # pragma: no cover
+        print(f"[analysis_persist] failed to enrich graph with analyses: {_e}")
     return graph_data
 
 
@@ -714,8 +755,8 @@ async def add_node_to_workspace(
         # Load the data
         data = load_data_file(file_path)
 
-        # Normalize: convert pandas -> polars
-        if hasattr(data, "columns") and hasattr(data, "iloc"):
+        # Normalize: convert pandas -> polars without triggering LazyFrame schema resolution
+        if hasattr(data, "iloc"):
             # pandas DataFrame
             data = pl.DataFrame(data)
 
@@ -1362,53 +1403,6 @@ async def convert_node(
             target,
         )
         raise HTTPException(status_code=500, detail=f"Conversion failed: {str(e)}")
-
-
-# Legacy endpoints for backward compatibility
-@router.post("/{workspace_id}/nodes/{node_id}/convert/to-docdataframe")
-async def convert_node_to_docdataframe(
-    workspace_id: str,
-    node_id: str,
-    document_column: Optional[str] = None,
-    current_user: dict = Depends(get_current_user),
-):
-    """Convert a node's data to a DocDataFrame in place. (Legacy endpoint - use /convert with target=docdataframe)"""
-    return await convert_node(
-        workspace_id, node_id, "docdataframe", document_column, current_user
-    )
-
-
-@router.post("/{workspace_id}/nodes/{node_id}/convert/to-dataframe")
-async def convert_node_to_dataframe(
-    workspace_id: str,
-    node_id: str,
-    current_user: dict = Depends(get_current_user),
-):
-    """Convert a node's data to a Polars DataFrame in place. (Legacy endpoint - use /convert with target=dataframe)"""
-    return await convert_node(workspace_id, node_id, "dataframe", None, current_user)
-
-
-@router.post("/{workspace_id}/nodes/{node_id}/convert/to-doclazyframe")
-async def convert_node_to_doclazyframe(
-    workspace_id: str,
-    node_id: str,
-    document_column: Optional[str] = None,
-    current_user: dict = Depends(get_current_user),
-):
-    """Convert a node's data to a DocLazyFrame in place. (Legacy endpoint - use /convert with target=doclazyframe)"""
-    return await convert_node(
-        workspace_id, node_id, "doclazyframe", document_column, current_user
-    )
-
-
-@router.post("/{workspace_id}/nodes/{node_id}/convert/to-lazyframe")
-async def convert_node_to_lazyframe(
-    workspace_id: str,
-    node_id: str,
-    current_user: dict = Depends(get_current_user),
-):
-    """Convert a node's data to a Polars LazyFrame in place. (Legacy endpoint - use /convert with target=lazyframe)"""
-    return await convert_node(workspace_id, node_id, "lazyframe", None, current_user)
 
 
 @router.post("/{workspace_id}/nodes/{node_id}/reset-document")
@@ -2085,7 +2079,7 @@ async def get_concordance(
 
             # Convert concordance DataFrame to format expected by frontend
             if hasattr(paginated_result, "to_dicts"):
-                return {
+                result_payload = {
                     "data": paginated_result.to_dicts(),
                     "columns": all_columns,
                     "metadata": metadata.model_dump(),
@@ -2103,6 +2097,20 @@ async def get_concordance(
                         "sort_order": request.sort_order,
                     },
                 }
+                # Persist
+                try:  # pragma: no cover
+                    from ldaca_web_app_backend.core.analysis_store import save_analysis
+
+                    save_analysis(
+                        user_id=user_id,
+                        workspace_id=workspace_id,
+                        task="concordance",
+                        request_dict=request.model_dump() if hasattr(request, "model_dump") else request.dict(),
+                        result_dict=result_payload,
+                    )
+                except Exception as _e:  # pragma: no cover
+                    print(f"[analysis_persist] concordance save failed: {_e}")
+                return result_payload
             else:
                 # Empty metadata for no results
                 empty_metadata = ConcordanceMetadata(
@@ -2110,7 +2118,7 @@ async def get_concordance(
                     metadata_columns=[],
                     all_columns=[],
                 )
-                return {
+                result_payload = {
                     "data": [],
                     "columns": [],
                     "metadata": empty_metadata.model_dump(),
@@ -2127,6 +2135,19 @@ async def get_concordance(
                         "sort_order": request.sort_order,
                     },
                 }
+                try:  # pragma: no cover
+                    from ldaca_web_app_backend.core.analysis_store import save_analysis
+
+                    save_analysis(
+                        user_id=user_id,
+                        workspace_id=workspace_id,
+                        task="concordance",
+                        request_dict=request.model_dump() if hasattr(request, "model_dump") else request.dict(),
+                        result_dict=result_payload,
+                    )
+                except Exception as _e:  # pragma: no cover
+                    print(f"[analysis_persist] concordance save failed: {_e}")
+                return result_payload
 
         else:
             # Fallback to basic string search
@@ -2157,7 +2178,7 @@ async def get_concordance(
                     metadata_columns=all_columns,  # All columns are metadata
                     all_columns=all_columns,
                 )
-                return {
+                result_payload = {
                     "data": paginated_filtered.to_dicts(),
                     "columns": all_columns,
                     "metadata": fallback_metadata.model_dump(),
@@ -2175,6 +2196,19 @@ async def get_concordance(
                         "sort_order": request.sort_order,
                     },
                 }
+                try:  # pragma: no cover
+                    from ldaca_web_app_backend.core.analysis_store import save_analysis
+
+                    save_analysis(
+                        user_id=user_id,
+                        workspace_id=workspace_id,
+                        task="concordance",
+                        request_dict=request.model_dump() if hasattr(request, "model_dump") else request.dict(),
+                        result_dict=result_payload,
+                    )
+                except Exception as _e:  # pragma: no cover
+                    print(f"[analysis_persist] concordance save failed: {_e}")
+                return result_payload
             else:
                 # Empty metadata for fallback with no results
                 empty_metadata = ConcordanceMetadata(
@@ -2182,7 +2216,7 @@ async def get_concordance(
                     metadata_columns=[],
                     all_columns=[],
                 )
-                return {
+                result_payload = {
                     "data": [],
                     "columns": [],
                     "metadata": empty_metadata.model_dump(),
@@ -2199,6 +2233,21 @@ async def get_concordance(
                         "sort_order": request.sort_order,
                     },
                 }
+                try:  # pragma: no cover
+                    from ldaca_web_app_backend.core.analysis_store import save_analysis
+
+                    save_analysis(
+                        user_id=user_id,
+                        workspace_id=workspace_id,
+                        task="concordance",
+                        request_payload=request.model_dump()
+                        if hasattr(request, "model_dump")
+                        else request.dict(),
+                        result_payload=result_payload,
+                    )
+                except Exception as _e:  # pragma: no cover
+                    print(f"[analysis_persist] concordance save failed: {_e}")
+                return result_payload
 
     except HTTPException:
         # Re-raise HTTP exceptions
@@ -2458,11 +2507,24 @@ async def get_multi_node_concordance(
             except Exception as ce:
                 print(f"⚠️ Failed to build combined concordance view: {ce}")
 
-        return {
+        result_payload = {
             "success": True,
             "message": f"Found concordance results for search term '{request.search_word}'",
             "data": results,
         }
+        try:  # pragma: no cover
+            from ldaca_web_app_backend.core.analysis_store import save_analysis
+
+            save_analysis(
+                user_id=user_id,
+                workspace_id=workspace_id,
+                task="multi_concordance",
+                request_dict=request.model_dump() if hasattr(request, "model_dump") else request.dict(),
+                result_dict=result_payload,
+            )
+        except Exception as _e:  # pragma: no cover
+            print(f"[analysis_persist] multi_concordance save failed: {_e}")
+        return result_payload
 
     except HTTPException:
         raise
@@ -2608,7 +2670,7 @@ async def get_frequency_analysis(
 
             # Convert frequency DataFrame to format expected by frontend
             if hasattr(frequency_result, "to_dicts"):
-                return {
+                result_payload = {
                     "success": True,
                     "data": frequency_result.to_dicts(),
                     "columns": list(frequency_result.columns),
@@ -2620,8 +2682,21 @@ async def get_frequency_analysis(
                         "sort_by_time": request.sort_by_time,
                     },
                 }
+                try:  # pragma: no cover
+                    from ldaca_web_app_backend.core.analysis_store import save_analysis
+
+                    save_analysis(
+                        user_id=user_id,
+                        workspace_id=workspace_id,
+                        task="frequency_analysis",
+                        request_dict=request.model_dump() if hasattr(request, "model_dump") else request.dict(),
+                        result_dict=result_payload,
+                    )
+                except Exception as _e:  # pragma: no cover
+                    print(f"[analysis_persist] frequency_analysis save failed: {_e}")
+                return result_payload
             else:
-                return {
+                result_payload = {
                     "success": True,
                     "data": [],
                     "columns": [],
@@ -2633,6 +2708,19 @@ async def get_frequency_analysis(
                         "sort_by_time": request.sort_by_time,
                     },
                 }
+                try:  # pragma: no cover
+                    from ldaca_web_app_backend.core.analysis_store import save_analysis
+
+                    save_analysis(
+                        user_id=user_id,
+                        workspace_id=workspace_id,
+                        task="frequency_analysis",
+                        request_dict=request.model_dump() if hasattr(request, "model_dump") else request.dict(),
+                        result_dict=result_payload,
+                    )
+                except Exception as _e:  # pragma: no cover
+                    print(f"[analysis_persist] frequency_analysis save failed: {_e}")
+                return result_payload
         else:
             raise HTTPException(
                 status_code=400,
@@ -2951,6 +3039,8 @@ async def calculate_token_frequencies(
             raise HTTPException(
                 status_code=400, detail="At least one node ID must be provided"
             )
+        if request.limit is None or request.limit <= 0:
+            raise HTTPException(status_code=400, detail="Limit must be a positive integer")
 
         if len(request.node_ids) > 2:
             raise HTTPException(
@@ -3155,12 +3245,15 @@ async def calculate_token_frequencies(
             if request.limit:
                 sorted_tokens = sorted_tokens[: request.limit]
 
-            # Convert to TokenFrequencyData objects
-            response_data[frame_name] = [
-                TokenFrequencyData(token=token, frequency=freq)
-                for token, freq in sorted_tokens
-                if freq > 0  # Only include tokens that actually appear
-            ]
+            # Convert to TokenFrequencyData objects with column metadata
+            response_data[frame_name] = {
+                "data": [
+                    TokenFrequencyData(token=token, frequency=freq)
+                    for token, freq in sorted_tokens
+                    if freq > 0  # Only include tokens that actually appear
+                ],
+                "columns": ["token", "frequency"],
+            }
 
         # Convert statistics DataFrame to response format (if available and we have 2 nodes)
         statistics_data = None
@@ -3204,12 +3297,34 @@ async def calculate_token_frequencies(
             # Do not limit or filter statistics by the per-node frequency results.
             # Return the full statistics table so the frontend can derive selections from all vocabulary.
 
-        return TokenFrequencyResponse(
+        result = TokenFrequencyResponse(
             success=True,
             message=f"Successfully calculated token frequencies for {len(frames_dict)} node(s)",
             data=response_data,
             statistics=statistics_data,
         )
+
+        # Persist analysis (best-effort; failures should not break endpoint)
+        try:  # pragma: no cover - persistence errors are non-critical
+            from ldaca_web_app_backend.core.analysis_store import save_analysis
+
+            save_analysis(
+                user_id=user_id,
+                workspace_id=workspace_id,
+                task="token_frequencies",
+                request_dict=(
+                    request.model_dump(exclude_none=True)
+                    if hasattr(request, "model_dump")
+                    else request.dict(exclude_none=True)
+                ),
+                result_dict=(
+                    result.model_dump() if hasattr(result, "model_dump") else result.dict()
+                ),
+            )
+        except Exception as _persist_err:  # pragma: no cover
+            print(f"[analysis_persist] token_frequencies save failed: {_persist_err}")
+
+        return result
 
     except HTTPException:
         # Re-raise HTTP exceptions (they already have proper error messages)

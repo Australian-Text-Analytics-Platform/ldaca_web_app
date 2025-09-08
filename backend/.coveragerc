@@ -1,0 +1,11 @@
+[run]
+branch = True
+source =
+    ldaca_web_app_backend
+omit =
+    */tests/*
+    */scripts/*
+
+[report]
+show_missing = True
+

@@ -5,8 +5,8 @@ We don't hit real Airtable (env likely unset during tests). Expect graceful succ
 
 
 class TestFeedbackEndpoint:
-    def test_submit_feedback_minimal(self, test_client):
-        resp = test_client.post(
+    async def test_submit_feedback_minimal(self, test_client):
+        resp = await test_client.post(
             "/api/feedback/submit",
             json={"subject": "Test Subject", "comments": "Some comment"},
         )
@@ -18,14 +18,14 @@ class TestFeedbackEndpoint:
             or "submitted" in data["message"].lower()
         )
 
-    def test_submit_feedback_requires_subject(self, test_client):
-        resp = test_client.post(
+    async def test_submit_feedback_requires_subject(self, test_client):
+        resp = await test_client.post(
             "/api/feedback/submit", json={"subject": " ", "comments": "x"}
         )
         assert resp.status_code == 400
 
-    def test_submit_feedback_requires_comments(self, test_client):
-        resp = test_client.post(
+    async def test_submit_feedback_requires_comments(self, test_client):
+        resp = await test_client.post(
             "/api/feedback/submit", json={"subject": "Hi", "comments": "   "}
         )
         assert resp.status_code == 400

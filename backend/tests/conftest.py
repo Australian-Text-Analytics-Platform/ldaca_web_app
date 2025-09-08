@@ -14,13 +14,6 @@ import pytest
 from ldaca_web_app_backend import db
 
 
-@pytest.fixture(scope="session")
-def event_loop():
-    """Create an instance of the default event loop for the test session."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
-
 
 @pytest.fixture(scope="session", autouse=True)
 async def init_test_db():
@@ -59,21 +52,68 @@ async def init_test_db():
 
 
 @pytest.fixture
+def settings_override(tmp_path: Path):
+    """Provide MagicMock settings pointing to a temporary data root.
+
+    This isolates tests from the repository filesystem and avoids cleanup needs.
+    """
+    mock_settings = MagicMock()
+    # Path helpers
+    mock_settings.get_data_root.return_value = tmp_path
+    mock_settings.get_user_data_folder.return_value = tmp_path / "users"
+    mock_settings.get_sample_data_folder.return_value = tmp_path / "sample_data"
+    mock_settings.get_database_backup_folder.return_value = tmp_path / "backups"
+    # Back-compat attributes some code might read
+    mock_settings.data_folder = tmp_path
+    mock_settings.user_data_folder = "users"
+    mock_settings.sample_data_folder = "sample_data"
+    mock_settings.allowed_origins = ["http://localhost:3000"]
+    # Core config
+    mock_settings.cors_allowed_origins = ["http://localhost:3000"]
+    mock_settings.cors_allow_credentials = True
+    mock_settings.multi_user = False
+    mock_settings.single_user_id = "test"
+    mock_settings.single_user_name = "Test User"
+    mock_settings.single_user_email = "test@localhost"
+    mock_settings.google_client_id = ""
+    mock_settings.database_url = "sqlite+aiosqlite:///:memory:"
+    mock_settings.server_host = "127.0.0.1"
+    mock_settings.server_port = 8001
+    mock_settings.debug = True
+    return mock_settings
+
+
+@pytest.fixture
 async def test_db_session():
     """Provide a test database session"""
-    import db
+    from ldaca_web_app_backend import db
 
     async with db.async_session_maker() as session:
         yield session
 
 
 @pytest.fixture
-def authenticated_client():
-    """Provide a test client with mocked authentication"""
-    # Mock user that will be returned by the authentication dependency
+def temp_data_root(test_user):
+    """Ensure a temporary user data root exists for tests that write files.
+
+    This creates the user's data directory used by get_user_data_folder so tests
+    that write files without explicitly creating directories will work reliably.
+    """
+    from ldaca_web_app_backend.core.utils import get_user_data_folder
+
+    user_data_dir = get_user_data_folder(test_user["id"])
+    user_data_dir.mkdir(parents=True, exist_ok=True)
+    return user_data_dir.parent
+
+
+@pytest.fixture
+async def authenticated_client(settings_override):
+    """Async test client with mocked authentication and isolated temp data root."""
     from datetime import datetime
 
-    from fastapi.testclient import TestClient
+    import httpx
+    from ldaca_web_app_backend.core.auth import get_current_user
+    from ldaca_web_app_backend.main import app
 
     mock_user = {
         "id": "test",
@@ -86,103 +126,60 @@ def authenticated_client():
         "is_verified": True,
     }
 
-    # Create a mock settings object with test values
-    mock_settings = MagicMock()
-    mock_settings.cors_allowed_origins = ["http://localhost:3000"]
-    mock_settings.allowed_origins = ["http://localhost:3000"]
-    mock_settings.cors_allow_credentials = True
-    mock_settings.multi_user = False
-    mock_settings.single_user_id = "test"
-    mock_settings.single_user_name = "Test User"
-    mock_settings.single_user_email = "test@localhost"
-    mock_settings.google_client_id = ""  # Empty for single-user mode
-    mock_settings.database_url = "sqlite+aiosqlite:///:memory:"
+    def mock_get_current_user():
+        return mock_user
 
-    # Mock the data_folder as a MagicMock that has mkdir
-    mock_data_folder = MagicMock()
-    mock_data_folder.mkdir = MagicMock()
-    mock_settings.data_folder = mock_data_folder
-
-    # Patch all the different ways settings can be imported
-    with (
-        patch("ldaca_web_app_backend.config.settings", mock_settings),
-        patch("ldaca_web_app_backend.main.settings", mock_settings),
-        patch("ldaca_web_app_backend.api.auth.settings", mock_settings),
-        patch("ldaca_web_app_backend.core.auth.settings", mock_settings),
+    patches = [
+        patch("ldaca_web_app_backend.config.settings", settings_override),
+        patch("ldaca_web_app_backend.main.settings", settings_override),
+        patch("ldaca_web_app_backend.api.auth.settings", settings_override),
+        patch("ldaca_web_app_backend.core.auth.settings", settings_override),
+        patch("ldaca_web_app_backend.core.utils.settings", settings_override),
         patch("ldaca_web_app_backend.db.init_db"),
         patch("ldaca_web_app_backend.db.cleanup_expired_sessions"),
-        patch("ldaca_web_app_backend.main.lifespan") as mock_lifespan,
-    ):
-        # Create a simple async context manager for the mock lifespan
-        from contextlib import asynccontextmanager
+    ]
 
-        @asynccontextmanager
-        async def mock_lifespan_func(app):
-            yield
+    for p in patches:
+        p.start()
 
-        mock_lifespan.side_effect = mock_lifespan_func
+    app.dependency_overrides[get_current_user] = mock_get_current_user
 
-        from ldaca_web_app_backend.core.auth import get_current_user
-        from ldaca_web_app_backend.main import app
-
-        # Override the dependency with our mock user
-        def mock_get_current_user():
-            return mock_user
-
-        app.dependency_overrides[get_current_user] = mock_get_current_user
-
-        client = TestClient(app)
-        yield client
-
-        # Clean up the override after the test
+    try:
+        transport = httpx.ASGITransport(app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            yield client
+    finally:
         app.dependency_overrides.clear()
+        for p in patches:
+            p.stop()
 
 
 @pytest.fixture
-def test_client():
-    """Provide a test client without authentication"""
-    from fastapi.testclient import TestClient
+async def test_client(settings_override):
+    """Provide an async test client without authentication (single-user mode)."""
+    import httpx
+    from ldaca_web_app_backend.main import app
 
-    # Create a mock settings object with test values
-    mock_settings = MagicMock()
-    mock_settings.cors_allowed_origins = ["http://localhost:3000"]
-    mock_settings.allowed_origins = ["http://localhost:3000"]
-    mock_settings.cors_allow_credentials = True
-    mock_settings.multi_user = False
-    mock_settings.single_user_id = "test"
-    mock_settings.single_user_name = "Test User"
-    mock_settings.single_user_email = "test@localhost"
-    mock_settings.google_client_id = ""  # Empty for single-user mode
-    mock_settings.database_url = "sqlite+aiosqlite:///:memory:"
-
-    # Mock the data_folder as a MagicMock that has mkdir
-    mock_data_folder = MagicMock()
-    mock_data_folder.mkdir = MagicMock()
-    mock_settings.data_folder = mock_data_folder
-
-    # Patch all the different ways settings can be imported
-    with (
-        patch("ldaca_web_app_backend.config.settings", mock_settings),
-        patch("ldaca_web_app_backend.main.settings", mock_settings),
-        patch("ldaca_web_app_backend.api.auth.settings", mock_settings),
-        patch("ldaca_web_app_backend.core.auth.settings", mock_settings),
+    patches = [
+        patch("ldaca_web_app_backend.config.settings", settings_override),
+        patch("ldaca_web_app_backend.main.settings", settings_override),
+        patch("ldaca_web_app_backend.api.auth.settings", settings_override),
+        patch("ldaca_web_app_backend.core.auth.settings", settings_override),
+        patch("ldaca_web_app_backend.core.utils.settings", settings_override),
         patch("ldaca_web_app_backend.db.init_db"),
         patch("ldaca_web_app_backend.db.cleanup_expired_sessions"),
-        patch("ldaca_web_app_backend.main.lifespan") as mock_lifespan,
-    ):
-        # Create a simple async context manager for the mock lifespan
-        from contextlib import asynccontextmanager
+    ]
 
-        @asynccontextmanager
-        async def mock_lifespan_func(app):
-            yield
+    for p in patches:
+        p.start()
 
-        mock_lifespan.side_effect = mock_lifespan_func
-
-        from ldaca_web_app_backend.main import app
-
-        client = TestClient(app)
-        yield client
+    try:
+        transport = httpx.ASGITransport(app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            yield client
+    finally:
+        for p in patches:
+            p.stop()
 
 
 @pytest.fixture
@@ -235,7 +232,9 @@ def mock_settings():
 @pytest.fixture
 def mock_workspace_manager():
     """Mock workspace manager for testing"""
-    with patch("ldaca_web_app_backend.core.workspace.workspace_manager") as mock_manager:
+    with patch(
+        "ldaca_web_app_backend.core.workspace.workspace_manager"
+    ) as mock_manager:
         mock_manager.get_user_workspaces.return_value = {}
         mock_manager.create_workspace.return_value = {
             "id": "test-workspace-123",
@@ -269,13 +268,6 @@ def sample_user_data():
         "created_at": "2024-01-01T00:00:00Z",
         "last_login": "2024-01-01T12:00:00Z",
     }
-
-
-# Deprecated fixture name for backward compatibility
-@pytest.fixture
-def mock_config(mock_settings):
-    """Deprecated: Use mock_settings instead"""
-    return mock_settings
 
 
 @pytest.fixture
@@ -331,6 +323,19 @@ def mock_google_token():
     }
 
 
+@pytest.fixture
+def mock_datetime():
+    """Mock datetime.utcnow for deterministic timestamps used by analysis_store."""
+    from datetime import datetime
+    from unittest.mock import patch
+
+    fixed_time = datetime(2024, 1, 15, 12, 30, 45)
+    with patch("ldaca_web_app_backend.core.analysis_store.datetime") as mock_dt:
+        mock_dt.utcnow.return_value = fixed_time
+        mock_dt.now.return_value = fixed_time
+        yield fixed_time
+
+
 # Test data constants
 SAMPLE_DATAFRAME_DATA = [
     {"name": "Alice", "age": 25, "city": "New York"},
@@ -348,61 +353,102 @@ SAMPLE_TEXT_DATA = [
 ]
 
 
-@pytest.fixture(scope="session", autouse=True)
-def cleanup_test_user_folders():
-    """Automatically clean up test user folders after test session"""
-    yield  # Let tests run first
 
-    # Cleanup after all tests are done
-    backend_root = Path(__file__).parent.parent
-    data_folder = backend_root / "data"
 
-    if not data_folder.exists():
-        return
 
-    # List of test user folder patterns to clean up
-    test_patterns = [
-        "user_test-user*",  # Primary test user pattern
-        "user_test_user*",
-        "user_fresh_user_*",
-        "user_new_user_*",
-        "user_user1_*",
-        "user_user2_*",
-        "user_12345678-1234-5678-*",  # Test UUID pattern
-        "user_test*",  # General test pattern
-    ]
 
-    for pattern in test_patterns:
-        pattern_path = data_folder / pattern
-        for folder in glob.glob(str(pattern_path)):
-            folder_path = Path(folder)
-            if folder_path.is_dir():
-                try:
-                    shutil.rmtree(folder_path)
-                    print(f"Cleaned up test folder: {folder_path.name}")
-                except Exception as e:
-                    print(f"Warning: Could not remove {folder_path}: {e}")
+# Analysis persistence test fixtures
 
 
 @pytest.fixture
-def test_user_cleanup():
-    """Clean up specific test user folders created during individual tests"""
-    created_folders = []
+def test_user():
+    """Provide consistent test user data for analysis tests."""
+    return {
+        "id": "test",
+        "email": "test@example.com",
+        "name": "Test User",
+        "picture": "https://example.com/avatar.jpg",
+        "is_active": True,
+        "is_verified": True,
+    }
 
-    def track_folder(user_id: str):
-        """Track a user folder for cleanup"""
-        backend_root = Path(__file__).parent.parent
-        data_folder = backend_root / "data"
-        user_folder = data_folder / f"user_{user_id}"
-        created_folders.append(user_folder)
-        return user_folder
 
-    yield track_folder
+@pytest.fixture
+async def workspace_id(authenticated_client):
+    """Create a test workspace and return its ID."""
+    response = await authenticated_client.post(
+        "/api/workspaces",
+        json={"name": "test_workspace", "description": "Test workspace for analysis"},
+    )
+    assert response.status_code == 200
+    return response.json()["workspace_id"]
 
-    # Cleanup tracked folders
-    for folder_path in created_folders:
-        if folder_path.exists() and folder_path.is_dir():
-            try:
-                shutil.rmtree(folder_path)
-            except Exception as e:
-                print(f"Warning: Could not remove {folder_path}: {e}")
+
+@pytest.fixture
+def tiny_text_file(test_user):
+    """Create a tiny CSV file for testing."""
+    import csv
+
+    from ldaca_web_app_backend.core.utils import get_user_data_folder
+
+    user_data_dir = get_user_data_folder(test_user["id"])
+    user_data_dir.mkdir(parents=True, exist_ok=True)
+
+    # Create a tiny CSV file
+    tiny_file = user_data_dir / "tiny.csv"
+    with open(tiny_file, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["document"])
+        writer.writerow(["Hello world."])
+        writer.writerow(["Another sentence."])
+
+    return tiny_file
+
+
+@pytest.fixture
+def sample_text_file(test_user):
+    """Create a sample CSV file for testing."""
+    import csv
+
+    from ldaca_web_app_backend.core.utils import get_user_data_folder
+
+    user_data_dir = get_user_data_folder(test_user["id"])
+    user_data_dir.mkdir(parents=True, exist_ok=True)
+
+    # Create a sample CSV file
+    sample_file = user_data_dir / "sample.csv"
+    with open(sample_file, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["document"])
+        writer.writerow(["This is a sample document."])
+        writer.writerow(["Another sample text for analysis."])
+        writer.writerow(["More text content for testing."])
+        writer.writerow(["Final sample sentence."])
+
+    return sample_file
+
+
+@pytest.fixture
+async def tiny_node_id(authenticated_client, workspace_id, tiny_text_file):
+    """Add a tiny node to the workspace and return its ID."""
+    response = await authenticated_client.post(
+        f"/api/workspaces/{workspace_id}/nodes",
+        params={"filename": tiny_text_file.name},
+    )
+    assert response.status_code == 200
+    result = response.json()
+    # The API returns 'id', not 'node_id'
+    return result["id"]
+
+
+@pytest.fixture
+async def sample_node_id(authenticated_client, workspace_id, sample_text_file):
+    """Add a sample node to the workspace and return its ID."""
+    response = await authenticated_client.post(
+        f"/api/workspaces/{workspace_id}/nodes",
+        params={"filename": sample_text_file.name},
+    )
+    assert response.status_code == 200
+    result = response.json()
+    # The API returns 'id', not 'node_id'
+    return result["id"]

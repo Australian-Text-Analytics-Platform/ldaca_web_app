@@ -4,7 +4,7 @@ Pydantic models for the ATAP Web App API
 
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 # =============================================================================
 # AUTHENTICATION MODELS
@@ -325,9 +325,9 @@ class FrequencyAnalysisRequest(BaseModel):
     frequency: str = "monthly"  # daily, weekly, monthly, yearly
     sort_by_time: bool = True
 
-    class Config:
-        # Validate frequency values
-        json_schema_extra = {
+    # Pydantic v2 model config
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "time_column": "created_at",
                 "group_by_columns": ["party", "electorate"],
@@ -335,6 +335,7 @@ class FrequencyAnalysisRequest(BaseModel):
                 "sort_by_time": True,
             }
         }
+    )
 
 
 class TextAnalysisInfo(BaseModel):
@@ -475,10 +476,11 @@ class TokenFrequencyRequest(BaseModel):
         None  # Maps node_id -> column_name (optional for auto-detection)
     )
     stop_words: Optional[List[str]] = None
-    limit: Optional[int] = 50  # Limit number of tokens to display
+    limit: int  # Limit number of tokens to display (required)
 
-    class Config:
-        json_schema_extra = {
+    # Pydantic v2 model config
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "node_ids": ["node1", "node2"],
                 "node_columns": {"node1": "text_column", "node2": "content_column"},
@@ -486,6 +488,7 @@ class TokenFrequencyRequest(BaseModel):
                 "limit": 50,
             }
         }
+    )
 
 
 class TokenFrequencyData(BaseModel):
@@ -517,11 +520,16 @@ class TokenStatisticsData(BaseModel):
     significance: str  # Significance level indicator
 
 
+class TokenFrequencyNodeResult(BaseModel):
+    data: List[TokenFrequencyData]
+    columns: List[str] = ["token", "frequency"]
+
+
 class TokenFrequencyResponse(BaseModel):
     success: bool
     message: str
-    data: Optional[Dict[str, List[TokenFrequencyData]]] = (
-        None  # Maps node_name -> frequency data
+    data: Optional[Dict[str, TokenFrequencyNodeResult]] = (
+        None  # Maps node_name -> { data: [...], columns: [...] }
     )
     statistics: Optional[List[TokenStatisticsData]] = (
         None  # Statistical measures (only when comparing 2 nodes)
@@ -539,8 +547,9 @@ class TopicModelingRequest(BaseModel):
     min_topic_size: Optional[int] = 5
     use_ctfidf: Optional[bool] = False
 
-    class Config:
-        json_schema_extra = {
+    # Pydantic v2 model config
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "node_ids": ["node1", "node2"],
                 "node_columns": {"node1": "text", "node2": "content"},
@@ -548,6 +557,7 @@ class TopicModelingRequest(BaseModel):
                 "use_ctfidf": False,
             }
         }
+    )
 
 
 class TopicModelingTopic(BaseModel):

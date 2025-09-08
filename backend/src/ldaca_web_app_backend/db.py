@@ -1,7 +1,7 @@
 import secrets
 import uuid
 from collections.abc import AsyncGenerator
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Any, Dict, Optional
 
 from fastapi import Depends
@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.sql import func
 
-from .config import config
+from .config import settings
 
 
 # SQLAlchemy setup
@@ -47,7 +47,7 @@ class UserSession(Base):
 
 # Create async engine and session maker
 # Use derived URL which respects DATA_ROOT
-engine = create_async_engine(config.get_database_url())
+engine = create_async_engine(settings.get_database_url())
 async_session_maker = async_sessionmaker(engine, expire_on_commit=False)
 
 
@@ -72,10 +72,10 @@ async def get_user_db(session: AsyncSession = Depends(get_async_session)):
 async def init_db():
     """Initialize database tables"""
     # Ensure DATA_ROOT exists before creating/opening DB file
-    data_root = config.get_data_root()
+    data_root = settings.get_data_root()
     data_root.mkdir(parents=True, exist_ok=True)
     await create_db_and_tables()
-    print(f"✅ Database initialized at: {config.get_database_url()}")
+    print(f"✅ Database initialized at: {settings.get_database_url()}")
 
 
 async def get_or_create_user(
@@ -92,7 +92,7 @@ async def get_or_create_user(
             user.name = name
             user.picture = picture
             user.google_id = google_id
-            user.last_login = datetime.utcnow()
+            user.last_login = datetime.now(UTC).replace(tzinfo=None)
             await session.commit()
             await session.refresh(user)
         else:
@@ -103,7 +103,7 @@ async def get_or_create_user(
                 picture=picture,
                 google_id=google_id,
                 user_folder_path=None,  # Will be set when folders are created
-                last_login=datetime.utcnow(),
+                last_login=datetime.now(UTC).replace(tzinfo=None),
                 is_active=True,
                 is_superuser=False,
                 is_verified=True,  # Auto-verify Google users
@@ -136,7 +136,7 @@ async def create_user_session(user_id: str, google_token: str) -> Dict[str, Any]
         refresh_token = secrets.token_urlsafe(32)
 
         # Calculate expiry time
-        expires_at = datetime.utcnow() + timedelta(hours=config.token_expire_hours)
+        expires_at = datetime.now(UTC).replace(tzinfo=None) + timedelta(hours=settings.token_expire_hours)
 
         # Clean up old sessions for this user (optional - keep only latest)
         result = await session.execute(
@@ -159,7 +159,7 @@ async def create_user_session(user_id: str, google_token: str) -> Dict[str, Any]
         return {
             "access_token": access_token,
             "refresh_token": refresh_token,
-            "expires_in": config.token_expire_hours * 3600,  # in seconds
+            "expires_in": settings.token_expire_hours * 3600,  # in seconds
             "expires_at": expires_at,
         }
 
@@ -171,7 +171,7 @@ async def validate_access_token(access_token: str) -> Optional[Dict[str, Any]]:
             select(User, UserSession)
             .join(UserSession, User.id == UserSession.user_id)
             .where(UserSession.access_token == access_token)
-            .where(UserSession.expires_at > datetime.utcnow())
+            .where(UserSession.expires_at > datetime.now(UTC).replace(tzinfo=None))
         )
         row = result.first()
 
@@ -222,7 +222,7 @@ async def cleanup_expired_sessions():
     """Clean up expired sessions"""
     async with async_session_maker() as session:
         result = await session.execute(
-            select(UserSession).where(UserSession.expires_at <= datetime.utcnow())
+            select(UserSession).where(UserSession.expires_at <= datetime.now(UTC).replace(tzinfo=None))
         )
         expired_sessions = result.scalars().all()
         for expired_session in expired_sessions:
@@ -244,9 +244,3 @@ async def update_user_folder_path(user_id: str, folder_path: str) -> None:
             print(f"✅ Updated user {user_id} folder path to: {folder_path}")
         else:
             print(f"⚠️ User {user_id} not found for folder path update")
-
-
-# Legacy sync function for backwards compatibility
-def connect_db():
-    """Legacy function - use async functions instead"""
-    raise NotImplementedError("Use async database functions instead")

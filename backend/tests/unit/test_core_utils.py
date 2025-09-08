@@ -24,12 +24,12 @@ from ldaca_web_app_backend.core.utils import (
 class TestUserFolders:
     """Test user folder management functions"""
 
-    @patch("ldaca_web_app_backend.core.utils.config")
-    def test_get_user_data_folder(self, mock_config, temp_dir):
+    @patch("ldaca_web_app_backend.core.utils.settings")
+    def test_get_user_data_folder(self, mock_settings, temp_dir):
         """Test getting user data folder"""
         # New path scheme: base under DATA_ROOT / user_data_folder
-        mock_config.get_data_root.return_value = temp_dir
-        mock_config.user_data_folder = "users"
+        mock_settings.get_data_root.return_value = temp_dir
+        mock_settings.user_data_folder = "users"
 
         user_id = "test_user_123"
         folder = get_user_data_folder(user_id)
@@ -38,11 +38,11 @@ class TestUserFolders:
         assert folder == expected_path
         assert folder.exists()
 
-    @patch("ldaca_web_app_backend.core.utils.config")
-    def test_get_user_workspace_folder(self, mock_config, temp_dir):
+    @patch("ldaca_web_app_backend.core.utils.settings")
+    def test_get_user_workspace_folder(self, mock_settings, temp_dir):
         """Test getting user workspace folder"""
-        mock_config.get_data_root.return_value = temp_dir
-        mock_config.user_data_folder = "users"
+        mock_settings.get_data_root.return_value = temp_dir
+        mock_settings.user_data_folder = "users"
 
         user_id = "test_user_123"
         folder = get_user_workspace_folder(user_id)
@@ -51,17 +51,17 @@ class TestUserFolders:
         assert folder == expected_path
         assert folder.exists()
 
-    @patch("ldaca_web_app_backend.core.utils.config")
-    def test_setup_user_folders(self, mock_config, temp_dir):
+    @patch("ldaca_web_app_backend.core.utils.settings")
+    def test_setup_user_folders(self, mock_settings, temp_dir):
         """Test setting up complete user folder structure"""
-        mock_config.get_data_root.return_value = temp_dir
-        mock_config.user_data_folder = "users"
+        mock_settings.get_data_root.return_value = temp_dir
+        mock_settings.user_data_folder = "users"
 
         # Create sample data in the expected location
         sample_data_dir = temp_dir / "sample_data"
         sample_data_dir.mkdir()
         (sample_data_dir / "test_file.txt").write_text("test content")
-        mock_config.get_sample_data_folder.return_value = sample_data_dir
+        mock_settings.get_sample_data_folder.return_value = sample_data_dir
 
         user_id = "test_user_123"
         folders = setup_user_folders(user_id)
