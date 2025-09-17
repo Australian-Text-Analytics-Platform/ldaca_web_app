@@ -25,6 +25,8 @@ class WorkspaceManager:
 
     def __init__(self) -> None:
         self._current: Dict[str, Dict[str, Any]] = {}
+        # Per-user/workspace task managers (not serialized)
+        self._task_managers: Dict[tuple[str, str], Any] = {}
 
     # ---------------- Core helpers ----------------
     def _get_current_entry(self, user_id: str) -> tuple[Optional[str], Optional[Any]]:
@@ -46,11 +48,25 @@ class WorkspaceManager:
         user_folder = get_user_workspace_folder(user_id)
         workspace_file = user_folder / f"workspace_{workspace_id}.json"
         if not workspace_file.exists():
+            print(f"Workspace file not found: {workspace_file}")
             return None
         try:
+            print(f"Attempting to load workspace {workspace_id} from {workspace_file}")
             return Workspace.deserialize(workspace_file)
         except Exception as e:  # pragma: no cover
-            print(f"Failed to deserialize workspace {workspace_id}: {e}")
+            print(f"Failed to deserialize workspace {workspace_id} from {workspace_file}: {e}")
+            # Try to get more specific error info
+            try:
+                with open(workspace_file, 'r') as f:
+                    content = f.read()
+                    print(f"Workspace file size: {len(content)} bytes")
+                    if len(content) > 1000:
+                        print(f"First 500 chars: {content[:500]!r}")
+                        print(f"Last 500 chars: {content[-500:]!r}")
+                    else:
+                        print(f"Full content: {content!r}")
+            except Exception as read_e:
+                print(f"Could not read workspace file for debugging: {read_e}")
             return None
 
     def _replace_current(self, user_id: str, new_id: str, new_ws: Any) -> None:
@@ -173,6 +189,15 @@ class WorkspaceManager:
             wf.unlink()
             return True
         return False
+
+    def get_task_manager(self, user_id: str, workspace_id: str):
+        from ldaca_web_app_backend.core.process_task_manager import ProcessTaskManager
+        key = (user_id, workspace_id)
+        tm = self._task_managers.get(key)
+        if tm is None:
+            tm = ProcessTaskManager()
+            self._task_managers[key] = tm
+        return tm
 
     def unload_workspace(self, user_id: str, save: bool = True) -> bool:
         cid, cws = self._get_current_entry(user_id)

@@ -470,13 +470,17 @@ class SliceRequest(BaseModel):
 # =============================================================================
 
 
+class StopWordsPayload(BaseModel):
+    stop_words: List[str]
+
+
 class TokenFrequencyRequest(BaseModel):
     node_ids: List[str]  # 1 or 2 node IDs
     node_columns: Optional[Dict[str, str]] = (
         None  # Maps node_id -> column_name (optional for auto-detection)
     )
     stop_words: Optional[List[str]] = None
-    limit: int  # Limit number of tokens to display (required)
+    limit: Optional[int] = None  # UI-only; not used by backend computation
 
     # Pydantic v2 model config
     model_config = ConfigDict(
@@ -527,6 +531,7 @@ class TokenFrequencyNodeResult(BaseModel):
 
 class TokenFrequencyResponse(BaseModel):
     success: bool
+    status: Optional[str] = None  # 'successful', 'failed', 'running'
     message: str
     data: Optional[Dict[str, TokenFrequencyNodeResult]] = (
         None  # Maps node_name -> { data: [...], columns: [...] }
@@ -594,9 +599,10 @@ class FeedbackResponse(BaseModel):
 
 
 class TopicModelingResponse(BaseModel):
-    success: bool
+    status: str  # 'successful', 'failed', 'running', 'cancelled'
     message: str
     data: Optional[TopicModelingData] = None
+    metadata: Optional[Dict[str, Any]] = None
 
 
 # Concordance response models

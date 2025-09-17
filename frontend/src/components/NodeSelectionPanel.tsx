@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import ColorSwatchPicker from './ui/ColorSwatchPicker';
 
 export interface NodeColumnSelection {
@@ -22,6 +22,8 @@ interface NodeSelectionPanelProps {
   renderNodeMeta?: (node: any) => React.ReactNode;
   showShape?: boolean; // fetch shape if available and not supplied via renderNodeMeta
   getNodeShapeFn?: (nodeId: string) => Promise<{ shape: [number, number]; is_lazy: boolean; calculated: boolean } | null>;
+  disabled?: boolean; // disables interactions but keeps UI fully visible
+  locked?: boolean;   // shows a small lock icon in the header when true
 }
 
 /** Shared node + text-column + color selection panel reused across analysis tabs */
@@ -41,6 +43,8 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
   renderNodeMeta,
   showShape = false,
   getNodeShapeFn,
+  disabled = false,
+  locked = false,
 }) => {
   const getColorForNodeId = (nodeId: string, idx: number) => {
     if (nodeColors[nodeId]) return nodeColors[nodeId];
@@ -50,30 +54,51 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
   const getColumnLabel = (node: any, idx: number) => (columnLabelFn ? columnLabelFn(node, idx) : 'Text Column:');
   const [shapes, setShapes] = useState<Record<string,string>>({});
 
+  // Compute stable list of selected node ids to avoid retriggering on object identity changes
+  const selectedNodeIds = useMemo(() => (
+    selectedNodes.map((node: any, idx: number) => (
+      node.id || node.node_id || node.data?.id || node.data?.node_id || node.unique_id || `node-${idx}`
+    ))
+  ), [selectedNodes]);
+
   useEffect(() => {
     if (!showShape || !getNodeShapeFn) return;
     let cancelled = false;
     const fetchShapes = async () => {
-      await Promise.all(selectedNodes.map(async (node: any, idx: number) => {
-        const nodeId: string = node.id || node.node_id || node.data?.id || node.data?.node_id || node.unique_id || `node-${idx}`;
+      await Promise.all(selectedNodeIds.map(async (nodeId: string) => {
+        if (!nodeId) return;
         if (shapes[nodeId]) return;
+        // Check sessionStorage cache to avoid duplicate network calls on StrictMode double-mount or tab switches
+        try {
+          const cacheKey = `node-shape:${nodeId}`;
+          const cached = typeof window !== 'undefined' ? window.sessionStorage.getItem(cacheKey) : null;
+          if (cached) {
+            if (!cancelled) setShapes(prev => ({ ...prev, [nodeId]: cached }));
+            return;
+          }
+        } catch (_) { /* ignore storage errors */ }
         try {
           const res = await getNodeShapeFn(nodeId);
           if (!cancelled && res?.shape) {
-            setShapes(prev => ({ ...prev, [nodeId]: `${res.shape[0]} × ${res.shape[1]}` }));
+            const val = `${res.shape[0]} × ${res.shape[1]}`;
+            setShapes(prev => ({ ...prev, [nodeId]: val }));
+            try { if (typeof window !== 'undefined') window.sessionStorage.setItem(`node-shape:${nodeId}`, val); } catch (_) { /* ignore */ }
           }
         } catch (e) { /* silent */ }
       }));
     };
     fetchShapes();
     return () => { cancelled = true; };
-  }, [showShape, getNodeShapeFn, selectedNodes, shapes]);
+  }, [showShape, getNodeShapeFn, selectedNodeIds]);
   return (
     <div className={className}>
       {showHeaderLabel && (
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Selected Nodes ({selectedNodes.length}/{maxCompare})
-        </label>
+        <div className="flex items-center justify-between mb-2">
+          <label className="block text-sm font-medium text-gray-700">
+            Selected Nodes ({selectedNodes.length}/{maxCompare})
+          </label>
+          {/* Locked indicator removed here; show lock at tab panel level instead */}
+        </div>
       )}
       {selectedNodes.length === 0 ? (
         <div className="text-sm text-gray-500 italic bg-gray-50 p-3 rounded-md">
@@ -85,7 +110,7 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
             const nodeId: string = node.id || node.node_id || node.data?.id || node.data?.node_id || node.unique_id || `node-${idx}`;
             const columns = getNodeColumns(node);
             const selection = nodeColumnSelections.find(sel => sel.nodeId === nodeId);
-            const nodeDisplayName = node.name || node.data?.name || (node as any).label || node.data?.label || nodeId;
+            const nodeDisplayName = node.name || node.data?.name || node.data?.nodeName || (node as any).label || node.data?.label || nodeId;
             const nodeColor = getColorForNodeId(nodeId, idx);
             return (
               <div key={nodeId} className={`bg-gray-50 p-3 rounded-md ${selectedNodes.length > maxCompare ? 'flex-none min-w-[50%]' : 'flex-1 min-w-0'}`}>
@@ -113,12 +138,18 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
                     <select
                       value={selection?.column || ''}
                       onChange={(e) => onColumnChange(nodeId, e.target.value)}
-                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      disabled={disabled}
+                      aria-disabled={disabled}
+                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
                     >
                       <option value="">Select a column...</option>
                       {columns.map((column: string) => (
                         <option key={column} value={column}>{column}</option>
                       ))}
+                      {/* Ensure locked selection stays visible even if not present in inferred columns */}
+                      {selection?.column && !columns.includes(selection.column) && (
+                        <option key={`__locked__:${selection.column}`} value={selection.column}>{selection.column}</option>
+                      )}
                     </select>
                   </div>
                 ) : (

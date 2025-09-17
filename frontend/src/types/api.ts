@@ -5,7 +5,7 @@
 
 // API Response Types
 export interface ApiResponse<T = any> {
-  success: boolean;
+  status: 'running' | 'successful' | 'failed' | 'cancelled';
   data?: T;
   message?: string;
   error?: string;
@@ -206,7 +206,7 @@ export interface ErrorBoundaryState {
 }
 
 // Loading States
-export type LoadingState = 'idle' | 'loading' | 'success' | 'error';
+export type LoadingState = 'idle' | 'loading' | 'successful' | 'failed' | 'cancelled';
 
 export interface OperationState {
   state: LoadingState;
@@ -220,7 +220,7 @@ export type OptionalBy<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
 
 // Generic API operation result
 export interface OperationResult<T = any> {
-  success: boolean;
+  status: 'running' | 'successful' | 'failed' | 'cancelled';
   data?: T;
   error?: string;
   timestamp: number;

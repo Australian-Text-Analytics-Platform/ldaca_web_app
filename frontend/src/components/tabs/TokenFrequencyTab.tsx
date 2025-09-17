@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import NodeSelectionPanel from '../NodeSelectionPanel';
 import { useWorkspace } from '../../hooks/useWorkspace';
+import { nodesApi } from '../../api/nodes';
 import { useAuth } from '../../hooks/useAuth';
 import { TokenFrequencyRequest, TokenFrequencyResponse, textApi } from '../../api/text';
 import { Wordcloud } from '@visx/wordcloud';
@@ -19,12 +20,23 @@ const TokenFrequencyTab: React.FC = () => {
     getNodeShape,
   } = useWorkspace();
 
+  const nodeIdToName = useMemo(() => {
+    const map: Record<string,string> = {};
+    selectedNodes.forEach(n => {
+      const name = (n.name || n.data?.name || (n as any).label || n.data?.label || n.data?.nodeName || n.id);
+      map[n.id] = String(name);
+    });
+    return map;
+  }, [selectedNodes]);
+
   const { getAuthHeaders } = useAuth();
 
   const [nodeColumnSelections, setNodeColumnSelections] = useState<NodeColumnSelection[]>([]);
   const [stopWords, setStopWords] = useState<string>('');
   const [limit, setLimit] = useState<number>(20);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isLocked, setIsLocked] = useState(false);
+  const [lockedNodesSnapshot, setLockedNodesSnapshot] = useState<Array<{ id: string; name: string; columns: string[] }>>([]);
   const [isLoadingStopWords, setIsLoadingStopWords] = useState(false);
   const [results, setResults] = useState<TokenFrequencyResponse | null>(null);
   // Statistical table head/tail preview & sorting
@@ -43,12 +55,24 @@ const TokenFrequencyTab: React.FC = () => {
   const [appliedStopSet, setAppliedStopSet] = useState<Set<string>>(new Set());
 
   // Helper to compute and apply stop set from a comma-separated string
+  const saveStopWordsToBackend = async (words: string[]) => {
+    try {
+      if (currentWorkspaceId) {
+        await textApi.postTokenFrequenciesCurrentRequest(currentWorkspaceId, { stop_words: words }, getAuthHeaders());
+      }
+    } catch (e) {
+      // non-fatal
+      if (localStorage.getItem('debugTF') === '1') console.warn('Failed to save stop words', e);
+    }
+  };
   const applyStopSetFromText = (text: string) => {
     const words = text
       .split(',')
       .map(w => w.trim().toLowerCase())
       .filter(Boolean);
     setAppliedStopSet(new Set(words));
+    // Persist stop words (UI preference) to backend; calculation does not use them
+    void saveStopWordsToBackend(words);
   };
   const defaultPalette = useMemo(
     () => [
@@ -94,12 +118,77 @@ const TokenFrequencyTab: React.FC = () => {
 
   // Removed legacy popover logic
 
+  // Hydrate from backend on mount/activation
+  const hydratedOnceRef = useRef<boolean>(false);
+  useEffect(() => {
+    (async () => {
+      if (hydratedOnceRef.current) return;
+      hydratedOnceRef.current = true;
+      if (!currentWorkspaceId) return;
+      try {
+        // Always fetch current-request first
+        const reqResp = await textApi.getTokenFrequenciesCurrentRequest(currentWorkspaceId, getAuthHeaders());
+        if (!reqResp) {
+          // No current request - fresh state
+          setStopWords('');
+          setAppliedStopSet(new Set());
+          setNodeColumnSelections([]);
+          setLastCompareNodeIds([]);
+          return;
+        }
+        
+        const req = (reqResp as any)?.data;
+        if (req) {
+          // Stop words
+          if (Array.isArray(req.stop_words)) {
+            const joined = req.stop_words.join(', ');
+            setStopWords(joined);
+            setAppliedStopSet(new Set(req.stop_words.map((w: any) => String(w).toLowerCase())));
+          } else {
+            setStopWords('');
+            setAppliedStopSet(new Set());
+          }
+          // Node selections
+          const nodeIds: string[] = Array.isArray(req.node_ids) ? req.node_ids.slice(0, 2) : [];
+          const node_columns: Record<string, string> = req.node_columns || {};
+          const sels = nodeIds.map((id: string) => ({ nodeId: id, column: node_columns[id] || '' }));
+          setNodeColumnSelections(sels);
+          setLastCompareNodeIds(nodeIds);
+          // Build snapshot and lock
+          try {
+            const snaps: Array<{ id: string; name: string; columns: string[] }> = [];
+            for (const id of nodeIds) {
+              try {
+                const info = await nodesApi.info(currentWorkspaceId!, id, getAuthHeaders());
+                const name = (info as any)?.name || (info as any)?.data?.name || id;
+                const columns = Array.isArray((info as any)?.columns) ? (info as any).columns : (Array.isArray((info as any)?.data?.columns) ? (info as any).data.columns : []);
+                snaps.push({ id, name: String(name), columns });
+              } catch {
+                snaps.push({ id, name: id, columns: [] });
+              }
+            }
+            setLockedNodesSnapshot(snaps);
+            setIsLocked(true);
+          } catch { /* ignore */ }
+        }
+        
+        // Then fetch current-result
+        const resResp = await textApi.getTokenFrequenciesCurrentResult(currentWorkspaceId, getAuthHeaders());
+        if (!resResp) return;
+        
+        const res = (resResp as any)?.data;
+        if (res) setResults(resResp as any);
+      } catch (_) { /* ignore */ }
+    })();
+  }, [currentWorkspaceId, getAuthHeaders]);
+
+
   // Debug results changes
   useEffect(() => {
-    if (results) {
+      if (results) {
       if (localStorage.getItem('debugTF') === '1') {
         console.log('Results updated:', results);
-        console.log('Results success:', results.success);
+        console.log('Results status:', results.status);
         console.log('Results data:', results.data);
       }
       if (results.data) {
@@ -119,21 +208,50 @@ const TokenFrequencyTab: React.FC = () => {
   // Use a more stable dependency by checking the actual node IDs
   const selectedNodeIds = useMemo(() => selectedNodes.map(node => node.id).sort(), [selectedNodes]);
   useEffect(() => {
-    setResults(null);
-  }, [selectedNodeIds]);
+    if (!isLocked) setResults(null);
+  }, [selectedNodeIds, isLocked]);
 
   // Memoize the getNodeColumns function to prevent re-renders
   const getNodeColumns = useMemo(() => {
     return (node: any) => {
-      // Get available columns from node data
+      if (localStorage.getItem('debugTF') === '1') {
+        console.log('getNodeColumns called for node:', node);
+      }
+      
+      // For locked nodes from snapshot, columns are directly available
       if (node.data?.columns && Array.isArray(node.data.columns)) {
+        if (localStorage.getItem('debugTF') === '1') {
+          console.log('Found columns in node.data.columns:', node.data.columns);
+        }
         return node.data.columns;
       }
-      if (node.data?.dtypes && typeof node.data.dtypes === 'object') {
-        return Object.keys(node.data.dtypes);
+      
+      // Also check if columns are directly on the node object (for locked snapshots)
+      if (node.columns && Array.isArray(node.columns)) {
+        if (localStorage.getItem('debugTF') === '1') {
+          console.log('Found columns in node.columns:', node.columns);
+        }
+        return node.columns;
       }
+      
+      if (node.data?.dtypes && typeof node.data.dtypes === 'object') {
+        const cols = Object.keys(node.data.dtypes);
+        if (localStorage.getItem('debugTF') === '1') {
+          console.log('Found columns in node.data.dtypes:', cols);
+        }
+        return cols;
+      }
+      
       if (node.data?.schema) {
-        return Object.keys(node.data.schema);
+        const cols = Object.keys(node.data.schema);
+        if (localStorage.getItem('debugTF') === '1') {
+          console.log('Found columns in node.data.schema:', cols);
+        }
+        return cols;
+      }
+      
+      if (localStorage.getItem('debugTF') === '1') {
+        console.warn('No columns found for node:', node);
       }
       return [];
     };
@@ -141,6 +259,7 @@ const TokenFrequencyTab: React.FC = () => {
 
   // Update node column selections when selected nodes change
   useEffect(() => {
+    if (isLocked) return;
     if (selectedNodes.length === 0) {
       setNodeColumnSelections([]);
       return;
@@ -189,10 +308,10 @@ const TokenFrequencyTab: React.FC = () => {
     setIsLoadingStopWords(true);
     try {
   const response = await textApi.defaultStopWords(getAuthHeaders());
-      if (response.success && response.data) {
+      if (response.status === 'successful' && response.data) {
         const joined = response.data.join(', ');
         setStopWords(joined);
-        // Auto-apply on fill default
+        // Auto-apply on fill default and persist
         applyStopSetFromText(joined);
       } else {
         console.error('Failed to get default stop words:', response.message);
@@ -235,7 +354,6 @@ const TokenFrequencyTab: React.FC = () => {
         node_ids: selectedNodes.slice(0, 2).map(node => node.id), // Limit to 2 nodes
         node_columns: nodeColumns,
         stop_words: stopWordsArray,
-  limit: fetchLimit
       };
 
   const response = await textApi.tokenFrequencies(currentWorkspaceId, request, getAuthHeaders());
@@ -243,20 +361,75 @@ const TokenFrequencyTab: React.FC = () => {
   if (localStorage.getItem('debugTF') === '1') console.log('Token Frequency Response:', response);
   setResults(response);
   setLastCompareNodeIds(request.node_ids);
+      // Lock panel with snapshot
+      try {
+        const snaps: Array<{ id: string; name: string; columns: string[] }> = [];
+        for (const id of request.node_ids) {
+          try {
+            const info = await nodesApi.info(currentWorkspaceId!, id, getAuthHeaders());
+            const name = (info as any)?.name || (info as any)?.data?.name || id;
+            const columns = Array.isArray((info as any)?.columns) ? (info as any).columns : (Array.isArray((info as any)?.data?.columns) ? (info as any).data.columns : []);
+            snaps.push({ id, name: String(name), columns });
+          } catch { snaps.push({ id, name: id, columns: [] }); }
+        }
+        setLockedNodesSnapshot(snaps);
+        setIsLocked(true);
+      } catch { /* ignore */ }
     } catch (error) {
       console.error('Error calculating token frequencies:', error);
       setResults({
-        success: false,
+        status: 'failed',
         message: error instanceof Error ? error.message : 'Unknown error occurred',
         data: null
-      });
+      } as any);
     } finally {
       setIsAnalyzing(false);
     }
   };
 
-  const handleTokenClick = (token: string) => {
-    // Store concordance search parameters in localStorage for cross-tab communication
+  const handleClearResults = async () => {
+    try {
+      if (currentWorkspaceId) {
+        await textApi.clearTokenFrequencies(currentWorkspaceId, getAuthHeaders());
+      }
+    } catch (e) {
+      console.error('Failed to clear backend analyses/cache:', e);
+    }
+    setResults(null);
+    setLastCompareNodeIds([]);
+    setLockedNodesSnapshot([]);
+    setIsLocked(false);
+  };
+
+  const handleTokenClick = async (token: string) => {
+    // Build a backend concordance request first so Concordance tab hydrates instantly
+    try {
+      if (currentWorkspaceId && selectedNodes.length > 0) {
+        const nodeColumns: Record<string, string> = {};
+        selectedNodes.slice(0, 2).forEach(n => {
+          const sel = nodeColumnSelections.find(s => s.nodeId === n.id);
+          if (sel?.column) nodeColumns[n.id] = sel.column;
+        });
+        const nodeIds = Object.keys(nodeColumns);
+        if (nodeIds.length > 0) {
+          const request = {
+            node_ids: nodeIds,
+            node_columns: nodeColumns,
+            search_word: token,
+            num_left_tokens: 10,
+            num_right_tokens: 10,
+            regex: false,
+            case_sensitive: false,
+          } as any;
+          await textApi.multiNodeConcordance(currentWorkspaceId, request, getAuthHeaders());
+        }
+      }
+    } catch (e) {
+      // Non-fatal if pre-trigger fails; Concordance tab can still run via UI
+      if (localStorage.getItem('debugTF') === '1') console.warn('Pre-trigger concordance failed:', e);
+    }
+
+    // Store parameters as a fallback and for UI hints
     const concordanceParams = {
       searchWord: token,
       nodeColumnSelections: nodeColumnSelections,
@@ -264,20 +437,15 @@ const TokenFrequencyTab: React.FC = () => {
         id: node.id,
         name: node.data?.name || node.id
       })),
-  nodeColors,
+      nodeColors,
       timestamp: Date.now()
     };
-    
-    localStorage.setItem('pendingConcordanceSearch', JSON.stringify(concordanceParams));
-    
-    // Navigate to concordance tab by dispatching a custom event
-    // The App component will need to listen for this event
-    window.dispatchEvent(new CustomEvent('navigateToConcordance', { 
-      detail: { token } 
-    }));
-    
-    // Also show a temporary notification
-  if (localStorage.getItem('debugTF') === '1') console.log(`Navigating to concordance with token: "${token}"`);
+    try { localStorage.setItem('pendingConcordanceSearch', JSON.stringify(concordanceParams)); } catch (_) {}
+
+    // Navigate to concordance tab
+    window.dispatchEvent(new CustomEvent('navigateToConcordance', { detail: { token } }));
+
+    if (localStorage.getItem('debugTF') === '1') console.log(`Navigating to concordance with token: "${token}"`);
   };
 
   // Right-click handler: add token to stop word list if not present
@@ -349,10 +517,11 @@ const TokenFrequencyTab: React.FC = () => {
   // Derive filtered results data according to the applied stop-word set
   const filteredResultsData = useMemo(() => {
     if (!results?.data) return null;
-    if (!appliedStopSet || appliedStopSet.size === 0) return results.data;
+    if (!appliedStopSet || appliedStopSet.size === 0) return results.data as any;
     const out: Record<string, any[]> = {};
-    for (const [nodeName, frequencies] of Object.entries(results.data)) {
-      out[nodeName] = (frequencies as any[]).filter(item => !appliedStopSet.has(String(item.token || '').toLowerCase()));
+    for (const [nodeName, freqValue] of Object.entries(results.data as any)) {
+      const rows = Array.isArray(freqValue) ? (freqValue as any[]) : ((freqValue as any)?.data ?? []);
+      out[nodeName] = rows.filter((item: any) => !appliedStopSet.has(String(item.token || '').toLowerCase()));
     }
     return out;
   }, [results, appliedStopSet]);
@@ -413,10 +582,29 @@ const TokenFrequencyTab: React.FC = () => {
   return (
     <div className="space-y-6">
       <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-        <h2 className="text-xl font-semibold text-gray-800 mb-4">Token Frequency Analysis</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold text-gray-800">Token Frequency Analysis</h2>
+{isLocked && (
+            <div className="relative group flex items-center text-sm text-gray-600 cursor-default">
+              <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                <path fillRule="evenodd" d="M5 8V6a5 5 0 1110 0v2h1a1 1 0 011 1v9a1 1 0 01-1 1H4a1 1 0 01-1-1V9a1 1 0 011-1h1zm2-2a3 3 0 116 0v2H7V6zm-2 4h10v7H5v-7z" clipRule="evenodd" />
+              </svg>
+              Locked
+              <div className="absolute right-0 mt-2 w-72 z-10 hidden group-hover:block bg-white border border-gray-200 shadow-lg rounded p-2 text-xs text-gray-700">
+                <div className="font-semibold mb-1">Panel locked</div>
+                <ul className="list-disc ml-4 space-y-1">
+                  <li>Locked to current request/results.</li>
+                  <li>Node selection and backend-used parameters are disabled.</li>
+                  <li>Frontend-only options (e.g., Stop words, Token Limit) stay editable.</li>
+                  <li>Clear results to unlock and resync with the graph selection.</li>
+                </ul>
+              </div>
+            </div>
+          )}
+        </div>
         
         <NodeSelectionPanel
-          selectedNodes={selectedNodes}
+          selectedNodes={(isLocked && lockedNodesSnapshot.length) ? lockedNodesSnapshot.map(s=>({ id: s.id, name: s.name, data: { name: s.name, nodeName: s.name, label: s.name, columns: s.columns }, columns: s.columns })) : selectedNodes}
           nodeColumnSelections={nodeColumnSelections}
           onColumnChange={handleColumnChange}
           nodeColors={nodeColors}
@@ -427,6 +615,8 @@ const TokenFrequencyTab: React.FC = () => {
           className="mb-6"
           showShape
           getNodeShapeFn={getNodeShape}
+          disabled={!!isLocked}
+          showColorPicker={true}
         />
 
         {/* Configuration */}
@@ -489,12 +679,21 @@ const TokenFrequencyTab: React.FC = () => {
               selectedNodes.length === 0 || 
               isAnalyzing || 
               !currentWorkspaceId ||
-              nodeColumnSelections.some(sel => !sel.column)
+              nodeColumnSelections.some(sel => !sel.column) ||
+              !!isLocked
             }
             className="w-full md:w-auto px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
           >
             {isAnalyzing ? 'Analyzing...' : 'Calculate Token Frequencies'}
           </button>
+          {results && (
+            <button
+              onClick={handleClearResults}
+              className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
+            >
+              Clear Results
+            </button>
+          )}
           {appliedStopSet.size > 0 && (
             <span className="text-xs text-gray-500">Active filter: {appliedStopSet.size} word{appliedStopSet.size === 1 ? '' : 's'}</span>
           )}
@@ -504,7 +703,7 @@ const TokenFrequencyTab: React.FC = () => {
       {/* Results */}
       {results && (
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          {results.success ? (
+          {results && results.status === 'successful' ? (
             <div>
               <h3 className="text-lg font-semibold text-gray-800 mb-4">Results</h3>
               <div className="text-sm text-gray-600 mb-4">{results.message}</div>
@@ -523,11 +722,12 @@ const TokenFrequencyTab: React.FC = () => {
               {results.data ? (
                 <div>
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                    {Object.entries((filteredResultsData ?? results.data)).map(([nodeName, frequencies], idx) => {
+                    {Object.entries((filteredResultsData ?? (results.data as any))).map(([nodeName, freqValue], idx) => {
                       const nodeId = lastCompareNodeIds[idx];
                       const color = getColorForNodeId(nodeId, idx);
+                      const rows = Array.isArray(freqValue) ? (freqValue as any[]) : ((freqValue as any)?.data ?? []);
                       // Cap to UI limit after filtering to maintain a stable count
-                      const display = (frequencies as any[]).slice(0, Math.max(1, limit || 1));
+                      const display = rows.slice(0, Math.max(1, limit || 1));
                       return renderChart(nodeName, display, color);
                     })}
                   </div>

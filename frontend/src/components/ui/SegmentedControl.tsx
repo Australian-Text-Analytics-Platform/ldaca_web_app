@@ -32,20 +32,21 @@ const SegmentedControl: React.FC<SegmentedControlProps> = ({
   const measure = useCallback(() => {
     const btn = buttonRefs.current[selectedIndex];
     if (btn) {
-      setIndicator({ width: btn.offsetWidth, left: btn.offsetLeft });
+      const next = { width: btn.offsetWidth, left: btn.offsetLeft };
+      setIndicator(prev => (prev.width !== next.width || prev.left !== next.left ? next : prev));
     }
   }, [selectedIndex]);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     measure();
-  }, [measure, options]);
+  }, [measure, selectedIndex]);
 
   useEffect(() => {
     if (!containerRef.current || typeof ResizeObserver === 'undefined') return;
     const ro = new ResizeObserver(() => measure());
     ro.observe(containerRef.current);
     return () => ro.disconnect();
-  }, [options, measure]);
+  }, [measure]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (disabled) return;

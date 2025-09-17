@@ -5,7 +5,10 @@ These endpoints are now simple HTTP wrappers around DocWorkspace methods.
 All business logic is handled by the DocWorkspace library itself.
 """
 
+import asyncio
+import json
 import logging
+import os
 import re
 import time
 from datetime import datetime
@@ -13,10 +16,12 @@ from typing import Any, Dict, Optional, Tuple, cast
 
 import polars as pl
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
+from pydantic import BaseModel
 
 from ..core.auth import get_current_user
 from ..core.docworkspace_api import DocWorkspaceAPIUtils
+from ..core.json_utils import json_sanitize
 
 # Note: DocWorkspace API helpers are not used directly in this HTTP layer
 from ..core.utils import get_user_data_folder, get_user_workspace_folder, load_data_file
@@ -33,6 +38,7 @@ from ..models import (
     QuotationDetachRequest,
     QuotationRequest,
     SliceRequest,
+    StopWordsPayload,
     TokenFrequencyData,
     TokenFrequencyRequest,
     TokenFrequencyResponse,
@@ -54,6 +60,67 @@ except Exception:  # pragma: no cover
     DocLazyFrame = None  # type: ignore
 
 logger = logging.getLogger(__name__)
+
+# -----------------------------------------------------------------------------
+# Configure Numba threading layer with automatic TBB detection and fallback
+# -----------------------------------------------------------------------------
+def _configure_numba_threading():
+    """Configure Numba threading layer with TBB detection and fallback to workqueue."""
+    try:
+        # Check if TBB is available to Numba
+        tbb_available = False
+        try:
+            import numba
+            from numba import config
+            # Check if TBB is in Numba's available threading layers
+            available_layers = getattr(config, 'THREADING_LAYER_PRIORITY', [])
+            if isinstance(available_layers, (list, tuple)):
+                tbb_available = 'tbb' in available_layers
+            elif isinstance(available_layers, str):
+                tbb_available = 'tbb' in available_layers
+                
+            # Also try importing TBB directly as a secondary check
+            if not tbb_available:
+                try:
+                    import tbb
+                    tbb_available = True
+                except ImportError:
+                    pass
+                    
+        except (ImportError, AttributeError):
+            # Numba not available, fall back to safe mode
+            pass
+        
+        if tbb_available:
+            # Use TBB if available (thread-safe for concurrent access)
+            os.environ.setdefault("NUMBA_THREADING_LAYER_PRIORITY", "tbb workqueue omp")
+            os.environ.setdefault("NUMBA_THREADING_LAYER", "tbb")
+            # Don't set NUMBA_NUM_THREADS when using TBB - let TBB manage threading
+            # Also prevent conflicts by not overriding if already set
+            if "NUMBA_NUM_THREADS" not in os.environ:
+                # TBB will manage its own threads
+                pass
+            print("📊 Numba: Using TBB threading layer (thread-safe, TBB-managed threads)")
+        else:
+            # Fall back to workqueue with single thread for safety
+            os.environ.setdefault("NUMBA_THREADING_LAYER", "workqueue")
+            os.environ.setdefault("NUMBA_THREADING_LAYER_PRIORITY", "workqueue omp tbb")
+            # Only set num threads if not already set to avoid conflicts
+            if "NUMBA_NUM_THREADS" not in os.environ:
+                os.environ["NUMBA_NUM_THREADS"] = "1"
+            print("📊 Numba: Using workqueue threading layer (single-threaded for safety)")
+            
+    except Exception as e:
+        # Final fallback - basic workqueue setup
+        os.environ.setdefault("NUMBA_THREADING_LAYER", "workqueue")
+        os.environ.setdefault("NUMBA_THREADING_LAYER_PRIORITY", "workqueue omp tbb")
+        os.environ.setdefault("NUMBA_NUM_THREADS", "1")
+        print(f"⚠️ Numba: Threading configuration warning: {e}")
+
+# Apply the configuration
+_configure_numba_threading()
+
+
 
 # -----------------------------------------------------------------------------
 # Concordance In-Memory Cache
@@ -99,11 +166,218 @@ def _get_cached_concordance_df(key):  # pragma: no cover - simple accessor
 # ============================================================================
 
 
+@router.get("/{workspace_id}/tasks")
+async def list_workspace_tasks(
+    workspace_id: str, current_user: dict = Depends(get_current_user)
+):
+    """List tasks for this workspace and current user."""
+    user_id = current_user["id"]
+    tm = workspace_manager.get_task_manager(user_id, workspace_id)
+    data = await tm.list()
+    return {"status": "successful", "data": data}
+
+
+@router.post("/{workspace_id}/tasks/cancel")
+async def cancel_workspace_tasks(
+    workspace_id: str,
+    task_type: Optional[str] = None,
+    task_id: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+):
+    """Cancel tasks for this workspace. If task_id provided, cancel only that task. Otherwise cancel all running tasks, optionally filtered by task_type."""
+    user_id = current_user["id"]
+    tm = workspace_manager.get_task_manager(user_id, workspace_id)
+    if task_id:
+        ok = await tm.cancel_task(task_id)
+        return {"status": "successful", "data": {"cancelled": ok}}
+    count = await tm.cancel_all(task_type=task_type)
+    return {"status": "successful", "data": {"cancelled_count": count}}
+
+
+@router.post("/{workspace_id}/tasks/clear")
+async def clear_workspace_tasks(
+    workspace_id: str,
+    task_type: Optional[str] = None,
+    task_id: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+):
+    """Clear (remove) task records for this workspace. This only removes task tracking records, not analysis results.
+    
+    If task_id provided, clear only that task. Otherwise clear all completed tasks, optionally filtered by task_type.
+    Analysis results are preserved and only task records are removed from memory.
+    """
+    user_id = current_user["id"]
+    tm = workspace_manager.get_task_manager(user_id, workspace_id)
+    
+    if task_id:
+        # Clear specific task by ID
+        cleared = await tm.clear_task(task_id)
+        return {"status": "successful", "data": {"cleared_count": 1 if cleared else 0}}
+    else:
+        # Clear all tasks of specified type (or all tasks if no type specified)
+        count = await tm.clear_tasks(task_type=task_type, user_id=user_id, workspace_id=workspace_id)
+        return {"status": "successful", "data": {"cleared_count": count}}
+
+
+@router.get("/{workspace_id}/tasks/stream")
+async def stream_task_progress(
+    workspace_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Server-Sent Events stream for real-time task progress updates."""
+    user_id = current_user["id"]
+    tm = workspace_manager.get_task_manager(user_id, workspace_id)
+    
+    async def event_generator():
+        queue = None
+        try:
+            # Subscribe to events
+            queue = await tm.subscribe(user_id, workspace_id)
+            
+            # Send initial tasks snapshot
+            tasks = await tm.list(user_id=user_id, workspace_id=workspace_id)
+            initial_data = {
+                "type": "tasks_snapshot",
+                "tasks": tasks,
+                "timestamp": time.time()
+            }
+            yield f"data: {json.dumps(initial_data)}\n\n"
+            
+            # Stream events from queue
+            last_heartbeat = time.time()
+            while True:
+                try:
+                    # Wait for event with timeout for heartbeat
+                    event = await asyncio.wait_for(queue.get(), timeout=30.0)
+                    yield f"data: {json.dumps(event)}\n\n"
+                    last_heartbeat = time.time()
+                except asyncio.TimeoutError:
+                    # Send heartbeat to keep connection alive
+                    if time.time() - last_heartbeat > 30:
+                        heartbeat_data = {
+                            "type": "heartbeat",
+                            "timestamp": time.time()
+                        }
+                        yield f"data: {json.dumps(heartbeat_data)}\n\n"
+                        last_heartbeat = time.time()
+                    
+        except asyncio.CancelledError:
+            print(f"SSE stream cancelled for user {user_id}, workspace {workspace_id}")
+        except Exception as e:
+            print(f"SSE stream error: {e}")
+            # Send error event
+            error_data = {
+                "type": "error",
+                "message": str(e),
+                "timestamp": time.time()
+            }
+            yield f"data: {json.dumps(error_data)}\n\n"
+        finally:
+            # Unsubscribe on cleanup
+            if queue:
+                try:
+                    await tm.unsubscribe(user_id, workspace_id, queue)
+                except Exception as e:
+                    print(f"Error unsubscribing from events: {e}")
+    
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "Cache-Control"
+        }
+    )
+
+
+@router.get("/{workspace_id}/topic-modeling/current-request")
+async def topic_modeling_current_request(
+    workspace_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    user_id = current_user["id"]
+    try:
+        from ldaca_web_app_backend.core.analysis_store import get_latest_analysis
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"analysis_store unavailable: {e}")
+    rec = await asyncio.to_thread(
+        get_latest_analysis, user_id, workspace_id, "topic_modeling"
+    )
+    if not rec:
+        return None
+    return {
+        "status": "successful",
+        "message": "ok",
+        "data": json_sanitize(rec.request),
+    }
+
+
+@router.get("/{workspace_id}/topic-modeling/current-result")
+async def topic_modeling_current_result(
+    workspace_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Get current topic modeling result - read-only endpoint."""
+    user_id = current_user["id"]
+    
+    # First try persisted analysis (primary source of truth)
+    try:
+        from ldaca_web_app_backend.core.analysis_store import get_latest_analysis
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"analysis_store unavailable: {e}")
+    
+    rec = await asyncio.to_thread(
+        get_latest_analysis, user_id, workspace_id, "topic_modeling"
+    )
+    if rec and getattr(rec, "result", None):
+        # Return persisted result
+        result = rec.result
+        if isinstance(result, dict) and "data" in result:
+            return {
+                "status": result.get("status", "successful"),
+                "message": result.get("message", "ok"),
+                "data": json_sanitize(result["data"]),
+            }
+        else:
+            # Legacy format
+            return {
+                "status": "successful",
+                "message": "ok",
+                "data": json_sanitize(result),
+            }
+    
+    # Fallback: check ProcessTaskManager for running state
+    tm = workspace_manager.get_task_manager(user_id, workspace_id)
+    latest = await tm.latest_by_type("topic_modeling", user_id=user_id, workspace_id=workspace_id)
+    if latest is None:
+        return None
+    
+    status_val = latest.status.value if hasattr(latest.status, 'value') else str(latest.status)
+    
+    if status_val == "running":
+        return {"status": "running", "message": "Task is still running", "data": None}
+    elif status_val == "failed":
+        return {
+            "status": "failed",
+            "message": latest.error or "Task failed",
+            "data": None,
+        }
+    else:
+        # Task completed but result not persisted yet (should be rare with new flow)
+        return {
+            "status": "running",
+            "message": "Task completed, result being processed",
+            "data": None,
+        }
+
+
 @router.post(
     "/{workspace_id}/topic-modeling",
     response_model=TopicModelingResponse,
     summary="Run topic modeling (BERTopic) across one or two nodes",
-    description="Fits a single BERTopic model over concatenated documents from up to two nodes and returns per-topic sizes and 2D coordinates.",
+    description="Starts a background topic modeling task over up to two nodes and returns a running task id.",
 )
 async def run_topic_modeling(
     workspace_id: str,
@@ -111,44 +385,55 @@ async def run_topic_modeling(
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    try:
-        if not request.node_ids:
-            raise HTTPException(
-                status_code=400, detail="At least one node ID must be provided"
-            )
-        if len(request.node_ids) > 2:
-            raise HTTPException(
-                status_code=400, detail="Maximum of 2 nodes can be compared"
-            )
+    # Validate inputs early
+    if not request.node_ids:
+        raise HTTPException(
+            status_code=400, detail="At least one node ID must be provided"
+        )
+    if len(request.node_ids) > 2:
+        raise HTTPException(
+            status_code=400, detail="Maximum of 2 nodes can be compared"
+        )
 
+    # Use ProcessTaskManager for robust background processing
+    tm = workspace_manager.get_task_manager(user_id, workspace_id)
+
+    # If a topic modeling task is already running for this workspace, return that task id
+    try:
+        if await tm.any_running(task_type="topic_modeling", user_id=user_id, workspace_id=workspace_id):
+            latest = await tm.latest_by_type("topic_modeling", user_id=user_id, workspace_id=workspace_id)
+            return {
+                "status": "running",
+                "message": "Topic modeling already running",
+                "data": None,
+                "metadata": {"task_id": latest.id if latest else None},
+            }
+    except Exception:
+        # If TaskManager check fails, proceed to attempt scheduling
+        pass
+
+    # Validate that workspace and nodes exist before submitting task
+    try:
         workspace = workspace_manager.get_workspace(user_id, workspace_id)
         if not workspace:
             raise HTTPException(
                 status_code=404, detail=f"Workspace {workspace_id} not found"
             )
-
-        try:
-            import polars as pl  # noqa: F401
-
-            from docframe import DocDataFrame, DocLazyFrame  # type: ignore
-        except Exception as e:  # pragma: no cover
-            raise HTTPException(
-                status_code=500, detail=f"Required libraries unavailable: {e}"
-            )
-
-        corpora: list[list[str]] = []
-        node_names: list[str] = []
+        
+        # Validate all nodes exist and determine columns
         node_columns = request.node_columns or {}
-
+        validated_columns: Dict[str, str] = {}
+        
         for node_id in request.node_ids:
             node = workspace_manager.get_node_from_workspace(
                 user_id, workspace_id, node_id
             )
             if not node:
-                raise HTTPException(status_code=404, detail=f"Node {node_id} not found")
+                raise HTTPException(
+                    status_code=404, detail=f"Node {node_id} not found"
+                )
+            
             node_data = getattr(node, "data", node)
-            node_name = getattr(node, "name", None) or node_id
-
             if hasattr(node_data, "columns"):
                 available_columns = node_data.columns  # type: ignore[attr-defined]
             elif hasattr(node_data, "collect_schema"):
@@ -157,14 +442,25 @@ async def run_topic_modeling(
                 available_columns = list(node_data.schema.keys())  # type: ignore
             else:
                 available_columns = []
-
+            
             column_name = node_columns.get(node_id)
             if not column_name:
-                if isinstance(node_data, (DocDataFrame, DocLazyFrame)) and getattr(
-                    node_data, "document_column", None
-                ):
-                    column_name = node_data.document_column  # type: ignore[attr-defined]
-                else:
+                try:
+                    from docframe import DocDataFrame, DocLazyFrame  # type: ignore
+                    if isinstance(node_data, (DocDataFrame, DocLazyFrame)) and getattr(
+                        node_data, "document_column", None
+                    ):
+                        column_name = node_data.document_column  # type: ignore[attr-defined]
+                    else:
+                        common = [
+                            c
+                            for c in ["document", "text", "content", "body", "message"]
+                            if c in available_columns
+                        ]
+                        if common:
+                            column_name = common[0]
+                except ImportError:
+                    # DocFrame not available, use common text columns
                     common = [
                         c
                         for c in ["document", "text", "content", "body", "message"]
@@ -172,6 +468,7 @@ async def run_topic_modeling(
                     ]
                     if common:
                         column_name = common[0]
+                        
             if not column_name:
                 raise HTTPException(
                     status_code=400,
@@ -182,86 +479,52 @@ async def run_topic_modeling(
                     status_code=400,
                     detail=f"Column '{column_name}' not in node {node_id}. Available: {available_columns}",
                 )
-
-            try:
-                if hasattr(node_data, "select"):
-                    selected = node_data.select(
-                        pl.col(column_name).alias("__doc_col__")
-                    )  # type: ignore
-                else:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Unsupported node data type for node {node_id}",
-                    )
-                if hasattr(selected, "collect"):
-                    try:
-                        selected = selected.collect()
-                    except Exception:  # pragma: no cover
-                        pass
-                docs = [
-                    str(v) if v is not None else ""
-                    for v in selected["__doc_col__"].to_list()
-                ]  # type: ignore[index]
-                corpora.append(docs)
-                node_names.append(node_name)
-            except HTTPException:
-                raise
-            except Exception as e:
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"Error extracting documents from node {node_id}: {e}",
-                )
-
-        try:
-            from docframe.core.text_utils import topic_visualization  # type: ignore
-        except Exception as e:  # pragma: no cover
-            raise HTTPException(
-                status_code=500, detail=f"topic_visualization unavailable: {e}"
-            )
-
-        try:
-            tv = topic_visualization(
-                corpora=corpora,
-                min_topic_size=request.min_topic_size or 5,
-                use_ctfidf=bool(request.use_ctfidf),
-            )
-        except ImportError as ie:
-            return TopicModelingResponse(success=False, message=str(ie), data=None)
-        except ValueError as ve:
-            raise HTTPException(status_code=400, detail=str(ve))
-        except Exception as e:  # pragma: no cover
-            raise HTTPException(
-                status_code=500, detail=f"Error running topic modeling: {e}"
-            )
-
-        response_data = {
-            "topics": tv["topics"],
-            "corpus_sizes": tv["corpus_sizes"],
-            "per_corpus_topic_counts": tv.get("per_corpus_topic_counts"),
-            "meta": {**tv.get("meta", {}), "node_names": node_names},
-        }
-        result = TopicModelingResponse(
-            success=True,
-            message=f"Successfully modeled topics for {len(corpora)} corpus/corpora",
-            data=response_data,  # type: ignore[arg-type]
-        )
-        try:  # pragma: no cover
-            from ldaca_web_app_backend.core.analysis_store import save_analysis
-
-            save_analysis(
-                user_id=user_id,
-                workspace_id=workspace_id,
-                task="topic_modeling",
-                request_dict=request.model_dump() if hasattr(request, "model_dump") else request.dict(),
-                result_dict=result.model_dump() if hasattr(result, "model_dump") else result.dict(),
-            )
-        except Exception as _e:  # pragma: no cover
-            print(f"[analysis_persist] topic_modeling save failed: {_e}")
-        return result
+            
+            validated_columns[node_id] = column_name
+    
     except HTTPException:
         raise
-    except Exception as e:  # pragma: no cover
-        raise HTTPException(status_code=500, detail=f"Unexpected error: {e}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Validation error: {e}")
+    
+    # Submit task to process pool
+    try:
+        task_info = await tm.submit_topic_modeling(
+            user_id=user_id,
+            workspace_id=workspace_id,
+            node_ids=request.node_ids,
+            node_columns=validated_columns,
+            min_topic_size=request.min_topic_size or 5,
+            use_ctfidf=bool(request.use_ctfidf)
+        )
+        
+        # Persist the request immediately so current-request is available while running
+        try:
+            from ldaca_web_app_backend.core.analysis_store import save_analysis
+
+            req_dict = (
+                request.model_dump() if hasattr(request, "model_dump") else request.dict()
+            )
+            # Do NOT store a running result payload under 'result' as it confuses current-result shape;
+            # save an empty dict for result so only current-request is hydrated.
+            await asyncio.to_thread(
+                save_analysis, user_id, workspace_id, "topic_modeling", req_dict, {}
+            )
+        except Exception as _e:
+            print(f"[analysis_persist] save running request failed: {_e}")
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to submit task: {e}")
+
+    # Immediate running response with task id
+    return {
+        "status": "running",
+        "message": "Topic modeling started",
+        "data": None,
+        "metadata": {"task_id": task_info.id},
+    }
 
 
 def _store_concordance_df(key, df):  # pragma: no cover
@@ -357,8 +620,6 @@ async def create_workspace(
                 "total_nodes", 0
             ),  # Updated to use latest terminology
         )
-
-
 
     except HTTPException:
         # Re-raise HTTPExceptions as-is
@@ -684,23 +945,24 @@ async def get_workspace_graph(
     graph_data = workspace_manager.get_workspace_graph(user_id, workspace_id)
     if not graph_data:
         raise HTTPException(status_code=404, detail="Workspace not found")
-    # Attach latest analyses (best-effort)
+    # Attach latest analyses (best-effort) with JSON sanitization to avoid numpy key errors
     try:  # pragma: no cover - enrichment non-critical
         from ldaca_web_app_backend.core.analysis_store import list_analyses
 
         records = list_analyses(user_id, workspace_id)
-        graph_data["latest_analysis"] = {
-            r.task: {
-                "task": r.task,
-                "saved_at": r.saved_at,
-                "request": r.request,
-                "result": r.result,
+        latest: Dict[str, Any] = {}
+        for r in records:
+            latest[str(r.task)] = {
+                "task": str(r.task),
+                "saved_at": json_sanitize(getattr(r, "saved_at", None)),
+                "request": json_sanitize(getattr(r, "request", None)),
+                "result": json_sanitize(getattr(r, "result", None)),
             }
-            for r in records
-        }
+        graph_data["latest_analysis"] = latest
     except Exception as _e:  # pragma: no cover
         print(f"[analysis_persist] failed to enrich graph with analyses: {_e}")
-    return graph_data
+    # Final defensive sanitize of entire graph payload
+    return json_sanitize(graph_data)
 
 
 @router.get("/{workspace_id}/nodes")
@@ -2015,45 +2277,66 @@ async def get_concordance(
 
             import polars as pl
 
-            # Store core concordance columns for metadata
-            core_concordance_columns = list(concordance_result.columns)
+            # Identify core concordance columns explicitly
+            core_names = {
+                "document_idx",
+                "left_context",
+                "matched_text",
+                "right_context",
+                "start_idx",
+                "end_idx",
+                "l1",
+                "r1",
+                "l1_freq",
+                "r1_freq",
+            }
+            core_concordance_columns = [
+                c for c in concordance_result.columns if c in core_names
+            ]
 
-            # Always join metadata (original row) by document_idx
-            # Frontend will decide whether to display metadata columns
+            # Ensure a stable row index for sorting/pagination, avoid duplicate metadata joins
             cdf = concordance_result
             if "document_idx" not in cdf.columns:
                 cdf = cdf.with_row_index("document_idx")
 
-            # Materialize original node data and add document_idx
-            base = node.data
-            if hasattr(base, "to_lazyframe"):
-                base_df = base.to_lazyframe().collect()
-            elif hasattr(base, "_df"):
-                base_df = base._df  # type: ignore[attr-defined]
-            elif hasattr(base, "collect"):
-                base_df = base.collect()
-            else:
-                base_df = base
-            if isinstance(base_df, pl.LazyFrame):
-                base_df = base_df.collect()
+            # If docframe already preserved metadata columns, do not join; fallback join otherwise
+            has_metadata = any(
+                (col not in core_concordance_columns) and (col != "document_idx")
+                for col in cdf.columns
+            )
+            if not has_metadata:
+                base = node.data
+                if hasattr(base, "to_lazyframe"):
+                    base_df = base.to_lazyframe().collect()
+                elif hasattr(base, "_df"):
+                    base_df = base._df  # type: ignore[attr-defined]
+                elif hasattr(base, "collect"):
+                    base_df = base.collect()
+                else:
+                    base_df = base
+                if isinstance(base_df, pl.LazyFrame):
+                    base_df = base_df.collect()
+                orig = base_df.with_row_index("document_idx")
+                try:
+                    idx_dtype = cdf.schema.get("document_idx")
+                    if idx_dtype is not None:
+                        orig = orig.with_columns(pl.col("document_idx").cast(idx_dtype))
+                except Exception:
+                    pass
+                cdf = cdf.join(orig, on="document_idx", how="left")
 
-            # Align document_idx dtype across both sides before join
-            orig = base_df.with_row_index("document_idx")
-            try:
-                idx_dtype = cdf.schema.get("document_idx")
-                if idx_dtype is not None:
-                    orig = orig.with_columns(pl.col("document_idx").cast(idx_dtype))
-            except Exception:
-                pass
+            concordance_result = cdf
 
-            # Join original metadata to the right
-            concordance_result = cdf.join(orig, on="document_idx", how="left")
-
-            # Determine metadata columns (columns that came from original data, excluding concordance columns)
+            # Determine metadata columns (columns that are not part of the core set)
             all_columns = list(concordance_result.columns)
             metadata_columns = [
                 col for col in all_columns if col not in core_concordance_columns
             ]
+
+            # Filter out rows with null matched_text before sorting/pagination (frontend doesn't need null-only rows)
+            concordance_result = concordance_result.filter(
+                pl.col("matched_text").is_not_null()
+            )
 
             # Apply sorting if requested (after join so metadata columns are sortable)
             if request.sort_by and request.sort_by in concordance_result.columns:
@@ -2105,7 +2388,9 @@ async def get_concordance(
                         user_id=user_id,
                         workspace_id=workspace_id,
                         task="concordance",
-                        request_dict=request.model_dump() if hasattr(request, "model_dump") else request.dict(),
+                        request_dict=request.model_dump()
+                        if hasattr(request, "model_dump")
+                        else request.dict(),
                         result_dict=result_payload,
                     )
                 except Exception as _e:  # pragma: no cover
@@ -2134,6 +2419,18 @@ async def get_concordance(
                         "sort_by": request.sort_by,
                         "sort_order": request.sort_order,
                     },
+                    "analysis_params": {
+                        "node_id": node_id,
+                        "column": request.column,
+                        "search_word": request.search_word,
+                        "num_left_tokens": request.num_left_tokens,
+                        "num_right_tokens": request.num_right_tokens,
+                        "regex": request.regex,
+                        "case_sensitive": request.case_sensitive,
+                        "page_size": request.page_size,
+                        "sort_by": request.sort_by,
+                        "sort_order": request.sort_order,
+                    },
                 }
                 try:  # pragma: no cover
                     from ldaca_web_app_backend.core.analysis_store import save_analysis
@@ -2142,7 +2439,9 @@ async def get_concordance(
                         user_id=user_id,
                         workspace_id=workspace_id,
                         task="concordance",
-                        request_dict=request.model_dump() if hasattr(request, "model_dump") else request.dict(),
+                        request_dict=request.model_dump()
+                        if hasattr(request, "model_dump")
+                        else request.dict(),
                         result_dict=result_payload,
                     )
                 except Exception as _e:  # pragma: no cover
@@ -2203,7 +2502,9 @@ async def get_concordance(
                         user_id=user_id,
                         workspace_id=workspace_id,
                         task="concordance",
-                        request_dict=request.model_dump() if hasattr(request, "model_dump") else request.dict(),
+                        request_dict=request.model_dump()
+                        if hasattr(request, "model_dump")
+                        else request.dict(),
                         result_dict=result_payload,
                     )
                 except Exception as _e:  # pragma: no cover
@@ -2259,6 +2560,126 @@ async def get_concordance(
         print(f"❌ Unexpected concordance error: {str(e)}")
         print(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+@router.get("/{workspace_id}/concordance/multi-node/current-request")
+async def multi_node_concordance_current_request(
+    workspace_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    user_id = current_user["id"]
+    try:
+        from ldaca_web_app_backend.core.analysis_store import get_latest_analysis
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"analysis_store unavailable: {e}")
+    rec = get_latest_analysis(user_id, workspace_id, task="multi_concordance")
+    if not rec:
+        return None
+    return {"status": "successful", "message": "ok", "data": rec.request}
+
+
+@router.get("/{workspace_id}/concordance/multi-node/current-result")
+async def multi_node_concordance_current_result(
+    workspace_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    user_id = current_user["id"]
+    try:
+        from ldaca_web_app_backend.core.analysis_store import get_latest_analysis
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"analysis_store unavailable: {e}")
+    rec = get_latest_analysis(user_id, workspace_id, task="multi_concordance")
+    if not rec:
+        return None
+    return {"status": "successful", "message": "ok", "data": rec.result}
+
+
+class MultiConcordanceResultQuery(BaseModel):
+    node_id: Optional[str] = None
+    combined: Optional[bool] = None
+    page: Optional[int] = None
+    page_size: Optional[int] = None
+    sort_by: Optional[str] = None
+    sort_order: Optional[str] = None
+
+
+@router.post("/{workspace_id}/concordance/multi-node/current-result")
+async def multi_node_concordance_current_result_post(
+    workspace_id: str,
+    query: MultiConcordanceResultQuery,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Returns current multi-node concordance result re-sorted/re-paginated according to overrides.
+    Delegates to the main multi-node concordance endpoint with the last saved request augmented with overrides.
+    """
+    user_id = current_user["id"]
+    try:
+        from ldaca_web_app_backend.core.analysis_store import get_latest_analysis
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"analysis_store unavailable: {e}")
+    rec = get_latest_analysis(user_id, workspace_id, task="multi_concordance")
+    if not rec or not rec.request:
+        return {
+            "status": "failed",
+            "message": "No analysis found for multi_concordance",
+            "data": None,
+        }
+
+    # Build new request from last saved
+    try:
+        base_req = rec.request
+        # Ensure required fields exist
+        node_ids = base_req.get("node_ids") or []
+        node_columns = base_req.get("node_columns") or {}
+        if not node_ids:
+            return {
+                "status": "failed",
+                "message": "No prior request found for multi_concordance",
+                "data": None,
+            }
+        # Inherit
+        page = query.page if query.page is not None else (base_req.get("page") or 1)
+        page_size = (
+            query.page_size
+            if query.page_size is not None
+            else (base_req.get("page_size") or 20)
+        )
+        sort_by = (
+            query.sort_by if query.sort_by is not None else base_req.get("sort_by")
+        )
+        sort_order = (
+            query.sort_order
+            if query.sort_order is not None
+            else (base_req.get("sort_order") or "asc")
+        )
+        combined = (
+            bool(query.combined)
+            if query.combined is not None
+            else bool(base_req.get("combined") or False)
+        )
+
+        # If node_id override supplied, we still re-run the request for both nodes; sorting applies where relevant
+        # Delegation to main endpoint will handle sorting, combined, pagination uniformly
+        new_req = MultiNodeConcordanceRequest(
+            node_ids=node_ids,
+            node_columns=node_columns,
+            search_word=base_req.get("search_word", ""),
+            num_left_tokens=base_req.get("num_left_tokens", 10),
+            num_right_tokens=base_req.get("num_right_tokens", 10),
+            regex=bool(base_req.get("regex", False)),
+            case_sensitive=bool(base_req.get("case_sensitive", False)),
+            page=page,
+            page_size=page_size,
+            sort_by=sort_by,
+            sort_order=sort_order,
+            combined=combined,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to prepare request: {e}")
+
+    # Delegate to main endpoint
+    return await get_multi_node_concordance(workspace_id, new_req, current_user)
 
 
 @router.post("/{workspace_id}/concordance/multi-node")
@@ -2349,36 +2770,64 @@ async def get_multi_node_concordance(
             # Work on a non-mutating sorted view for this request
             working_df = concordance_result
 
-            # Store core concordance columns for metadata
-            core_concordance_columns = list(concordance_result.columns)
+            # Identify core concordance columns explicitly (avoid treating metadata as concordance)
+            core_names = {
+                "document_idx",
+                "left_context",
+                "matched_text",
+                "right_context",
+                "start_idx",
+                "end_idx",
+                "l1",
+                "r1",
+                "l1_freq",
+                "r1_freq",
+            }
+            core_concordance_columns = [
+                c for c in working_df.columns if c in core_names
+            ]
 
-            # Always join metadata (original row) by document_idx
-            # Frontend will decide whether to display metadata columns
+            # Ensure we have a stable row index for pagination/sorting; do not join metadata again
+            # DocFrame's DataFrame.text.concordance(explode=True, unnest=True) preserves original columns,
+            # so re-joining the base table would create duplicate columns (e.g. *_right). Avoid that.
             try:
                 cdf = working_df
                 if "document_idx" not in cdf.columns:
                     cdf = cdf.with_row_index("document_idx")
-                base = node.data
-                if hasattr(base, "to_lazyframe"):
-                    base_df = base.to_lazyframe().collect()
-                elif hasattr(base, "_df"):
-                    base_df = base._df  # type: ignore[attr-defined]
-                elif hasattr(base, "collect"):
-                    base_df = base.collect()
-                else:
-                    base_df = base
-                if isinstance(base_df, pl.LazyFrame):
-                    base_df = base_df.collect()
-                orig = base_df.with_row_index("document_idx")
-                working_df = cdf.join(orig, on="document_idx", how="left")
+                # If for some reason there are no metadata columns present (only core columns),
+                # fallback to a single join to bring original metadata.
+                has_metadata = any(
+                    (col not in core_concordance_columns) and (col != "document_idx")
+                    for col in cdf.columns
+                )
+                if not has_metadata:
+                    base = node.data
+                    if hasattr(base, "to_lazyframe"):
+                        base_df = base.to_lazyframe().collect()
+                    elif hasattr(base, "_df"):
+                        base_df = base._df  # type: ignore[attr-defined]
+                    elif hasattr(base, "collect"):
+                        base_df = base.collect()
+                    else:
+                        base_df = base
+                    if isinstance(base_df, pl.LazyFrame):
+                        base_df = base_df.collect()
+                    orig = base_df.with_row_index("document_idx")
+                    cdf = cdf.join(orig, on="document_idx", how="left")
+                working_df = cdf
             except Exception as je:
-                logger.warning(f"Failed to join metadata for node {node_id}: {je}")
+                logger.warning(
+                    f"Failed to finalize concordance frame for node {node_id}: {je}"
+                )
 
-            # Determine metadata columns (columns that came from original data, excluding concordance columns)
+            # Determine metadata columns (columns that are not part of the core concordance set)
             all_columns = list(working_df.columns)
             metadata_columns = [
                 col for col in all_columns if col not in core_concordance_columns
             ]
+
+            # Filter out rows with null matched_text before sorting/pagination
+            working_df = working_df.filter(pl.col("matched_text").is_not_null())
 
             if (
                 request.sort_by
@@ -2465,7 +2914,7 @@ async def get_multi_node_concordance(
                 if not col_sets or any(cols != col_sets[0] for cols in col_sets[1:]):
                     # Skip combined view by not adding __COMBINED__ key
                     return {
-                        "success": True,
+                        "status": "successful",
                         "message": f"Found concordance results for search term '{request.search_word}'",
                         "data": results,
                     }
@@ -2508,7 +2957,7 @@ async def get_multi_node_concordance(
                 print(f"⚠️ Failed to build combined concordance view: {ce}")
 
         result_payload = {
-            "success": True,
+            "status": "successful",
             "message": f"Found concordance results for search term '{request.search_word}'",
             "data": results,
         }
@@ -2519,7 +2968,9 @@ async def get_multi_node_concordance(
                 user_id=user_id,
                 workspace_id=workspace_id,
                 task="multi_concordance",
-                request_dict=request.model_dump() if hasattr(request, "model_dump") else request.dict(),
+                request_dict=request.model_dump()
+                if hasattr(request, "model_dump")
+                else request.dict(),
                 result_dict=result_payload,
             )
         except Exception as _e:  # pragma: no cover
@@ -2543,7 +2994,82 @@ async def clear_concordance_cache(
     """Clear in-memory concordance cache for this user's workspace (called when leaving tab)."""
     user_id = current_user["id"]
     removed = _clear_concordance_cache_for(user_id, workspace_id)
-    return {"success": True, "removed": removed}
+    return {"status": "successful", "removed": removed}
+
+
+@router.post("/{workspace_id}/concordance/multi-node/clear")
+async def clear_multi_concordance_results(
+    workspace_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Clear saved multi_concordance analysis and concordance cache for the workspace."""
+    user_id = current_user["id"]
+    try:
+        from ldaca_web_app_backend.core.analysis_store import clear_analyses
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"analysis_store unavailable: {e}")
+    removed = clear_analyses(user_id, workspace_id, task="multi_concordance")
+    cache_removed = _clear_concordance_cache_for(user_id, workspace_id)
+    return {
+        "status": "successful",
+        "cleared": {
+            "analyses_removed": removed,
+            "concordance_cache_removed": cache_removed,
+        },
+    }
+
+
+@router.post("/{workspace_id}/analysis/clear")
+async def clear_analysis_records(
+    workspace_id: str,
+    task: Optional[str] = Query(
+        None,
+        description="Optional task to clear (e.g., 'concordance', 'multi_concordance', 'token_frequencies', 'frequency_analysis', 'topic_modeling', 'quotation')",
+    ),
+    current_user: dict = Depends(get_current_user),
+):
+    """Clear saved analyses and relevant in-memory caches for a workspace.
+
+    - If task is specified, only that task's saved analysis records are removed.
+    - If task is None, all saved analysis records are removed.
+    - For concordance tasks, also clears the in-memory concordance cache.
+    """
+    user_id = current_user["id"]
+    try:
+        # Clear saved analyses
+        try:
+            from ldaca_web_app_backend.core.analysis_store import clear_analyses
+        except Exception as e:  # pragma: no cover
+            raise HTTPException(
+                status_code=500, detail=f"analysis_store unavailable: {e}"
+            )
+
+        removed = clear_analyses(user_id, workspace_id, task)
+
+        # Clear concordance cache when applicable
+        cache_removed = 0
+        if task is None or task in {"concordance", "multi_concordance"}:
+            cache_removed = _clear_concordance_cache_for(user_id, workspace_id)
+        
+        # Clear TaskManager tasks when applicable
+        tasks_removed = 0
+        if task in {"topic_modeling"} or task is None:
+            tm = workspace_manager.get_task_manager(user_id, workspace_id)
+            tasks_removed = await tm.clear_tasks(task_type=task, user_id=user_id, workspace_id=workspace_id)
+
+        return {
+            "status": "successful",
+            "message": "Analysis records cleared",
+            "cleared": {
+                "analyses_removed": removed,
+                "concordance_cache_removed": cache_removed,
+                "tasks_removed": tasks_removed,
+            },
+        }
+    except HTTPException:
+        raise
+    except Exception as e:  # pragma: no cover
+        raise HTTPException(status_code=500, detail=f"Failed to clear analyses: {e}")
 
 
 @router.get("/{workspace_id}/nodes/{node_id}/concordance/{document_idx}")
@@ -2603,6 +3129,38 @@ async def get_concordance_detail(
         print(f"❌ Unexpected concordance detail error: {str(e)}")
         print(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+@router.get("/{workspace_id}/frequency-analysis/current-request")
+async def frequency_analysis_current_request(
+    workspace_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    user_id = current_user["id"]
+    try:
+        from ldaca_web_app_backend.core.analysis_store import get_latest_analysis
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"analysis_store unavailable: {e}")
+    rec = get_latest_analysis(user_id, workspace_id, task="frequency_analysis")
+    if not rec:
+        return None
+    return {"status": "successful", "message": "ok", "data": rec.request}
+
+
+@router.get("/{workspace_id}/frequency-analysis/current-result")
+async def frequency_analysis_current_result(
+    workspace_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    user_id = current_user["id"]
+    try:
+        from ldaca_web_app_backend.core.analysis_store import get_latest_analysis
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"analysis_store unavailable: {e}")
+    rec = get_latest_analysis(user_id, workspace_id, task="frequency_analysis")
+    if not rec:
+        return None
+    return {"status": "successful", "message": "ok", "data": rec.result}
 
 
 @router.post("/{workspace_id}/nodes/{node_id}/frequency-analysis")
@@ -2671,25 +3229,25 @@ async def get_frequency_analysis(
             # Convert frequency DataFrame to format expected by frontend
             if hasattr(frequency_result, "to_dicts"):
                 result_payload = {
-                    "success": True,
+                    "status": "successful",
                     "data": frequency_result.to_dicts(),
                     "columns": list(frequency_result.columns),
                     "total_records": len(frequency_result),
-                    "analysis_params": {
-                        "time_column": request.time_column,
-                        "group_by_columns": request.group_by_columns,
-                        "frequency": request.frequency,
-                        "sort_by_time": request.sort_by_time,
-                    },
                 }
                 try:  # pragma: no cover
                     from ldaca_web_app_backend.core.analysis_store import save_analysis
 
+                    req_dict = (
+                        request.model_dump()
+                        if hasattr(request, "model_dump")
+                        else request.dict()
+                    )
+                    req_dict = {**req_dict, "node_id": node_id}
                     save_analysis(
                         user_id=user_id,
                         workspace_id=workspace_id,
                         task="frequency_analysis",
-                        request_dict=request.model_dump() if hasattr(request, "model_dump") else request.dict(),
+                        request_dict=req_dict,
                         result_dict=result_payload,
                     )
                 except Exception as _e:  # pragma: no cover
@@ -2697,16 +3255,10 @@ async def get_frequency_analysis(
                 return result_payload
             else:
                 result_payload = {
-                    "success": True,
+                    "status": "successful",
                     "data": [],
                     "columns": [],
                     "total_records": 0,
-                    "analysis_params": {
-                        "time_column": request.time_column,
-                        "group_by_columns": request.group_by_columns,
-                        "frequency": request.frequency,
-                        "sort_by_time": request.sort_by_time,
-                    },
                 }
                 try:  # pragma: no cover
                     from ldaca_web_app_backend.core.analysis_store import save_analysis
@@ -2715,7 +3267,9 @@ async def get_frequency_analysis(
                         user_id=user_id,
                         workspace_id=workspace_id,
                         task="frequency_analysis",
-                        request_dict=request.model_dump() if hasattr(request, "model_dump") else request.dict(),
+                        request_dict=request.model_dump()
+                        if hasattr(request, "model_dump")
+                        else request.dict(),
                         result_dict=result_payload,
                     )
                 except Exception as _e:  # pragma: no cover
@@ -2974,7 +3528,7 @@ async def cast_node(
             else:
                 new_type = target_type
             return {
-                "success": True,
+                "status": "successful",
                 "node_id": node_id,
                 "cast_info": {
                     "column": column_name,
@@ -3015,6 +3569,92 @@ async def cast_node(
 # ============================================================================
 
 
+@router.get("/{workspace_id}/token-frequencies/current-request")
+async def token_frequencies_current_request(
+    workspace_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    user_id = current_user["id"]
+    try:
+        from ldaca_web_app_backend.core.analysis_store import get_latest_analysis
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"analysis_store unavailable: {e}")
+    rec = get_latest_analysis(user_id, workspace_id, task="token_frequencies")
+    if not rec:
+        return None
+    return {"status": "successful", "message": "ok", "data": rec.request}
+
+
+@router.post("/{workspace_id}/token-frequencies/current-request")
+async def update_token_frequencies_current_request(
+    workspace_id: str,
+    request_update: dict,
+    current_user: dict = Depends(get_current_user),
+):
+    """Update the last saved token_frequencies request (e.g., stop_words) without recomputing results.
+    Merges with the prior saved request if present.
+    """
+    user_id = current_user["id"]
+    try:
+        from ldaca_web_app_backend.core.analysis_store import (
+            get_latest_analysis,
+            save_analysis,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"analysis_store unavailable: {e}")
+    prev = get_latest_analysis(user_id, workspace_id, task="token_frequencies")
+    merged_req: dict = {}
+    if prev and isinstance(prev.request, dict):
+        merged_req = {**prev.request}
+    # Shallow merge update (stop_words and any other patched fields)
+    try:
+        merged_req.update(request_update or {})
+    except Exception:
+        pass
+    prev_result: dict = prev.result if prev and isinstance(prev.result, dict) else {}
+    try:
+        save_analysis(
+            user_id=user_id,
+            workspace_id=workspace_id,
+            task="token_frequencies",
+            request_dict=merged_req,
+            result_dict=prev_result,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save request: {e}")
+    return {"status": "successful", "message": "saved", "data": merged_req}
+
+
+@router.get("/{workspace_id}/token-frequencies/current-result")
+async def token_frequencies_current_result(
+    workspace_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    user_id = current_user["id"]
+    try:
+        from ldaca_web_app_backend.core.analysis_store import get_latest_analysis
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"analysis_store unavailable: {e}")
+    rec = get_latest_analysis(user_id, workspace_id, task="token_frequencies")
+    if not rec:
+        return None
+    return {"status": "successful", "message": "ok", "data": rec.result}
+
+
+@router.post("/{workspace_id}/token-frequencies/clear")
+async def clear_token_frequencies_results(
+    workspace_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    user_id = current_user["id"]
+    try:
+        from ldaca_web_app_backend.core.analysis_store import clear_analyses
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"analysis_store unavailable: {e}")
+    removed = clear_analyses(user_id, workspace_id, task="token_frequencies")
+    return {"status": "successful", "cleared": {"analyses_removed": removed}}
+
+
 @router.post(
     "/{workspace_id}/token-frequencies",
     response_model=TokenFrequencyResponse,
@@ -3039,8 +3679,7 @@ async def calculate_token_frequencies(
             raise HTTPException(
                 status_code=400, detail="At least one node ID must be provided"
             )
-        if request.limit is None or request.limit <= 0:
-            raise HTTPException(status_code=400, detail="Limit must be a positive integer")
+        # 'limit' is UI-only and optional; ignore it if present
 
         if len(request.node_ids) > 2:
             raise HTTPException(
@@ -3237,13 +3876,11 @@ async def calculate_token_frequencies(
             frames=frames_dict, stop_words=request.stop_words
         )
 
-        # Convert to response format and apply limit
+        # Convert to response format (frontend applies any UI limit)
         response_data = {}
         for frame_name, freq_dict in frequency_results.items():
-            # Sort by frequency (descending) and apply limit
+            # Sort by frequency (descending)
             sorted_tokens = sorted(freq_dict.items(), key=lambda x: x[1], reverse=True)
-            if request.limit:
-                sorted_tokens = sorted_tokens[: request.limit]
 
             # Convert to TokenFrequencyData objects with column metadata
             response_data[frame_name] = {
@@ -3299,6 +3936,7 @@ async def calculate_token_frequencies(
 
         result = TokenFrequencyResponse(
             success=True,
+            status="successful",
             message=f"Successfully calculated token frequencies for {len(frames_dict)} node(s)",
             data=response_data,
             statistics=statistics_data,
@@ -3308,17 +3946,26 @@ async def calculate_token_frequencies(
         try:  # pragma: no cover - persistence errors are non-critical
             from ldaca_web_app_backend.core.analysis_store import save_analysis
 
+            # Exclude UI-only params like 'limit' from persisted request
+            req_dict = (
+                request.model_dump(exclude_none=True)
+                if hasattr(request, "model_dump")
+                else request.dict(exclude_none=True)
+            )
+            if isinstance(req_dict, dict) and "limit" in req_dict:
+                try:
+                    req_dict.pop("limit")
+                except Exception:
+                    pass
             save_analysis(
                 user_id=user_id,
                 workspace_id=workspace_id,
                 task="token_frequencies",
-                request_dict=(
-                    request.model_dump(exclude_none=True)
-                    if hasattr(request, "model_dump")
-                    else request.dict(exclude_none=True)
-                ),
+                request_dict=req_dict,
                 result_dict=(
-                    result.model_dump() if hasattr(result, "model_dump") else result.dict()
+                    result.model_dump()
+                    if hasattr(result, "model_dump")
+                    else result.dict()
                 ),
             )
         except Exception as _persist_err:  # pragma: no cover
@@ -3617,8 +4264,45 @@ async def export_nodes(
 
 
 # ============================================================================
+# ANALYSIS CURRENT REQUEST/RESULT (generic)
+# ============================================================================
+
+
+# ============================================================================
 # QUOTATION ENDPOINTS (mirror concordance but without search params)
 # ============================================================================
+
+
+@router.get("/{workspace_id}/quotation/current-request")
+async def quotation_current_request(
+    workspace_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    user_id = current_user["id"]
+    try:
+        from ldaca_web_app_backend.core.analysis_store import get_latest_analysis
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"analysis_store unavailable: {e}")
+    rec = get_latest_analysis(user_id, workspace_id, task="quotation")
+    if not rec:
+        return None
+    return {"status": "successful", "message": "ok", "data": rec.request}
+
+
+@router.get("/{workspace_id}/quotation/current-result")
+async def quotation_current_result(
+    workspace_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    user_id = current_user["id"]
+    try:
+        from ldaca_web_app_backend.core.analysis_store import get_latest_analysis
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"analysis_store unavailable: {e}")
+    rec = get_latest_analysis(user_id, workspace_id, task="quotation")
+    if not rec:
+        return None
+    return {"status": "successful", "message": "ok", "data": rec.result}
 
 
 @router.post("/{workspace_id}/nodes/{node_id}/quotation")
@@ -3701,7 +4385,7 @@ async def get_quotation(
         end_idx = start_idx + request.page_size
         paginated = qdf.slice(start_idx, request.page_size)
 
-        return {
+        result_payload = {
             "data": paginated.to_dicts() if hasattr(paginated, "to_dicts") else [],
             "columns": list(qdf.columns) if hasattr(qdf, "columns") else [],
             "total_rows": total_rows,
@@ -3718,6 +4402,25 @@ async def get_quotation(
                 "sort_order": request.sort_order,
             },
         }
+        try:  # persist best-effort
+            from ldaca_web_app_backend.core.analysis_store import save_analysis
+
+            req_dict = (
+                request.model_dump()
+                if hasattr(request, "model_dump")
+                else request.dict()
+            )
+            req_dict = {**req_dict, "node_id": node_id}
+            save_analysis(
+                user_id=user_id,
+                workspace_id=workspace_id,
+                task="quotation",
+                request_dict=req_dict,
+                result_dict=result_payload,
+            )
+        except Exception:
+            pass
+        return result_payload
     except HTTPException:
         raise
     except Exception as e:
@@ -3869,7 +4572,7 @@ async def detach_quotation(
 
         total_rows = final_data.height if hasattr(final_data, "height") else -1
         return {
-            "success": True,
+            "status": "successful",
             "message": f"Successfully created detached quotation node '{new_node_name}' with {total_rows if total_rows >= 0 else 'unknown'} rows",
             "new_node_id": new_node.id,
             "new_node_name": new_node_name,

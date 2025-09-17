@@ -4,6 +4,8 @@ import SegmentedControl from '../ui/SegmentedControl';
 import { useWorkspace } from '../../hooks/useWorkspace';
 import { useAuth } from '../../hooks/useAuth';
 import { MultiNodeConcordanceRequest, MultiNodeConcordanceResponse, textApi } from '../../api/text';
+import { nodesApi } from '../../api/nodes';
+import { workspacesApi } from '../../api/workspaces';
 
 interface NodeColumnSelection {
   nodeId: string;
@@ -24,6 +26,7 @@ const ConcordanceTab: React.FC = () => {
   const { getAuthHeaders } = useAuth();
 
   const [nodeColumnSelections, setNodeColumnSelections] = useState<NodeColumnSelection[]>([]);
+  const [lockedNodeSelections, setLockedNodeSelections] = useState<NodeColumnSelection[] | null>(null);
   const [searchWord, setSearchWord] = useState('');
   const [numLeftTokens, setNumLeftTokens] = useState(10);
   const [numRightTokens, setNumRightTokens] = useState(10);
@@ -37,6 +40,8 @@ const ConcordanceTab: React.FC = () => {
   const defaultPalette = useMemo(() => [
     '#2563eb', '#dc2626', '#16a34a', '#9333ea', '#d97706', '#0d9488', '#db2777', '#4f46e5', '#65a30d', '#0891b2', '#92400e', '#6b7280'
   ], []);
+  // Track the last pair of node IDs used when results were generated
+  const [lastCompareNodeIds, setLastCompareNodeIds] = useState<string[]>([]);
   // legacy inline picker state removed in favor of shared component
   const [viewMode, setViewMode] = useState<'separated'|'combined'>('separated');
   const [combinedPage, setCombinedPage] = useState(1);
@@ -61,6 +66,9 @@ const ConcordanceTab: React.FC = () => {
     return map;
   }, [selectedNodes, nodeColors, defaultPalette]);
   
+  const [isLocked, setIsLocked] = useState(false);
+  const [lockedNodesSnapshot, setLockedNodesSnapshot] = useState<Array<{ id: string; name: string; columns: string[] }>>([]);
+
   // Pagination and sorting state - separate for each node
   const [nodePagination, setNodePagination] = useState<Record<string, {
     currentPage: number;
@@ -88,13 +96,13 @@ const ConcordanceTab: React.FC = () => {
 
   // Debug results changes
   useEffect(() => {
-    if (results) {
+      if (results) {
       if (localStorage.getItem('debugConc') === '1') {
         console.log('Concordance results updated:', results);
-        console.log('Results success:', results.success);
-        console.log('Results data:', results.data);
+        console.log('Results status:', (results as any)?.status);
+        console.log('Results data:', (results as any)?.data);
       }
-      if (results.data) {
+      if ((results as any)?.data) {
   if (localStorage.getItem('debugConc') === '1') console.log('Data entries:', Object.entries(results.data));
       }
     }
@@ -107,12 +115,11 @@ const ConcordanceTab: React.FC = () => {
     const prev = prevSelectedNodeIdsRef.current;
     const curr = selectedNodeIds;
     const changed = !prev || prev.length !== curr.length || prev.some((id, i) => id !== curr[i]);
-    if (changed) {
-      // Only clear if selection truly changed; keep tables if selection is stable
+    if (changed && !isLocked) {
       setResults(null);
     }
     prevSelectedNodeIdsRef.current = curr;
-  }, [selectedNodeIds]);
+  }, [selectedNodeIds, isLocked]);
 
   // Check for pending concordance search from TokenFrequencyTab
   useEffect(() => {
@@ -165,6 +172,10 @@ const ConcordanceTab: React.FC = () => {
       if (node.data?.columns && Array.isArray(node.data.columns)) {
         return node.data.columns;
       }
+      // Also check if columns are directly on the node object (for locked snapshots)
+      if (node.columns && Array.isArray(node.columns)) {
+        return node.columns;
+      }
       if (node.data?.dtypes && typeof node.data.dtypes === 'object') {
         return Object.keys(node.data.dtypes);
       }
@@ -177,6 +188,7 @@ const ConcordanceTab: React.FC = () => {
 
   // Update node column selections when selected nodes change
   useEffect(() => {
+    if (isLocked) return;
     if (selectedNodes.length === 0) {
       setNodeColumnSelections([]);
       return;
@@ -238,6 +250,14 @@ const ConcordanceTab: React.FC = () => {
   // Color assignments now handled by NodeSelectionPanel; retain helper for any future use
   const getColorForNodeId = (nodeId: string, idx: number) => nodeColors[nodeId] || defaultPalette[idx % defaultPalette.length]; // eslint-disable-line @typescript-eslint/no-unused-vars
 
+  // Stabilize the selectedNodes passed to NodeSelectionPanel to avoid repeated shape fetches
+  const displayedNodes = useMemo(() => {
+    if (isLocked && lockedNodesSnapshot.length) {
+      return lockedNodesSnapshot.map(s => ({ id: s.id, name: s.name, data: { name: s.name, nodeName: s.name, label: s.name, columns: s.columns }, columns: s.columns }));
+    }
+    return selectedNodes;
+  }, [isLocked, lockedNodesSnapshot, selectedNodes]);
+
   const handleColumnChange = (nodeId: string, column: string) => {
     setNodeColumnSelections(prev => 
       prev.map(sel => 
@@ -253,6 +273,7 @@ const ConcordanceTab: React.FC = () => {
     overrideSortBy?: string,
     overrideSortOrder?: 'asc'|'desc'
   ) => {
+    if (isLocked) return;
     if (!currentWorkspaceId || selectedNodes.length === 0) {
       return;
     }
@@ -320,38 +341,123 @@ const ConcordanceTab: React.FC = () => {
 
   if (localStorage.getItem('debugConc') === '1') console.log('Multi-Node Concordance Response:', response);
       setResults(response);
+      setLastCompareNodeIds(selectedNodes.slice(0, 2).map(n => n.id));
+      // Lock UI and snapshot nodes
+      try {
+        const ids = selectedNodes.slice(0,2).map(n=>n.id);
+        const snaps: Array<{ id: string; name: string; columns: string[] }> = [];
+        for (const id of ids) {
+          try {
+            const info = await nodesApi.info(currentWorkspaceId!, id, getAuthHeaders());
+            const name = (info as any)?.name || (info as any)?.data?.name || id;
+            const columns = Array.isArray((info as any)?.columns) ? (info as any).columns : (Array.isArray((info as any)?.data?.columns) ? (info as any).data.columns : []);
+            snaps.push({ id, name: String(name), columns });
+          } catch {
+            snaps.push({ id, name: id, columns: [] });
+          }
+        }
+        setLockedNodesSnapshot(snaps);
+        setIsLocked(true);
+      } catch { /* ignore */ }
     } catch (error) {
       console.error('Error performing concordance search:', error);
       setResults({
-        success: false,
+        status: 'failed',
         message: error instanceof Error ? error.message : 'Unknown error occurred',
         data: {}
-      });
+      } as any);
     } finally {
       setIsSearching(false);
     }
   }, [currentWorkspaceId, selectedNodes, searchWord, nodeColumnSelections, nodePagination, globalPageSize, numLeftTokens, numRightTokens, regex, caseSensitive, showMetadata, getAuthHeaders, viewMode, combinedPage, combinedPageSize]);
 
-  // Effect to handle auto-search trigger from TokenFrequencyTab
+  // Hydrate from backend current-request/result once per mount
+  const hydratedOnceRef = useRef<boolean>(false);
   useEffect(() => {
-    if (shouldAutoSearch && searchWord.trim() && selectedNodes.length > 0) {
-  if (localStorage.getItem('debugConc') === '1') console.log('Executing auto-search for:', searchWord);
-      handleSearch(true);
-      setShouldAutoSearch(false); // Reset the flag
-    }
-  }, [shouldAutoSearch, searchWord, selectedNodes, handleSearch]);
+    (async () => {
+      if (hydratedOnceRef.current) return;
+      hydratedOnceRef.current = true;
+      if (!currentWorkspaceId) return;
+      try {
+        // First check current-request; if null, don't request current-result
+        const reqResp = await textApi.getMultiNodeConcordanceCurrentRequest(currentWorkspaceId, getAuthHeaders());
+        if (!reqResp) {
+          // No current request - fresh state
+          return;
+        }
+        
+        const req = (reqResp as any)?.data;
+        if (req) {
+          const nodeIds: string[] = Array.isArray(req.node_ids) ? req.node_ids.slice(0,2) : [];
+          const node_columns: Record<string,string> = req.node_columns || {};
+          const sels = nodeIds.map((id: string) => ({ nodeId: id, column: node_columns[id] || '' }));
+          setNodeColumnSelections(sels);
+          setLockedNodeSelections(sels);
+          setSearchWord(String(req.search_word || ''));
+          setNumLeftTokens(Number(req.num_left_tokens ?? 10));
+          setNumRightTokens(Number(req.num_right_tokens ?? 10));
+          setRegex(!!req.regex);
+          setCaseSensitive(!!req.case_sensitive);
+          setViewMode(req.combined ? 'combined' : 'separated');
+          setLastCompareNodeIds(nodeIds);
+          
+          // Build snapshot and lock
+          try {
+            const snaps: Array<{ id: string; name: string; columns: string[] }> = [];
+            for (const id of nodeIds) {
+              try {
+                const info = await nodesApi.info(currentWorkspaceId!, id, getAuthHeaders());
+                const name = (info as any)?.name || (info as any)?.data?.name || id;
+                const columns = Array.isArray((info as any)?.columns) ? (info as any).columns : (Array.isArray((info as any)?.data?.columns) ? (info as any).data.columns : []);
+                snaps.push({ id, name: String(name), columns });
+              } catch {
+                snaps.push({ id, name: id, columns: [] });
+              }
+            }
+            setLockedNodesSnapshot(snaps);
+            setIsLocked(true);
+          } catch { /* ignore */ }
+        }
+        
+        // Now get current-result
+        const resResp = await textApi.getMultiNodeConcordanceCurrentResult(currentWorkspaceId, getAuthHeaders());
+        if (!resResp) {
+          // No result yet
+          return;
+        }
+        
+        const res = (resResp as any)?.data;
+        if (res) {
+          setResults(resResp as any);
+        }
+      } catch (_) { /* ignore */ }
+    })();
+  }, [currentWorkspaceId, getAuthHeaders]);
 
-  const handleClearResults = () => {
+  const handleClearResults = async () => {
+    try {
+      if (currentWorkspaceId) {
+        await textApi.clearMultiNodeConcordance(currentWorkspaceId, getAuthHeaders());
+      }
+    } catch (e) {
+      console.error('Failed to clear backend analyses/cache:', e);
+    }
     setResults(null);
     setNodePagination({});
-  setCombinedPage(1);
+    setCombinedPage(1);
+    setLockedNodesSnapshot([]);
+    setIsLocked(false);
   };
 
   // Refetch combined results when combined page changes
   useEffect(() => {
     if (viewMode === 'combined' && results) {
-      // Only refetch when user explicitly navigates pages (not initial setResults loop)
-      handleSearch(false, undefined, 'combined');
+      // Request combined page via current-result POST
+      void (async () => {
+        if (!currentWorkspaceId) return;
+        const resp: any = await textApi.postMultiNodeConcordanceCurrentResult(currentWorkspaceId, { combined: true, page: combinedPage, page_size: combinedPageSize }, getAuthHeaders());
+        if (resp?.data) setResults(resp);
+      })();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [combinedPage]);
@@ -368,6 +474,15 @@ const ConcordanceTab: React.FC = () => {
       const isSameColumn = currentNodePagination.sortBy === columnName;
       const newSortOrder = isSameColumn ? (currentNodePagination.sortOrder === 'asc' ? 'desc' : 'asc') : 'asc';
 
+      // Trigger backend resort using current-result POST
+      const pageSize = currentNodePagination.pageSize;
+      void (async () => {
+        if (!currentWorkspaceId) return;
+        const overrides = { node_id: nodeId, sort_by: columnName, sort_order: newSortOrder, page: 1, page_size: pageSize } as any;
+        const resp: any = await textApi.postMultiNodeConcordanceCurrentResult(currentWorkspaceId, overrides, getAuthHeaders());
+        if (resp?.data) setResults(resp);
+      })();
+
       return {
         ...prev,
         [nodeId]: {
@@ -378,8 +493,6 @@ const ConcordanceTab: React.FC = () => {
         }
       };
     });
-    // For sorting, search this specific node with page reset and current sort
-    setTimeout(() => handleSingleNodeSearch(nodeId, 1, columnName, undefined), 0);
   };
 
   const handlePageChange = (newPage: number, nodeId: string) => {
@@ -391,6 +504,20 @@ const ConcordanceTab: React.FC = () => {
         sortOrder: 'asc' as 'asc' | 'desc'
       };
 
+      // Trigger backend page update using current-result POST
+      void (async () => {
+        if (!currentWorkspaceId) return;
+        const overrides = {
+          node_id: nodeId,
+          page: newPage,
+          page_size: currentNodePagination.pageSize,
+          sort_by: currentNodePagination.sortBy || undefined,
+          sort_order: currentNodePagination.sortOrder,
+        } as any;
+        const resp: any = await textApi.postMultiNodeConcordanceCurrentResult(currentWorkspaceId, overrides, getAuthHeaders());
+        if (resp?.data) setResults(resp);
+      })();
+
       return {
         ...prev,
         [nodeId]: {
@@ -399,9 +526,6 @@ const ConcordanceTab: React.FC = () => {
         }
       };
     });
-    
-    // For pagination, we'll search only this specific node with the new page number
-    handleSingleNodeSearch(nodeId, newPage);
   };
 
   // New function to search a single node (for pagination and sorting)
@@ -544,11 +668,6 @@ const ConcordanceTab: React.FC = () => {
       return;
     }
 
-    const node = selectedNodes.find(n => n.id === nodeId);
-    if (!node) {
-      return;
-    }
-
     setNodeDetaching(prev => ({ ...prev, [nodeId]: true }));
     
     try {
@@ -597,18 +716,33 @@ const ConcordanceTab: React.FC = () => {
     );
   };
 
+  const coreCols = useMemo(() => (
+    [
+      'document_idx','left_context','matched_text','right_context','start_idx','end_idx','l1','r1','l1_freq','r1_freq'
+    ]
+  ), []);
+
   const renderConcordanceTable = (nodeName: string, nodeData: any, nodeId: string, column: string) => {
     if (nodeName === '__COMBINED__') {
       const rows = nodeData.data || [];
-      const columns = nodeData.columns || [];
+      const columns: string[] = nodeData.columns || [];
       const combinedSorting = nodeData.sorting || { sort_by: '', sort_order: 'asc' };
       const handleCombinedSort = (col: string) => {
         const isSame = combinedSorting.sort_by === col;
         const nextOrder: 'asc'|'desc' = isSame && combinedSorting.sort_order === 'asc' ? 'desc' : 'asc';
-        // Reuse handleSearch with combined mode and sort overrides; reset to page 1
         setCombinedPage(1);
-        handleSearch(true, undefined, 'combined', col, nextOrder);
+        // Backend combined sorting via current-result POST
+        void (async () => {
+          if (!currentWorkspaceId) return;
+          const resp: any = await textApi.postMultiNodeConcordanceCurrentResult(currentWorkspaceId, { combined: true, sort_by: col, sort_order: nextOrder, page: 1, page_size: combinedPageSize }, getAuthHeaders());
+          if (resp?.data) setResults(resp);
+        })();
       };
+      // Derive display columns: core first, then metadata (columns minus core and internal)
+      const coreSet = new Set(coreCols);
+      const metaCols = columns.filter(c => !coreSet.has(c) && c !== '__source_node');
+      const displayColumns = showMetadata ? [...coreCols.filter(c => columns.includes(c)), ...metaCols] : coreCols.filter(c => columns.includes(c));
+
       return (
         <div key="__COMBINED__" className="mb-6">
           <div className="flex items-center mb-4">
@@ -617,13 +751,16 @@ const ConcordanceTab: React.FC = () => {
               <span className="text-xs text-gray-500">Rows colored by source node</span>
               <button
                 onClick={async () => {
-                  if (selectedNodes.length === 0 || !searchWord.trim()) return;
+                  // Use locked snapshot when locked so actions are stable
+                  const nodeIdsForDetach = selectedNodes.slice(0,2).map(n => n.id);
+                  if (nodeIdsForDetach.length === 0 || !searchWord.trim()) return;
                   setCombinedLoading(true);
                   try {
-                    for (const n of selectedNodes.slice(0,2)) {
-                      const sel = nodeColumnSelections.find(s => s.nodeId === n.id);
-                      if (!sel) continue;
-                      await handleDetach(n.id, sel.column);
+                    for (const nid of nodeIdsForDetach.slice(0,2)) {
+                      // Prefer lockedNodeColumns when available to ensure correct column
+                      const col = (nodeColumnSelections.find(s => s.nodeId === nid)?.column || '');
+                      if (!col) continue;
+                      await handleDetach(nid, col);
                     }
                   } finally { setCombinedLoading(false); }
                 }}
@@ -637,7 +774,7 @@ const ConcordanceTab: React.FC = () => {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50 sticky top-0">
                   <tr>
-                    {columns.map((c: string) => {
+                    {displayColumns.map((c: string) => {
                       const lower = c.toLowerCase();
                       const neverSortable = ['left_context','matched_text','right_context'];
                       const sortable = !neverSortable.includes(lower);
@@ -684,7 +821,8 @@ const ConcordanceTab: React.FC = () => {
                     return (
                       <tr key={idx} className="cursor-pointer hover:bg-blue-50" style={{ backgroundColor: bg }} onClick={() => {
                         if (rawSrc) {
-                          const nodeObj = selectedNodes.find(n => {
+                    const nodesForDetail = selectedNodes;
+                    const nodeObj = nodesForDetail.find((n: any) => {
                             const candidates = [n.id, n.name, (n as any).name, n.data?.name, (n as any).label, n.data?.label].filter(Boolean).map(v=>v.toString().toLowerCase());
                             return candidates.includes(rawSrc.toString().toLowerCase());
                           });
@@ -692,7 +830,7 @@ const ConcordanceTab: React.FC = () => {
                           if (nodeObj && sel) handleRowClick(row, nodeObj.id, sel.column);
                         }
                       }}>
-                        {columns.map((c: string, i: number) => <td key={i} className="px-4 py-2 text-sm text-gray-900">{row[c] !== undefined && row[c] !== null ? String(row[c]) : ''}</td>)}
+                        {displayColumns.map((c: string, i: number) => <td key={i} className="px-4 py-2 text-sm text-gray-900">{row[c] !== undefined && row[c] !== null ? String(row[c]) : ''}</td>)}
                       </tr>
                     );
                   })}
@@ -713,6 +851,12 @@ const ConcordanceTab: React.FC = () => {
         </div>
       );
     }
+    // Build per-node display columns using metadata
+    const rows = nodeData.data || [];
+    const allCols: string[] = (nodeData.columns || (rows.length ? Object.keys(rows[0]) : [])) as string[];
+    const metaCols: string[] = (nodeData.metadata?.metadata_columns as string[] | undefined) ?? allCols.filter(c => !coreCols.includes(c));
+    const displayColumns = showMetadata ? [...coreCols.filter(c => allCols.includes(c)), ...metaCols.filter(c => allCols.includes(c))] : coreCols.filter(c => allCols.includes(c));
+
     if (!nodeData.data || nodeData.data.length === 0) {
       return (
         <div key={nodeName} className="mb-6">
@@ -739,10 +883,7 @@ const ConcordanceTab: React.FC = () => {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50 sticky top-0">
                 <tr>
-                  {Object.keys(nodeData.data[0]).map(key => {
-                    // Sorting rules: never sortable for core context columns; otherwise
-                    // - when metadata is shown, allow sorting by any other column
-                    // - when metadata is off, restrict to L/R tokens and frequencies and document_idx
+                  {displayColumns.map(key => {
                     const neverSortable = ['left_context','matched_text','right_context'];
                     const keyLower = key.toLowerCase();
                     let isSortable: boolean;
@@ -754,7 +895,6 @@ const ConcordanceTab: React.FC = () => {
                       const allowed = ['l1','r1','l1_freq','r1_freq','document_idx'];
                       isSortable = allowed.includes(keyLower);
                     }
-                    
                     return isSortable ? (
                       <SortableHeader key={key} columnKey={key} label={key} nodeId={nodeId} />
                     ) : (
@@ -772,9 +912,9 @@ const ConcordanceTab: React.FC = () => {
                     className={`cursor-pointer hover:bg-blue-50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
                     onClick={() => handleRowClick(row, nodeId, column)}
                   >
-                    {Object.values(row).map((value: any, cellIndex) => (
+                    {displayColumns.map((colKey: string, cellIndex) => (
                       <td key={cellIndex} className="px-4 py-2 text-sm text-gray-900">
-                        {value !== null && value !== undefined ? String(value) : ''}
+                        {row[colKey] !== null && row[colKey] !== undefined ? String(row[colKey]) : ''}
                       </td>
                     ))}
                   </tr>
@@ -863,148 +1003,177 @@ const ConcordanceTab: React.FC = () => {
   return (
     <div className="space-y-6">
       <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-        <h2 className="text-xl font-semibold text-gray-800 mb-4">Concordance Search</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold text-gray-800">Concordance Search</h2>
+{isLocked && (
+            <div className="relative group flex items-center text-sm text-gray-600 cursor-default">
+              <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                <path fillRule="evenodd" d="M5 8V6a5 5 0 1110 0v2h1a1 1 0 011 1v9a1 1 0 01-1 1H4a1 1 0 01-1-1V9a1 1 0 011-1h1zm2-2a3 3 0 116 0v2H7V6zm-2 4h10v7H5v-7z" clipRule="evenodd" />
+              </svg>
+              Locked
+              <div className="absolute right-0 mt-2 w-72 z-10 hidden group-hover:block bg-white border border-gray-200 shadow-lg rounded p-2 text-xs text-gray-700">
+                <div className="font-semibold mb-1">Panel locked</div>
+                <ul className="list-disc ml-4 space-y-1">
+                  <li>Locked to current request/results.</li>
+                  <li>Node selection and backend-used parameters are disabled.</li>
+                  <li>Frontend-only options (e.g., Show Metadata) stay editable.</li>
+                  <li>Clear results to unlock and resync with the graph selection.</li>
+                </ul>
+              </div>
+            </div>
+          )}
+        </div>
         
-        <NodeSelectionPanel
-          selectedNodes={selectedNodes}
-          nodeColumnSelections={nodeColumnSelections}
-          onColumnChange={handleColumnChange}
-          nodeColors={nodeColors}
-          onColorChange={handleColorChange}
-          getNodeColumns={getNodeColumns}
-          defaultPalette={defaultPalette}
-          maxCompare={2}
-          className="mb-6"
-          showShape
-          getNodeShapeFn={getNodeShape}
-        />
+        <div className="mb-6">
+            <NodeSelectionPanel
+            selectedNodes={displayedNodes}
+            nodeColumnSelections={isLocked && lockedNodeSelections ? lockedNodeSelections : nodeColumnSelections}
+            onColumnChange={handleColumnChange}
+            nodeColors={nodeColors}
+            onColorChange={handleColorChange}
+            getNodeColumns={getNodeColumns}
+            defaultPalette={defaultPalette}
+            maxCompare={2}
+            showShape
+            getNodeShapeFn={getNodeShape}
+            disabled={!!isLocked}
+            showColorPicker={true}
+          />
+        </div>
 
         {/* Search Configuration */}
-        <div className="space-y-4 mb-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Search Word/Phrase
-            </label>
-            <input
-              type="text"
-              value={searchWord}
-              onChange={(e) => setSearchWord(e.target.value)}
-              placeholder="Enter word or phrase to search for"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="mb-6">
+          <div className={`space-y-4`}>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Left Context (tokens)
+                Search Word/Phrase
               </label>
               <input
-                type="number"
-                value={numLeftTokens}
-                onChange={(e) => setNumLeftTokens(parseInt(e.target.value) || 10)}
-                min="1"
-                max="50"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                type="text"
+                value={searchWord}
+                onChange={(e) => setSearchWord(e.target.value)}
+                placeholder="Enter word or phrase to search for"
+                disabled={!!isLocked}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
               />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Left Context (tokens)
+                </label>
+                <input
+                  type="number"
+                  value={numLeftTokens}
+                  onChange={(e) => setNumLeftTokens(parseInt(e.target.value) || 10)}
+                  min="1"
+                  max="50"
+                  disabled={!!isLocked}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Right Context (tokens)
+                </label>
+                <input
+                  type="number"
+                  value={numRightTokens}
+                  onChange={(e) => setNumRightTokens(parseInt(e.target.value) || 10)}
+                  min="1"
+                  max="50"
+                  disabled={!!isLocked}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                />
+              </div>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Right Context (tokens)
+                Results per page
               </label>
-              <input
-                type="number"
-                value={numRightTokens}
-                onChange={(e) => setNumRightTokens(parseInt(e.target.value) || 10)}
-                min="1"
-                max="50"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Results per page
-            </label>
-            <select
-              value={globalPageSize}
-              onChange={(e) => {
-                const newPageSize = parseInt(e.target.value);
-                setGlobalPageSize(newPageSize);
-                // Update all node pagination to use new page size and reset to page 1
-                setNodePagination(prev => {
-                  const updated = { ...prev };
-                  Object.keys(updated).forEach(nodeId => {
-                    updated[nodeId] = {
-                      ...updated[nodeId],
-                      pageSize: newPageSize,
-                      currentPage: 1
-                    };
-                  });
-                  return updated;
-                });
-                // Trigger search for all visible nodes with new page size
-                setTimeout(() => {
-                  if (results && results.success && results.data) {
-                    Object.keys(results.data).forEach(nodeName => {
-                      // Find the corresponding node ID from nodeName
-                      let node = selectedNodes.find(n => n.id === nodeName);
-                      if (!node) {
-                        node = selectedNodes.find(n => n.name === nodeName);
-                      }
-                      if (!node) {
-                        const nodeIndex = Object.keys(results.data!).indexOf(nodeName);
-                        node = selectedNodes[nodeIndex];
-                      }
-                      if (node) {
-                        handleSingleNodeSearch(node.id);
-                      }
+              <select
+                value={globalPageSize}
+                onChange={(e) => {
+                  const newPageSize = parseInt(e.target.value);
+                  setGlobalPageSize(newPageSize);
+                  // Update all node pagination to use new page size and reset to page 1
+                  setNodePagination(prev => {
+                    const updated = { ...prev };
+                    Object.keys(updated).forEach(nodeId => {
+                      updated[nodeId] = {
+                        ...updated[nodeId],
+                        pageSize: newPageSize,
+                        currentPage: 1
+                      };
                     });
-                  }
-                }, 100);
-              }}
-              className="w-full md:w-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value={10}>10</option>
-              <option value={20}>20</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-            </select>
-          </div>
+                    return updated;
+                  });
+                  // Trigger search for all visible nodes with new page size
+                  setTimeout(() => {
+                    if (results && (results as any).status === 'successful' && (results as any).data) {
+                      Object.keys(results.data).forEach(nodeName => {
+                        // Find the corresponding node ID from nodeName
+                        let node = selectedNodes.find(n => n.id === nodeName);
+                        if (!node) {
+                          node = selectedNodes.find(n => n.name === nodeName);
+                        }
+                        if (!node) {
+                          const nodeIndex = Object.keys(results.data!).indexOf(nodeName);
+                          node = selectedNodes[nodeIndex];
+                        }
+                        if (node) {
+                          handleSingleNodeSearch(node.id);
+                        }
+                      });
+                    }
+                  }, 100);
+                }}
+                className="w-full md:w-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+              >
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+            </div>
 
-          {/* Options */}
-          <div className="flex space-x-4">
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                checked={regex}
-                onChange={(e) => setRegex(e.target.checked)}
-                className="mr-2"
-              />
-              <span className="text-sm text-gray-700">Use Regular Expression</span>
-            </label>
+            {/* Options */}
+            <div className="flex space-x-4">
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={regex}
+                  onChange={(e) => setRegex(e.target.checked)}
+                  className="mr-2"
+                  disabled={!!isLocked}
+                />
+                <span className="text-sm text-gray-700">Use Regular Expression</span>
+              </label>
 
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                checked={caseSensitive}
-                onChange={(e) => setCaseSensitive(e.target.checked)}
-                className="mr-2"
-              />
-              <span className="text-sm text-gray-700">Case Sensitive</span>
-            </label>
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={caseSensitive}
+                  onChange={(e) => setCaseSensitive(e.target.checked)}
+                  className="mr-2"
+                  disabled={!!isLocked}
+                />
+                <span className="text-sm text-gray-700">Case Sensitive</span>
+              </label>
 
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                checked={showMetadata}
-                onChange={(e) => setShowMetadata(e.target.checked)}
-                className="mr-2"
-              />
-              <span className="text-sm text-gray-700">Show Metadata</span>
-            </label>
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={showMetadata}
+                  onChange={(e) => setShowMetadata(e.target.checked)}
+                  className="mr-2"
+                />
+                <span className="text-sm text-gray-700">Show Metadata</span>
+              </label>
+            </div>
           </div>
         </div>
 
@@ -1012,12 +1181,13 @@ const ConcordanceTab: React.FC = () => {
         <div className="flex flex-wrap gap-3 items-center">
           <button
             onClick={() => handleSearch(true)}
-            disabled={
+              disabled={
               selectedNodes.length === 0 || 
               isSearching || 
               !currentWorkspaceId ||
               !searchWord.trim() ||
-              nodeColumnSelections.some(sel => !sel.column)
+              nodeColumnSelections.some(sel => !sel.column) ||
+              !!isLocked
             }
             className="w-full md:w-auto px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
           >
@@ -1038,7 +1208,7 @@ const ConcordanceTab: React.FC = () => {
       {/* Results */}
       {results && (
         <div ref={resultsRef} className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          {results.success ? (
+          {(results as any)?.status === 'successful' ? (
             <div>
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
                 <h3 className="text-lg font-semibold text-gray-800">Search Results</h3>
@@ -1107,20 +1277,21 @@ const ConcordanceTab: React.FC = () => {
                     if (localStorage.getItem('debugConc') === '1') console.log('Trying to match nodeName:', nodeName);
                     if (localStorage.getItem('debugConc') === '1') console.log('Available nodes:', selectedNodes.map(n => ({ id: n.id, name: n.data?.name, nodeName: n.name })));
                     
-                    let node = selectedNodes.find(n => (n.data?.name || n.id) === nodeName);
+                    const nodesForDetail = selectedNodes;
+                    let node = nodesForDetail.find((n: any) => (n.data?.name || n.id) === nodeName);
                     if (!node) {
                       // Try matching by just the ID
-                      node = selectedNodes.find(n => n.id === nodeName);
+                      node = nodesForDetail.find((n: any) => n.id === nodeName);
                     }
                     if (!node) {
                       // Try matching by node.name property (if it exists)
-                      node = selectedNodes.find(n => n.name === nodeName);
+                      node = nodesForDetail.find((n: any) => n.name === nodeName);
                     }
                     if (!node) {
                       // Fallback: just use the first available node for this nodeName
                       // This is needed because the backend might be returning a different format
                       const nodeIndex = Object.keys(results.data).indexOf(nodeName);
-                      node = selectedNodes[nodeIndex];
+                      node = (nodesForDetail as any)[nodeIndex];
                     }
                     
                     const nodeId = node?.id || '';

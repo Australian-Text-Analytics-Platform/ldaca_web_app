@@ -143,9 +143,31 @@ export const useWorkspace = () => {
   // Stable getNodeShape function to prevent infinite loops
   const getNodeShapeStable = useCallback(async (nodeId: string): Promise<{ shape: [number, number]; is_lazy: boolean; calculated: boolean } | null> => {
     if (!currentWorkspaceId) return null;
-    
+
+    const cacheKey = `node-shape:${currentWorkspaceId}:${nodeId}`;
     try {
-  const shapeData = await nodesApi.shape(currentWorkspaceId, nodeId, authHeaders);
+      if (typeof window !== 'undefined') {
+        const cached = window.sessionStorage.getItem(cacheKey);
+        if (cached) {
+          const parts = cached.split('×').map(s => s.trim());
+          if (parts.length === 2) {
+            const r = parseInt(parts[0], 10);
+            const c = parseInt(parts[1], 10);
+            if (!Number.isNaN(r) && !Number.isNaN(c)) {
+              return { shape: [r, c], is_lazy: false, calculated: true } as any;
+            }
+          }
+        }
+      }
+    } catch (_) { /* ignore */ }
+
+    try {
+      const shapeData = await nodesApi.shape(currentWorkspaceId, nodeId, authHeaders);
+      try {
+        if (shapeData?.shape && typeof window !== 'undefined') {
+          window.sessionStorage.setItem(cacheKey, `${shapeData.shape[0]} × ${shapeData.shape[1]}`);
+        }
+      } catch (_) { /* ignore */ }
       return shapeData;
     } catch (error) {
       console.error('Failed to get node shape:', error);

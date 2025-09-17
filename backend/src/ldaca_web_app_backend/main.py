@@ -46,6 +46,15 @@ async def lifespan(app: FastAPI):
     # Initialize database
     await init_db()
     await cleanup_expired_sessions()
+    
+    # Initialize worker pool for background tasks
+    try:
+        from .core.worker import get_worker_pool
+        worker_pool = get_worker_pool()
+        worker_pool.start()
+        print("✅ Worker pool started for background processing")
+    except Exception as e:
+        print(f"⚠️ Warning: Failed to start worker pool: {e}")
 
     print("✅ Enhanced API initialized successfully")
     print(
@@ -59,6 +68,16 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     print("👋 Shutting down Enhanced LDaCA Web App API...")
+    
+    # Shutdown worker pool
+    try:
+        from .core.worker import get_worker_pool
+        worker_pool = get_worker_pool()
+        worker_pool.shutdown(wait=True)
+        print("🔌 Worker pool shutdown complete")
+    except Exception as e:
+        print(f"⚠️ Warning: Error during worker pool shutdown: {e}")
+    
     await cleanup_expired_sessions()
 
 

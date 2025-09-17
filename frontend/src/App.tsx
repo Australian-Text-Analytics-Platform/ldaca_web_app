@@ -24,7 +24,11 @@ const TokenFrequencyTab = lazy(() => import('./components/tabs/TokenFrequencyTab
  * Improved App component with proper error boundaries and loading states
  */
 const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'data-loader' | 'filter' | 'token-frequency' | 'concordance' | 'analysis' | 'topic-modeling' | 'quotation' | 'export'>('data-loader');
+  const [activeTab, setActiveTab] = useState<'data-loader' | 'filter' | 'token-frequency' | 'concordance' | 'analysis' | 'topic-modeling' | 'quotation' | 'export'>(() => {
+    const saved = localStorage.getItem('activeTab') as any;
+    const allowed = new Set(['data-loader','filter','token-frequency','concordance','analysis','topic-modeling','quotation','export']);
+    return allowed.has(saved) ? saved : 'data-loader';
+  });
   const [isTutorial, setIsTutorial] = useState<boolean>(false);
   const { user, loginWithGoogle, logout, isAuthenticated, isMultiUserMode, isLoading, error } = useAuth();
   const { ready: backendReady } = useBackendHealth();
@@ -96,6 +100,11 @@ const App: React.FC = () => {
       return next;
     });
   }, [rightWidth, lastRightWidth]);
+
+  // Persist active tab across refreshes
+  useEffect(() => {
+    try { localStorage.setItem('activeTab', activeTab); } catch {}
+  }, [activeTab]);
 
   // Listen for navigation events from TokenFrequencyTab
   useEffect(() => {

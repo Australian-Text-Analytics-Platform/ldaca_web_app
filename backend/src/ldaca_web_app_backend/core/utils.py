@@ -140,6 +140,16 @@ def load_data_file(
             return pl.read_json(file_path)
         elif file_type == "tsv":
             return pl.scan_csv(file_path, separator="\t")
+        elif file_type == "excel":
+            # Use Polars to read Excel directly; returns an eager DataFrame
+            try:
+                return pl.read_excel(file_path)
+            except Exception as ex:
+                # Some versions require specifying sheet id/name
+                try:
+                    return pl.read_excel(file_path, sheet_id=0)
+                except Exception as ex2:
+                    raise RuntimeError(f"Failed to read Excel via polars: {ex2}") from ex
     except Exception as e:
         print(f"Warning: polars lazy loading failed: {e}, falling back to pandas")
 
@@ -151,7 +161,8 @@ def load_data_file(
     elif file_type == "parquet":
         return pd.read_parquet(file_path)
     elif file_type == "excel":
-        return pd.read_excel(file_path)
+        # Avoid pandas dependency for Excel; require polars support instead
+        raise ValueError("Excel loading requires polars.read_excel; pandas-based Excel loading is disabled. Convert to CSV or ensure polars supports your Excel file.")
     elif file_type == "tsv":
         return pd.read_csv(file_path, sep="\t")
     else:

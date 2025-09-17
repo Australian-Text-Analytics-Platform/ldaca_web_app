@@ -5,9 +5,12 @@ import { useAuth } from '../../hooks/useAuth';
 // Updated to use modular API object pattern
 import { textApi } from '../../api/text';
 import type { TopicModelingRequest } from '../../api/text';
+import { workspacesApi } from '../../api/workspaces';
+import { nodesApi } from '../../api/nodes';
+import { useAnalysisStore } from '../../stores/analysisStore';
 // Define local lightweight response/topic interfaces if not exported (legacy code referenced these)
 interface TopicModelingTopic { id: number; label: string; size: number[]; total_size: number; x: number; y: number; }
-interface TopicModelingResponse { success: boolean; message: string; data?: { topics: TopicModelingTopic[]; corpus_sizes?: number[] }; }
+interface TopicModelingResponse { status: 'running' | 'successful' | 'failed' | 'cancelled'; message: string; data?: { topics: TopicModelingTopic[]; corpus_sizes?: number[] }; metadata?: { task_id?: string; [k: string]: any } }
 
 interface NodeColumnSelection { nodeId: string; column: string; }
 
@@ -22,13 +25,32 @@ function interpolateColor(c1: string, c2: string, t: number) {
 const TopicModelingTab: React.FC = () => {
   const { selectedNodes, currentWorkspaceId } = useWorkspace();
   const { getAuthHeaders } = useAuth();
+  const { setTasks } = useAnalysisStore() as any;
   const [nodeColumnSelections, setNodeColumnSelections] = useState<NodeColumnSelection[]>([]);
   const [isRunning, setIsRunning] = useState(false);
+  const [isLocked, setIsLocked] = useState(false);
+  const runningRef = useRef<boolean>(false);
+  const [lockedNodesSnapshot, setLockedNodesSnapshot] = useState<Array<{ id: string; name: string; columns: string[] }>>([]);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<TopicModelingResponse | null>(null);
+  const resultRef = useRef<TopicModelingResponse | null>(null); // Track result to prevent downgrades
+  
+  // Safe setResult wrapper that prevents downgrades from successful to running
+  const setResultSafely = (newResult: TopicModelingResponse | null) => {
+    // Prevent downgrading from successful to running (race condition fix)
+    if (resultRef.current?.status === 'successful' && newResult?.status === 'running') {
+      console.log('TopicModelingTab: Ignoring stale running update that would hide successful results');
+      return;
+    }
+    
+    setResult(newResult);
+    resultRef.current = newResult;
+  };
+  
   const [minTopicSize, setMinTopicSize] = useState(5);
   const [useCtTfidf, setUseCtTfidf] = useState(false);
   const [nodeColors, setNodeColors] = useState<Record<string,string>>({});
+  const [isClearing, setIsClearing] = useState(false);
   const [hoveredTopicId, setHoveredTopicId] = useState<number | null>(null);
   const [tooltip, setTooltip] = useState<{x:number;y:number; topic: TopicModelingTopic | null}>({x:0,y:0,topic:null});
   const containerRef = useRef<HTMLDivElement | null>(null); // overall card
@@ -63,12 +85,15 @@ const TopicModelingTab: React.FC = () => {
 
   const getNodeColumns = useMemo(()=> (node: any)=>{
     if (node.data?.columns) return node.data.columns;
+    // Also check if columns are directly on the node object (for locked snapshots)
+    if (node.columns && Array.isArray(node.columns)) return node.columns;
     if (node.data?.dtypes) return Object.keys(node.data.dtypes);
     if (node.data?.schema) return Object.keys(node.data.schema);
     return [];
   },[]);
 
   useEffect(()=>{
+    if (isLocked) return;
     if(!selectedNodes.length) { setNodeColumnSelections([]); return; }
     setNodeColumnSelections(prev=>{
       const next = selectedNodes.map((n:any)=>{
@@ -82,17 +107,23 @@ const TopicModelingTab: React.FC = () => {
   },[selectedNodes, getNodeColumns]);
 
   const handleColumnChange = (nodeId: string, column: string) => {
+    if (isLocked) return;
     setNodeColumnSelections(prev=>prev.map(sel=> sel.nodeId===nodeId ? { ...sel, column } : sel));
   };
   const handleColorChange = (nodeId: string, color: string) => setNodeColors(p=>({...p,[nodeId]:color}));
 
   const handleRun = async () => {
     if (!currentWorkspaceId || !selectedNodes.length) return;
+    if (runningRef.current) return; // guard double click
     const firstTwo = selectedNodes.slice(0,2);
     if (firstTwo.some(n=> !nodeColumnSelections.find(s=>s.nodeId===n.id)?.column)) {
       alert('Select a text column for all selected nodes'); return;
     }
-    setIsRunning(true); setError(null); setResult(null);
+    // Optimistically enter running state immediately
+    setIsRunning(true);
+    runningRef.current = true;
+    setError(null);
+    setResultSafely(null);
     try {
       const node_columns: Record<string,string> = {};
       nodeColumnSelections.forEach(s=>{ if(s.column) node_columns[s.nodeId]=s.column; });
@@ -102,12 +133,42 @@ const TopicModelingTab: React.FC = () => {
         min_topic_size: minTopicSize,
         use_ctfidf: useCtTfidf
       };
-  const res = await textApi.topicModeling(currentWorkspaceId, req, getAuthHeaders());
-      setResult(res);
-      if (!res.success) setError(res.message || 'Topic modeling failed');
+      const res = await textApi.topicModeling(currentWorkspaceId, req, getAuthHeaders());
+      setResultSafely(res);
+      if (res.status === 'running') {
+        // lock immediately while task is running
+        setIsLocked(true);
+        // SSE will provide task updates automatically, no need to manually fetch
+      } else if (res.status === 'failed') {
+        // Immediate failure (validation etc.)
+        setIsRunning(false);
+        runningRef.current = false;
+        setIsLocked(false);
+      }
+      if (res.status !== 'successful' && res.status !== 'running') setError(res.message || 'Topic modeling failed');
+      // Lock with snapshot
+      try {
+        const ids = firstTwo.map(n=>n.id);
+        const snaps: Array<{ id: string; name: string; columns: string[] }> = [];
+        for (const id of ids) {
+          try {
+            const info = await nodesApi.info(currentWorkspaceId!, id, getAuthHeaders());
+            const name = (info as any)?.name || (info as any)?.data?.name || id;
+            const columns = Array.isArray((info as any)?.columns) ? (info as any).columns : (Array.isArray((info as any)?.data?.columns) ? (info as any).data.columns : []);
+            snaps.push({ id, name: String(name), columns });
+          } catch {
+            snaps.push({ id, name: id, columns: [] });
+          }
+        }
+        setLockedNodesSnapshot(snaps);
+        setIsLocked(true);
+      } catch { /* ignore */ }
     } catch (e:any) {
       setError(e?.message || 'Error running topic modeling');
-    } finally { setIsRunning(false); }
+      // Exit running state on error
+      setIsRunning(false);
+      runningRef.current = false;
+    }
   };
 
   const topics: TopicModelingTopic[] = useMemo(()=> result?.data?.topics || [], [result]);
@@ -210,37 +271,244 @@ const TopicModelingTab: React.FC = () => {
     );
   },[topics, corpusCount, selectedNodes, nodeColors, chartWidth, hoveredTopicId]);
 
+// Hydration from backend once per mount - simplified to avoid race conditions
+  const hydratedOnceRef = useRef<boolean>(false);
+  useEffect(() => {
+    (async () => {
+      if (hydratedOnceRef.current || !currentWorkspaceId) return;
+      hydratedOnceRef.current = true;
+      
+      try {
+        // First check current-request to restore UI state
+        const reqResp = await textApi.getTopicModelingCurrentRequest(currentWorkspaceId, getAuthHeaders());
+        if (!reqResp) return; // No current request - fresh state
+        
+        // Restore request parameters to UI
+        const req = (reqResp as any)?.data;
+        if (req) {
+          const nodeIds: string[] = Array.isArray(req.node_ids) ? req.node_ids.slice(0,2) : [];
+          const node_columns: Record<string,string> = req.node_columns || {};
+          const sels = nodeIds.map((id: string) => ({ nodeId: id, column: node_columns[id] || '' }));
+          setNodeColumnSelections(sels);
+          setMinTopicSize(Number(req.min_topic_size ?? 5));
+          setUseCtTfidf(!!req.use_ctfidf);
+          
+          // Create locked node snapshots for UI display
+          const snaps: Array<{ id: string; name: string; columns: string[] }> = [];
+          for (const id of nodeIds) {
+            try {
+              const info = await nodesApi.info(currentWorkspaceId!, id, getAuthHeaders());
+              const name = (info as any)?.name || (info as any)?.data?.name || id;
+              const columns = Array.isArray((info as any)?.columns) ? (info as any).columns : (Array.isArray((info as any)?.data?.columns) ? (info as any).data.columns : []);
+              snaps.push({ id, name: String(name), columns });
+            } catch { 
+              snaps.push({ id, name: id, columns: [] }); 
+            }
+          }
+          if (snaps.length) setLockedNodesSnapshot(snaps);
+        }
+        
+        // Now get current result state
+        const resResp = await textApi.getTopicModelingCurrentResult(currentWorkspaceId, getAuthHeaders());
+        if (resResp) {
+          const resStatus = (resResp as any)?.status;
+          if (resStatus === 'successful') {
+            setResultSafely(resResp as any);
+            setIsLocked(true);
+          } else if (resStatus === 'failed') {
+            setResultSafely(resResp as any);
+            setIsLocked(true);
+            setIsRunning(false);
+            runningRef.current = false;
+          } else if (resStatus === 'running') {
+            // Only set running if no successful result exists yet
+            if (!resultRef.current || resultRef.current.status !== 'successful') {
+              setResultSafely({ status: 'running', message: 'Task running', metadata: (resResp as any)?.metadata } as any);
+              setIsLocked(true); 
+              runningRef.current = true; 
+              setIsRunning(true);
+            }
+          }
+        }
+      } catch (error) {
+        console.warn('TopicModelingTab hydration failed:', error);
+      }
+    })();
+  }, [currentWorkspaceId, getAuthHeaders]);
+
+  // React to task state changes for running state management
+  useEffect(() => {
+    const onTasksUpdated = async (ev: any) => {
+      try {
+        const tasks = ev?.detail?.tasks || [];
+        const tmTasks = tasks.filter((t: any) => t.task_type === 'topic_modeling');
+        const hasRunningTM = tmTasks.some((t: any) => t.status === 'running');
+        const hasFailedTM = tmTasks.some((t: any) => t.status === 'failed');
+        
+        if (hasRunningTM && !runningRef.current) {
+          // Enter running state
+          setIsLocked(true);
+          setIsRunning(true);
+          runningRef.current = true;
+        } else if (!hasRunningTM && runningRef.current && !hasFailedTM) {
+          // Exit running state (but only if not failed, let failure event handle that)
+          setIsRunning(false);
+          runningRef.current = false;
+        }
+      } catch { /* ignore */ }
+    };
+    window.addEventListener('tasksUpdated', onTasksUpdated as EventListener);
+    return () => window.removeEventListener('tasksUpdated', onTasksUpdated as EventListener);
+  }, []);
+  
+  // React to topic modeling result ready event
+  useEffect(() => {
+    const onResultReady = async (ev: any) => {
+      if (!currentWorkspaceId) return;
+      
+      try {
+        console.log('Topic modeling result ready, fetching current-result');
+        const rr = await textApi.getTopicModelingCurrentResult(currentWorkspaceId, getAuthHeaders());
+        if (rr) {
+          const resStatus = (rr as any)?.status;
+          if (resStatus === 'successful') {
+            setResultSafely(rr as any);
+            setIsLocked(true);
+            setIsRunning(false);
+            runningRef.current = false;
+            console.log('Topic modeling results updated successfully');
+          } else if (resStatus === 'failed') {
+            setResultSafely(rr as any);
+            setIsLocked(true);
+            setIsRunning(false);
+            runningRef.current = false;
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to fetch topic modeling result after ready event:', error);
+      }
+    };
+    
+    window.addEventListener('topicModelingResultReady', onResultReady as EventListener);
+    return () => window.removeEventListener('topicModelingResultReady', onResultReady as EventListener);
+  }, [currentWorkspaceId, getAuthHeaders]);
+
+  // If result failed, keep the panel locked and run disabled until cleared
+  useEffect(() => {
+    if (result && result.status === 'failed') {
+      setIsLocked(true);
+      setIsRunning(false);
+      runningRef.current = false;
+    }
+  }, [result]);
+
   return (
     <div className="space-y-6">
-      <div className="bg-white p-4 rounded-lg border">
-        <h2 className="text-lg font-semibold mb-4 text-gray-800">Topic Modeling (BERTopic)</h2>
-        <NodeSelectionPanel
-          selectedNodes={selectedNodes}
-          nodeColumnSelections={nodeColumnSelections}
-          onColumnChange={handleColumnChange}
-          nodeColors={nodeColors}
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold text-gray-800">Topic Modeling (BERTopic)</h2>
+{isLocked && (
+            <div className="relative group flex items-center text-sm text-gray-600 cursor-default">
+              <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                <path fillRule="evenodd" d="M5 8V6a5 5 0 1110 0v2h1a1 1 0 011 1v9a1 1 0 01-1 1H4a1 1 0 01-1-1V9a1 1 0 011-1h1zm2-2a3 3 0 116 0v2H7V6zm-2 4h10v7H5v-7z" clipRule="evenodd" />
+              </svg>
+              Locked
+              <div className="absolute right-0 mt-2 w-72 z-10 hidden group-hover:block bg-white border border-gray-200 shadow-lg rounded p-2 text-xs text-gray-700">
+                <div className="font-semibold mb-1">Panel locked</div>
+                <ul className="list-disc ml-4 space-y-1">
+                  <li>Locked to current request/results.</li>
+                  <li>Node selection and backend-used parameters are disabled.</li>
+                  <li>Clear results to unlock and resync with the graph selection.</li>
+                </ul>
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="mb-6">
+          <NodeSelectionPanel
+            selectedNodes={(isLocked && lockedNodesSnapshot.length) ? lockedNodesSnapshot.map(s=>({ id: s.id, name: s.name, data: { name: s.name, nodeName: s.name, label: s.name, columns: s.columns }, columns: s.columns })) : selectedNodes}
+            nodeColumnSelections={nodeColumnSelections}
+            onColumnChange={handleColumnChange}
+            nodeColors={nodeColors}
             onColorChange={handleColorChange}
-          getNodeColumns={getNodeColumns}
-          defaultPalette={defaultPalette}
-          maxCompare={2}
-        />
-        <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
+            getNodeColumns={getNodeColumns}
+            defaultPalette={defaultPalette}
+            maxCompare={2}
+            disabled={!!isLocked}
+          />
+        </div>
+
+        {/* Configuration */}
+        <div className="space-y-4 mb-6">
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Min Topic Size</label>
-            <input type="number" min={2} value={minTopicSize} onChange={e=>setMinTopicSize(parseInt(e.target.value)||5)} className="w-full px-2 py-1 text-sm border rounded" />
+            <label className="block text-sm font-medium text-gray-700 mb-2">Min Topic Size</label>
+            <input
+              type="number"
+              min={2}
+              value={minTopicSize}
+              onChange={e=>setMinTopicSize(parseInt(e.target.value)||5)}
+              disabled={!!isLocked}
+              className="w-full md:w-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+            />
           </div>
-          <div className="flex items-center gap-2 pt-5">
-            <input id="useCtTfidf" type="checkbox" checked={useCtTfidf} onChange={e=>setUseCtTfidf(e.target.checked)} />
-            <label htmlFor="useCtTfidf" className="text-sm text-gray-700">Use c-TF-IDF embeddings</label>
-          </div>
-          <div className="pt-5">
-            <button disabled={isRunning || !selectedNodes.length} onClick={handleRun} className={`px-4 py-2 text-sm rounded-md font-medium text-white ${isRunning? 'bg-blue-400':'bg-blue-600 hover:bg-blue-700'}`}>{isRunning? 'Running...' : 'Run Topic Modeling'}</button>
+          <div>
+            <label className="flex items-center">
+              <input id="useCtTfidf" type="checkbox" checked={useCtTfidf} onChange={e=>setUseCtTfidf(e.target.checked)} disabled={!!isLocked} className="mr-2" />
+              <span className="text-sm text-gray-700">Use c-TF-IDF embeddings</span>
+            </label>
           </div>
         </div>
+
+        {/* Action Buttons */}
+        <div className="flex flex-wrap gap-3 items-center">
+          <button
+            onClick={handleRun}
+            disabled={isRunning || !!isLocked || !!result || !selectedNodes.length || selectedNodes.slice(0,2).some(n=> !nodeColumnSelections.find(s=>s.nodeId===n.id)?.column)}
+            className="w-full md:w-auto px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+          >
+            {isRunning ? 'Running...' : 'Run Topic Modeling'}
+          </button>
+          <button
+            onClick={async () => {
+              if (!currentWorkspaceId) return;
+              setIsClearing(true);
+              try {
+                // Cancel any running topic_modeling tasks first
+                try { await workspacesApi.cancelTasks(currentWorkspaceId, { task_type: 'topic_modeling' }, getAuthHeaders()); } catch {}
+                // Clear saved analyses
+                try { await workspacesApi.clearAnalysis(currentWorkspaceId, 'topic_modeling', getAuthHeaders()); } catch {}
+              } finally {
+                setIsClearing(false);
+                // Reset local state
+                setResultSafely(null);
+                setIsLocked(false);
+                setLockedNodesSnapshot([]);
+                setIsRunning(false);
+                runningRef.current = false;
+              }
+            }}
+            disabled={isClearing || (!result && !isLocked && !isRunning) || !currentWorkspaceId}
+            className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+            title={!result && !isLocked && !isRunning ? 'No results to clear' : 'Clear results'}
+          >
+            {isClearing ? 'Clearing…' : 'Clear Results'}
+          </button>
+        </div>
+
         {error && <div className="mt-3 text-sm text-red-600">{error}</div>}
+        {result && result.status === 'running' && (
+          <div className="mt-3 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+            Topic modeling task started and is running in the background{result?.metadata?.task_id ? ` (task ${result.metadata.task_id})` : ''}. See Tasks list for progress.
+          </div>
+        )}
+        {result && result.status === 'failed' && (
+          <div className="mt-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded p-2">
+            {result.message || 'Topic modeling failed'}
+          </div>
+        )}
       </div>
-      {result && result.success && (
-        <div className="bg-white p-4 rounded-lg border" ref={containerRef}>
+      {result && result.status === 'successful' && (
+        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200" ref={containerRef}>
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-md font-semibold text-gray-800">Topics ({topics.length})</h3>
             <div className="text-xs text-gray-500">Colors blend by proportion of first vs second corpus</div>
@@ -277,7 +545,7 @@ const TopicModelingTab: React.FC = () => {
           </div>
         </div>
       )}
-      {result && !result.success && (
+      {result && result.status === 'failed' && (
         <div className="bg-white p-4 rounded border text-sm text-red-600">{result.message}</div>
       )}
     </div>

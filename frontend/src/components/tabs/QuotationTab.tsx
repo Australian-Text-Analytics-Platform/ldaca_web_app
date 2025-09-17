@@ -1,6 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import NodeSelectionPanel from '../NodeSelectionPanel';
 import { useWorkspace } from '../../hooks/useWorkspace';
+import { useAuth } from '../../hooks/useAuth';
+import { textApi } from '../../api/text';
+import { nodesApi } from '../../api/nodes';
+import { workspacesApi } from '../../api/workspaces';
 
 interface NodeColumnSelection {
   nodeId: string;
@@ -9,11 +13,14 @@ interface NodeColumnSelection {
 
 const QuotationTab: React.FC = () => {
   const { selectedNodes, currentWorkspaceId, getNodeShape, quotationSearch, detachQuotation, nodeData, handlePageChange: baseHandlePageChange, handlePageSizeChange } = useWorkspace();
+  const { getAuthHeaders } = useAuth();
 
   const [nodeColumnSelections, setNodeColumnSelections] = useState<NodeColumnSelection[]>([]);
   // Show metadata by default so the table mirrors original columns
   const [showMetadata, setShowMetadata] = useState(true);
   const [hasLoaded, setHasLoaded] = useState(false);
+  const [isLocked, setIsLocked] = useState(false);
+  const [lockedNodesSnapshot, setLockedNodesSnapshot] = useState<Array<{ id: string; name: string; columns: string[] }>>([]);
 
   // Per-node pagination and sorting state
   const [nodeState, setNodeState] = useState<Record<string, {
@@ -33,14 +40,17 @@ const QuotationTab: React.FC = () => {
   const getNodeColumns = useMemo(() => {
     return (node: any) => {
       if (node.data?.columns && Array.isArray(node.data.columns)) return node.data.columns;
+      // Also check if columns are directly on the node object (for locked snapshots)
+      if (node.columns && Array.isArray(node.columns)) return node.columns;
       if (node.data?.dtypes && typeof node.data.dtypes === 'object') return Object.keys(node.data.dtypes);
       if (node.data?.schema) return Object.keys(node.data.schema);
       return [];
     };
   }, []);
 
-  // Sync selection with current nodes (limit to 1 by default)
+// Sync selection with current nodes (limit to 1 by default)
   useEffect(() => {
+    if (isLocked) return;
     if (selectedNodes.length === 0) { setNodeColumnSelections([]); return; }
     setNodeColumnSelections(prev => {
       const newSelections = selectedNodes.slice(0, 1).map(node => {
@@ -56,7 +66,8 @@ const QuotationTab: React.FC = () => {
     });
   }, [selectedNodes, getNodeColumns]);
 
-  const handleColumnChange = (nodeId: string, column: string) => {
+const handleColumnChange = (nodeId: string, column: string) => {
+    if (isLocked) return;
     setNodeColumnSelections(prev => prev.map(sel => sel.nodeId === nodeId ? { ...sel, column } : sel));
   };
 
@@ -196,7 +207,7 @@ const QuotationTab: React.FC = () => {
     }
   };
 
-  const fetchQuotations = async (nodeId: string, _page?: number, _sortBy?: string, _sortOrder?: 'asc'|'desc') => {
+const fetchQuotations = async (nodeId: string, _page?: number, _sortBy?: string, _sortOrder?: 'asc'|'desc') => {
     if (!currentWorkspaceId) return;
     const selection = nodeColumnSelections.find(s => s.nodeId === nodeId);
     if (!selection?.column) return;
@@ -233,10 +244,20 @@ const QuotationTab: React.FC = () => {
     }
   };
 
-  const handleSearchAll = async () => {
+const handleSearchAll = async () => {
   setHasLoaded(true);
-  await Promise.all(selectedNodes.slice(0,1).map(n => fetchQuotations(n.id, 1)));
-  };
+  const runNodes = selectedNodes.slice(0,1);
+  await Promise.all(runNodes.map(n => fetchQuotations(n.id, 1)));
+  // Lock with snapshot
+  try {
+    const nodeId = runNodes[0].id;
+    const info = await nodesApi.info(currentWorkspaceId!, nodeId, getAuthHeaders());
+    const name = (info as any)?.name || (info as any)?.data?.name || nodeId;
+    const columns = Array.isArray((info as any)?.columns) ? (info as any).columns : (Array.isArray((info as any)?.data?.columns) ? (info as any).data.columns : []);
+    setLockedNodesSnapshot([{ id: nodeId, name: String(name), columns }]);
+    setIsLocked(true);
+  } catch { /* ignore */ }
+};
 
   const handlePageChange = (newPage: number) => {
     // Use base table pagination; quotes already aggregated in spanMap
@@ -265,45 +286,131 @@ const QuotationTab: React.FC = () => {
     }
   };
 
+  // Hydration from backend once per mount
+  const hydratedOnceRef = React.useRef<boolean>(false);
+  useEffect(() => {
+    (async () => {
+      if (hydratedOnceRef.current) return;
+      hydratedOnceRef.current = true;
+      if (!currentWorkspaceId) return;
+      try {
+        // First check current-request; if null, don't request current-result
+        const reqResp = await textApi.getQuotationCurrentRequest(currentWorkspaceId, getAuthHeaders());
+        if (!reqResp) {
+          // No current request - fresh state
+          return;
+        }
+        
+        const req = (reqResp as any)?.data;
+        if (req) {
+          const nodeId = req.node_id || req.nodeId;
+          const column = req.column || '';
+          setNodeColumnSelections([{ nodeId, column }]);
+          setShowMetadata(true);
+          
+          // Lock with snapshot
+          try {
+            const info = await nodesApi.info(currentWorkspaceId!, nodeId, getAuthHeaders());
+            const name = (info as any)?.name || (info as any)?.data?.name || nodeId;
+            const columns = Array.isArray((info as any)?.columns) ? (info as any).columns : (Array.isArray((info as any)?.data?.columns) ? (info as any).data.columns : []);
+            setLockedNodesSnapshot([{ id: nodeId, name: String(name), columns }]);
+            setIsLocked(true);
+          } catch { /* ignore */ }
+        }
+        
+        // Now get current-result
+        const resResp = await textApi.getQuotationCurrentResult(currentWorkspaceId, getAuthHeaders());
+        if (!resResp) {
+          // No result yet
+          return;
+        }
+        
+        const res = (resResp as any)?.data;
+        if (res) {
+          setHasLoaded(true);
+          const nodeId = req?.node_id || req?.nodeId;
+          if (nodeId) {
+            await fetchQuotations(nodeId, 1);
+          }
+        }
+      } catch { /* ignore */ }
+    })();
+  }, [currentWorkspaceId, getAuthHeaders]);
+
   return (
     <div className="space-y-6">
       <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-        <div className="flex items-start gap-4">
-          <div className="flex-1 min-w-0">
-            <NodeSelectionPanel
-              selectedNodes={selectedNodes.slice(0,1)}
-              nodeColumnSelections={nodeColumnSelections}
-              onColumnChange={handleColumnChange}
-              nodeColors={{}}
-              onColorChange={()=>{}}
-              getNodeColumns={getNodeColumns}
-              defaultPalette={[]}
-              maxCompare={1}
-              className="mb-0"
-              showShape
-              getNodeShapeFn={getNodeShape}
-              showColorPicker={false}
-            />
-          </div>
-          <div className="w-64 flex-shrink-0">
-            <div className="space-y-3">
-              <div>
-                <label className="flex items-center">
-                  <input type="checkbox" className="mr-2" checked={showMetadata} onChange={(e)=>setShowMetadata(e.target.checked)} />
-                  <span className="text-sm text-gray-700">Show metadata</span>
-                </label>
-              </div>
-              <div>
-                <button
-                  onClick={handleSearchAll}
-                  disabled={!selectedNodes.length || nodeColumnSelections.some(s=>!s.column)}
-                  className="w-full px-4 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors text-sm"
-                >
-                  Load quotations
-                </button>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-semibold text-gray-800">Quotation Extraction</h2>
+{isLocked && (
+            <div className="relative group flex items-center text-sm text-gray-600 cursor-default">
+              <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                <path fillRule="evenodd" d="M5 8V6a5 5 0 1110 0v2h1a1 1 0 011 1v9a1 1 0 01-1 1H4a1 1 0 01-1-1V9a1 1 0 011-1h1zm2-2a3 3 0 116 0v2H7V6zm-2 4h10v7H5v-7z" clipRule="evenodd" />
+              </svg>
+              Locked
+              <div className="absolute right-0 mt-2 w-72 z-10 hidden group-hover:block bg-white border border-gray-200 shadow-lg rounded p-2 text-xs text-gray-700">
+                <div className="font-semibold mb-1">Panel locked</div>
+                <ul className="list-disc ml-4 space-y-1">
+                  <li>Locked to current request/results.</li>
+                  <li>Node selection and backend-used parameters are disabled.</li>
+                  <li>Frontend-only options (e.g., Show metadata) stay editable.</li>
+                  <li>Clear results to unlock and resync with the graph selection.</li>
+                </ul>
               </div>
             </div>
-          </div>
+          )}
+        </div>
+        <div>
+          <NodeSelectionPanel
+            selectedNodes={(isLocked && lockedNodesSnapshot.length) ? lockedNodesSnapshot.map(s=>({ id: s.id, name: s.name, data: { name: s.name, nodeName: s.name, label: s.name, columns: s.columns }, columns: s.columns })) : selectedNodes.slice(0,1)}
+            nodeColumnSelections={nodeColumnSelections}
+            onColumnChange={handleColumnChange}
+            nodeColors={{}}
+            onColorChange={()=>{}}
+            getNodeColumns={getNodeColumns}
+            defaultPalette={[]}
+            maxCompare={1}
+            className="mb-0"
+            showShape
+            getNodeShapeFn={getNodeShape}
+            showColorPicker={false}
+            disabled={!!isLocked}
+          />
+        </div>
+
+        {/* Configuration */}
+        <div className="mt-4 mb-4">
+          <label className="flex items-center">
+            <input type="checkbox" className="mr-2" checked={showMetadata} onChange={(e)=>setShowMetadata(e.target.checked)} />
+            <span className="text-sm text-gray-700">Show metadata</span>
+          </label>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex flex-wrap gap-3 items-center">
+          <button
+            onClick={handleSearchAll}
+            disabled={!selectedNodes.length || nodeColumnSelections.some(s=>!s.column) || !!isLocked}
+            className="w-full md:w-auto px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+          >
+            Load Quotations
+          </button>
+          {hasLoaded && (
+            <button
+              onClick={async () => {
+                try {
+                  if (currentWorkspaceId) await workspacesApi.clearAnalysis(currentWorkspaceId, 'quotation', getAuthHeaders());
+                } catch {/* ignore */}
+                setHasLoaded(false);
+                setSpanMap({});
+                setLockedNodesSnapshot([]);
+                setIsLocked(false);
+              }}
+              className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
+            >
+              Clear Results
+            </button>
+          )}
         </div>
       </div>
 

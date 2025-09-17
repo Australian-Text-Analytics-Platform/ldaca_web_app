@@ -122,6 +122,10 @@ class DocWorkspaceAPIUtils:
             dtype = info["dtype"]
             info["dtype"] = f"{dtype.__module__}.{dtype.__name__}"
 
+        # Explicitly add columns field for frontend compatibility
+        if "columns" not in info:
+            info["columns"] = getattr(node, "columns", [])
+
         return info
 
     @staticmethod
