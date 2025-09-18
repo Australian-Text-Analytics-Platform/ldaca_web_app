@@ -61,6 +61,7 @@ except Exception:  # pragma: no cover
 
 logger = logging.getLogger(__name__)
 
+
 # -----------------------------------------------------------------------------
 # Configure Numba threading layer with automatic TBB detection and fallback
 # -----------------------------------------------------------------------------
@@ -72,25 +73,27 @@ def _configure_numba_threading():
         try:
             import numba
             from numba import config
+
             # Check if TBB is in Numba's available threading layers
-            available_layers = getattr(config, 'THREADING_LAYER_PRIORITY', [])
+            available_layers = getattr(config, "THREADING_LAYER_PRIORITY", [])
             if isinstance(available_layers, (list, tuple)):
-                tbb_available = 'tbb' in available_layers
+                tbb_available = "tbb" in available_layers
             elif isinstance(available_layers, str):
-                tbb_available = 'tbb' in available_layers
-                
+                tbb_available = "tbb" in available_layers
+
             # Also try importing TBB directly as a secondary check
             if not tbb_available:
                 try:
                     import tbb
+
                     tbb_available = True
                 except ImportError:
                     pass
-                    
+
         except (ImportError, AttributeError):
             # Numba not available, fall back to safe mode
             pass
-        
+
         if tbb_available:
             # Use TBB if available (thread-safe for concurrent access)
             os.environ.setdefault("NUMBA_THREADING_LAYER_PRIORITY", "tbb workqueue omp")
@@ -100,7 +103,9 @@ def _configure_numba_threading():
             if "NUMBA_NUM_THREADS" not in os.environ:
                 # TBB will manage its own threads
                 pass
-            print("📊 Numba: Using TBB threading layer (thread-safe, TBB-managed threads)")
+            print(
+                "📊 Numba: Using TBB threading layer (thread-safe, TBB-managed threads)"
+            )
         else:
             # Fall back to workqueue with single thread for safety
             os.environ.setdefault("NUMBA_THREADING_LAYER", "workqueue")
@@ -108,8 +113,10 @@ def _configure_numba_threading():
             # Only set num threads if not already set to avoid conflicts
             if "NUMBA_NUM_THREADS" not in os.environ:
                 os.environ["NUMBA_NUM_THREADS"] = "1"
-            print("📊 Numba: Using workqueue threading layer (single-threaded for safety)")
-            
+            print(
+                "📊 Numba: Using workqueue threading layer (single-threaded for safety)"
+            )
+
     except Exception as e:
         # Final fallback - basic workqueue setup
         os.environ.setdefault("NUMBA_THREADING_LAYER", "workqueue")
@@ -117,9 +124,9 @@ def _configure_numba_threading():
         os.environ.setdefault("NUMBA_NUM_THREADS", "1")
         print(f"⚠️ Numba: Threading configuration warning: {e}")
 
+
 # Apply the configuration
 _configure_numba_threading()
-
 
 
 # -----------------------------------------------------------------------------
@@ -174,7 +181,11 @@ async def list_workspace_tasks(
     user_id = current_user["id"]
     tm = workspace_manager.get_task_manager(user_id, workspace_id)
     data = await tm.list()
-    return {"status": "successful", "data": data}
+    return {
+        "state": "successful",
+        "data": data,
+        "message": "Tasks retrieved successfully.",
+    }
 
 
 @router.post("/{workspace_id}/tasks/cancel")
@@ -189,9 +200,17 @@ async def cancel_workspace_tasks(
     tm = workspace_manager.get_task_manager(user_id, workspace_id)
     if task_id:
         ok = await tm.cancel_task(task_id)
-        return {"status": "successful", "data": {"cancelled": ok}}
+        return {
+            "state": "successful",
+            "data": {"cancelled": ok},
+            "message": "Task cancelled successfully.",
+        }
     count = await tm.cancel_all(task_type=task_type)
-    return {"status": "successful", "data": {"cancelled_count": count}}
+    return {
+        "state": "successful",
+        "data": {"cancelled_count": count},
+        "message": "All tasks cancelled successfully.",
+    }
 
 
 @router.post("/{workspace_id}/tasks/clear")
@@ -202,21 +221,28 @@ async def clear_workspace_tasks(
     current_user: dict = Depends(get_current_user),
 ):
     """Clear (remove) task records for this workspace. This only removes task tracking records, not analysis results.
-    
+
     If task_id provided, clear only that task. Otherwise clear all completed tasks, optionally filtered by task_type.
     Analysis results are preserved and only task records are removed from memory.
     """
     user_id = current_user["id"]
     tm = workspace_manager.get_task_manager(user_id, workspace_id)
-    
+
     if task_id:
-        # Clear specific task by ID
         cleared = await tm.clear_task(task_id)
-        return {"status": "successful", "data": {"cleared_count": 1 if cleared else 0}}
-    else:
-        # Clear all tasks of specified type (or all tasks if no type specified)
-        count = await tm.clear_tasks(task_type=task_type, user_id=user_id, workspace_id=workspace_id)
-        return {"status": "successful", "data": {"cleared_count": count}}
+        return {
+            "state": "successful",
+            "data": {"cleared_count": 1 if cleared else 0},
+            "message": "Task cleared successfully.",
+        }
+    count = await tm.clear_tasks(
+        task_type=task_type, user_id=user_id, workspace_id=workspace_id
+    )
+    return {
+        "state": "successful",
+        "data": {"cleared_count": count},
+        "message": "All tasks cleared successfully.",
+    }
 
 
 @router.get("/{workspace_id}/tasks/stream")
@@ -227,22 +253,22 @@ async def stream_task_progress(
     """Server-Sent Events stream for real-time task progress updates."""
     user_id = current_user["id"]
     tm = workspace_manager.get_task_manager(user_id, workspace_id)
-    
+
     async def event_generator():
         queue = None
         try:
             # Subscribe to events
             queue = await tm.subscribe(user_id, workspace_id)
-            
+
             # Send initial tasks snapshot
             tasks = await tm.list(user_id=user_id, workspace_id=workspace_id)
             initial_data = {
                 "type": "tasks_snapshot",
                 "tasks": tasks,
-                "timestamp": time.time()
+                "timestamp": time.time(),
             }
             yield f"data: {json.dumps(initial_data)}\n\n"
-            
+
             # Stream events from queue
             last_heartbeat = time.time()
             while True:
@@ -254,23 +280,16 @@ async def stream_task_progress(
                 except asyncio.TimeoutError:
                     # Send heartbeat to keep connection alive
                     if time.time() - last_heartbeat > 30:
-                        heartbeat_data = {
-                            "type": "heartbeat",
-                            "timestamp": time.time()
-                        }
+                        heartbeat_data = {"type": "heartbeat", "timestamp": time.time()}
                         yield f"data: {json.dumps(heartbeat_data)}\n\n"
                         last_heartbeat = time.time()
-                    
+
         except asyncio.CancelledError:
             print(f"SSE stream cancelled for user {user_id}, workspace {workspace_id}")
         except Exception as e:
             print(f"SSE stream error: {e}")
             # Send error event
-            error_data = {
-                "type": "error",
-                "message": str(e),
-                "timestamp": time.time()
-            }
+            error_data = {"type": "error", "message": str(e), "timestamp": time.time()}
             yield f"data: {json.dumps(error_data)}\n\n"
         finally:
             # Unsubscribe on cleanup
@@ -279,7 +298,7 @@ async def stream_task_progress(
                     await tm.unsubscribe(user_id, workspace_id, queue)
                 except Exception as e:
                     print(f"Error unsubscribing from events: {e}")
-    
+
     return StreamingResponse(
         event_generator(),
         media_type="text/event-stream",
@@ -287,8 +306,8 @@ async def stream_task_progress(
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
             "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Headers": "Cache-Control"
-        }
+            "Access-Control-Allow-Headers": "Cache-Control",
+        },
     )
 
 
@@ -307,11 +326,11 @@ async def topic_modeling_current_request(
     )
     if not rec:
         return None
-    return {
-        "status": "successful",
-        "message": "ok",
-        "data": json_sanitize(rec.request),
-    }
+        return {
+            "state": "successful",
+            "message": "ok",
+            "data": json_sanitize(rec.request),
+        }
 
 
 @router.get("/{workspace_id}/topic-modeling/current-result")
@@ -321,13 +340,13 @@ async def topic_modeling_current_result(
 ):
     """Get current topic modeling result - read-only endpoint."""
     user_id = current_user["id"]
-    
+
     # First try persisted analysis (primary source of truth)
     try:
         from ldaca_web_app_backend.core.analysis_store import get_latest_analysis
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"analysis_store unavailable: {e}")
-    
+
     rec = await asyncio.to_thread(
         get_latest_analysis, user_id, workspace_id, "topic_modeling"
     )
@@ -336,38 +355,42 @@ async def topic_modeling_current_result(
         result = rec.result
         if isinstance(result, dict) and "data" in result:
             return {
-                "status": result.get("status", "successful"),
+                "state": result.get("state", result.get("status", "successful")),
                 "message": result.get("message", "ok"),
                 "data": json_sanitize(result["data"]),
             }
         else:
             # Legacy format
             return {
-                "status": "successful",
+                "state": "successful",
                 "message": "ok",
                 "data": json_sanitize(result),
             }
-    
+
     # Fallback: check ProcessTaskManager for running state
     tm = workspace_manager.get_task_manager(user_id, workspace_id)
-    latest = await tm.latest_by_type("topic_modeling", user_id=user_id, workspace_id=workspace_id)
+    latest = await tm.latest_by_type(
+        "topic_modeling", user_id=user_id, workspace_id=workspace_id
+    )
     if latest is None:
         return None
-    
-    status_val = latest.status.value if hasattr(latest.status, 'value') else str(latest.status)
-    
+
+    status_val = (
+        latest.status.value if hasattr(latest.status, "value") else str(latest.status)
+    )
+
     if status_val == "running":
-        return {"status": "running", "message": "Task is still running", "data": None}
+        return {"state": "running", "message": "Task is still running", "data": None}
     elif status_val == "failed":
         return {
-            "status": "failed",
+            "state": "failed",
             "message": latest.error or "Task failed",
             "data": None,
         }
     else:
         # Task completed but result not persisted yet (should be rare with new flow)
         return {
-            "status": "running",
+            "state": "running",
             "message": "Task completed, result being processed",
             "data": None,
         }
@@ -400,10 +423,14 @@ async def run_topic_modeling(
 
     # If a topic modeling task is already running for this workspace, return that task id
     try:
-        if await tm.any_running(task_type="topic_modeling", user_id=user_id, workspace_id=workspace_id):
-            latest = await tm.latest_by_type("topic_modeling", user_id=user_id, workspace_id=workspace_id)
+        if await tm.any_running(
+            task_type="topic_modeling", user_id=user_id, workspace_id=workspace_id
+        ):
+            latest = await tm.latest_by_type(
+                "topic_modeling", user_id=user_id, workspace_id=workspace_id
+            )
             return {
-                "status": "running",
+                "state": "running",
                 "message": "Topic modeling already running",
                 "data": None,
                 "metadata": {"task_id": latest.id if latest else None},
@@ -419,20 +446,18 @@ async def run_topic_modeling(
             raise HTTPException(
                 status_code=404, detail=f"Workspace {workspace_id} not found"
             )
-        
+
         # Validate all nodes exist and determine columns
         node_columns = request.node_columns or {}
         validated_columns: Dict[str, str] = {}
-        
+
         for node_id in request.node_ids:
             node = workspace_manager.get_node_from_workspace(
                 user_id, workspace_id, node_id
             )
             if not node:
-                raise HTTPException(
-                    status_code=404, detail=f"Node {node_id} not found"
-                )
-            
+                raise HTTPException(status_code=404, detail=f"Node {node_id} not found")
+
             node_data = getattr(node, "data", node)
             if hasattr(node_data, "columns"):
                 available_columns = node_data.columns  # type: ignore[attr-defined]
@@ -442,11 +467,12 @@ async def run_topic_modeling(
                 available_columns = list(node_data.schema.keys())  # type: ignore
             else:
                 available_columns = []
-            
+
             column_name = node_columns.get(node_id)
             if not column_name:
                 try:
                     from docframe import DocDataFrame, DocLazyFrame  # type: ignore
+
                     if isinstance(node_data, (DocDataFrame, DocLazyFrame)) and getattr(
                         node_data, "document_column", None
                     ):
@@ -468,7 +494,7 @@ async def run_topic_modeling(
                     ]
                     if common:
                         column_name = common[0]
-                        
+
             if not column_name:
                 raise HTTPException(
                     status_code=400,
@@ -479,14 +505,14 @@ async def run_topic_modeling(
                     status_code=400,
                     detail=f"Column '{column_name}' not in node {node_id}. Available: {available_columns}",
                 )
-            
+
             validated_columns[node_id] = column_name
-    
+
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Validation error: {e}")
-    
+
     # Submit task to process pool
     try:
         task_info = await tm.submit_topic_modeling(
@@ -495,15 +521,17 @@ async def run_topic_modeling(
             node_ids=request.node_ids,
             node_columns=validated_columns,
             min_topic_size=request.min_topic_size or 5,
-            use_ctfidf=bool(request.use_ctfidf)
+            use_ctfidf=bool(request.use_ctfidf),
         )
-        
+
         # Persist the request immediately so current-request is available while running
         try:
             from ldaca_web_app_backend.core.analysis_store import save_analysis
 
             req_dict = (
-                request.model_dump() if hasattr(request, "model_dump") else request.dict()
+                request.model_dump()
+                if hasattr(request, "model_dump")
+                else request.dict()
             )
             # Do NOT store a running result payload under 'result' as it confuses current-result shape;
             # save an empty dict for result so only current-request is hydrated.
@@ -512,15 +540,14 @@ async def run_topic_modeling(
             )
         except Exception as _e:
             print(f"[analysis_persist] save running request failed: {_e}")
-    
+
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to submit task: {e}")
-
-    # Immediate running response with task id
+    # Immediate running response with task id (moved outside of exception block so it actually executes)
     return {
-        "status": "running",
+        "state": "running",
         "message": "Topic modeling started",
         "data": None,
         "metadata": {"task_id": task_info.id},
@@ -585,7 +612,7 @@ async def set_current_workspace(
     if not success and workspace_id is not None:
         raise HTTPException(status_code=404, detail="Workspace not found")
 
-    return {"success": True, "current_workspace_id": workspace_id}
+    return {"state": "successful", "current_workspace_id": workspace_id}
 
 
 @router.post("/", response_model=WorkspaceInfo)
@@ -659,7 +686,7 @@ async def delete_workspace(
         raise HTTPException(status_code=404, detail="Workspace not found")
 
     return {
-        "success": True,
+        "state": "successful",
         "message": f"Workspace {workspace_id} deleted successfully",
     }
 
@@ -682,7 +709,7 @@ async def unload_workspace(
     if not existed:
         raise HTTPException(status_code=404, detail="Workspace not found")
     return {
-        "success": True,
+        "state": "successful",
         "message": f"Workspace {workspace_id} unloaded",
         "workspace_id": workspace_id,
     }
@@ -750,7 +777,7 @@ async def save_workspace(
         raise HTTPException(status_code=404, detail="Workspace not found")
     try:
         workspace_manager.persist(user_id, workspace_id)
-        return {"success": True, "message": "Workspace saved"}
+        return {"state": "successful", "message": "Workspace saved"}
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Failed to save workspace: {str(e)}"
@@ -796,7 +823,11 @@ async def save_workspace_as(
         target_folder.mkdir(parents=True, exist_ok=True)
         new_workspace.serialize(target_folder / f"workspace_{new_id}.json")
         info = workspace_manager.get_workspace_info(user_id, new_id)
-        return {"success": True, "message": "Workspace cloned", "new_workspace": info}
+        return {
+            "state": "successful",
+            "message": "Workspace cloned",
+            "new_workspace": info,
+        }
     except Exception as e:  # pragma: no cover
         raise HTTPException(
             status_code=500, detail=f"Failed to save workspace copy: {e}"
@@ -902,7 +933,7 @@ async def import_workspace(
         if not info:
             # Fallback minimal info
             info = {"workspace_id": new_id, "name": getattr(new_ws, "name", base_name)}
-        return {"success": True, "workspace": info}
+        return {"state": "successful", "workspace": info}
     except HTTPException:
         raise
     except Exception as e:  # pragma: no cover
@@ -1405,7 +1436,7 @@ async def delete_node(
     if not success:
         raise HTTPException(status_code=404, detail="Node not found")
 
-    return {"success": True, "message": "Node deleted successfully"}
+    return {"state": "successful", "message": "Node deleted successfully"}
 
 
 @router.post("/{workspace_id}/nodes/{node_id}/convert")
@@ -1889,7 +1920,7 @@ async def upload_file_to_workspace(
 
         # Return node summary using DocWorkspace method
         return {
-            "success": True,
+            "state": "successful",
             "message": "File uploaded successfully",
             "node": DocWorkspaceAPIUtils.convert_node_info_for_api(
                 node
@@ -2575,7 +2606,7 @@ async def multi_node_concordance_current_request(
     rec = get_latest_analysis(user_id, workspace_id, task="multi_concordance")
     if not rec:
         return None
-    return {"status": "successful", "message": "ok", "data": rec.request}
+    return {"state": "successful", "message": "ok", "data": rec.request}
 
 
 @router.get("/{workspace_id}/concordance/multi-node/current-result")
@@ -2591,7 +2622,7 @@ async def multi_node_concordance_current_result(
     rec = get_latest_analysis(user_id, workspace_id, task="multi_concordance")
     if not rec:
         return None
-    return {"status": "successful", "message": "ok", "data": rec.result}
+    return {"state": "successful", "message": "ok", "data": rec.result}
 
 
 class MultiConcordanceResultQuery(BaseModel):
@@ -2621,7 +2652,7 @@ async def multi_node_concordance_current_result_post(
     rec = get_latest_analysis(user_id, workspace_id, task="multi_concordance")
     if not rec or not rec.request:
         return {
-            "status": "failed",
+            "state": "failed",
             "message": "No analysis found for multi_concordance",
             "data": None,
         }
@@ -2634,7 +2665,7 @@ async def multi_node_concordance_current_result_post(
         node_columns = base_req.get("node_columns") or {}
         if not node_ids:
             return {
-                "status": "failed",
+                "state": "failed",
                 "message": "No prior request found for multi_concordance",
                 "data": None,
             }
@@ -2914,7 +2945,7 @@ async def get_multi_node_concordance(
                 if not col_sets or any(cols != col_sets[0] for cols in col_sets[1:]):
                     # Skip combined view by not adding __COMBINED__ key
                     return {
-                        "status": "successful",
+                        "state": "successful",
                         "message": f"Found concordance results for search term '{request.search_word}'",
                         "data": results,
                     }
@@ -2957,7 +2988,7 @@ async def get_multi_node_concordance(
                 print(f"⚠️ Failed to build combined concordance view: {ce}")
 
         result_payload = {
-            "status": "successful",
+            "state": "successful",
             "message": f"Found concordance results for search term '{request.search_word}'",
             "data": results,
         }
@@ -2994,7 +3025,7 @@ async def clear_concordance_cache(
     """Clear in-memory concordance cache for this user's workspace (called when leaving tab)."""
     user_id = current_user["id"]
     removed = _clear_concordance_cache_for(user_id, workspace_id)
-    return {"status": "successful", "removed": removed}
+    return {"state": "successful", "removed": removed}
 
 
 @router.post("/{workspace_id}/concordance/multi-node/clear")
@@ -3011,7 +3042,7 @@ async def clear_multi_concordance_results(
     removed = clear_analyses(user_id, workspace_id, task="multi_concordance")
     cache_removed = _clear_concordance_cache_for(user_id, workspace_id)
     return {
-        "status": "successful",
+        "state": "successful",
         "cleared": {
             "analyses_removed": removed,
             "concordance_cache_removed": cache_removed,
@@ -3050,15 +3081,17 @@ async def clear_analysis_records(
         cache_removed = 0
         if task is None or task in {"concordance", "multi_concordance"}:
             cache_removed = _clear_concordance_cache_for(user_id, workspace_id)
-        
+
         # Clear TaskManager tasks when applicable
         tasks_removed = 0
         if task in {"topic_modeling"} or task is None:
             tm = workspace_manager.get_task_manager(user_id, workspace_id)
-            tasks_removed = await tm.clear_tasks(task_type=task, user_id=user_id, workspace_id=workspace_id)
+            tasks_removed = await tm.clear_tasks(
+                task_type=task, user_id=user_id, workspace_id=workspace_id
+            )
 
         return {
-            "status": "successful",
+            "state": "successful",
             "message": "Analysis records cleared",
             "cleared": {
                 "analyses_removed": removed,
@@ -3144,7 +3177,7 @@ async def frequency_analysis_current_request(
     rec = get_latest_analysis(user_id, workspace_id, task="frequency_analysis")
     if not rec:
         return None
-    return {"status": "successful", "message": "ok", "data": rec.request}
+    return {"state": "successful", "message": "ok", "data": rec.request}
 
 
 @router.get("/{workspace_id}/frequency-analysis/current-result")
@@ -3160,7 +3193,7 @@ async def frequency_analysis_current_result(
     rec = get_latest_analysis(user_id, workspace_id, task="frequency_analysis")
     if not rec:
         return None
-    return {"status": "successful", "message": "ok", "data": rec.result}
+    return {"state": "successful", "message": "ok", "data": rec.result}
 
 
 @router.post("/{workspace_id}/nodes/{node_id}/frequency-analysis")
@@ -3229,7 +3262,7 @@ async def get_frequency_analysis(
             # Convert frequency DataFrame to format expected by frontend
             if hasattr(frequency_result, "to_dicts"):
                 result_payload = {
-                    "status": "successful",
+                    "state": "successful",
                     "data": frequency_result.to_dicts(),
                     "columns": list(frequency_result.columns),
                     "total_records": len(frequency_result),
@@ -3255,7 +3288,7 @@ async def get_frequency_analysis(
                 return result_payload
             else:
                 result_payload = {
-                    "status": "successful",
+                    "state": "successful",
                     "data": [],
                     "columns": [],
                     "total_records": 0,
@@ -3528,7 +3561,7 @@ async def cast_node(
             else:
                 new_type = target_type
             return {
-                "status": "successful",
+                "state": "successful",
                 "node_id": node_id,
                 "cast_info": {
                     "column": column_name,
@@ -3582,7 +3615,7 @@ async def token_frequencies_current_request(
     rec = get_latest_analysis(user_id, workspace_id, task="token_frequencies")
     if not rec:
         return None
-    return {"status": "successful", "message": "ok", "data": rec.request}
+    return {"state": "successful", "message": "ok", "data": rec.request}
 
 
 @router.post("/{workspace_id}/token-frequencies/current-request")
@@ -3622,7 +3655,7 @@ async def update_token_frequencies_current_request(
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to save request: {e}")
-    return {"status": "successful", "message": "saved", "data": merged_req}
+    return {"state": "successful", "message": "saved", "data": merged_req}
 
 
 @router.get("/{workspace_id}/token-frequencies/current-result")
@@ -3638,7 +3671,26 @@ async def token_frequencies_current_result(
     rec = get_latest_analysis(user_id, workspace_id, task="token_frequencies")
     if not rec:
         return None
-    return {"status": "successful", "message": "ok", "data": rec.result}
+    stored = rec.result
+    # Unwrap legacy double envelope if present
+    if (
+        isinstance(stored, dict)
+        and "data" in stored
+        and ("status" in stored or "success" in stored or "state" in stored)
+        and isinstance(stored["data"], (dict, list))
+    ):
+        inner = stored["data"]
+        # If the inner itself is an envelope, unwrap only one level (we assume domain data at inner level)
+        if (
+            isinstance(inner, dict)
+            and "data" in inner
+            and ("status" in inner or "success" in inner or "state" in inner)
+        ):
+            inner = inner["data"]
+        domain = inner
+    else:
+        domain = stored
+    return {"state": "successful", "message": "ok", "data": domain}
 
 
 @router.post("/{workspace_id}/token-frequencies/clear")
@@ -3652,7 +3704,7 @@ async def clear_token_frequencies_results(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"analysis_store unavailable: {e}")
     removed = clear_analyses(user_id, workspace_id, task="token_frequencies")
-    return {"status": "successful", "cleared": {"analyses_removed": removed}}
+    return {"state": "successful", "cleared": {"analyses_removed": removed}}
 
 
 @router.post(
@@ -3679,7 +3731,11 @@ async def calculate_token_frequencies(
             raise HTTPException(
                 status_code=400, detail="At least one node ID must be provided"
             )
-        # 'limit' is UI-only and optional; ignore it if present
+        # Validate limit positive
+        if request.limit is not None and request.limit <= 0:
+            raise HTTPException(
+                status_code=400, detail="limit must be a positive integer"
+            )
 
         if len(request.node_ids) > 2:
             raise HTTPException(
@@ -3935,8 +3991,7 @@ async def calculate_token_frequencies(
             # Return the full statistics table so the frontend can derive selections from all vocabulary.
 
         result = TokenFrequencyResponse(
-            success=True,
-            status="successful",
+            state="successful",
             message=f"Successfully calculated token frequencies for {len(frames_dict)} node(s)",
             data=response_data,
             statistics=statistics_data,
@@ -3946,27 +4001,24 @@ async def calculate_token_frequencies(
         try:  # pragma: no cover - persistence errors are non-critical
             from ldaca_web_app_backend.core.analysis_store import save_analysis
 
-            # Exclude UI-only params like 'limit' from persisted request
+            # Persist full request including limit so replays match original invocation
             req_dict = (
                 request.model_dump(exclude_none=True)
                 if hasattr(request, "model_dump")
                 else request.dict(exclude_none=True)
             )
-            if isinstance(req_dict, dict) and "limit" in req_dict:
-                try:
-                    req_dict.pop("limit")
-                except Exception:
-                    pass
+            # Persist full result envelope (state/message/data/statistics) for transparency
+            result_dict = (
+                result.model_dump(exclude_none=True)
+                if hasattr(result, "model_dump")
+                else result.dict(exclude_none=True)
+            )
             save_analysis(
                 user_id=user_id,
                 workspace_id=workspace_id,
                 task="token_frequencies",
                 request_dict=req_dict,
-                result_dict=(
-                    result.model_dump()
-                    if hasattr(result, "model_dump")
-                    else result.dict()
-                ),
+                result_dict=result_dict,
             )
         except Exception as _persist_err:  # pragma: no cover
             print(f"[analysis_persist] token_frequencies save failed: {_persist_err}")
@@ -4286,7 +4338,7 @@ async def quotation_current_request(
     rec = get_latest_analysis(user_id, workspace_id, task="quotation")
     if not rec:
         return None
-    return {"status": "successful", "message": "ok", "data": rec.request}
+    return {"state": "successful", "message": "ok", "data": rec.request}
 
 
 @router.get("/{workspace_id}/quotation/current-result")
@@ -4302,7 +4354,7 @@ async def quotation_current_result(
     rec = get_latest_analysis(user_id, workspace_id, task="quotation")
     if not rec:
         return None
-    return {"status": "successful", "message": "ok", "data": rec.result}
+    return {"state": "successful", "message": "ok", "data": rec.result}
 
 
 @router.post("/{workspace_id}/nodes/{node_id}/quotation")
@@ -4572,7 +4624,7 @@ async def detach_quotation(
 
         total_rows = final_data.height if hasattr(final_data, "height") else -1
         return {
-            "status": "successful",
+            "state": "successful",
             "message": f"Successfully created detached quotation node '{new_node_name}' with {total_rows if total_rows >= 0 else 'unknown'} rows",
             "new_node_id": new_node.id,
             "new_node_name": new_node_name,

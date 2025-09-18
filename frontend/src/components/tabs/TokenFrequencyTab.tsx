@@ -188,7 +188,7 @@ const TokenFrequencyTab: React.FC = () => {
       if (results) {
       if (localStorage.getItem('debugTF') === '1') {
         console.log('Results updated:', results);
-        console.log('Results status:', results.status);
+  console.log('Results state:', (results as any).state);
         console.log('Results data:', results.data);
       }
       if (results.data) {
@@ -307,8 +307,8 @@ const TokenFrequencyTab: React.FC = () => {
   const handleFillDefaultStopWords = async () => {
     setIsLoadingStopWords(true);
     try {
-  const response = await textApi.defaultStopWords(getAuthHeaders());
-      if (response.status === 'successful' && response.data) {
+    const response = await textApi.defaultStopWords(getAuthHeaders());
+    if (response.state === 'successful' && response.data) {
         const joined = response.data.join(', ');
         setStopWords(joined);
         // Auto-apply on fill default and persist
@@ -354,6 +354,7 @@ const TokenFrequencyTab: React.FC = () => {
         node_ids: selectedNodes.slice(0, 2).map(node => node.id), // Limit to 2 nodes
         node_columns: nodeColumns,
         stop_words: stopWordsArray,
+        limit: fetchLimit,
       };
 
   const response = await textApi.tokenFrequencies(currentWorkspaceId, request, getAuthHeaders());
@@ -378,7 +379,7 @@ const TokenFrequencyTab: React.FC = () => {
     } catch (error) {
       console.error('Error calculating token frequencies:', error);
       setResults({
-        status: 'failed',
+        state: 'failed',
         message: error instanceof Error ? error.message : 'Unknown error occurred',
         data: null
       } as any);
@@ -703,7 +704,7 @@ const TokenFrequencyTab: React.FC = () => {
       {/* Results */}
       {results && (
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          {results && results.status === 'successful' ? (
+          {results && (results as any).state === 'successful' ? (
             <div>
               <h3 className="text-lg font-semibold text-gray-800 mb-4">Results</h3>
               <div className="text-sm text-gray-600 mb-4">{results.message}</div>

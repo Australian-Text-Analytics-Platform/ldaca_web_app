@@ -124,8 +124,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
                     });
                     
                     // Bridge: If task is topic_modeling, successful, and result_persisted, dispatch result ready event
-                    if (parsedData.task?.task_type === 'topic_modeling' && 
-                        parsedData.task?.status === 'successful' && 
+          if (parsedData.task?.task_type === 'topic_modeling' && 
+            parsedData.task?.state === 'successful' && 
                         parsedData.result_persisted === true) {
                       window.dispatchEvent(new CustomEvent('topicModelingResultReady', {
                         detail: {
@@ -357,9 +357,9 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
             const ka = (a.finished_at||a.started_at||a.created_at||0);
             return kb - ka;
           }).map((t:any)=>{
-            const status = t.status as string;
-            const icon = status === 'running' ? '⏳' : status === 'successful' ? '✅' : status === 'failed' ? '❌' : '⏹️';
-            const color = status === 'running' ? 'text-amber-600' : status === 'successful' ? 'text-green-600' : status === 'failed' ? 'text-red-600' : 'text-gray-600';
+            const status = t.state as string;
+            const icon = status === 'running' ? '⏳' : status === 'successful' ? '✅' : status === 'failed' ? '❌' : status === 'cancelled' ? '⏹️' : '⏺️';
+            const color = status === 'running' ? 'text-amber-600' : status === 'successful' ? 'text-green-600' : status === 'failed' ? 'text-red-600' : status === 'cancelled' ? 'text-gray-600' : 'text-gray-600';
             return (
               <div key={t.task_id} className="flex flex-col px-2 py-1 rounded hover:bg-gray-50">
                 <div className="flex items-center justify-between">
@@ -380,7 +380,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
                             setTasks((prevTasks: any[]) => 
                               prevTasks.map(task => 
                                 task.task_id === t.task_id 
-                                  ? { ...task, status: 'cancelled' } 
+                                  ? { ...task, state: 'cancelled' } 
                                   : task
                               )
                             );

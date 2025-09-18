@@ -99,7 +99,7 @@ const ConcordanceTab: React.FC = () => {
       if (results) {
       if (localStorage.getItem('debugConc') === '1') {
         console.log('Concordance results updated:', results);
-        console.log('Results status:', (results as any)?.status);
+  console.log('Results state:', (results as any)?.state || (results as any)?.status);
         console.log('Results data:', (results as any)?.data);
       }
       if ((results as any)?.data) {
@@ -362,7 +362,7 @@ const ConcordanceTab: React.FC = () => {
     } catch (error) {
       console.error('Error performing concordance search:', error);
       setResults({
-        status: 'failed',
+        state: 'failed',
         message: error instanceof Error ? error.message : 'Unknown error occurred',
         data: {}
       } as any);
@@ -1113,7 +1113,7 @@ const ConcordanceTab: React.FC = () => {
                   });
                   // Trigger search for all visible nodes with new page size
                   setTimeout(() => {
-                    if (results && (results as any).status === 'successful' && (results as any).data) {
+                    if (results && ((results as any).state === 'successful' || (results as any).status === 'successful') && (results as any).data) {
                       Object.keys(results.data).forEach(nodeName => {
                         // Find the corresponding node ID from nodeName
                         let node = selectedNodes.find(n => n.id === nodeName);
@@ -1208,7 +1208,7 @@ const ConcordanceTab: React.FC = () => {
       {/* Results */}
       {results && (
         <div ref={resultsRef} className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          {(results as any)?.status === 'successful' ? (
+          {((results as any)?.state === 'successful') || ((results as any)?.status === 'successful') ? (
             <div>
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
                 <h3 className="text-lg font-semibold text-gray-800">Search Results</h3>

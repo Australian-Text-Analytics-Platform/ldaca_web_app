@@ -34,7 +34,7 @@ async def get_default_stop_words():
             stop_words = list(stopwords.words("english"))
 
             return {
-                "status": "successful",
+                "state": "successful",
                 "message": f"Retrieved {len(stop_words)} default stop words",
                 "data": stop_words,
             }
@@ -120,8 +120,8 @@ async def get_default_stop_words():
             ]
 
             return {
-                "status": "successful",
-                "message": f"Retrieved {len(basic_stop_words)} basic stop words (NLTK not available)",
+                "state": "successful",
+                "message": f"Retrieved {len(basic_stop_words)} basic default stop words (NLTK not available)",
                 "data": basic_stop_words,
             }
 

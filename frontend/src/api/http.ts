@@ -40,6 +40,20 @@ function buildQuery(params?: Record<string, any>): string {
   return qs ? `?${qs}` : '';
 }
 
+// normalizeEnvelope previously mapped legacy {status|success} → state; now backend emits canonical 'state'.
+function normalizeEnvelope(obj: any) {
+  return obj;
+}
+
+function deepUnwrap(data: any, depth = 0): any {
+  if (!data || typeof data !== 'object' || depth > 3) return data;
+  const hasNested = data && typeof data === 'object' && ('data' in data) && data.data && typeof data.data === 'object' && (('state' in data.data));
+  if (hasNested) {
+    return deepUnwrap(data.data, depth + 1);
+  }
+  return data;
+}
+
 async function parseResponse(res: Response, expectBlob?: boolean) {
   if (!res.ok) {
     let detail: any = null;
@@ -49,7 +63,24 @@ async function parseResponse(res: Response, expectBlob?: boolean) {
   }
   if (expectBlob) return res.blob();
   const ct = res.headers.get('content-type') || '';
-  if (ct.includes('application/json')) return res.json();
+  if (ct.includes('application/json')) {
+    const raw = await res.json();
+    // Normalize top-level envelope if it looks like one
+    if (raw && typeof raw === 'object') {
+      // If token frequency or analysis endpoints: they already produce { state, message?, data }
+      normalizeEnvelope(raw);
+      // If we detect nested envelope pattern, unwrap and keep outer state/message
+      if (raw && typeof raw === 'object' && 'data' in raw && raw.data && typeof raw.data === 'object') {
+        const inner = raw.data;
+        if (inner && typeof inner === 'object' && (inner.state || inner.status || inner.success)) {
+          // Preserve outer state if present; prefer most inner successful state if outer is running
+          const unwrapped = deepUnwrap(raw);
+          if (unwrapped !== raw) return normalizeEnvelope(unwrapped);
+        }
+      }
+    }
+    return raw;
+  }
   return res.text();
 }
 

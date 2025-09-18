@@ -11,16 +11,16 @@ export interface ConcordanceMetadata {
 export interface ConcordanceRequest { column: string; search_word: string; num_left_tokens?: number; num_right_tokens?: number; regex?: boolean; case_sensitive?: boolean; page?: number; page_size?: number; sort_by?: string; sort_order?: 'asc' | 'desc'; }
 export interface ConcordanceDetachRequest { node_id: string; column: string; search_word: string; num_left_tokens?: number; num_right_tokens?: number; regex?: boolean; case_sensitive?: boolean; new_node_name?: string; }
 export interface MultiNodeConcordanceRequest { node_ids: string[]; node_columns: Record<string,string>; search_word: string; num_left_tokens?: number; num_right_tokens?: number; regex?: boolean; case_sensitive?: boolean; page?: number; page_size?: number; sort_by?: string; sort_order?: 'asc' | 'desc'; combined?: boolean; }
-export interface MultiNodeConcordanceResponse { status: 'running' | 'successful' | 'failed' | 'cancelled'; message: string; data: Record<string, { data: any[]; columns: string[]; metadata: ConcordanceMetadata; total_matches: number; pagination: { page: number; page_size: number; total_pages: number; has_next: boolean; has_prev: boolean; }; sorting: { sort_by?: string; sort_order: string; }; }>; analysis_params?: any; }
+export interface MultiNodeConcordanceResponse { state: 'running' | 'successful' | 'failed' | 'cancelled'; message: string; data: Record<string, { data: any[]; columns: string[]; metadata: ConcordanceMetadata; total_matches: number; pagination: { page: number; page_size: number; total_pages: number; has_next: boolean; has_prev: boolean; }; sorting: { sort_by?: string; sort_order: string; }; }>; analysis_params?: any; }
 export interface QuotationRequest { column: string; page?: number; page_size?: number; sort_by?: string | null; sort_order?: 'asc' | 'desc'; }
 export interface QuotationDetachRequest { node_id: string; column: string; new_node_name?: string; }
 export interface FrequencyAnalysisRequest { time_column: string; group_by_columns?: string[] | null; frequency: 'daily' | 'weekly' | 'monthly' | 'yearly'; sort_by_time: boolean; }
 
-export interface TokenFrequencyRequest { node_ids: string[]; node_columns: Record<string,string>; stop_words?: string[] | null; limit?: number; }
+export interface TokenFrequencyRequest { node_ids: string[]; node_columns: Record<string,string>; stop_words?: string[] | null; limit: number; }
 export interface TokenFrequencyNodeResult { data: { token: string; frequency: number }[]; columns: string[]; }
 export interface TokenFrequencyResponse {
-  status: 'running' | 'successful' | 'failed' | 'cancelled';
-  message: string;
+  state: 'running' | 'successful' | 'failed' | 'cancelled';
+  message?: string;
   data: Record<string, TokenFrequencyNodeResult> | null;
   analysis_params?: any;
   statistics?: Array<{
@@ -61,7 +61,7 @@ export const textApi = {
 
   // Token Frequency
   tokenFrequencies: (ws: string, req: TokenFrequencyRequest, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/token-frequencies`, req, headers),
-  defaultStopWords: (headers: Record<string,string> = {}) => get<{ status: 'successful'; message: string; data: string[] }>('/text/default-stop-words', headers),
+  defaultStopWords: (headers: Record<string,string> = {}) => get<{ state: 'successful'; message: string; data: string[] }>('/text/default-stop-words', headers),
   getTokenFrequenciesCurrentRequest: (ws: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/token-frequencies/current-request`, { method: 'GET', headers }),
   postTokenFrequenciesCurrentRequest: (ws: string, reqUpdate: any, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/token-frequencies/current-request`, reqUpdate, headers),
   getTokenFrequenciesCurrentResult: (ws: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/token-frequencies/current-result`, { method: 'GET', headers }),

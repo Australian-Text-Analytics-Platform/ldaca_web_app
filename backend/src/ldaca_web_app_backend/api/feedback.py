@@ -56,7 +56,7 @@ async def submit_feedback(
     # If Airtable not configured, short‑circuit (helpful for dev / tests)
     if not _airtable_available():
         return FeedbackResponse(
-            success=True,
+            state="successful",
             message="Feedback received (Airtable not configured)",
             record_id=None,
             meta={"persisted": False, "airtable": False},
@@ -91,7 +91,7 @@ async def submit_feedback(
         record_id = record.get("id") if isinstance(record, dict) else None
 
         return FeedbackResponse(
-            success=True,
+            state="successful",
             message="Feedback submitted",
             record_id=record_id,
             meta={
@@ -105,7 +105,7 @@ async def submit_feedback(
     except Exception as e:  # pragma: no cover - network / library errors
         # Fail softly: return success false with informative message instead of 500
         return FeedbackResponse(
-            success=False,
+            state="failed",
             message=f"Feedback not persisted (Airtable error: {e})",
             record_id=None,
             meta={"persisted": False, "airtable": True, "error": str(e)},

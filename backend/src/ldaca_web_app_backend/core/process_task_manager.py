@@ -6,15 +6,15 @@ that uses separate processes for heavy computational tasks.
 """
 
 import asyncio
+import logging
 import time
 import uuid
 from concurrent.futures import Future
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, Optional, List, Tuple, Set
+from typing import Any, Dict, List, Optional, Set, Tuple
+
 from .worker import get_worker_pool, topic_modeling_task
-import weakref
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ class TaskInfo:
     progress: float = 0.0  # 0..1 for UI progress bars
     progress_message: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
-    
+
     def update_status(self):
         """Update status based on future state."""
         if self.future.cancelled():
@@ -69,53 +69,63 @@ class TaskInfo:
 
 class ProcessTaskManager:
     """Task manager that uses ProcessPoolExecutor for background jobs."""
-    
+
     def __init__(self):
         self._tasks: Dict[str, TaskInfo] = {}
         self._lock = asyncio.Lock()
         self._progress_store: Dict[str, Dict[str, Any]] = {}  # task_id -> progress info
-        
+
         # Event bus for real-time updates
-        self._subscribers: Dict[Tuple[str, str], Set[asyncio.Queue]] = {}  # (user_id, workspace_id) -> set of queues
+        self._subscribers: Dict[
+            Tuple[str, str], Set[asyncio.Queue]
+        ] = {}  # (user_id, workspace_id) -> set of queues
         self._subscriber_lock = asyncio.Lock()
-    
+
     async def subscribe(self, user_id: str, workspace_id: str) -> asyncio.Queue:
         """Subscribe to events for a specific user and workspace."""
         queue = asyncio.Queue(maxsize=100)  # Bounded to prevent memory leaks
         key = (user_id, workspace_id)
-        
+
         async with self._subscriber_lock:
             if key not in self._subscribers:
                 self._subscribers[key] = set()
             self._subscribers[key].add(queue)
-        
-        logger.debug(f"Subscribed to events for user {user_id}, workspace {workspace_id}")
+
+        logger.debug(
+            f"Subscribed to events for user {user_id}, workspace {workspace_id}"
+        )
         return queue
-    
+
     async def unsubscribe(self, user_id: str, workspace_id: str, queue: asyncio.Queue):
         """Unsubscribe from events."""
         key = (user_id, workspace_id)
-        
+
         async with self._subscriber_lock:
             if key in self._subscribers:
                 self._subscribers[key].discard(queue)
                 if not self._subscribers[key]:  # Clean up empty sets
                     del self._subscribers[key]
-        
-        logger.debug(f"Unsubscribed from events for user {user_id}, workspace {workspace_id}")
-    
+
+        logger.debug(
+            f"Unsubscribed from events for user {user_id}, workspace {workspace_id}"
+        )
+
     async def emit(self, user_id: str, workspace_id: str, event: Dict[str, Any]):
         """Emit an event to all subscribers for a user/workspace."""
         key = (user_id, workspace_id)
-        
+
         async with self._subscriber_lock:
             if key not in self._subscribers:
-                logger.debug(f"No subscribers for user {user_id}, workspace {workspace_id} - event {event.get('type')} dropped")
+                logger.debug(
+                    f"No subscribers for user {user_id}, workspace {workspace_id} - event {event.get('type')} dropped"
+                )
                 return
-            
+
             subscriber_count = len(self._subscribers[key])
-            logger.debug(f"Emitting {event.get('type')} event to {subscriber_count} subscribers for user {user_id}, workspace {workspace_id}")
-            
+            logger.debug(
+                f"Emitting {event.get('type')} event to {subscriber_count} subscribers for user {user_id}, workspace {workspace_id}"
+            )
+
             # Send to all subscribers, remove any that are full
             active_queues = set()
             for queue in self._subscribers[key]:
@@ -123,18 +133,21 @@ class ProcessTaskManager:
                     queue.put_nowait(event)
                     active_queues.add(queue)
                 except asyncio.QueueFull:
-                    logger.warning(f"Event queue full for user {user_id}, workspace {workspace_id}, dropping event")
+                    logger.warning(
+                        f"Event queue full for user {user_id}, workspace {workspace_id}, dropping event"
+                    )
                     # Don't add to active_queues, will be removed
-            
+
             self._subscribers[key] = active_queues
             if not self._subscribers[key]:
                 del self._subscribers[key]
-    
+
     def _serialize_task(self, task_info: TaskInfo) -> Dict[str, Any]:
         """Serialize task info for events."""
         return {
             "task_id": task_info.id,
-            "status": task_info.status.value,
+            # Public API field renamed from 'status' -> 'state'
+            "state": task_info.status.value,
             "created_at": task_info.created_at,
             "started_at": task_info.started_at,
             "finished_at": task_info.finished_at,
@@ -142,12 +155,18 @@ class ProcessTaskManager:
             "progress_message": task_info.progress_message,
             "metadata": task_info.metadata,
             "task_type": task_info.metadata.get("task_type"),
-            "message": task_info.error or task_info.progress_message or (
-                "Task running" if task_info.status == TaskStatus.RUNNING else "Task finished"
+            "message": task_info.error
+            or task_info.progress_message
+            or (
+                "Task running"
+                if task_info.status == TaskStatus.RUNNING
+                else "Task finished"
             ),
         }
-    
-    async def _progress_ticker(self, task_info: TaskInfo, user_id: str, workspace_id: str):
+
+    async def _progress_ticker(
+        self, task_info: TaskInfo, user_id: str, workspace_id: str
+    ):
         """Emit periodic task_changed events with simulated progress while running."""
         try:
             # Only run while task is not done
@@ -156,7 +175,7 @@ class ProcessTaskManager:
                 task_info.update_status()
                 if task_info.status != TaskStatus.RUNNING or not task_info.started_at:
                     break
-                
+
                 # Simulate progress based on elapsed time (same phases as list())
                 elapsed = time.time() - task_info.started_at
                 if elapsed < 10:
@@ -173,7 +192,7 @@ class ProcessTaskManager:
                 else:
                     estimated_progress = 0.9
                     phase_message = "Finalizing results..."
-                
+
                 # Update progress store and task_info
                 self._progress_store[task_info.id] = {
                     "progress": estimated_progress,
@@ -182,104 +201,145 @@ class ProcessTaskManager:
                 }
                 task_info.progress = estimated_progress
                 task_info.progress_message = phase_message
-                
+
                 # Emit progress update
-                await self.emit(user_id, workspace_id, {
-                    "type": "task_changed",
-                    "task": self._serialize_task(task_info),
-                    "timestamp": time.time(),
-                })
-                
+                await self.emit(
+                    user_id,
+                    workspace_id,
+                    {
+                        "type": "task_changed",
+                        "task": self._serialize_task(task_info),
+                        "timestamp": time.time(),
+                    },
+                )
+
                 await asyncio.sleep(1.0)
         except Exception as e:
             logger.warning(f"Progress ticker stopped for task {task_info.id}: {e}")
-    
-    async def _monitor_task_completion(self, task_info: TaskInfo, user_id: str, workspace_id: str):
+
+    async def _monitor_task_completion(
+        self, task_info: TaskInfo, user_id: str, workspace_id: str
+    ):
         """Monitor task completion and handle result persistence."""
         result_persisted = False
-        
+
         try:
             # Wait for the task to complete
             result = await asyncio.wrap_future(task_info.future)
-            
+
             # Update task status
             task_info.update_status()
-            
-            if task_info.status == TaskStatus.SUCCESSFUL and task_info.metadata.get("task_type") == "topic_modeling":
+
+            if (
+                task_info.status == TaskStatus.SUCCESSFUL
+                and task_info.metadata.get("task_type") == "topic_modeling"
+            ):
                 try:
                     # Save the analysis result
-                    await self._save_topic_modeling_result(user_id, workspace_id, task_info, result)
+                    await self._save_topic_modeling_result(
+                        user_id, workspace_id, task_info, result
+                    )
                     result_persisted = True
-                    
+
                     # Emit analysis_saved event ONLY after successful save
-                    await self.emit(user_id, workspace_id, {
-                        "type": "analysis_saved",
-                        "task_type": "topic_modeling",
-                        "task_id": task_info.id,
-                        "timestamp": time.time()
-                    })
+                    await self.emit(
+                        user_id,
+                        workspace_id,
+                        {
+                            "type": "analysis_saved",
+                            "task_type": "topic_modeling",
+                            "task_id": task_info.id,
+                            "timestamp": time.time(),
+                        },
+                    )
                 except Exception as save_error:
-                    logger.error(f"Failed to save topic modeling result for task {task_info.id}: {save_error}")
-                    
+                    logger.error(
+                        f"Failed to save topic modeling result for task {task_info.id}: {save_error}"
+                    )
+
                     # Emit analysis save failure event
-                    await self.emit(user_id, workspace_id, {
-                        "type": "analysis_save_failed",
-                        "task_type": "topic_modeling",
-                        "task_id": task_info.id,
-                        "message": f"Failed to save result: {str(save_error)}",
-                        "timestamp": time.time()
-                    })
-            
+                    await self.emit(
+                        user_id,
+                        workspace_id,
+                        {
+                            "type": "analysis_save_failed",
+                            "task_type": "topic_modeling",
+                            "task_id": task_info.id,
+                            "message": f"Failed to save result: {str(save_error)}",
+                            "timestamp": time.time(),
+                        },
+                    )
+
             # Always emit task_changed for completion with accurate result_persisted flag
-            await self.emit(user_id, workspace_id, {
-                "type": "task_changed",
-                "task": self._serialize_task(task_info),
-                "result_persisted": result_persisted,
-                "timestamp": time.time()
-            })
-            
+            await self.emit(
+                user_id,
+                workspace_id,
+                {
+                    "type": "task_changed",
+                    "task": self._serialize_task(task_info),
+                    "result_persisted": result_persisted,
+                    "timestamp": time.time(),
+                },
+            )
+
         except Exception as e:
             logger.error(f"Error monitoring task completion for {task_info.id}: {e}")
             task_info.update_status()  # Update with error
-            
+
             # Emit failure event
-            await self.emit(user_id, workspace_id, {
-                "type": "task_changed",
-                "task": self._serialize_task(task_info),
-                "result_persisted": False,
-                "timestamp": time.time()
-            })
-    
-    async def _save_topic_modeling_result(self, user_id: str, workspace_id: str, task_info: TaskInfo, result: Any):
+            await self.emit(
+                user_id,
+                workspace_id,
+                {
+                    "type": "task_changed",
+                    "task": self._serialize_task(task_info),
+                    "result_persisted": False,
+                    "timestamp": time.time(),
+                },
+            )
+
+    async def _save_topic_modeling_result(
+        self, user_id: str, workspace_id: str, task_info: TaskInfo, result: Any
+    ):
         """Save topic modeling result to analysis store."""
         try:
-            from ldaca_web_app_backend.core.analysis_store import save_analysis, get_latest_analysis
-            
+            from ldaca_web_app_backend.core.analysis_store import (
+                get_latest_analysis,
+                save_analysis,
+            )
+
             # Get the original request to preserve it
             existing = await asyncio.to_thread(
                 get_latest_analysis, user_id, workspace_id, "topic_modeling"
             )
             req_dict = existing.request if existing else {}
-            
+
             result_payload = {
                 "status": "successful",
                 "message": "Topic modeling completed successfully",
                 "data": result,
             }
-            
+
             # Save with the actual result
             await asyncio.to_thread(
-                save_analysis, user_id, workspace_id, "topic_modeling", req_dict, result_payload
+                save_analysis,
+                user_id,
+                workspace_id,
+                "topic_modeling",
+                req_dict,
+                result_payload,
             )
-            
+
             logger.info(f"Topic modeling result saved for task {task_info.id}")
-            
+
         except Exception as e:
-            logger.error(f"Failed to save topic modeling result for task {task_info.id}: {e}")
+            logger.error(
+                f"Failed to save topic modeling result for task {task_info.id}: {e}"
+            )
             raise  # Re-raise to mark task as failed
-    
+
     async def submit_topic_modeling(
-        self, 
+        self,
         user_id: str,
         workspace_id: str,
         node_ids: List[str],
@@ -287,19 +347,19 @@ class ProcessTaskManager:
         min_topic_size: int = 5,
         use_ctfidf: bool = False,
         task_name: str = "Topic Modeling",
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> TaskInfo:
         """Submit a topic modeling task to the process pool."""
-        
+
         # Create task ID for progress tracking
         task_id = str(uuid.uuid4())
-        
+
         # Submit task to worker pool without progress callback
         # Progress will be handled differently since callbacks can't be pickled
         worker_pool = get_worker_pool()
         if not worker_pool.is_running:
             worker_pool.start()
-        
+
         future = worker_pool.submit_task(
             topic_modeling_task,
             user_id=user_id,
@@ -308,9 +368,9 @@ class ProcessTaskManager:
             node_columns=node_columns,
             min_topic_size=min_topic_size,
             use_ctfidf=use_ctfidf,
-            progress_callback=None  # Remove progress callback for now
+            progress_callback=None,  # Remove progress callback for now
         )
-        
+
         task_info = TaskInfo(
             id=task_id,
             future=future,
@@ -321,52 +381,66 @@ class ProcessTaskManager:
                 "name": task_name,
                 "user_id": user_id,
                 "workspace_id": workspace_id,
-                **(metadata or {})
-            }
+                **(metadata or {}),
+            },
         )
-        
+
         # Initialize progress tracking
         self._progress_store[task_id] = {
             "progress": 0.0,
             "message": "Task submitted",
-            "updated_at": time.time()
+            "updated_at": time.time(),
         }
-        
+
         async with self._lock:
             self._tasks[task_id] = task_info
-        
+
         # Start monitoring task completion in background
-        asyncio.create_task(self._monitor_task_completion(task_info, user_id, workspace_id))
+        asyncio.create_task(
+            self._monitor_task_completion(task_info, user_id, workspace_id)
+        )
         # Start progress ticker to emit periodic progress updates
         asyncio.create_task(self._progress_ticker(task_info, user_id, workspace_id))
-        
+
         # Emit task_changed event for initial submission
         logger.info(f"Emitting initial task_changed for task {task_info.id}")
-        await self.emit(user_id, workspace_id, {
-            "type": "task_changed",
-            "task": self._serialize_task(task_info),
-            "timestamp": time.time()
-        })
-        
-        logger.info(f"Task {task_info.id} submitted successfully for user {user_id}, workspace {workspace_id}")
+        await self.emit(
+            user_id,
+            workspace_id,
+            {
+                "type": "task_changed",
+                "task": self._serialize_task(task_info),
+                "timestamp": time.time(),
+            },
+        )
+
+        logger.info(
+            f"Task {task_info.id} submitted successfully for user {user_id}, workspace {workspace_id}"
+        )
         return task_info
-    
+
     async def cancel_task(self, task_id: str) -> bool:
         """Cancel a task by its ID."""
         async with self._lock:
             task_info = self._tasks.get(task_id)
             if not task_info:
                 return False
-            
+
             if task_info.future.done():
                 return False
-            
+
             success = task_info.future.cancel()
             if success:
                 task_info.update_status()
             return success
-    
-    async def cancel_all(self, *, task_type: Optional[str] = None, user_id: Optional[str] = None, workspace_id: Optional[str] = None) -> int:
+
+    async def cancel_all(
+        self,
+        *,
+        task_type: Optional[str] = None,
+        user_id: Optional[str] = None,
+        workspace_id: Optional[str] = None,
+    ) -> int:
         """Cancel all tasks matching the given filters."""
         count = 0
         async with self._lock:
@@ -376,16 +450,21 @@ class ProcessTaskManager:
                     continue
                 if user_id and task_info.metadata.get("user_id") != user_id:
                     continue
-                if workspace_id and task_info.metadata.get("workspace_id") != workspace_id:
+                if (
+                    workspace_id
+                    and task_info.metadata.get("workspace_id") != workspace_id
+                ):
                     continue
-                
+
                 if not task_info.future.done():
                     if task_info.future.cancel():
                         task_info.update_status()
                         count += 1
         return count
-    
-    async def list(self, *, user_id: Optional[str] = None, workspace_id: Optional[str] = None) -> List[Dict[str, Any]]:
+
+    async def list(
+        self, *, user_id: Optional[str] = None, workspace_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
         """List all tasks, optionally filtered by user_id or workspace_id."""
         async with self._lock:
             out: List[Dict[str, Any]] = []
@@ -393,17 +472,20 @@ class ProcessTaskManager:
                 # Apply filters
                 if user_id and task_info.metadata.get("user_id") != user_id:
                     continue
-                if workspace_id and task_info.metadata.get("workspace_id") != workspace_id:
+                if (
+                    workspace_id
+                    and task_info.metadata.get("workspace_id") != workspace_id
+                ):
                     continue
-                
+
                 # Update status from future
                 task_info.update_status()
-                
+
                 # Handle progress based on task status
                 if task_info.status == TaskStatus.RUNNING and task_info.started_at:
                     # For running tasks, simulate progress based on elapsed time
                     elapsed = time.time() - task_info.started_at
-                    
+
                     # More realistic progress simulation with phases
                     if elapsed < 10:
                         # Initial phase: data loading (0-20%)
@@ -423,13 +505,13 @@ class ProcessTaskManager:
                         # Capped at 90% until actual completion
                         estimated_progress = 0.9
                         phase_message = "Finalizing results..."
-                    
+
                     # Update or create progress info
                     if task_info.id not in self._progress_store:
                         self._progress_store[task_info.id] = {
                             "progress": estimated_progress,
                             "message": phase_message,
-                            "updated_at": time.time()
+                            "updated_at": time.time(),
                         }
                     else:
                         # Update progress if we don't have real progress data
@@ -438,30 +520,38 @@ class ProcessTaskManager:
                             progress_info["progress"] = estimated_progress
                             progress_info["message"] = phase_message
                             progress_info["updated_at"] = time.time()
-                            
-                elif task_info.status in [TaskStatus.SUCCESSFUL, TaskStatus.FAILED, TaskStatus.CANCELLED]:
+
+                elif task_info.status in [
+                    TaskStatus.SUCCESSFUL,
+                    TaskStatus.FAILED,
+                    TaskStatus.CANCELLED,
+                ]:
                     # For completed tasks, ensure progress store reflects completion
                     if task_info.status == TaskStatus.SUCCESSFUL:
                         self._progress_store[task_info.id] = {
                             "progress": 1.0,
                             "message": "Completed successfully",
-                            "updated_at": time.time()
+                            "updated_at": time.time(),
                         }
                     elif task_info.status == TaskStatus.FAILED:
                         self._progress_store[task_info.id] = {
                             "progress": -1.0,
                             "message": f"Failed: {task_info.error or 'Unknown error'}",
-                            "updated_at": time.time()
+                            "updated_at": time.time(),
                         }
                     elif task_info.status == TaskStatus.CANCELLED:
                         self._progress_store[task_info.id] = {
                             "progress": -1.0,
                             "message": "Cancelled",
-                            "updated_at": time.time()
+                            "updated_at": time.time(),
                         }
-                
+
                 # Always use the values from TaskInfo for completed tasks, progress store for running tasks
-                if task_info.status in [TaskStatus.SUCCESSFUL, TaskStatus.FAILED, TaskStatus.CANCELLED]:
+                if task_info.status in [
+                    TaskStatus.SUCCESSFUL,
+                    TaskStatus.FAILED,
+                    TaskStatus.CANCELLED,
+                ]:
                     # Use values from TaskInfo.update_status() for completed tasks
                     pass  # task_info.progress and progress_message are already set by update_status()
                 else:
@@ -470,10 +560,10 @@ class ProcessTaskManager:
                         progress_info = self._progress_store[task_info.id]
                         task_info.progress = progress_info["progress"]
                         task_info.progress_message = progress_info["message"]
-                
+
                 d = {
                     "task_id": task_info.id,
-                    "status": task_info.status.value,
+                    "state": task_info.status.value,
                     "created_at": task_info.created_at,
                     "started_at": task_info.started_at,
                     "finished_at": task_info.finished_at,
@@ -482,14 +572,24 @@ class ProcessTaskManager:
                     "metadata": task_info.metadata,
                     # Back-compat fields used by UI
                     "task_type": task_info.metadata.get("task_type"),
-                    "message": task_info.error or task_info.progress_message or (
-                        "Task running" if task_info.status == TaskStatus.RUNNING else "Task finished"
+                    "message": task_info.error
+                    or task_info.progress_message
+                    or (
+                        "Task running"
+                        if task_info.status == TaskStatus.RUNNING
+                        else "Task finished"
                     ),
                 }
                 out.append(d)
             return out
-    
-    async def any_running(self, *, task_type: Optional[str] = None, user_id: Optional[str] = None, workspace_id: Optional[str] = None) -> bool:
+
+    async def any_running(
+        self,
+        *,
+        task_type: Optional[str] = None,
+        user_id: Optional[str] = None,
+        workspace_id: Optional[str] = None,
+    ) -> bool:
         """Check if any tasks are running, optionally filtered."""
         async with self._lock:
             for task_info in self._tasks.values():
@@ -498,15 +598,24 @@ class ProcessTaskManager:
                     continue
                 if user_id and task_info.metadata.get("user_id") != user_id:
                     continue
-                if workspace_id and task_info.metadata.get("workspace_id") != workspace_id:
+                if (
+                    workspace_id
+                    and task_info.metadata.get("workspace_id") != workspace_id
+                ):
                     continue
-                
+
                 task_info.update_status()
                 if task_info.status == TaskStatus.RUNNING:
                     return True
             return False
-    
-    async def latest_by_type(self, task_type: str, *, user_id: Optional[str] = None, workspace_id: Optional[str] = None) -> Optional[TaskInfo]:
+
+    async def latest_by_type(
+        self,
+        task_type: str,
+        *,
+        user_id: Optional[str] = None,
+        workspace_id: Optional[str] = None,
+    ) -> Optional[TaskInfo]:
         """Get the latest task of a given type, optionally filtered."""
         async with self._lock:
             items = []
@@ -515,30 +624,33 @@ class ProcessTaskManager:
                     continue
                 if user_id and task_info.metadata.get("user_id") != user_id:
                     continue
-                if workspace_id and task_info.metadata.get("workspace_id") != workspace_id:
+                if (
+                    workspace_id
+                    and task_info.metadata.get("workspace_id") != workspace_id
+                ):
                     continue
-                
+
                 task_info.update_status()
                 items.append(task_info)
-            
+
             if not items:
                 return None
-            
+
             items.sort(key=lambda x: x.created_at, reverse=True)
             return items[0]
-    
+
     async def get_task(self, task_id: str) -> Optional[TaskInfo]:
         """Get a task by its ID."""
         async with self._lock:
             task_info = self._tasks.get(task_id)
             if task_info:
                 task_info.update_status()
-                
+
                 # Handle progress based on task status
                 if task_info.status == TaskStatus.RUNNING and task_info.started_at:
                     # For running tasks, simulate progress based on elapsed time
                     elapsed = time.time() - task_info.started_at
-                    
+
                     # More realistic progress simulation with phases
                     if elapsed < 10:
                         # Initial phase: data loading (0-20%)
@@ -558,13 +670,13 @@ class ProcessTaskManager:
                         # Capped at 90% until actual completion
                         estimated_progress = 0.9
                         phase_message = "Finalizing results..."
-                    
+
                     # Update or create progress info
                     if task_id not in self._progress_store:
                         self._progress_store[task_id] = {
                             "progress": estimated_progress,
                             "message": phase_message,
-                            "updated_at": time.time()
+                            "updated_at": time.time(),
                         }
                     else:
                         # Update progress if we don't have real progress data
@@ -573,30 +685,38 @@ class ProcessTaskManager:
                             progress_info["progress"] = estimated_progress
                             progress_info["message"] = phase_message
                             progress_info["updated_at"] = time.time()
-                            
-                elif task_info.status in [TaskStatus.SUCCESSFUL, TaskStatus.FAILED, TaskStatus.CANCELLED]:
+
+                elif task_info.status in [
+                    TaskStatus.SUCCESSFUL,
+                    TaskStatus.FAILED,
+                    TaskStatus.CANCELLED,
+                ]:
                     # For completed tasks, ensure progress store reflects completion
                     if task_info.status == TaskStatus.SUCCESSFUL:
                         self._progress_store[task_id] = {
                             "progress": 1.0,
                             "message": "Completed successfully",
-                            "updated_at": time.time()
+                            "updated_at": time.time(),
                         }
                     elif task_info.status == TaskStatus.FAILED:
                         self._progress_store[task_id] = {
                             "progress": -1.0,
                             "message": f"Failed: {task_info.error or 'Unknown error'}",
-                            "updated_at": time.time()
+                            "updated_at": time.time(),
                         }
                     elif task_info.status == TaskStatus.CANCELLED:
                         self._progress_store[task_id] = {
                             "progress": -1.0,
                             "message": "Cancelled",
-                            "updated_at": time.time()
+                            "updated_at": time.time(),
                         }
-                
+
                 # Use appropriate progress values based on task status
-                if task_info.status in [TaskStatus.SUCCESSFUL, TaskStatus.FAILED, TaskStatus.CANCELLED]:
+                if task_info.status in [
+                    TaskStatus.SUCCESSFUL,
+                    TaskStatus.FAILED,
+                    TaskStatus.CANCELLED,
+                ]:
                     # Use values from TaskInfo.update_status() for completed tasks
                     pass  # task_info.progress and progress_message are already set by update_status()
                 else:
@@ -605,26 +725,32 @@ class ProcessTaskManager:
                         progress_info = self._progress_store[task_id]
                         task_info.progress = progress_info["progress"]
                         task_info.progress_message = progress_info["message"]
-                    
+
             return task_info
-    
+
     async def clear_task(self, task_id: str) -> bool:
         """Clear and remove a specific task record by ID."""
         async with self._lock:
             task_info = self._tasks.get(task_id)
             if not task_info:
                 return False
-            
+
             # Cancel the future if it's still running
             if not task_info.future.done():
                 task_info.future.cancel()
-            
+
             # Remove from tracking
             del self._tasks[task_id]
             self._progress_store.pop(task_id, None)
             return True
-    
-    async def clear_tasks(self, task_type: Optional[str] = None, *, user_id: Optional[str] = None, workspace_id: Optional[str] = None) -> int:
+
+    async def clear_tasks(
+        self,
+        task_type: Optional[str] = None,
+        *,
+        user_id: Optional[str] = None,
+        workspace_id: Optional[str] = None,
+    ) -> int:
         """Clear and remove task records, optionally filtered."""
         count = 0
         async with self._lock:
@@ -635,21 +761,24 @@ class ProcessTaskManager:
                     continue
                 if user_id and task_info.metadata.get("user_id") != user_id:
                     continue
-                if workspace_id and task_info.metadata.get("workspace_id") != workspace_id:
+                if (
+                    workspace_id
+                    and task_info.metadata.get("workspace_id") != workspace_id
+                ):
                     continue
-                
+
                 if not task_info.future.done():
                     task_info.future.cancel()
                 task_ids_to_remove.append(task_id)
-            
+
             for task_id in task_ids_to_remove:
                 del self._tasks[task_id]
                 # Clean up progress store
                 self._progress_store.pop(task_id, None)
                 count += 1
-        
+
         return count
-    
+
     async def cleanup_finished_tasks(self, max_age_seconds: int = 3600):
         """Clean up old finished tasks to prevent memory leaks."""
         current_time = time.time()
@@ -657,10 +786,17 @@ class ProcessTaskManager:
             task_ids_to_remove = []
             for task_id, task_info in self._tasks.items():
                 task_info.update_status()
-                if task_info.status in [TaskStatus.SUCCESSFUL, TaskStatus.FAILED, TaskStatus.CANCELLED]:
-                    if task_info.finished_at and (current_time - task_info.finished_at) > max_age_seconds:
+                if task_info.status in [
+                    TaskStatus.SUCCESSFUL,
+                    TaskStatus.FAILED,
+                    TaskStatus.CANCELLED,
+                ]:
+                    if (
+                        task_info.finished_at
+                        and (current_time - task_info.finished_at) > max_age_seconds
+                    ):
                         task_ids_to_remove.append(task_id)
-            
+
             for task_id in task_ids_to_remove:
                 del self._tasks[task_id]
                 self._progress_store.pop(task_id, None)

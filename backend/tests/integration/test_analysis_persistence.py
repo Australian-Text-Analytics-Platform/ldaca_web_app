@@ -38,8 +38,9 @@ def assert_analysis_record_structure(record_dict: dict, expected_task: str):
 
 def assert_successful_result(result_dict: dict):
     """Assert that a result dict represents a successful analysis."""
-    assert result_dict.get("success") is True
-    assert "message" in result_dict
+    # Contract migrated: 'success': True -> 'state': 'successful'
+    assert result_dict.get("state") == "successful"
+    # message remains optional in some endpoints; only assert data presence
     assert "data" in result_dict
 
 

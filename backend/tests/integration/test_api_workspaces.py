@@ -147,7 +147,7 @@ class TestWorkspaceAPI:
             assert response.status_code == 200
             data = response.json()
             assert data["message"] == "Workspace workspace-123 deleted successfully"
-            assert data["success"] is True
+            # Contract: success removed; deletion returns message only
 
     async def test_delete_workspace_not_found(self, authenticated_client):
         """Test deleting non-existent workspace"""
@@ -173,7 +173,7 @@ class TestWorkspaceAPI:
             )
             assert response.status_code == 200
             data = response.json()
-            assert data["success"] is True
+            assert data.get("state") == "successful"
             assert data["workspace_id"] == "workspace-123"
             mock_unload.assert_called_once_with("test", "workspace-123", save=True)
 
@@ -244,7 +244,7 @@ class TestWorkspaceAPI:
 
                 assert response.status_code == 200
                 response_data = response.json()
-                assert response_data["success"] is True
+                assert response_data.get("state") == "successful"
                 assert "message" in response_data
                 assert "node" in response_data
                 assert response_data["node"]["name"] == "test_data"
@@ -299,7 +299,7 @@ class TestWorkspaceAPI:
             response_data = response.json()
 
             # Verify response structure
-            assert response_data["success"] is True
+            assert response_data.get("state") == "successful"
             assert response_data["node_id"] == "test-node"
             assert "cast_info" in response_data
 
@@ -417,7 +417,7 @@ class TestWorkspaceAPI:
 
             # Verify the cast was successful
             response_data = response.json()
-            assert response_data["success"] is True
+            assert response_data.get("state") == "successful"
             assert response_data["cast_info"]["column"] == "created_at"
 
     async def test_cast_node_datetime_to_string(self, authenticated_client):
@@ -456,7 +456,7 @@ class TestWorkspaceAPI:
             )
             assert response.status_code == 200
             data = response.json()
-            assert data["success"] is True
+            assert data.get("state") == "successful"
             assert data["cast_info"]["target_type"] == "string"
             mock_save.assert_called_once()
 
@@ -491,7 +491,7 @@ class TestWorkspaceAPI:
 
             assert response.status_code == 200
             data = response.json()
-            assert data["success"] is True
+            assert data.get("state") == "successful"
             assert data["cast_info"]["target_type"] == "integer"
             mock_save.assert_called_once()
 

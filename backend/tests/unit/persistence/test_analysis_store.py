@@ -4,9 +4,7 @@ Unit tests for analysis_store module.
 Tests the core persistence logic without FastAPI dependencies.
 """
 
-from ldaca_web_app_backend.core.analysis_store import (
-    AnalysisRecord,
-)
+from ldaca_web_app_backend.core.analysis_store import AnalysisRecord
 
 
 class TestAnalysisRecord:
@@ -18,14 +16,14 @@ class TestAnalysisRecord:
             task="test_task",
             saved_at="2024-01-15T12:30:45",
             request={"param": "value"},
-            result={"success": True, "data": []},
+            result={"state": "successful", "data": []},
         )
 
         expected = {
             "task": "test_task",
             "saved_at": "2024-01-15T12:30:45",
             "request": {"param": "value"},
-            "result": {"success": True, "data": []},
+            "result": {"state": "successful", "data": []},
         }
 
         assert record.to_dict() == expected
@@ -57,14 +55,14 @@ class TestSerializationPersistence:
                 wid,
                 "token_frequencies",
                 {"limit": 5},
-                {"success": True, "data": []},
+                {"state": "successful", "data": []},
             )
             save_analysis(
                 user_id,
                 wid,
                 "topic_modeling",
                 {"k": 10},
-                {"success": True, "topics": []},
+                {"state": "successful", "topics": []},
             )
             pre_reload = list_analyses(user_id, wid)
             assert {r.task for r in pre_reload} == {

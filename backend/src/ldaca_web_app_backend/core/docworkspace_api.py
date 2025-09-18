@@ -9,7 +9,6 @@ import math
 from typing import Any, Dict, List, Optional
 
 import polars as pl
-
 from docworkspace import Node, Workspace
 
 # Import API models
@@ -124,7 +123,19 @@ class DocWorkspaceAPIUtils:
 
         # Explicitly add columns field for frontend compatibility
         if "columns" not in info:
-            info["columns"] = getattr(node, "columns", [])
+            cols = getattr(node, "columns", [])
+            # Sanitize non-serializable objects (e.g., Mock) that could cause recursion
+            if isinstance(cols, (list, tuple)):
+                safe_cols = list(cols)
+            else:
+                try:
+                    if hasattr(cols, "__iter__") and not isinstance(cols, (str, bytes)):
+                        safe_cols = [c for c in list(cols)]  # type: ignore[arg-type]
+                    else:
+                        safe_cols = []
+                except Exception:
+                    safe_cols = []
+            info["columns"] = safe_cols
 
         return info
 

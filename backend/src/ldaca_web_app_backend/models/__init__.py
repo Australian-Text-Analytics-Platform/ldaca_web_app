@@ -480,7 +480,8 @@ class TokenFrequencyRequest(BaseModel):
         None  # Maps node_id -> column_name (optional for auto-detection)
     )
     stop_words: Optional[List[str]] = None
-    limit: Optional[int] = None  # UI-only; not used by backend computation
+    # Make limit required so missing field triggers 422; enforce >0 in endpoint logic
+    limit: int
 
     # Pydantic v2 model config
     model_config = ConfigDict(
@@ -530,8 +531,13 @@ class TokenFrequencyNodeResult(BaseModel):
 
 
 class TokenFrequencyResponse(BaseModel):
-    success: bool
-    status: Optional[str] = None  # 'successful', 'failed', 'running'
+    """Unified response model for token frequency analysis.
+
+    NOTE: Legacy fields 'success' and 'status' have been removed in favor of a
+    single 'state' field. Valid values: 'successful', 'failed', 'running'.
+    """
+
+    state: Optional[str] = None  # 'successful', 'failed', 'running'
     message: str
     data: Optional[Dict[str, TokenFrequencyNodeResult]] = (
         None  # Maps node_name -> { data: [...], columns: [...] }
@@ -591,15 +597,42 @@ class FeedbackRequest(BaseModel):
 
 
 class FeedbackResponse(BaseModel):
-    success: bool
+    """Unified feedback response model.
+
+    Migration notes:
+    - Legacy field `success` (bool) replaced by `state` (str) with values: 'successful' | 'failed'
+    - Frontend should now branch on `state == 'successful'` instead of the boolean.
+    - `meta` remains free-form for auxiliary info.
+    """
+
+    state: str  # 'successful' | 'failed'
     message: str
     record_id: Optional[str] = None
     per_corpus_topic_counts: Optional[List[Dict[int, int]]] = None
     meta: Dict[str, Any] = {}
 
+    @classmethod
+    def from_legacy(
+        cls,
+        *,
+        success: bool,
+        message: str,
+        record_id: Optional[str] = None,
+        per_corpus_topic_counts: Optional[List[Dict[int, int]]] = None,
+        meta: Optional[Dict[str, Any]] = None,
+    ) -> "FeedbackResponse":
+        """Helper to construct from old signature (temporary shim)."""
+        return cls(
+            state="successful" if success else "failed",
+            message=message,
+            record_id=record_id,
+            per_corpus_topic_counts=per_corpus_topic_counts,
+            meta=meta or {},
+        )
+
 
 class TopicModelingResponse(BaseModel):
-    status: str  # 'successful', 'failed', 'running', 'cancelled'
+    state: str  # 'successful', 'failed', 'running', 'cancelled'
     message: str
     data: Optional[TopicModelingData] = None
     metadata: Optional[Dict[str, Any]] = None

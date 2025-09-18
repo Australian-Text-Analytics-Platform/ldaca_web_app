@@ -10,7 +10,7 @@ import { nodesApi } from '../../api/nodes';
 import { useAnalysisStore } from '../../stores/analysisStore';
 // Define local lightweight response/topic interfaces if not exported (legacy code referenced these)
 interface TopicModelingTopic { id: number; label: string; size: number[]; total_size: number; x: number; y: number; }
-interface TopicModelingResponse { status: 'running' | 'successful' | 'failed' | 'cancelled'; message: string; data?: { topics: TopicModelingTopic[]; corpus_sizes?: number[] }; metadata?: { task_id?: string; [k: string]: any } }
+interface TopicModelingResponse { state?: 'running' | 'successful' | 'failed' | 'cancelled'; message?: string; data?: { topics: TopicModelingTopic[]; corpus_sizes?: number[] }; metadata?: { task_id?: string; [k: string]: any } }
 
 interface NodeColumnSelection { nodeId: string; column: string; }
 
@@ -38,7 +38,7 @@ const TopicModelingTab: React.FC = () => {
   // Safe setResult wrapper that prevents downgrades from successful to running
   const setResultSafely = (newResult: TopicModelingResponse | null) => {
     // Prevent downgrading from successful to running (race condition fix)
-    if (resultRef.current?.status === 'successful' && newResult?.status === 'running') {
+  if (resultRef.current?.state === 'successful' && newResult?.state === 'running') {
       console.log('TopicModelingTab: Ignoring stale running update that would hide successful results');
       return;
     }
@@ -135,17 +135,17 @@ const TopicModelingTab: React.FC = () => {
       };
       const res = await textApi.topicModeling(currentWorkspaceId, req, getAuthHeaders());
       setResultSafely(res);
-      if (res.status === 'running') {
+  if (res.state === 'running') {
         // lock immediately while task is running
         setIsLocked(true);
         // SSE will provide task updates automatically, no need to manually fetch
-      } else if (res.status === 'failed') {
+  } else if (res.state === 'failed') {
         // Immediate failure (validation etc.)
         setIsRunning(false);
         runningRef.current = false;
         setIsLocked(false);
       }
-      if (res.status !== 'successful' && res.status !== 'running') setError(res.message || 'Topic modeling failed');
+  if (res.state !== 'successful' && res.state !== 'running') setError(res.message || 'Topic modeling failed');
       // Lock with snapshot
       try {
         const ids = firstTwo.map(n=>n.id);
@@ -311,7 +311,7 @@ const TopicModelingTab: React.FC = () => {
         // Now get current result state
         const resResp = await textApi.getTopicModelingCurrentResult(currentWorkspaceId, getAuthHeaders());
         if (resResp) {
-          const resStatus = (resResp as any)?.status;
+          const resStatus = (resResp as any)?.state;
           if (resStatus === 'successful') {
             setResultSafely(resResp as any);
             setIsLocked(true);
@@ -322,10 +322,10 @@ const TopicModelingTab: React.FC = () => {
             runningRef.current = false;
           } else if (resStatus === 'running') {
             // Only set running if no successful result exists yet
-            if (!resultRef.current || resultRef.current.status !== 'successful') {
-              setResultSafely({ status: 'running', message: 'Task running', metadata: (resResp as any)?.metadata } as any);
-              setIsLocked(true); 
-              runningRef.current = true; 
+            if (!resultRef.current || resultRef.current.state !== 'successful') {
+              setResultSafely({ state: 'running', message: 'Task running', metadata: (resResp as any)?.metadata } as any);
+              setIsLocked(true);
+              runningRef.current = true;
               setIsRunning(true);
             }
           }
@@ -342,8 +342,8 @@ const TopicModelingTab: React.FC = () => {
       try {
         const tasks = ev?.detail?.tasks || [];
         const tmTasks = tasks.filter((t: any) => t.task_type === 'topic_modeling');
-        const hasRunningTM = tmTasks.some((t: any) => t.status === 'running');
-        const hasFailedTM = tmTasks.some((t: any) => t.status === 'failed');
+  const hasRunningTM = tmTasks.some((t: any) => t.state === 'running');
+  const hasFailedTM = tmTasks.some((t: any) => t.state === 'failed');
         
         if (hasRunningTM && !runningRef.current) {
           // Enter running state
@@ -370,7 +370,7 @@ const TopicModelingTab: React.FC = () => {
         console.log('Topic modeling result ready, fetching current-result');
         const rr = await textApi.getTopicModelingCurrentResult(currentWorkspaceId, getAuthHeaders());
         if (rr) {
-          const resStatus = (rr as any)?.status;
+          const resStatus = (rr as any)?.state;
           if (resStatus === 'successful') {
             setResultSafely(rr as any);
             setIsLocked(true);
@@ -395,7 +395,7 @@ const TopicModelingTab: React.FC = () => {
 
   // If result failed, keep the panel locked and run disabled until cleared
   useEffect(() => {
-    if (result && result.status === 'failed') {
+  if (result && result.state === 'failed') {
       setIsLocked(true);
       setIsRunning(false);
       runningRef.current = false;
@@ -496,18 +496,18 @@ const TopicModelingTab: React.FC = () => {
         </div>
 
         {error && <div className="mt-3 text-sm text-red-600">{error}</div>}
-        {result && result.status === 'running' && (
+  {result && result.state === 'running' && (
           <div className="mt-3 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
             Topic modeling task started and is running in the background{result?.metadata?.task_id ? ` (task ${result.metadata.task_id})` : ''}. See Tasks list for progress.
           </div>
         )}
-        {result && result.status === 'failed' && (
+  {result && result.state === 'failed' && (
           <div className="mt-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded p-2">
             {result.message || 'Topic modeling failed'}
           </div>
         )}
       </div>
-      {result && result.status === 'successful' && (
+  {result && result.state === 'successful' && (
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200" ref={containerRef}>
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-md font-semibold text-gray-800">Topics ({topics.length})</h3>
@@ -545,7 +545,7 @@ const TopicModelingTab: React.FC = () => {
           </div>
         </div>
       )}
-      {result && result.status === 'failed' && (
+  {result && result.state === 'failed' && (
         <div className="bg-white p-4 rounded border text-sm text-red-600">{result.message}</div>
       )}
     </div>

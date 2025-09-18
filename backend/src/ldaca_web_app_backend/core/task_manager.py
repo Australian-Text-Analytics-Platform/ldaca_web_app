@@ -5,7 +5,7 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, Optional, List, Awaitable
+from typing import Any, Awaitable, Dict, List, Optional
 
 
 class TaskStatus(str, Enum):
@@ -35,7 +35,14 @@ class TaskManager:
         self._tasks: Dict[str, TaskInfo] = {}
         self._lock = asyncio.Lock()
 
-    async def add_task(self, coro: Awaitable[Any], *, task_type: str, name: Optional[str] = None, metadata: Optional[Dict[str, Any]] = None) -> TaskInfo:
+    async def add_task(
+        self,
+        coro: Awaitable[Any],
+        *,
+        task_type: str,
+        name: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> TaskInfo:
         async def _runner():
             return await coro
 
@@ -46,7 +53,11 @@ class TaskManager:
             task=t,
             status=TaskStatus.RUNNING,
             started_at=time.time(),
-            metadata={"task_type": task_type, "name": name or task_type, **(metadata or {})},
+            metadata={
+                "task_type": task_type,
+                "name": name or task_type,
+                **(metadata or {}),
+            },
         )
         async with self._lock:
             self._tasks[task_id] = info
@@ -95,7 +106,8 @@ class TaskManager:
             for ti in self._tasks.values():
                 d = {
                     "task_id": ti.id,
-                    "status": ti.status.value,
+                    # Public API contract: expose task lifecycle under 'state' (formerly 'status')
+                    "state": ti.status.value,
                     "created_at": ti.created_at,
                     "started_at": ti.started_at,
                     "finished_at": ti.finished_at,
@@ -103,7 +115,12 @@ class TaskManager:
                     "metadata": ti.metadata,
                     # Back-compat fields used by UI
                     "task_type": ti.metadata.get("task_type"),
-                    "message": ti.error or ("Task running" if ti.status == TaskStatus.RUNNING else "Task finished"),
+                    "message": ti.error
+                    or (
+                        "Task running"
+                        if ti.status == TaskStatus.RUNNING
+                        else "Task finished"
+                    ),
                 }
                 out.append(d)
             return out
@@ -111,13 +128,19 @@ class TaskManager:
     async def any_running(self, *, task_type: Optional[str] = None) -> bool:
         async with self._lock:
             for ti in self._tasks.values():
-                if ti.status == TaskStatus.RUNNING and (task_type is None or ti.metadata.get("task_type") == task_type):
+                if ti.status == TaskStatus.RUNNING and (
+                    task_type is None or ti.metadata.get("task_type") == task_type
+                ):
                     return True
             return False
 
     async def latest_by_type(self, task_type: str) -> Optional[TaskInfo]:
         async with self._lock:
-            items = [ti for ti in self._tasks.values() if ti.metadata.get("task_type") == task_type]
+            items = [
+                ti
+                for ti in self._tasks.values()
+                if ti.metadata.get("task_type") == task_type
+            ]
             if not items:
                 return None
             items.sort(key=lambda x: x.created_at, reverse=True)
@@ -134,10 +157,9 @@ class TaskManager:
                     if not ti.task.done():
                         ti.task.cancel()
                     task_ids_to_remove.append(task_id)
-            
+
             for task_id in task_ids_to_remove:
                 del self._tasks[task_id]
                 count += 1
-        
-        return count
 
+        return count

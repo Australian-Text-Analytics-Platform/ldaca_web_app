@@ -12,7 +12,7 @@ class TestFeedbackEndpoint:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["success"] is True
+        assert data.get("state") == "successful"
         assert (
             "feedback" in data["message"].lower()
             or "submitted" in data["message"].lower()

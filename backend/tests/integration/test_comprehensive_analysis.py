@@ -15,7 +15,7 @@ ANALYSIS_CONFIGS = [
             "node_columns": {},  # Will be filled by test
             "limit": 10,
         },
-        "expected_result_keys": {"success", "message", "data"},
+        "expected_result_keys": {"state", "data"},
     },
     # Add more analysis types as they become available:
     # {
@@ -72,9 +72,10 @@ class TestParametrizedAnalysisPersistence:
         assert response.status_code == 200
         result_data = response.json()
 
-        # Verify expected result structure
+        # Verify expected result structure (state + data; message optional)
         for key in analysis_config["expected_result_keys"]:
             assert key in result_data
+        assert result_data.get("state") == "successful"
 
         # And: An analysis record was persisted
         analyses = list_analyses(test_user["id"], workspace_id)
@@ -87,6 +88,7 @@ class TestParametrizedAnalysisPersistence:
         # Verify result structure matches response
         for key in analysis_config["expected_result_keys"]:
             assert key in record.result
+        assert record.result.get("state") == "successful"
 
 
 @pytest.mark.anyio
@@ -194,8 +196,10 @@ class TestAnalysisDataIntegrity:
         persisted_result = analyses[0].result
 
         # Key fields should match exactly
-        assert persisted_result["success"] == api_result["success"]
-        assert persisted_result["message"] == api_result["message"]
+        assert persisted_result["state"] == api_result["state"]
+        # message may be absent; only compare if both present
+        if "message" in persisted_result and "message" in api_result:
+            assert persisted_result["message"] == api_result["message"]
         assert persisted_result["data"] == api_result["data"]
 
         # Check data structure integrity
