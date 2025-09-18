@@ -90,8 +90,6 @@ interface TopicModelingLockState {
 interface TaskItem { 
   task_id: string; 
   task_type: string; 
-  // Note: backend task polling may still send `status`; keeping both for transitional compatibility
-  status?: 'running' | 'successful' | 'failed' | 'cancelled';
   state?: 'running' | 'successful' | 'failed' | 'cancelled';
   message?: string; 
   progress?: number; 

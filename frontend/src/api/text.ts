@@ -40,7 +40,8 @@ export interface TokenFrequencyResponse {
   }>;
 }
 export interface TopicModelingRequest { node_ids: string[]; node_columns?: Record<string,string>; min_topic_size?: number; use_ctfidf?: boolean; }
-export interface TopicModelingResponse { status: 'running' | 'successful' | 'failed' | 'cancelled'; message: string; data?: { topics: any[]; corpus_sizes?: number[] }; metadata?: { task_id?: string; [k: string]: any } }
+// Topic Modeling now uses the canonical 'state' field (legacy 'status' removed)
+export interface TopicModelingResponse { state: 'running' | 'successful' | 'failed' | 'cancelled'; message: string; data?: { topics: any[]; corpus_sizes?: number[] }; metadata?: { task_id?: string; [k: string]: any } }
 
 export const textApi = {
   concordance: (ws: string, node: string, req: ConcordanceRequest, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/nodes/${node}/concordance`, req, headers),
