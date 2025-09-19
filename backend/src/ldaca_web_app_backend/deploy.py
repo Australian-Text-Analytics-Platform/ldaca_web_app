@@ -5,7 +5,7 @@ import subprocess
 
 import uvicorn
 
-from .config import PROJECT_ROOT
+from .config import PROJECT_ROOT, settings
 
 # Import app directly from main (same directory)
 from .main import app  # assumes `app` is FastAPI instance
@@ -69,12 +69,12 @@ def start_frontend(port=3000, platform=None):
     NGINX_OUTPUT_CONF = tempfile.NamedTemporaryFile(suffix=".conf", delete=False).name
 
     subprocess.run(
-        f"FRONTEND_DIR={DIST_DIR} FRONTEND_PORT={port} envsubst < {NGINX_CONF_TEMPLATE} > {NGINX_OUTPUT_CONF}",
+        f"FRONTEND_DIR={DIST_DIR} FRONTEND_PORT={port} BACKEND_PORT={settings.backend_port} envsubst < {NGINX_CONF_TEMPLATE} > {NGINX_OUTPUT_CONF}",
         check=True,
         shell=True,
     )
     print(f"Using nginx config template: {NGINX_CONF_TEMPLATE}")
-    subprocess.run(f"nginx -t -c {NGINX_OUTPUT_CONF}", check=True, shell=True)
+    subprocess.run(f"nginx -c {NGINX_OUTPUT_CONF}", check=True, shell=True)
 
     if ON_COLAB:
         output.serve_kernel_port_as_window(port)
