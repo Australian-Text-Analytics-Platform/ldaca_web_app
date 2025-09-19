@@ -1,0 +1,99 @@
+# In-thread async FastAPI dev server (non-blocking) - Port 8001
+import asyncio
+import os
+import subprocess
+
+import uvicorn
+
+from .config import PROJECT_ROOT
+
+# Import app directly from main (same directory)
+from .main import app  # assumes `app` is FastAPI instance
+
+# # Apply nest_asyncio to allow nested event loops
+# nest_asyncio.apply()
+
+# Add Colab detection
+try:
+    from google.colab import output
+
+    ON_COLAB = True
+except ImportError:
+    ON_COLAB = False
+
+import tarfile
+import tempfile
+
+import requests
+
+_server: uvicorn.Server | None = None
+_server_task: asyncio.Task | None = None
+
+
+def start_backend(port=8001):
+    global _server, _server_task
+    if _server and getattr(_server, "started", False):
+        print(f"Server already running at http://localhost:{port}")
+        return _server
+    config = uvicorn.Config(
+        app,
+        host="localhost",
+        port=port,
+        reload=False,  # in-loop reload unsupported; use reload_app()+restart_server
+        log_level="info",
+        timeout_keep_alive=30,
+        lifespan="on",
+    )
+    _server = uvicorn.Server(config)
+    loop = asyncio.get_running_loop()
+    _server_task = loop.create_task(_server.serve())
+    return _server_task
+
+
+def start_frontend(port=3000, platform=None):
+    url = f"http://localhost:{port}"
+    FRONTEND_RELEASE_URL = "https://github.com/Australian-Text-Analytics-Platform/ldaca_web_app/releases/download/frontend-latest/frontend-build.tar.gz"
+
+    response = requests.get(FRONTEND_RELEASE_URL)
+    response.raise_for_status()  # Raise error for bad status codes
+    with tempfile.NamedTemporaryFile(suffix=".tar.gz", delete=False) as temp_file:
+        temp_file.write(response.content)
+        temp_file_path = temp_file.name
+
+    DIST_DIR = tempfile.mkdtemp(prefix="ldaca_frontend_build_")
+    print(f"Extracting frontend to {DIST_DIR}")
+    os.makedirs(DIST_DIR, exist_ok=True)
+    with tarfile.open(temp_file_path, "r:gz") as tar:
+        tar.extractall(path=DIST_DIR)
+    NGINX_CONF_TEMPLATE = PROJECT_ROOT / "configs" / "nginx.conf.template"
+    NGINX_OUTPUT_CONF = PROJECT_ROOT / "nginx_ldaca_frontend.conf"
+
+    subprocess.run(
+        f"FRONTEND_DIR={DIST_DIR} FRONTEND_PORT={port} envsubst < {NGINX_CONF_TEMPLATE} > {NGINX_OUTPUT_CONF}",
+        check=True,
+        shell=True,
+    )
+
+    subprocess.run(f"nginx -t -c {NGINX_OUTPUT_CONF}", check=True, shell=True)
+
+    if ON_COLAB:
+        output.serve_kernel_port_as_window(port)
+    else:
+        import IPython.display as display
+        from IPython.display import Javascript, Markdown
+
+        base = (
+            os.environ.get("JUPYTERHUB_SERVICE_PREFIX")
+            or os.environ.get("JUPYTER_SERVER_URL")
+            or os.environ.get("JUPYTER_SERVER_ROOT")
+            or ""
+        )
+        if base and not base.endswith("/"):
+            base += "/"
+
+        url = f"{base}proxy/{3000}/"
+
+        display(Javascript(f"window.open('{url}', '_blank');"))
+        display(Markdown(f"If popup was blocked, click: [Open Frontend]({url})"))
+        display(Markdown(f"If popup was blocked, click: [Open Frontend]({url})"))
+        display(Markdown(f"If popup was blocked, click: [Open Frontend]({url})"))
