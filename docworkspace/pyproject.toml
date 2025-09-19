@@ -5,7 +5,6 @@ description = "A workspace library for managing DocDataFrames and DataFrames wit
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "polars",
     "docframe",
     "typing-extensions",
 ]

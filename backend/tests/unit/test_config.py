@@ -17,7 +17,7 @@ class TestSettings:
         test_settings = Settings()
 
         assert test_settings.server_host == "0.0.0.0"
-        assert test_settings.server_port == 8001
+        assert test_settings.backend_port == 8001
         # debug may be overridden by environment/.env; just ensure it's a boolean
         assert isinstance(test_settings.debug, bool)
         # database_url is derived only when accessed via method; default field may be None
@@ -31,25 +31,16 @@ class TestSettings:
             os.environ,
             {
                 "SERVER_HOST": "127.0.0.1",
-                "SERVER_PORT": "9000",
+                "backend_port": "9000",
                 "DEBUG": "true",
                 "DATABASE_URL": "postgresql://test",
             },
         ):
             test_settings = Settings()
             assert test_settings.server_host == "127.0.0.1"
-            assert test_settings.server_port == 9000
+            assert test_settings.backend_port == 9000
             assert test_settings.debug
             assert test_settings.database_url == "postgresql://test"
-
-    def test_cors_allowed_origins_parsing(self):
-        """Test CORS allowed origins parsing"""
-        test_settings = Settings()
-        origins = test_settings.cors_allowed_origins
-
-        assert isinstance(origins, list)
-        assert "http://localhost:3000" in origins
-        assert "https://ldaca.sguo.org" in origins
 
     def test_path_methods(self):
         """Test path convenience methods"""

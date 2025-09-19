@@ -46,10 +46,11 @@ async def lifespan(app: FastAPI):
     # Initialize database
     await init_db()
     await cleanup_expired_sessions()
-    
+
     # Initialize worker pool for background tasks
     try:
         from .core.worker import get_worker_pool
+
         worker_pool = get_worker_pool()
         worker_pool.start()
         print("✅ Worker pool started for background processing")
@@ -58,26 +59,27 @@ async def lifespan(app: FastAPI):
 
     print("✅ Enhanced API initialized successfully")
     print(
-        f"📖 API Documentation: http://{settings.server_host}:{settings.server_port}/api/docs"
+        f"📖 API Documentation: http://{settings.server_host}:{settings.backend_port}/api/docs"
     )
     print(
-        f"🔍 Health Check: http://{settings.server_host}:{settings.server_port}/health"
+        f"🔍 Health Check: http://{settings.server_host}:{settings.backend_port}/health"
     )
 
     yield  # Application runs here
 
     # Shutdown
     print("👋 Shutting down Enhanced LDaCA Web App API...")
-    
+
     # Shutdown worker pool
     try:
         from .core.worker import get_worker_pool
+
         worker_pool = get_worker_pool()
         worker_pool.shutdown(wait=True)
         print("🔌 Worker pool shutdown complete")
     except Exception as e:
         print(f"⚠️ Warning: Error during worker pool shutdown: {e}")
-    
+
     await cleanup_expired_sessions()
 
 
@@ -92,10 +94,10 @@ app = FastAPI(
     openapi_url="/api/openapi.json",
 )
 
-# Setup CORS
+# Setup CORS (regex + credentials from settings)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_allowed_origins,
+    allow_origin_regex=settings.cors_allow_origin_regex,
     allow_credentials=settings.cors_allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -235,7 +237,7 @@ if __name__ == "__main__":
     uvicorn.run(
         app,
         host=settings.server_host,
-        port=settings.server_port,
+        port=settings.backend_port,
         reload=settings.debug,
         log_level="info",
     )

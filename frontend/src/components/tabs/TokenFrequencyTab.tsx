@@ -431,7 +431,9 @@ const TokenFrequencyTab: React.FC = () => {
     }
 
     // Store parameters as a fallback and for UI hints
-    const concordanceParams = {
+  // Persist parameters so ConcordanceTab can hydrate & auto-run without user clicking 'Run'.
+  // autoRun flag triggers a short-delay (50ms) immediate execution in ConcordanceTab.
+  const concordanceParams = {
       searchWord: token,
       nodeColumnSelections: nodeColumnSelections,
       selectedNodes: selectedNodes.map(node => ({
@@ -439,7 +441,8 @@ const TokenFrequencyTab: React.FC = () => {
         name: node.data?.name || node.id
       })),
       nodeColors,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      autoRun: true, // New flag to force auto execution in Concordance tab
     };
     try { localStorage.setItem('pendingConcordanceSearch', JSON.stringify(concordanceParams)); } catch (_) {}
 
