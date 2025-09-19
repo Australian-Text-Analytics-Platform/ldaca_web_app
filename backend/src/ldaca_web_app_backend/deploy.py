@@ -73,7 +73,7 @@ def start_frontend(port=3000, platform=None):
         check=True,
         shell=True,
     )
-    print(f"Using nginx config template: {NGINX_CONF_TEMPLATE}")
+    print(f"Using nginx config file: {NGINX_OUTPUT_CONF}")
     subprocess.run(f"nginx -c {NGINX_OUTPUT_CONF}", check=True, shell=True)
 
     if ON_COLAB:
