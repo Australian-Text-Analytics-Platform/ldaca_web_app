@@ -8,11 +8,11 @@ from pathlib import Path
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-PROJECT_ROOT = Path(__file__).parent.parent.parent
+PROJECT_ROOT = Path(__file__).parent
 
 # Determine which .env file to load for settings
-DEFAULT_EXAMPLE_ENV_PATH = PROJECT_ROOT / ".env.example"
-DEFAULT_PROD_ENV_PATH = PROJECT_ROOT / ".env"
+DEFAULT_EXAMPLE_ENV_PATH = PROJECT_ROOT / "configs" / ".env.example"
+DEFAULT_PROD_ENV_PATH = PROJECT_ROOT / "configs" / ".env"
 
 
 class Settings(BaseSettings):
@@ -38,7 +38,7 @@ class Settings(BaseSettings):
 
     # Root for all data-related storage (folders and DB)
     data_root: str | Path = Field(
-        default=PROJECT_ROOT / "data",
+        default=Path(os.environ.get("HOME")) / "ldaca_data",
         description="Root data folder",
     )
 
@@ -160,8 +160,8 @@ class Settings(BaseSettings):
         return self.get_data_root() / self.user_data_folder
 
     def get_sample_data_folder(self) -> Path:
-        """Get sample data folder absolute path (DATA_ROOT/sample_data_folder)."""
-        return self.get_data_root() / self.sample_data_folder
+        """Get sample data folder absolute path (PROJECT_ROOT/sample_data_folder)."""
+        return PROJECT_ROOT / self.sample_data_folder
 
     def get_database_backup_folder(self) -> Path:
         """Get database backup folder absolute path (DATA_ROOT/database_backup_folder)."""
@@ -177,35 +177,4 @@ class Settings(BaseSettings):
 
 
 # Global settings instance
-settings = Settings()
-
-# Backward compatibility: if legacy SERVER_PORT is set and BACKEND_PORT not set, mirror it.
-legacy_server_port = os.environ.get("SERVER_PORT")
-if legacy_server_port and not os.environ.get("BACKEND_PORT"):
-    try:
-        settings.backend_port = int(legacy_server_port)
-    except ValueError:
-        pass
-
-# Backward compatibility accessors -------------------------------------------------
-if not hasattr(Settings, "server_port"):
-    # Provide attribute-style access for legacy tests
-    @property  # type: ignore[misc]
-    def server_port(self):  # noqa: D401
-        """Backward compatibility property: returns backend_port."""
-        return self.backend_port
-
-    setattr(Settings, "server_port", server_port)  # type: ignore[arg-type]
-
-if not hasattr(Settings, "cors_allowed_origins"):
-
-    @property  # type: ignore[misc]
-    def cors_allowed_origins(self):  # noqa: D401
-        """Legacy list accessor derived from regex (returns common localhost variants)."""
-        # Provide typical defaults for code/tests expecting a list
-        return [
-            "http://localhost:3000",
-            "http://127.0.0.1:3000",
-        ]
-
-    setattr(Settings, "cors_allowed_origins", cors_allowed_origins)  # type: ignore[arg-type]
+settings = Settings()# type: ignore[arg-type]

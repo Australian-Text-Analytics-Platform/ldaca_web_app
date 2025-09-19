@@ -66,14 +66,14 @@ def start_frontend(port=3000, platform=None):
     with tarfile.open(temp_file_path, "r:gz") as tar:
         tar.extractall(path=DIST_DIR)
     NGINX_CONF_TEMPLATE = PROJECT_ROOT / "configs" / "nginx.conf.template"
-    NGINX_OUTPUT_CONF = PROJECT_ROOT / "nginx_ldaca_frontend.conf"
+    NGINX_OUTPUT_CONF = tempfile.NamedTemporaryFile(suffix=".conf", delete=False).name
 
     subprocess.run(
         f"FRONTEND_DIR={DIST_DIR} FRONTEND_PORT={port} envsubst < {NGINX_CONF_TEMPLATE} > {NGINX_OUTPUT_CONF}",
         check=True,
         shell=True,
     )
-
+    print(f"Using nginx config template: {NGINX_CONF_TEMPLATE}")
     subprocess.run(f"nginx -t -c {NGINX_OUTPUT_CONF}", check=True, shell=True)
 
     if ON_COLAB:

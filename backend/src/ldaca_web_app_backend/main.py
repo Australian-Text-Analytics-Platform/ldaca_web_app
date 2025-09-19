@@ -97,8 +97,8 @@ app = FastAPI(
 # Setup CORS (regex + credentials from settings)
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=settings.cors_allow_origin_regex,
-    allow_credentials=settings.cors_allow_credentials,
+    allow_origin_regex=r"http://(localhost|127\.0\.0\.1)(:\d+)?",
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
