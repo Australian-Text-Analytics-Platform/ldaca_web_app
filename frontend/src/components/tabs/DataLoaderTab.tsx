@@ -38,6 +38,22 @@ const DataLoaderTab: React.FC = () => {
   const [previewFile, setPreviewFile] = useState<string | null>(null);
   const [addingToWorkspace, setAddingToWorkspace] = useState<string | null>(null);
   const [fileToAdd, setFileToAdd] = useState<string | null>(null);
+  const [importingSamples, setImportingSamples] = useState(false);
+  const handleImportSamples = useCallback(async () => {
+    if (!window.confirm('Import sample data? This will replace any existing sample_data folder.')) return;
+    setImportingSamples(true);
+    try {
+      await filesApi.importSampleData(authHeaders);
+      // Invalidate and refetch files
+      await refetchFiles();
+      queryClient.invalidateQueries({ queryKey: queryKeys.files });
+    } catch (e) {
+      console.error('Failed to import sample data', e);
+      alert('Failed to import sample data');
+    } finally {
+      setImportingSamples(false);
+    }
+  }, [authHeaders, refetchFiles]);
   const downloadFile = useCallback(async (filename: string) => {
     try {
       const blob = await filesApi.download(filename, authHeaders);
@@ -126,6 +142,15 @@ const DataLoaderTab: React.FC = () => {
             onChange={(val: string)=> setActiveLoader(val as 'file'|'workspace')}
             ariaLabel="Data loader mode"
           />
+        </div>
+        <div className="mb-4 flex items-center space-x-3">
+          <button
+            onClick={handleImportSamples}
+            disabled={importingSamples || uploading || isLoading.operations}
+            className="px-3 py-1.5 text-sm bg-purple-100 text-purple-700 rounded hover:bg-purple-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {importingSamples ? 'Importing Samples...' : 'Import Sample Data'}
+          </button>
         </div>
 
         {/* File Upload Tab */}

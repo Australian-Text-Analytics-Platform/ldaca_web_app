@@ -53,11 +53,10 @@ class TestUserFolders:
 
     @patch("ldaca_web_app_backend.core.utils.settings")
     def test_setup_user_folders(self, mock_settings, temp_dir):
-        """Test setting up complete user folder structure"""
+        """Test setting up complete user folder structure (no auto sample copy)"""
         mock_settings.get_data_root.return_value = temp_dir
         mock_settings.user_data_folder = "users"
-
-        # Create sample data in the expected location
+        # Previously sample data would be copied automatically; now it should NOT.
         sample_data_dir = temp_dir / "sample_data"
         sample_data_dir.mkdir()
         (sample_data_dir / "test_file.txt").write_text("test content")
@@ -80,8 +79,8 @@ class TestUserFolders:
         assert user_folder.exists()
         assert user_data.exists()
         assert user_workspaces.exists()
-        assert sample_data_copy.exists()
-        assert (sample_data_copy / "test_file.txt").exists()
+        # Sample data should NOT be auto copied now
+        assert not sample_data_copy.exists()
 
 
 class TestFileOperations:

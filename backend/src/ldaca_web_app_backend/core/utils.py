@@ -2,6 +2,7 @@
 Core utilities for the LDaCA Web App
 """
 
+import os
 import shutil
 import uuid
 from pathlib import Path
@@ -47,12 +48,14 @@ def get_user_workspace_folder(user_id: str) -> Path:
 
 
 def setup_user_folders(user_id: str) -> Dict[str, Path]:
-    """Set up complete user folder structure and copy sample data"""
-    # In single-user mode, always use 'user_root' folder
-    if not settings.multi_user:
-        folder_name = "user_root"
-    else:
-        folder_name = f"user_{user_id}"
+    """Set up complete user folder structure.
+
+    NOTE: Sample data is NO LONGER copied automatically during auth/login.
+    Clients that wish to import sample data must call the dedicated
+    "import sample data" endpoint which will invoke a controlled copy
+    operation. This keeps login fast and avoids unexpected data resets.
+    """
+    folder_name = f"user_{user_id}"
 
     # Base under DATA_ROOT/users/<folder_name>
     user_folder = settings.get_data_root() / settings.user_data_folder / folder_name
@@ -63,9 +66,6 @@ def setup_user_folders(user_id: str) -> Dict[str, Path]:
     user_data_folder.mkdir(parents=True, exist_ok=True)
     user_workspaces_folder.mkdir(parents=True, exist_ok=True)
 
-    # Copy/reset sample_data into user_data
-    copy_sample_data_to_user(user_id)
-
     return {
         "user_folder": user_folder,
         "user_data": user_data_folder,
@@ -73,23 +73,46 @@ def setup_user_folders(user_id: str) -> Dict[str, Path]:
     }
 
 
-def copy_sample_data_to_user(user_id: str) -> None:
-    """Copy sample_data folder into user's data folder, resetting if it exists"""
-    # Source sample data under DATA_ROOT/sample_data
+def import_sample_data_for_user(user_id: str) -> Dict[str, Any]:
+    """Import (or re-import) sample data for a user on demand.
+
+    Removes any existing sample_data folder then copies from the canonical
+    sample data source. Returns summary statistics.
+    """
     source_sample_data = settings.get_sample_data_folder()
     user_data_folder = get_user_data_folder(user_id)
     target_sample_data = user_data_folder / "sample_data"
 
-    # If sample data exists in user folder, remove it first (reset)
+    if not source_sample_data.exists():
+        raise FileNotFoundError(
+            f"Source sample data folder not found: {source_sample_data}"
+        )
+
+    removed_existing = False
     if target_sample_data.exists():
         shutil.rmtree(target_sample_data)
+        removed_existing = True
 
-    # Copy the sample data if source exists
-    if source_sample_data.exists():
-        shutil.copytree(source_sample_data, target_sample_data)
-        print(f"✅ Sample data copied to user {user_id} data folder")
-    else:
-        print(f"⚠️ No sample_data folder found at {source_sample_data}")
+    temp_target = user_data_folder / f".sample_data_tmp_{uuid.uuid4().hex}"
+    shutil.copytree(source_sample_data, temp_target)
+    os.replace(temp_target, target_sample_data)
+
+    file_count = 0
+    bytes_copied = 0
+    for fp in target_sample_data.rglob("*"):
+        if fp.is_file():
+            file_count += 1
+            try:
+                bytes_copied += fp.stat().st_size
+            except OSError:
+                pass
+
+    return {
+        "removed_existing": removed_existing,
+        "file_count": file_count,
+        "bytes_copied": bytes_copied,
+        "sample_dir": str(target_sample_data),
+    }
 
 
 def get_file_size_mb(file_path: Path) -> float:
@@ -149,7 +172,9 @@ def load_data_file(
                 try:
                     return pl.read_excel(file_path, sheet_id=0)
                 except Exception as ex2:
-                    raise RuntimeError(f"Failed to read Excel via polars: {ex2}") from ex
+                    raise RuntimeError(
+                        f"Failed to read Excel via polars: {ex2}"
+                    ) from ex
     except Exception as e:
         print(f"Warning: polars lazy loading failed: {e}, falling back to pandas")
 
@@ -162,7 +187,9 @@ def load_data_file(
         return pd.read_parquet(file_path)
     elif file_type == "excel":
         # Avoid pandas dependency for Excel; require polars support instead
-        raise ValueError("Excel loading requires polars.read_excel; pandas-based Excel loading is disabled. Convert to CSV or ensure polars supports your Excel file.")
+        raise ValueError(
+            "Excel loading requires polars.read_excel; pandas-based Excel loading is disabled. Convert to CSV or ensure polars supports your Excel file."
+        )
     elif file_type == "tsv":
         return pd.read_csv(file_path, sep="\t")
     else:

@@ -12,11 +12,17 @@ from ..core.auth import get_current_user
 from ..core.utils import (
     detect_file_type,
     get_user_data_folder,
+    import_sample_data_for_user,
     load_data_file,
     serialize_dataframe_for_json,
     validate_file_path,
 )
-from ..models import FilePreviewRequest, FilePreviewResponse, FileUploadResponse
+from ..models import (
+    FilePreviewRequest,
+    FilePreviewResponse,
+    FileUploadResponse,
+    ImportSampleDataResponse,
+)
 
 router = APIRouter(prefix="/files", tags=["file_management"])
 
@@ -208,6 +214,28 @@ async def delete_file(filename: str, current_user: dict = Depends(get_current_us
         return {"message": f"File {filename} deleted successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to delete file: {str(e)}")
+
+
+@router.post("/import-sample-data", response_model=ImportSampleDataResponse)
+async def import_sample_data(current_user: dict = Depends(get_current_user)):
+    """Import (or re-import) sample data for the current user on demand."""
+    user_id = current_user["id"]
+    try:
+        summary = import_sample_data_for_user(user_id)
+        return {
+            "status": "ok",
+            "removed_existing": summary["removed_existing"],
+            "file_count": summary["file_count"],
+            "bytes_copied": summary["bytes_copied"],
+            "sample_dir": summary["sample_dir"],
+            "message": "Sample data imported successfully",
+        }
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to import sample data: {e}"
+        )
 
 
 @router.post("/preview", response_model=FilePreviewResponse)

@@ -35,4 +35,5 @@ export const filesApi = {
   preview: (body: UnifiedFilePreviewRequest, headers: Record<string,string> = {}) => post('/files/preview', body, headers),
   info: (fileName: string, headers: Record<string,string> = {}) => get(`/files/${encodeURIComponent(fileName)}/info`, headers),
   delete: (fileName: string, headers: Record<string,string> = {}) => del(`/files/${encodeURIComponent(fileName)}`, headers),
+  importSampleData: (headers: Record<string,string> = {}) => post('/files/import-sample-data', {}, headers),
 };

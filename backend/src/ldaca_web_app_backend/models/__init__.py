@@ -96,6 +96,15 @@ class FileUploadResponse(BaseModel):
     preview_available: bool
 
 
+class ImportSampleDataResponse(BaseModel):
+    status: str
+    removed_existing: bool
+    file_count: int
+    bytes_copied: int
+    message: str
+    sample_dir: Optional[str] = None
+
+
 class DataFileInfo(BaseModel):
     filename: str
     size: int

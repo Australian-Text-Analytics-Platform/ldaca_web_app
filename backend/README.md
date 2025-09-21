@@ -60,6 +60,22 @@ Create your own `.env` based on `.env.example`.
 - Do not commit `data/` (ensure in `.gitignore`).
 - Access paths through utility helpers (planned: a storage service) to ease future S3 / GCS migration.
 
+### Sample Data (Manual Import)
+
+Sample data is no longer copied automatically during authentication. Users (or the single-user instance) can import or refresh the canonical sample dataset explicitly via:
+
+```http
+POST /api/files/import-sample-data
+```
+
+In multi-user mode this requires a valid bearer token. The endpoint:
+
+- Deletes any existing `sample_data/` directory under the user's data root
+- Copies the configured `SAMPLE_DATA_FOLDER` into place atomically
+- Returns a JSON summary: `status`, `removed_existing`, `file_count`, `bytes_copied`.
+
+The frontend exposes an "Import Sample Data" button in the Data Loader tab which calls this endpoint and then refreshes the file list.
+
 ## Quick Start (Development)
 
 ```bash

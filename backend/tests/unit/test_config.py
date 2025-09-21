@@ -23,7 +23,8 @@ class TestSettings:
         # database_url is derived only when accessed via method; default field may be None
         assert test_settings.database_file == "users.db"
         assert test_settings.user_data_folder == "users"
-        assert test_settings.sample_data_folder == "sample_data"
+        # Field exposed as 'sample_data' with accessor get_sample_data_folder
+        assert Path(test_settings.sample_data).name == "sample_data"
 
     def test_environment_override(self):
         """Test environment variable override"""
