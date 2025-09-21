@@ -59,8 +59,8 @@ class Settings(BaseSettings):
     user_data_folder: str = Field(
         default="users", description="User data folder (relative to data_root)"
     )
-    sample_data_folder: str = Field(
-        default="sample_data", description="Sample data folder (relative to data_root)"
+    sample_data: str = Field(
+        default=str(PROJECT_ROOT / "sample_data"), description="Sample data folder"
     )
 
     # Server Configuration
@@ -160,8 +160,8 @@ class Settings(BaseSettings):
         return self.get_data_root() / self.user_data_folder
 
     def get_sample_data_folder(self) -> Path:
-        """Get sample data folder absolute path (PROJECT_ROOT/sample_data_folder)."""
-        return PROJECT_ROOT / self.sample_data_folder
+        """Get sample data folder."""
+        return Path(self.sample_data)
 
     def get_database_backup_folder(self) -> Path:
         """Get database backup folder absolute path (DATA_ROOT/database_backup_folder)."""
@@ -177,4 +177,4 @@ class Settings(BaseSettings):
 
 
 # Global settings instance
-settings = Settings()# type: ignore[arg-type]
+settings = Settings()  # type: ignore[arg-type]
