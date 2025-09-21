@@ -69,7 +69,7 @@ def start_frontend(port=3000, platform=None):
     NGINX_OUTPUT_CONF = tempfile.NamedTemporaryFile(suffix=".conf", delete=False).name
 
     subprocess.run(
-        f"FRONTEND_DIR={DIST_DIR} FRONTEND_PORT={port} BACKEND_PORT={settings.backend_port} envsubst < {NGINX_CONF_TEMPLATE} > {NGINX_OUTPUT_CONF}",
+        f"FRONTEND_DIR={DIST_DIR} FRONTEND_PORT={port} BACKEND_PORT={settings.backend_port} envsubst '$FRONTEND_DIR $FRONTEND_PORT $BACKEND_PORT' < {NGINX_CONF_TEMPLATE} > {NGINX_OUTPUT_CONF}",
         check=True,
         shell=True,
     )
@@ -94,6 +94,4 @@ def start_frontend(port=3000, platform=None):
         url = f"{base}proxy/{3000}/"
 
         display(Javascript(f"window.open('{url}', '_blank');"))
-        display(Markdown(f"If popup was blocked, click: [Open Frontend]({url})"))
-        display(Markdown(f"If popup was blocked, click: [Open Frontend]({url})"))
         display(Markdown(f"If popup was blocked, click: [Open Frontend]({url})"))
