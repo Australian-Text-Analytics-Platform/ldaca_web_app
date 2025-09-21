@@ -32,15 +32,14 @@ except Exception:
 async def lifespan(app: FastAPI):
     """Application lifespan manager"""
     # Startup
-    print("🚀 Starting LDaCA Web App...")
+    print("Starting LDaCA Web App...")
     print("=" * 50)
-    print("🔧 DocFrame: ✅ Available")
-    print("🔧 DocWorkspace: ✅ Available")
 
     # Ensure DATA_ROOT and data folders exist before DB init
     settings.get_data_root().mkdir(parents=True, exist_ok=True)
     settings.get_user_data_folder().mkdir(parents=True, exist_ok=True)
     settings.get_sample_data_folder().mkdir(parents=True, exist_ok=True)
+    print(f"Sample data folder: {settings.get_sample_data_folder()}")
     settings.get_database_backup_folder().mkdir(parents=True, exist_ok=True)
 
     # Initialize database
@@ -53,11 +52,10 @@ async def lifespan(app: FastAPI):
 
         worker_pool = get_worker_pool()
         worker_pool.start()
-        print("✅ Worker pool started for background processing")
+        print("Worker pool started for background processing")
     except Exception as e:
-        print(f"⚠️ Warning: Failed to start worker pool: {e}")
+        print(f"Warning: Failed to start worker pool: {e}")
 
-    print("✅ Enhanced API initialized successfully")
     print(
         f"📖 API Documentation: http://{settings.server_host}:{settings.backend_port}/api/docs"
     )
@@ -68,7 +66,7 @@ async def lifespan(app: FastAPI):
     yield  # Application runs here
 
     # Shutdown
-    print("👋 Shutting down Enhanced LDaCA Web App API...")
+    print("Shutting down Enhanced LDaCA Web App API...")
 
     # Shutdown worker pool
     try:
@@ -76,9 +74,9 @@ async def lifespan(app: FastAPI):
 
         worker_pool = get_worker_pool()
         worker_pool.shutdown(wait=True)
-        print("🔌 Worker pool shutdown complete")
+        print("Worker pool shutdown complete")
     except Exception as e:
-        print(f"⚠️ Warning: Error during worker pool shutdown: {e}")
+        print(f"Warning: Error during worker pool shutdown: {e}")
 
     await cleanup_expired_sessions()
 
