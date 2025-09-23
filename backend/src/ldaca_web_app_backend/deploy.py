@@ -48,7 +48,7 @@ def start_backend(port=8001):
 
 
 def start_frontend(
-    port=3000, platform=None, download_release=True, frontend_dir=None, build_dir=None
+    port=3000, platform=None, download_release=False, frontend_dir=None, build_dir=None
 ):
     url = f"http://localhost:{port}"
     NGINX_DIR = Path("~/nginx").expanduser()
