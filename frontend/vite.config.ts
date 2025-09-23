@@ -12,7 +12,7 @@ export default defineConfig({
   },
   build: {
     sourcemap: true,
-    outDir: 'build', // keep previous CRA output folder name if backend expects it
+    outDir: 'build',
     emptyOutDir: true,
     rollupOptions: {
       output: {

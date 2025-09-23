@@ -2,16 +2,13 @@
 import asyncio
 import os
 import subprocess
+from pathlib import Path
 
 import uvicorn
+from IPython.display import Markdown, display
 
 from .config import PROJECT_ROOT, settings
-
-# Import app directly from main (same directory)
-from .main import app  # assumes `app` is FastAPI instance
-
-# # Apply nest_asyncio to allow nested event loops
-# nest_asyncio.apply()
+from .main import app
 
 # Add Colab detection
 try:
@@ -50,12 +47,19 @@ def start_backend(port=8001):
     return _server_task
 
 
-def start_frontend(port=3000, platform=None, use_latest=False, frontend_dir=None):
+def start_frontend(
+    port=3000, platform=None, download_release=True, frontend_dir=None, build_dir=None
+):
     url = f"http://localhost:{port}"
-    DIST_DIR = tempfile.mkdtemp(prefix="ldaca_frontend_build_")
-    os.makedirs(DIST_DIR, exist_ok=True)
+    NGINX_DIR = Path("~/nginx").expanduser()
+    NGINX_DIR.mkdir(parents=True, exist_ok=True)
+    (NGINX_DIR / "logs").mkdir(parents=True, exist_ok=True)
+    (NGINX_DIR / "tmp").mkdir(parents=True, exist_ok=True)
+    (NGINX_DIR / "run").mkdir(parents=True, exist_ok=True)
 
-    if use_latest:
+    if download_release:
+        DIST_DIR = tempfile.mkdtemp(prefix="ldaca_frontend_build_")
+        os.makedirs(DIST_DIR, exist_ok=True)
         FRONTEND_RELEASE_URL = "https://github.com/Australian-Text-Analytics-Platform/ldaca_web_app/releases/download/frontend-latest/frontend-build.tar.gz"
 
         response = requests.get(FRONTEND_RELEASE_URL)
@@ -68,33 +72,44 @@ def start_frontend(port=3000, platform=None, use_latest=False, frontend_dir=None
         with tarfile.open(temp_file_path, "r:gz") as tar:
             tar.extractall(path=DIST_DIR)
     else:
-        if frontend_dir is None:
-            raise ValueError("frontend_dir must be specified if use_latest is False")
-        subprocess.run(
-            f"cd {frontend_dir} && BUILD_PATH={DIST_DIR} npm install > dev/null 2>&1 && npm run build > dev/null 2>&1",
-            check=True,
-            shell=True,
-        )
+        if frontend_dir is None and build_dir is None:
+            raise ValueError(
+                "frontend_dir or build_dir must be specified if download_release is False"
+            )
+        if frontend_dir is not None:
+            DIST_DIR = Path(frontend_dir) / "build"
+            DIST_DIR = DIST_DIR.absolute()
+            subprocess.run(
+                f"cd {frontend_dir} && npm install > /dev/null 2>&1 && npm run build > /dev/null 2>&1",
+                check=True,
+                shell=True,
+            )
+        if build_dir is not None:
+            DIST_DIR = Path(build_dir).absolute()
 
     NGINX_CONF_TEMPLATE = PROJECT_ROOT / "configs" / "nginx.conf.template"
-    NGINX_OUTPUT_CONF = tempfile.NamedTemporaryFile(suffix=".conf", delete=False).name
 
     subprocess.run(
-        f"FRONTEND_DIR={DIST_DIR} FRONTEND_PORT={port} BACKEND_PORT={settings.backend_port} envsubst '$FRONTEND_DIR $FRONTEND_PORT $BACKEND_PORT' < {NGINX_CONF_TEMPLATE} > {NGINX_OUTPUT_CONF}",
+        f"FRONTEND_DIR={DIST_DIR} FRONTEND_PORT={port} BACKEND_PORT={settings.backend_port} envsubst '$FRONTEND_DIR $FRONTEND_PORT $BACKEND_PORT' < {NGINX_CONF_TEMPLATE} > {NGINX_DIR / 'nginx.conf'}",
         check=True,
         shell=True,
     )
-    print(f"Using nginx config file: {NGINX_OUTPUT_CONF}")
-    subprocess.run(f"nginx -s reload -c {NGINX_OUTPUT_CONF}", check=False, shell=True)
+    print(f"Using nginx config file: {NGINX_DIR / 'nginx.conf'}")
+    proc = subprocess.Popen(
+        f"nginx -p {NGINX_DIR} -c 'nginx.conf' -g 'daemon off;'", shell=True
+    )
 
     if ON_COLAB:
         output.serve_kernel_port_as_window(port)
     else:
-        from IPython.display import Javascript, Markdown, display
-
         base = os.environ["JUPYTERHUB_SERVICE_PREFIX"]
         if base and not base.endswith("/"):
             base += "/"
 
         url = f"{base}proxy/{3000}/"
-        display(Markdown(f"If popup was blocked, click: [Open web app]({url})"))
+        display(
+            Markdown(
+                f"Click the following link to open the web app:\n# [Open web app]({url})"
+            )
+        )
+    return proc
