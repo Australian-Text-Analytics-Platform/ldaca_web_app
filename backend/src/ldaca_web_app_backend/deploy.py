@@ -50,7 +50,7 @@ def start_backend(port=8001):
     return _server_task
 
 
-def start_frontend(port=3000, platform=None, use_latest=False):
+def start_frontend(port=3000, platform=None, use_latest=False, frontend_dir=None):
     url = f"http://localhost:{port}"
     DIST_DIR = tempfile.mkdtemp(prefix="ldaca_frontend_build_")
     os.makedirs(DIST_DIR, exist_ok=True)
@@ -68,10 +68,10 @@ def start_frontend(port=3000, platform=None, use_latest=False):
         with tarfile.open(temp_file_path, "r:gz") as tar:
             tar.extractall(path=DIST_DIR)
     else:
-        FRONTEND_ROOT = PROJECT_ROOT / ".." / "frontend"
-
+        if frontend_dir is None:
+            raise ValueError("frontend_dir must be specified if use_latest is False")
         subprocess.run(
-            f"cd {FRONTEND_ROOT} && BUILD_PATH={DIST_DIR} npm install && npm run build",
+            f"cd {frontend_dir} && BUILD_PATH={DIST_DIR} npm install && npm run build",
             check=True,
             shell=True,
         )
