@@ -71,7 +71,7 @@ def start_frontend(port=3000, platform=None, use_latest=False, frontend_dir=None
         if frontend_dir is None:
             raise ValueError("frontend_dir must be specified if use_latest is False")
         subprocess.run(
-            f"cd {frontend_dir} && BUILD_PATH={DIST_DIR} npm install && npm run build",
+            f"cd {frontend_dir} && BUILD_PATH={DIST_DIR} npm install > dev/null 2>&1 && npm run build > dev/null 2>&1",
             check=True,
             shell=True,
         )
@@ -90,8 +90,7 @@ def start_frontend(port=3000, platform=None, use_latest=False, frontend_dir=None
     if ON_COLAB:
         output.serve_kernel_port_as_window(port)
     else:
-        import IPython.display as display
-        from IPython.display import Javascript, Markdown
+        from IPython.display import Javascript, Markdown, display
 
         base = os.environ["JUPYTERHUB_SERVICE_PREFIX"]
         if base and not base.endswith("/"):
