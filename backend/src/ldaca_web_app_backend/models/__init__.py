@@ -537,6 +537,8 @@ class TokenStatisticsData(BaseModel):
 class TokenFrequencyNodeResult(BaseModel):
     data: List[TokenFrequencyData]
     columns: List[str] = ["token", "frequency"]
+    # Optional metadata (e.g., server-side truncation info)
+    metadata: Optional[Dict[str, Any]] = None
 
 
 class TokenFrequencyResponse(BaseModel):

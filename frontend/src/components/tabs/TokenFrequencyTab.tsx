@@ -6,6 +6,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { TokenFrequencyRequest, TokenFrequencyResponse, textApi } from '../../api/text';
 import { Wordcloud } from '@visx/wordcloud';
 import { Text } from '@visx/text';
+import useAutoNodeColumns from '../../hooks/useAutoNodeColumns';
 
 interface NodeColumnSelection {
   nodeId: string;
@@ -31,11 +32,22 @@ const TokenFrequencyTab: React.FC = () => {
 
   const { getAuthHeaders } = useAuth();
 
-  const [nodeColumnSelections, setNodeColumnSelections] = useState<NodeColumnSelection[]>([]);
   const [stopWords, setStopWords] = useState<string>('');
-  const [limit, setLimit] = useState<number>(20);
+  // Default display limit (frontend-only)
+  const [limit, setLimit] = useState<number>(10);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
+  // Shared auto column selection hook (shared scope with Concordance via undefined storageScope)
+  const { selections: nodeColumnSelections, setSelection: setNodeColumnSelection, setSelections: setNodeColumnSelectionsRaw, recompute: recomputeAutoColumns } = useAutoNodeColumns({
+    selectedNodes,
+    getNodeColumns: (n: any) => {
+      if (n.data?.columns && Array.isArray(n.data.columns)) return n.data.columns;
+      if (n.columns && Array.isArray(n.columns)) return n.columns;
+      if (n.data?.dtypes && typeof n.data.dtypes === 'object') return Object.keys(n.data.dtypes);
+      if (n.data?.schema) return Object.keys(n.data.schema);
+      return [];
+    },
+  }, { workspaceId: currentWorkspaceId, maxNodes: 2, isLocked, docTypeOnly: true, enableHeuristicGuess: false });
   const [lockedNodesSnapshot, setLockedNodesSnapshot] = useState<Array<{ id: string; name: string; columns: string[] }>>([]);
   const [isLoadingStopWords, setIsLoadingStopWords] = useState(false);
   const [results, setResults] = useState<TokenFrequencyResponse | null>(null);
@@ -118,69 +130,76 @@ const TokenFrequencyTab: React.FC = () => {
 
   // Removed legacy popover logic
 
-  // Hydrate from backend on mount/activation
-  const hydratedOnceRef = useRef<boolean>(false);
-  useEffect(() => {
-    (async () => {
-      if (hydratedOnceRef.current) return;
-      hydratedOnceRef.current = true;
-      if (!currentWorkspaceId) return;
-      try {
-        // Always fetch current-request first
-        const reqResp = await textApi.getTokenFrequenciesCurrentRequest(currentWorkspaceId, getAuthHeaders());
-        if (!reqResp) {
-          // No current request - fresh state
+  // Hydrate from backend on mount and whenever the tab becomes visible again or we lack statistics
+  const hydratingRef = useRef<boolean>(false);
+  const performHydration = async () => {
+    if (hydratingRef.current) return;
+    if (!currentWorkspaceId) return;
+    hydratingRef.current = true;
+    try {
+      const reqResp = await textApi.getTokenFrequenciesCurrentRequest(currentWorkspaceId, getAuthHeaders());
+      if (!reqResp) {
+        // No current request: clear local persisted state and DO NOT fetch current-result
+        setStopWords('');
+        setAppliedStopSet(new Set());
+        setNodeColumnSelectionsRaw([], { replace: true });
+        setLastCompareNodeIds([]);
+        return;
+      }
+      const req = (reqResp as any)?.data;
+      if (req) {
+        if (Array.isArray(req.stop_words)) {
+          const joined = req.stop_words.join(', ');
+          setStopWords(joined);
+          setAppliedStopSet(new Set(req.stop_words.map((w: any) => String(w).toLowerCase())));
+        } else {
           setStopWords('');
           setAppliedStopSet(new Set());
-          setNodeColumnSelections([]);
-          setLastCompareNodeIds([]);
-          return;
         }
-        
-        const req = (reqResp as any)?.data;
-        if (req) {
-          // Stop words
-          if (Array.isArray(req.stop_words)) {
-            const joined = req.stop_words.join(', ');
-            setStopWords(joined);
-            setAppliedStopSet(new Set(req.stop_words.map((w: any) => String(w).toLowerCase())));
-          } else {
-            setStopWords('');
-            setAppliedStopSet(new Set());
-          }
-          // Node selections
-          const nodeIds: string[] = Array.isArray(req.node_ids) ? req.node_ids.slice(0, 2) : [];
-          const node_columns: Record<string, string> = req.node_columns || {};
-          const sels = nodeIds.map((id: string) => ({ nodeId: id, column: node_columns[id] || '' }));
-          setNodeColumnSelections(sels);
-          setLastCompareNodeIds(nodeIds);
-          // Build snapshot and lock
-          try {
-            const snaps: Array<{ id: string; name: string; columns: string[] }> = [];
-            for (const id of nodeIds) {
-              try {
-                const info = await nodesApi.info(currentWorkspaceId!, id, getAuthHeaders());
-                const name = (info as any)?.name || (info as any)?.data?.name || id;
-                const columns = Array.isArray((info as any)?.columns) ? (info as any).columns : (Array.isArray((info as any)?.data?.columns) ? (info as any).data.columns : []);
-                snaps.push({ id, name: String(name), columns });
-              } catch {
-                snaps.push({ id, name: id, columns: [] });
-              }
+        const nodeIds: string[] = Array.isArray(req.node_ids) ? req.node_ids.slice(0, 2) : [];
+  const node_columns: Record<string, string> = req.node_columns || {};
+  const sels = nodeIds.map((id: string) => ({ nodeId: id, column: node_columns[id] || '' }));
+  setNodeColumnSelectionsRaw(sels, { replace: true });
+        setLastCompareNodeIds(nodeIds);
+        try {
+          const snaps: Array<{ id: string; name: string; columns: string[] }> = [];
+          for (const id of nodeIds) {
+            try {
+              const info = await nodesApi.info(currentWorkspaceId!, id, getAuthHeaders());
+              const name = (info as any)?.name || (info as any)?.data?.name || id;
+              const columns = Array.isArray((info as any)?.columns) ? (info as any).columns : (Array.isArray((info as any)?.data?.columns) ? (info as any).data.columns : []);
+              snaps.push({ id, name: String(name), columns });
+            } catch {
+              snaps.push({ id, name: id, columns: [] });
             }
+          }
+          if (snaps.length) {
             setLockedNodesSnapshot(snaps);
             setIsLocked(true);
-          } catch { /* ignore */ }
-        }
-        
-        // Then fetch current-result
-        const resResp = await textApi.getTokenFrequenciesCurrentResult(currentWorkspaceId, getAuthHeaders());
-        if (!resResp) return;
-        
-        const res = (resResp as any)?.data;
-        if (res) setResults(resResp as any);
-      } catch (_) { /* ignore */ }
-    })();
-  }, [currentWorkspaceId, getAuthHeaders]);
+          }
+        } catch { /* ignore */ }
+      }
+      // Only fetch current-result if a request existed
+      const resResp = await textApi.getTokenFrequenciesCurrentResult(currentWorkspaceId, getAuthHeaders());
+      if (resResp) setResults(resResp as any);
+    } catch { /* ignore */ }
+    finally {
+      hydratingRef.current = false;
+    }
+  };
+  useEffect(() => { void performHydration(); }, [currentWorkspaceId, getAuthHeaders]);
+  useEffect(() => {
+    const handleVisibility = () => {
+      const shouldRehydrate = document.visibilityState === 'visible' && currentWorkspaceId && (!results || (Array.isArray(results.statistics) && results.statistics.length === 0 && lastCompareNodeIds.length === 2));
+      if (shouldRehydrate) void performHydration();
+    };
+    window.addEventListener('focus', handleVisibility);
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      window.removeEventListener('focus', handleVisibility);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [results, currentWorkspaceId, lastCompareNodeIds]);
 
 
   // Debug results changes
@@ -257,52 +276,14 @@ const TokenFrequencyTab: React.FC = () => {
     };
   }, []);
 
-  // Update node column selections when selected nodes change
+  // Recompute auto columns if we become unlocked and selections empty while nodes exist
   useEffect(() => {
-    if (isLocked) return;
-    if (selectedNodes.length === 0) {
-      setNodeColumnSelections([]);
-      return;
+    if (!isLocked && selectedNodes.length > 0 && nodeColumnSelections.length === 0) {
+      recomputeAutoColumns();
     }
+  }, [isLocked, selectedNodes, nodeColumnSelections, recomputeAutoColumns]);
 
-    // Keep existing selections for nodes that are still selected, add new ones for new nodes
-    setNodeColumnSelections(prev => {
-      const newSelections = selectedNodes.map(node => {
-        const existing = prev.find(sel => sel.nodeId === node.id);
-        if (existing) {
-          return existing;
-        }
-        
-        // Only auto-select for DocType nodes using explicit documentColumn; leave blank otherwise
-        const columns = getNodeColumns(node);
-        let defaultColumn = '';
-        const isDocType = !!(node.data?.nodeType && node.data.nodeType.includes('Doc'));
-        const documentColumn = node.data?.documentColumn;
-        if (isDocType && documentColumn && columns.includes(documentColumn)) {
-          defaultColumn = documentColumn;
-        }
-        
-        return {
-          nodeId: node.id,
-          column: defaultColumn
-        };
-      });
-
-      // Only update if the selections actually changed
-      if (JSON.stringify(newSelections) === JSON.stringify(prev)) {
-        return prev;
-      }
-      return newSelections;
-    });
-  }, [selectedNodeIds, selectedNodes, getNodeColumns]); // Include all dependencies
-
-  const handleColumnChange = (nodeId: string, column: string) => {
-    setNodeColumnSelections(prev => 
-      prev.map(sel => 
-        sel.nodeId === nodeId ? { ...sel, column } : sel
-      )
-    );
-  };
+  const handleColumnChange = (nodeId: string, column: string) => setNodeColumnSelection(nodeId, column);
 
   const handleFillDefaultStopWords = async () => {
     setIsLoadingStopWords(true);
@@ -766,13 +747,15 @@ const TokenFrequencyTab: React.FC = () => {
                     if (stats.length === 0) return null;
 
                     const sortedAsc = [...stats].sort((a, b) => a.juxRank - b.juxRank);
-                    const half = Math.floor(limit / 2);
+                    // Use 2 * limit for unified word cloud
+                    const cloudLimit = 2 * limit;
+                    const half = Math.floor(cloudLimit / 2);
                     const low = sortedAsc.slice(0, Math.min(half, sortedAsc.length));
                     const high = sortedAsc.slice(Math.max(sortedAsc.length - half, 0));
                     let selected = [...low, ...high];
 
-                    // If limit is odd, add one more from the side with larger absolute extremum not already picked
-                    const remaining = Math.max(0, limit - selected.length);
+                    // If cloudLimit is odd, add one more from the side with larger absolute extremum not already picked
+                    const remaining = Math.max(0, cloudLimit - selected.length);
                     if (remaining > 0 && sortedAsc.length > selected.length) {
                       const nextLow = sortedAsc[low.length] || null;
                       const nextHigh = sortedAsc[sortedAsc.length - high.length - 1] || null;
@@ -784,12 +767,12 @@ const TokenFrequencyTab: React.FC = () => {
                       if (pick) selected.push(pick);
                     }
 
-                    // De-duplicate in case of overlap (when limit > unique items etc.)
+                    // De-duplicate in case of overlap (when cloudLimit > unique items etc.)
                     const seen = new Set<string>();
                     selected = selected.filter(s => (seen.has(s.token) ? false : (seen.add(s.token), true)));
 
-                    // Ensure we don't exceed limit
-                    selected = selected.slice(0, Math.min(limit, selected.length));
+                    // Ensure we don't exceed cloudLimit
+                    selected = selected.slice(0, Math.min(cloudLimit, selected.length));
 
                     // // Debug print of selected tokens with juxRank
                     // const debugOn = (typeof window !== 'undefined') && localStorage.getItem('debugTF') === '1';
@@ -886,7 +869,7 @@ const TokenFrequencyTab: React.FC = () => {
                             </Wordcloud>
                           </svg>
                         </div>
-                        <p className="text-xs text-gray-500 mt-2 text-center">Selection uses juxRank = log10(O1+O2) × LogRatio: 50% lowest and 50% highest by juxRank. Size = (O1+O2). Color uses relative percentage share (%1 vs %2) so differing corpus sizes don't bias color; shifts toward {nodeAName} (left) or {nodeBName} (right).</p>
+                        <p className="text-xs text-gray-500 mt-2 text-center">Selection uses juxRank = log10(O1+O2) × LogRatio: 50% lowest and 50% highest by juxRank (2× token limit = {2 * limit} tokens). Size = (O1+O2). Color uses relative percentage share (%1 vs %2) so differing corpus sizes don't bias color; shifts toward {nodeAName} (left) or {nodeBName} (right).</p>
                         {/* {debugOn && (
                           <div className="mt-2 p-2 bg-gray-50 border border-gray-200 rounded">
                             <div className="text-[11px] text-gray-600 font-mono whitespace-pre-wrap">

@@ -183,3 +183,14 @@ Add an explicit license file (e.g., Apache-2.0 or MIT) at repository root if not
 
 ---
 For any clarifications or to automate the refactor into the proposed structure, open an issue or request a restructuring task.
+
+## Token Frequencies – Persistence Notes
+
+The token frequency endpoint behavior:
+
+1. Stop words are frontend-only: the backend ignores the provided list when computing raw counts (they are persisted only so the UI can restore the filter preference). This keeps the operation reversible without recomputation.
+2. Persistence returns the full stored `TokenFrequencyResponse` (including `statistics`). Earlier flattening removed `statistics` which caused the unified word cloud and stats table to disappear after tab switching—this is fixed.
+3. The numeric "limit" provided in the request (and the default of 10 in the UI) is a presentation parameter only. The backend returns the full vocabulary (subject only to inherent processing constraints of the underlying data). The client applies the limit when rendering bar charts / word clouds.
+4. Unified Word Cloud derives from the persisted `statistics`; no additional backend metadata is required.
+
+If extremely large vocabularies become a performance issue in the future, consider adding an opt-in pagination or download endpoint rather than implicit truncation.

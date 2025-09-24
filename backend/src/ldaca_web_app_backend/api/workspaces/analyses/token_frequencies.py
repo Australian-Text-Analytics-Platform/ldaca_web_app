@@ -70,23 +70,19 @@ async def token_frequencies_current_result(
     if not rec:
         return None
     stored = rec.result
-    if (
-        isinstance(stored, dict)
-        and "data" in stored
-        and ("status" in stored or "success" in stored or "state" in stored)
-        and isinstance(stored["data"], (dict, list))
-    ):
-        inner = stored["data"]
-        if (
-            isinstance(inner, dict)
-            and "data" in inner
-            and ("status" in inner or "success" in inner or "state" in inner)
-        ):
-            inner = inner["data"]
-        domain = inner
-    else:
-        domain = stored
-    return {"state": "successful", "message": "ok", "data": domain}
+    # Prior implementation attempted to "flatten" the stored result which stripped the
+    # 'statistics' array (and any future metadata) leaving only raw per-node frequencies.
+    # This caused the unified word cloud & stats table to disappear on tab re‑entry.
+    # We now return the full stored TokenFrequencyResponse exactly as it was persisted.
+    if isinstance(stored, dict):
+        # Ensure a state field for consistency if missing (legacy records safeguard)
+        if "state" not in stored:
+            stored = {"state": "successful", **stored}
+        return stored
+    # Fallback: wrap non-dict legacy formats
+    with open("~/Sources/test.txt", "wt") as f:
+        f.write(str(stored))
+    return {"state": "successful", "message": "ok", "data": stored}
 
 
 @router.post("/{workspace_id}/token-frequencies/clear")
@@ -280,10 +276,15 @@ async def calculate_token_frequencies(
                 detail="docframe library not available for token frequency calculation",
             )
 
+        # IMPORTANT CHANGE: Backend now ignores provided stop_words for raw frequency computation.
+        # Stop words are purely a frontend display filter; we persist them in the saved request
+        # so the UI can restore the user's filter preference without losing raw counts.
+        # Previously: frames=frames_dict, stop_words=request.stop_words
         frequency_results, stats_df = compute_token_frequencies(
-            frames=frames_dict, stop_words=request.stop_words
+            frames=frames_dict, stop_words=None
         )
 
+        # Return full vocabulary (no backend truncation); UI limit is purely presentation.
         response_data = {}
         for frame_name, freq_dict in frequency_results.items():
             sorted_tokens = sorted(freq_dict.items(), key=lambda x: x[1], reverse=True)

@@ -6,6 +6,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { MultiNodeConcordanceRequest, MultiNodeConcordanceResponse, textApi } from '../../api/text';
 import { nodesApi } from '../../api/nodes';
 import { workspacesApi } from '../../api/workspaces';
+import useAutoNodeColumns from '../../hooks/useAutoNodeColumns';
 
 interface NodeColumnSelection {
   nodeId: string;
@@ -25,7 +26,18 @@ const ConcordanceTab: React.FC = () => {
 
   const { getAuthHeaders } = useAuth();
 
-  const [nodeColumnSelections, setNodeColumnSelections] = useState<NodeColumnSelection[]>([]);
+  const [isLocked, setIsLocked] = useState(false);
+  // Shared auto column selection (shared with TokenFrequencyTab via undefined storageScope)
+  const { selections: nodeColumnSelections, setSelection: setNodeColumnSelection, setSelections: setNodeColumnSelectionsRaw, recompute: recomputeAutoColumns } = useAutoNodeColumns({
+    selectedNodes,
+    getNodeColumns: (n: any) => {
+      if (n.data?.columns && Array.isArray(n.data.columns)) return n.data.columns;
+      if (n.columns && Array.isArray(n.columns)) return n.columns;
+      if (n.data?.dtypes && typeof n.data.dtypes === 'object') return Object.keys(n.data.dtypes);
+      if (n.data?.schema) return Object.keys(n.data.schema);
+      return [];
+    }
+  }, { workspaceId: currentWorkspaceId, maxNodes: 2, isLocked, docTypeOnly: true, enableHeuristicGuess: false });
   const [lockedNodeSelections, setLockedNodeSelections] = useState<NodeColumnSelection[] | null>(null);
   const [searchWord, setSearchWord] = useState('');
   const [numLeftTokens, setNumLeftTokens] = useState(10);
@@ -66,7 +78,6 @@ const ConcordanceTab: React.FC = () => {
     return map;
   }, [selectedNodes, nodeColors, defaultPalette]);
   
-  const [isLocked, setIsLocked] = useState(false);
   const [lockedNodesSnapshot, setLockedNodesSnapshot] = useState<Array<{ id: string; name: string; columns: string[] }>>([]);
 
   // Pagination and sorting state - separate for each node
@@ -137,7 +148,7 @@ const ConcordanceTab: React.FC = () => {
         const matchingSelections = params.nodeColumnSelections.filter((sel: any) =>
           selectedNodes.some((node: any) => node.id === sel.nodeId)
         );
-        if (matchingSelections.length > 0) setNodeColumnSelections(matchingSelections);
+  if (matchingSelections.length > 0) setNodeColumnSelectionsRaw(matchingSelections, { replace: true });
       }
       if (params.nodeColors) setNodeColors((prev) => ({ ...params.nodeColors, ...prev }));
 
@@ -179,44 +190,12 @@ const ConcordanceTab: React.FC = () => {
     };
   }, []);
 
-  // Update node column selections when selected nodes change
+  // Recompute auto columns if unlocked and selections empty but nodes exist
   useEffect(() => {
-    if (isLocked) return;
-    if (selectedNodes.length === 0) {
-      setNodeColumnSelections([]);
-      return;
+    if (!isLocked && selectedNodes.length > 0 && nodeColumnSelections.length === 0) {
+      recomputeAutoColumns();
     }
-
-    // Keep existing selections for nodes that are still selected, add new ones for new nodes
-    setNodeColumnSelections(prev => {
-      const newSelections = selectedNodes.map(node => {
-        const existing = prev.find(sel => sel.nodeId === node.id);
-        if (existing) {
-          return existing;
-        }
-        
-        // Only auto-select for DocType nodes (with explicit documentColumn). No guessing for non DocTypes.
-        const columns = getNodeColumns(node);
-        let defaultColumn = '';
-        const isDocType = !!(node.data?.nodeType && node.data.nodeType.includes('Doc'));
-        const documentColumn = node.data?.documentColumn;
-        if (isDocType && documentColumn && columns.includes(documentColumn)) {
-          defaultColumn = documentColumn;
-        }
-        
-        return {
-          nodeId: node.id,
-          column: defaultColumn
-        };
-      });
-
-      // Only update if the selections actually changed
-      if (JSON.stringify(newSelections) === JSON.stringify(prev)) {
-        return prev;
-      }
-      return newSelections;
-    });
-  }, [selectedNodeIds, selectedNodes, getNodeColumns]); // Include all dependencies
+  }, [isLocked, selectedNodes, nodeColumnSelections, recomputeAutoColumns]);
 
   // Ensure every selected node has a color
   useEffect(() => {
@@ -251,13 +230,7 @@ const ConcordanceTab: React.FC = () => {
     return selectedNodes;
   }, [isLocked, lockedNodesSnapshot, selectedNodes]);
 
-  const handleColumnChange = (nodeId: string, column: string) => {
-    setNodeColumnSelections(prev => 
-      prev.map(sel => 
-        sel.nodeId === nodeId ? { ...sel, column } : sel
-      )
-    );
-  };
+  const handleColumnChange = (nodeId: string, column: string) => setNodeColumnSelection(nodeId, column);
 
   const handleSearch = useCallback(async (
     resetPage = true,
@@ -384,7 +357,7 @@ const ConcordanceTab: React.FC = () => {
           const nodeIds: string[] = Array.isArray(req.node_ids) ? req.node_ids.slice(0,2) : [];
           const node_columns: Record<string,string> = req.node_columns || {};
           const sels = nodeIds.map((id: string) => ({ nodeId: id, column: node_columns[id] || '' }));
-          setNodeColumnSelections(sels);
+          setNodeColumnSelectionsRaw(sels, { replace: true });
           setLockedNodeSelections(sels);
           setSearchWord(String(req.search_word || ''));
           setNumLeftTokens(Number(req.num_left_tokens ?? 10));
@@ -412,8 +385,10 @@ const ConcordanceTab: React.FC = () => {
           } catch { /* ignore */ }
         }
         
-        // Now get current-result
-        const resResp = await textApi.getMultiNodeConcordanceCurrentResult(currentWorkspaceId, getAuthHeaders());
+  // If no request data, don't attempt to fetch current-result
+  if (!req) return;
+  // Now get current-result
+  const resResp = await textApi.getMultiNodeConcordanceCurrentResult(currentWorkspaceId, getAuthHeaders());
         if (!resResp) {
           // No result yet
           return;
