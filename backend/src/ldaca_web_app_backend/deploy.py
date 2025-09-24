@@ -5,7 +5,7 @@ import subprocess
 from pathlib import Path
 
 import uvicorn
-from IPython.display import Markdown, display
+from IPython.display import Javascript, Markdown, display
 
 from .config import PROJECT_ROOT, settings
 from .main import app
@@ -107,6 +107,7 @@ def start_frontend(
             base += "/"
 
         url = f"{base}proxy/{3000}/"
+        display(Javascript(f"window.open('{url}', '_blank');"))
         display(
             Markdown(
                 f"Click the following link to open the web app:\n# [Open web app]({url})"

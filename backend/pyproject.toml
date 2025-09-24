@@ -21,6 +21,7 @@ dependencies = [
     "pyairtable>=3.2.0",
     "trio>=0.23.0",
     "jupyter-server-proxy>=4.4.0",
+    "ipython>=9.5.0",
 ]
 
 [tool.pytest.ini_options]
