@@ -8,7 +8,7 @@ Preserves original paths:
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from ....core.analysis_store import get_latest_analysis, save_analysis
+from ....core.analysis_store import clear_analyses, get_latest_analysis, save_analysis
 from ....core.auth import get_current_user
 from ....core.workspace import workspace_manager
 from ....models import FrequencyAnalysisRequest
@@ -140,3 +140,12 @@ async def get_frequency_analysis(
         print(f"❌ Unexpected frequency analysis error: {e}")
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
+
+
+@router.post("/{workspace_id}/frequency-analysis/clear")
+async def clear_frequency_analysis_results(
+    workspace_id: str, current_user: dict = Depends(get_current_user)
+):
+    user_id = current_user["id"]
+    removed = clear_analyses(user_id, workspace_id, task="frequency_analysis")
+    return {"state": "successful", "cleared": {"analyses_removed": removed}}

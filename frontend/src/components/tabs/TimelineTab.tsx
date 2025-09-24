@@ -72,6 +72,9 @@ const TimelineTab: React.FC = () => {
   const [chartType, setChartType] = useState<'line' | 'bar' | 'area'>('line');
   const [isLocked, setIsLocked] = useState(false);
   const [lockedNodesSnapshot, setLockedNodesSnapshot] = useState<Array<{ id: string; name: string; columns: string[] }>>([]);
+  // Store schema (column -> js_type) separately so we don't lose types when locking/unlocking
+  const [currentSchema, setCurrentSchema] = useState<Record<string,string>>({});
+  const [lockedSchema, setLockedSchema] = useState<Record<string,string> | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [results, setResults] = useState<any>(null);
 
@@ -87,13 +90,13 @@ const TimelineTab: React.FC = () => {
     return 'string';
   };
 
-  // Get available columns from node data with normalized datatypes (mirrors FilterTab logic)
+  // Get available columns from schema (prefer fetched schema; fallback to nodeData/selectedNode) preserving types
   const availableColumns = useMemo(() => {
-    // When locked, freeze the schema table using locked snapshot columns
-    if (isLocked && lockedNodesSnapshot.length > 0) {
-      const cols = lockedNodesSnapshot[0].columns || [];
-      return cols.map((name: string) => ({ name, dataType: 'string' }));
+    const effectiveSchema = isLocked ? (lockedSchema || currentSchema) : currentSchema;
+    if (effectiveSchema && Object.keys(effectiveSchema).length > 0) {
+      return Object.entries(effectiveSchema).map(([name, jsType]) => ({ name, dataType: jsType }));
     }
+    // Fallback logic (legacy) only if schema not yet fetched
     const columns: Array<{ name: string; dataType: string }> = [];
     if (nodeData?.columns && Array.isArray(nodeData.columns) && nodeData?.dtypes) {
       nodeData.columns.forEach((colName: string) => {
@@ -108,12 +111,36 @@ const TimelineTab: React.FC = () => {
         columns.push({ name: colName, dataType: normalizedDataType });
       });
     } else if (selectedNode?.data?.schema) {
-      Object.keys(selectedNode.data.schema).forEach(colName => {
-        columns.push({ name: colName, dataType: 'string' });
+      // selectedNode.data.schema may already be array of objects or mapping; attempt to parse
+      const schemaObj = Array.isArray(selectedNode.data.schema)
+        ? Object.fromEntries(selectedNode.data.schema.map((c:any)=>[c.name, c.js_type || 'string']))
+        : selectedNode.data.schema;
+      Object.entries(schemaObj).forEach(([colName, jsType]) => {
+        columns.push({ name: colName, dataType: typeof jsType === 'string' ? normalizeTypeName(jsType) : 'string' });
       });
     }
     return columns;
-  }, [isLocked, lockedNodesSnapshot, nodeData?.columns, nodeData?.dtypes, selectedNode?.data?.schema]);
+  }, [isLocked, lockedSchema, currentSchema, nodeData?.columns, nodeData?.dtypes, selectedNode?.data?.schema]);
+
+  // Fetch schema on-demand when selected node changes (and not locked)
+  useEffect(() => {
+    if (!selectedNodeId || isLocked) return;
+    (async () => {
+      try {
+        if (!currentWorkspaceId) return;
+        const info = await nodesApi.info(currentWorkspaceId, selectedNodeId, getAuthHeaders());
+        // info.schema could be array (NodeSummary) or mapping (legacy). Normalize to mapping of js_type.
+        let schemaMap: Record<string,string> = {};
+        const rawSchema = (info as any)?.schema;
+        if (Array.isArray(rawSchema)) {
+          schemaMap = Object.fromEntries(rawSchema.map((c:any)=>[c.name, c.js_type || 'string']));
+        } else if (rawSchema && typeof rawSchema === 'object') {
+          schemaMap = Object.fromEntries(Object.entries(rawSchema).map(([k,v])=>[k, typeof v === 'string' ? normalizeTypeName(v) : 'string']));
+        }
+        if (Object.keys(schemaMap).length > 0) setCurrentSchema(schemaMap);
+      } catch { /* ignore schema fetch errors */ }
+    })();
+  }, [selectedNodeId, isLocked, currentWorkspaceId, getAuthHeaders]);
 
 // Keep nodeColumnSelections in sync with selectedNodeId
   useEffect(() => {
@@ -188,12 +215,21 @@ const handleAnalyze = async () => {
       const headers = Object.keys(authHeaders).length > 0 ? authHeaders as Record<string, string> : {};
       const result = await textApi.frequency(currentWorkspaceId, selectedNodeId, request, headers);
       setResults(result);
-      // Lock with snapshot
+      // Lock with snapshot & preserve schema
       try {
         const info = await nodesApi.info(currentWorkspaceId, selectedNodeId, getAuthHeaders());
         const name = (info as any)?.name || (info as any)?.data?.name || selectedNodeId;
         const columns = Array.isArray((info as any)?.columns) ? (info as any).columns : (Array.isArray((info as any)?.data?.columns) ? (info as any).data.columns : []);
         setLockedNodesSnapshot([{ id: selectedNodeId, name: String(name), columns }]);
+        // Capture schema for locked display
+        const rawSchema = (info as any)?.schema;
+        if (Array.isArray(rawSchema)) {
+          setLockedSchema(Object.fromEntries(rawSchema.map((c:any)=>[c.name, c.js_type || 'string'])));
+        } else if (rawSchema && typeof rawSchema === 'object') {
+          setLockedSchema(Object.fromEntries(Object.entries(rawSchema).map(([k,v])=>[k, typeof v === 'string' ? normalizeTypeName(v) : 'string'])));
+        } else {
+          setLockedSchema(currentSchema);
+        }
         setIsLocked(true);
       } catch { /* ignore */ }
     } catch (error) {
@@ -206,10 +242,11 @@ const handleAnalyze = async () => {
 
 const handleClearResults = async () => {
     try {
-      if (currentWorkspaceId) await workspacesApi.clearAnalysis(currentWorkspaceId, 'frequency_analysis', getAuthHeaders());
+      if (currentWorkspaceId) await textApi.clearFrequencyAnalysis(currentWorkspaceId, getAuthHeaders());
     } catch { /* ignore */ }
     setResults(null);
     setLockedNodesSnapshot([]);
+    setLockedSchema(null);
     setIsLocked(false);
   };
 
@@ -478,7 +515,7 @@ const handleClearResults = async () => {
           columnLabelFn={() => 'Time Column *'}
           renderNodeMeta={() => (
             <div className="pt-1">
-              <div className="text-xs font-semibold text-gray-600 mb-1 tracking-wide">SCHEMA</div>
+              <div className="text-xs font-semibold text-gray-600 mb-1 tracking-wide">SCHEMA (on-demand)</div>
               <div className="overflow-x-auto border border-gray-200 rounded-md bg-white">
                 <table className="text-[11px] font-mono border-collapse">
                   <tbody>
