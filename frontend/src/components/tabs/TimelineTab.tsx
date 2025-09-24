@@ -56,6 +56,7 @@ const TimelineTab: React.FC = () => {
   const { 
     selectedNodeId, 
     selectedNode,
+    selectedNodes,
     nodeData,
     isLoading,
     currentWorkspaceId
@@ -489,7 +490,9 @@ const handleClearResults = async () => {
           )}
         </div>
         <NodeSelectionPanel
-          selectedNodes={(isLocked && lockedNodesSnapshot.length) ? lockedNodesSnapshot.map(s=>({ id: s.id, name: s.name, data: { name: s.name, nodeName: s.name, label: s.name, columns: s.columns }, columns: s.columns })) : (selectedNode ? [{ id: selectedNode.id, name: selectedNode.data?.name, data: selectedNode.data }] : [])}
+          selectedNodes={(isLocked && lockedNodesSnapshot.length)
+            ? lockedNodesSnapshot.map(s=>({ id: s.id, name: s.name, data: { name: s.name, nodeName: s.name, label: s.name, columns: s.columns }, columns: s.columns }))
+            : (selectedNode ? [{ id: selectedNode.id, name: selectedNode.data?.name, data: selectedNode.data }] : [])}
           nodeColumnSelections={nodeColumnSelections}
           onColumnChange={(nodeId, column) => { if (isLocked) return; setNodeColumnSelections([{ nodeId, column }]); setTimeColumn(column); }}
           nodeColors={{}}
@@ -512,6 +515,7 @@ const handleClearResults = async () => {
           showColorPicker={false}
           disabled={!!isLocked}
           locked={!!isLocked}
+          originalCount={selectedNodes?.length || (selectedNode ? 1 : 0)}
           columnLabelFn={() => 'Time Column *'}
           renderNodeMeta={() => (
             <div className="pt-1">

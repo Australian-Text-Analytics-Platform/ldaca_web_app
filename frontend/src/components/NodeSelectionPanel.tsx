@@ -24,6 +24,7 @@ interface NodeSelectionPanelProps {
   getNodeShapeFn?: (nodeId: string) => Promise<{ shape: [number, number]; is_lazy: boolean; calculated: boolean } | null>;
   disabled?: boolean; // disables interactions but keeps UI fully visible
   locked?: boolean;   // shows a small lock icon in the header when true
+  originalCount?: number; // total selection count prior to slicing for display
 }
 
 /** Shared node + text-column + color selection panel reused across analysis tabs */
@@ -45,6 +46,7 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
   getNodeShapeFn,
   disabled = false,
   locked = false,
+  originalCount,
 }) => {
   const getColorForNodeId = (nodeId: string, idx: number) => {
     if (nodeColors[nodeId]) return nodeColors[nodeId];
@@ -95,14 +97,15 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
       {showHeaderLabel && (
         <div className="flex items-center justify-between mb-2">
           <label className="block text-sm font-medium text-gray-700">
-            Selected Nodes ({selectedNodes.length}/{maxCompare})
+            Selected Nodes ({(originalCount ?? selectedNodes.length)}/{maxCompare})
           </label>
-          {/* Locked indicator removed here; show lock at tab panel level instead */}
         </div>
       )}
       {selectedNodes.length === 0 ? (
         <div className="text-sm text-gray-500 italic bg-gray-50 p-3 rounded-md">
-          No nodes selected. Single click on nodes in the workspace view to select them (max {maxCompare} for comparison).
+          { (originalCount && originalCount > 0)
+            ? `Over-selected (${originalCount}) but none usable. Reduce to max ${maxCompare}.`
+            : `No nodes selected. Single click on nodes in the workspace view to select them (max ${maxCompare} for comparison).` }
         </div>
       ) : (
         <div className={`flex space-x-3 pb-2 ${selectedNodes.length > maxCompare ? 'overflow-x-auto' : 'overflow-x-hidden'}`}>
@@ -160,8 +163,8 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
           })}
         </div>
       )}
-      {selectedNodes.length > maxCompare && (
-        <div className="text-sm text-orange-600 mt-2">⚠️ Only the first {maxCompare} selected nodes will be used for comparison.</div>
+      {(originalCount ?? selectedNodes.length) > maxCompare && (
+        <div className="text-sm text-orange-600 mt-2">⚠️ Maximum {maxCompare} node allowed here. Currently {(originalCount ?? selectedNodes.length)} selected in workspace; only the first {maxCompare} is used.</div>
       )}
     </div>
   );
