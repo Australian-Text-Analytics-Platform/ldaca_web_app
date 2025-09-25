@@ -266,33 +266,16 @@ class KeywordExtractionRequest(BaseModel):
     by_document: bool = False
 
 
-class ConcordanceRequest(BaseModel):
-    column: str
-    search_word: str
-    num_left_tokens: int = 10
-    num_right_tokens: int = 10
-    regex: bool = False
-    case_sensitive: bool = False
-    # Pagination parameters
-    page: int = 1
-    page_size: int = 50
-    # Sorting parameters
-    sort_by: Optional[str] = None  # column name to sort by
-    sort_order: str = "asc"  # "asc" or "desc"
-
-
-class MultiNodeConcordanceRequest(BaseModel):
-    node_ids: List[str]  # Support up to 2 nodes
+class ConcordanceAnalysisRequest(BaseModel):
+    node_ids: List[str]  # Support up to 2 nodes (1 = single node mode)
     node_columns: Dict[str, str]  # node_id -> column_name mapping
     search_word: str
     num_left_tokens: int = 10
     num_right_tokens: int = 10
     regex: bool = False
     case_sensitive: bool = False
-    combined: bool = (
-        False  # if true, backend will also build a combined view across nodes
-    )
-    # Pagination parameters
+    combined: bool = False  # if true, backend builds a combined view across nodes
+    # Pagination parameters (apply to all requested nodes unless a subset call is made)
     page: int = 1
     page_size: int = 50
     # Sorting parameters
@@ -660,8 +643,8 @@ class ConcordanceMetadata(BaseModel):
     all_columns: List[str]  # All available columns
 
 
-class ConcordanceResponse(BaseModel):
-    """Response for single node concordance with complete data and metadata info"""
+class ConcordanceNodeResult(BaseModel):
+    """Per-node concordance payload returned to the frontend."""
 
     data: List[Dict[str, Any]]
     columns: List[str]
@@ -671,9 +654,12 @@ class ConcordanceResponse(BaseModel):
     sorting: Dict[str, Any]
 
 
-class MultiNodeConcordanceResponse(BaseModel):
-    """Response for multi-node concordance with complete data and metadata info"""
+class ConcordanceAnalysisResponse(BaseModel):
+    """Unified concordance response for single or multi-node requests."""
 
-    results: Dict[str, Dict[str, Any]]  # node_name -> concordance response
-    combined: Optional[Dict[str, Any]] = None
-    metadata: Dict[str, ConcordanceMetadata]  # node_name -> metadata
+    state: str  # 'successful', 'failed', 'running', 'cancelled'
+    message: str
+    data: Dict[
+        str, Dict[str, Any]
+    ]  # node label -> ConcordanceNodeResult | combined summary
+    analysis_params: Optional[Dict[str, Any]] = None

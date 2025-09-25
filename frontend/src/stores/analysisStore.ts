@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { devtools } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
 
-import type { MultiNodeConcordanceResponse } from '../api/text'
+import type { ConcordanceAnalysisResponse } from '../api/text'
 import type { TokenFrequencyResponse } from '../api/text'
 
 interface LockedNodeSnapshot {
@@ -17,7 +17,7 @@ interface ConcordanceLockState {
   lockedNodeIds: string[]
   lockedNodeColumns: Record<string, string>
   viewMode: 'separated' | 'combined'
-  results: MultiNodeConcordanceResponse | null
+  results: ConcordanceAnalysisResponse | null
   lockedNodesSnapshot: LockedNodeSnapshot[]
   lockedParams: {
     searchWord: string;

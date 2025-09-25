@@ -3,7 +3,7 @@ import NodeSelectionPanel from '../NodeSelectionPanel';
 import SegmentedControl from '../ui/SegmentedControl';
 import { useWorkspace } from '../../hooks/useWorkspace';
 import { useAuth } from '../../hooks/useAuth';
-import { MultiNodeConcordanceRequest, MultiNodeConcordanceResponse, textApi } from '../../api/text';
+import { ConcordanceAnalysisRequest, ConcordanceAnalysisResponse, ConcordanceResultEntry, textApi } from '../../api/text';
 import { nodesApi } from '../../api/nodes';
 import { workspacesApi } from '../../api/workspaces';
 import useAutoNodeColumns from '../../hooks/useAutoNodeColumns';
@@ -46,7 +46,33 @@ const ConcordanceTab: React.FC = () => {
   const [caseSensitive, setCaseSensitive] = useState(false);
   const [showMetadata, setShowMetadata] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
-  const [results, setResults] = useState<MultiNodeConcordanceResponse | null>(null);
+  const [results, setResults] = useState<ConcordanceAnalysisResponse | null>(null);
+
+  const mergeConcordanceResults = useCallback((incoming: ConcordanceAnalysisResponse | null) => {
+    if (!incoming) return;
+    setResults(prev => {
+      if (!prev || !prev.data) {
+        return incoming;
+      }
+      if (!incoming.data) {
+        return prev;
+      }
+      const mergedData = { ...prev.data };
+      Object.entries(incoming.data).forEach(([key, value]) => {
+        mergedData[key] = value;
+      });
+      const mergedParams = incoming.analysis_params
+        ? { ...(prev.analysis_params || {}), ...incoming.analysis_params }
+        : prev.analysis_params;
+      return {
+        state: incoming.state ?? prev.state,
+        message: incoming.message ?? prev.message,
+        data: mergedData,
+        analysis_params: mergedParams,
+        combinable: incoming.combinable ?? prev.combinable,
+      };
+    });
+  }, []);
   // Color management & view mode
   const [nodeColors, setNodeColors] = useState<Record<string,string>>({});
   const defaultPalette = useMemo(() => [
@@ -118,6 +144,12 @@ const ConcordanceTab: React.FC = () => {
       }
     }
   }, [results]);
+
+  useEffect(() => {
+    if (viewMode === 'combined' && results && results.combinable === false) {
+      setViewMode('separated');
+    }
+  }, [viewMode, results]);
 
   // Preserve results across transient graph refetches: only clear when the actual set of selected IDs changes
   const selectedNodeIds = useMemo(() => selectedNodes.map(node => node.id).sort(), [selectedNodes]);
@@ -237,9 +269,10 @@ const ConcordanceTab: React.FC = () => {
     targetNodeId?: string,
     forceMode?: 'separated'|'combined',
     overrideSortBy?: string,
-    overrideSortOrder?: 'asc'|'desc'
+    overrideSortOrder?: 'asc'|'desc',
+    allowWhenLocked: boolean = false
   ) => {
-    if (isLocked) return;
+    if (isLocked && !allowWhenLocked) return;
     if (!currentWorkspaceId || selectedNodes.length === 0) {
       return;
     }
@@ -274,6 +307,15 @@ const ConcordanceTab: React.FC = () => {
     });
     setNodePagination(updatedPagination);
 
+    const shouldForceSeparated = resetPage && !allowWhenLocked && !forceMode;
+    const effectiveMode = shouldForceSeparated ? 'separated' : (forceMode || viewMode);
+    if (shouldForceSeparated && viewMode !== 'separated') {
+      setViewMode('separated');
+    }
+    if (shouldForceSeparated && combinedPage !== 1) {
+      setCombinedPage(1);
+    }
+
     setIsSearching(true);
     try {
       // Create node_columns mapping
@@ -285,27 +327,28 @@ const ConcordanceTab: React.FC = () => {
       // Use the first node's pagination settings for the API call
       // Note: This is a limitation of the current backend API that we'll work around
       const firstNodeId = selectedNodes[0].id;
-  const firstNodePagination = updatedPagination[firstNodeId];
-
-      const effectiveMode = forceMode || viewMode;
-      const request: MultiNodeConcordanceRequest = {
-        node_ids: selectedNodes.slice(0, 2).map(node => node.id), // Limit to 2 nodes
+      const firstNodePagination = updatedPagination[firstNodeId];
+      const request: ConcordanceAnalysisRequest = {
+        node_ids: selectedNodes.slice(0, 2).map(node => node.id),
         node_columns: nodeColumns,
         search_word: searchWord.trim(),
         num_left_tokens: numLeftTokens,
         num_right_tokens: numRightTokens,
-        regex: regex,
+        regex,
         case_sensitive: caseSensitive,
         page: effectiveMode === 'combined' ? combinedPage : firstNodePagination.currentPage,
         page_size: effectiveMode === 'combined' ? combinedPageSize : firstNodePagination.pageSize,
-  sort_by: (overrideSortBy ?? firstNodePagination.sortBy) || undefined,
-  sort_order: overrideSortOrder ?? firstNodePagination.sortOrder
+        sort_by: (overrideSortBy ?? firstNodePagination.sortBy) || undefined,
+        sort_order: overrideSortOrder ?? firstNodePagination.sortOrder,
+        combined: effectiveMode === 'combined',
       };
-      if (effectiveMode === 'combined') request.combined = true;
+      const response = await textApi.concordance(currentWorkspaceId, request, getAuthHeaders());
 
-  const response = await textApi.multiNodeConcordance(currentWorkspaceId, request, getAuthHeaders());
+      if (effectiveMode === 'combined' && !response?.combinable) {
+        setViewMode('separated');
+      }
 
-  if (localStorage.getItem('debugConc') === '1') console.log('Multi-Node Concordance Response:', response);
+    if (localStorage.getItem('debugConc') === '1') console.log('Multi-Node Concordance Response:', response);
       setResults(response);
       setLastCompareNodeIds(selectedNodes.slice(0, 2).map(n => n.id));
       // Lock UI and snapshot nodes
@@ -335,7 +378,7 @@ const ConcordanceTab: React.FC = () => {
     } finally {
       setIsSearching(false);
     }
-  }, [currentWorkspaceId, selectedNodes, searchWord, nodeColumnSelections, nodePagination, globalPageSize, numLeftTokens, numRightTokens, regex, caseSensitive, showMetadata, getAuthHeaders, viewMode, combinedPage, combinedPageSize]);
+  }, [currentWorkspaceId, selectedNodes, searchWord, nodeColumnSelections, nodePagination, globalPageSize, numLeftTokens, numRightTokens, regex, caseSensitive, showMetadata, getAuthHeaders, viewMode, combinedPage, combinedPageSize, isLocked]);
 
   // Hydrate from backend current-request/result once per mount
   const hydratedOnceRef = useRef<boolean>(false);
@@ -346,7 +389,7 @@ const ConcordanceTab: React.FC = () => {
       if (!currentWorkspaceId) return;
       try {
         // First check current-request; if null, don't request current-result
-        const reqResp = await textApi.getMultiNodeConcordanceCurrentRequest(currentWorkspaceId, getAuthHeaders());
+  const reqResp = await textApi.getConcordanceCurrentRequest(currentWorkspaceId, getAuthHeaders());
         if (!reqResp) {
           // No current request - fresh state
           return;
@@ -364,7 +407,8 @@ const ConcordanceTab: React.FC = () => {
           setNumRightTokens(Number(req.num_right_tokens ?? 10));
           setRegex(!!req.regex);
           setCaseSensitive(!!req.case_sensitive);
-          setViewMode(req.combined ? 'combined' : 'separated');
+          const hydratedMode: 'separated' | 'combined' = req.combined && req.combinable !== false ? 'combined' : 'separated';
+          setViewMode(hydratedMode);
           setLastCompareNodeIds(nodeIds);
           
           // Build snapshot and lock
@@ -388,7 +432,7 @@ const ConcordanceTab: React.FC = () => {
   // If no request data, don't attempt to fetch current-result
   if (!req) return;
   // Now get current-result
-  const resResp = await textApi.getMultiNodeConcordanceCurrentResult(currentWorkspaceId, getAuthHeaders());
+  const resResp = await textApi.getConcordanceCurrentResult(currentWorkspaceId, getAuthHeaders());
         if (!resResp) {
           // No result yet
           return;
@@ -405,7 +449,7 @@ const ConcordanceTab: React.FC = () => {
   const handleClearResults = async () => {
     try {
       if (currentWorkspaceId) {
-        await textApi.clearMultiNodeConcordance(currentWorkspaceId, getAuthHeaders());
+  await textApi.clearConcordance(currentWorkspaceId, getAuthHeaders());
       }
     } catch (e) {
       console.error('Failed to clear backend analyses/cache:', e);
@@ -423,8 +467,8 @@ const ConcordanceTab: React.FC = () => {
       // Request combined page via current-result POST
       void (async () => {
         if (!currentWorkspaceId) return;
-        const resp: any = await textApi.postMultiNodeConcordanceCurrentResult(currentWorkspaceId, { combined: true, page: combinedPage, page_size: combinedPageSize }, getAuthHeaders());
-        if (resp?.data) setResults(resp);
+        const resp: any = await textApi.postConcordanceCurrentResult(currentWorkspaceId, { combined: true, page: combinedPage, page_size: combinedPageSize }, getAuthHeaders());
+        if (resp?.data) mergeConcordanceResults(resp as ConcordanceAnalysisResponse);
       })();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -445,10 +489,10 @@ const ConcordanceTab: React.FC = () => {
       // Trigger backend resort using current-result POST
       const pageSize = currentNodePagination.pageSize;
       void (async () => {
-        if (!currentWorkspaceId) return;
-        const overrides = { node_id: nodeId, sort_by: columnName, sort_order: newSortOrder, page: 1, page_size: pageSize } as any;
-        const resp: any = await textApi.postMultiNodeConcordanceCurrentResult(currentWorkspaceId, overrides, getAuthHeaders());
-        if (resp?.data) setResults(resp);
+    if (!currentWorkspaceId) return;
+    const overrides = { node_id: nodeId, sort_by: columnName, sort_order: newSortOrder, page: 1, page_size: pageSize } as any;
+    const resp: any = await textApi.postConcordanceCurrentResult(currentWorkspaceId, overrides, getAuthHeaders());
+    if (resp?.data) mergeConcordanceResults(resp as ConcordanceAnalysisResponse);
       })();
 
       return {
@@ -482,8 +526,8 @@ const ConcordanceTab: React.FC = () => {
           sort_by: currentNodePagination.sortBy || undefined,
           sort_order: currentNodePagination.sortOrder,
         } as any;
-        const resp: any = await textApi.postMultiNodeConcordanceCurrentResult(currentWorkspaceId, overrides, getAuthHeaders());
-        if (resp?.data) setResults(resp);
+        const resp: any = await textApi.postConcordanceCurrentResult(currentWorkspaceId, overrides, getAuthHeaders());
+        if (resp?.data) mergeConcordanceResults(resp as ConcordanceAnalysisResponse);
       })();
 
       return {
@@ -523,88 +567,100 @@ const ConcordanceTab: React.FC = () => {
     setNodeLoading(prev => ({ ...prev, [nodeId]: true }));
     
     try {
-      // Use the single-node concordance API
-      const request: any = {
-        column: selection.column,
+      const unifiedRequest: ConcordanceAnalysisRequest = {
+        node_ids: [nodeId],
+        node_columns: { [nodeId]: selection.column },
         search_word: searchWord.trim(),
         num_left_tokens: numLeftTokens,
         num_right_tokens: numRightTokens,
-        regex: regex,
+        regex,
         case_sensitive: caseSensitive,
         page: currentPage,
         page_size: nodeState.pageSize,
-  sort_by: (overrideSortBy ?? nodeState.sortBy) || undefined,
-  sort_order: overrideSortOrder ?? nodeState.sortOrder
+        sort_by: (overrideSortBy ?? nodeState.sortBy) || undefined,
+        sort_order: overrideSortOrder ?? nodeState.sortOrder,
+        combined: false,
       };
 
-      // Import the single-node concordance search function
-  const response = await textApi.concordance(currentWorkspaceId, nodeId, request, getAuthHeaders());
+      const response = await textApi.concordance(currentWorkspaceId, unifiedRequest, getAuthHeaders());
 
-  if (localStorage.getItem('debugConc') === '1') console.log('Single Node Concordance Response:', response);
+      if (localStorage.getItem('debugConc') === '1') console.log('Single Node Concordance Response:', response);
 
-      // Update results with this node's new data
-      if (results && results.data) {
-        // Find the existing key for this node in the results data
-        // This ensures we update the same entry that was created by the initial multi-node search
-        let existingKey: string | null = null;
-        
-        // Try to find the key by checking if any existing key corresponds to this nodeId
+      const responseEntries = Object.entries(response.data || {});
+      const [responseKey, responsePayload] = responseEntries[0] || [undefined, undefined];
+
+      // Determine which key should be updated in the existing results
+      let existingKey: string | null = null;
+      if (results?.data) {
         for (const [key] of Object.entries(results.data)) {
-          // Try multiple matching strategies
-          if (key === nodeId || 
-              key === (node.data?.name || nodeId) ||
-              key === node.data?.name ||
-              key === node.name) {
+          if (
+            key === nodeId ||
+            key === (node.data?.name || nodeId) ||
+            key === node.data?.name ||
+            key === node.name
+          ) {
             existingKey = key;
             break;
           }
         }
-        
-        // If we still haven't found a match, use the first available key
-        // This handles cases where backend returns different naming than expected
         if (!existingKey && Object.keys(results.data).length > 0) {
           const nodeIndex = selectedNodes.findIndex(n => n.id === nodeId);
           const availableKeys = Object.keys(results.data);
           if (nodeIndex >= 0 && nodeIndex < availableKeys.length) {
             existingKey = availableKeys[nodeIndex];
           } else {
-            existingKey = availableKeys[0]; // fallback to first key
+            existingKey = availableKeys[0];
           }
         }
-        
-  if (localStorage.getItem('debugConc') === '1') console.log('Updating existing key:', existingKey, 'for nodeId:', nodeId);
-        
-        if (existingKey) {
-          const updatedResults = {
-            ...results,
-            data: {
-              ...results.data,
-              [existingKey]: {
-                data: response.data || [],
-                columns: response.columns || [],
-                metadata: response.metadata || {
-                  concordance_columns: [],
-                  metadata_columns: [],
-                  all_columns: response.columns || [],
-                },
-                total_matches: response.total_matches || 0,
-                pagination: response.pagination || {
-                  page: currentPage,
-                  page_size: nodeState.pageSize,
-                  total_pages: 1,
-                  has_next: false,
-                  has_prev: false,
-                },
-                sorting: response.sorting || {
-                  sort_by: nodeState.sortBy,
-                  sort_order: nodeState.sortOrder,
-                },
-              }
-            }
-          };
-          setResults(updatedResults);
-        }
       }
+
+      if (localStorage.getItem('debugConc') === '1') console.log('Updating existing key:', existingKey, 'for nodeId:', nodeId);
+
+      const fallbackExisting = existingKey && results?.data ? results.data[existingKey] : undefined;
+
+      const normalizedPayload: ConcordanceResultEntry = {
+        data: responsePayload?.data ?? [],
+        columns: responsePayload?.columns ?? fallbackExisting?.columns ?? [],
+        metadata:
+          responsePayload?.metadata ??
+          fallbackExisting?.metadata ?? {
+            concordance_columns: [],
+            metadata_columns: [],
+            all_columns:
+              responsePayload?.columns ??
+              fallbackExisting?.metadata?.all_columns ??
+              fallbackExisting?.columns ?? [],
+          },
+        total_matches: responsePayload?.total_matches ?? fallbackExisting?.total_matches ?? 0,
+        pagination:
+          responsePayload?.pagination ??
+          fallbackExisting?.pagination ?? {
+            page: currentPage,
+            page_size: nodeState.pageSize,
+            total_pages: 1,
+            has_next: false,
+            has_prev: false,
+          },
+        sorting:
+          responsePayload?.sorting ??
+          fallbackExisting?.sorting ?? {
+            sort_by: nodeState.sortBy,
+            sort_order: nodeState.sortOrder,
+          },
+      };
+
+      const targetKey = existingKey || responseKey || nodeId;
+      const patchedResponse: ConcordanceAnalysisResponse = {
+        state: response.state,
+        message: response.message,
+        data: {
+          [targetKey]: normalizedPayload,
+        },
+        analysis_params: response.analysis_params ?? results?.analysis_params,
+        combinable: response.combinable ?? results?.combinable,
+      };
+
+      mergeConcordanceResults(patchedResponse);
     } catch (error) {
       console.error('Error performing single node concordance search:', error);
     } finally {
@@ -702,8 +758,8 @@ const ConcordanceTab: React.FC = () => {
         // Backend combined sorting via current-result POST
         void (async () => {
           if (!currentWorkspaceId) return;
-          const resp: any = await textApi.postMultiNodeConcordanceCurrentResult(currentWorkspaceId, { combined: true, sort_by: col, sort_order: nextOrder, page: 1, page_size: combinedPageSize }, getAuthHeaders());
-          if (resp?.data) setResults(resp);
+          const resp: any = await textApi.postConcordanceCurrentResult(currentWorkspaceId, { combined: true, sort_by: col, sort_order: nextOrder, page: 1, page_size: combinedPageSize }, getAuthHeaders());
+          if (resp?.data) mergeConcordanceResults(resp as ConcordanceAnalysisResponse);
         })();
       };
       // Derive display columns: core first, then metadata (columns minus core and internal)
@@ -1182,18 +1238,12 @@ const ConcordanceTab: React.FC = () => {
                 <h3 className="text-lg font-semibold text-gray-800">Search Results</h3>
                 <SegmentedControl
                   options={(() => {
-                    const base = [{ value: 'separated', label: 'Separated' }];
-                    // Gate combined option when showMetadata is on and schemas differ
-                    let canCombined = true;
-                    if (showMetadata && results && results.data) {
-                      const keys = Object.keys(results.data).filter(k => k !== '__COMBINED__');
-                      if (keys.length >= 2) {
-                        const colsA = (results.data as any)[keys[0]]?.columns || [];
-                        const colsB = (results.data as any)[keys[1]]?.columns || [];
-                        canCombined = JSON.stringify(colsA) === JSON.stringify(colsB);
-                      }
+                    const base: Array<{ value: 'separated' | 'combined'; label: string }> = [
+                      { value: 'separated', label: 'Separated' },
+                    ];
+                    if (results?.combinable) {
+                      base.push({ value: 'combined', label: 'Combined' });
                     }
-                    if (canCombined) base.push({ value: 'combined', label: 'Combined' } as const);
                     return base;
                   })()}
                   value={viewMode}
@@ -1210,7 +1260,7 @@ const ConcordanceTab: React.FC = () => {
                         const h = anchorEl.getBoundingClientRect().height;
                         anchorEl.style.minHeight = h + 'px';
                       }
-                      Promise.resolve(handleSearch(true, undefined, mode)).finally(() => {
+                      Promise.resolve(handleSearch(true, undefined, mode, undefined, undefined, mode === 'combined')).finally(() => {
                         // After results update and paint, compensate scroll so anchor stays put
                         requestAnimationFrame(() => {
                           requestAnimationFrame(() => {

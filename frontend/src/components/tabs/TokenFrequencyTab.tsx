@@ -402,8 +402,10 @@ const TokenFrequencyTab: React.FC = () => {
             num_right_tokens: 10,
             regex: false,
             case_sensitive: false,
-          } as any;
-          await textApi.multiNodeConcordance(currentWorkspaceId, request, getAuthHeaders());
+            page: 1,
+            page_size: 20,
+          };
+          await textApi.concordance(currentWorkspaceId, request, getAuthHeaders());
         }
       }
     } catch (e) {

@@ -6,7 +6,7 @@ import { NodeSchemaResponse } from '../types';
 // New modular API imports
 import { workspacesApi } from '../api/workspaces';
 import { nodesApi, FilterRequest } from '../api/nodes';
-import { textApi, ConcordanceRequest, ConcordanceDetachRequest, QuotationRequest, QuotationDetachRequest } from '../api/text';
+import { textApi, ConcordanceRequest, ConcordanceDetachRequest, QuotationRequest, QuotationDetachRequest, ConcordanceAnalysisRequest } from '../api/text';
 import { queryKeys } from '../lib/queryKeys';
 
 /**
@@ -442,7 +442,21 @@ export const useWorkspace = () => {
       nodeId: string;
       request: ConcordanceRequest;
     }) => {
-  return textApi.concordance(workspaceId, nodeId, request as any, authHeaders);
+      const unifiedRequest: ConcordanceAnalysisRequest = {
+        node_ids: [nodeId],
+        node_columns: { [nodeId]: request.column },
+        search_word: request.search_word,
+        num_left_tokens: request.num_left_tokens,
+        num_right_tokens: request.num_right_tokens,
+        regex: request.regex,
+        case_sensitive: request.case_sensitive,
+        page: request.page,
+        page_size: request.page_size,
+        sort_by: request.sort_by ?? undefined,
+        sort_order: request.sort_order ?? 'asc',
+        combined: false,
+      };
+      return textApi.concordance(workspaceId, unifiedRequest, authHeaders);
     },
     onMutate: () => {
       startOperation('concordance');

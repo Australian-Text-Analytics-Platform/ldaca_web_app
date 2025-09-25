@@ -1,11 +1,11 @@
 """Concordance analysis endpoints extracted from legacy monolithic base.py.
 
 Includes:
-  - POST /workspaces/{workspace_id}/nodes/{node_id}/concordance
-  - GET  /workspaces/{workspace_id}/concordance/multi-node/current-request
-  - GET  /workspaces/{workspace_id}/concordance/multi-node/current-result
-  - POST /workspaces/{workspace_id}/concordance/multi-node/current-result
-  - POST /workspaces/{workspace_id}/concordance/multi-node
+    - POST /workspaces/{workspace_id}/concordance
+    - GET  /workspaces/{workspace_id}/concordance/current-request
+    - GET  /workspaces/{workspace_id}/concordance/current-result
+    - POST /workspaces/{workspace_id}/concordance/current-result
+        - POST /workspaces/{workspace_id}/concordance/clear
   - POST /workspaces/{workspace_id}/concordance/cache/clear
   - POST /workspaces/{workspace_id}/concordance/multi-node/clear
   - GET  /workspaces/{workspace_id}/nodes/{node_id}/concordance/{document_idx}
@@ -19,7 +19,7 @@ frontend/test regressions.
 
 import logging
 import time
-from typing import Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import polars as pl
 from fastapi import APIRouter, Depends, HTTPException
@@ -28,10 +28,9 @@ from pydantic import BaseModel
 from ....core.auth import get_current_user
 from ....core.workspace import workspace_manager
 from ....models import (
+    ConcordanceAnalysisRequest,
     ConcordanceDetachRequest,
     ConcordanceMetadata,
-    ConcordanceRequest,
-    MultiNodeConcordanceRequest,
 )
 
 logger = logging.getLogger(__name__)
@@ -84,36 +83,79 @@ def _store_concordance_df(key, df):  # pragma: no cover
 
 
 # ---------------------------------------------------------------------------
-# Single-node concordance endpoint (base.py lines ~2257-2588)
+# Unified concordance helpers and endpoints
 # ---------------------------------------------------------------------------
-@router.post("/{workspace_id}/nodes/{node_id}/concordance")
-async def get_concordance(
-    workspace_id: str,
-    node_id: str,
-    request: ConcordanceRequest,
-    current_user: dict = Depends(get_current_user),
-):
-    user_id = current_user["id"]
-    try:
-        node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
-        if not node:
-            raise HTTPException(status_code=404, detail="Node not found")
+CORE_CONCORDANCE_COLUMNS = {
+    "document_idx",
+    "left_context",
+    "matched_text",
+    "right_context",
+    "start_idx",
+    "end_idx",
+    "l1",
+    "r1",
+    "l1_freq",
+    "r1_freq",
+}
 
-        if hasattr(node.data, "columns"):
-            available_columns = node.data.columns
-        elif hasattr(node.data, "schema"):
-            available_columns = list(node.data.schema.keys())
-        else:
-            available_columns = []
-        if available_columns and request.column not in available_columns:
+
+def _normalize_sort_order(sort_order: Optional[str]) -> str:
+    if isinstance(sort_order, str) and sort_order.lower() == "desc":
+        return "desc"
+    return "asc"
+
+
+def _materialize_base_dataframe(node_data) -> pl.DataFrame:
+    if hasattr(node_data, "to_lazyframe"):
+        base_df = node_data.to_lazyframe().collect()
+    elif hasattr(node_data, "_df"):
+        base_df = node_data._df  # type: ignore[attr-defined]
+    elif hasattr(node_data, "collect"):
+        base_df = node_data.collect()
+    else:
+        base_df = node_data
+    if isinstance(base_df, pl.LazyFrame):
+        base_df = base_df.collect()
+    if not isinstance(base_df, pl.DataFrame):
+        try:
+            base_df = pl.DataFrame(base_df)
+        except Exception as exc:
             raise HTTPException(
-                status_code=400,
-                detail=f"Column '{request.column}' not found. Available columns: {available_columns}",
+                status_code=500,
+                detail=f"Unable to materialize node data into DataFrame: {exc}",
             )
+    return base_df
 
-        if hasattr(node.data, "text"):
+
+def _process_node_concordance(
+    user_id: str,
+    workspace_id: str,
+    node,
+    node_id: str,
+    column: str,
+    request: ConcordanceAnalysisRequest,
+    page: int,
+    page_size: int,
+    sort_order: str,
+):
+    node_name = node.name if getattr(node, "name", None) else node_id
+    result: Dict[str, Any]
+    if hasattr(node.data, "text"):
+        cache_key = _concordance_cache_key(
+            user_id,
+            workspace_id,
+            node_id,
+            column,
+            request.search_word,
+            request.num_left_tokens,
+            request.num_right_tokens,
+            request.regex,
+            request.case_sensitive,
+        )
+        concordance_result = _get_cached_concordance_df(cache_key)
+        if concordance_result is None:
             concordance_result = node.data.text.concordance(
-                column=request.column,
+                column=column,
                 search_word=request.search_word,
                 num_left_tokens=request.num_left_tokens,
                 num_right_tokens=request.num_right_tokens,
@@ -122,42 +164,20 @@ async def get_concordance(
                 explode=True,
                 unnest=True,
             )
+            _store_concordance_df(cache_key, concordance_result)
 
-            core_names = {
-                "document_idx",
-                "left_context",
-                "matched_text",
-                "right_context",
-                "start_idx",
-                "end_idx",
-                "l1",
-                "r1",
-                "l1_freq",
-                "r1_freq",
-            }
-            core_concordance_columns = [
-                c for c in concordance_result.columns if c in core_names
-            ]
-            cdf = concordance_result
+        working_df = concordance_result
+        core_columns = [c for c in working_df.columns if c in CORE_CONCORDANCE_COLUMNS]
+        try:
+            cdf = working_df
             if "document_idx" not in cdf.columns:
                 cdf = cdf.with_row_index("document_idx")
-
             has_metadata = any(
-                (col not in core_concordance_columns) and (col != "document_idx")
+                (col not in core_columns) and (col != "document_idx")
                 for col in cdf.columns
             )
             if not has_metadata:
-                base = node.data
-                if hasattr(base, "to_lazyframe"):
-                    base_df = base.to_lazyframe().collect()
-                elif hasattr(base, "_df"):
-                    base_df = base._df  # type: ignore[attr-defined]
-                elif hasattr(base, "collect"):
-                    base_df = base.collect()
-                else:
-                    base_df = base
-                if isinstance(base_df, pl.LazyFrame):
-                    base_df = base_df.collect()
+                base_df = _materialize_base_dataframe(node.data)
                 orig = base_df.with_row_index("document_idx")
                 try:
                     idx_dtype = cdf.schema.get("document_idx")
@@ -166,199 +186,563 @@ async def get_concordance(
                 except Exception:
                     pass
                 cdf = cdf.join(orig, on="document_idx", how="left")
-
-            concordance_result = cdf
-            all_columns = list(concordance_result.columns)
-            metadata_columns = [
-                col for col in all_columns if col not in core_concordance_columns
-            ]
-            concordance_result = concordance_result.filter(
-                pl.col("matched_text").is_not_null()
+            working_df = cdf
+        except Exception as je:
+            logger.warning(
+                "Failed to finalize concordance frame for node %s: %s", node_id, je
             )
-            if request.sort_by and request.sort_by in concordance_result.columns:
-                concordance_result = concordance_result.sort(
-                    pl.col(request.sort_by),
-                    descending=request.sort_order.lower() == "desc",
-                )
-            total_matches = len(concordance_result)
-            start_idx = (request.page - 1) * request.page_size
-            end_idx = start_idx + request.page_size
-            paginated_result = concordance_result.slice(start_idx, request.page_size)
-            metadata = ConcordanceMetadata(
-                concordance_columns=core_concordance_columns,
-                metadata_columns=metadata_columns,
-                all_columns=all_columns,
+
+        working_df = working_df.filter(pl.col("matched_text").is_not_null())
+        if request.sort_by and request.sort_by in working_df.columns:
+            working_df = working_df.sort(
+                pl.col(request.sort_by),
+                descending=sort_order == "desc",
             )
-            if hasattr(paginated_result, "to_dicts"):
-                result_payload = {
-                    "data": paginated_result.to_dicts(),
-                    "columns": all_columns,
-                    "metadata": metadata.model_dump(),
-                    "total_matches": total_matches,
-                    "pagination": {
-                        "page": request.page,
-                        "page_size": request.page_size,
-                        "total_pages": (total_matches + request.page_size - 1)
-                        // request.page_size,
-                        "has_next": end_idx < total_matches,
-                        "has_prev": start_idx > 0,
-                    },
-                    "sorting": {
-                        "sort_by": request.sort_by,
-                        "sort_order": request.sort_order,
-                    },
-                }
-                try:  # pragma: no cover
-                    from ....core.analysis_store import save_analysis
-
-                    save_analysis(
-                        user_id=user_id,
-                        workspace_id=workspace_id,
-                        task="concordance",
-                        request_dict=request.model_dump()
-                        if hasattr(request, "model_dump")
-                        else request.dict(),
-                        result_dict=result_payload,
-                    )
-                except Exception as _e:  # pragma: no cover
-                    print(f"[analysis_persist] concordance save failed: {_e}")
-                return result_payload
-            else:
-                empty_metadata = ConcordanceMetadata(
-                    concordance_columns=[], metadata_columns=[], all_columns=[]
+        total_matches = len(working_df)
+        start_idx = (page - 1) * page_size
+        paginated = working_df.slice(start_idx, page_size)
+        all_columns = list(working_df.columns)
+        metadata_columns = [col for col in all_columns if col not in core_columns]
+        node_metadata = ConcordanceMetadata(
+            concordance_columns=core_columns,
+            metadata_columns=metadata_columns,
+            all_columns=all_columns,
+        )
+        metadata_dict = node_metadata.model_dump()
+        payload = {
+            "data": paginated.to_dicts(),
+            "columns": all_columns,
+            "metadata": metadata_dict,
+            "total_matches": total_matches,
+            "pagination": {
+                "page": page,
+                "page_size": page_size,
+                "total_pages": (total_matches + page_size - 1) // page_size,
+                "has_next": (start_idx + page_size) < total_matches,
+                "has_prev": page > 1,
+            },
+            "sorting": {
+                "sort_by": request.sort_by,
+                "sort_order": sort_order,
+            },
+        }
+        combined_frame = None
+        if request.combined:
+            try:
+                combined_frame = working_df.with_columns(
+                    pl.lit(node_name).alias("__source_node")
                 )
-                result_payload = {
-                    "data": [],
-                    "columns": [],
-                    "metadata": empty_metadata.model_dump(),
-                    "total_matches": 0,
-                    "pagination": {
-                        "page": 1,
-                        "page_size": request.page_size,
-                        "total_pages": 0,
-                        "has_next": False,
-                        "has_prev": False,
-                    },
-                    "sorting": {
-                        "sort_by": request.sort_by,
-                        "sort_order": request.sort_order,
-                    },
-                    "analysis_params": {
-                        "node_id": node_id,
-                        "column": request.column,
-                        "search_word": request.search_word,
-                        "num_left_tokens": request.num_left_tokens,
-                        "num_right_tokens": request.num_right_tokens,
-                        "regex": request.regex,
-                        "case_sensitive": request.case_sensitive,
-                        "page_size": request.page_size,
-                        "sort_by": request.sort_by,
-                        "sort_order": request.sort_order,
-                    },
-                }
-                try:  # pragma: no cover
-                    from ....core.analysis_store import save_analysis
+            except Exception:
+                combined_frame = None
+        result = {
+            "label": node_name,
+            "page_payload": payload,
+            "combined_frame": combined_frame,
+            "columns": all_columns,
+            "full_frame": working_df,
+            "metadata": metadata_dict,
+            "total_matches": total_matches,
+        }
+        return result
 
-                    save_analysis(
-                        user_id=user_id,
-                        workspace_id=workspace_id,
-                        task="concordance",
-                        request_dict=request.model_dump()
-                        if hasattr(request, "model_dump")
-                        else request.dict(),
-                        result_dict=result_payload,
-                    )
-                except Exception as _e:  # pragma: no cover
-                    print(f"[analysis_persist] concordance save failed: {_e}")
-                return result_payload
+    base_df = _materialize_base_dataframe(node.data)
+    filtered = base_df
+    if request.search_word:
+        search_value = (
+            request.search_word
+            if request.case_sensitive
+            else request.search_word.lower()
+        )
+        expr_column = pl.col(column)
+        helper_added = False
+        if not request.case_sensitive:
+            helper_name = "__match_column"
+            filtered = filtered.with_columns(
+                pl.col(column).cast(pl.Utf8).str.to_lowercase().alias(helper_name)
+            )
+            expr_column = pl.col(helper_name)
+            helper_added = True
+        try:
+            filtered = filtered.filter(
+                expr_column.str.contains(search_value, literal=not request.regex)
+            )
+        except Exception as fe:
+            logger.warning(
+                "Fallback concordance filtering failed for node %s: %s", node_id, fe
+            )
+        if helper_added and helper_name in filtered.columns:
+            filtered = filtered.drop(helper_name)
+    if request.sort_by and request.sort_by in filtered.columns:
+        filtered = filtered.sort(
+            pl.col(request.sort_by), descending=sort_order == "desc"
+        )
+    total_matches = len(filtered)
+    start_idx = (page - 1) * page_size
+    paginated = filtered.slice(start_idx, page_size)
+    all_columns = list(filtered.columns)
+    fallback_metadata = ConcordanceMetadata(
+        concordance_columns=[],
+        metadata_columns=all_columns,
+        all_columns=all_columns,
+    )
+    metadata_dict = fallback_metadata.model_dump()
+    payload = {
+        "data": paginated.to_dicts() if hasattr(paginated, "to_dicts") else [],
+        "columns": all_columns,
+        "metadata": metadata_dict,
+        "total_matches": total_matches,
+        "pagination": {
+            "page": page,
+            "page_size": page_size,
+            "total_pages": (total_matches + page_size - 1) // page_size,
+            "has_next": (start_idx + page_size) < total_matches,
+            "has_prev": page > 1,
+        },
+        "sorting": {
+            "sort_by": request.sort_by,
+            "sort_order": sort_order,
+        },
+    }
+    filtered_df = (
+        filtered if isinstance(filtered, pl.DataFrame) else pl.DataFrame(filtered)
+    )
+    result = {
+        "label": node_name,
+        "page_payload": payload,
+        "combined_frame": None,
+        "columns": all_columns,
+        "full_frame": filtered_df,
+        "metadata": metadata_dict,
+        "total_matches": total_matches,
+    }
+    return result
+
+
+class ConcordanceResultQuery(BaseModel):
+    node_id: Optional[str] = None
+    combined: Optional[bool] = None
+    page: Optional[int] = None
+    page_number: Optional[int] = None
+    page_size: Optional[int] = None
+    sort_by: Optional[str] = None
+    sort_order: Optional[str] = None
+
+
+def _normalize_saved_request(
+    raw_request: Optional[dict], raw_result: Optional[dict]
+) -> Optional[dict]:
+    if not raw_request:
+        return None
+    if "node_ids" in raw_request and "node_columns" in raw_request:
+        return raw_request
+    analysis_params = (raw_result or {}).get("analysis_params") or {}
+    node_id = analysis_params.get("node_id") or raw_request.get("node_id")
+    column = analysis_params.get("column") or raw_request.get("column")
+    if not node_id or not column:
+        return None
+    return {
+        "node_ids": [node_id],
+        "node_columns": {node_id: column},
+        "search_word": raw_request.get("search_word", ""),
+        "num_left_tokens": raw_request.get("num_left_tokens", 10),
+        "num_right_tokens": raw_request.get("num_right_tokens", 10),
+        "regex": bool(raw_request.get("regex", False)),
+        "case_sensitive": bool(raw_request.get("case_sensitive", False)),
+        "combined": bool(raw_request.get("combined", False)),
+        "page": raw_request.get("page", 1),
+        "page_size": raw_request.get("page_size", 50),
+        "sort_by": raw_request.get("sort_by"),
+        "sort_order": raw_request.get("sort_order", "asc"),
+    }
+
+
+def _normalize_saved_result(
+    raw_result: Optional[dict], normalized_request: dict
+) -> Optional[dict]:
+    if not raw_result:
+        return None
+    if "_stored" in raw_result:
+        sanitized = {k: v for k, v in raw_result.items() if k != "_stored"}
+        if isinstance(sanitized.get("data"), dict) and sanitized.get("state"):
+            return sanitized
+        raw_result = sanitized
+    if isinstance(raw_result.get("data"), dict) and raw_result.get("state"):
+        return raw_result
+    node_ids = normalized_request.get("node_ids") or []
+    node_id = node_ids[0] if node_ids else "node"
+    analysis_params = (
+        raw_result.get("analysis_params") if isinstance(raw_result, dict) else {}
+    )
+    node_label = (
+        analysis_params.get("node_name") or analysis_params.get("node_id") or node_id
+    )
+    columns = raw_result.get("columns") or []
+    metadata = (
+        raw_result.get("metadata")
+        or ConcordanceMetadata(
+            concordance_columns=[],
+            metadata_columns=columns,
+            all_columns=columns,
+        ).model_dump()
+    )
+    page = normalized_request.get("page", 1)
+    page_size = normalized_request.get("page_size", 50)
+    total_matches = raw_result.get("total_matches", 0)
+    pagination = raw_result.get("pagination") or {
+        "page": page,
+        "page_size": page_size,
+        "total_pages": (total_matches + page_size - 1) // page_size,
+        "has_next": (page - 1) * page_size + page_size < total_matches,
+        "has_prev": page > 1,
+    }
+    sorting = raw_result.get("sorting") or {
+        "sort_by": normalized_request.get("sort_by"),
+        "sort_order": normalized_request.get("sort_order", "asc"),
+    }
+    return {
+        "state": raw_result.get("state", "successful"),
+        "message": raw_result.get("message", "ok"),
+        "data": {
+            node_label: {
+                "data": raw_result.get("data", []),
+                "columns": columns,
+                "metadata": metadata,
+                "total_matches": total_matches,
+                "pagination": pagination,
+                "sorting": sorting,
+            }
+        },
+        "analysis_params": analysis_params or normalized_request,
+        "combinable": raw_result.get("combinable", False),
+    }
+
+
+def _paginate_stored_entry(
+    entry: Dict[str, Any],
+    page: int,
+    page_size: int,
+    sort_by: Optional[str],
+    sort_order: Optional[str],
+) -> Dict[str, Any]:
+    if not entry:
+        raise HTTPException(
+            status_code=404, detail="Stored concordance data unavailable"
+        )
+
+    normalized_page = max(1, page)
+    normalized_page_size = max(1, page_size)
+
+    columns = entry.get("columns") or []
+    metadata = entry.get("metadata")
+    if not metadata:
+        metadata = {
+            "concordance_columns": [
+                col for col in columns if col in CORE_CONCORDANCE_COLUMNS
+            ],
+            "metadata_columns": [
+                col for col in columns if col not in CORE_CONCORDANCE_COLUMNS
+            ],
+            "all_columns": columns,
+        }
+
+    data_rows = entry.get("data") or []
+    if data_rows:
+        df = pl.DataFrame(data_rows)
+    else:
+        df = pl.DataFrame({col: [] for col in columns}) if columns else pl.DataFrame([])
+
+    effective_sort_by = sort_by or entry.get("default_sort_by")
+    effective_sort_order = _normalize_sort_order(
+        sort_order or entry.get("default_sort_order")
+    )
+
+    if effective_sort_by and effective_sort_by in df.columns:
+        df = df.sort(
+            pl.col(effective_sort_by), descending=effective_sort_order == "desc"
+        )
+    else:
+        effective_sort_by = None
+
+    total_matches = entry.get("total_matches")
+    if total_matches is None:
+        total_matches = df.height
+
+    start_idx = (normalized_page - 1) * normalized_page_size
+    if start_idx >= total_matches and total_matches > 0:
+        normalized_page = max(1, (total_matches - 1) // normalized_page_size + 1)
+        start_idx = (normalized_page - 1) * normalized_page_size
+
+    paginated_df = df.slice(start_idx, normalized_page_size)
+    paginated_rows = paginated_df.to_dicts()
+
+    total_pages = (
+        (total_matches + normalized_page_size - 1) // normalized_page_size
+        if total_matches
+        else 1
+    )
+
+    return {
+        "data": paginated_rows,
+        "columns": columns,
+        "metadata": metadata,
+        "total_matches": total_matches,
+        "pagination": {
+            "page": normalized_page,
+            "page_size": normalized_page_size,
+            "total_pages": total_pages,
+            "has_next": (start_idx + normalized_page_size) < total_matches,
+            "has_prev": normalized_page > 1,
+        },
+        "sorting": {
+            "sort_by": effective_sort_by,
+            "sort_order": effective_sort_order,
+        },
+    }
+
+
+async def _execute_concordance(
+    workspace_id: str,
+    request: ConcordanceAnalysisRequest,
+    current_user: dict,
+):
+    user_id = current_user["id"]
+    if not request.node_ids:
+        raise HTTPException(
+            status_code=400, detail="At least one node ID must be provided"
+        )
+    if len(request.node_ids) > 2:
+        raise HTTPException(
+            status_code=400, detail="Maximum 2 nodes supported for comparison"
+        )
+
+    page = max(1, request.page)
+    page_size = max(1, request.page_size)
+    sort_order = _normalize_sort_order(request.sort_order)
+
+    results: Dict[str, Dict[str, Any]] = {}
+    combined_frames: List[pl.DataFrame] = []
+    per_node_columns: Dict[str, List[str]] = {}
+    stored_nodes: Dict[str, Dict[str, Any]] = {}
+    node_label_map: Dict[str, str] = {}
+
+    for node_id in request.node_ids:
+        node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
+        if not node:
+            raise HTTPException(status_code=404, detail=f"Node {node_id} not found")
+        column = request.node_columns.get(node_id)
+        if not column:
+            raise HTTPException(
+                status_code=400, detail=f"No column specified for node {node_id}"
+            )
+        if hasattr(node.data, "columns"):
+            available_columns = node.data.columns
+        elif hasattr(node.data, "schema"):
+            available_columns = list(node.data.schema.keys())
         else:
-            filtered = node.data.filter(
-                pl.col(request.column).str.contains(request.search_word)
+            available_columns = []
+        if available_columns and column not in available_columns:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Column '{column}' not found in node {node_id}. Available columns: {available_columns}",
             )
-            if request.sort_by and request.sort_by in filtered.columns:
-                if request.sort_order.lower() == "desc":
-                    filtered = filtered.sort(pl.col(request.sort_by), descending=True)
+
+        node_result = _process_node_concordance(
+            user_id,
+            workspace_id,
+            node,
+            node_id,
+            column,
+            request,
+            page,
+            page_size,
+            sort_order,
+        )
+        node_label = node_result["label"]
+        results[node_label] = node_result["page_payload"]
+        per_node_columns[node_label] = node_result["columns"]
+        if node_result["combined_frame"] is not None:
+            combined_frames.append(node_result["combined_frame"])
+        stored_nodes[node_id] = {
+            "label": node_label,
+            "columns": node_result["columns"],
+            "metadata": node_result["metadata"],
+            "total_matches": node_result["total_matches"],
+            "data": node_result["full_frame"].to_dicts()
+            if hasattr(node_result["full_frame"], "to_dicts")
+            else [],
+            "default_sort_by": request.sort_by,
+            "default_sort_order": sort_order,
+        }
+        node_label_map[node_id] = node_label
+
+    column_sets = list(per_node_columns.values())
+    combinable = False
+    if len(column_sets) >= 2:
+        first_columns = column_sets[0]
+        combinable = all(cols == first_columns for cols in column_sets[1:])
+
+    if request.combined and combinable and len(combined_frames) >= 2:
+        ordered_columns: List[str] = []
+        column_dtypes: Dict[str, pl.datatypes.DataType] = {}
+        aligned_frames: List[pl.DataFrame] = []
+        for frame in combined_frames:
+            for col, dtype in frame.schema.items():
+                if col not in ordered_columns:
+                    ordered_columns.append(col)
+                if col not in column_dtypes:
+                    column_dtypes[col] = dtype
+        for frame in combined_frames:
+            mutations = []
+            missing_literals = []
+            for col in ordered_columns:
+                target_dtype = column_dtypes.get(col)
+                if col not in frame.columns:
+                    lit_expr = pl.lit(None)
+                    if target_dtype is not None:
+                        lit_expr = lit_expr.cast(target_dtype)
+                    missing_literals.append(lit_expr.alias(col))
                 else:
-                    filtered = filtered.sort(pl.col(request.sort_by))
-            total_matches = len(filtered)
-            start_idx = (request.page - 1) * request.page_size
-            paginated_filtered = filtered.slice(start_idx, request.page_size)
-            if hasattr(paginated_filtered, "to_dicts"):
-                all_columns = list(filtered.columns)
-                fallback_metadata = ConcordanceMetadata(
-                    concordance_columns=[],
-                    metadata_columns=all_columns,
-                    all_columns=all_columns,
-                )
-                result_payload = {
-                    "data": paginated_filtered.to_dicts(),
-                    "columns": all_columns,
-                    "metadata": fallback_metadata.model_dump(),
-                    "total_matches": total_matches,
-                    "pagination": {
-                        "page": request.page,
-                        "page_size": request.page_size,
-                        "total_pages": (total_matches + request.page_size - 1)
-                        // request.page_size,
-                        "has_next": start_idx + request.page_size < total_matches,
-                        "has_prev": request.page > 1,
-                    },
-                    "sorting": {
-                        "sort_by": request.sort_by,
-                        "sort_order": request.sort_order,
-                    },
-                }
-                try:  # pragma: no cover
-                    from ....core.analysis_store import save_analysis
+                    current_dtype = frame.schema.get(col)
+                    if target_dtype is not None and current_dtype != target_dtype:
+                        mutations.append(pl.col(col).cast(target_dtype))
+            if missing_literals:
+                frame = frame.with_columns(missing_literals)
+            if mutations:
+                frame = frame.with_columns(mutations)
+            aligned_frames.append(frame.select(ordered_columns))
+        combined_df = pl.concat(aligned_frames, how="vertical")
+        effective_sort_by = None
+        if request.sort_by and request.sort_by in combined_df.columns:
+            effective_sort_by = request.sort_by
+            combined_df = combined_df.sort(
+                pl.col(request.sort_by),
+                descending=sort_order == "desc",
+            )
+        elif "document_idx" in combined_df.columns:
+            effective_sort_by = "document_idx"
+            combined_df = combined_df.sort(pl.col("document_idx"))
+        total_combined = len(combined_df)
+        start_idx = (page - 1) * page_size
+        paginated = combined_df.slice(start_idx, page_size)
+        combined_columns = list(combined_df.columns)
+        combined_metadata = {
+            "concordance_columns": [
+                col for col in combined_columns if col in CORE_CONCORDANCE_COLUMNS
+            ],
+            "metadata_columns": [
+                col for col in combined_columns if col not in CORE_CONCORDANCE_COLUMNS
+            ],
+            "all_columns": combined_columns,
+        }
+        results["__COMBINED__"] = {
+            "data": paginated.to_dicts(),
+            "columns": combined_columns,
+            "metadata": combined_metadata,
+            "total_matches": total_combined,
+            "pagination": {
+                "page": page,
+                "page_size": page_size,
+                "total_pages": (total_combined + page_size - 1) // page_size,
+                "has_next": (start_idx + page_size) < total_combined,
+                "has_prev": page > 1,
+            },
+            "sorting": {
+                "sort_by": effective_sort_by,
+                "sort_order": sort_order,
+            },
+        }
+        stored_nodes["__COMBINED__"] = {
+            "label": "__COMBINED__",
+            "columns": combined_columns,
+            "metadata": combined_metadata,
+            "total_matches": total_combined,
+            "data": combined_df.to_dicts(),
+            "default_sort_by": effective_sort_by,
+            "default_sort_order": sort_order,
+        }
 
-                    save_analysis(
-                        user_id=user_id,
-                        workspace_id=workspace_id,
-                        task="concordance",
-                        request_dict=request.model_dump()
-                        if hasattr(request, "model_dump")
-                        else request.dict(),
-                        result_dict=result_payload,
-                    )
-                except Exception as _e:  # pragma: no cover
-                    print(f"[analysis_persist] concordance save failed: {_e}")
-                return result_payload
-            else:
-                empty_metadata = ConcordanceMetadata(
-                    concordance_columns=[], metadata_columns=[], all_columns=[]
-                )
-                result_payload = {
-                    "data": [],
-                    "columns": [],
-                    "metadata": empty_metadata.model_dump(),
-                    "total_matches": 0,
-                    "pagination": {
-                        "page": 1,
-                        "page_size": request.page_size,
-                        "total_pages": 0,
-                        "has_next": False,
-                        "has_prev": False,
-                    },
-                    "sorting": {
-                        "sort_by": request.sort_by,
-                        "sort_order": request.sort_order,
-                    },
-                }
-                try:  # pragma: no cover
-                    from ....core.analysis_store import save_analysis
+    has_combined_result = "__COMBINED__" in results
+    effective_combined = request.combined and combinable and has_combined_result
 
-                    save_analysis(
-                        user_id=user_id,
-                        workspace_id=workspace_id,
-                        task="concordance",
-                        request_payload=request.model_dump()
-                        if hasattr(request, "model_dump")
-                        else request.dict(),
-                        result_payload=result_payload,
-                    )
-                except Exception as _e:  # pragma: no cover
-                    print(f"[analysis_persist] concordance save failed: {_e}")
-                return result_payload
+    message = (
+        f"Found concordance results for search term '{request.search_word}'"
+        if request.search_word
+        else "Concordance results ready"
+    )
+    if request.combined and not effective_combined:
+        message = (
+            "Combined concordance view unavailable because node schemas differ; "
+            "showing separated results instead."
+            if request.search_word
+            else "Combined concordance view unavailable due to schema mismatch."
+        )
+
+    analysis_params_dict = request.model_dump()
+    analysis_params_dict["combined"] = effective_combined
+    analysis_params_dict["combinable"] = combinable
+
+    result_payload = {
+        "state": "successful",
+        "message": message,
+        "data": results,
+        "analysis_params": analysis_params_dict,
+        "combinable": combinable,
+    }
+
+    storage_blob = {
+        "nodes": stored_nodes,
+        "node_label_map": node_label_map,
+        "label_to_node_map": {
+            label: node_id for node_id, label in node_label_map.items()
+        },
+        "default_page": {
+            "page": page,
+            "page_size": page_size,
+        },
+        "combinable": combinable,
+    }
+
+    if has_combined_result:
+        storage_blob["combined_available"] = True
+    else:
+        storage_blob["combined_available"] = False
+
+    try:  # pragma: no cover
+        from ....core.analysis_store import save_analysis
+
+        request_for_storage = request.model_dump()
+        request_for_storage["combined"] = effective_combined
+
+        persist_payload = {
+            "state": result_payload["state"],
+            "message": result_payload["message"],
+            "data": result_payload["data"],
+            "analysis_params": result_payload["analysis_params"],
+            "combinable": combinable,
+            "_stored": storage_blob,
+        }
+
+        save_analysis(
+            user_id=user_id,
+            workspace_id=workspace_id,
+            task="concordance",
+            request_dict=request_for_storage,
+            result_dict=persist_payload,
+        )
+    except Exception as _e:  # pragma: no cover
+        print(f"[analysis_persist] concordance save failed: {_e}")
+
+    return result_payload
+
+
+@router.post("/{workspace_id}/concordance")
+async def run_concordance(
+    workspace_id: str,
+    request: ConcordanceAnalysisRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    try:
+        return await _execute_concordance(workspace_id, request, current_user)
     except HTTPException:
         raise
     except Exception as e:
@@ -369,11 +753,8 @@ async def get_concordance(
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
-# ---------------------------------------------------------------------------
-# Multi-node concordance endpoints (base.py lines ~2588-3013)
-# ---------------------------------------------------------------------------
-@router.get("/{workspace_id}/concordance/multi-node/current-request")
-async def multi_node_concordance_current_request(
+@router.get("/{workspace_id}/concordance/current-request")
+async def concordance_current_request(
     workspace_id: str, current_user: dict = Depends(get_current_user)
 ):
     user_id = current_user["id"]
@@ -381,14 +762,19 @@ async def multi_node_concordance_current_request(
         from ....core.analysis_store import get_latest_analysis
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"analysis_store unavailable: {e}")
-    rec = get_latest_analysis(user_id, workspace_id, task="multi_concordance")
+    rec = get_latest_analysis(user_id, workspace_id, task="concordance")
+    if not rec:
+        rec = get_latest_analysis(user_id, workspace_id, task="multi_concordance")
     if not rec:
         return None
-    return {"state": "successful", "message": "ok", "data": rec.request}
+    normalized_request = _normalize_saved_request(rec.request, rec.result)
+    if not normalized_request:
+        return None
+    return {"state": "successful", "message": "ok", "data": normalized_request}
 
 
-@router.get("/{workspace_id}/concordance/multi-node/current-result")
-async def multi_node_concordance_current_result(
+@router.get("/{workspace_id}/concordance/current-result")
+async def concordance_current_result(
     workspace_id: str, current_user: dict = Depends(get_current_user)
 ):
     user_id = current_user["id"]
@@ -396,25 +782,24 @@ async def multi_node_concordance_current_result(
         from ....core.analysis_store import get_latest_analysis
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"analysis_store unavailable: {e}")
-    rec = get_latest_analysis(user_id, workspace_id, task="multi_concordance")
+    rec = get_latest_analysis(user_id, workspace_id, task="concordance")
+    if not rec:
+        rec = get_latest_analysis(user_id, workspace_id, task="multi_concordance")
     if not rec:
         return None
-    return {"state": "successful", "message": "ok", "data": rec.result}
+    normalized_request = _normalize_saved_request(rec.request, rec.result)
+    if not normalized_request:
+        return None
+    normalized_result = _normalize_saved_result(rec.result, normalized_request)
+    if not normalized_result:
+        return None
+    return normalized_result
 
 
-class MultiConcordanceResultQuery(BaseModel):
-    node_id: Optional[str] = None
-    combined: Optional[bool] = None
-    page: Optional[int] = None
-    page_size: Optional[int] = None
-    sort_by: Optional[str] = None
-    sort_order: Optional[str] = None
-
-
-@router.post("/{workspace_id}/concordance/multi-node/current-result")
-async def multi_node_concordance_current_result_post(
+@router.post("/{workspace_id}/concordance/current-result")
+async def concordance_current_result_post(
     workspace_id: str,
-    query: MultiConcordanceResultQuery,
+    query: ConcordanceResultQuery,
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
@@ -422,321 +807,170 @@ async def multi_node_concordance_current_result_post(
         from ....core.analysis_store import get_latest_analysis
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"analysis_store unavailable: {e}")
-    rec = get_latest_analysis(user_id, workspace_id, task="multi_concordance")
+    rec = get_latest_analysis(user_id, workspace_id, task="concordance")
+    if not rec:
+        rec = get_latest_analysis(user_id, workspace_id, task="multi_concordance")
     if not rec or not rec.request:
         return {
             "state": "failed",
-            "message": "No analysis found for multi_concordance",
+            "message": "No analysis found for concordance",
             "data": None,
         }
-    try:
-        base_req = rec.request
-        node_ids = base_req.get("node_ids") or []
-        node_columns = base_req.get("node_columns") or {}
-        if not node_ids:
-            return {
-                "state": "failed",
-                "message": "No prior request found for multi_concordance",
-                "data": None,
-            }
-        page = query.page if query.page is not None else (base_req.get("page") or 1)
-        page_size = (
+    normalized_request = _normalize_saved_request(rec.request, rec.result)
+    base_result = rec.result or {}
+    stored_blob = base_result.get("_stored") if isinstance(base_result, dict) else None
+
+    if stored_blob:
+        default_page_info = stored_blob.get("default_page", {})
+        requested_page = (
+            query.page_number
+            if query.page_number is not None
+            else query.page
+            if query.page is not None
+            else default_page_info.get("page", 1)
+        )
+        requested_page_size = (
             query.page_size
             if query.page_size is not None
-            else (base_req.get("page_size") or 20)
+            else default_page_info.get("page_size", 50)
         )
-        sort_by = (
-            query.sort_by if query.sort_by is not None else base_req.get("sort_by")
-        )
-        sort_order = (
-            query.sort_order
-            if query.sort_order is not None
-            else (base_req.get("sort_order") or "asc")
-        )
-        combined = (
-            bool(query.combined)
-            if query.combined is not None
-            else bool(base_req.get("combined") or False)
-        )
-        new_req = MultiNodeConcordanceRequest(
-            node_ids=node_ids,
-            node_columns=node_columns,
-            search_word=base_req.get("search_word", ""),
-            num_left_tokens=base_req.get("num_left_tokens", 10),
-            num_right_tokens=base_req.get("num_right_tokens", 10),
-            regex=bool(base_req.get("regex", False)),
-            case_sensitive=bool(base_req.get("case_sensitive", False)),
-            page=page,
-            page_size=page_size,
-            sort_by=sort_by,
-            sort_order=sort_order,
-            combined=combined,
-        )
+        requested_sort_by = query.sort_by
+        requested_sort_order = query.sort_order
+
+        nodes_map: Dict[str, Dict[str, Any]] = stored_blob.get("nodes", {})
+        label_to_node: Dict[str, str] = stored_blob.get("label_to_node_map", {})
+
+        response_data: Dict[str, Dict[str, Any]] = {}
+        target_nodes: List[Tuple[str, Dict[str, Any]]] = []
+
+        if query.combined or (query.node_id == "__COMBINED__"):
+            combined_entry = nodes_map.get("__COMBINED__")
+            if not combined_entry:
+                return {
+                    "state": "failed",
+                    "message": "Combined concordance view not available",
+                    "data": None,
+                }
+            target_nodes.append(("__COMBINED__", combined_entry))
+        elif query.node_id:
+            lookup_key = query.node_id
+            if lookup_key not in nodes_map and lookup_key in label_to_node:
+                lookup_key = label_to_node[lookup_key]
+            entry = nodes_map.get(lookup_key)
+            if not entry:
+                return {
+                    "state": "failed",
+                    "message": f"No stored concordance found for node {query.node_id}",
+                    "data": None,
+                }
+            label = entry.get("label") or lookup_key
+            target_nodes.append((label, entry))
+        else:
+            for node_key, entry in nodes_map.items():
+                if node_key == "__COMBINED__":
+                    continue
+                label = entry.get("label") or node_key
+                target_nodes.append((label, entry))
+
+        derived_page = requested_page
+        derived_page_size = requested_page_size
+        derived_sort_by = requested_sort_by
+        derived_sort_order = requested_sort_order
+
+        for label, entry in target_nodes:
+            payload = _paginate_stored_entry(
+                entry,
+                requested_page,
+                requested_page_size,
+                requested_sort_by,
+                requested_sort_order,
+            )
+            response_data[label] = payload
+            derived_page = payload["pagination"]["page"]
+            derived_page_size = payload["pagination"]["page_size"]
+            derived_sort_by = payload["sorting"].get("sort_by")
+            derived_sort_order = payload["sorting"].get("sort_order")
+
+        base_state = base_result.get("state", "successful")
+        base_message = base_result.get("message", "ok")
+        analysis_params = (
+            base_result.get("analysis_params") or normalized_request or {}
+        ).copy()
+        if analysis_params is None:
+            analysis_params = {}
+        analysis_params.update({
+            "page": derived_page,
+            "page_size": derived_page_size,
+            "sort_by": derived_sort_by,
+            "sort_order": derived_sort_order,
+        })
+        if query.combined or (query.node_id == "__COMBINED__"):
+            analysis_params["combined"] = True
+        if query.node_id:
+            lookup_key = query.node_id
+            if lookup_key in label_to_node:
+                lookup_key = label_to_node[lookup_key]
+            analysis_params["selected_node_id"] = lookup_key
+
+        return {
+            "state": base_state,
+            "message": base_message,
+            "data": response_data,
+            "analysis_params": analysis_params,
+            "combinable": stored_blob.get("combinable", False),
+        }
+
+    # Fallback: re-run concordance if storage unavailable
+    if not normalized_request:
+        return {
+            "state": "failed",
+            "message": "Unable to reconstruct prior concordance request",
+            "data": None,
+        }
+    request_payload = normalized_request.copy()
+    if query.node_id:
+        request_payload["node_ids"] = [query.node_id]
+        node_columns = request_payload.get("node_columns", {})
+        if query.node_id not in node_columns:
+            analysis_params = (rec.result or {}).get("analysis_params") or {}
+            column_hint = analysis_params.get("column")
+            if not column_hint:
+                return {
+                    "state": "failed",
+                    "message": f"No column information available for node {query.node_id}",
+                    "data": None,
+                }
+            node_columns[query.node_id] = column_hint
+            request_payload["node_columns"] = node_columns
+    if query.combined is not None:
+        request_payload["combined"] = query.combined
+    page_override = query.page_number if query.page_number is not None else query.page
+    if page_override is not None:
+        request_payload["page"] = page_override
+    if query.page_size is not None:
+        request_payload["page_size"] = query.page_size
+    if query.sort_by is not None:
+        request_payload["sort_by"] = query.sort_by
+    if query.sort_order is not None:
+        request_payload["sort_order"] = query.sort_order
+
+    try:
+        next_request = ConcordanceAnalysisRequest(**request_payload)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to prepare request: {e}")
-    return await get_multi_node_concordance(workspace_id, new_req, current_user)
+        raise HTTPException(status_code=400, detail=f"Invalid request parameters: {e}")
+
+    return await _execute_concordance(workspace_id, next_request, current_user)
 
 
-@router.post("/{workspace_id}/concordance/multi-node")
-async def get_multi_node_concordance(
-    workspace_id: str,
-    request: MultiNodeConcordanceRequest,
-    current_user: dict = Depends(get_current_user),
+@router.post("/{workspace_id}/concordance/clear")
+async def clear_concordance_results(
+    workspace_id: str, current_user: dict = Depends(get_current_user)
 ):
     user_id = current_user["id"]
-    try:
-        if len(request.node_ids) == 0:
-            raise HTTPException(
-                status_code=400, detail="At least one node ID must be provided"
-            )
-        if len(request.node_ids) > 2:
-            raise HTTPException(
-                status_code=400, detail="Maximum 2 nodes supported for comparison"
-            )
-        results = {}
-        full_dfs = []
-        per_node_columns = {}
-        for node_id in request.node_ids:
-            node = workspace_manager.get_node_from_workspace(
-                user_id, workspace_id, node_id
-            )
-            if not node:
-                raise HTTPException(status_code=404, detail=f"Node {node_id} not found")
-            column = request.node_columns.get(node_id)
-            if not column:
-                raise HTTPException(
-                    status_code=400, detail=f"No column specified for node {node_id}"
-                )
-            if hasattr(node.data, "columns"):
-                available_columns = node.data.columns
-            elif hasattr(node.data, "schema"):
-                available_columns = list(node.data.schema.keys())
-            else:
-                available_columns = []
-            if available_columns and column not in available_columns:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Column '{column}' not found in node {node_id}. Available columns: {available_columns}",
-                )
-            cache_key = _concordance_cache_key(
-                user_id,
-                workspace_id,
-                node_id,
-                column,
-                request.search_word,
-                request.num_left_tokens,
-                request.num_right_tokens,
-                request.regex,
-                request.case_sensitive,
-            )
-            concordance_result = _get_cached_concordance_df(cache_key)
-            if concordance_result is None:
-                if hasattr(node.data, "text"):
-                    concordance_result = node.data.text.concordance(
-                        column=column,
-                        search_word=request.search_word,
-                        num_left_tokens=request.num_left_tokens,
-                        num_right_tokens=request.num_right_tokens,
-                        regex=request.regex,
-                        case_sensitive=request.case_sensitive,
-                        explode=True,
-                        unnest=True,
-                    )
-                else:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Node {node_id} does not support text operations",
-                    )
-                _store_concordance_df(cache_key, concordance_result)
-            working_df = concordance_result
-            core_names = {
-                "document_idx",
-                "left_context",
-                "matched_text",
-                "right_context",
-                "start_idx",
-                "end_idx",
-                "l1",
-                "r1",
-                "l1_freq",
-                "r1_freq",
-            }
-            core_concordance_columns = [
-                c for c in working_df.columns if c in core_names
-            ]
-            try:
-                cdf = working_df
-                if "document_idx" not in cdf.columns:
-                    cdf = cdf.with_row_index("document_idx")
-                has_metadata = any(
-                    (col not in core_concordance_columns) and (col != "document_idx")
-                    for col in cdf.columns
-                )
-                if not has_metadata:
-                    base = node.data
-                    if hasattr(base, "to_lazyframe"):
-                        base_df = base.to_lazyframe().collect()
-                    elif hasattr(base, "_df"):
-                        base_df = base._df  # type: ignore[attr-defined]
-                    elif hasattr(base, "collect"):
-                        base_df = base.collect()
-                    else:
-                        base_df = base
-                    if isinstance(base_df, pl.LazyFrame):
-                        base_df = base_df.collect()
-                    orig = base_df.with_row_index("document_idx")
-                    cdf = cdf.join(orig, on="document_idx", how="left")
-                working_df = cdf
-            except Exception as je:
-                logger.warning(
-                    f"Failed to finalize concordance frame for node {node_id}: {je}"
-                )
-            all_columns = list(working_df.columns)
-            metadata_columns = [
-                col for col in all_columns if col not in core_concordance_columns
-            ]
-            working_df = working_df.filter(pl.col("matched_text").is_not_null())
-            if (
-                request.sort_by
-                and hasattr(working_df, "columns")
-                and request.sort_by in working_df.columns
-            ):  # type: ignore
-                working_df = working_df.sort(
-                    pl.col(request.sort_by),
-                    descending=request.sort_order.lower() == "desc",
-                )  # type: ignore
-            total_matches = len(working_df)
-            start_idx = (request.page - 1) * request.page_size
-            end_idx = start_idx + request.page_size
-            paginated_result = working_df.slice(start_idx, request.page_size)
-            node_name = node.name if hasattr(node, "name") and node.name else node_id
-            per_node_columns[node_name] = list(working_df.columns)
-            node_metadata = ConcordanceMetadata(
-                concordance_columns=core_concordance_columns,
-                metadata_columns=metadata_columns,
-                all_columns=all_columns,
-            )
-            if hasattr(paginated_result, "to_dicts"):
-                results[node_name] = {
-                    "data": paginated_result.to_dicts(),
-                    "columns": list(working_df.columns),
-                    "metadata": node_metadata.model_dump(),
-                    "total_matches": total_matches,
-                    "pagination": {
-                        "page": request.page,
-                        "page_size": request.page_size,
-                        "total_pages": (total_matches + request.page_size - 1)
-                        // request.page_size,
-                        "has_next": end_idx < total_matches,
-                        "has_prev": request.page > 1,
-                    },
-                    "sorting": {
-                        "sort_by": request.sort_by,
-                        "sort_order": request.sort_order,
-                    },
-                }
-                if request.combined:
-                    try:
-                        df_with_source = working_df.with_columns(
-                            pl.lit(node_name).alias("__source_node")
-                        )  # type: ignore
-                        full_dfs.append(df_with_source)
-                    except Exception:
-                        pass
-            else:
-                empty_metadata = ConcordanceMetadata(
-                    concordance_columns=[], metadata_columns=[], all_columns=[]
-                )
-                results[node_name] = {
-                    "data": [],
-                    "columns": [],
-                    "metadata": empty_metadata.model_dump(),
-                    "total_matches": 0,
-                    "pagination": {
-                        "page": 1,
-                        "page_size": request.page_size,
-                        "total_pages": 0,
-                        "has_next": False,
-                        "has_prev": False,
-                    },
-                    "sorting": {
-                        "sort_by": request.sort_by,
-                        "sort_order": request.sort_order,
-                    },
-                }
-        if request.combined and len(full_dfs) >= 2:
-            try:
-                col_sets = list(per_node_columns.values())
-                if not col_sets or any(cols != col_sets[0] for cols in col_sets[1:]):
-                    return {
-                        "state": "successful",
-                        "message": f"Found concordance results for search term '{request.search_word}'",
-                        "data": results,
-                    }
-                combined_df = pl.concat(full_dfs, how="vertical")
-                effective_sort_by = None
-                effective_sort_order = (
-                    request.sort_order if request.sort_order else "asc"
-                )
-                if request.sort_by and request.sort_by in combined_df.columns:
-                    effective_sort_by = request.sort_by
-                    combined_df = combined_df.sort(
-                        pl.col(request.sort_by),
-                        descending=effective_sort_order.lower() == "desc",
-                    )
-                elif "document_idx" in combined_df.columns:
-                    effective_sort_by = "document_idx"
-                    combined_df = combined_df.sort(pl.col("document_idx"))
-                total_combined = len(combined_df)
-                start_idx = (request.page - 1) * request.page_size
-                paginated = combined_df.slice(start_idx, request.page_size)
-                results["__COMBINED__"] = {
-                    "data": paginated.to_dicts(),
-                    "columns": list(combined_df.columns),
-                    "total_matches": total_combined,
-                    "pagination": {
-                        "page": request.page,
-                        "page_size": request.page_size,
-                        "total_pages": (total_combined + request.page_size - 1)
-                        // request.page_size,
-                        "has_next": (start_idx + request.page_size) < total_combined,
-                        "has_prev": request.page > 1,
-                    },
-                    "sorting": {
-                        "sort_by": effective_sort_by,
-                        "sort_order": effective_sort_order,
-                    },
-                }
-            except Exception as ce:
-                print(f"⚠️ Failed to build combined concordance view: {ce}")
-        result_payload = {
-            "state": "successful",
-            "message": f"Found concordance results for search term '{request.search_word}'",
-            "data": results,
-        }
-        try:  # pragma: no cover
-            from ....core.analysis_store import save_analysis
+    from ....core.analysis_admin import clear_analyses_and_cache
 
-            save_analysis(
-                user_id=user_id,
-                workspace_id=workspace_id,
-                task="multi_concordance",
-                request_dict=request.model_dump()
-                if hasattr(request, "model_dump")
-                else request.dict(),
-                result_dict=result_payload,
-            )
-        except Exception as _e:  # pragma: no cover
-            print(f"[analysis_persist] multi_concordance save failed: {_e}")
-        return result_payload
-    except HTTPException:
-        raise
-    except Exception as e:
-        import traceback
-
-        print(f"❌ Unexpected multi-node concordance error: {str(e)}")
-        print(f"Traceback: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+    summary = clear_analyses_and_cache(user_id, workspace_id, task="concordance")
+    return {"state": "successful", "cleared": summary}
 
 
 @router.post("/{workspace_id}/concordance/cache/clear")

@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../hooks/useAuth';
 import { useSelectionStore } from '../../stores/selectionStore';
 import { useWorkspaceStore } from '../../stores/workspaceStore';
-import { MultiNodeConcordanceRequest, MultiNodeConcordanceResponse, textApi } from '../../api/text';
+import { ConcordanceAnalysisRequest, ConcordanceAnalysisResponse, textApi } from '../../api/text';
 import { queryKeys } from '../../lib/queryKeys';
 
 interface NodeColumnSelection {
@@ -68,7 +68,7 @@ export const useConcordanceTab = () => {
         return null;
       }
 
-      const request: MultiNodeConcordanceRequest = {
+      const request: ConcordanceAnalysisRequest = {
         node_ids: selectedNodeIds,
         node_columns: Object.fromEntries(
           nodeColumnSelections.map(sel => [sel.nodeId, sel.column])
@@ -85,7 +85,7 @@ export const useConcordanceTab = () => {
         }),
       };
 
-      return textApi.multiNodeConcordance(currentWorkspaceId, request, authHeaders);
+      return textApi.concordance(currentWorkspaceId, request, authHeaders);
     },
     enabled: !!(currentWorkspaceId && selectedNodeIds.length > 0 && settings.searchWord.trim()),
     staleTime: 30 * 1000, // 30 seconds
@@ -178,7 +178,7 @@ export const useConcordanceTab = () => {
     sourceColorMap,
     
     // Query state
-    concordanceData: concordanceQuery.data,
+  concordanceData: concordanceQuery.data as ConcordanceAnalysisResponse | null,
     isSearching: concordanceQuery.isLoading,
     searchError: concordanceQuery.error,
     
