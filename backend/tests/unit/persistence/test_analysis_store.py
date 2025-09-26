@@ -29,10 +29,10 @@ class TestAnalysisRecord:
         assert record.to_dict() == expected
 
 
-class TestSerializationPersistence:
-    """Verify analyses stored in metadata persist through serialize/deserialize."""
+class TestInMemoryPersistence:
+    """Verify analyses are session-only and excluded from serialization."""
 
-    def test_analyses_survive_workspace_reload(self, tmp_path, mock_datetime):
+    def test_analyses_do_not_survive_workspace_reload(self, tmp_path, mock_datetime):
         from unittest.mock import patch
 
         from ldaca_web_app_backend.core.analysis_store import (
@@ -43,7 +43,7 @@ class TestSerializationPersistence:
 
         user_id = "meta_user"
         with patch(
-            "ldaca_web_app_backend.core.utils.get_user_workspace_folder",
+            "ldaca_web_app_backend.core.workspace.get_user_workspace_folder",
             return_value=tmp_path / user_id / "user_workspaces",
         ):
             ws = workspace_manager.create_workspace(
@@ -57,25 +57,42 @@ class TestSerializationPersistence:
                 {"limit": 5},
                 {"state": "successful", "data": []},
             )
-            save_analysis(
-                user_id,
-                wid,
-                "topic_modeling",
-                {"k": 10},
-                {"state": "successful", "topics": []},
-            )
             pre_reload = list_analyses(user_id, wid)
-            assert {r.task for r in pre_reload} == {
-                "token_frequencies",
-                "topic_modeling",
-            }
+            assert [r.task for r in pre_reload] == ["token_frequencies"]
+
             workspace_manager.unload_workspace(user_id, save=True)
             reloaded = workspace_manager.get_workspace(user_id, wid)
             assert reloaded is not None
             post_reload = list_analyses(user_id, wid)
-            assert len(post_reload) == 2
-            assert {r.task for r in post_reload} == {
+            assert post_reload == []
+
+    def test_serialized_workspace_omits_analysis_state(self, tmp_path, mock_datetime):
+        from unittest.mock import patch
+
+        from ldaca_web_app_backend.core.analysis_store import save_analysis
+        from ldaca_web_app_backend.core.workspace import workspace_manager
+
+        user_id = "ser_user"
+        with patch(
+            "ldaca_web_app_backend.core.workspace.get_user_workspace_folder",
+            return_value=tmp_path / user_id / "user_workspaces",
+        ):
+            ws = workspace_manager.create_workspace(
+                user_id, name="Serialize Test", description="Desc"
+            )
+            wid = ws.get_metadata("id")
+            save_analysis(
+                user_id,
+                wid,
                 "token_frequencies",
-                "topic_modeling",
-            }
-            assert post_reload[0].saved_at <= post_reload[-1].saved_at
+                {"limit": 5},
+                {"state": "successful", "data": []},
+            )
+            workspace_manager.unload_workspace(user_id, save=True)
+            workspace_manager.get_workspace(user_id, wid)
+            workspace_file = (
+                tmp_path / user_id / "user_workspaces" / f"workspace_{wid}.json"
+            )
+            assert workspace_file.exists()
+            content = workspace_file.read_text()
+            assert "token_frequencies" not in content

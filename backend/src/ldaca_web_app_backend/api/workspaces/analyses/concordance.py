@@ -1075,13 +1075,16 @@ async def detach_concordance(
                 "left_context",
                 "matched_text",
                 "right_context",
+                "start_idx",
+                "end_idx",
                 "l1",
                 "r1",
                 "l1_freq",
                 "r1_freq",
             ])
+            other_df = other_df.filter(pl.col("matched_text").is_not_null())
             final_data = original_with_idx.join(
-                other_df, on="document_idx", how="left"
+                other_df, on="document_idx", how="right"
             ).drop("document_idx")
             if request.new_node_name:
                 new_node_name = request.new_node_name

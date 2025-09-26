@@ -1,20 +1,18 @@
-"""Analysis persistence stored directly in Workspace metadata.
+"""In-memory analysis persistence scoped to a workspace session.
 
-Simplified implementation: analyses are appended to a list stored under the
-workspace metadata key "analyses" and automatically serialized with the
-workspace JSON. No filesystem directory for analysis records remains.
+Analysis requests/results now live exclusively in process memory and are not
+serialized with workspace files. Data will be cleared whenever a workspace is
+unloaded or the process restarts.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from typing import Any, Dict, List, Optional
 
-from .workspace import workspace_manager
 from .json_utils import json_sanitize
-
-_ANALYSES_META_KEY = "analyses"
+from .workspace import workspace_manager
 
 
 @dataclass
@@ -33,24 +31,21 @@ class AnalysisRecord:
         }
 
 
-def _get_workspace(user_id: str, workspace_id: str):
-    return workspace_manager.get_workspace(user_id, workspace_id)
-
-
-def _ensure_metadata_list(ws) -> List[Dict[str, Any]]:
-    existing = ws.get_metadata(_ANALYSES_META_KEY)
-    if not existing or not isinstance(existing, list):
-        ws.set_metadata(_ANALYSES_META_KEY, [])
-        return ws.get_metadata(_ANALYSES_META_KEY)  # type: ignore
-    return existing  # type: ignore
+def _get_bucket(user_id: str, workspace_id: str) -> Optional[Dict[str, Dict[str, Any]]]:
+    ws = workspace_manager.get_workspace(user_id, workspace_id)
+    if ws is None:
+        return None
+    try:
+        return workspace_manager.get_analysis_state(user_id, workspace_id)
+    except ValueError:
+        return None
 
 
 def list_analyses(user_id: str, workspace_id: str) -> List[AnalysisRecord]:
-    ws = _get_workspace(user_id, workspace_id)
-    if not ws:
+    bucket = _get_bucket(user_id, workspace_id)
+    if bucket is None:
         return []
-    meta_list = _ensure_metadata_list(ws)
-    return [AnalysisRecord(**rec) for rec in meta_list]
+    return [AnalysisRecord(**rec) for rec in bucket.values()]
 
 
 def save_analysis(
@@ -60,39 +55,34 @@ def save_analysis(
     request_dict: Dict[str, Any],
     result_dict: Dict[str, Any],
 ) -> AnalysisRecord:
-    ws = _get_workspace(user_id, workspace_id)
-    if not ws:
+    bucket = _get_bucket(user_id, workspace_id)
+    if bucket is None:
         raise ValueError("Workspace not found")
-    meta_list = _ensure_metadata_list(ws)
-    # Ensure only the latest record is kept per task
-    try:
-        meta_list[:] = [rec for rec in meta_list if rec.get("task") != task]
-    except Exception:
-        # If unexpected structure, reset list
-        ws.set_metadata(_ANALYSES_META_KEY, [])
-        meta_list = _ensure_metadata_list(ws)
-    
+
     # Sanitize data to prevent JSON serialization errors (e.g., numpy.int64 keys)
     sanitized_request = json_sanitize(request_dict)
     sanitized_result = json_sanitize(result_dict)
-    
+
     record = AnalysisRecord(
         task=task,
         saved_at=datetime.now(UTC).isoformat(),
         request=sanitized_request,
         result=sanitized_result,
     )
-    meta_list.append(record.to_dict())
-    workspace_manager.persist(user_id, workspace_id)
+    record_dict = record.to_dict()
+    bucket.pop(task, None)  # Move latest to end of insertion order
+    bucket[task] = record_dict
     return record
 
 
 def get_latest_analysis(
     user_id: str, workspace_id: str, task: str
 ) -> Optional[AnalysisRecord]:
-    records = list_analyses(user_id, workspace_id)
-    filtered = [r for r in records if r.task == task]
-    return filtered[-1] if filtered else None
+    bucket = _get_bucket(user_id, workspace_id)
+    if bucket is None:
+        return None
+    record = bucket.get(task)
+    return AnalysisRecord(**record) if record else None
 
 
 def clear_analyses(user_id: str, workspace_id: str, task: Optional[str] = None) -> int:
@@ -106,24 +96,11 @@ def clear_analyses(user_id: str, workspace_id: str, task: Optional[str] = None) 
     Returns:
         Number of analysis records removed
     """
-    ws = _get_workspace(user_id, workspace_id)
-    if not ws:
-        return 0
-    existing = ws.get_metadata(_ANALYSES_META_KEY) or []
-    if not isinstance(existing, list):
-        # Nothing to clear
+    bucket = _get_bucket(user_id, workspace_id)
+    if bucket is None:
         return 0
     if task is None:
-        removed = len(existing)
-        ws.set_metadata(_ANALYSES_META_KEY, [])
-        workspace_manager.persist(user_id, workspace_id)
+        removed = len(bucket)
+        bucket.clear()
         return removed
-    # Filter out requested task
-    try:
-        before = len(existing)
-        remaining = [rec for rec in existing if rec.get("task") != task]
-        ws.set_metadata(_ANALYSES_META_KEY, remaining)
-        workspace_manager.persist(user_id, workspace_id)
-        return before - len(remaining)
-    except Exception:
-        return 0
+    return 1 if bucket.pop(task, None) else 0

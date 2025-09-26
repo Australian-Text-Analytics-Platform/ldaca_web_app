@@ -13,11 +13,14 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
 import polars as pl
-
 from docworkspace import Node, Workspace  # type: ignore
 
+from .docworkspace_api import (
+    DocWorkspaceAPIUtils,
+    create_operation_result,
+    handle_api_error,
+)
 from .utils import generate_workspace_id, get_user_workspace_folder
-from .docworkspace_api import DocWorkspaceAPIUtils, handle_api_error, create_operation_result
 
 
 class WorkspaceManager:
@@ -27,6 +30,8 @@ class WorkspaceManager:
         self._current: Dict[str, Dict[str, Any]] = {}
         # Per-user/workspace task managers (not serialized)
         self._task_managers: Dict[tuple[str, str], Any] = {}
+        # In-memory analysis cache per user/workspace
+        self._analysis_state: Dict[tuple[str, str], Dict[str, Dict[str, Any]]] = {}
 
     # ---------------- Core helpers ----------------
     def _get_current_entry(self, user_id: str) -> tuple[Optional[str], Optional[Any]]:
@@ -34,6 +39,27 @@ class WorkspaceManager:
         if not entry:
             return None, None
         return entry.get("id"), entry.get("ws")
+
+    def _analysis_key(self, user_id: str, workspace_id: str) -> tuple[str, str]:
+        return (user_id, workspace_id)
+
+    def _ensure_analysis_state(
+        self, user_id: str, workspace_id: str
+    ) -> Dict[str, Dict[str, Any]]:
+        key = self._analysis_key(user_id, workspace_id)
+        return self._analysis_state.setdefault(key, {})
+
+    def get_analysis_state(
+        self, user_id: str, workspace_id: str
+    ) -> Dict[str, Dict[str, Any]]:
+        ws = self.get_workspace(user_id, workspace_id)
+        if ws is None:
+            raise ValueError("Workspace not found")
+        return self._ensure_analysis_state(user_id, workspace_id)
+
+    def drop_analysis_state(self, user_id: str, workspace_id: str) -> None:
+        key = self._analysis_key(user_id, workspace_id)
+        self._analysis_state.pop(key, None)
 
     def _save(self, user_id: str, workspace_id: str, workspace: Workspace) -> None:
         user_folder = get_user_workspace_folder(user_id)
@@ -52,12 +78,17 @@ class WorkspaceManager:
             return None
         try:
             print(f"Attempting to load workspace {workspace_id} from {workspace_file}")
-            return Workspace.deserialize(workspace_file)
+            ws = Workspace.deserialize(workspace_file)
+            if ws is not None:
+                self._ensure_analysis_state(user_id, workspace_id)
+            return ws
         except Exception as e:  # pragma: no cover
-            print(f"Failed to deserialize workspace {workspace_id} from {workspace_file}: {e}")
+            print(
+                f"Failed to deserialize workspace {workspace_id} from {workspace_file}: {e}"
+            )
             # Try to get more specific error info
             try:
-                with open(workspace_file, 'r') as f:
+                with open(workspace_file, "r") as f:
                     content = f.read()
                     print(f"Workspace file size: {len(content)} bytes")
                     if len(content) > 1000:
@@ -76,7 +107,9 @@ class WorkspaceManager:
                 self._save(user_id, current_id, current_ws)
             except Exception as e:  # pragma: no cover
                 print(f"Warning: failed to save previous workspace {current_id}: {e}")
+            self.drop_analysis_state(user_id, current_id)
         self._current[user_id] = {"id": new_id, "ws": new_ws}
+        self._ensure_analysis_state(user_id, new_id)
 
     # ---------------- Public API ----------------
     def get_current_workspace_id(self, user_id: str) -> Optional[str]:
@@ -92,10 +125,12 @@ class WorkspaceManager:
             cid, cws = self._get_current_entry(user_id)
             if cid and cws:
                 self._save(user_id, cid, cws)
+                self.drop_analysis_state(user_id, cid)
             self._current.pop(user_id, None)
             return True
         cid, cws = self._get_current_entry(user_id)
         if cid == workspace_id and cws is not None:
+            self._ensure_analysis_state(user_id, workspace_id)
             return True
         new_ws = self._load(user_id, workspace_id)
         if not new_ws:
@@ -123,11 +158,14 @@ class WorkspaceManager:
         ws.set_metadata("modified_at", now)
         self._save(user_id, wid, ws)
         self._current[user_id] = {"id": wid, "ws": ws}
+        self._ensure_analysis_state(user_id, wid)
         return ws
 
     def get_workspace(self, user_id: str, workspace_id: str) -> Optional[Any]:
         cid, cws = self._get_current_entry(user_id)
         if cid == workspace_id:
+            if cws is not None:
+                self._ensure_analysis_state(user_id, workspace_id)
             return cws
         ws = self._load(user_id, workspace_id)
         if not ws:
@@ -183,15 +221,18 @@ class WorkspaceManager:
             except Exception:
                 pass
             self._current.pop(user_id, None)
+            self.drop_analysis_state(user_id, cid)
         user_folder = get_user_workspace_folder(user_id)
         wf = user_folder / f"workspace_{workspace_id}.json"
         if wf.exists():
             wf.unlink()
+            self.drop_analysis_state(user_id, workspace_id)
             return True
         return False
 
     def get_task_manager(self, user_id: str, workspace_id: str):
         from ldaca_web_app_backend.core.process_task_manager import ProcessTaskManager
+
         key = (user_id, workspace_id)
         tm = self._task_managers.get(key)
         if tm is None:
@@ -206,6 +247,7 @@ class WorkspaceManager:
         if save:
             self._save(user_id, cid, cws)
         self._current.pop(user_id, None)
+        self.drop_analysis_state(user_id, cid)
         return True
 
     # ---------------- Node operations ----------------
@@ -273,7 +315,9 @@ class WorkspaceManager:
         ws = self.get_workspace(user_id, workspace_id)
         if ws is None:
             return []
-        return [DocWorkspaceAPIUtils.node_to_summary(node) for node in ws.nodes.values()]
+        return [
+            DocWorkspaceAPIUtils.node_to_summary(node) for node in ws.nodes.values()
+        ]
 
     def get_workspace_info(
         self, user_id: str, workspace_id: str

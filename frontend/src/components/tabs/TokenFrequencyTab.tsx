@@ -13,6 +13,32 @@ interface NodeColumnSelection {
   column: string;
 }
 
+const toFiniteNumber = (value: unknown): number | null => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+};
+
+type FormatNumberOptions = {
+  suffix?: string;
+  multiplier?: number;
+  fallback?: string;
+};
+
+const formatNumber = (value: unknown, decimals: number, options: FormatNumberOptions = {}): string => {
+  const { suffix = '', multiplier = 1, fallback = '—' } = options;
+  const numeric = toFiniteNumber(value);
+  if (numeric === null) return fallback;
+  const scaled = numeric * multiplier;
+  if (!Number.isFinite(scaled)) return fallback;
+  const formatted = scaled.toFixed(decimals);
+  const sanitized = /^-0(?:\.0+)?$/.test(formatted) ? formatted.replace('-', '') : formatted;
+  return `${sanitized}${suffix}`;
+};
+
 const TokenFrequencyTab: React.FC = () => {
   const {
     selectedNodes,
@@ -934,16 +960,16 @@ const TokenFrequencyTab: React.FC = () => {
                         const columns: { key: string; label: string; accessor: (s: any) => any; isNumeric?: boolean; formatter?: (v: any, s: any) => React.ReactNode }[] = [
                           { key: 'token', label: 'Token', accessor: s => s.token },
                           { key: 'freq_corpus_0', label: 'O1', accessor: s => s.freq_corpus_0, isNumeric: true },
-                          { key: 'percent_corpus_0', label: '%1', accessor: s => s.percent_corpus_0, isNumeric: true, formatter: v => v.toFixed(2) + '%' },
+                          { key: 'percent_corpus_0', label: '%1', accessor: s => s.percent_corpus_0, isNumeric: true, formatter: v => formatNumber(v, 2, { suffix: '%' }) },
                           { key: 'freq_corpus_1', label: 'O2', accessor: s => s.freq_corpus_1, isNumeric: true },
-                          { key: 'percent_corpus_1', label: '%2', accessor: s => s.percent_corpus_1, isNumeric: true, formatter: v => v.toFixed(2) + '%' },
-                          { key: 'log_likelihood_llv', label: 'LL', accessor: s => s.log_likelihood_llv, isNumeric: true, formatter: v => v.toFixed(2) },
-                          { key: 'percent_diff', label: '%DIFF', accessor: s => s.percent_diff, isNumeric: true, formatter: v => (v * 100).toFixed(2) + '%' },
-                          { key: 'bayes_factor_bic', label: 'Bayes', accessor: s => s.bayes_factor_bic, isNumeric: true, formatter: v => v.toFixed(2) },
-                          { key: 'effect_size_ell', label: 'ELL', accessor: s => s.effect_size_ell, isNumeric: true, formatter: v => (v !== null ? v.toFixed(4) : 'N/A') },
-                          { key: 'relative_risk', label: 'RRisk', accessor: s => s.relative_risk, isNumeric: true, formatter: v => (v !== null ? v.toFixed(2) : '∞') },
-                          { key: 'log_ratio', label: 'LogRatio', accessor: s => s.log_ratio, isNumeric: true, formatter: v => (v !== null ? v.toFixed(4) : 'N/A') },
-                          { key: 'odds_ratio', label: 'OddsRatio', accessor: s => s.odds_ratio, isNumeric: true, formatter: v => (v !== null ? v.toFixed(2) : '∞') },
+                          { key: 'percent_corpus_1', label: '%2', accessor: s => s.percent_corpus_1, isNumeric: true, formatter: v => formatNumber(v, 2, { suffix: '%' }) },
+                          { key: 'log_likelihood_llv', label: 'LL', accessor: s => s.log_likelihood_llv, isNumeric: true, formatter: v => formatNumber(v, 2) },
+                          { key: 'percent_diff', label: '%DIFF', accessor: s => s.percent_diff, isNumeric: true, formatter: v => formatNumber(v, 2, { suffix: '%', multiplier: 100 }) },
+                          { key: 'bayes_factor_bic', label: 'Bayes', accessor: s => s.bayes_factor_bic, isNumeric: true, formatter: v => formatNumber(v, 2) },
+                          { key: 'effect_size_ell', label: 'ELL', accessor: s => s.effect_size_ell, isNumeric: true, formatter: v => formatNumber(v, 4, { fallback: 'N/A' }) },
+                          { key: 'relative_risk', label: 'RRisk', accessor: s => s.relative_risk, isNumeric: true, formatter: v => formatNumber(v, 2, { fallback: '∞' }) },
+                          { key: 'log_ratio', label: 'LogRatio', accessor: s => s.log_ratio, isNumeric: true, formatter: v => formatNumber(v, 4, { fallback: 'N/A' }) },
+                          { key: 'odds_ratio', label: 'OddsRatio', accessor: s => s.odds_ratio, isNumeric: true, formatter: v => formatNumber(v, 2, { fallback: '∞' }) },
                           { key: 'significance', label: 'Significance', accessor: s => s.significance || '', formatter: (_: any, s: any) => (
                             <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                               s.significance === '****' ? 'bg-red-100 text-red-800' :
@@ -1087,17 +1113,17 @@ const TokenFrequencyTab: React.FC = () => {
                         // Rebuild columns with labels & formatters (duplicate of earlier definition to keep scope simple)
                         const columns = [
                           { key: 'token', label: 'Token', accessor: (s: any) => s.token },
-                          { key: 'freq_corpus_0', label: 'O1', accessor: (s: any) => s.freq_corpus_0, formatter: (v: any) => v },
-                          { key: 'percent_corpus_0', label: '%1', accessor: (s: any) => s.percent_corpus_0, formatter: (v: any) => v.toFixed(2) + '%' },
-                          { key: 'freq_corpus_1', label: 'O2', accessor: (s: any) => s.freq_corpus_1, formatter: (v: any) => v },
-                          { key: 'percent_corpus_1', label: '%2', accessor: (s: any) => s.percent_corpus_1, formatter: (v: any) => v.toFixed(2) + '%' },
-                          { key: 'log_likelihood_llv', label: 'LL', accessor: (s: any) => s.log_likelihood_llv, formatter: (v: any) => v.toFixed(2) },
-                          { key: 'percent_diff', label: '%DIFF', accessor: (s: any) => s.percent_diff, formatter: (v: any) => (v * 100).toFixed(2) + '%' },
-                          { key: 'bayes_factor_bic', label: 'Bayes', accessor: (s: any) => s.bayes_factor_bic, formatter: (v: any) => v.toFixed(2) },
-                          { key: 'effect_size_ell', label: 'ELL', accessor: (s: any) => s.effect_size_ell, formatter: (v: any) => (v !== null ? v.toFixed(4) : 'N/A') },
-                          { key: 'relative_risk', label: 'RRisk', accessor: (s: any) => s.relative_risk, formatter: (v: any) => (v !== null ? v.toFixed(2) : '∞') },
-                          { key: 'log_ratio', label: 'LogRatio', accessor: (s: any) => s.log_ratio, formatter: (v: any) => (v !== null ? v.toFixed(4) : 'N/A') },
-                          { key: 'odds_ratio', label: 'OddsRatio', accessor: (s: any) => s.odds_ratio, formatter: (v: any) => (v !== null ? v.toFixed(2) : '∞') },
+                          { key: 'freq_corpus_0', label: 'O1', accessor: (s: any) => s.freq_corpus_0, formatter: (v: any) => formatNumber(v, 0) },
+                          { key: 'percent_corpus_0', label: '%1', accessor: (s: any) => s.percent_corpus_0, formatter: (v: any) => formatNumber(v, 2, { suffix: '%' }) },
+                          { key: 'freq_corpus_1', label: 'O2', accessor: (s: any) => s.freq_corpus_1, formatter: (v: any) => formatNumber(v, 0) },
+                          { key: 'percent_corpus_1', label: '%2', accessor: (s: any) => s.percent_corpus_1, formatter: (v: any) => formatNumber(v, 2, { suffix: '%' }) },
+                          { key: 'log_likelihood_llv', label: 'LL', accessor: (s: any) => s.log_likelihood_llv, formatter: (v: any) => formatNumber(v, 2) },
+                          { key: 'percent_diff', label: '%DIFF', accessor: (s: any) => s.percent_diff, formatter: (v: any) => formatNumber(v, 2, { suffix: '%', multiplier: 100 }) },
+                          { key: 'bayes_factor_bic', label: 'Bayes', accessor: (s: any) => s.bayes_factor_bic, formatter: (v: any) => formatNumber(v, 2) },
+                          { key: 'effect_size_ell', label: 'ELL', accessor: (s: any) => s.effect_size_ell, formatter: (v: any) => formatNumber(v, 4, { fallback: 'N/A' }) },
+                          { key: 'relative_risk', label: 'RRisk', accessor: (s: any) => s.relative_risk, formatter: (v: any) => formatNumber(v, 2, { fallback: '∞' }) },
+                          { key: 'log_ratio', label: 'LogRatio', accessor: (s: any) => s.log_ratio, formatter: (v: any) => formatNumber(v, 4, { fallback: 'N/A' }) },
+                          { key: 'odds_ratio', label: 'OddsRatio', accessor: (s: any) => s.odds_ratio, formatter: (v: any) => formatNumber(v, 2, { fallback: '∞' }) },
                           { key: 'significance', label: 'Significance', accessor: (s: any) => s.significance || '', formatter: (_: any, s: any) => (
                             <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                               s.significance === '****' ? 'bg-red-100 text-red-800' :
@@ -1169,20 +1195,34 @@ const TokenFrequencyTab: React.FC = () => {
                           };
               const toCSVVal = (colKey: string, stat: any) => {
                             switch (colKey) {
-                              case 'token': return stat.token;
-                              case 'freq_corpus_0': return stat.freq_corpus_0;
-                              case 'percent_corpus_0': return `${stat.percent_corpus_0.toFixed(2)}%`;
-                              case 'freq_corpus_1': return stat.freq_corpus_1;
-                              case 'percent_corpus_1': return `${stat.percent_corpus_1.toFixed(2)}%`;
-                              case 'log_likelihood_llv': return stat.log_likelihood_llv.toFixed(2);
-                              case 'percent_diff': return `${(stat.percent_diff * 100).toFixed(2)}%`;
-                              case 'bayes_factor_bic': return stat.bayes_factor_bic.toFixed(2);
-                              case 'effect_size_ell': return stat.effect_size_ell !== null ? stat.effect_size_ell.toFixed(4) : '';
-                case 'relative_risk': return stat.relative_risk !== null ? stat.relative_risk.toFixed(2) : 'inf';
-                              case 'log_ratio': return stat.log_ratio !== null ? stat.log_ratio.toFixed(4) : '';
-                case 'odds_ratio': return stat.odds_ratio !== null ? stat.odds_ratio.toFixed(2) : 'inf';
-                              case 'significance': return stat.significance || 'n.s.';
-                              default: return '';
+                              case 'token':
+                                return stat.token;
+                              case 'freq_corpus_0':
+                                return formatNumber(stat.freq_corpus_0, 0, { fallback: '' });
+                              case 'percent_corpus_0':
+                                return formatNumber(stat.percent_corpus_0, 2, { suffix: '%', fallback: '' });
+                              case 'freq_corpus_1':
+                                return formatNumber(stat.freq_corpus_1, 0, { fallback: '' });
+                              case 'percent_corpus_1':
+                                return formatNumber(stat.percent_corpus_1, 2, { suffix: '%', fallback: '' });
+                              case 'log_likelihood_llv':
+                                return formatNumber(stat.log_likelihood_llv, 2, { fallback: '' });
+                              case 'percent_diff':
+                                return formatNumber(stat.percent_diff, 2, { suffix: '%', multiplier: 100, fallback: '' });
+                              case 'bayes_factor_bic':
+                                return formatNumber(stat.bayes_factor_bic, 2, { fallback: '' });
+                              case 'effect_size_ell':
+                                return formatNumber(stat.effect_size_ell, 4, { fallback: '' });
+                              case 'relative_risk':
+                                return formatNumber(stat.relative_risk, 2, { fallback: 'inf' });
+                              case 'log_ratio':
+                                return formatNumber(stat.log_ratio, 4, { fallback: '' });
+                              case 'odds_ratio':
+                                return formatNumber(stat.odds_ratio, 2, { fallback: 'inf' });
+                              case 'significance':
+                                return stat.significance || 'n.s.';
+                              default:
+                                return '';
                             }
                           };
                           const rows = modalSorted.map(stat => columns.map(c => csvEscape(toCSVVal(c.key, stat))).join(','));

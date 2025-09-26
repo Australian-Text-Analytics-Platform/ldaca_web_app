@@ -620,9 +620,6 @@ async def cast_node(
         )
 
 
-## Concordance detach endpoint moved to analyses/concordance.py
-
-
 @router.get("/{workspace_id}/export")
 async def export_nodes(
     workspace_id: str,
