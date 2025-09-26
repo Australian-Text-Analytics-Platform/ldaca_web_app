@@ -68,7 +68,7 @@ export const useConcordanceTab = () => {
         return null;
       }
 
-      const request: ConcordanceAnalysisRequest = {
+      const baseRequest: ConcordanceAnalysisRequest = {
         node_ids: selectedNodeIds,
         node_columns: Object.fromEntries(
           nodeColumnSelections.map(sel => [sel.nodeId, sel.column])
@@ -78,14 +78,22 @@ export const useConcordanceTab = () => {
         num_right_tokens: settings.numRightTokens,
         regex: settings.regex,
         case_sensitive: settings.caseSensitive,
-        combined: viewMode === 'combined',
-        ...(viewMode === 'combined' && {
-          page: combinedPage,
-          page_size: combinedPageSize,
-        }),
+        combined: false,
       };
 
-      return textApi.concordance(currentWorkspaceId, request, authHeaders);
+      if (viewMode === 'combined') {
+        return textApi.postConcordanceCurrentResult(
+          currentWorkspaceId,
+          {
+            combined: true,
+            page: combinedPage,
+            page_size: combinedPageSize,
+          },
+          authHeaders
+        );
+      }
+
+      return textApi.concordance(currentWorkspaceId, baseRequest, authHeaders);
     },
     enabled: !!(currentWorkspaceId && selectedNodeIds.length > 0 && settings.searchWord.trim()),
     staleTime: 30 * 1000, // 30 seconds

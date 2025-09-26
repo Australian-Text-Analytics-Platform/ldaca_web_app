@@ -206,6 +206,82 @@ async def test_concordance_multi_node_combined(authenticated_client, workspace_i
 
 @pytest.mark.anyio
 @pytest.mark.skipif(DocDataFrame is None, reason="docframe not available")
+async def test_concordance_combined_toggle_after_separated_request(
+    authenticated_client, workspace_id
+):
+    """Combined toggle should succeed even if initial search requested separated view."""
+    from ldaca_web_app_backend.core import analysis_store
+
+    analysis_store.clear_analyses("test", workspace_id, task="concordance")
+    analysis_store.clear_analyses("test", workspace_id, task="multi_concordance")
+
+    df_left = pl.DataFrame({
+        "text": ["alpha beta", "beta alpha", "alpha gamma"],
+        "speaker": ["L1", "L2", "L3"],
+    })
+    df_right = pl.DataFrame({
+        "text": ["alpha delta", "epsilon alpha", "zeta"],
+        "speaker": ["R1", "R2", "R3"],
+    })
+
+    left_node = workspace_manager.add_node_to_workspace(
+        user_id="test",
+        workspace_id=workspace_id,
+        data=DocDataFrame(df_left, document_column="text"),  # type: ignore
+        node_name="left_docs",
+        operation="test_setup",
+        parents=[],
+    )
+    right_node = workspace_manager.add_node_to_workspace(
+        user_id="test",
+        workspace_id=workspace_id,
+        data=DocDataFrame(df_right, document_column="text"),  # type: ignore
+        node_name="right_docs",
+        operation="test_setup",
+        parents=[],
+    )
+
+    request_payload = {
+        "node_ids": [left_node.id, right_node.id],
+        "node_columns": {left_node.id: "text", right_node.id: "text"},
+        "search_word": "alpha",
+        "num_left_tokens": 2,
+        "num_right_tokens": 2,
+        "regex": False,
+        "case_sensitive": False,
+        "combined": False,
+        "page": 1,
+        "page_size": 2,
+    }
+
+    resp = await authenticated_client.post(
+        f"/api/workspaces/{workspace_id}/concordance",
+        json=request_payload,
+    )
+    assert resp.status_code == 200, resp.text
+    payload = resp.json()
+    assert payload["state"] == "successful"
+    assert payload.get("combinable") is True
+    assert "__COMBINED__" not in payload["data"]
+
+    combined_toggle = await authenticated_client.post(
+        f"/api/workspaces/{workspace_id}/concordance/current-result",
+        json={"combined": True, "page": 1, "page_size": 2},
+    )
+    assert combined_toggle.status_code == 200
+    combined_payload = combined_toggle.json()
+    assert combined_payload["state"] == "successful"
+    assert combined_payload.get("combinable") is True
+    assert "__COMBINED__" in combined_payload["data"]
+    combined_data = combined_payload["data"]["__COMBINED__"]
+    assert combined_data["pagination"]["page"] == 1
+    assert combined_data["pagination"]["page_size"] == 2
+    assert combined_data["total_matches"] >= 2
+    assert combined_payload["analysis_params"].get("combined") is True
+
+
+@pytest.mark.anyio
+@pytest.mark.skipif(DocDataFrame is None, reason="docframe not available")
 async def test_concordance_combined_handles_mismatched_columns(
     authenticated_client, workspace_id
 ):

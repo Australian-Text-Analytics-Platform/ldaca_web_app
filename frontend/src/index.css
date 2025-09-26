@@ -126,3 +126,9 @@ code {
   transform: translateY(-2px);
   box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
 }
+
+/* Ensure table content aligns to the top for improved readability */
+table th,
+table td {
+  vertical-align: top;
+}

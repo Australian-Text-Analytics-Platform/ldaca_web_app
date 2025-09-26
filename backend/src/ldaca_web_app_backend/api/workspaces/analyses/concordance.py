@@ -227,13 +227,12 @@ def _process_node_concordance(
             },
         }
         combined_frame = None
-        if request.combined:
-            try:
-                combined_frame = working_df.with_columns(
-                    pl.lit(node_name).alias("__source_node")
-                )
-            except Exception:
-                combined_frame = None
+        try:
+            combined_frame = working_df.with_columns(
+                pl.lit(node_name).alias("__source_node")
+            )
+        except Exception:
+            combined_frame = None
         result = {
             "label": node_name,
             "page_payload": payload,
@@ -306,10 +305,18 @@ def _process_node_concordance(
     filtered_df = (
         filtered if isinstance(filtered, pl.DataFrame) else pl.DataFrame(filtered)
     )
+    combined_frame = None
+    try:
+        combined_frame = filtered_df.with_columns(
+            pl.lit(node_name).alias("__source_node")
+        )
+    except Exception:
+        combined_frame = None
+
     result = {
         "label": node_name,
         "page_payload": payload,
-        "combined_frame": None,
+        "combined_frame": combined_frame,
         "columns": all_columns,
         "full_frame": filtered_df,
         "metadata": metadata_dict,
@@ -581,7 +588,8 @@ async def _execute_concordance(
         first_columns = column_sets[0]
         combinable = all(cols == first_columns for cols in column_sets[1:])
 
-    if request.combined and combinable and len(combined_frames) >= 2:
+    should_build_combined = combinable and len(combined_frames) >= 2
+    if should_build_combined:
         ordered_columns: List[str] = []
         column_dtypes: Dict[str, pl.datatypes.DataType] = {}
         aligned_frames: List[pl.DataFrame] = []
@@ -634,7 +642,7 @@ async def _execute_concordance(
             ],
             "all_columns": combined_columns,
         }
-        results["__COMBINED__"] = {
+        combined_page_payload = {
             "data": paginated.to_dicts(),
             "columns": combined_columns,
             "metadata": combined_metadata,
@@ -651,6 +659,8 @@ async def _execute_concordance(
                 "sort_order": sort_order,
             },
         }
+        if request.combined:
+            results["__COMBINED__"] = combined_page_payload
         stored_nodes["__COMBINED__"] = {
             "label": "__COMBINED__",
             "columns": combined_columns,
@@ -702,10 +712,7 @@ async def _execute_concordance(
         "combinable": combinable,
     }
 
-    if has_combined_result:
-        storage_blob["combined_available"] = True
-    else:
-        storage_blob["combined_available"] = False
+    storage_blob["combined_available"] = should_build_combined
 
     try:  # pragma: no cover
         from ....core.analysis_store import save_analysis
@@ -1004,49 +1011,6 @@ async def clear_multi_concordance_results(
             "concordance_cache_removed": cache_removed,
         },
     }
-
-
-# ---------------------------------------------------------------------------
-# Concordance detail endpoint (base.py lines ~3100-3155)
-# ---------------------------------------------------------------------------
-@router.get("/{workspace_id}/nodes/{node_id}/concordance/{document_idx}")
-async def get_concordance_detail(
-    workspace_id: str,
-    node_id: str,
-    document_idx: int,
-    text_column: str,
-    current_user: dict = Depends(get_current_user),
-):
-    user_id = current_user["id"]
-    try:
-        node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
-        if not node:
-            raise HTTPException(status_code=404, detail="Node not found")
-        data = node.data
-        if hasattr(data, "collect"):
-            data = data.collect()
-        if document_idx < 0 or document_idx >= len(data):
-            raise HTTPException(status_code=404, detail="Document index not found")
-        record = data.slice(document_idx, 1).to_dicts()[0]
-        full_text = record.get(text_column, "")
-        metadata = {k: v for k, v in record.items() if k != text_column}
-        available_columns = list(data.columns) if hasattr(data, "columns") else []
-        return {
-            "document_idx": document_idx,
-            "text_column": text_column,
-            "full_text": str(full_text),
-            "metadata": metadata,
-            "available_columns": available_columns,
-            "record": record,
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        import traceback
-
-        print(f"❌ Unexpected concordance detail error: {str(e)}")
-        print(f"Traceback: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
 # ---------------------------------------------------------------------------

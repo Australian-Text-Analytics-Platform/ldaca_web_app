@@ -60,7 +60,6 @@ export interface TopicModelingResponse { state: 'running' | 'successful' | 'fail
 
 export const textApi = {
   concordance: (ws: string, req: ConcordanceAnalysisRequest, headers: Record<string,string> = {}) => post<ConcordanceAnalysisResponse>(`/workspaces/${ws}/concordance`, req, headers),
-  concordanceDetail: (ws: string, node: string, docIdx: number, textColumn: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/nodes/${node}/concordance/${docIdx}`, { method: 'GET', headers, params: { text_column: textColumn } }),
   concordanceDetach: (ws: string, node: string, req: ConcordanceDetachRequest, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/nodes/${node}/concordance/detach`, req, headers),
   getConcordanceCurrentRequest: (ws: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/concordance/current-request`, { method: 'GET', headers }),
   getConcordanceCurrentResult: (ws: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/concordance/current-result`, { method: 'GET', headers }),

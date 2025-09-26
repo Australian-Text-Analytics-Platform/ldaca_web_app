@@ -3,7 +3,7 @@ import NodeSelectionPanel from '../NodeSelectionPanel';
 import SegmentedControl from '../ui/SegmentedControl';
 import { useWorkspace } from '../../hooks/useWorkspace';
 import { useAuth } from '../../hooks/useAuth';
-import { ConcordanceAnalysisRequest, ConcordanceAnalysisResponse, ConcordanceResultEntry, textApi } from '../../api/text';
+import { ConcordanceAnalysisRequest, ConcordanceAnalysisResponse, textApi } from '../../api/text';
 import { nodesApi } from '../../api/nodes';
 import { workspacesApi } from '../../api/workspaces';
 import useAutoNodeColumns from '../../hooks/useAutoNodeColumns';
@@ -126,7 +126,6 @@ const ConcordanceTab: React.FC = () => {
   // Detail view state
   const [selectedDetail, setSelectedDetail] = useState<any>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
-  const [loadingDetail, setLoadingDetail] = useState(false);
   
   // State for auto-triggering search from TokenFrequencyTab
   const [shouldAutoSearch, setShouldAutoSearch] = useState(false);
@@ -324,50 +323,79 @@ const ConcordanceTab: React.FC = () => {
         nodeColumns[sel.nodeId] = sel.column;
       });
 
-      // Use the first node's pagination settings for the API call
-      // Note: This is a limitation of the current backend API that we'll work around
       const firstNodeId = selectedNodes[0].id;
       const firstNodePagination = updatedPagination[firstNodeId];
-      const request: ConcordanceAnalysisRequest = {
-        node_ids: selectedNodes.slice(0, 2).map(node => node.id),
-        node_columns: nodeColumns,
-        search_word: searchWord.trim(),
-        num_left_tokens: numLeftTokens,
-        num_right_tokens: numRightTokens,
-        regex,
-        case_sensitive: caseSensitive,
-        page: effectiveMode === 'combined' ? combinedPage : firstNodePagination.currentPage,
-        page_size: effectiveMode === 'combined' ? combinedPageSize : firstNodePagination.pageSize,
-        sort_by: (overrideSortBy ?? firstNodePagination.sortBy) || undefined,
-        sort_order: overrideSortOrder ?? firstNodePagination.sortOrder,
-        combined: effectiveMode === 'combined',
-      };
-      const response = await textApi.concordance(currentWorkspaceId, request, getAuthHeaders());
+      const authHeaders = getAuthHeaders();
+      const isCombinedQuery = effectiveMode === 'combined';
+      const useStoredResult = forceMode !== undefined || (isLocked && allowWhenLocked);
+      let response: ConcordanceAnalysisResponse | null = null;
 
-      if (effectiveMode === 'combined' && !response?.combinable) {
-        setViewMode('separated');
-      }
+      if (useStoredResult) {
+        const overrides: Record<string, any> = {
+          combined: isCombinedQuery,
+          sort_by: (overrideSortBy ?? firstNodePagination.sortBy) || undefined,
+          sort_order: overrideSortOrder ?? firstNodePagination.sortOrder,
+        };
 
-    if (localStorage.getItem('debugConc') === '1') console.log('Multi-Node Concordance Response:', response);
-      setResults(response);
-      setLastCompareNodeIds(selectedNodes.slice(0, 2).map(n => n.id));
-      // Lock UI and snapshot nodes
-      try {
-        const ids = selectedNodes.slice(0,2).map(n=>n.id);
-        const snaps: Array<{ id: string; name: string; columns: string[] }> = [];
-        for (const id of ids) {
-          try {
-            const info = await nodesApi.info(currentWorkspaceId!, id, getAuthHeaders());
-            const name = (info as any)?.name || (info as any)?.data?.name || id;
-            const columns = Array.isArray((info as any)?.columns) ? (info as any).columns : (Array.isArray((info as any)?.data?.columns) ? (info as any).data.columns : []);
-            snaps.push({ id, name: String(name), columns });
-          } catch {
-            snaps.push({ id, name: id, columns: [] });
-          }
+        if (isCombinedQuery) {
+          overrides.page = combinedPage;
+          overrides.page_size = combinedPageSize;
+        } else {
+          overrides.page = firstNodePagination.currentPage;
+          overrides.page_size = firstNodePagination.pageSize;
         }
-        setLockedNodesSnapshot(snaps);
-        setIsLocked(true);
-      } catch { /* ignore */ }
+
+        response = await textApi.postConcordanceCurrentResult(currentWorkspaceId, overrides, authHeaders) as ConcordanceAnalysisResponse;
+        if (response?.data) {
+          mergeConcordanceResults(response);
+        } else if (response) {
+          setResults(response);
+        }
+
+        if (isCombinedQuery && response && response.combinable === false) {
+          setViewMode('separated');
+        }
+      } else {
+        const request: ConcordanceAnalysisRequest = {
+          node_ids: selectedNodes.slice(0, 2).map(node => node.id),
+          node_columns: nodeColumns,
+          search_word: searchWord.trim(),
+          num_left_tokens: numLeftTokens,
+          num_right_tokens: numRightTokens,
+          regex,
+          case_sensitive: caseSensitive,
+          page: firstNodePagination.currentPage,
+          page_size: firstNodePagination.pageSize,
+          sort_by: (overrideSortBy ?? firstNodePagination.sortBy) || undefined,
+          sort_order: overrideSortOrder ?? firstNodePagination.sortOrder,
+          combined: false,
+        };
+        response = await textApi.concordance(currentWorkspaceId, request, authHeaders);
+        if (localStorage.getItem('debugConc') === '1') console.log('Multi-Node Concordance Response:', response);
+        setResults(response);
+        setLastCompareNodeIds(selectedNodes.slice(0, 2).map(n => n.id));
+        // Lock UI and snapshot nodes
+        try {
+          const ids = selectedNodes.slice(0, 2).map(n => n.id);
+          const snaps: Array<{ id: string; name: string; columns: string[] }> = [];
+          for (const id of ids) {
+            try {
+              const info = await nodesApi.info(currentWorkspaceId!, id, authHeaders);
+              const name = (info as any)?.name || (info as any)?.data?.name || id;
+              const columns = Array.isArray((info as any)?.columns) ? (info as any).columns : (Array.isArray((info as any)?.data?.columns) ? (info as any).data.columns : []);
+              snaps.push({ id, name: String(name), columns });
+            } catch {
+              snaps.push({ id, name: id, columns: [] });
+            }
+          }
+          setLockedNodesSnapshot(snaps);
+          setIsLocked(true);
+        } catch { /* ignore */ }
+
+        if (response?.combinable === false && viewMode === 'combined') {
+          setViewMode('separated');
+        }
+      }
     } catch (error) {
       console.error('Error performing concordance search:', error);
       setResults({
@@ -567,100 +595,24 @@ const ConcordanceTab: React.FC = () => {
     setNodeLoading(prev => ({ ...prev, [nodeId]: true }));
     
     try {
-      const unifiedRequest: ConcordanceAnalysisRequest = {
-        node_ids: [nodeId],
-        node_columns: { [nodeId]: selection.column },
-        search_word: searchWord.trim(),
-        num_left_tokens: numLeftTokens,
-        num_right_tokens: numRightTokens,
-        regex,
-        case_sensitive: caseSensitive,
+      const overrides = {
+        node_id: nodeId,
+        combined: false,
         page: currentPage,
         page_size: nodeState.pageSize,
         sort_by: (overrideSortBy ?? nodeState.sortBy) || undefined,
         sort_order: overrideSortOrder ?? nodeState.sortOrder,
-        combined: false,
       };
 
-      const response = await textApi.concordance(currentWorkspaceId, unifiedRequest, getAuthHeaders());
+      const response = await textApi.postConcordanceCurrentResult(currentWorkspaceId, overrides, getAuthHeaders()) as ConcordanceAnalysisResponse;
 
       if (localStorage.getItem('debugConc') === '1') console.log('Single Node Concordance Response:', response);
 
-      const responseEntries = Object.entries(response.data || {});
-      const [responseKey, responsePayload] = responseEntries[0] || [undefined, undefined];
-
-      // Determine which key should be updated in the existing results
-      let existingKey: string | null = null;
-      if (results?.data) {
-        for (const [key] of Object.entries(results.data)) {
-          if (
-            key === nodeId ||
-            key === (node.data?.name || nodeId) ||
-            key === node.data?.name ||
-            key === node.name
-          ) {
-            existingKey = key;
-            break;
-          }
-        }
-        if (!existingKey && Object.keys(results.data).length > 0) {
-          const nodeIndex = selectedNodes.findIndex(n => n.id === nodeId);
-          const availableKeys = Object.keys(results.data);
-          if (nodeIndex >= 0 && nodeIndex < availableKeys.length) {
-            existingKey = availableKeys[nodeIndex];
-          } else {
-            existingKey = availableKeys[0];
-          }
-        }
+      if (response?.data) {
+        mergeConcordanceResults(response);
+      } else if (response) {
+        setResults(response);
       }
-
-      if (localStorage.getItem('debugConc') === '1') console.log('Updating existing key:', existingKey, 'for nodeId:', nodeId);
-
-      const fallbackExisting = existingKey && results?.data ? results.data[existingKey] : undefined;
-
-      const normalizedPayload: ConcordanceResultEntry = {
-        data: responsePayload?.data ?? [],
-        columns: responsePayload?.columns ?? fallbackExisting?.columns ?? [],
-        metadata:
-          responsePayload?.metadata ??
-          fallbackExisting?.metadata ?? {
-            concordance_columns: [],
-            metadata_columns: [],
-            all_columns:
-              responsePayload?.columns ??
-              fallbackExisting?.metadata?.all_columns ??
-              fallbackExisting?.columns ?? [],
-          },
-        total_matches: responsePayload?.total_matches ?? fallbackExisting?.total_matches ?? 0,
-        pagination:
-          responsePayload?.pagination ??
-          fallbackExisting?.pagination ?? {
-            page: currentPage,
-            page_size: nodeState.pageSize,
-            total_pages: 1,
-            has_next: false,
-            has_prev: false,
-          },
-        sorting:
-          responsePayload?.sorting ??
-          fallbackExisting?.sorting ?? {
-            sort_by: nodeState.sortBy,
-            sort_order: nodeState.sortOrder,
-          },
-      };
-
-      const targetKey = existingKey || responseKey || nodeId;
-      const patchedResponse: ConcordanceAnalysisResponse = {
-        state: response.state,
-        message: response.message,
-        data: {
-          [targetKey]: normalizedPayload,
-        },
-        analysis_params: response.analysis_params ?? results?.analysis_params,
-        combinable: response.combinable ?? results?.combinable,
-      };
-
-      mergeConcordanceResults(patchedResponse);
     } catch (error) {
       console.error('Error performing single node concordance search:', error);
     } finally {
@@ -669,23 +621,118 @@ const ConcordanceTab: React.FC = () => {
     }
   };
 
-  const handleRowClick = async (row: any, nodeId: string, column: string) => {
+  const handleRowClick = (row: any, nodeId: string, column: string) => {
     if (!currentWorkspaceId || row.document_idx === undefined) return;
-    
-    setLoadingDetail(true);
-    try {
-      const authHeaders = getAuthHeaders();
-      const headers = Object.keys(authHeaders).length > 0 ? authHeaders as Record<string, string> : {};
-  const detail = await textApi.concordanceDetail(currentWorkspaceId, nodeId, row.document_idx, column, headers);
-      setSelectedDetail({ ...row, ...detail, nodeId, column });
-      setShowDetailModal(true);
-    } catch (error) {
-      console.error('Error fetching concordance detail:', error);
-      alert('Error loading detail view');
-    } finally {
-      setLoadingDetail(false);
-    }
+
+    const record = { ...row };
+    const availableColumns = Object.keys(record);
+    const rawFullText = record[column];
+    const fullText = rawFullText === null || rawFullText === undefined ? undefined : String(rawFullText);
+
+    const detailPayload = {
+      ...row,
+      nodeId,
+      column,
+      full_text: fullText,
+      record,
+      available_columns: availableColumns,
+      case_sensitive: row.case_sensitive ?? caseSensitive,
+    };
+
+    setSelectedDetail(detailPayload);
+    setShowDetailModal(true);
   };
+
+  const highlightMatchInText = useCallback(
+    (
+      textValue: string,
+      startValue: unknown,
+      endValue: unknown,
+      fallbackMatch?: string,
+      fallbackCaseSensitive?: boolean
+    ): React.ReactNode => {
+      if (typeof textValue !== 'string' || textValue.length === 0) {
+        return textValue;
+      }
+
+      const parseIndex = (value: unknown): number | null => {
+        if (typeof value === 'number' && Number.isFinite(value)) {
+          return Math.floor(value);
+        }
+        if (typeof value === 'string' && value.trim() !== '') {
+          const parsed = Number.parseInt(value, 10);
+          return Number.isNaN(parsed) ? null : parsed;
+        }
+        return null;
+      };
+
+      let startIdx = parseIndex(startValue);
+      let endIdx = parseIndex(endValue);
+
+      if (startIdx === null || endIdx === null || endIdx <= startIdx) {
+        if (fallbackMatch && fallbackMatch.length > 0) {
+          const source = fallbackCaseSensitive ? textValue : textValue.toLowerCase();
+          const needle = fallbackCaseSensitive ? fallbackMatch : fallbackMatch.toLowerCase();
+          const fallbackIdx = source.indexOf(needle);
+          if (fallbackIdx !== -1) {
+            startIdx = fallbackIdx;
+            endIdx = fallbackIdx + needle.length;
+          }
+        }
+      }
+
+      if (startIdx === null || endIdx === null || endIdx <= startIdx) {
+        return textValue;
+      }
+
+      const safeStart = Math.max(0, Math.min(startIdx, textValue.length));
+      const safeEnd = Math.max(safeStart, Math.min(endIdx, textValue.length));
+
+      if (safeEnd <= safeStart) {
+        return textValue;
+      }
+
+      return (
+        <>
+          {textValue.slice(0, safeStart)}
+          <mark className="bg-yellow-200 text-gray-900 rounded px-1">
+            {textValue.slice(safeStart, safeEnd)}
+          </mark>
+          {textValue.slice(safeEnd)}
+        </>
+      );
+    },
+    []
+  );
+
+  const detailFullTextInfo = useMemo(() => {
+    if (!selectedDetail) {
+      return { text: null as string | null, highlighted: null as React.ReactNode };
+    }
+
+    const textCandidate =
+      typeof selectedDetail.full_text === 'string'
+        ? selectedDetail.full_text
+        : typeof selectedDetail.text === 'string'
+        ? selectedDetail.text
+        : null;
+
+    if (!textCandidate) {
+      return { text: null as string | null, highlighted: null as React.ReactNode };
+    }
+
+    const highlighted = highlightMatchInText(
+      textCandidate,
+      selectedDetail.start_idx,
+      selectedDetail.end_idx,
+      (typeof selectedDetail.matched_text === 'string' && selectedDetail.matched_text.length > 0)
+        ? selectedDetail.matched_text
+        : searchWord,
+      typeof selectedDetail.case_sensitive === 'boolean' ? selectedDetail.case_sensitive : caseSensitive
+    );
+
+    return { text: textCandidate, highlighted };
+  }, [selectedDetail, highlightMatchInText, searchWord, caseSensitive]);
 
   const handleDetach = async (nodeId: string, column: string) => {
     if (!currentWorkspaceId || !searchWord.trim()) {
@@ -1260,7 +1307,7 @@ const ConcordanceTab: React.FC = () => {
                         const h = anchorEl.getBoundingClientRect().height;
                         anchorEl.style.minHeight = h + 'px';
                       }
-                      Promise.resolve(handleSearch(true, undefined, mode, undefined, undefined, mode === 'combined')).finally(() => {
+                      Promise.resolve(handleSearch(true, undefined, mode, undefined, undefined, true)).finally(() => {
                         // After results update and paint, compensate scroll so anchor stays put
                         requestAnimationFrame(() => {
                           requestAnimationFrame(() => {
@@ -1357,94 +1404,87 @@ const ConcordanceTab: React.FC = () => {
             </div>
             
             <div className="p-6 overflow-y-auto max-h-[calc(80vh-120px)]">
-              {loadingDetail ? (
-                <div className="text-center py-12">
-                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                  <p className="text-gray-600 mt-2">Loading detail...</p>
-                </div>
-              ) : (
-                <>
-                  {/* Metadata */}
-                  <div className="mb-6 grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="font-medium text-gray-700">Document Index:</span>
-                      <span className="ml-2">{selectedDetail.document_idx}</span>
-                    </div>
-                    <div>
-                      <span className="font-medium text-gray-700">Search Word:</span>
-                      <span className="ml-2 font-mono bg-yellow-100 px-1 rounded">{searchWord}</span>
-                    </div>
-                    <div>
-                      <span className="font-medium text-gray-700">L1 Word:</span>
-                      <span className="ml-2">{selectedDetail.l1} (freq: {selectedDetail.l1_freq})</span>
-                    </div>
-                    <div>
-                      <span className="font-medium text-gray-700">R1 Word:</span>
-                      <span className="ml-2">{selectedDetail.r1} (freq: {selectedDetail.r1_freq})</span>
-                    </div>
-                  </div>
-                  
-                  {/* Full Text */}
-                  <div className="mb-6">
-                    <h4 className="font-medium text-gray-700 mb-2">Full Text from Column: {selectedDetail.column}</h4>
-                    <div className="bg-gray-50 p-4 rounded-lg border">
-                      <div className="font-mono text-sm whitespace-pre-wrap max-h-96 overflow-y-auto">
-                        {selectedDetail.full_text || selectedDetail.text || 'Text not available'}
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* Document Metadata Table */}
+              <>
+                {/* Metadata */}
+                <div className="mb-6 grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <h4 className="font-medium text-gray-700 mb-2">Document Metadata</h4>
-                    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Field</th>
-                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Value</th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {selectedDetail.record && Object.entries(selectedDetail.record).map(([key, value]) => {
-                            // Skip the text column since it's already displayed above
-                            if (key === selectedDetail.column) {
-                              return null;
-                            }
-                            
-                            // Format the value properly
-                            let displayValue: string;
-                            if (value === null || value === undefined) {
-                              displayValue = 'null';
-                            } else if (typeof value === 'object') {
-                              displayValue = JSON.stringify(value, null, 2);
-                            } else {
-                              displayValue = String(value);
-                            }
-                            
-                            return (
-                              <tr key={key} className="hover:bg-gray-50">
-                                <td className="px-4 py-2 text-sm font-medium text-gray-900">{key}</td>
-                                <td className="px-4 py-2 text-sm text-gray-700">
-                                  <div className="max-w-md break-words">
-                                    {typeof value === 'object' && value !== null ? (
-                                      <pre className="text-xs bg-gray-100 p-2 rounded overflow-x-auto">
-                                        {displayValue}
-                                      </pre>
-                                    ) : (
-                                      displayValue
-                                    )}
-                                  </div>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                    <span className="font-medium text-gray-700">Document Index:</span>
+                    <span className="ml-2">{selectedDetail.document_idx}</span>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Search Word:</span>
+                    <span className="ml-2 font-mono bg-yellow-100 px-1 rounded">{searchWord}</span>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">L1 Word:</span>
+                    <span className="ml-2">{selectedDetail.l1} (freq: {selectedDetail.l1_freq})</span>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">R1 Word:</span>
+                    <span className="ml-2">{selectedDetail.r1} (freq: {selectedDetail.r1_freq})</span>
+                  </div>
+                </div>
+                
+                {/* Full Text */}
+                <div className="mb-6">
+                  <h4 className="font-medium text-gray-700 mb-2">Full Text from Column: {selectedDetail.column}</h4>
+                  <div className="bg-gray-50 p-4 rounded-lg border">
+                    <div className="font-mono text-sm whitespace-pre-wrap max-h-96 overflow-y-auto">
+                      {detailFullTextInfo.text
+                        ? detailFullTextInfo.highlighted ?? detailFullTextInfo.text
+                        : 'Text not available'}
                     </div>
                   </div>
-                </>
-              )}
+                </div>
+                
+                {/* Document Metadata Table */}
+                <div>
+                  <h4 className="font-medium text-gray-700 mb-2">Document Metadata</h4>
+                  <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Field</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Value</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {selectedDetail.record && Object.entries(selectedDetail.record).map(([key, value]) => {
+                          if (key === selectedDetail.column) {
+                            return null;
+                          }
+
+                          let displayValue: string;
+                          if (value === null || value === undefined) {
+                            displayValue = 'null';
+                          } else if (typeof value === 'object') {
+                            displayValue = JSON.stringify(value, null, 2);
+                          } else {
+                            displayValue = String(value);
+                          }
+
+                          return (
+                            <tr key={key} className="hover:bg-gray-50">
+                              <td className="px-4 py-2 text-sm font-medium text-gray-900">{key}</td>
+                              <td className="px-4 py-2 text-sm text-gray-700">
+                                <div className="max-w-md break-words">
+                                  {typeof value === 'object' && value !== null ? (
+                                    <pre className="text-xs bg-gray-100 p-2 rounded overflow-x-auto">
+                                      {displayValue}
+                                    </pre>
+                                  ) : (
+                                    displayValue
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </>
             </div>
           </div>
         </div>

@@ -404,6 +404,7 @@ const TokenFrequencyTab: React.FC = () => {
             case_sensitive: false,
             page: 1,
             page_size: 20,
+            combined: false,
           };
           await textApi.concordance(currentWorkspaceId, request, getAuthHeaders());
         }
