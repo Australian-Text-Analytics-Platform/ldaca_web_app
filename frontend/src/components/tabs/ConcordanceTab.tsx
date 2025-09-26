@@ -1115,24 +1115,25 @@ const ConcordanceTab: React.FC = () => {
         {/* Search Configuration */}
         <div className="mb-6">
           <div className={`space-y-4`}>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Search Word/Phrase
-              </label>
-              <input
-                type="text"
-                value={searchWord}
-                onChange={(e) => setSearchWord(e.target.value)}
-                placeholder="Enter word or phrase to search for"
-                disabled={!!isLocked}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
+            <div className="flex flex-col gap-4 md:flex-row md:items-end">
+              <div className="flex-1">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Left Context (tokens)
+                  Search Word/Phrase
+                </label>
+                <input
+                  type="text"
+                  value={searchWord}
+                  onChange={(e) => setSearchWord(e.target.value)}
+                  placeholder="Enter word or phrase to search for"
+                  disabled={!!isLocked}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                />
+              </div>
+
+              <div className="md:flex-none">
+                <label className="block text-sm font-medium text-gray-700 mb-2 leading-tight">
+                  <span className="block">Left Context</span>
+                  <span className="block">(tokens)</span>
                 </label>
                 <input
                   type="number"
@@ -1141,13 +1142,14 @@ const ConcordanceTab: React.FC = () => {
                   min="1"
                   max="50"
                   disabled={!!isLocked}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  className="w-full md:w-auto md:max-w-[7rem] px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Right Context (tokens)
+              <div className="md:flex-none">
+                <label className="block text-sm font-medium text-gray-700 mb-2 leading-tight">
+                  <span className="block">Right Context</span>
+                  <span className="block">(tokens)</span>
                 </label>
                 <input
                   type="number"
@@ -1156,59 +1158,60 @@ const ConcordanceTab: React.FC = () => {
                   min="1"
                   max="50"
                   disabled={!!isLocked}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  className="w-full md:w-auto md:max-w-[7rem] px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
                 />
               </div>
-            </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Results per page
-              </label>
-              <select
-                value={globalPageSize}
-                onChange={(e) => {
-                  const newPageSize = parseInt(e.target.value);
-                  setGlobalPageSize(newPageSize);
-                  // Update all node pagination to use new page size and reset to page 1
-                  setNodePagination(prev => {
-                    const updated = { ...prev };
-                    Object.keys(updated).forEach(nodeId => {
-                      updated[nodeId] = {
-                        ...updated[nodeId],
-                        pageSize: newPageSize,
-                        currentPage: 1
-                      };
-                    });
-                    return updated;
-                  });
-                  // Trigger search for all visible nodes with new page size
-                  setTimeout(() => {
-                    if (results && ((results as any).state === 'successful') && (results as any).data) {
-                      Object.keys(results.data).forEach(nodeName => {
-                        // Find the corresponding node ID from nodeName
-                        let node = selectedNodes.find(n => n.id === nodeName);
-                        if (!node) {
-                          node = selectedNodes.find(n => n.name === nodeName);
-                        }
-                        if (!node) {
-                          const nodeIndex = Object.keys(results.data!).indexOf(nodeName);
-                          node = selectedNodes[nodeIndex];
-                        }
-                        if (node) {
-                          handleSingleNodeSearch(node.id);
-                        }
+              <div className="md:flex-none">
+                <label className="block text-sm font-medium text-gray-700 mb-2 leading-tight">
+                  <span className="block">Results per</span>
+                  <span className="block">page</span>
+                </label>
+                <select
+                  value={globalPageSize}
+                  onChange={(e) => {
+                    const newPageSize = parseInt(e.target.value);
+                    setGlobalPageSize(newPageSize);
+                    // Update all node pagination to use new page size and reset to page 1
+                    setNodePagination(prev => {
+                      const updated = { ...prev };
+                      Object.keys(updated).forEach(nodeId => {
+                        updated[nodeId] = {
+                          ...updated[nodeId],
+                          pageSize: newPageSize,
+                          currentPage: 1
+                        };
                       });
-                    }
-                  }, 100);
-                }}
-                className="w-full md:w-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
-              >
-                <option value={10}>10</option>
-                <option value={20}>20</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-              </select>
+                      return updated;
+                    });
+                    // Trigger search for all visible nodes with new page size
+                    setTimeout(() => {
+                      if (results && ((results as any).state === 'successful') && (results as any).data) {
+                        Object.keys(results.data).forEach(nodeName => {
+                          // Find the corresponding node ID from nodeName
+                          let node = selectedNodes.find(n => n.id === nodeName);
+                          if (!node) {
+                            node = selectedNodes.find(n => n.name === nodeName);
+                          }
+                          if (!node) {
+                            const nodeIndex = Object.keys(results.data!).indexOf(nodeName);
+                            node = selectedNodes[nodeIndex];
+                          }
+                          if (node) {
+                            handleSingleNodeSearch(node.id);
+                          }
+                        });
+                      }
+                    }, 100);
+                  }}
+                  className="w-full md:w-auto md:max-w-[7rem] px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                >
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </div>
             </div>
 
             {/* Options */}
