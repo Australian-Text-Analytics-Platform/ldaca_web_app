@@ -272,6 +272,8 @@ async def detach_quotation(
             "verb_start_idx",
             "verb_end_idx",
             "quote_type",
+            "quote_token_count",
+            "is_floating_quote",
         ]
         if "quote_row_idx" not in quotation_with_idx.columns:
             quotation_with_idx = quotation_with_idx.with_row_index("quote_row_idx")
