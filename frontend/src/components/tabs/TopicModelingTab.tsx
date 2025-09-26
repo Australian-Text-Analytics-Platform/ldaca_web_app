@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import NodeSelectionPanel from '../NodeSelectionPanel';
 import { useWorkspace } from '../../hooks/useWorkspace';
 import { useAuth } from '../../hooks/useAuth';
@@ -8,6 +8,8 @@ import type { TopicModelingRequest } from '../../api/text';
 import { workspacesApi } from '../../api/workspaces';
 import { nodesApi } from '../../api/nodes';
 import { useAnalysisStore } from '../../stores/analysisStore';
+import useAutoNodeColumns from '../../hooks/useAutoNodeColumns';
+import useNodeColumnInfos from '../../hooks/useNodeColumnInfos';
 // Define local lightweight response/topic interfaces if not exported (legacy code referenced these)
 interface TopicModelingTopic { id: number; label: string; size: number[]; total_size: number; x: number; y: number; }
 interface TopicModelingResponse { state?: 'running' | 'successful' | 'failed' | 'cancelled'; message?: string; data?: { topics: TopicModelingTopic[]; corpus_sizes?: number[] }; metadata?: { task_id?: string; [k: string]: any } }
@@ -23,14 +25,14 @@ function interpolateColor(c1: string, c2: string, t: number) {
 }
 
 const TopicModelingTab: React.FC = () => {
-  const { selectedNodes, currentWorkspaceId } = useWorkspace();
+  const { selectedNodes, currentWorkspaceId, getNodeShape } = useWorkspace();
   const { getAuthHeaders } = useAuth();
   const { setTasks } = useAnalysisStore() as any;
-  const [nodeColumnSelections, setNodeColumnSelections] = useState<NodeColumnSelection[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
   const runningRef = useRef<boolean>(false);
   const [lockedNodesSnapshot, setLockedNodesSnapshot] = useState<Array<{ id: string; name: string; columns: string[] }>>([]);
+  const [lockedNodeSelections, setLockedNodeSelections] = useState<NodeColumnSelection[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<TopicModelingResponse | null>(null);
   const resultRef = useRef<TopicModelingResponse | null>(null); // Track result to prevent downgrades
@@ -74,6 +76,17 @@ const TopicModelingTab: React.FC = () => {
 
   const defaultPalette = useMemo(()=>['#2563eb','#dc2626','#16a34a','#9333ea','#0d9488','#db2777'],[]);
 
+  const { getColumnInfos } = useNodeColumnInfos({
+    workspaceId: currentWorkspaceId,
+    nodes: selectedNodes,
+  });
+
+  const { selections: nodeColumnSelections, setSelection: setNodeColumnSelection, setSelections: setNodeColumnSelectionsRaw, recompute: recomputeAutoColumns } = useAutoNodeColumns({
+    selectedNodes,
+    getNodeColumns: getColumnInfos,
+    allowedDataTypes: ['string'],
+  }, { workspaceId: currentWorkspaceId, maxNodes: 2, isLocked, docTypeOnly: true, enableHeuristicGuess: false });
+
   // Ensure colors assigned
   useEffect(()=>{
     setNodeColors(prev=>{
@@ -83,32 +96,15 @@ const TopicModelingTab: React.FC = () => {
     });
   },[selectedNodes, defaultPalette]);
 
-  const getNodeColumns = useMemo(()=> (node: any)=>{
-    if (node.data?.columns) return node.data.columns;
-    // Also check if columns are directly on the node object (for locked snapshots)
-    if (node.columns && Array.isArray(node.columns)) return node.columns;
-    if (node.data?.dtypes) return Object.keys(node.data.dtypes);
-    if (node.data?.schema) return Object.keys(node.data.schema);
-    return [];
-  },[]);
-
-  useEffect(()=>{
-    if (isLocked) return;
-    if(!selectedNodes.length) { setNodeColumnSelections([]); return; }
-    setNodeColumnSelections(prev=>{
-      const next = selectedNodes.map((n:any)=>{
-        const existing = prev.find(p=>p.nodeId===n.id); if(existing) return existing;
-        const cols = getNodeColumns(n);
-        const docCol = n.data?.documentColumn;
-        return { nodeId: n.id, column: (docCol && cols.includes(docCol)) ? docCol : '' };
-      });
-      return next;
-    });
-  },[selectedNodes, getNodeColumns]);
+  useEffect(() => {
+    if (!isLocked && selectedNodes.length > 0 && nodeColumnSelections.length === 0) {
+      recomputeAutoColumns();
+    }
+  }, [isLocked, selectedNodes, nodeColumnSelections, recomputeAutoColumns]);
 
   const handleColumnChange = (nodeId: string, column: string) => {
     if (isLocked) return;
-    setNodeColumnSelections(prev=>prev.map(sel=> sel.nodeId===nodeId ? { ...sel, column } : sel));
+    setNodeColumnSelection(nodeId, column);
   };
   const handleColorChange = (nodeId: string, color: string) => setNodeColors(p=>({...p,[nodeId]:color}));
 
@@ -125,8 +121,8 @@ const TopicModelingTab: React.FC = () => {
     setError(null);
     setResultSafely(null);
     try {
-      const node_columns: Record<string,string> = {};
-      nodeColumnSelections.forEach(s=>{ if(s.column) node_columns[s.nodeId]=s.column; });
+  const node_columns: Record<string,string> = {};
+  nodeColumnSelections.forEach(s=>{ if(s.column) node_columns[s.nodeId]=s.column; });
       const req: TopicModelingRequest = {
         node_ids: firstTwo.map(n=>n.id),
         node_columns,
@@ -161,6 +157,8 @@ const TopicModelingTab: React.FC = () => {
           }
         }
         setLockedNodesSnapshot(snaps);
+        const lockedSelections = nodeColumnSelections.filter(sel => ids.includes(sel.nodeId));
+        setLockedNodeSelections(lockedSelections);
         setIsLocked(true);
       } catch { /* ignore */ }
     } catch (e:any) {
@@ -289,7 +287,8 @@ const TopicModelingTab: React.FC = () => {
           const nodeIds: string[] = Array.isArray(req.node_ids) ? req.node_ids.slice(0,2) : [];
           const node_columns: Record<string,string> = req.node_columns || {};
           const sels = nodeIds.map((id: string) => ({ nodeId: id, column: node_columns[id] || '' }));
-          setNodeColumnSelections(sels);
+          setNodeColumnSelectionsRaw(sels, { replace: true });
+          setLockedNodeSelections(sels);
           setMinTopicSize(Number(req.min_topic_size ?? 5));
           setUseCtTfidf(!!req.use_ctfidf);
           
@@ -426,15 +425,22 @@ const TopicModelingTab: React.FC = () => {
         </div>
         <div className="mb-6">
           <NodeSelectionPanel
-            selectedNodes={(isLocked && lockedNodesSnapshot.length) ? lockedNodesSnapshot.map(s=>({ id: s.id, name: s.name, data: { name: s.name, nodeName: s.name, label: s.name, columns: s.columns }, columns: s.columns })) : selectedNodes}
-            nodeColumnSelections={nodeColumnSelections}
+            selectedNodes={(isLocked && lockedNodesSnapshot.length)
+              ? lockedNodesSnapshot.map(s=>({ id: s.id, name: s.name, data: { name: s.name, nodeName: s.name, label: s.name, columns: s.columns }, columns: s.columns }))
+              : selectedNodes}
+            nodeColumnSelections={(isLocked && lockedNodeSelections) ? lockedNodeSelections : nodeColumnSelections}
             onColumnChange={handleColumnChange}
             nodeColors={nodeColors}
             onColorChange={handleColorChange}
-            getNodeColumns={getNodeColumns}
+            getNodeColumns={getColumnInfos}
             defaultPalette={defaultPalette}
             maxCompare={2}
             disabled={!!isLocked}
+            showShape
+            getNodeShapeFn={getNodeShape}
+            showColorPicker
+            locked={!!isLocked}
+            allowedDataTypes={['string']}
           />
         </div>
 
@@ -483,8 +489,11 @@ const TopicModelingTab: React.FC = () => {
                 setResultSafely(null);
                 setIsLocked(false);
                 setLockedNodesSnapshot([]);
+                setLockedNodeSelections(null);
                 setIsRunning(false);
                 runningRef.current = false;
+                setNodeColumnSelectionsRaw([], { replace: true, persist: false });
+                recomputeAutoColumns();
               }
             }}
             disabled={isClearing || (!result && !isLocked && !isRunning) || !currentWorkspaceId}

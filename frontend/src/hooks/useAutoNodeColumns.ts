@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { ColumnInfo, filterColumnsByType, mapColumnsToInfo, normalizeTypeName } from '../utils/columnTypes';
 
 /** Represents a chosen text column for a node */
 export interface NodeColumnSelection {
@@ -54,16 +55,22 @@ interface AutoNodeColumnsHookReturn {
  * Testing Notes:
  *  - Frontend test harness not yet established for hooks; a TODO marker is placed below for future jest/react-testing-library coverage.
  */
+type NodeColumnSource = string[] | ColumnInfo[];
+
 export function useAutoNodeColumns(
   params: {
     selectedNodes: any[];
-    getNodeColumns: (node: any) => string[];
+    getNodeColumns?: (node: any) => NodeColumnSource;
+    allowedDataTypes?: string[];
+    fallbackToAllColumns?: boolean;
   },
   options: UseAutoNodeColumnsOptions = {}
 ): AutoNodeColumnsHookReturn {
   const {
     selectedNodes,
     getNodeColumns,
+    allowedDataTypes = [],
+    fallbackToAllColumns = false,
   } = params;
   const {
     workspaceId,
@@ -129,6 +136,35 @@ export function useAutoNodeColumns(
   }, [setSelections]);
 
   // Auto-update selections when selectedNodes changes (unless locked)
+  const normalizeColumnInfos = useCallback((source: NodeColumnSource | undefined): ColumnInfo[] => {
+    if (!source) return [];
+    if (!Array.isArray(source) || source.length === 0) return [];
+    const first = source[0];
+    if (typeof first === 'string') {
+      return (source as string[]).map((name) => ({ name, dataType: 'string' }));
+    }
+    return (source as ColumnInfo[]).map((col) => ({ name: col.name, dataType: normalizeTypeName(col.dataType) }));
+  }, []);
+
+  const deriveColumnInfos = useCallback((node: any): ColumnInfo[] => {
+    let infos: ColumnInfo[] = [];
+    if (getNodeColumns) {
+      infos = normalizeColumnInfos(getNodeColumns(node));
+    } else {
+      infos = mapColumnsToInfo(node);
+    }
+    if (allowedDataTypes.length) {
+      const filtered = filterColumnsByType(infos, allowedDataTypes);
+      if (filtered.length > 0) {
+        return filtered;
+      }
+      if (!fallbackToAllColumns) {
+        return filtered;
+      }
+    }
+    return infos;
+  }, [allowedDataTypes, fallbackToAllColumns, getNodeColumns, normalizeColumnInfos]);
+
   const recompute = useCallback(() => {
     if (isLocked) return;
     const ids = selectedNodes.slice(0, maxNodes).map(n => n.id).filter(Boolean);
@@ -147,7 +183,7 @@ export function useAutoNodeColumns(
         // Auto select logic
         let column = '';
         if (node) {
-          const cols = getNodeColumns(node) || [];
+          const cols = deriveColumnInfos(node).map((info) => info.name);
             const documentColumn = node.data?.documentColumn || node.data?.document_column;
             const isDocType = !!(node.data?.nodeType && node.data.nodeType.includes('Doc'));
             if (documentColumn && cols.includes(documentColumn)) {
@@ -168,7 +204,7 @@ export function useAutoNodeColumns(
       persistSelections(next);
       return next;
     });
-  }, [enableHeuristicGuess, docTypeOnly, getNodeColumns, heuristicCandidates, isLocked, maxNodes, persistSelections, selectedNodes]);
+  }, [deriveColumnInfos, enableHeuristicGuess, docTypeOnly, heuristicCandidates, isLocked, maxNodes, persistSelections, selectedNodes]);
 
   useEffect(() => {
     const currIds = selectedNodes.slice(0, maxNodes).map(n => n.id).filter(Boolean);

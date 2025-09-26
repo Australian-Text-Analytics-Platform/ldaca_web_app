@@ -7,6 +7,7 @@ import { ConcordanceAnalysisRequest, ConcordanceAnalysisResponse, textApi } from
 import { nodesApi } from '../../api/nodes';
 import { workspacesApi } from '../../api/workspaces';
 import useAutoNodeColumns from '../../hooks/useAutoNodeColumns';
+import useNodeColumnInfos from '../../hooks/useNodeColumnInfos';
 
 interface NodeColumnSelection {
   nodeId: string;
@@ -24,19 +25,19 @@ const ConcordanceTab: React.FC = () => {
   getNodeShape
   } = useWorkspace();
 
+  const { getColumnInfos } = useNodeColumnInfos({
+    workspaceId: currentWorkspaceId,
+    nodes: selectedNodes,
+  });
+
   const { getAuthHeaders } = useAuth();
 
   const [isLocked, setIsLocked] = useState(false);
   // Shared auto column selection (shared with TokenFrequencyTab via undefined storageScope)
   const { selections: nodeColumnSelections, setSelection: setNodeColumnSelection, setSelections: setNodeColumnSelectionsRaw, recompute: recomputeAutoColumns } = useAutoNodeColumns({
     selectedNodes,
-    getNodeColumns: (n: any) => {
-      if (n.data?.columns && Array.isArray(n.data.columns)) return n.data.columns;
-      if (n.columns && Array.isArray(n.columns)) return n.columns;
-      if (n.data?.dtypes && typeof n.data.dtypes === 'object') return Object.keys(n.data.dtypes);
-      if (n.data?.schema) return Object.keys(n.data.schema);
-      return [];
-    }
+    getNodeColumns: getColumnInfos,
+    allowedDataTypes: ['string']
   }, { workspaceId: currentWorkspaceId, maxNodes: 2, isLocked, docTypeOnly: true, enableHeuristicGuess: false });
   const [lockedNodeSelections, setLockedNodeSelections] = useState<NodeColumnSelection[] | null>(null);
   const [searchWord, setSearchWord] = useState('');
@@ -199,27 +200,6 @@ const ConcordanceTab: React.FC = () => {
       localStorage.removeItem('pendingConcordanceSearch');
     }
   }, [selectedNodes]);
-
-  // Memoize the getNodeColumns function to prevent re-renders
-  const getNodeColumns = useMemo(() => {
-    return (node: any) => {
-      // Get available columns from node data
-      if (node.data?.columns && Array.isArray(node.data.columns)) {
-        return node.data.columns;
-      }
-      // Also check if columns are directly on the node object (for locked snapshots)
-      if (node.columns && Array.isArray(node.columns)) {
-        return node.columns;
-      }
-      if (node.data?.dtypes && typeof node.data.dtypes === 'object') {
-        return Object.keys(node.data.dtypes);
-      }
-      if (node.data?.schema) {
-        return Object.keys(node.data.schema);
-      }
-      return [];
-    };
-  }, []);
 
   // Recompute auto columns if unlocked and selections empty but nodes exist
   useEffect(() => {
@@ -1102,13 +1082,14 @@ const ConcordanceTab: React.FC = () => {
             onColumnChange={handleColumnChange}
             nodeColors={nodeColors}
             onColorChange={handleColorChange}
-            getNodeColumns={getNodeColumns}
             defaultPalette={defaultPalette}
             maxCompare={2}
             showShape
             getNodeShapeFn={getNodeShape}
             disabled={!!isLocked}
             showColorPicker={true}
+            getNodeColumns={getColumnInfos}
+            allowedDataTypes={['string']}
           />
         </div>
 

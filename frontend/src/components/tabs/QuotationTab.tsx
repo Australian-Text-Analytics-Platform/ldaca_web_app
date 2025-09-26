@@ -1,10 +1,12 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import NodeSelectionPanel from '../NodeSelectionPanel';
 import { useWorkspace } from '../../hooks/useWorkspace';
 import { useAuth } from '../../hooks/useAuth';
 import { textApi } from '../../api/text';
 import { nodesApi } from '../../api/nodes';
 import { workspacesApi } from '../../api/workspaces';
+import useAutoNodeColumns from '../../hooks/useAutoNodeColumns';
+import useNodeColumnInfos from '../../hooks/useNodeColumnInfos';
 
 interface NodeColumnSelection {
   nodeId: string;
@@ -15,12 +17,29 @@ const QuotationTab: React.FC = () => {
   const { selectedNodes, currentWorkspaceId, getNodeShape, quotationSearch, detachQuotation, nodeData, handlePageChange: baseHandlePageChange, handlePageSizeChange } = useWorkspace();
   const { getAuthHeaders } = useAuth();
 
-  const [nodeColumnSelections, setNodeColumnSelections] = useState<NodeColumnSelection[]>([]);
   // Show metadata by default so the table mirrors original columns
   const [showMetadata, setShowMetadata] = useState(true);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
   const [lockedNodesSnapshot, setLockedNodesSnapshot] = useState<Array<{ id: string; name: string; columns: string[] }>>([]);
+  const [lockedNodeSelections, setLockedNodeSelections] = useState<NodeColumnSelection[] | null>(null);
+
+  const { getColumnInfos } = useNodeColumnInfos({
+    workspaceId: currentWorkspaceId,
+    nodes: selectedNodes,
+  });
+
+  const { selections: nodeColumnSelections, setSelection: setNodeColumnSelection, setSelections: setNodeColumnSelectionsRaw, recompute: recomputeAutoColumns } = useAutoNodeColumns({
+    selectedNodes,
+    getNodeColumns: getColumnInfos,
+    allowedDataTypes: ['string'],
+  }, { workspaceId: currentWorkspaceId, maxNodes: 1, isLocked, docTypeOnly: true, enableHeuristicGuess: false });
+
+  const activeSelections = useMemo(() => (
+    isLocked && lockedNodeSelections ? lockedNodeSelections : nodeColumnSelections
+  ), [isLocked, lockedNodeSelections, nodeColumnSelections]);
+
+  const getStringColumns = useCallback((node: any) => getColumnInfos(node).map(info => info.name), [getColumnInfos]);
 
   // Per-node pagination and sorting state
   const [nodeState, setNodeState] = useState<Record<string, {
@@ -36,39 +55,22 @@ const QuotationTab: React.FC = () => {
   // Aggregated spans keyed by a row signature (JSON of original column values)
   const [spanMap, setSpanMap] = useState<Record<string, Record<string, { start: number; end: number; type: string }[]>>>({});
 
-  // Helpers
-  const getNodeColumns = useMemo(() => {
-    return (node: any) => {
-      if (node.data?.columns && Array.isArray(node.data.columns)) return node.data.columns;
-      // Also check if columns are directly on the node object (for locked snapshots)
-      if (node.columns && Array.isArray(node.columns)) return node.columns;
-      if (node.data?.dtypes && typeof node.data.dtypes === 'object') return Object.keys(node.data.dtypes);
-      if (node.data?.schema) return Object.keys(node.data.schema);
-      return [];
-    };
-  }, []);
-
-// Sync selection with current nodes (limit to 1 by default)
   useEffect(() => {
     if (isLocked) return;
-    if (selectedNodes.length === 0) { setNodeColumnSelections([]); return; }
-    setNodeColumnSelections(prev => {
-      const newSelections = selectedNodes.slice(0, 1).map(node => {
-        const existing = prev.find(sel => sel.nodeId === node.id);
-        if (existing) return existing;
-        const columns = getNodeColumns(node);
-        const isDocType = !!(node.data?.nodeType && node.data.nodeType.includes('Doc'));
-        const documentColumn = node.data?.documentColumn;
-        const defaultColumn = isDocType && documentColumn && columns.includes(documentColumn) ? documentColumn : '';
-        return { nodeId: node.id, column: defaultColumn };
-      });
-      return JSON.stringify(newSelections) === JSON.stringify(prev) ? prev : newSelections;
-    });
-  }, [selectedNodes, getNodeColumns]);
+    if (!selectedNodes.length) {
+      if (nodeColumnSelections.length) {
+        setNodeColumnSelectionsRaw([], { replace: true, persist: false });
+      }
+      return;
+    }
+    if (nodeColumnSelections.length === 0) {
+      recomputeAutoColumns();
+    }
+  }, [isLocked, selectedNodes, nodeColumnSelections, recomputeAutoColumns, setNodeColumnSelectionsRaw]);
 
-const handleColumnChange = (nodeId: string, column: string) => {
+  const handleColumnChange = (nodeId: string, column: string) => {
     if (isLocked) return;
-    setNodeColumnSelections(prev => prev.map(sel => sel.nodeId === nodeId ? { ...sel, column } : sel));
+    setNodeColumnSelection(nodeId, column);
   };
 
   // Colors for underline types
@@ -209,7 +211,7 @@ const handleColumnChange = (nodeId: string, column: string) => {
 
 const fetchQuotations = async (nodeId: string, _page?: number, _sortBy?: string, _sortOrder?: 'asc'|'desc') => {
     if (!currentWorkspaceId) return;
-    const selection = nodeColumnSelections.find(s => s.nodeId === nodeId);
+  const selection = activeSelections.find(s => s.nodeId === nodeId);
     if (!selection?.column) return;
 
   // show loading via global UI if desired; skip per-node loading state
@@ -223,8 +225,8 @@ const fetchQuotations = async (nodeId: string, _page?: number, _sortBy?: string,
       } as any;
     const res = await quotationSearch(nodeId, req);
       // Build span map keyed by row signature from original columns
-      const node = selectedNodes.find(n => n.id === nodeId);
-      const origCols = node ? getNodeColumns(node) : [];
+  const node = selectedNodes.find(n => n.id === nodeId);
+  const origCols = node ? getStringColumns(node) : [];
       const map: Record<string, { start: number; end: number; type: string }[]> = {};
       const rows: any[] = res?.data || [];
       const sig = (r: any) => JSON.stringify(origCols.map((c: string) => r?.[c]));
@@ -247,10 +249,15 @@ const fetchQuotations = async (nodeId: string, _page?: number, _sortBy?: string,
 const handleSearchAll = async () => {
   setHasLoaded(true);
   const runNodes = selectedNodes.slice(0,1);
+  if (!runNodes.length) return;
   await Promise.all(runNodes.map(n => fetchQuotations(n.id, 1)));
   // Lock with snapshot
   try {
     const nodeId = runNodes[0].id;
+    const lockedSelections = activeSelections.filter(sel => sel.nodeId === nodeId && sel.column);
+    if (lockedSelections.length) {
+      setLockedNodeSelections(lockedSelections);
+    }
     const info = await nodesApi.info(currentWorkspaceId!, nodeId, getAuthHeaders());
     const name = (info as any)?.name || (info as any)?.data?.name || nodeId;
     const columns = Array.isArray((info as any)?.columns) ? (info as any).columns : (Array.isArray((info as any)?.data?.columns) ? (info as any).data.columns : []);
@@ -274,7 +281,7 @@ const handleSearchAll = async () => {
   };
 
   const handleDetach = async (nodeId: string) => {
-    const selection = nodeColumnSelections.find(s => s.nodeId === nodeId);
+    const selection = activeSelections.find(s => s.nodeId === nodeId);
     if (!selection?.column) return;
     setNodeDetaching(prev => ({ ...prev, [nodeId]: true }));
     try {
@@ -305,7 +312,12 @@ const handleSearchAll = async () => {
         if (req) {
           const nodeId = req.node_id || req.nodeId;
           const column = req.column || '';
-          setNodeColumnSelections([{ nodeId, column }]);
+          if (nodeId) {
+            setNodeColumnSelectionsRaw([{ nodeId, column }], { replace: true });
+            if (column) {
+              setLockedNodeSelections([{ nodeId, column }]);
+            }
+          }
           setShowMetadata(true);
           
           // Lock with snapshot
@@ -363,11 +375,11 @@ const handleSearchAll = async () => {
         <div>
           <NodeSelectionPanel
             selectedNodes={(isLocked && lockedNodesSnapshot.length) ? lockedNodesSnapshot.map(s=>({ id: s.id, name: s.name, data: { name: s.name, nodeName: s.name, label: s.name, columns: s.columns }, columns: s.columns })) : selectedNodes.slice(0,1)}
-            nodeColumnSelections={nodeColumnSelections}
+            nodeColumnSelections={activeSelections}
             onColumnChange={handleColumnChange}
             nodeColors={{}}
             onColorChange={()=>{}}
-            getNodeColumns={getNodeColumns}
+            getNodeColumns={getColumnInfos}
             defaultPalette={[]}
             maxCompare={1}
             className="mb-0"
@@ -375,6 +387,7 @@ const handleSearchAll = async () => {
             getNodeShapeFn={getNodeShape}
             showColorPicker={false}
             disabled={!!isLocked}
+            allowedDataTypes={['string']}
           />
         </div>
 
@@ -390,7 +403,7 @@ const handleSearchAll = async () => {
         <div className="flex flex-wrap gap-3 items-center">
           <button
             onClick={handleSearchAll}
-            disabled={!selectedNodes.length || nodeColumnSelections.some(s=>!s.column) || !!isLocked}
+            disabled={!selectedNodes.length || activeSelections.some(s=>!s.column) || !!isLocked}
             className="w-full md:w-auto px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
           >
             Load Quotations
@@ -404,7 +417,10 @@ const handleSearchAll = async () => {
                 setHasLoaded(false);
                 setSpanMap({});
                 setLockedNodesSnapshot([]);
+                setLockedNodeSelections(null);
                 setIsLocked(false);
+                setNodeColumnSelectionsRaw([], { replace: true, persist: false });
+                recomputeAutoColumns();
               }}
               className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
             >
@@ -419,8 +435,8 @@ const handleSearchAll = async () => {
         const nodeId = node.id;
   // const nodeRes = results[nodeId]; // no longer needed; we use base table pagination
   // Determine which columns to show: mirror original node columns only
-        const originalColumns = getNodeColumns(node);
-        const selection = nodeColumnSelections.find(s => s.nodeId === nodeId);
+  const originalColumns = getStringColumns(node);
+  const selection = activeSelections.find(s => s.nodeId === nodeId);
         const textCol = selection?.column || '';
         const cols = originalColumns;
   // Use base table rows as the source of truth

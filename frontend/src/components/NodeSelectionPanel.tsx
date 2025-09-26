@@ -1,10 +1,13 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import ColorSwatchPicker from './ui/ColorSwatchPicker';
+import { ColumnInfo, filterColumnsByType, mapColumnsToInfo, normalizeTypeName } from '../utils/columnTypes';
 
 export interface NodeColumnSelection {
   nodeId: string;
   column: string;
 }
+
+type NodeColumnSource = string[] | ColumnInfo[];
 
 interface NodeSelectionPanelProps {
   selectedNodes: any[];
@@ -12,7 +15,7 @@ interface NodeSelectionPanelProps {
   onColumnChange: (nodeId: string, column: string) => void;
   nodeColors: Record<string,string>;
   onColorChange: (nodeId: string, color: string) => void;
-  getNodeColumns: (node: any) => string[];
+  getNodeColumns?: (node: any) => NodeColumnSource;
   defaultPalette: string[];
   maxCompare?: number;
   className?: string;
@@ -25,6 +28,12 @@ interface NodeSelectionPanelProps {
   disabled?: boolean; // disables interactions but keeps UI fully visible
   locked?: boolean;   // shows a small lock icon in the header when true
   originalCount?: number; // total selection count prior to slicing for display
+  /**
+   * Restrict selectable columns by normalized data type (e.g., ['string'], ['datetime']).
+   * Types are normalized via utils/columnTypes.normalizeTypeName before comparison.
+   */
+  allowedDataTypes?: string[];
+  fallbackToAllColumns?: boolean; // if true, when filtering removes all columns we fall back to the unfiltered list
 }
 
 /** Shared node + text-column + color selection panel reused across analysis tabs */
@@ -47,6 +56,8 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
   disabled = false,
   locked = false,
   originalCount,
+  allowedDataTypes,
+  fallbackToAllColumns = false,
 }) => {
   const getColorForNodeId = (nodeId: string, idx: number) => {
     if (nodeColors[nodeId]) return nodeColors[nodeId];
@@ -92,6 +103,40 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
     fetchShapes();
     return () => { cancelled = true; };
   }, [showShape, getNodeShapeFn, selectedNodeIds]);
+  const normalizeColumnInfos = useCallback((source: NodeColumnSource | undefined): ColumnInfo[] => {
+    if (!source) return [];
+    if (!Array.isArray(source) || source.length === 0) return [];
+    const first = source[0];
+    if (typeof first === 'string') {
+      return (source as string[]).map((name) => ({ name, dataType: 'string' }));
+    }
+    return (source as ColumnInfo[]).map((col) => ({
+      name: col.name,
+      dataType: normalizeTypeName(col.dataType),
+    }));
+  }, []);
+
+  const resolveColumnInfos = useCallback((node: any): ColumnInfo[] => {
+    let infos: ColumnInfo[] = [];
+    if (getNodeColumns) {
+  const provided = normalizeColumnInfos(getNodeColumns(node));
+      infos = provided;
+    } else {
+      infos = mapColumnsToInfo(node);
+    }
+
+    if (allowedDataTypes && allowedDataTypes.length) {
+      const filtered = filterColumnsByType(infos, allowedDataTypes);
+      if (filtered.length > 0) {
+        return filtered;
+      }
+      if (!fallbackToAllColumns) {
+        return filtered;
+      }
+    }
+    return infos;
+  }, [allowedDataTypes, fallbackToAllColumns, getNodeColumns, normalizeColumnInfos]);
+
   return (
     <div className={className}>
       {showHeaderLabel && (
@@ -111,7 +156,8 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
         <div className={`flex space-x-3 pb-2 ${selectedNodes.length > maxCompare ? 'overflow-x-auto' : 'overflow-x-hidden'}`}>
           {selectedNodes.map((node: any, idx: number) => {
             const nodeId: string = node.id || node.node_id || node.data?.id || node.data?.node_id || node.unique_id || `node-${idx}`;
-            const columns = getNodeColumns(node);
+            const columnInfos = resolveColumnInfos(node);
+            const columns = columnInfos.map((info) => info.name);
             const selection = nodeColumnSelections.find(sel => sel.nodeId === nodeId);
             const nodeDisplayName = node.name || node.data?.name || node.data?.nodeName || (node as any).label || node.data?.label || nodeId;
             const nodeColor = getColorForNodeId(nodeId, idx);

@@ -6,6 +6,7 @@ import { FrequencyAnalysisRequest, textApi } from '../../api/text';
 import { nodesApi } from '../../api/index';
 import { workspacesApi } from '../../api/workspaces';
 import NodeSelectionPanel from '../NodeSelectionPanel';
+import { normalizeTypeName } from '../../utils/columnTypes';
 import {
   LineChart,
   Line,
@@ -79,18 +80,6 @@ const TimelineTab: React.FC = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [results, setResults] = useState<any>(null);
 
-  // Utility function (duplicated from FilterTab) to normalize type names for consistent display
-  const normalizeTypeName = (type: string): string => {
-    const lowercaseType = type.toLowerCase();
-    if (lowercaseType.includes('utf8') || lowercaseType.includes('string')) return 'string';
-    if (lowercaseType.includes('int') && !lowercaseType.includes('interval')) return 'integer';
-    if (lowercaseType.includes('float') || lowercaseType.includes('double')) return 'float';
-    if (lowercaseType.includes('bool')) return 'boolean';
-    if (lowercaseType.includes('datetime') || lowercaseType.includes('timestamp')) return 'datetime';
-    if (lowercaseType.includes('list') || lowercaseType.includes('array')) return 'array';
-    return 'string';
-  };
-
   // Get available columns from schema (prefer fetched schema; fallback to nodeData/selectedNode) preserving types
   const availableColumns = useMemo(() => {
     const effectiveSchema = isLocked ? (lockedSchema || currentSchema) : currentSchema;
@@ -123,6 +112,16 @@ const TimelineTab: React.FC = () => {
     return columns;
   }, [isLocked, lockedSchema, currentSchema, nodeData?.columns, nodeData?.dtypes, selectedNode?.data?.schema]);
 
+  const datetimeColumns = useMemo(
+    () => availableColumns.filter((column) => column.dataType === 'datetime'),
+    [availableColumns]
+  );
+
+  const timeColumnOptions = useMemo(
+    () => datetimeColumns.map((column) => column.name),
+    [datetimeColumns]
+  );
+
   // Fetch schema on-demand when selected node changes (and not locked)
   useEffect(() => {
     if (!selectedNodeId || isLocked) return;
@@ -143,34 +142,39 @@ const TimelineTab: React.FC = () => {
     })();
   }, [selectedNodeId, isLocked, currentWorkspaceId, getAuthHeaders]);
 
-// Keep nodeColumnSelections in sync with selectedNodeId
   useEffect(() => {
     if (isLocked) return;
-    if (!selectedNodeId) { setNodeColumnSelections([]); return; }
-    setNodeColumnSelections(prev => {
-      const existing = prev.find(s => s.nodeId === selectedNodeId);
-      if (existing) return prev;
-      const initial = { nodeId: selectedNodeId, column: timeColumn || '' };
-      return [initial];
-    });
-  }, [selectedNodeId]);
-
-  // Auto-select first datetime-like column
-  useEffect(() => {
-    if (isLocked) return;
-    if (availableColumns.length > 0 && !timeColumn) {
-      const dateColumnObj = availableColumns.find((c) => 
-        c.name.toLowerCase().includes('date') ||
-        c.name.toLowerCase().includes('time') ||
-        c.name.toLowerCase().includes('created') ||
-        c.name.toLowerCase().includes('timestamp') ||
-        c.dataType === 'datetime'
-      );
-      const picked = dateColumnObj?.name || availableColumns[0].name;
-      setTimeColumn(picked);
-      if (selectedNodeId) setNodeColumnSelections([{ nodeId: selectedNodeId, column: picked }]);
+    if (!selectedNodeId) {
+      setNodeColumnSelections([]);
+      setTimeColumn('');
+      return;
     }
-  }, [availableColumns, timeColumn, selectedNodeId]);
+
+    if (!timeColumnOptions.length) {
+      setNodeColumnSelections((prev) => {
+        if (prev.length === 1 && prev[0].nodeId === selectedNodeId && prev[0].column === '') {
+          return prev;
+        }
+        return [{ nodeId: selectedNodeId, column: '' }];
+      });
+      if (timeColumn !== '') {
+        setTimeColumn('');
+      }
+      return;
+    }
+
+    const desired = timeColumnOptions.includes(timeColumn) ? timeColumn : timeColumnOptions[0];
+    if (desired !== timeColumn) {
+      setTimeColumn(desired);
+    }
+
+    setNodeColumnSelections((prev) => {
+      if (prev.length === 1 && prev[0].nodeId === selectedNodeId && prev[0].column === desired) {
+        return prev;
+      }
+      return [{ nodeId: selectedNodeId, column: desired }];
+    });
+  }, [isLocked, selectedNodeId, timeColumn, timeColumnOptions]);
 
   const handleAddGroupByColumn = () => {
     if (groupByColumns.length < 3) {
@@ -215,7 +219,16 @@ const handleAnalyze = async () => {
       const authHeaders = getAuthHeaders();
       const headers = Object.keys(authHeaders).length > 0 ? authHeaders as Record<string, string> : {};
       const result = await textApi.frequency(currentWorkspaceId, selectedNodeId, request, headers);
-      setResults(result);
+      const enrichedResult = {
+        ...result,
+        analysis_params: {
+          ...(result as any)?.analysis_params,
+          group_by_columns: validGroupByColumns,
+          time_column: picked,
+          frequency,
+        },
+      };
+      setResults(enrichedResult);
       // Lock with snapshot & preserve schema
       try {
         const info = await nodesApi.info(currentWorkspaceId, selectedNodeId, getAuthHeaders());
@@ -257,9 +270,12 @@ const handleClearResults = async () => {
       return [];
     }
 
-    const groupByColumns = results.analysis_params?.group_by_columns;
+    const groupingColumns = (results as any)?.analysis_params?.group_by_columns;
+    const effectiveGroupColumns = Array.isArray(groupingColumns)
+      ? groupingColumns
+      : (groupByColumns.length ? groupByColumns : []);
     
-    if (!groupByColumns || groupByColumns.length === 0) {
+    if (!effectiveGroupColumns || effectiveGroupColumns.length === 0) {
       // No grouping - simple time series
       return results.data.map((item: any) => ({
         time_period: item.time_period_formatted || item.time_period,
@@ -273,7 +289,7 @@ const handleClearResults = async () => {
     
     results.data.forEach((item: any) => {
       const timePeriod = item.time_period_formatted || item.time_period;
-      const groupKey = groupByColumns.map((col: string) => item[col]).join(' - ');
+      const groupKey = effectiveGroupColumns.map((col: string) => item[col]).join(' - ');
       
       if (!timeMap.has(timePeriod)) {
         timeMap.set(timePeriod, { time_period: timePeriod });
@@ -286,11 +302,16 @@ const handleClearResults = async () => {
     return Array.from(timeMap.values()).sort((a, b) => 
       a.time_period.localeCompare(b.time_period)
     );
-  }, [results]);
+  }, [results, groupByColumns]);
 
   // Get unique group values for legend colors
   const groupKeys = useMemo(() => {
-    if (!results?.analysis_params?.group_by_columns || !chartData.length) {
+    const groupingColumns = (results as any)?.analysis_params?.group_by_columns;
+    const effectiveGroupColumns = Array.isArray(groupingColumns)
+      ? groupingColumns
+      : (groupByColumns.length ? groupByColumns : []);
+
+    if (!effectiveGroupColumns.length || !chartData.length) {
       return ['frequency_count'];
     }
     
@@ -305,7 +326,7 @@ const handleClearResults = async () => {
     });
     
     return Array.from(keys);
-  }, [results, chartData]);
+  }, [results, chartData, groupByColumns]);
 
   // Color palette for different groups
   const colors = [
@@ -433,8 +454,10 @@ const handleClearResults = async () => {
         if (req) {
           const nodeId = String(req.node_id || req.nodeId || selectedNodeId || '');
           const col = String(req.time_column || '');
-          setNodeColumnSelections(nodeId ? [{ nodeId, column: col }] : []);
-          setTimeColumn(col);
+          if (!isLocked) {
+            setNodeColumnSelections(nodeId ? [{ nodeId, column: col }] : []);
+            setTimeColumn(col);
+          }
           setGroupByColumns(Array.isArray(req.group_by_columns) ? req.group_by_columns : []);
           setFrequency(req.frequency as any);
           
@@ -460,7 +483,17 @@ const handleClearResults = async () => {
         
         const res = (resResp as any)?.data;
         if (res) {
-          setResults(resResp);
+          const groupCols = Array.isArray((req as any)?.group_by_columns) ? (req as any).group_by_columns : [];
+          const enriched = {
+            ...resResp,
+            analysis_params: {
+              ...(resResp as any)?.analysis_params,
+              group_by_columns: groupCols,
+              time_column: (req as any)?.time_column || '',
+              frequency: (req as any)?.frequency || frequency,
+            },
+          };
+          setResults(enriched);
         }
       } catch { /* ignore */ }
     })();
@@ -497,13 +530,7 @@ const handleClearResults = async () => {
           onColumnChange={(nodeId, column) => { if (isLocked) return; setNodeColumnSelections([{ nodeId, column }]); setTimeColumn(column); }}
           nodeColors={{}}
           onColorChange={()=>{}}
-          getNodeColumns={(node: any) => {
-            if (node?.data?.columns && Array.isArray(node.data.columns)) return node.data.columns;
-            if (node?.columns && Array.isArray(node.columns)) return node.columns;
-            if (node?.data?.dtypes && typeof node.data.dtypes === 'object') return Object.keys(node.data.dtypes);
-            if (node?.data?.schema) return Object.keys(node.data.schema);
-            return [];
-          }}
+          getNodeColumns={() => datetimeColumns}
           defaultPalette={[]}
           maxCompare={1}
           className="mb-0"
@@ -517,6 +544,7 @@ const handleClearResults = async () => {
           locked={!!isLocked}
           originalCount={selectedNodes?.length || (selectedNode ? 1 : 0)}
           columnLabelFn={() => 'Time Column *'}
+          allowedDataTypes={['datetime']}
           renderNodeMeta={() => (
             <div className="pt-1">
               <div className="text-xs font-semibold text-gray-600 mb-1 tracking-wide">SCHEMA (on-demand)</div>

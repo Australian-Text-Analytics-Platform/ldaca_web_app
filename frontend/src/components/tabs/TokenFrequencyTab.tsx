@@ -7,6 +7,7 @@ import { TokenFrequencyRequest, TokenFrequencyResponse, textApi } from '../../ap
 import { Wordcloud } from '@visx/wordcloud';
 import { Text } from '@visx/text';
 import useAutoNodeColumns from '../../hooks/useAutoNodeColumns';
+import useNodeColumnInfos from '../../hooks/useNodeColumnInfos';
 
 interface NodeColumnSelection {
   nodeId: string;
@@ -47,6 +48,11 @@ const TokenFrequencyTab: React.FC = () => {
     getNodeShape,
   } = useWorkspace();
 
+  const { getColumnInfos } = useNodeColumnInfos({
+    workspaceId: currentWorkspaceId,
+    nodes: selectedNodes,
+  });
+
   const nodeIdToName = useMemo(() => {
     const map: Record<string,string> = {};
     selectedNodes.forEach(n => {
@@ -66,13 +72,8 @@ const TokenFrequencyTab: React.FC = () => {
   // Shared auto column selection hook (shared scope with Concordance via undefined storageScope)
   const { selections: nodeColumnSelections, setSelection: setNodeColumnSelection, setSelections: setNodeColumnSelectionsRaw, recompute: recomputeAutoColumns } = useAutoNodeColumns({
     selectedNodes,
-    getNodeColumns: (n: any) => {
-      if (n.data?.columns && Array.isArray(n.data.columns)) return n.data.columns;
-      if (n.columns && Array.isArray(n.columns)) return n.columns;
-      if (n.data?.dtypes && typeof n.data.dtypes === 'object') return Object.keys(n.data.dtypes);
-      if (n.data?.schema) return Object.keys(n.data.schema);
-      return [];
-    },
+    getNodeColumns: getColumnInfos,
+    allowedDataTypes: ['string'],
   }, { workspaceId: currentWorkspaceId, maxNodes: 2, isLocked, docTypeOnly: true, enableHeuristicGuess: false });
   const [lockedNodesSnapshot, setLockedNodesSnapshot] = useState<Array<{ id: string; name: string; columns: string[] }>>([]);
   const [isLoadingStopWords, setIsLoadingStopWords] = useState(false);
@@ -255,52 +256,6 @@ const TokenFrequencyTab: React.FC = () => {
   useEffect(() => {
     if (!isLocked) setResults(null);
   }, [selectedNodeIds, isLocked]);
-
-  // Memoize the getNodeColumns function to prevent re-renders
-  const getNodeColumns = useMemo(() => {
-    return (node: any) => {
-      if (localStorage.getItem('debugTF') === '1') {
-        console.log('getNodeColumns called for node:', node);
-      }
-      
-      // For locked nodes from snapshot, columns are directly available
-      if (node.data?.columns && Array.isArray(node.data.columns)) {
-        if (localStorage.getItem('debugTF') === '1') {
-          console.log('Found columns in node.data.columns:', node.data.columns);
-        }
-        return node.data.columns;
-      }
-      
-      // Also check if columns are directly on the node object (for locked snapshots)
-      if (node.columns && Array.isArray(node.columns)) {
-        if (localStorage.getItem('debugTF') === '1') {
-          console.log('Found columns in node.columns:', node.columns);
-        }
-        return node.columns;
-      }
-      
-      if (node.data?.dtypes && typeof node.data.dtypes === 'object') {
-        const cols = Object.keys(node.data.dtypes);
-        if (localStorage.getItem('debugTF') === '1') {
-          console.log('Found columns in node.data.dtypes:', cols);
-        }
-        return cols;
-      }
-      
-      if (node.data?.schema) {
-        const cols = Object.keys(node.data.schema);
-        if (localStorage.getItem('debugTF') === '1') {
-          console.log('Found columns in node.data.schema:', cols);
-        }
-        return cols;
-      }
-      
-      if (localStorage.getItem('debugTF') === '1') {
-        console.warn('No columns found for node:', node);
-      }
-      return [];
-    };
-  }, []);
 
   // Recompute auto columns if we become unlocked and selections empty while nodes exist
   useEffect(() => {
@@ -623,7 +578,6 @@ const TokenFrequencyTab: React.FC = () => {
           onColumnChange={handleColumnChange}
           nodeColors={nodeColors}
           onColorChange={handleColorChange}
-          getNodeColumns={getNodeColumns}
           defaultPalette={defaultPalette}
           maxCompare={2}
           className="mb-6"
@@ -631,6 +585,8 @@ const TokenFrequencyTab: React.FC = () => {
           getNodeShapeFn={getNodeShape}
           disabled={!!isLocked}
           showColorPicker={true}
+          getNodeColumns={getColumnInfos}
+          allowedDataTypes={['string']}
         />
 
         {/* Configuration */}
