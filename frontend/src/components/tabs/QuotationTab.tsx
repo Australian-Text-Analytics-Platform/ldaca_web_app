@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import NodeSelectionPanel from '../NodeSelectionPanel';
-import { useWorkspace } from '../../hooks/useWorkspace';
+import { useWorkspaceData } from '../../hooks/useWorkspaceData';
+import { useWorkspaceSelection } from '../../hooks/useWorkspaceSelection';
+import { useWorkspaceActions } from '../../hooks/useWorkspaceActions';
 import { useAuth } from '../../hooks/useAuth';
 import { textApi } from '../../api/text';
 import { nodesApi } from '../../api/nodes';
@@ -14,7 +16,9 @@ interface NodeColumnSelection {
 }
 
 const QuotationTab: React.FC = () => {
-  const { selectedNodes, currentWorkspaceId, getNodeShape, quotationSearch, detachQuotation, nodeData, handlePageChange: baseHandlePageChange, handlePageSizeChange } = useWorkspace();
+  const { selectedNodes, handlePageChange: baseHandlePageChange, handlePageSizeChange } = useWorkspaceSelection();
+  const { currentWorkspaceId, getNodeShape, nodeData } = useWorkspaceData();
+  const { quotationSearch, detachQuotation } = useWorkspaceActions();
   const { getAuthHeaders } = useAuth();
 
   // Show metadata by default so the table mirrors original columns

@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-import { useWorkspace } from '../../hooks/useWorkspace';
+import { useWorkspaceSelection } from '../../hooks/useWorkspaceSelection';
+import { useWorkspaceData } from '../../hooks/useWorkspaceData';
+import { useWorkspaceActions } from '../../hooks/useWorkspaceActions';
+import { useWorkspaceStatus } from '../../hooks/useWorkspaceStatus';
 // Import nodesApi for filter operation (types redefined locally for UI)
 import { nodesApi } from '../../api/nodes';
 // Define minimal request types (backend expects these shapes)
@@ -76,13 +79,10 @@ interface FilterConditionWithId extends Omit<FilterCondition, 'value'> {
 // Removed DatePicker & custom time input: now using direct ISO8601 text input for timezone-aware datetime entry.
 
 const FilterTab: React.FC = () => {
-  const { 
-    selectedNodeId, 
-    selectedNode,
-    nodeData,
-    filterNode,
-    isLoading
-  } = useWorkspace();
+  const { selectedNodeId, selectedNode } = useWorkspaceSelection();
+  const { nodeData } = useWorkspaceData();
+  const { filterNode } = useWorkspaceActions();
+  const { isLoading } = useWorkspaceStatus();
 
   const [conditions, setConditions] = useState<FilterConditionWithId[]>([{
     id: '1',

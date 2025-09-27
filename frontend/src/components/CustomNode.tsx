@@ -3,7 +3,7 @@ import { NodeProps, Handle, Position } from '@xyflow/react';
 import { WorkspaceNode } from '../types';
 import DocumentColumnModal from './modals/DocumentColumnModal';
 import { formatDataType, getTypeStyleClass } from '../utils/typeFormatting';
-import { useWorkspace } from '../hooks/useWorkspace';
+import { useWorkspaceData } from '../hooks/useWorkspaceData';
 
 interface CustomNodeData {
   node: WorkspaceNode;
@@ -32,7 +32,7 @@ const CustomNode: React.FC<NodeProps<any>> = ({ data, selected }) => {
   const menuRef = useRef<HTMLDivElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
 
-  const { getNodeShape } = useWorkspace();
+  const { getNodeShape } = useWorkspaceData();
 
   const DEBUG_GRAPH = (typeof window !== 'undefined' && (window as any).__LDACA_DEBUG_GRAPH) ||
     (typeof window !== 'undefined' && localStorage.getItem('debugGraph') === '1');

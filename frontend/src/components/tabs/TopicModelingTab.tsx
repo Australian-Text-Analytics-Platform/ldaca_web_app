@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import NodeSelectionPanel from '../NodeSelectionPanel';
-import { useWorkspace } from '../../hooks/useWorkspace';
+import { useWorkspaceData } from '../../hooks/useWorkspaceData';
+import { useWorkspaceSelection } from '../../hooks/useWorkspaceSelection';
 import { useAuth } from '../../hooks/useAuth';
 // Updated to use modular API object pattern
 import { textApi } from '../../api/text';
@@ -25,7 +26,8 @@ function interpolateColor(c1: string, c2: string, t: number) {
 }
 
 const TopicModelingTab: React.FC = () => {
-  const { selectedNodes, currentWorkspaceId, getNodeShape } = useWorkspace();
+  const { selectedNodes } = useWorkspaceSelection();
+  const { currentWorkspaceId, getNodeShape } = useWorkspaceData();
   const { getAuthHeaders } = useAuth();
   const { setTasks } = useAnalysisStore() as any;
   const [isRunning, setIsRunning] = useState(false);

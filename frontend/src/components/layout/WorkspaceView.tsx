@@ -2,7 +2,6 @@ import React, { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { WorkspaceGraphView } from './WorkspaceGraphView';
 import { WorkspaceDataView } from './WorkspaceDataView';
 import { WorkspaceControls } from './WorkspaceControls';
-import { useWorkspace } from '../../hooks/useWorkspace';
 
 /**
  * Improved WorkspaceView with vertical layout showing both graph and data views
@@ -16,9 +15,6 @@ const WorkspaceView: React.FC = memo(() => {
   const bottomRef = useRef<HTMLDivElement>(null);
   const [split, setSplit] = useState<number>(50); // percentage for top panel height
   const isDraggingRef = useRef(false);
-  // Selection actions now handled within graph controls
-  useWorkspace();
-
   const onStartDrag = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     isDraggingRef.current = true;

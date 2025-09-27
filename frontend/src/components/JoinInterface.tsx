@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { WorkspaceNode } from '../types';
-import { useWorkspace } from '../hooks/useWorkspace';
+import { useWorkspaceData } from '../hooks/useWorkspaceData';
 import NodeSelectionPanel, { NodeColumnSelection } from './NodeSelectionPanel';
 
 interface JoinInterfaceProps {
@@ -18,7 +18,7 @@ const JoinInterface: React.FC<JoinInterfaceProps> = ({
   onCancel,
   loading = false
 }) => {
-  const { getNodeShape } = useWorkspace();
+  const { getNodeShape } = useWorkspaceData();
   const [leftOn, setLeftOn] = useState<string>('');
   const [rightOn, setRightOn] = useState<string>('');
   const [how, setHow] = useState<'inner' | 'left' | 'right' | 'full' | 'semi' | 'anti' | 'cross'>('left');

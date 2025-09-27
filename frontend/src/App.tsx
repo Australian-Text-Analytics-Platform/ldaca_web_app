@@ -3,6 +3,7 @@ import './App.css';
 import { useAuth } from './hooks/useAuth';
 import { useBackendHealth } from './hooks/useBackendHealth';
 import { QueryProvider } from './providers/QueryProvider';
+import { WorkspaceProvider } from './providers/WorkspaceProvider';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import GoogleLogin from './components/GoogleLogin';
 import { WorkspaceView, Sidebar } from './components/layout';
@@ -204,115 +205,117 @@ const App: React.FC = () => {
 
   return (
     <QueryProvider>
-      <ErrorBoundary>
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-          <FeedbackModal isOpen={showFeedback} onClose={() => setShowFeedback(false)} />
-          {/* Global drag-and-drop overlay removed; users can drop directly onto the file list */}
-          {/* Header */}
-          <header className="bg-white border-b border-gray-200 px-6 py-4 relative">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <img src={logo} alt="LDaCA Logo" className="h-8 w-auto object-contain" />
-                <h1 className="text-xl font-bold text-gray-800">LDaCA Corpus Analysis</h1>
+      <WorkspaceProvider>
+        <ErrorBoundary>
+          <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+            <FeedbackModal isOpen={showFeedback} onClose={() => setShowFeedback(false)} />
+            {/* Global drag-and-drop overlay removed; users can drop directly onto the file list */}
+            {/* Header */}
+            <header className="bg-white border-b border-gray-200 px-6 py-4 relative">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <img src={logo} alt="LDaCA Logo" className="h-8 w-auto object-contain" />
+                  <h1 className="text-xl font-bold text-gray-800">LDaCA Corpus Analysis</h1>
+                </div>
+                <div className="flex items-center space-x-4">
+                  <span className="text-sm text-gray-600">Welcome, {user?.name}</span>
+                  <button
+                    onClick={logout}
+                    className="text-sm text-red-600 hover:text-red-700 transition-colors"
+                  >
+                    Logout
+                  </button>
+                </div>
               </div>
-              <div className="flex items-center space-x-4">
-                <span className="text-sm text-gray-600">Welcome, {user?.name}</span>
-                <button
-                  onClick={logout}
-                  className="text-sm text-red-600 hover:text-red-700 transition-colors"
-                >
-                  Logout
-                </button>
-              </div>
-            </div>
-          </header>
+            </header>
 
-          <div className="flex h-[calc(100vh-73px)] relative" ref={layoutRef}>
-            {/* Left Sidebar */}
-            <ErrorBoundary>
-              <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
-            </ErrorBoundary>
+            <div className="flex h-[calc(100vh-73px)] relative" ref={layoutRef}>
+              {/* Left Sidebar */}
+              <ErrorBoundary>
+                <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
+              </ErrorBoundary>
 
-            {/* Middle Panel - Operation UI */}
-            <main
-              ref={mainRef}
-              className={`p-6 overflow-y-auto relative ${isResizing ? 'transition-none' : 'transition-all duration-300 ease-in-out'}`}
-              style={{ width: isRightCollapsed ? '100%' : `${100 - rightWidth}%`, minWidth: 280 }}
-            >
-              <div className={`${isRightCollapsed ? 'w-full max-w-none mx-0' : 'w-full max-w-4xl mx-auto'}`}>
-                <ErrorBoundary>
-                  <Suspense fallback={
-                    <div className="flex items-center justify-center py-12">
-                      <div className="text-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-3"></div>
-                        <p className="text-gray-600 text-sm">Loading...</p>
+              {/* Middle Panel - Operation UI */}
+              <main
+                ref={mainRef}
+                className={`p-6 overflow-y-auto relative ${isResizing ? 'transition-none' : 'transition-all duration-300 ease-in-out'}`}
+                style={{ width: isRightCollapsed ? '100%' : `${100 - rightWidth}%`, minWidth: 280 }}
+              >
+                <div className={`${isRightCollapsed ? 'w-full max-w-none mx-0' : 'w-full max-w-4xl mx-auto'}`}>
+                  <ErrorBoundary>
+                    <Suspense fallback={
+                      <div className="flex items-center justify-center py-12">
+                        <div className="text-center">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-3"></div>
+                          <p className="text-gray-600 text-sm">Loading...</p>
+                        </div>
                       </div>
-                    </div>
-                  }>
-                    {activeTab === 'data-loader' && <DataLoaderTab />}
-                    {activeTab === 'filter' && <FilterTab />}
-                    {activeTab === 'token-frequency' && <TokenFrequencyTab />}
-                    {activeTab === 'concordance' && <ConcordanceTab />}
-                    {activeTab === 'analysis' && <TimelineTab />}
-                    {activeTab === 'topic-modeling' && <TopicModelingTab />}
-                    {activeTab === 'quotation' && <QuotationTab />}
-                    {activeTab === 'export' && <ExportTab />}
-                  </Suspense>
-                </ErrorBoundary>
-              </div>
-            </main>
+                    }>
+                      {activeTab === 'data-loader' && <DataLoaderTab />}
+                      {activeTab === 'filter' && <FilterTab />}
+                      {activeTab === 'token-frequency' && <TokenFrequencyTab />}
+                      {activeTab === 'concordance' && <ConcordanceTab />}
+                      {activeTab === 'analysis' && <TimelineTab />}
+                      {activeTab === 'topic-modeling' && <TopicModelingTab />}
+                      {activeTab === 'quotation' && <QuotationTab />}
+                      {activeTab === 'export' && <ExportTab />}
+                    </Suspense>
+                  </ErrorBoundary>
+                </div>
+              </main>
 
-            {/* Vertical drag handle between main and right panel */}
-            {!isRightCollapsed && (
-              <div
-                className={`w-1 ${isResizing ? 'bg-gray-300' : 'bg-gray-200 hover:bg-gray-300'} cursor-col-resize`}
-                onMouseDown={onStartResize}
-                role="separator"
-                aria-orientation="vertical"
-                aria-label="Resize right panel"
-              />
-            )}
-
-            {/* Right Panel - Workspace View */}
-            <aside
-              ref={asideRef}
-              className={`bg-white border-l border-gray-200 relative overflow-hidden ${isResizing ? 'transition-none' : 'transition-all duration-300 ease-in-out'} ${
-                isRightCollapsed ? 'min-w-0' : 'min-w-[320px]'
-              }`}
-              style={{ width: isRightCollapsed ? 0 : `${rightWidth}%` }}
-            >
-              {/* Outlook-like collapse button at top-right of the right panel */}
+              {/* Vertical drag handle between main and right panel */}
               {!isRightCollapsed && (
+                <div
+                  className={`w-1 ${isResizing ? 'bg-gray-300' : 'bg-gray-200 hover:bg-gray-300'} cursor-col-resize`}
+                  onMouseDown={onStartResize}
+                  role="separator"
+                  aria-orientation="vertical"
+                  aria-label="Resize right panel"
+                />
+              )}
+
+              {/* Right Panel - Workspace View */}
+              <aside
+                ref={asideRef}
+                className={`bg-white border-l border-gray-200 relative overflow-hidden ${isResizing ? 'transition-none' : 'transition-all duration-300 ease-in-out'} ${
+                  isRightCollapsed ? 'min-w-0' : 'min-w-[320px]'
+                }`}
+                style={{ width: isRightCollapsed ? 0 : `${rightWidth}%` }}
+              >
+                {/* Outlook-like collapse button at top-right of the right panel */}
+                {!isRightCollapsed && (
+                  <button
+                    onClick={toggleRightPanel}
+                    className="group absolute top-2 right-2 z-20 rounded-md border border-gray-300 bg-white/80 backdrop-blur px-2 py-1 text-gray-700 hover:bg-gray-50 shadow-sm flex items-center"
+                    aria-label="Collapse right panel"
+                    title="Collapse"
+                  >
+                    <span className="overflow-hidden whitespace-nowrap transition-all duration-200 max-w-0 group-hover:max-w-[120px] mr-1">Collapse</span>
+                    <span aria-hidden>❯</span>
+                  </button>
+                )}
+                <ErrorBoundary>
+                  {!isRightCollapsed && <WorkspaceView />}
+                </ErrorBoundary>
+              </aside>
+
+              {/* Floating expand button when panel is collapsed (top-right), Outlook style */}
+              {isRightCollapsed && (
                 <button
                   onClick={toggleRightPanel}
-                  className="group absolute top-2 right-2 z-20 rounded-md border border-gray-300 bg-white/80 backdrop-blur px-2 py-1 text-gray-700 hover:bg-gray-50 shadow-sm flex items-center"
-                  aria-label="Collapse right panel"
-                  title="Collapse"
+                  className="group absolute top-2 right-2 z-30 rounded-md border border-gray-300 bg-white/90 backdrop-blur px-2 py-1 text-gray-700 hover:bg-gray-50 shadow flex items-center"
+                  aria-label="Expand right panel"
+                  title="Expand"
                 >
-                  <span className="overflow-hidden whitespace-nowrap transition-all duration-200 max-w-0 group-hover:max-w-[120px] mr-1">Collapse</span>
-                  <span aria-hidden>❯</span>
+                  <span className="overflow-hidden whitespace-nowrap transition-all duration-200 max-w-0 group-hover:max-w-[90px] mr-1">Show</span>
+                  <span aria-hidden>❮</span>
                 </button>
               )}
-              <ErrorBoundary>
-                {!isRightCollapsed && <WorkspaceView />}
-              </ErrorBoundary>
-            </aside>
-
-            {/* Floating expand button when panel is collapsed (top-right), Outlook style */}
-            {isRightCollapsed && (
-              <button
-                onClick={toggleRightPanel}
-                className="group absolute top-2 right-2 z-30 rounded-md border border-gray-300 bg-white/90 backdrop-blur px-2 py-1 text-gray-700 hover:bg-gray-50 shadow flex items-center"
-                aria-label="Expand right panel"
-                title="Expand"
-              >
-                <span className="overflow-hidden whitespace-nowrap transition-all duration-200 max-w-0 group-hover:max-w-[90px] mr-1">Show</span>
-                <span aria-hidden>❮</span>
-              </button>
-            )}
+            </div>
           </div>
-        </div>
-      </ErrorBoundary>
+        </ErrorBoundary>
+      </WorkspaceProvider>
     </QueryProvider>
   );
 };

@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import NodeSelectionPanel from '../NodeSelectionPanel';
-import { useWorkspace } from '../../hooks/useWorkspace';
+import { useWorkspaceData } from '../../hooks/useWorkspaceData';
+import { useWorkspaceSelection } from '../../hooks/useWorkspaceSelection';
+import { useWorkspaceStatus } from '../../hooks/useWorkspaceStatus';
 import { nodesApi } from '../../api/nodes';
 import { useAuth } from '../../hooks/useAuth';
 import { TokenFrequencyRequest, TokenFrequencyResponse, textApi } from '../../api/text';
@@ -41,12 +43,9 @@ const formatNumber = (value: unknown, decimals: number, options: FormatNumberOpt
 };
 
 const TokenFrequencyTab: React.FC = () => {
-  const {
-    selectedNodes,
-    isLoading,
-    currentWorkspaceId,
-    getNodeShape,
-  } = useWorkspace();
+  const { selectedNodes } = useWorkspaceSelection();
+  const { currentWorkspaceId, getNodeShape } = useWorkspaceData();
+  const { isLoading } = useWorkspaceStatus();
 
   const { getColumnInfos } = useNodeColumnInfos({
     workspaceId: currentWorkspaceId,

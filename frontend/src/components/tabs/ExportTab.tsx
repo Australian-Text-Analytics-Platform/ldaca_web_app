@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { useWorkspace } from '../../hooks/useWorkspace';
+import { useWorkspaceSelection } from '../../hooks/useWorkspaceSelection';
+import { useWorkspaceData } from '../../hooks/useWorkspaceData';
 import { useAuth } from '../../hooks/useAuth';
 import { getApiBase } from '../../api/env';
 
@@ -13,7 +14,9 @@ const FORMATS = [
 ];
 
 const ExportTab: React.FC = () => {
-  const { selectedNodes, currentWorkspaceId } = useWorkspace();
+  const { selectedNodes: rawSelectedNodes } = useWorkspaceSelection();
+  const { currentWorkspaceId } = useWorkspaceData();
+  const selectedNodes = rawSelectedNodes ?? [];
   const { getAuthHeaders } = useAuth();
   const [format, setFormat] = useState('csv');
   const [exporting, setExporting] = useState(false);

@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import NodeSelectionPanel from '../NodeSelectionPanel';
 import SegmentedControl from '../ui/SegmentedControl';
-import { useWorkspace } from '../../hooks/useWorkspace';
+import { useWorkspaceSelection } from '../../hooks/useWorkspaceSelection';
+import { useWorkspaceStatus } from '../../hooks/useWorkspaceStatus';
+import { useWorkspaceData } from '../../hooks/useWorkspaceData';
+import { useWorkspaceActions } from '../../hooks/useWorkspaceActions';
 import { useAuth } from '../../hooks/useAuth';
 import { ConcordanceAnalysisRequest, ConcordanceAnalysisResponse, textApi } from '../../api/text';
 import { nodesApi } from '../../api/nodes';
@@ -17,13 +20,10 @@ interface NodeColumnSelection {
 const ConcordanceTab: React.FC = () => {
   // Anchor ref for results container to stabilize scroll on view mode toggle
   const resultsRef = useRef<HTMLDivElement | null>(null);
-  const { 
-    selectedNodes,
-    isLoading,
-    currentWorkspaceId,
-  detachConcordance,
-  getNodeShape
-  } = useWorkspace();
+  const { selectedNodes } = useWorkspaceSelection();
+  const { isLoading } = useWorkspaceStatus();
+  const { currentWorkspaceId, getNodeShape } = useWorkspaceData();
+  const { detachConcordance } = useWorkspaceActions();
 
   const { getColumnInfos } = useNodeColumnInfos({
     workspaceId: currentWorkspaceId,

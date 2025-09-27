@@ -2,7 +2,9 @@ import React, { useState, useCallback, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import SegmentedControl from '../ui/SegmentedControl';
 import { useAuth } from '../../hooks/useAuth';
-import { useWorkspace } from '../../hooks/useWorkspace';
+import { useWorkspaceData } from '../../hooks/useWorkspaceData';
+import { useWorkspaceStatus } from '../../hooks/useWorkspaceStatus';
+import { useWorkspaceActions } from '../../hooks/useWorkspaceActions';
 import { filesApi, workspacesApi } from '../../api/index';
 import { queryKeys } from '../../lib/queryKeys';
 import { useFiles } from '../../hooks/useFiles';
@@ -12,17 +14,9 @@ import AddFileModal from '../modals/AddFileModal';
 const DataLoaderTab: React.FC = () => {
   const { getAuthHeaders } = useAuth();
   const queryClient = useQueryClient();
-  const { 
-    currentWorkspace,
-    workspaces,
-    isLoading,
-    errors,
-    createWorkspace,
-    setCurrentWorkspace,
-  createNodeFromFile,
-  deleteWorkspace,
-  saveWorkspace
-  } = useWorkspace();
+  const { currentWorkspace, workspaces } = useWorkspaceData();
+  const { isLoading, errors } = useWorkspaceStatus();
+  const { createWorkspace, setCurrentWorkspace, createNodeFromFile, deleteWorkspace, saveWorkspace } = useWorkspaceActions();
 
   // Create stable auth headers object
   const authHeaders = useMemo(() => {

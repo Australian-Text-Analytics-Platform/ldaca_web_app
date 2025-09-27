@@ -1,5 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { useWorkspace } from '../../hooks/useWorkspace';
+import React, { useEffect, useState } from 'react';
+import { useWorkspaceData } from '../../hooks/useWorkspaceData';
+import { useWorkspaceSelection } from '../../hooks/useWorkspaceSelection';
+import { useWorkspaceActions } from '../../hooks/useWorkspaceActions';
 import { useAuth } from '../../hooks/useAuth';
 import { workspacesApi } from '../../api/workspaces';
 import { useAnalysisStore } from '../../stores/analysisStore';
@@ -11,12 +13,9 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
-  const { 
-    workspaceGraph,
-    selectedNodeIds,
-    toggleNodeSelection,
-    currentWorkspaceId,
-  } = useWorkspace();
+  const { workspaceGraph, currentWorkspaceId } = useWorkspaceData();
+  const { selectedNodeIds } = useWorkspaceSelection();
+  const { toggleNodeSelection } = useWorkspaceActions();
   const { getAuthHeaders } = useAuth();
   const { tasks, setTasks } = useAnalysisStore() as any;
   const [isConnected, setIsConnected] = useState<boolean>(false);

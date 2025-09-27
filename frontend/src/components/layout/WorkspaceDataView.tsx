@@ -1,5 +1,8 @@
 import React, { memo, useState, useEffect } from 'react';
-import { useWorkspace } from '../../hooks/useWorkspace';
+import { useWorkspaceData } from '../../hooks/useWorkspaceData';
+import { useWorkspaceSelection } from '../../hooks/useWorkspaceSelection';
+import { useWorkspaceActions } from '../../hooks/useWorkspaceActions';
+import { useWorkspaceStatus } from '../../hooks/useWorkspaceStatus';
 import { TableLoadingSkeleton, EmptyState } from '../ui/LoadingStates';
 import JoinInterface from '../JoinInterface';
 import DataTable from '../ui/DataTable';
@@ -9,20 +12,10 @@ import DataTable from '../ui/DataTable';
  * This replaces the data table logic from the monolithic WorkspaceView
  */
 export const WorkspaceDataView: React.FC = memo(() => {
-  const { 
-    selectedNode, 
-    selectedNodes,
-    currentWorkspaceId,
-    nodeData, 
-    isLoading,
-    joinNodes,
-    castColumn,
-    refreshNodeSchema,
-    getNodeShape,
-    clearSelection,
-    handlePageChange,
-    handlePageSizeChange
-  } = useWorkspace();
+  const { currentWorkspaceId, nodeData, getNodeShape } = useWorkspaceData();
+  const { selectedNode, selectedNodes, handlePageChange, handlePageSizeChange } = useWorkspaceSelection();
+  const { joinNodes, castColumn, refreshNodeSchema, clearSelection } = useWorkspaceActions();
+  const { isLoading } = useWorkspaceStatus();
 
   const [actualShape, setActualShape] = useState<[number, number] | null>(null);
   const [isLoadingShape, setIsLoadingShape] = useState(false);

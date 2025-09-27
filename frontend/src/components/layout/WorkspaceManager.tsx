@@ -1,5 +1,7 @@
 import React, { useState, useCallback } from 'react';
-import { useWorkspace } from '../../hooks/useWorkspace';
+import { useWorkspaceData } from '../../hooks/useWorkspaceData';
+import { useWorkspaceActions } from '../../hooks/useWorkspaceActions';
+import { useWorkspaceStatus } from '../../hooks/useWorkspaceStatus';
 import { WorkspaceInfo, WorkspaceNode } from '../../types';
 
 const WorkspaceManager: React.FC = () => {
@@ -7,17 +9,9 @@ const WorkspaceManager: React.FC = () => {
   const [showCreateForm, setShowCreateForm] = useState(false);
 
   // Use improved hooks
-  const { 
-    workspaces, 
-    currentWorkspaceId, 
-    workspaceGraph,
-    setCurrentWorkspace,
-    createWorkspace,
-    deleteWorkspace,
-    selectNode,
-    isLoading,
-    errors
-  } = useWorkspace();
+  const { workspaces, currentWorkspaceId, workspaceGraph } = useWorkspaceData();
+  const { isLoading, errors } = useWorkspaceStatus();
+  const { setCurrentWorkspace, createWorkspace, deleteWorkspace, selectNode } = useWorkspaceActions();
 
   // Extract nodes from the unified graph data source
   const nodes = workspaceGraph?.nodes || [];

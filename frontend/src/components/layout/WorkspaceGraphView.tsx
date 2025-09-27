@@ -16,7 +16,10 @@ import {
   BezierEdge,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { useWorkspace } from '../../hooks/useWorkspace';
+import { useWorkspaceData } from '../../hooks/useWorkspaceData';
+import { useWorkspaceActions } from '../../hooks/useWorkspaceActions';
+import { useWorkspaceSelection } from '../../hooks/useWorkspaceSelection';
+import { useWorkspaceStatus } from '../../hooks/useWorkspaceStatus';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '../../lib/queryKeys';
 import { GraphLoadingSkeleton, EmptyState } from '../ui/LoadingStates';
@@ -76,7 +79,20 @@ export const WorkspaceGraphView: React.FC = memo(() => {
   const dlog = useCallback((...args: any[]) => { if (DEBUG_GRAPH) console.log(...args); }, [DEBUG_GRAPH]);
   // Minimap hidden by default; user can toggle via custom control button
   const [showOverview, setShowOverview] = useState(false);
-  const { workspaceGraph, isLoading, deleteNode, renameNode, toggleNodeSelection, convertToDocDataFrame, convertToDataFrame, convertToDocLazyFrame, convertToLazyFrame, resetDocumentColumn, currentWorkspaceId, selectedNodeIds, clearSelection } = useWorkspace();
+  const { workspaceGraph, currentWorkspaceId } = useWorkspaceData();
+  const { selectedNodeIds } = useWorkspaceSelection();
+  const { isLoading } = useWorkspaceStatus();
+  const {
+    deleteNode,
+    renameNode,
+    toggleNodeSelection,
+    convertToDocDataFrame,
+    convertToDataFrame,
+    convertToDocLazyFrame,
+    convertToLazyFrame,
+    resetDocumentColumn,
+    clearSelection,
+  } = useWorkspaceActions();
   const queryClient = useQueryClient();
   
   // Track pending delete operations to prevent duplicates

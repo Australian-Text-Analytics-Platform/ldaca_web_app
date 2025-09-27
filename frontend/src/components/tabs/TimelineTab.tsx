@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useWorkspace } from '../../hooks/useWorkspace';
+import { useWorkspaceData } from '../../hooks/useWorkspaceData';
+import { useWorkspaceSelection } from '../../hooks/useWorkspaceSelection';
+import { useWorkspaceStatus } from '../../hooks/useWorkspaceStatus';
 import { useAuth } from '../../hooks/useAuth';
 import { FrequencyAnalysisRequest, textApi } from '../../api/text';
 import { nodesApi } from '../../api/index';
@@ -54,14 +56,9 @@ const UniqueValueCount: React.FC<UniqueValueCountProps> = ({ workspaceId, nodeId
 };
 
 const TimelineTab: React.FC = () => {
-  const { 
-    selectedNodeId, 
-    selectedNode,
-    selectedNodes,
-    nodeData,
-    isLoading,
-    currentWorkspaceId
-  } = useWorkspace();
+  const { selectedNodeId, selectedNode, selectedNodes } = useWorkspaceSelection();
+  const { nodeData, currentWorkspaceId } = useWorkspaceData();
+  const { isLoading } = useWorkspaceStatus();
 
   const { getAuthHeaders } = useAuth();
 
