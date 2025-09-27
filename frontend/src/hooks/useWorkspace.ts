@@ -1,6 +1,8 @@
 import { useCallback, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useAppStore } from '../stores/appStore';
+import { useSelectionStore } from '../stores/selectionStore';
+import { useWorkspaceStore } from '../stores/workspaceStore';
+import { useUIStore } from '../stores/uiStore';
 import { useAuth } from './useAuth';
 import { NodeSchemaResponse } from '../types';
 // New modular API imports
@@ -17,20 +19,67 @@ export const useWorkspace = () => {
   const { getAuthHeaders, isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
   
-  // Get state from centralized store
+  // Selection state/actions
   const {
-    selection: { nodeId: selectedNodeId, nodeIds: selectedNodeIds },
-    ui: { loading, errors },
-    pagination,
-    setPagination,
-    setSelectedNode,
+    selectedNodeId,
+    selectedNodeIds,
+    selectNode,
     setSelectedNodes,
     toggleNodeSelection,
-    clearSelection,
+    clearAllSelections,
+  } = useSelectionStore();
+
+  // Workspace pagination state/actions
+  const {
+    pagination,
+    setPagination,
+    updateCurrentPage,
+    updatePageSize,
+  } = useWorkspaceStore();
+
+  // UI loading/error state/actions
+  const {
+    loadingOperations,
+    operationErrors,
     startOperation,
     endOperation,
     setOperationError,
-  } = useAppStore();
+  } = useUIStore();
+
+  const setSelectedNode = selectNode;
+  const clearSelection = clearAllSelections;
+
+  const loadingOperationCount = useMemo(() => {
+    if (loadingOperations instanceof Set) {
+      return loadingOperations.size;
+    }
+    return 0;
+  }, [loadingOperations]);
+
+  const operationErrorsRecord = useMemo(() => {
+    if (!operationErrors) {
+      return {} as Record<string, string>;
+    }
+    if (operationErrors instanceof Map) {
+      const result: Record<string, string> = {};
+      operationErrors.forEach((value, key) => {
+        if (typeof value === 'string') {
+          result[key] = value;
+        }
+      });
+      return result;
+    }
+    if (typeof operationErrors === 'object') {
+      const entries = Object.entries(operationErrors as Record<string, string>);
+      return entries.reduce<Record<string, string>>((acc, [key, value]) => {
+        if (typeof value === 'string') {
+          acc[key] = value;
+        }
+        return acc;
+      }, {});
+    }
+    return {} as Record<string, string>;
+  }, [operationErrors]);
 
   // Memoize auth headers to prevent unnecessary re-renders
   const authHeaders = useMemo(() => {
@@ -120,7 +169,9 @@ export const useWorkspace = () => {
   // Preserve selection order by mapping selectedNodeIds to their corresponding nodes
   // Memoize selectedNodes to prevent infinite re-renders
   const selectedNodes = useMemo(() => {
-    return selectedNodeIds.map(id => nodes.find((n: any) => n.id === id)).filter(Boolean);
+    return selectedNodeIds
+      .map((id: string) => nodes.find((n: any) => n.id === id))
+      .filter(Boolean);
   }, [selectedNodeIds, nodes]);
   const nodeData = nodeDataQuery.data || { data: [], page: 0, total_pages: 0 };
 
@@ -131,13 +182,13 @@ export const useWorkspace = () => {
     nodes: graphQuery.isLoading, // Use graph loading state for nodes
     graph: graphQuery.isLoading,
     nodeData: nodeDataQuery.isLoading,
-    operations: loading.operations.length > 0,
+    operations: loadingOperationCount > 0,
   }), [
     workspacesQuery.isLoading,
     currentWorkspaceQuery.isLoading,
     graphQuery.isLoading,
     nodeDataQuery.isLoading,
-  loading.operations.length,
+    loadingOperationCount,
   ]);
 
   // Stable getNodeShape function to prevent infinite loops
@@ -182,13 +233,13 @@ export const useWorkspace = () => {
     nodes: graphQuery.error?.message || null, // Use graph error state for nodes
     graph: graphQuery.error?.message || null,
     nodeData: nodeDataQuery.error?.message || null,
-    operations: Object.values(errors.operations)[0] || null,
+    operations: Object.values(operationErrorsRecord)[0] || null,
   }), [
     workspacesQuery.error,
     currentWorkspaceQuery.error,
     graphQuery.error,
     nodeDataQuery.error,
-    errors.operations,
+    operationErrorsRecord,
   ]);
 
   // Mutations with proper error handling and loading states
@@ -867,29 +918,16 @@ export const useWorkspace = () => {
 
   // Pagination management functions
   const handlePageChange = useCallback((page: number) => {
-    if (selectedNodeId) {
-      const currentPageSize = pagination[selectedNodeId]?.pageSize || 20;
-      setPagination(selectedNodeId, {
-        currentPage: page,
-        pageSize: currentPageSize,
-        totalPages: pagination[selectedNodeId]?.totalPages || 1
-      });
-      
-      // The query will automatically refetch due to queryKey dependency
-    }
-  }, [selectedNodeId, pagination]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!selectedNodeId) return;
+    updateCurrentPage(selectedNodeId, page);
+    // The query will automatically refetch due to queryKey dependency
+  }, [selectedNodeId, updateCurrentPage]);
 
   const handlePageSizeChange = useCallback((pageSize: number) => {
-    if (selectedNodeId) {
-      setPagination(selectedNodeId, {
-        currentPage: 1, // Reset to first page when changing page size
-        pageSize: pageSize,
-        totalPages: pagination[selectedNodeId]?.totalPages || 1
-      });
-      
-      // The query will automatically refetch due to queryKey dependency
-    }
-  }, [selectedNodeId, pagination, setPagination]);
+    if (!selectedNodeId) return;
+    updatePageSize(selectedNodeId, pageSize);
+    // The query will automatically refetch due to queryKey dependency
+  }, [selectedNodeId, updatePageSize]);
 
   // Reset pagination when node selection changes
   useEffect(() => {
@@ -897,7 +935,8 @@ export const useWorkspace = () => {
       setPagination(selectedNodeId, {
         currentPage: 1,
         pageSize: 20,
-        totalPages: 1
+        totalPages: 1,
+        totalItems: 0,
       });
     }
   }, [selectedNodeId, pagination, setPagination]);
