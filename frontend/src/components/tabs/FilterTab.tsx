@@ -127,12 +127,19 @@ const FilterTab: React.FC = () => {
     return columns;
   }, [nodeData?.columns, nodeData?.dtypes, selectedNode?.data?.schema]);
 
+  const hasSelection = Boolean(selectedNodeId);
+  const hasSchema = availableColumns.length > 0;
+  const isSchemaLoading = hasSelection && !hasSchema && (isLoading.nodeData || isLoading.graph);
+  const isConfigDisabled = !hasSelection || !hasSchema;
+
   // Auto-generate node name based on selected node
   useEffect(() => {
     if (selectedNode?.data?.name) {
       setNewNodeName(`${selectedNode.data.name}_filtered`);
+    } else if (!selectedNodeId) {
+      setNewNodeName('');
     }
-  }, [selectedNode]);
+  }, [selectedNode, selectedNodeId]);
 
   const handleAddCondition = () => {
     const firstColumn = availableColumns[0];
@@ -176,7 +183,19 @@ const FilterTab: React.FC = () => {
   };
 
   // Render appropriate input based on data type and operator
-  const renderValueInput = (condition: FilterConditionWithId) => {
+  const renderValueInput = (condition: FilterConditionWithId, disabled: boolean) => {
+    if (disabled) {
+      return (
+        <input
+          type="text"
+          value={condition.operator === 'between' ? '' : String(condition.value ?? '')}
+          disabled
+          placeholder={hasSelection ? 'Select a column' : 'Select a node to configure filters'}
+          className="px-2 py-1 border border-gray-200 rounded text-sm flex-1 bg-gray-100 text-gray-500"
+        />
+      );
+    }
+
     const dataType = condition.dataType || 'string';
 
     if (dataType === 'boolean') {
@@ -185,6 +204,7 @@ const FilterTab: React.FC = () => {
           value={String(condition.value)}
           onChange={(e) => handleConditionChange(condition.id, 'value', e.target.value === 'true')}
           className="px-2 py-1 border border-gray-300 rounded text-sm flex-1"
+          disabled={disabled}
         >
           <option value="">Select value</option>
           <option value="true">True</option>
@@ -280,7 +300,15 @@ const FilterTab: React.FC = () => {
           );
         });
 
-        return (
+        return disabled ? (
+          <input
+            type="text"
+            value={committedValue}
+            disabled
+            placeholder={isoPlaceholder}
+            className="px-2 py-1 border border-gray-200 rounded text-sm font-mono bg-gray-100 text-gray-500"
+          />
+        ) : (
           <DatePicker
             selected={committedDate || undefined}
             onChange={(d) => {
@@ -338,6 +366,7 @@ const FilterTab: React.FC = () => {
             dataType === 'integer' ? parseInt(e.target.value) || 0 : parseFloat(e.target.value) || 0)}
           placeholder="Enter number"
           className="px-2 py-1 border border-gray-300 rounded text-sm flex-1"
+          disabled={disabled}
         />
       );
     }
@@ -350,6 +379,7 @@ const FilterTab: React.FC = () => {
         onChange={(e) => handleConditionChange(condition.id, 'value', e.target.value)}
         placeholder="Enter value"
         className="px-2 py-1 border border-gray-300 rounded text-sm flex-1"
+        disabled={disabled}
       />
     );
   };
@@ -405,188 +435,226 @@ const FilterTab: React.FC = () => {
     }
   };
 
-  if (!selectedNodeId) {
-    return (
-      <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-        <h3 className="text-lg font-medium text-blue-800 mb-2">Filter Data</h3>
-        <p className="text-blue-700">
-          Please select a node from the graph to apply filters.
-        </p>
-      </div>
-    );
-  }
-
-  if (availableColumns.length === 0) {
-    return (
-      <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-        <h3 className="text-lg font-medium text-yellow-800 mb-2">Filter Data</h3>
-        <p className="text-yellow-700">
-          Loading node schema... Please wait.
-        </p>
-      </div>
-    );
-  }
-
   return (
-    <div className="p-4 space-y-4">
-      <h3 className="text-lg font-medium text-gray-900 mb-4">Filter Data</h3>
-      
-      {/* Selected Node Info */}
-      <div className="bg-gray-50 p-4 rounded-lg space-y-2">
-        <div>
-          {(() => {
-            const displayName = selectedNode ? (
-              selectedNode.data?.nodeName || selectedNode.data?.label || selectedNode.data?.name || selectedNode.label || selectedNode.id || selectedNodeId
-            ) : selectedNodeId;
-            return (
-              <>
-                <div className="text-sm font-medium text-gray-800 break-words">{displayName}</div>
-                <div className="text-xs text-gray-500 break-all">{selectedNodeId}</div>
-              </>
-            );
-          })()}
-        </div>
-        <div className="pt-1">
-          <div className="text-xs font-semibold text-gray-600 mb-1 tracking-wide">SCHEMA</div>
-          <div className="overflow-x-auto border border-gray-200 rounded-md bg-white">
-            <table className="text-[11px] font-mono border-collapse">
-              <tbody>
-                <tr className="align-top">
-                  {availableColumns.map(col => (
-                    <td key={col.name + '-name'} className="px-2 py-1 font-semibold text-gray-700 whitespace-nowrap border-b border-gray-100 min-w-[6rem]">{col.name}</td>
-                  ))}
-                </tr>
-                <tr className="align-top">
-                  {availableColumns.map(col => (
-                    <td key={col.name + '-type'} className="px-2 py-1 text-gray-500 whitespace-nowrap min-w-[6rem]">{col.dataType}</td>
-                  ))}
-                </tr>
-              </tbody>
-            </table>
+    <div className="space-y-6">
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 space-y-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-800">Filter &amp; Slice Data</h2>
+            <p className="text-sm text-gray-600 max-w-2xl">
+              Create a new node by applying column-based filters to the selected dataset. Define one or more conditions and choose how they combine.
+            </p>
           </div>
-          <div className="text-[10px] text-gray-400 mt-1">Scroll horizontally to view all {availableColumns.length} column(s).</div>
-        </div>
-      </div>
-
-      {/* Filter Conditions */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h4 className="text-md font-medium text-gray-800">Filter Conditions</h4>
-          <button
-            onClick={handleAddCondition}
-            className="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600"
-          >
-            Add Condition
-          </button>
+          {isFiltering && (
+            <span className="px-3 py-1 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-md">
+              Running…
+            </span>
+          )}
         </div>
 
-        {conditions.map((condition, index) => (
-          <div key={condition.id} className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg w-full">
-            {index > 0 && (
-              <select
-                value={logic}
-                onChange={(e) => setLogic(e.target.value as 'and' | 'or')}
-                className="px-2 py-1 border border-gray-300 rounded text-sm"
-              >
-                <option value="and">AND</option>
-                <option value="or">OR</option>
-              </select>
-            )}
-
-            {/* Negate and Regex toggles at the front */}
-            <label className="flex items-center gap-1 text-xs text-gray-700">
-              <input
-                aria-label="negate condition"
-                type="checkbox"
-                checked={Boolean(condition.negate)}
-                onChange={(e) => handleConditionChange(condition.id, 'negate' as any, e.target.checked)}
-              />
-              negate
-            </label>
-            {(condition.dataType === 'string' && condition.operator === 'contains') && (
-              <label className="flex items-center gap-1 text-xs text-gray-700">
-                <input
-                  aria-label="use regex"
-                  type="checkbox"
-                  checked={Boolean(condition.regex ?? true)}
-                  onChange={(e) => handleConditionChange(condition.id, 'regex' as any, e.target.checked)}
-                />
-                regex
+        <section className="space-y-4">
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Selected Node ({hasSelection ? 1 : 0}/1)
               </label>
+            </div>
+            {!hasSelection ? (
+              <div className="text-sm text-gray-500 italic bg-gray-50 border border-gray-200 p-3 rounded-md">
+                No nodes selected. Single click on a node in the workspace view to select it (max 1 for this operation).
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
+                  <div className="text-sm font-medium text-slate-800 break-words">
+                    {selectedNode?.data?.nodeName || selectedNode?.data?.label || selectedNode?.data?.name || selectedNode?.label || selectedNode?.id || selectedNodeId}
+                  </div>
+                  <div className="text-xs text-slate-500 break-all">{selectedNodeId}</div>
+                </div>
+
+                {isSchemaLoading ? (
+                  <div className="rounded-md border border-dashed border-amber-300 bg-amber-50/80 p-4 text-sm text-amber-700">
+                    Loading column metadata…
+                  </div>
+                ) : hasSchema ? (
+                  <div className="space-y-2">
+                    <div className="text-xs font-semibold text-slate-600 tracking-wide">SCHEMA</div>
+                    <div className="overflow-x-auto border border-slate-200 rounded-md bg-white">
+                      <table className="text-[11px] font-mono border-collapse">
+                        <tbody>
+                          <tr className="align-top">
+                            {availableColumns.map((col) => (
+                              <td key={`${col.name}-name`} className="px-2 py-1 font-semibold text-slate-700 whitespace-nowrap border-b border-slate-100 min-w-[6rem]">
+                                {col.name}
+                              </td>
+                            ))}
+                          </tr>
+                          <tr className="align-top">
+                            {availableColumns.map((col) => (
+                              <td key={`${col.name}-type`} className="px-2 py-1 text-slate-500 whitespace-nowrap min-w-[6rem]">
+                                {col.dataType}
+                              </td>
+                            ))}
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="text-[10px] text-slate-400">Scroll horizontally to view all {availableColumns.length} column(s).</div>
+                  </div>
+                ) : (
+                  <div className="rounded-md border border-dashed border-amber-300 bg-amber-50/80 p-4 text-sm text-amber-700">
+                    No schema information is available for this node yet.
+                  </div>
+                )}
+              </div>
             )}
-            
-            <select
-              value={condition.column}
-              onChange={(e) => handleConditionChange(condition.id, 'column', e.target.value)}
-              className="px-2 py-1 border border-gray-300 rounded text-sm flex-grow min-w-[10rem]"
-            >
-              <option value="">Select Column</option>
-              {availableColumns.map((col) => (
-                <option key={col.name} value={col.name}>
-                  {col.name} ({col.dataType})
-                </option>
-              ))}
-            </select>
+          </div>
 
-            <select
-              value={condition.operator}
-              onChange={(e) => handleConditionChange(condition.id, 'operator', e.target.value)}
-              disabled={!condition.column}
-              className={`px-2 py-1 border border-gray-300 rounded text-sm flex-none w-32 text-ellipsis ${
-                !condition.column ? 'bg-gray-100 text-gray-500' : ''
-              }`}
-            >
-              {!condition.column ? (
-                <option value="">Please select a column first</option>
-              ) : (
-                getOperatorsForType(condition.dataType || 'string').map((op) => (
-                  <option key={op.value} value={op.value}>
-                    {op.label}
-                  </option>
-                ))
-              )}
-            </select>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between gap-4">
+              <h3 className="text-lg font-semibold text-gray-800">Filter conditions</h3>
+              <button
+                onClick={handleAddCondition}
+                disabled={isConfigDisabled}
+                className="px-3 py-1.5 rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:text-gray-500"
+              >
+                Add condition
+              </button>
+            </div>
 
-            {condition.operator !== 'is_null' && (
-              <div className="flex-none">
-                {renderValueInput(condition)}
+            {hasSelection && isSchemaLoading && (
+              <div className="rounded-md border border-dashed border-amber-300 bg-amber-50/80 p-4 text-sm text-amber-700">
+                Retrieving column information…
               </div>
             )}
 
-            {conditions.length > 1 && (
-              <button
-                onClick={() => handleRemoveCondition(condition.id)}
-                className="px-2 py-1 bg-red-500 text-white text-sm rounded hover:bg-red-600"
-              >
-                Remove
-              </button>
+            {!hasSelection && (
+              <div className="rounded-md border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">
+                Configure conditions once a node is selected.
+              </div>
             )}
+
+            <div className="space-y-3">
+              {conditions.map((condition, index) => {
+                const rowDisabled = isConfigDisabled || !condition.column;
+                return (
+                  <div key={condition.id} className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 md:flex-row md:items-center md:gap-3">
+                    <div className="flex items-center gap-2 md:w-auto">
+                      {index > 0 && (
+                        <select
+                          value={logic}
+                          onChange={(e) => setLogic(e.target.value as 'and' | 'or')}
+                          disabled={isConfigDisabled}
+                          className="px-2 py-1 border border-slate-300 rounded text-sm bg-white disabled:bg-slate-100 disabled:text-slate-400"
+                        >
+                          <option value="and">AND</option>
+                          <option value="or">OR</option>
+                        </select>
+                      )}
+
+                      <label className="flex items-center gap-1 text-xs text-slate-700">
+                        <input
+                          aria-label="negate condition"
+                          type="checkbox"
+                          checked={Boolean(condition.negate)}
+                          onChange={(e) => handleConditionChange(condition.id, 'negate' as any, e.target.checked)}
+                          disabled={isConfigDisabled}
+                        />
+                        negate
+                      </label>
+
+                      {condition.dataType === 'string' && condition.operator === 'contains' && (
+                        <label className="flex items-center gap-1 text-xs text-slate-700">
+                          <input
+                            aria-label="use regex"
+                            type="checkbox"
+                            checked={Boolean(condition.regex ?? true)}
+                            onChange={(e) => handleConditionChange(condition.id, 'regex' as any, e.target.checked)}
+                            disabled={isConfigDisabled}
+                          />
+                          regex
+                        </label>
+                      )}
+                    </div>
+
+                    <div className="flex flex-1 flex-col gap-2 md:flex-row md:items-center">
+                      <select
+                        value={condition.column}
+                        onChange={(e) => handleConditionChange(condition.id, 'column', e.target.value)}
+                        disabled={isConfigDisabled}
+                        className="px-2 py-1 border border-slate-300 rounded text-sm flex-grow min-w-[10rem] bg-white disabled:bg-slate-100 disabled:text-slate-400"
+                      >
+                        <option value="">Select column</option>
+                        {availableColumns.map((col) => (
+                          <option key={col.name} value={col.name}>
+                            {col.name} ({col.dataType})
+                          </option>
+                        ))}
+                      </select>
+
+                      <select
+                        value={condition.operator}
+                        onChange={(e) => handleConditionChange(condition.id, 'operator', e.target.value)}
+                        disabled={rowDisabled}
+                        className="px-2 py-1 border border-slate-300 rounded text-sm flex-none w-36 bg-white disabled:bg-slate-100 disabled:text-slate-400"
+                      >
+                        {!condition.column ? (
+                          <option value="">Select a column first</option>
+                        ) : (
+                          getOperatorsForType(condition.dataType || 'string').map((op) => (
+                            <option key={op.value} value={op.value}>
+                              {op.label}
+                            </option>
+                          ))
+                        )}
+                      </select>
+
+                      {condition.operator !== 'is_null' && (
+                        <div className="flex-1 md:flex-none">
+                          {renderValueInput(condition, rowDisabled)}
+                        </div>
+                      )}
+                    </div>
+
+                    {conditions.length > 1 && (
+                      <button
+                        onClick={() => handleRemoveCondition(condition.id)}
+                        className="px-2 py-1 text-sm rounded-md bg-red-500 text-white hover:bg-red-600"
+                        type="button"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        ))}
-      </div>
 
-      {/* New Node Name */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          New Node Name
-        </label>
-        <input
-          type="text"
-          value={newNodeName}
-          onChange={(e) => setNewNodeName(e.target.value)}
-          placeholder="Enter name for filtered data"
-          className="w-full px-3 py-2 border border-gray-300 rounded-md"
-        />
-      </div>
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-slate-700" htmlFor="filter-new-node-name">
+              New node name
+            </label>
+            <input
+              id="filter-new-node-name"
+              type="text"
+              value={newNodeName}
+              onChange={(e) => setNewNodeName(e.target.value)}
+              placeholder="Enter name for filtered data"
+              disabled={!hasSelection}
+              className="w-full px-3 py-2 border border-slate-300 rounded-md bg-white disabled:bg-slate-100 disabled:text-slate-400"
+            />
+          </div>
 
-      {/* Apply Button */}
-      <button
-        onClick={handleApplyFilter}
-        disabled={isFiltering || isLoading.operations}
-        className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400"
-      >
-        {isFiltering ? 'Applying Filter...' : 'Apply Filter'}
-      </button>
+          <button
+            onClick={handleApplyFilter}
+            disabled={isConfigDisabled || isFiltering || isLoading.operations}
+            className="w-full px-4 py-2 rounded-md text-white font-medium bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:text-gray-500"
+          >
+            {isFiltering ? 'Applying filter…' : 'Apply filter'}
+          </button>
+        </section>
+      </div>
     </div>
   );
 };
