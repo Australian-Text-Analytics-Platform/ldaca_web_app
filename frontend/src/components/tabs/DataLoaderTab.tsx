@@ -337,8 +337,7 @@ const DataLoaderTab: React.FC = () => {
                         console.error('Failed to import workspace:', err);
                         alert('Failed to import workspace');
                       } finally {
-                        // Invalidate workspace list via useWorkspace hook
-                        // We don't have direct access to query client here; rely on backend consistency
+                        // Additional invalidation happens via query keys; rely on backend consistency here
                       }
                     }}
                   />

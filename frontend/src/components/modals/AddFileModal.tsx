@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useFilePreview } from '../../hooks/useFilePreview';
+import columnPersistence from '../../utils/columnPersistence';
+import { useWorkspaceData } from '../../hooks/useWorkspaceData';
 
 interface AddFileModalProps {
   filename: string | null;
@@ -24,6 +26,7 @@ function guessDocumentColumn(columns: string[], rows: any[]): string | null {
 }
 
 const AddFileModal: React.FC<AddFileModalProps> = ({ filename, isOpen, onClose, onConfirm }) => {
+  const { currentWorkspaceId } = useWorkspaceData() as any;
   const {
     previewData,
     columns,
@@ -41,6 +44,15 @@ const AddFileModal: React.FC<AddFileModalProps> = ({ filename, isOpen, onClose, 
   const [documentColumn, setDocumentColumn] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const guessed = useMemo(() => guessDocumentColumn(columns, previewData) , [columns, previewData]);
+  const filePersistenceCtx = useMemo(() => ({
+    workspaceId: currentWorkspaceId ?? null,
+    scope: 'add-file-modal',
+    storage: 'local' as const,
+  }), [currentWorkspaceId]);
+  const persistedDocumentColumn = useMemo(() => {
+    if (!filename) return null;
+    return columnPersistence.get(filePersistenceCtx, filename);
+  }, [filePersistenceCtx, filename]);
 
   useEffect(() => {
     if (isOpen && filename) {
@@ -63,11 +75,11 @@ const AddFileModal: React.FC<AddFileModalProps> = ({ filename, isOpen, onClose, 
 
   useEffect(() => {
   if (mode === 'DocLazyFrame' || mode === 'DocDataFrame') {
-      setDocumentColumn(prev => prev || guessed || null);
+      setDocumentColumn(prev => prev || persistedDocumentColumn || guessed || null);
     } else {
       setDocumentColumn(null);
     }
-  }, [mode, guessed]);
+  }, [mode, guessed, persistedDocumentColumn]);
 
   if (!isOpen || !filename) return null;
 
@@ -75,6 +87,9 @@ const AddFileModal: React.FC<AddFileModalProps> = ({ filename, isOpen, onClose, 
     try {
       setSubmitting(true);
   await onConfirm({ mode, documentColumn: (mode === 'DocLazyFrame' || mode === 'DocDataFrame') ? documentColumn || undefined : undefined });
+      if ((mode === 'DocLazyFrame' || mode === 'DocDataFrame') && filename && documentColumn) {
+        columnPersistence.set(filePersistenceCtx, filename, documentColumn);
+      }
       onClose();
     } finally {
       setSubmitting(false);

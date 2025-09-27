@@ -9,6 +9,8 @@ import GoogleLogin from './components/GoogleLogin';
 import { WorkspaceView, Sidebar } from './components/layout';
 import logo from './logo.png';
 import { FeedbackModal } from './components/modals';
+import { useUIStore } from './stores';
+import { useShallow } from 'zustand/react/shallow';
 
 // Lazy load components for code splitting
 const TutorialView = lazy(() => import('./components/TutorialView'));
@@ -25,11 +27,17 @@ const TokenFrequencyTab = lazy(() => import('./components/tabs/TokenFrequencyTab
  * Improved App component with proper error boundaries and loading states
  */
 const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'data-loader' | 'filter' | 'token-frequency' | 'concordance' | 'analysis' | 'topic-modeling' | 'quotation' | 'export'>(() => {
-    const saved = localStorage.getItem('activeTab') as any;
-    const allowed = new Set(['data-loader','filter','token-frequency','concordance','analysis','topic-modeling','quotation','export']);
-    return allowed.has(saved) ? saved : 'data-loader';
-  });
+  const {
+    currentView,
+    setCurrentView,
+    closeFeedbackModal,
+    feedbackOpen,
+  } = useUIStore(useShallow((state) => ({
+    currentView: state.currentView,
+    setCurrentView: state.setCurrentView,
+    closeFeedbackModal: state.closeFeedbackModal,
+    feedbackOpen: state.modals.feedbackModal,
+  })));
   const [isTutorial, setIsTutorial] = useState<boolean>(false);
   const { user, loginWithGoogle, logout, isAuthenticated, isMultiUserMode, isLoading, error } = useAuth();
   const { ready: backendReady } = useBackendHealth();
@@ -38,7 +46,6 @@ const App: React.FC = () => {
   const [rightWidth, setRightWidth] = useState<number>(50); // percentage of total width
   const [lastRightWidth, setLastRightWidth] = useState<number>(50); // remember last width when collapsing
   const [isRightCollapsed, setIsRightCollapsed] = useState<boolean>(false);
-  const [showFeedback, setShowFeedback] = useState<boolean>(false);
   const [isResizing, setIsResizing] = useState(false);
   const layoutRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLElement>(null);
@@ -101,32 +108,6 @@ const App: React.FC = () => {
       return next;
     });
   }, [rightWidth, lastRightWidth]);
-
-  // Persist active tab across refreshes
-  useEffect(() => {
-    try { localStorage.setItem('activeTab', activeTab); } catch {}
-  }, [activeTab]);
-
-  // Listen for navigation events from TokenFrequencyTab
-  useEffect(() => {
-    const handleNavigateToConcordance = (event: CustomEvent) => {
-      console.log('Navigating to concordance with token:', event.detail.token);
-      setActiveTab('concordance');
-    };
-
-    window.addEventListener('navigateToConcordance', handleNavigateToConcordance as EventListener);
-
-    return () => {
-      window.removeEventListener('navigateToConcordance', handleNavigateToConcordance as EventListener);
-    };
-  }, []);
-
-  // Global event to open feedback from Sidebar footer
-  useEffect(() => {
-    const open = () => setShowFeedback(true);
-    window.addEventListener('openFeedback', open as EventListener);
-    return () => window.removeEventListener('openFeedback', open as EventListener);
-  }, []);
 
   // Hash-based lightweight routing for tutorial page
   useEffect(() => {
@@ -208,7 +189,7 @@ const App: React.FC = () => {
       <WorkspaceProvider>
         <ErrorBoundary>
           <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-            <FeedbackModal isOpen={showFeedback} onClose={() => setShowFeedback(false)} />
+            <FeedbackModal isOpen={feedbackOpen} onClose={closeFeedbackModal} />
             {/* Global drag-and-drop overlay removed; users can drop directly onto the file list */}
             {/* Header */}
             <header className="bg-white border-b border-gray-200 px-6 py-4 relative">
@@ -232,7 +213,7 @@ const App: React.FC = () => {
             <div className="flex h-[calc(100vh-73px)] relative" ref={layoutRef}>
               {/* Left Sidebar */}
               <ErrorBoundary>
-                <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
+                <Sidebar />
               </ErrorBoundary>
 
               {/* Middle Panel - Operation UI */}
@@ -251,14 +232,14 @@ const App: React.FC = () => {
                         </div>
                       </div>
                     }>
-                      {activeTab === 'data-loader' && <DataLoaderTab />}
-                      {activeTab === 'filter' && <FilterTab />}
-                      {activeTab === 'token-frequency' && <TokenFrequencyTab />}
-                      {activeTab === 'concordance' && <ConcordanceTab />}
-                      {activeTab === 'analysis' && <TimelineTab />}
-                      {activeTab === 'topic-modeling' && <TopicModelingTab />}
-                      {activeTab === 'quotation' && <QuotationTab />}
-                      {activeTab === 'export' && <ExportTab />}
+                      {currentView === 'data-loader' && <DataLoaderTab />}
+                      {currentView === 'filter' && <FilterTab />}
+                      {currentView === 'token-frequency' && <TokenFrequencyTab />}
+                      {currentView === 'concordance' && <ConcordanceTab />}
+                      {currentView === 'analysis' && <TimelineTab />}
+                      {currentView === 'topic-modeling' && <TopicModelingTab />}
+                      {currentView === 'quotation' && <QuotationTab />}
+                      {currentView === 'export' && <ExportTab />}
                     </Suspense>
                   </ErrorBoundary>
                 </div>

@@ -29,7 +29,10 @@ const TopicModelingTab: React.FC = () => {
   const { selectedNodes } = useWorkspaceSelection();
   const { currentWorkspaceId, getNodeShape } = useWorkspaceData();
   const { getAuthHeaders } = useAuth();
-  const { setTasks } = useAnalysisStore() as any;
+  const tasks = useAnalysisStore((state: any) => state.tasks);
+  const topicModelingReadyTaskId = useAnalysisStore((state: any) => state.topicModelingReadyTaskId);
+  const topicModelingReadyTimestamp = useAnalysisStore((state: any) => state.topicModelingReadyTimestamp);
+  const resetTopicModelingReady = useAnalysisStore((state: any) => state.resetTopicModelingReady);
   const [isRunning, setIsRunning] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
   const runningRef = useRef<boolean>(false);
@@ -40,16 +43,16 @@ const TopicModelingTab: React.FC = () => {
   const resultRef = useRef<TopicModelingResponse | null>(null); // Track result to prevent downgrades
   
   // Safe setResult wrapper that prevents downgrades from successful to running
-  const setResultSafely = (newResult: TopicModelingResponse | null) => {
+  const setResultSafely = useCallback((newResult: TopicModelingResponse | null) => {
     // Prevent downgrading from successful to running (race condition fix)
-  if (resultRef.current?.state === 'successful' && newResult?.state === 'running') {
+    if (resultRef.current?.state === 'successful' && newResult?.state === 'running') {
       console.log('TopicModelingTab: Ignoring stale running update that would hide successful results');
       return;
     }
-    
+
     setResult(newResult);
     resultRef.current = newResult;
-  };
+  }, []);
   
   const [minTopicSize, setMinTopicSize] = useState(5);
   const [useCtTfidf, setUseCtTfidf] = useState(false);
@@ -60,6 +63,49 @@ const TopicModelingTab: React.FC = () => {
   const containerRef = useRef<HTMLDivElement | null>(null); // overall card
   const chartRef = useRef<HTMLDivElement | null>(null); // chart area
   const [chartWidth, setChartWidth] = useState<number>(800);
+  const lastFetchedRef = useRef<{ taskId: string | null; state: 'successful' | 'failed' | null }>({ taskId: null, state: null });
+
+  useEffect(() => {
+    lastFetchedRef.current = { taskId: null, state: null };
+    resetTopicModelingReady();
+  }, [currentWorkspaceId, resetTopicModelingReady]);
+
+  const fetchTopicModelingResult = useCallback(
+    async (taskId: string | null, expectedState: 'successful' | 'failed') => {
+      if (!currentWorkspaceId) return;
+      if (
+        taskId &&
+        lastFetchedRef.current.taskId === taskId &&
+        lastFetchedRef.current.state === expectedState
+      ) {
+        return;
+      }
+
+      try {
+        const rr = await textApi.getTopicModelingCurrentResult(currentWorkspaceId, getAuthHeaders());
+        if (!rr) return;
+
+        setResultSafely(rr as any);
+
+        if (rr.state === 'successful') {
+          setIsLocked(true);
+          setIsRunning(false);
+          runningRef.current = false;
+          setError(null);
+          lastFetchedRef.current = { taskId: taskId ?? null, state: 'successful' };
+        } else if (rr.state === 'failed') {
+          setIsLocked(true);
+          setIsRunning(false);
+          runningRef.current = false;
+          setError(rr.message || 'Topic modeling failed');
+          lastFetchedRef.current = { taskId: taskId ?? null, state: 'failed' };
+        }
+      } catch (error) {
+        console.warn('Failed to fetch topic modeling result', error);
+      }
+    },
+    [currentWorkspaceId, getAuthHeaders, setResultSafely]
+  );
 
   // Observe container width for responsive sizing
   useEffect(()=>{
@@ -117,6 +163,8 @@ const TopicModelingTab: React.FC = () => {
     if (firstTwo.some(n=> !nodeColumnSelections.find(s=>s.nodeId===n.id)?.column)) {
       alert('Select a text column for all selected nodes'); return;
     }
+    lastFetchedRef.current = { taskId: null, state: null };
+    resetTopicModelingReady();
     // Optimistically enter running state immediately
     setIsRunning(true);
     runningRef.current = true;
@@ -339,60 +387,60 @@ const TopicModelingTab: React.FC = () => {
 
   // React to task state changes for running state management
   useEffect(() => {
-    const onTasksUpdated = async (ev: any) => {
-      try {
-        const tasks = ev?.detail?.tasks || [];
-        const tmTasks = tasks.filter((t: any) => t.task_type === 'topic_modeling');
-  const hasRunningTM = tmTasks.some((t: any) => t.state === 'running');
-  const hasFailedTM = tmTasks.some((t: any) => t.state === 'failed');
-        
-        if (hasRunningTM && !runningRef.current) {
-          // Enter running state
-          setIsLocked(true);
-          setIsRunning(true);
-          runningRef.current = true;
-        } else if (!hasRunningTM && runningRef.current && !hasFailedTM) {
-          // Exit running state (but only if not failed, let failure event handle that)
-          setIsRunning(false);
-          runningRef.current = false;
-        }
-      } catch { /* ignore */ }
-    };
-    window.addEventListener('tasksUpdated', onTasksUpdated as EventListener);
-    return () => window.removeEventListener('tasksUpdated', onTasksUpdated as EventListener);
-  }, []);
-  
-  // React to topic modeling result ready event
-  useEffect(() => {
-    const onResultReady = async (ev: any) => {
-      if (!currentWorkspaceId) return;
-      
-      try {
-        console.log('Topic modeling result ready, fetching current-result');
-        const rr = await textApi.getTopicModelingCurrentResult(currentWorkspaceId, getAuthHeaders());
-        if (rr) {
-          const resStatus = (rr as any)?.state;
-          if (resStatus === 'successful') {
-            setResultSafely(rr as any);
-            setIsLocked(true);
-            setIsRunning(false);
-            runningRef.current = false;
-            console.log('Topic modeling results updated successfully');
-          } else if (resStatus === 'failed') {
-            setResultSafely(rr as any);
-            setIsLocked(true);
-            setIsRunning(false);
-            runningRef.current = false;
-          }
-        }
-      } catch (error) {
-        console.warn('Failed to fetch topic modeling result after ready event:', error);
+    if (!tasks || !tasks.length) {
+      if (runningRef.current) {
+        setIsRunning(false);
+        runningRef.current = false;
       }
-    };
-    
-    window.addEventListener('topicModelingResultReady', onResultReady as EventListener);
-    return () => window.removeEventListener('topicModelingResultReady', onResultReady as EventListener);
-  }, [currentWorkspaceId, getAuthHeaders]);
+      return;
+    }
+
+    const tmTasks = tasks.filter((t: any) => t.task_type === 'topic_modeling');
+    if (!tmTasks.length) {
+      if (runningRef.current) {
+        setIsRunning(false);
+        runningRef.current = false;
+      }
+      return;
+    }
+
+    const hasRunningTM = tmTasks.some((t: any) => t.state === 'running');
+    const failedTask = tmTasks.find((t: any) => t.state === 'failed');
+    const successfulTask = tmTasks.find((t: any) => t.state === 'successful' && t.result_persisted);
+
+    if (hasRunningTM) {
+      setIsLocked(true);
+      setIsRunning(true);
+      runningRef.current = true;
+    } else if (!failedTask) {
+      if (runningRef.current) {
+        setIsRunning(false);
+        runningRef.current = false;
+      }
+    }
+
+    if (successfulTask?.task_id) {
+      setIsLocked(true);
+      setIsRunning(false);
+      runningRef.current = false;
+      void fetchTopicModelingResult(successfulTask.task_id, 'successful');
+    } else if (failedTask?.task_id) {
+      setIsLocked(true);
+      setIsRunning(false);
+      runningRef.current = false;
+      void fetchTopicModelingResult(failedTask.task_id, 'failed');
+    }
+  }, [tasks, fetchTopicModelingResult]);
+
+  // React to explicit ready markers from task stream (covers persisted results without state change yet)
+  useEffect(() => {
+    if (!topicModelingReadyTaskId) return;
+
+    (async () => {
+      await fetchTopicModelingResult(topicModelingReadyTaskId, 'successful');
+      resetTopicModelingReady();
+    })();
+  }, [topicModelingReadyTaskId, topicModelingReadyTimestamp, fetchTopicModelingResult, resetTopicModelingReady]);
 
   // If result failed, keep the panel locked and run disabled until cleared
   useEffect(() => {
@@ -494,6 +542,8 @@ const TopicModelingTab: React.FC = () => {
                 setLockedNodeSelections(null);
                 setIsRunning(false);
                 runningRef.current = false;
+                resetTopicModelingReady();
+                lastFetchedRef.current = { taskId: null, state: null };
                 setNodeColumnSelectionsRaw([], { replace: true, persist: false });
                 recomputeAutoColumns();
               }

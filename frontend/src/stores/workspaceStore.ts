@@ -100,43 +100,47 @@ const defaultPagination = {
   totalItems: 0,
 };
 
-const defaultGraphState = {
+const createDefaultPagination = () => ({ ...defaultPagination });
+
+const createDefaultGraphState = () => ({
   zoom: 1,
   center: { x: 0, y: 0 },
   fitViewOnLoad: true,
-};
+});
+
+const createDefaultNodeOperations = () => ({
+  pendingDeletes: new Set<string>(),
+  pendingRenames: new Set<string>(),
+  pendingFilters: new Set<string>(),
+  pendingJoins: new Set<string>(),
+});
+
+const createDefaultFileUploadState = () => ({
+  uploadProgress: 0,
+  isUploading: false,
+  uploadedFiles: [] as string[],
+});
 
 export const useWorkspaceStore = create<WorkspaceStore>()(
   devtools(
     immer((set, get) => ({
       // Initial state
       currentWorkspaceId: null,
-      graph: defaultGraphState,
+      graph: createDefaultGraphState(),
       pagination: {},
-      nodeOperations: {
-        pendingDeletes: new Set(),
-        pendingRenames: new Set(),
-        pendingFilters: new Set(),
-        pendingJoins: new Set(),
-      },
-      fileUpload: {
-        uploadProgress: 0,
-        isUploading: false,
-        uploadedFiles: [],
-      },
+      nodeOperations: createDefaultNodeOperations(),
+      fileUpload: createDefaultFileUploadState(),
 
       // Current workspace management
       setCurrentWorkspaceId: (workspaceId) => set((state) => {
+        if (state.currentWorkspaceId === workspaceId) {
+          return;
+        }
         state.currentWorkspaceId = workspaceId;
         // Reset workspace-specific state when workspace changes
-        state.graph = defaultGraphState;
+        state.graph = createDefaultGraphState();
         state.pagination = {};
-        state.nodeOperations = {
-          pendingDeletes: new Set(),
-          pendingRenames: new Set(),
-          pendingFilters: new Set(),
-          pendingJoins: new Set(),
-        };
+        state.nodeOperations = createDefaultNodeOperations();
       }),
 
       // Graph management
@@ -153,7 +157,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       }),
       
       resetGraphView: () => set((state) => {
-        state.graph = defaultGraphState;
+        state.graph = createDefaultGraphState();
       }),
 
       // Pagination management
@@ -179,7 +183,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       }),
       
       resetPagination: (nodeId) => set((state) => {
-        state.pagination[nodeId] = defaultPagination;
+        state.pagination[nodeId] = createDefaultPagination();
       }),
       
       clearAllPagination: () => set((state) => {
@@ -228,12 +232,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       isNodeJoinPending: (joinId) => get().nodeOperations.pendingJoins.has(joinId),
       
       clearAllPendingOperations: () => set((state) => {
-        state.nodeOperations = {
-          pendingDeletes: new Set(),
-          pendingRenames: new Set(),
-          pendingFilters: new Set(),
-          pendingJoins: new Set(),
-        };
+        state.nodeOperations = createDefaultNodeOperations();
       }),
 
       // File upload management
@@ -259,11 +258,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       }),
       
       resetUploadState: () => set((state) => {
-        state.fileUpload = {
-          uploadProgress: 0,
-          isUploading: false,
-          uploadedFiles: [],
-        };
+        state.fileUpload = createDefaultFileUploadState();
       }),
     })),
     { name: 'workspace-store' }

@@ -1,230 +1,43 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useWorkspaceData } from '../../hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '../../hooks/useWorkspaceSelection';
 import { useWorkspaceActions } from '../../hooks/useWorkspaceActions';
 import { useAuth } from '../../hooks/useAuth';
 import { workspacesApi } from '../../api/workspaces';
 import { useAnalysisStore } from '../../stores/analysisStore';
-import { getApiBase } from '../../api/env';
+import { useUIStore } from '../../stores';
+import { useShallow } from 'zustand/react/shallow';
+import { useWorkspaceTaskStream } from '../../hooks/useWorkspaceTaskStream';
 
-interface SidebarProps {
-  activeTab: 'data-loader' | 'filter' | 'token-frequency' | 'topic-modeling' | 'concordance' | 'analysis' | 'quotation' | 'export';
-  onTabChange: (tab: 'data-loader' | 'filter' | 'token-frequency' | 'topic-modeling' | 'concordance' | 'analysis' | 'quotation' | 'export') => void;
-}
-
-const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
+const Sidebar: React.FC = () => {
+  const { currentView, setCurrentView, openFeedbackModal } = useUIStore(
+    useShallow(({ currentView, setCurrentView, openFeedbackModal }) => ({ currentView, setCurrentView, openFeedbackModal }))
+  );
   const { workspaceGraph, currentWorkspaceId } = useWorkspaceData();
   const { selectedNodeIds } = useWorkspaceSelection();
   const { toggleNodeSelection } = useWorkspaceActions();
   const { getAuthHeaders } = useAuth();
   const { tasks, setTasks } = useAnalysisStore() as any;
-  const [isConnected, setIsConnected] = useState<boolean>(false);
-  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const {
+    status: taskStreamStatus,
+    error: taskStreamError,
+    reconnect: reconnectTaskStream,
+  } = useWorkspaceTaskStream(currentWorkspaceId ?? null);
+  const isConnected = taskStreamStatus === 'open';
+  const isConnecting = taskStreamStatus === 'connecting';
+  const connectionError = taskStreamStatus === 'error' ? taskStreamError : null;
   // Use workspaceGraph.nodes as the single source of truth for node count
   const nodeCount = workspaceGraph?.nodes?.length || 0;
 
-  // Use SSE for real-time task updates (no polling fallback)
-  useEffect(() => {
-    if (!currentWorkspaceId) {
-      setIsConnected(false);
-      setConnectionError(null);
-      return;
-    }
-
-    let cleanup = false;
-    let abortController: AbortController | null = null;
-
-    const connectSSE = async () => {
-      if (cleanup) return;
-      
-      try {
-        const authHeaders = getAuthHeaders();
-        const baseUrl = getApiBase();
-        const url = `${baseUrl}/workspaces/${currentWorkspaceId}/tasks/stream`;
-        
-        // Use fetch with proper auth headers for SSE
-        abortController = new AbortController();
-        const response = await fetch(url, {
-          method: 'GET',
-          headers: {
-            'Accept': 'text/event-stream',
-            'Cache-Control': 'no-cache',
-            ...authHeaders
-          },
-          credentials: 'include',
-          signal: abortController.signal
-        });
-        
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        
-        if (!response.body) {
-          throw new Error('Response body is null');
-        }
-        
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        
-        // Set connected state
-        if (!cleanup) {
-          setIsConnected(true);
-          setConnectionError(null);
-          console.log('SSE connected for task updates');
-        }
-        
-        const processStream = async () => {
-          let buffer = '';
-          
-          try {
-            while (true) {
-              const { done, value } = await reader.read();
-              
-              if (done || cleanup) {
-                break;
-              }
-              
-              const chunk = decoder.decode(value, { stream: true });
-              buffer += chunk;
-              
-              // Process complete SSE frames (ending with \n\n)
-              const frames = buffer.split('\n\n');
-              // Keep the last incomplete frame in buffer
-              buffer = frames.pop() || '';
-              
-              for (const frame of frames) {
-                if (!frame.trim()) continue;
-                
-                // Extract data from SSE frame (supports multiline data)
-                const dataLines = frame.split('\n')
-                  .filter(line => line.startsWith('data: '))
-                  .map(line => line.slice(6)); // Remove 'data: ' prefix
-                
-                if (dataLines.length === 0) continue;
-                
-                const data = dataLines.join('\n'); // Rejoin multiline data
-                if (!data.trim()) continue;
-                
-                try {
-                  const parsedData = JSON.parse(data);
-                  
-                  if (parsedData.type === 'tasks_snapshot' && parsedData.tasks) {
-                    // Initial snapshot of all tasks
-                    setTasks(parsedData.tasks);
-                  } else if (parsedData.type === 'task_changed' && parsedData.task) {
-                    // Single task updated - merge into existing tasks
-                    setTasks((prevTasks: any[]) => {
-                      const otherTasks = prevTasks.filter(t => t.task_id !== parsedData.task.task_id);
-                      return [...otherTasks, parsedData.task].sort((a, b) => {
-                        const tb = (b.finished_at || b.started_at || b.created_at || 0);
-                        const ta = (a.finished_at || a.started_at || a.created_at || 0);
-                        return tb - ta;
-                      });
-                    });
-                    
-                    // Bridge: If task is topic_modeling, successful, and result_persisted, dispatch result ready event
-          if (parsedData.task?.task_type === 'topic_modeling' && 
-            parsedData.task?.state === 'successful' && 
-                        parsedData.result_persisted === true) {
-                      window.dispatchEvent(new CustomEvent('topicModelingResultReady', {
-                        detail: {
-                          task_id: parsedData.task.task_id,
-                          task_type: parsedData.task.task_type,
-                          timestamp: parsedData.timestamp
-                        }
-                      }));
-                    }
-                  } else if (parsedData.type === 'analysis_saved' && parsedData.task_type === 'topic_modeling') {
-                    // Topic modeling result is ready - dispatch custom event
-                    window.dispatchEvent(new CustomEvent('topicModelingResultReady', {
-                      detail: {
-                        task_id: parsedData.task_id,
-                        task_type: parsedData.task_type,
-                        timestamp: parsedData.timestamp
-                      }
-                    }));
-                  } else if (parsedData.type === 'analysis_save_failed' && parsedData.task_type === 'topic_modeling') {
-                    // Analysis save failed - show error
-                    console.error('Topic modeling result save failed:', parsedData.message);
-                    setConnectionError(`Save failed: ${parsedData.message}`);
-                  } else if (parsedData.type === 'task_update' && parsedData.tasks) {
-                    // Legacy task_update format for backward compatibility
-                    setTasks(parsedData.tasks);
-                  } else if (parsedData.type === 'error') {
-                    console.error('SSE error:', parsedData.message);
-                    setConnectionError(parsedData.message);
-                  } else if (parsedData.type === 'heartbeat') {
-                    // Heartbeat - just keep connection alive, no action needed
-                  }
-                } catch (e) {
-                  console.warn('Failed to parse SSE message:', data, e);
-                }
-              }
-            }
-          } catch (error) {
-            if (!cleanup) {
-              console.warn('Stream processing error:', error);
-              setIsConnected(false);
-              setConnectionError('Stream processing error');
-            }
-          } finally {
-            reader.releaseLock();
-          }
-        };
-        
-        // Process the stream with error handling
-        try {
-          await processStream();
-        } catch (streamError) {
-          if (!cleanup) {
-            console.warn('Stream processing failed:', streamError);
-            setIsConnected(false);
-            setConnectionError('Stream processing error');
-            
-            // Auto-reconnect SSE after a delay
-            setTimeout(() => {
-              if (!cleanup) {
-                connectSSE();
-              }
-            }, 5000);
-          }
-        }
-        
-      } catch (error) {
-        if (!cleanup) {
-          console.error('Failed to create SSE connection:', error);
-          setIsConnected(false);
-          setConnectionError('Connection error');
-          
-          // Auto-reconnect SSE after a delay
-          setTimeout(() => {
-            if (!cleanup) {
-              connectSSE();
-            }
-          }, 10000);
-        }
-      }
-    };
-
-    connectSSE();
-
-    return () => {
-      cleanup = true;
-      if (abortController) {
-        abortController.abort();
-      }
-      setIsConnected(false);
-      setConnectionError(null);
-    };
-  }, [currentWorkspaceId, getAuthHeaders, setTasks]);
+  // Task stream state handled by useWorkspaceTaskStream; reconnectTaskStream available for manual retries.
 
   return (
     <aside className="w-64 bg-white border-r border-gray-200 p-4 flex flex-col h-full">
       <nav className="space-y-2">
         <button
-          onClick={() => onTabChange('data-loader')}
+          onClick={() => setCurrentView('data-loader')}
           className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${
-            activeTab === 'data-loader'
+            currentView === 'data-loader'
               ? 'bg-blue-100 text-blue-700 font-medium'
               : 'text-gray-600 hover:bg-gray-100'
           }`}
@@ -232,9 +45,9 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
           📁 Data Loader
         </button>
         <button
-          onClick={() => onTabChange('filter')}
+          onClick={() => setCurrentView('filter')}
           className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${
-            activeTab === 'filter'
+            currentView === 'filter'
               ? 'bg-blue-100 text-blue-700 font-medium'
               : 'text-gray-600 hover:bg-gray-100'
           }`}
@@ -242,9 +55,9 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
           🔍 Filter/Slicing
         </button>
   <button
-          onClick={() => onTabChange('token-frequency')}
+          onClick={() => setCurrentView('token-frequency')}
           className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${
-            activeTab === 'token-frequency'
+            currentView === 'token-frequency'
               ? 'bg-blue-100 text-blue-700 font-medium'
               : 'text-gray-600 hover:bg-gray-100'
           }`}
@@ -252,9 +65,9 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
           📈 Token Frequency
         </button>
         <button
-          onClick={() => onTabChange('concordance')}
+          onClick={() => setCurrentView('concordance')}
           className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${
-            activeTab === 'concordance'
+            currentView === 'concordance'
               ? 'bg-blue-100 text-blue-700 font-medium'
               : 'text-gray-600 hover:bg-gray-100'
           }`}
@@ -262,9 +75,9 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
           📝 Concordance
         </button>
         <button
-          onClick={() => onTabChange('analysis')}
+          onClick={() => setCurrentView('analysis')}
           className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${
-            activeTab === 'analysis'
+            currentView === 'analysis'
               ? 'bg-blue-100 text-blue-700 font-medium'
               : 'text-gray-600 hover:bg-gray-100'
           }`}
@@ -272,9 +85,9 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
           📊 Timeline
         </button>
         <button
-          onClick={() => onTabChange('topic-modeling')}
+          onClick={() => setCurrentView('topic-modeling')}
           className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${
-            activeTab === 'topic-modeling'
+            currentView === 'topic-modeling'
               ? 'bg-blue-100 text-blue-700 font-medium'
               : 'text-gray-600 hover:bg-gray-100'
           }`}
@@ -282,9 +95,9 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
           🧩 Topic Modeling
         </button>
         <button
-          onClick={() => onTabChange('quotation')}
+          onClick={() => setCurrentView('quotation')}
           className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${
-            activeTab === 'quotation'
+            currentView === 'quotation'
               ? 'bg-blue-100 text-blue-700 font-medium'
               : 'text-gray-600 hover:bg-gray-100'
           }`}
@@ -292,9 +105,9 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
           ❝ Quotation
         </button>
         <button
-          onClick={() => onTabChange('export')}
+          onClick={() => setCurrentView('export')}
           className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${
-            activeTab === 'export'
+            currentView === 'export'
               ? 'bg-blue-100 text-blue-700 font-medium'
               : 'text-gray-600 hover:bg-gray-100'
           }`}
@@ -342,11 +155,18 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
           <h4 className="text-sm font-medium text-gray-700">Tasks</h4>
           <div className="flex items-center gap-2">
             {connectionError ? (
-              <span className="text-xs text-red-500" title={connectionError}>❌</span>
+              <button
+                type="button"
+                className="text-xs text-red-500 underline decoration-dotted decoration-red-400 underline-offset-2"
+                title={`${connectionError}. Click to retry.`}
+                onClick={() => reconnectTaskStream()}
+              >
+                ❌
+              </button>
             ) : isConnected ? (
               <span className="text-xs text-green-500" title="Real-time updates active (SSE)">🟢</span>
             ) : (
-              <span className="text-xs text-yellow-500" title="Connecting...">🟡</span>
+              <span className="text-xs text-yellow-500 animate-pulse" title={isConnecting ? 'Connecting…' : 'Waiting for workspace'}>🟡</span>
             )}
           </div>
         </div>
@@ -444,7 +264,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
           📘 Tutorial
         </button>
         <button
-          onClick={() => window.dispatchEvent(new CustomEvent('openFeedback'))}
+          onClick={openFeedbackModal}
           className="w-full text-left px-4 py-2 rounded-lg transition-colors text-gray-700 hover:bg-gray-100"
         >
           💬 Feedback

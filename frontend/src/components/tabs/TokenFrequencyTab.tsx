@@ -10,6 +10,8 @@ import { Wordcloud } from '@visx/wordcloud';
 import { Text } from '@visx/text';
 import useAutoNodeColumns from '../../hooks/useAutoNodeColumns';
 import useNodeColumnInfos from '../../hooks/useNodeColumnInfos';
+import { useUIStore } from '../../stores';
+import { useAnalysisStore } from '../../stores/analysisStore';
 
 interface NodeColumnSelection {
   nodeId: string;
@@ -62,6 +64,8 @@ const TokenFrequencyTab: React.FC = () => {
   }, [selectedNodes]);
 
   const { getAuthHeaders } = useAuth();
+  const setCurrentView = useUIStore((state) => state.setCurrentView);
+  const setPendingConcordance = useAnalysisStore((state) => state.setPendingConcordance);
 
   const [stopWords, setStopWords] = useState<string>('');
   // Default display limit (frontend-only)
@@ -408,12 +412,20 @@ const TokenFrequencyTab: React.FC = () => {
       timestamp: Date.now(),
       autoRun: true, // New flag to force auto execution in Concordance tab
     };
-    try { localStorage.setItem('pendingConcordanceSearch', JSON.stringify(concordanceParams)); } catch (_) {}
+    setPendingConcordance({
+      ...concordanceParams,
+      nodeColumnSelections: nodeColumnSelections.map((sel) => ({ ...sel })),
+      selectedNodes: selectedNodes.map((node) => ({
+        id: node.id,
+        name: nodeIdToName[node.id] || node.id,
+      })),
+      nodeColors: { ...nodeColors },
+      timestamp: Date.now(),
+    });
 
-    // Navigate to concordance tab
-    window.dispatchEvent(new CustomEvent('navigateToConcordance', { detail: { token } }));
+    setCurrentView('concordance');
 
-    if (localStorage.getItem('debugTF') === '1') console.log(`Navigating to concordance with token: "${token}"`);
+    if (localStorage.getItem('debugTF') === '1') console.log(`Navigating to concordance with token: "${token}" via store`);
   };
 
   // Right-click handler: add token to stop word list if not present

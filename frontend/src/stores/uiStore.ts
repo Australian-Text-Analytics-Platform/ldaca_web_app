@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { devtools } from 'zustand/middleware';
+import { devtools, persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 
 /**
@@ -7,7 +7,15 @@ import { immer } from 'zustand/middleware/immer';
  * Separated from business logic for better maintainability
  */
 
-export type ViewType = 'data-loader' | 'filter' | 'concordance' | 'analysis' | 'export';
+export type ViewType =
+  | 'data-loader'
+  | 'filter'
+  | 'token-frequency'
+  | 'concordance'
+  | 'analysis'
+  | 'topic-modeling'
+  | 'quotation'
+  | 'export';
 
 interface UIState {
   // Current view and navigation
@@ -29,6 +37,7 @@ interface UIState {
     documentColumnModal: boolean;
     renameModal: boolean;
     deleteConfirmModal: boolean;
+    feedbackModal: boolean;
   };
 }
 
@@ -61,6 +70,8 @@ interface UIActions {
   closeRenameModal: () => void;
   openDeleteConfirmModal: () => void;
   closeDeleteConfirmModal: () => void;
+  openFeedbackModal: () => void;
+  closeFeedbackModal: () => void;
   closeAllModals: () => void;
 }
 
@@ -68,7 +79,8 @@ type UIStore = UIState & UIActions;
 
 export const useUIStore = create<UIStore>()(
   devtools(
-    immer((set, get) => ({
+    persist(
+      immer((set, get) => ({
       // Initial state
       currentView: 'data-loader',
       sidebarCollapsed: false,
@@ -82,10 +94,14 @@ export const useUIStore = create<UIStore>()(
         documentColumnModal: false,
         renameModal: false,
         deleteConfirmModal: false,
+        feedbackModal: false,
       },
 
       // View management
       setCurrentView: (view) => set((state) => {
+        if (state.currentView === view) {
+          return;
+        }
         state.currentView = view;
       }),
       
@@ -174,6 +190,14 @@ export const useUIStore = create<UIStore>()(
       closeDeleteConfirmModal: () => set((state) => {
         state.modals.deleteConfirmModal = false;
       }),
+
+      openFeedbackModal: () => set((state) => {
+        state.modals.feedbackModal = true;
+      }),
+
+      closeFeedbackModal: () => set((state) => {
+        state.modals.feedbackModal = false;
+      }),
       
       closeAllModals: () => set((state) => {
         Object.keys(state.modals).forEach(key => {
@@ -181,6 +205,13 @@ export const useUIStore = create<UIStore>()(
         });
       }),
     })),
+      {
+        name: 'ldaca-ui-store',
+        partialize: (state) => ({
+          currentView: state.currentView,
+        }),
+      }
+    ),
     { name: 'ui-store' }
   )
 );

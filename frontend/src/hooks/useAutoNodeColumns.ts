@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ColumnInfo, filterColumnsByType, mapColumnsToInfo, normalizeTypeName } from '../utils/columnTypes';
+import columnPersistence from '../utils/columnPersistence';
 
 /** Represents a chosen text column for a node */
 export interface NodeColumnSelection {
@@ -83,36 +84,43 @@ export function useAutoNodeColumns(
     persist = true,
   } = options;
 
-  const storageKey = workspaceId && persist
-    ? `autoNodeCols:${workspaceId}${storageScope ? ':' + storageScope : ''}`
-    : null;
-
   const [selections, setSelectionsState] = useState<NodeColumnSelection[]>([]);
-  const initializedRef = useRef(false);
   const lastSelectedIdsRef = useRef<string[]>([]);
 
-  // Load persisted selections once
+  const persistenceCtx = useMemo(() => {
+    if (!persist || !workspaceId) {
+      return null;
+    }
+    return {
+      workspaceId,
+      scope: storageScope,
+      storage: 'session' as const,
+    };
+  }, [persist, workspaceId, storageScope]);
+
   useEffect(() => {
-    if (!storageKey || initializedRef.current) return;
-    initializedRef.current = true;
-    try {
-      const raw = sessionStorage.getItem(storageKey);
-      if (raw) {
-        const parsed = JSON.parse(raw) as Record<string,string>;
-        const arr: NodeColumnSelection[] = Object.entries(parsed).map(([nodeId, column]) => ({ nodeId, column }));
-        setSelectionsState(arr);
+    if (!persistenceCtx) {
+      if (!workspaceId) {
+        setSelectionsState([]);
       }
-    } catch (_) { /* ignore */ }
-  }, [storageKey]);
+      return;
+    }
+
+    const persisted = columnPersistence.readAll(persistenceCtx);
+    const hydrated = Object.entries(persisted).map(([nodeId, column]) => ({ nodeId, column }));
+    setSelectionsState(hydrated);
+  }, [persistenceCtx, workspaceId]);
 
   const persistSelections = useCallback((next: NodeColumnSelection[]) => {
-    if (!storageKey) return;
-    try {
-      const map: Record<string,string> = {};
-      next.forEach(s => { if (s.column) map[s.nodeId] = s.column; });
-      sessionStorage.setItem(storageKey, JSON.stringify(map));
-    } catch (_) { /* ignore */ }
-  }, [storageKey]);
+    if (!persistenceCtx) return;
+    const map: Record<string, string> = {};
+    next.forEach(({ nodeId, column }) => {
+      if (column) {
+        map[nodeId] = column;
+      }
+    });
+    columnPersistence.storeAll(persistenceCtx, map);
+  }, [persistenceCtx]);
 
   const setSelections = useCallback((next: NodeColumnSelection[], opts?: { replace?: boolean; persist?: boolean }) => {
     setSelectionsState(prev => {

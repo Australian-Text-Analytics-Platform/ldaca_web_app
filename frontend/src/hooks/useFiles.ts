@@ -1,6 +1,8 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useCallback, useMemo } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { filesApi } from '../api/files';
 import { FileInfo, FileListResponse } from '../types';
+import { queryKeys } from '../lib/queryKeys';
 
 interface UseFilesProps {
   authHeaders?: Record<string, string>;
@@ -8,28 +10,39 @@ interface UseFilesProps {
 }
 
 export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {}) => {
-  const [files, setFiles] = useState<FileInfo[]>([]);
-  const [fileListResponse, setFileListResponse] = useState<FileListResponse | null>(null);
+  const queryClient = useQueryClient();
+  const normalizedHeaders = useMemo(() => authHeaders ?? {}, [authHeaders]);
+  const headerSignature = useMemo(() => JSON.stringify(normalizedHeaders), [normalizedHeaders]);
+  const filesQuery = useQuery<FileListResponse>({
+    queryKey: [...queryKeys.files, headerSignature],
+    queryFn: () => filesApi.list(normalizedHeaders),
+    enabled,
+    staleTime: 2 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
-  const [loadingFiles, setLoadingFiles] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadedFile, setLoadedFile] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
+  const uploadMutation = useMutation({
+    mutationFn: (file: File) => filesApi.upload(file, normalizedHeaders),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.files });
+    },
+  });
+  const deleteMutation = useMutation({
+    mutationFn: (filename: string) => filesApi.delete(filename, normalizedHeaders),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.files });
+    },
+  });
 
-  const hasFetchedRef = useRef(false);
-  const fetchFiles = useCallback(async () => {
-    setLoadingFiles(true);
-    try {
-  const res = await filesApi.list(authHeaders);
-      setFileListResponse(res);
-      setFiles(res.files || []);
-    } catch (error) {
-      console.error('Failed to fetch files:', error);
-      setFiles([]);
-    } finally {
-      setLoadingFiles(false);
-    }
-  }, [authHeaders]);
+  const files = (filesQuery.data?.files || []) as FileInfo[];
+  const fileListResponse = filesQuery.data ?? null;
+  const refetchFiles = useCallback(async () => {
+    const result = await filesQuery.refetch();
+    return result.data ?? null;
+  }, [filesQuery]);
 
   const handleLoadFile = useCallback(async (filename: string) => {
     setLoading(true);
@@ -47,23 +60,20 @@ export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {
   }, [authHeaders]);
 
   const handleUploadFile = useCallback(async (file: File) => {
-    setUploading(true);
     try {
-  await filesApi.upload(file, authHeaders);
-      await fetchFiles(); // Refresh file list
+      await uploadMutation.mutateAsync(file);
+      await refetchFiles();
       return true;
     } catch (error) {
       console.error('Failed to upload file:', error);
       return false;
-    } finally {
-      setUploading(false);
     }
-  }, [authHeaders, fetchFiles]);
+  }, [uploadMutation, refetchFiles]);
 
   const handleDeleteFile = useCallback(async (filename: string) => {
     try {
-  await filesApi.delete(filename, authHeaders);
-      await fetchFiles(); // Refresh file list
+      await deleteMutation.mutateAsync(filename);
+      await refetchFiles();
       if (selectedFile === filename) {
         setSelectedFile(null);
       }
@@ -75,11 +85,11 @@ export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {
       console.error('Failed to delete file:', error);
       return false;
     }
-  }, [authHeaders, fetchFiles, selectedFile, loadedFile]);
+  }, [deleteMutation, refetchFiles, selectedFile, loadedFile]);
 
   const handleDownloadFile = useCallback(async (filename: string) => {
     try {
-  const blob = await filesApi.download(filename, authHeaders);
+      const blob = await filesApi.download(filename, normalizedHeaders);
       const url = window.URL.createObjectURL(new Blob([blob]));
       const link = document.createElement('a');
       link.href = url;
@@ -93,29 +103,21 @@ export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {
       console.error('Failed to download file:', error);
       return false;
     }
-  }, [authHeaders]);
-
-  useEffect(() => {
-    if (!enabled) return; // do not fetch until enabled
-    // Avoid duplicate initial fetches (e.g., React StrictMode double-mount or auth state transition immediately after mount)
-    if (hasFetchedRef.current) return;
-    hasFetchedRef.current = true;
-    fetchFiles();
-  }, [enabled, fetchFiles]);
+  }, [normalizedHeaders]);
 
   return {
     files,
     fileListResponse,
     selectedFile,
     setSelectedFile,
-    loadingFiles,
+  loadingFiles: filesQuery.isLoading || filesQuery.isFetching,
     loading,
-    uploading,
+    uploading: uploadMutation.isPending,
     loadedFile,
     handleLoadFile,
     handleUploadFile,
     handleDeleteFile,
     handleDownloadFile,
-  refetchFiles: fetchFiles
+    refetchFiles,
   };
 };

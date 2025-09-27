@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useEffect } from 'react';
+import { useCallback, useMemo, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSelectionStore } from '../stores/selectionStore';
 import { useWorkspaceStore } from '../stores/workspaceStore';
@@ -31,6 +31,8 @@ export const useWorkspaceInternal = () => {
 
   // Workspace pagination state/actions
   const {
+    currentWorkspaceId,
+    setCurrentWorkspaceId,
     pagination,
     setPagination,
     updateCurrentPage,
@@ -105,7 +107,41 @@ export const useWorkspaceInternal = () => {
     retry: false,
   });
 
-  const currentWorkspaceId = currentWorkspaceQuery.data || null;
+  const currentWorkspaceIdFromQuery = currentWorkspaceQuery.data;
+  const currentWorkspaceQueryError = currentWorkspaceQuery.isError;
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setCurrentWorkspaceId(null);
+      return;
+    }
+
+    if (currentWorkspaceIdFromQuery !== undefined) {
+      if (currentWorkspaceIdFromQuery !== currentWorkspaceId) {
+        setCurrentWorkspaceId(currentWorkspaceIdFromQuery);
+      }
+    } else if (currentWorkspaceQueryError) {
+      setCurrentWorkspaceId(null);
+    }
+  }, [
+    isAuthenticated,
+    currentWorkspaceIdFromQuery,
+    currentWorkspaceQueryError,
+    currentWorkspaceId,
+    setCurrentWorkspaceId,
+  ]);
+
+  const previousWorkspaceIdRef = useRef<string | null>(currentWorkspaceId);
+
+  useEffect(() => {
+    const previous = previousWorkspaceIdRef.current;
+    if (previous !== currentWorkspaceId) {
+      if (previous !== null) {
+        clearSelection();
+      }
+      previousWorkspaceIdRef.current = currentWorkspaceId;
+    }
+  }, [currentWorkspaceId, clearSelection]);
 
   const graphQuery = useQuery({
     queryKey: currentWorkspaceId ? queryKeys.workspaceGraph(currentWorkspaceId) : ['workspaces', 'graph'],
@@ -248,10 +284,16 @@ export const useWorkspaceInternal = () => {
     onMutate: () => {
       startOperation('setCurrentWorkspace');
     },
-    onSuccess: () => {
+    onSuccess: (_data, workspaceId) => {
+      setCurrentWorkspaceId(workspaceId ?? null);
       clearSelection();
       queryClient.invalidateQueries({ queryKey: queryKeys.currentWorkspace });
-      queryClient.invalidateQueries({ queryKey: ['workspaces', '*', 'graph'] });
+      queryClient.invalidateQueries({
+        predicate: ({ queryKey }) =>
+          Array.isArray(queryKey) &&
+          queryKey[0] === 'workspaces' &&
+          queryKey.some((part) => part === 'graph'),
+      });
       endOperation('setCurrentWorkspace');
     },
     onError: (error: any) => {
@@ -281,8 +323,13 @@ export const useWorkspaceInternal = () => {
     onMutate: () => {
       startOperation('deleteWorkspace');
     },
-    onSuccess: () => {
+    onSuccess: (_data, workspaceId) => {
+      if (currentWorkspaceId && workspaceId === currentWorkspaceId) {
+        setCurrentWorkspaceId(null);
+        clearSelection();
+      }
       queryClient.invalidateQueries({ queryKey: queryKeys.workspaces });
+      queryClient.invalidateQueries({ queryKey: queryKeys.currentWorkspace });
       endOperation('deleteWorkspace');
     },
     onError: (error: any) => {

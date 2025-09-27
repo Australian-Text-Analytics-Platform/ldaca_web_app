@@ -32,7 +32,7 @@ const CustomNode: React.FC<NodeProps<any>> = ({ data, selected }) => {
   const menuRef = useRef<HTMLDivElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
 
-  const { getNodeShape } = useWorkspaceData();
+  const { getNodeShape, currentWorkspaceId } = useWorkspaceData() as any;
 
   const DEBUG_GRAPH = (typeof window !== 'undefined' && (window as any).__LDACA_DEBUG_GRAPH) ||
     (typeof window !== 'undefined' && localStorage.getItem('debugGraph') === '1');
@@ -460,6 +460,8 @@ const CustomNode: React.FC<NodeProps<any>> = ({ data, selected }) => {
         onConfirm={handleDocColumnConfirm}
         columns={nodeColumns}
         nodeName={nodeName}
+        workspaceId={currentWorkspaceId}
+        nodeId={node?.node_id || null}
       />
     </div>
   );

@@ -9,6 +9,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { ConcordanceAnalysisRequest, ConcordanceAnalysisResponse, textApi } from '../../api/text';
 import { nodesApi } from '../../api/nodes';
 import { workspacesApi } from '../../api/workspaces';
+import { useAnalysisStore } from '../../stores/analysisStore';
 import useAutoNodeColumns from '../../hooks/useAutoNodeColumns';
 import useNodeColumnInfos from '../../hooks/useNodeColumnInfos';
 
@@ -31,6 +32,8 @@ const ConcordanceTab: React.FC = () => {
   });
 
   const { getAuthHeaders } = useAuth();
+  const pendingConcordance = useAnalysisStore((state) => state.pendingConcordance);
+  const clearPendingConcordance = useAnalysisStore((state) => state.clearPendingConcordance);
 
   const [isLocked, setIsLocked] = useState(false);
   // Shared auto column selection (shared with TokenFrequencyTab via undefined storageScope)
@@ -106,6 +109,7 @@ const ConcordanceTab: React.FC = () => {
   }, [selectedNodes, nodeColors, defaultPalette]);
   
   const [lockedNodesSnapshot, setLockedNodesSnapshot] = useState<Array<{ id: string; name: string; columns: string[] }>>([]);
+  const lastPendingConcordanceRef = useRef<number | null>(null);
 
   // Pagination and sorting state - separate for each node
   const [nodePagination, setNodePagination] = useState<Record<string, {
@@ -164,42 +168,49 @@ const ConcordanceTab: React.FC = () => {
     prevSelectedNodeIdsRef.current = curr;
   }, [selectedNodeIds, isLocked]);
 
-  // Check for pending concordance search from TokenFrequencyTab.
-  // When autoRun is true (set by token click), we trigger faster (50ms) instead of default 500ms hydration delay.
+  // React to pending concordance handoff from TokenFrequencyTab
   useEffect(() => {
-    const pendingSearch = localStorage.getItem('pendingConcordanceSearch');
-    if (!pendingSearch) return;
-    try {
-      const params = JSON.parse(pendingSearch);
-      if (localStorage.getItem('debugConc') === '1') console.log('Found pending concordance search:', params);
-
-      // Set core state
-      if (params.searchWord) setSearchWord(params.searchWord);
-
-      if (params.nodeColumnSelections && params.selectedNodes) {
-        const matchingSelections = params.nodeColumnSelections.filter((sel: any) =>
-          selectedNodes.some((node: any) => node.id === sel.nodeId)
-        );
-  if (matchingSelections.length > 0) setNodeColumnSelectionsRaw(matchingSelections, { replace: true });
-      }
-      if (params.nodeColors) setNodeColors((prev) => ({ ...params.nodeColors, ...prev }));
-
-      // Always clear immediately so we don't re-run repeatedly on re-renders
-      localStorage.removeItem('pendingConcordanceSearch');
-
-      // Decide trigger strategy. If explicit autoRun flag present, trigger ASAP (next tick)
-      const delay = params.autoRun ? 50 : 500; // shorter delay when explicitly requested
-      if (params.searchWord && selectedNodes.length > 0) {
-        setTimeout(() => {
-          if (localStorage.getItem('debugConc') === '1') console.log(`Auto-triggering concordance search for: ${params.searchWord} (delay=${delay}ms, autoRun=${params.autoRun})`);
-          setShouldAutoSearch(true);
-        }, delay);
-      }
-    } catch (error) {
-      console.error('Error parsing pending concordance search:', error);
-      localStorage.removeItem('pendingConcordanceSearch');
+    if (!pendingConcordance) return;
+    if (lastPendingConcordanceRef.current === pendingConcordance.timestamp) {
+      return;
     }
-  }, [selectedNodes]);
+    lastPendingConcordanceRef.current = pendingConcordance.timestamp;
+
+    if (localStorage.getItem('debugConc') === '1') console.log('Processing pending concordance search:', pendingConcordance);
+
+    if (pendingConcordance.searchWord) {
+      setSearchWord(pendingConcordance.searchWord);
+    }
+
+    if (pendingConcordance.nodeColumnSelections?.length) {
+      const matchingSelections = pendingConcordance.nodeColumnSelections.filter((sel) =>
+        selectedNodes.some((node: any) => node.id === sel.nodeId)
+      );
+      if (matchingSelections.length > 0) {
+        setNodeColumnSelectionsRaw(matchingSelections, { replace: true });
+      }
+    }
+
+    if (pendingConcordance.nodeColors) {
+      setNodeColors((prev) => ({ ...pendingConcordance.nodeColors, ...prev }));
+    }
+
+    const delay = pendingConcordance.autoRun ? 50 : 500;
+    let timeoutId: number | null = null;
+    if (pendingConcordance.searchWord && selectedNodes.length > 0) {
+      timeoutId = window.setTimeout(() => {
+        if (localStorage.getItem('debugConc') === '1') console.log(`Auto-triggering concordance search for: ${pendingConcordance.searchWord} (delay=${delay}ms, autoRun=${pendingConcordance.autoRun})`);
+        setShouldAutoSearch(true);
+      }, delay);
+    }
+
+    clearPendingConcordance();
+    return () => {
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, [pendingConcordance, selectedNodes, setNodeColumnSelectionsRaw, clearPendingConcordance]);
 
   // Recompute auto columns if unlocked and selections empty but nodes exist
   useEffect(() => {

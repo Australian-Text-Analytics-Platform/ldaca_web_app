@@ -99,6 +99,16 @@ interface TaskItem {
   started_at?: number;
   finished_at?: number | null;
   metadata?: any;
+  result_persisted?: boolean;
+}
+
+interface ConcordancePendingSearch {
+  searchWord: string;
+  nodeColumnSelections: Array<{ nodeId: string; column: string }>;
+  selectedNodes: Array<{ id: string; name: string }>;
+  nodeColors: Record<string, string>;
+  autoRun?: boolean;
+  timestamp: number;
 }
 
 interface AnalysisStoreState {
@@ -108,6 +118,9 @@ interface AnalysisStoreState {
   quotation: QuotationLockState | null
   timeline: TimelineLockState | null
   topicModeling: TopicModelingLockState | null
+  topicModelingReadyTaskId: string | null
+  topicModelingReadyTimestamp: number | null
+  pendingConcordance: ConcordancePendingSearch | null
 }
 
 interface AnalysisStoreActions {
@@ -123,6 +136,10 @@ interface AnalysisStoreActions {
   clearTimeline: () => void
   setTopicModelingLock: (s: TopicModelingLockState) => void
   clearTopicModeling: () => void
+  markTopicModelingReady: (taskId: string, timestamp?: number | null) => void
+  resetTopicModelingReady: () => void
+  setPendingConcordance: (payload: ConcordancePendingSearch) => void
+  clearPendingConcordance: () => void
 }
 
 export const useAnalysisStore = create<AnalysisStoreState & AnalysisStoreActions>()(
@@ -134,6 +151,9 @@ export const useAnalysisStore = create<AnalysisStoreState & AnalysisStoreActions
       quotation: null,
       timeline: null,
       topicModeling: null,
+      topicModelingReadyTaskId: null,
+      topicModelingReadyTimestamp: null,
+      pendingConcordance: null,
 
       setTasks: (tasks) => set((state) => { 
         // Handle both array and updater function forms
@@ -141,12 +161,6 @@ export const useAnalysisStore = create<AnalysisStoreState & AnalysisStoreActions
           ? (tasks as (prev: TaskItem[]) => TaskItem[])(state.tasks) 
           : tasks;
         state.tasks = nextTasks;
-        // Dispatch event to notify components of task updates
-        try {
-          window.dispatchEvent(new CustomEvent('tasksUpdated', { detail: { tasks: nextTasks } }));
-        } catch (e) {
-          // Ignore errors (e.g., in test environments)
-        }
       }),
       clearTasks: () => set((state) => { state.tasks = [] }),
 
@@ -164,6 +178,22 @@ export const useAnalysisStore = create<AnalysisStoreState & AnalysisStoreActions
 
       setTopicModelingLock: (s) => set((state) => { state.topicModeling = s }),
       clearTopicModeling: () => set((state) => { state.topicModeling = null }),
+
+      markTopicModelingReady: (taskId, timestamp = null) => set((state) => {
+        state.topicModelingReadyTaskId = taskId;
+        state.topicModelingReadyTimestamp = timestamp ?? Date.now();
+      }),
+      resetTopicModelingReady: () => set((state) => {
+        state.topicModelingReadyTaskId = null;
+        state.topicModelingReadyTimestamp = null;
+      }),
+
+      setPendingConcordance: (payload) => set((state) => {
+        state.pendingConcordance = payload;
+      }),
+      clearPendingConcordance: () => set((state) => {
+        state.pendingConcordance = null;
+      }),
     })),
     { name: 'analysis-store' }
   )

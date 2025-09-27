@@ -57,6 +57,14 @@ export const useModalStates = () => {
     closeJoinModal,
     openFilterModal,
     closeFilterModal,
+    openDocumentColumnModal,
+    closeDocumentColumnModal,
+    openRenameModal,
+    closeRenameModal,
+    openDeleteConfirmModal,
+    closeDeleteConfirmModal,
+    openFeedbackModal,
+    closeFeedbackModal,
     closeAllModals,
   } = useUIStore();
   
@@ -66,6 +74,14 @@ export const useModalStates = () => {
     closeJoinModal,
     openFilterModal,
     closeFilterModal,
+    openDocumentColumnModal,
+    closeDocumentColumnModal,
+    openRenameModal,
+    closeRenameModal,
+    openDeleteConfirmModal,
+    closeDeleteConfirmModal,
+    openFeedbackModal,
+    closeFeedbackModal,
     closeAllModals,
   };
 };

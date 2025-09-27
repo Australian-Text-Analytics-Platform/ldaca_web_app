@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import columnPersistence from '../../utils/columnPersistence';
 
 interface DocumentColumnModalProps {
   isOpen: boolean;
@@ -6,6 +7,9 @@ interface DocumentColumnModalProps {
   onConfirm: (documentColumn: string) => void;
   columns: string[];
   nodeName: string;
+  workspaceId?: string | null;
+  nodeId?: string | null;
+  persistenceScope?: string;
 }
 
 const DocumentColumnModal: React.FC<DocumentColumnModalProps> = ({
@@ -13,10 +17,18 @@ const DocumentColumnModal: React.FC<DocumentColumnModalProps> = ({
   onClose,
   onConfirm,
   columns,
-  nodeName
+  nodeName,
+  workspaceId,
+  nodeId,
+  persistenceScope = 'document-column-modal'
 }) => {
   const [selectedColumn, setSelectedColumn] = useState<string>('');
   const [submitting, setSubmitting] = useState<boolean>(false);
+
+  const persistenceCtx = useMemo(() => {
+    if (!workspaceId || !nodeId) return null;
+    return { workspaceId, scope: persistenceScope, storage: 'session' as const };
+  }, [workspaceId, nodeId, persistenceScope]);
 
   // Ensure modal always starts in a fresh, enabled state when (re)opened.
   // Without this, submitting could remain true after a previous confirm,
@@ -30,11 +42,22 @@ const DocumentColumnModal: React.FC<DocumentColumnModalProps> = ({
     }
   }, [isOpen]);
 
+  useEffect(() => {
+    if (!isOpen || !persistenceCtx || !nodeId) return;
+    const persisted = columnPersistence.get(persistenceCtx, nodeId);
+    if (persisted) {
+      setSelectedColumn(persisted);
+    }
+  }, [isOpen, persistenceCtx, nodeId]);
+
   const handleConfirm = () => {
     if (submitting) return;
     if (selectedColumn) {
       setSubmitting(true);
       onConfirm(selectedColumn);
+      if (persistenceCtx && nodeId) {
+        columnPersistence.set(persistenceCtx, nodeId, selectedColumn);
+      }
       setSelectedColumn('');
       // Parent (CustomNode) handles closing; submitting reset handled by useEffect on reopen.
     }

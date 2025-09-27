@@ -1,27 +1,13 @@
-import { useMemo } from 'react';
-import { useWorkspaceData } from './useWorkspaceData';
-import { useWorkspaceSelection } from './useWorkspaceSelection';
-import { useWorkspaceActions } from './useWorkspaceActions';
-import { useWorkspaceStatus } from './useWorkspaceStatus';
-
 /**
- * Backward-compatible hook that merges workspace slices for consumers
- * still expecting the monolithic useWorkspace return signature.
+ * @deprecated The monolithic useWorkspace hook has been removed.
+ * Use the dedicated slice hooks instead:
+ * - useWorkspaceData
+ * - useWorkspaceSelection
+ * - useWorkspaceActions
+ * - useWorkspaceStatus
  */
-export const useWorkspace = () => {
-  const data = useWorkspaceData();
-  const selection = useWorkspaceSelection();
-  const actions = useWorkspaceActions();
-  const status = useWorkspaceStatus();
-
-  return useMemo(
-    () => ({
-      ...data,
-      ...selection,
-      ...status,
-      ...actions,
-      actions,
-    }),
-    [actions, data, selection, status],
+export function useWorkspace(): never {
+  throw new Error(
+    'useWorkspace has been removed. Use the slice hooks (useWorkspaceData, useWorkspaceSelection, useWorkspaceActions, useWorkspaceStatus) instead.',
   );
-};
+}
