@@ -880,6 +880,11 @@ export const useWorkspaceInternal = () => {
       if (!currentWorkspaceId) return Promise.reject(new Error('No workspace selected'));
       return filterNodeMutation.mutateAsync({ workspaceId: currentWorkspaceId, nodeId, request });
     },
+
+    filterPreview: (nodeId: string, request: FilterRequest, page = 1, pageSize = 10) => {
+      if (!currentWorkspaceId) return Promise.reject(new Error('No workspace selected'));
+      return nodesApi.filterPreview(currentWorkspaceId, nodeId, request, page, pageSize, authHeaders);
+    },
     
     concordanceSearch: (nodeId: string, request: ConcordanceRequest) => {
       if (!currentWorkspaceId) return Promise.reject(new Error('No workspace selected'));

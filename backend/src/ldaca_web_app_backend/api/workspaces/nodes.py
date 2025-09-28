@@ -5,9 +5,10 @@ Maintains identical routes and behavior to preserve backward compatibility.
 
 from __future__ import annotations
 
+import math
 import re
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 
 import polars as pl
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -15,7 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from ...core.auth import get_current_user
 from ...core.docworkspace_api import DocWorkspaceAPIUtils
 from ...core.workspace import workspace_manager
-from ...models import FilterRequest, SliceRequest
+from ...models import FilterPreviewResponse, FilterRequest, SliceRequest
 from .utils import _handle_operation_result
 
 router = APIRouter(prefix="/workspaces", tags=["nodes"])
@@ -25,6 +26,176 @@ try:  # pragma: no cover
 except Exception:  # pragma: no cover
     DocDataFrame = None  # type: ignore
     DocLazyFrame = None  # type: ignore
+
+
+ISO_PATTERN = re.compile(
+    r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,6})?)?(Z|[+\-]\d{2}:?\d{2})$"
+)
+
+
+def _parse_temporal(value: Any) -> Any:
+    if isinstance(value, str) and ISO_PATTERN.match(value):
+        s = value
+        if s.endswith("Z"):
+            s = s[:-1] + "+00:00"
+        if re.search(r"([+\-]\d{2})(\d{2})$", s):
+            s = re.sub(r"([+\-]\d{2})(\d{2})$", r"\1:\2", s)
+        try:
+            return datetime.fromisoformat(s)
+        except Exception:
+            return value
+    return value
+
+
+def _coerce_scalar(value: Any) -> Any:
+    if isinstance(value, str):
+        lowered = value.lower()
+        if lowered in {"true", "false"}:
+            return lowered == "true"
+        try:
+            if "." in value:
+                return float(value)
+            return int(value)
+        except Exception:
+            return value
+    return value
+
+
+def _build_filter_expression(request: FilterRequest) -> pl.Expr:
+    logic = (request.logic or "and").lower()
+    filter_expr = None
+
+    for condition in request.conditions:
+        column_expr = pl.col(condition.column)
+        op = condition.operator
+        raw_value = condition.value
+        expr = None
+
+        if op in {
+            "eq",
+            "equals",
+            "ne",
+            "gt",
+            "greater_than",
+            "gte",
+            "lt",
+            "less_than",
+            "lte",
+        }:
+            value = _coerce_scalar(_parse_temporal(raw_value))
+            lit_val = pl.lit(value) if isinstance(value, datetime) else value
+            if op in {"eq", "equals"}:
+                expr = column_expr == lit_val
+            elif op == "ne":
+                expr = column_expr != lit_val
+            elif op in {"gt", "greater_than"}:
+                expr = column_expr > lit_val
+            elif op == "gte":
+                expr = column_expr >= lit_val
+            elif op in {"lt", "less_than"}:
+                expr = column_expr < lit_val
+            elif op == "lte":
+                expr = column_expr <= lit_val
+        elif op == "contains":
+            pattern = str(raw_value)
+            if getattr(condition, "regex", False):
+                expr = column_expr.str.contains(pattern)
+            else:
+                expr = column_expr.str.contains(pl.lit(pattern), literal=True)
+        elif op == "startswith":
+            expr = column_expr.str.starts_with(str(raw_value))
+        elif op == "endswith":
+            expr = column_expr.str.ends_with(str(raw_value))
+        elif op == "is_null":
+            expr = column_expr.is_null()
+        elif op == "is_not_null":
+            expr = column_expr.is_not_null()
+        elif op == "between":
+            expr = pl.lit(True)
+            if isinstance(raw_value, dict):
+                start_val = (
+                    _parse_temporal(raw_value.get("start"))
+                    if raw_value.get("start") is not None
+                    else None
+                )
+                end_val = (
+                    _parse_temporal(raw_value.get("end"))
+                    if raw_value.get("end") is not None
+                    else None
+                )
+                if start_val is not None and end_val is not None:
+                    if isinstance(start_val, datetime):
+                        start_val = pl.lit(start_val)
+                    if isinstance(end_val, datetime):
+                        end_val = pl.lit(end_val)
+                    expr = column_expr.is_between(start_val, end_val, closed="both")
+                elif start_val is not None:
+                    if isinstance(start_val, datetime):
+                        start_val = pl.lit(start_val)
+                    expr = column_expr >= start_val
+                elif end_val is not None:
+                    if isinstance(end_val, datetime):
+                        end_val = pl.lit(end_val)
+                    expr = column_expr <= end_val
+        else:
+            expr = column_expr.str.contains(str(raw_value))
+
+        if getattr(condition, "negate", False) and expr is not None:
+            try:
+                expr = expr.not_()
+            except Exception:
+                expr = ~expr
+
+        if expr is None:
+            continue
+
+        if filter_expr is None:
+            filter_expr = expr
+        else:
+            filter_expr = (
+                (filter_expr | expr) if logic == "or" else (filter_expr & expr)
+            )
+
+    if filter_expr is None:
+        raise ValueError("No valid filter conditions provided")
+
+    return filter_expr
+
+
+def _ensure_lazyframe(data: Any) -> pl.LazyFrame:
+    if isinstance(data, pl.LazyFrame):
+        return data
+    if isinstance(data, pl.DataFrame):
+        return data.lazy()
+    if hasattr(data, "lazy"):
+        try:
+            lazy_candidate = data.lazy()
+            if isinstance(lazy_candidate, pl.LazyFrame):
+                return lazy_candidate
+        except Exception:
+            pass
+    if hasattr(data, "to_lazyframe"):
+        try:
+            lazy_candidate = data.to_lazyframe()
+            if isinstance(lazy_candidate, pl.LazyFrame):
+                return lazy_candidate
+        except Exception:
+            pass
+    if hasattr(data, "to_docdataframe"):
+        try:
+            doc_df = data.to_docdataframe()
+            base_df = getattr(doc_df, "dataframe", None)
+            if isinstance(base_df, pl.DataFrame):
+                return base_df.lazy()
+        except Exception:
+            pass
+    if hasattr(data, "dataframe"):
+        base_df = getattr(data, "dataframe")
+        if isinstance(base_df, pl.DataFrame):
+            return base_df.lazy()
+    raise HTTPException(
+        status_code=500, detail="Unsupported data type for filtering preview"
+    )
 
 
 @router.get("/{workspace_id}/nodes/{node_id}")
@@ -516,123 +687,7 @@ async def filter_node(
         node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
         if not node:
             raise ValueError("Node not found")
-        iso_pattern = re.compile(
-            r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,6})?)?(Z|[+\-]\d{2}:?\d{2})$"
-        )
-
-        def parse_temporal(val):
-            if isinstance(val, str) and iso_pattern.match(val):
-                s = val
-                if s.endswith("Z"):
-                    s = s[:-1] + "+00:00"
-                if re.search(r"([+\-]\d{2})(\d{2})$", s):
-                    s = re.sub(r"([+\-]\d{2})(\d{2})$", r"\1:\2", s)
-                try:
-                    return datetime.fromisoformat(s)
-                except Exception:
-                    return val
-            return val
-
-        def coerce_scalar(v):
-            if isinstance(v, str):
-                try:
-                    if "." in v:
-                        return float(v)
-                    return int(v)
-                except Exception:
-                    pass
-            return v
-
-        filter_expr = None
-        for condition in request.conditions:
-            column_expr = pl.col(condition.column)
-            op = condition.operator
-            raw_value = condition.value
-            expr = None
-            if op in {
-                "eq",
-                "equals",
-                "ne",
-                "gt",
-                "greater_than",
-                "gte",
-                "lt",
-                "less_than",
-                "lte",
-            }:
-                value = coerce_scalar(parse_temporal(raw_value))
-                lit_val = pl.lit(value) if isinstance(value, datetime) else value
-                if op in {"eq", "equals"}:
-                    expr = column_expr == lit_val
-                elif op == "ne":
-                    expr = column_expr != lit_val
-                elif op in {"gt", "greater_than"}:
-                    expr = column_expr > lit_val
-                elif op == "gte":
-                    expr = column_expr >= lit_val
-                elif op in {"lt", "less_than"}:
-                    expr = column_expr < lit_val
-                elif op == "lte":
-                    expr = column_expr <= lit_val
-            elif op == "contains":
-                pattern = str(raw_value)
-                if getattr(condition, "regex", False):
-                    expr = column_expr.str.contains(pattern)
-                else:
-                    expr = column_expr.str.contains(pl.lit(pattern), literal=True)
-            elif op == "startswith":
-                expr = column_expr.str.starts_with(str(raw_value))
-            elif op == "endswith":
-                expr = column_expr.str.ends_with(str(raw_value))
-            elif op == "is_null":
-                expr = column_expr.is_null()
-            elif op == "is_not_null":
-                expr = column_expr.is_not_null()
-            elif op == "between":
-                if isinstance(raw_value, dict):
-                    start_val = (
-                        parse_temporal(raw_value.get("start"))
-                        if raw_value.get("start") is not None
-                        else None
-                    )
-                    end_val = (
-                        parse_temporal(raw_value.get("end"))
-                        if raw_value.get("end") is not None
-                        else None
-                    )
-                    if start_val is not None and end_val is not None:
-                        if isinstance(start_val, datetime):
-                            start_val = pl.lit(start_val)
-                        if isinstance(end_val, datetime):
-                            end_val = pl.lit(end_val)
-                        expr = column_expr.is_between(start_val, end_val, closed="both")
-                    elif start_val is not None:
-                        if isinstance(start_val, datetime):
-                            start_val = pl.lit(start_val)
-                        expr = column_expr >= start_val
-                    elif end_val is not None:
-                        if isinstance(end_val, datetime):
-                            end_val = pl.lit(end_val)
-                        expr = column_expr <= end_val
-                    else:
-                        expr = pl.lit(True)
-                else:
-                    expr = pl.lit(True)
-            else:
-                expr = column_expr.str.contains(str(raw_value))
-            if getattr(condition, "negate", False) and expr is not None:
-                try:
-                    expr = expr.not_()
-                except Exception:
-                    expr = ~expr
-            if filter_expr is None:
-                filter_expr = expr
-            else:
-                filter_expr = (
-                    (filter_expr | expr)
-                    if request.logic == "or"
-                    else (filter_expr & expr)
-                )
+        filter_expr = _build_filter_expression(request)
         if hasattr(node.data, "filter"):
             filtered_data = node.data.filter(filter_expr)
         else:
@@ -655,6 +710,71 @@ async def filter_node(
     if not success:
         raise HTTPException(status_code=400, detail=message)
     return result_obj
+
+
+@router.post("/{workspace_id}/nodes/{node_id}/filter/preview")
+async def filter_preview(
+    workspace_id: str,
+    node_id: str,
+    request: FilterRequest,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=500),
+    current_user: dict = Depends(get_current_user),
+) -> FilterPreviewResponse:
+    user_id = current_user["id"]
+    node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
+    if not node:
+        raise HTTPException(status_code=404, detail="Node not found")
+
+    try:
+        filter_expr = _build_filter_expression(request)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    try:
+        lazy_data = _ensure_lazyframe(node.data)
+        filtered_lazy = lazy_data.filter(filter_expr)
+
+        total_rows_series = (
+            filtered_lazy.select(pl.len().alias("_len")).collect().to_series(0)
+        )
+        total_rows = int(total_rows_series.item()) if total_rows_series.len() else 0
+
+        normalized_page_size = page_size
+        total_pages = math.ceil(total_rows / normalized_page_size) if total_rows else 0
+        normalized_page = min(max(page, 1), total_pages or 1)
+        start_idx = (normalized_page - 1) * normalized_page_size if total_rows else 0
+
+        preview_df = (
+            filtered_lazy.slice(start_idx, normalized_page_size).collect()
+            if total_rows
+            else filtered_lazy.slice(0, normalized_page_size).collect()
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:  # pragma: no cover
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to generate filter preview: {exc}",
+        ) from exc
+
+    columns = list(preview_df.columns)
+    dtypes = {col: str(dtype) for col, dtype in preview_df.schema.items()}
+    data_rows = preview_df.to_dicts()
+
+    return {
+        "data": data_rows,
+        "columns": columns,
+        "dtypes": dtypes,
+        "pagination": {
+            "page": normalized_page,
+            "page_size": normalized_page_size,
+            "total_rows": total_rows,
+            "total_pages": total_pages,
+            "has_next": normalized_page < total_pages,
+            "has_prev": normalized_page > 1 and total_rows > 0,
+        },
+    }
 
 
 @router.post("/{workspace_id}/nodes/{node_id}/slice")

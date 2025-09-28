@@ -67,21 +67,252 @@ const getOperatorsForType = (dataType: string) => {
   }
 };
 
+const ISO_PLACEHOLDER = 'YYYY-MM-DDTHH:MM:SS+00:00';
+
+const normalizeIsoDraft = (txt: string): string => {
+  let s = txt.trim();
+  if (!s) return s;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) s += 'T00:00:00+00:00';
+  if (/T\d{2}:\d{2}(\+00:00)?$/.test(s)) s = s.replace(/T(\d{2}:\d{2})(\+00:00)?$/, (m, hm, tz) => `T${hm}:00${tz || '+00:00'}`);
+  if (/T\d{2}:\d{2}:\d{2}(\.\d+)?$/.test(s)) s += '+00:00';
+  s = s.replace(/Z$/, '+00:00');
+  return s;
+};
+
+const parseIsoToLocalDate = (input: string): Date | null => {
+  if (!input) return null;
+  let candidate = input.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(candidate)) {
+    candidate += 'T00:00:00+00:00';
+  }
+  if (/T\d{2}:\d{2}(Z|[+-]\d{2}:?\d{2})?$/.test(candidate)) {
+    candidate = candidate.replace(/T(\d{2}:\d{2})(Z|[+-]\d{2}:?\d{2})?$/, (m, hm, tz) => `T${hm}:00${tz || '+00:00'}`);
+  }
+  if (/T\d{2}:\d{2}:\d{2}(\.\d+)?$/.test(candidate)) {
+    candidate += '+00:00';
+  }
+  candidate = candidate.replace(/([+-]\d{2})(\d{2})$/, '$1:$2');
+  const d = new Date(candidate);
+  if (isNaN(d.getTime())) return null;
+  try {
+    const m = candidate.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/);
+    if (m) {
+      const [, Y, M, D, H, Min, S] = m;
+      return new Date(Number(Y), Number(M) - 1, Number(D), Number(H), Number(Min), Number(S));
+    }
+  } catch { /* ignore */ }
+  return d;
+};
+
+interface IsoDateInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  committedValue: string;
+  onCommit: (value: string) => void;
+}
+
+const IsoDateInput = React.forwardRef<HTMLInputElement, IsoDateInputProps>((props, externalRef) => {
+  const {
+    committedValue,
+    onCommit,
+    onBlur: parentOnBlur,
+    onFocus: parentOnFocus,
+    onClick: parentOnClick,
+    onChange: parentOnChange,
+    onKeyDown: parentOnKeyDown,
+    onPaste: parentOnPaste,
+    readOnly: parentReadOnly,
+    className: parentClassName,
+    placeholder = ISO_PLACEHOLDER,
+    ...restProps
+  } = props;
+
+  const [draft, setDraft] = React.useState(committedValue);
+  const [focused, setFocused] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!focused) {
+      setDraft(committedValue);
+    }
+  }, [committedValue, focused]);
+
+  const innerRef = React.useRef<HTMLInputElement | null>(null);
+  const setRefs = React.useCallback((el: HTMLInputElement | null) => {
+    innerRef.current = el;
+    if (typeof externalRef === 'function') {
+      externalRef(el);
+    } else if (externalRef) {
+      (externalRef as React.MutableRefObject<HTMLInputElement | null>).current = el;
+    }
+  }, [externalRef]);
+
+  const commitNormalized = (text: string, { syncDraft = false }: { syncDraft?: boolean } = {}) => {
+    const trimmed = text.trim();
+    if (!trimmed) {
+      onCommit('');
+      if (syncDraft) setDraft('');
+      return;
+    }
+    const normalized = normalizeIsoDraft(trimmed);
+    if (!normalized) return;
+    if (!parseIsoToLocalDate(normalized)) return;
+    onCommit(normalized);
+    if (syncDraft) setDraft(normalized);
+  };
+
+  return (
+    <input
+      {...restProps}
+      ref={setRefs}
+      type="text"
+      readOnly={parentReadOnly ?? false}
+      value={draft}
+      onClick={(e) => {
+        parentOnClick?.(e);
+      }}
+      onFocus={(e) => {
+        setFocused(true);
+        parentOnFocus?.(e);
+      }}
+      onBlur={(e) => {
+        setFocused(false);
+        commitNormalized(draft, { syncDraft: true });
+        parentOnBlur?.(e);
+      }}
+      onChange={(e) => {
+        parentOnChange?.(e);
+        const next = e.target.value;
+        setDraft(next);
+        commitNormalized(next);
+      }}
+      onPaste={(e) => {
+        parentOnPaste?.(e);
+        if (typeof window === 'undefined') return;
+        requestAnimationFrame(() => {
+          const input = e.target as HTMLInputElement;
+          setDraft(input.value);
+          commitNormalized(input.value);
+        });
+      }}
+      onKeyDown={(e) => {
+        parentOnKeyDown?.(e);
+        if (e.key === 'Enter') {
+          commitNormalized(draft, { syncDraft: true });
+          (e.target as HTMLInputElement).blur();
+        }
+      }}
+      placeholder={placeholder}
+      className={`${parentClassName ? `${parentClassName} ` : ''}px-2 py-1 border border-gray-300 rounded text-sm font-mono`}
+      size={28}
+      style={{ width: '28ch', minWidth: '28ch', maxWidth: '28ch', flex: 'none' }}
+    />
+  );
+});
+
 // Extended interface for UI with tracking ID
 interface FilterConditionWithId extends Omit<FilterCondition, 'value'> {
   id: string;
   dataType?: string;
-  value: string | number | boolean | Date | { start: Date | null, end: Date | null } | null;
+  value: string | number | boolean | Date | { start: string | Date | null; end: string | Date | null } | null;
   negate?: boolean;
   regex?: boolean;
 }
+
+type PreviewPagination = {
+  page: number;
+  page_size: number;
+  total_rows: number;
+  total_pages: number;
+  has_next: boolean;
+  has_prev: boolean;
+};
+
+const PREVIEW_PAGE_SIZE_OPTIONS = [10, 20, 50];
+
+const hasNonEmptyValue = (value: any): boolean => {
+  if (value === null || value === undefined) return false;
+  if (typeof value === 'string') return value.trim().length > 0;
+  if (typeof value === 'number') return true;
+  if (typeof value === 'boolean') return true;
+  if (value instanceof Date) return true;
+  if (typeof value === 'object') {
+    if ('start' in value || 'end' in value) {
+      return hasNonEmptyValue((value as any).start) || hasNonEmptyValue((value as any).end);
+    }
+    return Object.values(value).some((entry) => hasNonEmptyValue(entry));
+  }
+  return true;
+};
+
+const serializeConditionsForRequest = (conditions: FilterConditionWithId[]) => {
+  return conditions.map((c) => {
+    let value: any;
+    if (c.operator === 'is_null') {
+      value = null;
+    } else if (c.value instanceof Date) {
+      value = c.value.toISOString();
+    } else if (c.value && typeof c.value === 'object' && 'start' in c.value) {
+      const range: any = c.value;
+      const normalizeEdge = (edge: any) => {
+        if (edge instanceof Date) return edge.toISOString();
+        if (typeof edge === 'string') {
+          const trimmed = edge.trim();
+          return trimmed.length ? trimmed : null;
+        }
+        return edge ?? null;
+      };
+      value = {
+        start: normalizeEdge(range.start),
+        end: normalizeEdge(range.end),
+      };
+    } else {
+      value = c.value;
+    }
+
+    const payload: any = { column: c.column, operator: c.operator, value };
+    if (c.negate !== undefined) payload.negate = Boolean(c.negate);
+    if (c.regex !== undefined) payload.regex = Boolean(c.regex);
+    return payload;
+  });
+};
+
+const buildFilterRequestPayload = (
+  conditions: FilterConditionWithId[],
+  logic: string,
+  newNodeName?: string
+): FilterRequest => ({
+  conditions: serializeConditionsForRequest(conditions),
+  logic,
+  new_node_name: newNodeName && newNodeName.trim() ? newNodeName : undefined,
+});
+
+const isConditionComplete = (condition: FilterConditionWithId): boolean => {
+  if (!condition.column) return false;
+  if (condition.operator === 'is_null') return true;
+  if (condition.operator === 'between') {
+    const range = condition.value && typeof condition.value === 'object' ? condition.value : {};
+    return hasNonEmptyValue(range);
+  }
+  return hasNonEmptyValue(condition.value);
+};
+
+const formatPreviewValue = (value: any): string => {
+  if (value === null || value === undefined) return '';
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === 'object') {
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return String(value);
+    }
+  }
+  return String(value);
+};
 
 // Removed DatePicker & custom time input: now using direct ISO8601 text input for timezone-aware datetime entry.
 
 const FilterTab: React.FC = () => {
   const { selectedNodeId, selectedNode } = useWorkspaceSelection();
   const { nodeData } = useWorkspaceData();
-  const { filterNode } = useWorkspaceActions();
+  const { filterNode, filterPreview } = useWorkspaceActions();
   const { isLoading } = useWorkspaceStatus();
 
   const [conditions, setConditions] = useState<FilterConditionWithId[]>([{
@@ -95,6 +326,14 @@ const FilterTab: React.FC = () => {
   const [logic, setLogic] = useState<'and' | 'or'>('and');
   const [newNodeName, setNewNodeName] = useState('');
   const [isFiltering, setIsFiltering] = useState(false);
+  const [previewPage, setPreviewPage] = useState(1);
+  const [previewPageSize, setPreviewPageSize] = useState(10);
+  const [previewData, setPreviewData] = useState<any[]>([]);
+  const [previewColumns, setPreviewColumns] = useState<string[]>([]);
+  const [previewPagination, setPreviewPagination] = useState<PreviewPagination | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [debouncedRequest, setDebouncedRequest] = useState<{ request: FilterRequest; signature: string } | null>(null);
 
   // Get available columns with their datatypes from node data
   const availableColumns = useMemo(() => {
@@ -140,6 +379,128 @@ const FilterTab: React.FC = () => {
       setNewNodeName('');
     }
   }, [selectedNode, selectedNodeId]);
+
+  const previewRequest = useMemo(() => {
+    if (!conditions.length) return null;
+    return buildFilterRequestPayload(conditions, logic);
+  }, [conditions, logic]);
+
+  const previewRequestSignature = useMemo(() => {
+    if (!previewRequest) return '';
+    const baseSignature = JSON.stringify(previewRequest);
+    return selectedNodeId ? `${selectedNodeId}::${baseSignature}` : baseSignature;
+  }, [previewRequest, selectedNodeId]);
+
+  const previewReady = hasSelection && conditions.length > 0 && conditions.every(isConditionComplete);
+
+  const previewColumnsToRender = useMemo(() => {
+    if (previewColumns.length > 0) return previewColumns;
+    if (previewData.length > 0 && typeof previewData[0] === 'object' && previewData[0] !== null) {
+      return Object.keys(previewData[0]);
+    }
+    return [];
+  }, [previewColumns, previewData]);
+
+  const handlePreviewPrev = () => {
+    if (previewPagination?.has_prev && !previewLoading) {
+      setPreviewPage((prev) => Math.max(1, prev - 1));
+    }
+  };
+
+  const handlePreviewNext = () => {
+    if (previewPagination?.has_next && !previewLoading) {
+      setPreviewPage((prev) => prev + 1);
+    }
+  };
+
+  const handlePreviewPageSizeChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const nextSize = Number(event.target.value);
+    if (!Number.isNaN(nextSize)) {
+      setPreviewPageSize(nextSize);
+      setPreviewPage(1);
+    }
+  };
+
+  const resolvedTotalPages = useMemo(() => {
+    if (!previewPagination) return 0;
+    if (previewPagination.total_pages) return previewPagination.total_pages;
+    if (!previewPagination.total_rows) return 0;
+    return Math.ceil(previewPagination.total_rows / previewPagination.page_size);
+  }, [previewPagination]);
+
+  const currentPreviewPage = previewPagination?.page ?? previewPage;
+  const previewTableColSpan = Math.max(previewColumnsToRender.length, 1);
+  const displayTotalPages = resolvedTotalPages > 0 ? resolvedTotalPages : 1;
+
+  useEffect(() => {
+    setPreviewPage(1);
+  }, [previewRequestSignature]);
+
+  useEffect(() => {
+    if (!previewReady || !previewRequest || !previewRequestSignature) {
+      if (!previewReady) {
+        setPreviewData([]);
+        setPreviewColumns([]);
+        setPreviewPagination(null);
+      }
+      setPreviewError(null);
+      setDebouncedRequest(null);
+      if (!previewReady) {
+        setPreviewLoading(false);
+      }
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedRequest({ request: previewRequest, signature: previewRequestSignature });
+    }, 600);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [previewReady, previewRequest, previewRequestSignature]);
+
+  useEffect(() => {
+    if (!debouncedRequest || !selectedNodeId || !previewReady) return;
+
+    let cancelled = false;
+    setPreviewLoading(true);
+    setPreviewError(null);
+
+    filterPreview(selectedNodeId, debouncedRequest.request, previewPage, previewPageSize)
+      .then((resp) => {
+        if (cancelled) return;
+        const rows = Array.isArray(resp?.data) ? resp.data : [];
+        const cols = Array.isArray(resp?.columns) ? resp.columns : [];
+        setPreviewData(rows);
+        setPreviewColumns(cols);
+        if (resp?.pagination) {
+          setPreviewPagination(resp.pagination);
+          if (resp.pagination.page && resp.pagination.page !== previewPage) {
+            setPreviewPage(resp.pagination.page);
+          }
+        } else {
+          setPreviewPagination(null);
+        }
+      })
+      .catch((error: any) => {
+        if (cancelled) return;
+        const message = error?.message || 'Failed to load preview data';
+        setPreviewError(message);
+        setPreviewData([]);
+        setPreviewColumns([]);
+        setPreviewPagination(null);
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setPreviewLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [debouncedRequest, selectedNodeId, previewReady, previewPage, previewPageSize, filterPreview]);
 
   const handleAddCondition = () => {
     const firstColumn = availableColumns[0];
@@ -214,98 +575,15 @@ const FilterTab: React.FC = () => {
     }
 
     if (dataType === 'datetime') {
-  const isoPlaceholder = 'YYYY-MM-DDTHH:MM:SS+00:00';
-      const parseIso = (s: string): Date | null => {
-        if (!s) return null;
-        // Accept missing seconds (add :00Z if only minutes and no tz)
-        let candidate = s.trim();
-        // If user entered just date, append T00:00:00Z
-    if (/^\d{4}-\d{2}-\d{2}$/.test(candidate)) {
-      candidate += 'T00:00:00+00:00';
-        }
-        // Add seconds if missing (pattern HH:MM(+tz) or HH:MMZ)
-        if (/T\d{2}:\d{2}(Z|[+-]\d{2}:?\d{2})?$/.test(candidate)) {
-          candidate = candidate.replace(/T(\d{2}:\d{2})(Z|[+-]\d{2}:?\d{2})?$/, (m, hm, tz) => `T${hm}:00${tz || '+00:00'}`);
-        }
-        // If no timezone specified, assume Z
-        if (/T\d{2}:\d{2}:\d{2}(\.\d+)?$/.test(candidate)) {
-          candidate += '+00:00';
-        }
-        // Normalize timezone without colon
-  candidate = candidate.replace(/([+-]\d{2})(\d{2})$/, '$1:$2');
-        const d = new Date(candidate);
-        if (isNaN(d.getTime())) return null;
-        // We want DatePicker to show the same HH:MM as the ISO value (which is UTC).
-        // Convert the UTC instant to a local wall date keeping the UTC components.
-        try {
-          const m = candidate.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/);
-          if (m) {
-            const [, Y, M, D, H, Min, S] = m;
-            return new Date(Number(Y), Number(M) - 1, Number(D), Number(H), Number(Min), Number(S));
-          }
-        } catch { /* ignore */ }
-        return d;
-      };
-
       const buildPicker = (committedValue: string, commitValue: (v: string)=>void) => {
-        const committedDate = parseIso(committedValue);
-        // Buffered input component
-        // eslint-disable-next-line react/display-name
-        const IsoInput = React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>((props, ref) => {
-          const [draft, setDraft] = React.useState(committedValue);
-          const [focused, setFocused] = React.useState(false);
-          // Sync external committed value when not actively editing
-          React.useEffect(() => {
-            if (!focused) {
-              setDraft(committedValue);
-            }
-          // eslint-disable-next-line react-hooks/exhaustive-deps
-          }, [committedValue, focused]);
-
-          const normalize = (txt: string): string => {
-            let s = txt.trim();
-            if (!s) return s;
-            // If only date
-            if (/^\d{4}-\d{2}-\d{2}$/.test(s)) s += 'T00:00:00+00:00';
-            // If missing seconds but has HH:MM
-            if (/T\d{2}:\d{2}(\+00:00)?$/.test(s)) s = s.replace(/T(\d{2}:\d{2})(\+00:00)?$/, (m,_hm,_tz) => `T${_hm}:00+00:00`);
-            // Ensure timezone
-            if (/T\d{2}:\d{2}:\d{2}$/.test(s)) s += '+00:00';
-            // Canonicalize Z to +00:00
-            s = s.replace(/Z$/, '+00:00');
-            return s;
-          };
-
-            const commit = () => {
-              const normalized = normalize(draft);
-              commitValue(normalized || '');
-              setDraft(normalized);
-            };
-
-          return (
-            <input
-              {...props}
-              ref={ref}
-              type="text"
-              value={draft}
-              onFocus={() => setFocused(true)}
-              onBlur={() => { setFocused(false); commit(); }}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') { commit(); (e.target as HTMLInputElement).blur(); } }}
-              placeholder={isoPlaceholder}
-              className="px-2 py-1 border border-gray-300 rounded text-sm font-mono"
-              size={28}
-              style={{ width: '28ch', minWidth: '28ch', maxWidth: '28ch', flex: 'none' }}
-            />
-          );
-        });
+        const committedDate = parseIsoToLocalDate(committedValue);
 
         return disabled ? (
           <input
             type="text"
             value={committedValue}
             disabled
-            placeholder={isoPlaceholder}
+            placeholder={ISO_PLACEHOLDER}
             className="px-2 py-1 border border-gray-200 rounded text-sm font-mono bg-gray-100 text-gray-500"
           />
         ) : (
@@ -316,12 +594,19 @@ const FilterTab: React.FC = () => {
                 const pad = (n:number) => String(n).padStart(2,'0');
                 const iso = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}+00:00`;
                 commitValue(iso);
+              } else {
+                commitValue('');
               }
             }}
             showTimeSelect
             timeIntervals={15}
             dateFormat="yyyy-MM-dd'T'HH:mm:ssXXX"
-            customInput={<IsoInput />}
+            customInput={(
+              <IsoDateInput
+                committedValue={committedValue}
+                onCommit={(value) => commitValue(value)}
+              />
+            )}
             popperClassName="z-50"
           />
         );
@@ -341,7 +626,7 @@ const FilterTab: React.FC = () => {
               ? rangeValue.end.toISOString()
               : '';
         return (
-          <div className="flex items-center space-x-2">
+          <div className="flex flex-wrap items-center gap-2">
             <div className="flex-none">{buildPicker(startStr, (v) => handleConditionChange(condition.id, 'value', { ...rangeValue, start: v }))}</div>
             <div className="flex-none">{buildPicker(endStr, (v) => handleConditionChange(condition.id, 'value', { ...rangeValue, end: v }))}</div>
           </div>
@@ -361,9 +646,16 @@ const FilterTab: React.FC = () => {
         <input
           type="number"
           step={dataType === 'float' ? 'any' : '1'}
-          value={String(condition.value)}
-          onChange={(e) => handleConditionChange(condition.id, 'value', 
-            dataType === 'integer' ? parseInt(e.target.value) || 0 : parseFloat(e.target.value) || 0)}
+          value={condition.value === null ? '' : String(condition.value ?? '')}
+          onChange={(e) => {
+            const raw = e.target.value;
+            if (raw === '') {
+              handleConditionChange(condition.id, 'value', '');
+              return;
+            }
+            const parsed = dataType === 'integer' ? parseInt(raw, 10) : parseFloat(raw);
+            handleConditionChange(condition.id, 'value', Number.isNaN(parsed) ? '' : parsed);
+          }}
           placeholder="Enter number"
           className="px-2 py-1 border border-gray-300 rounded text-sm flex-1"
           disabled={disabled}
@@ -390,38 +682,12 @@ const FilterTab: React.FC = () => {
       return;
     }
 
-  if (conditions.some(c => !c.column || (c.operator !== 'is_null' && !c.value))) {
+  if (conditions.length === 0 || conditions.some((condition) => !isConditionComplete(condition))) {
       alert('Please fill in all filter conditions');
       return;
     }
 
-    // Serialize conditions for API
-    const serializedConditions = conditions.map(c => {
-      let value: any;
-  if (c.operator === 'is_null') {
-        value = null;
-      } else if (c.value instanceof Date) {
-        value = c.value.toISOString();
-      } else if (c.value && typeof c.value === 'object' && 'start' in c.value) {
-        const range: any = c.value;
-        value = {
-          start: range.start instanceof Date ? range.start.toISOString() : (typeof range.start === 'string' ? range.start : null),
-          end: range.end instanceof Date ? range.end.toISOString() : (typeof range.end === 'string' ? range.end : null)
-        };
-      } else {
-        value = c.value;
-      }
-  const payload: any = { column: c.column, operator: c.operator, value };
-  if ((c as any).negate !== undefined) payload.negate = Boolean((c as any).negate);
-  if ((c as any).regex !== undefined) payload.regex = Boolean((c as any).regex);
-  return payload;
-    });
-
-    const request: FilterRequest = {
-      conditions: serializedConditions,
-      logic,
-      new_node_name: newNodeName || undefined
-    };
+    const request: FilterRequest = buildFilterRequestPayload(conditions, logic, newNodeName);
 
     try {
       setIsFiltering(true);
@@ -577,7 +843,7 @@ const FilterTab: React.FC = () => {
                       )}
                     </div>
 
-                    <div className="flex flex-1 flex-col gap-2 md:flex-row md:items-center">
+                    <div className="flex flex-1 flex-col gap-2 md:flex-row md:flex-wrap md:items-center md:gap-x-3 md:gap-y-2">
                       <select
                         value={condition.column}
                         onChange={(e) => handleConditionChange(condition.id, 'column', e.target.value)}
@@ -610,7 +876,7 @@ const FilterTab: React.FC = () => {
                       </select>
 
                       {condition.operator !== 'is_null' && (
-                        <div className="flex-1 md:flex-none">
+                        <div className="flex-1 md:flex-auto md:min-w-[28ch] md:max-w-full">
                           {renderValueInput(condition, rowDisabled)}
                         </div>
                       )}
@@ -651,9 +917,122 @@ const FilterTab: React.FC = () => {
             disabled={isConfigDisabled || isFiltering || isLoading.operations}
             className="w-full px-4 py-2 rounded-md text-white font-medium bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:text-gray-500"
           >
-            {isFiltering ? 'Applying filter…' : 'Apply filter'}
+            {isFiltering ? 'Adding to workspace…' : 'Add to Workspace'}
           </button>
         </section>
+      </div>
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h3 className="text-lg font-semibold text-gray-800">Preview filtered rows</h3>
+          <div className="flex items-center gap-2 text-sm text-slate-600">
+            <label htmlFor="filter-preview-page-size" className="text-sm text-slate-600">Rows per page</label>
+            <select
+              id="filter-preview-page-size"
+              value={previewPageSize}
+              onChange={handlePreviewPageSizeChange}
+              disabled={!previewReady || previewLoading}
+              className="px-2 py-1 border border-slate-300 rounded text-sm bg-white disabled:bg-slate-100 disabled:text-slate-400"
+            >
+              {PREVIEW_PAGE_SIZE_OPTIONS.map((option) => (
+                <option key={option} value={option}>{option}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {!hasSelection ? (
+          <div className="rounded-md border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">
+            Select a node to preview filtered results.
+          </div>
+        ) : !previewReady ? (
+          <div className="rounded-md border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">
+            Configure at least one complete condition to see a live preview of the filtered rows.
+          </div>
+        ) : previewError ? (
+          <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            {previewError}
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="overflow-x-auto border border-slate-200 rounded-md bg-white">
+              <table className="min-w-full divide-y divide-slate-200 text-sm">
+                <thead className="bg-slate-50">
+                  <tr>
+                    {previewColumnsToRender.length > 0 ? (
+                      previewColumnsToRender.map((col) => (
+                        <th key={col} className="px-3 py-2 text-left font-semibold text-slate-700 whitespace-nowrap">
+                          {col}
+                        </th>
+                      ))
+                    ) : (
+                      <th className="px-3 py-2 text-left font-semibold text-slate-700">No columns</th>
+                    )}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {previewLoading && previewData.length === 0 ? (
+                    <tr>
+                      <td colSpan={previewTableColSpan} className="px-3 py-6 text-center text-slate-500">
+                        <span className="inline-flex items-center gap-2">
+                          <svg className="animate-spin h-5 w-5 text-blue-600" viewBox="0 0 24 24" fill="none">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                          </svg>
+                          Loading preview…
+                        </span>
+                      </td>
+                    </tr>
+                  ) : previewData.length === 0 ? (
+                    <tr>
+                      <td colSpan={previewTableColSpan} className="px-3 py-6 text-center text-slate-500">
+                        No rows match the current filters.
+                      </td>
+                    </tr>
+                  ) : (
+                    previewData.map((row, rowIndex) => (
+                      <tr key={rowIndex} className="bg-white">
+                        {previewColumnsToRender.map((col) => (
+                          <td key={`${rowIndex}-${col}`} className="px-3 py-2 whitespace-nowrap text-slate-700 font-mono text-xs">
+                            {formatPreviewValue((row as any)?.[col])}
+                          </td>
+                        ))}
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="text-sm text-slate-600">
+                {previewPagination
+                  ? `${previewPagination.total_rows} row${previewPagination.total_rows === 1 ? '' : 's'} · page ${currentPreviewPage} of ${displayTotalPages}`
+                  : 'Preview ready'}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handlePreviewPrev}
+                  disabled={!previewPagination?.has_prev || previewLoading}
+                  className="px-3 py-1 border border-slate-300 rounded-md text-sm bg-white disabled:bg-slate-100 disabled:text-slate-400"
+                >
+                  Previous
+                </button>
+                <span className="text-sm text-slate-600">
+                  Page {currentPreviewPage}
+                </span>
+                <button
+                  type="button"
+                  onClick={handlePreviewNext}
+                  disabled={!previewPagination?.has_next || previewLoading}
+                  className="px-3 py-1 border border-slate-300 rounded-md text-sm bg-white disabled:bg-slate-100 disabled:text-slate-400"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

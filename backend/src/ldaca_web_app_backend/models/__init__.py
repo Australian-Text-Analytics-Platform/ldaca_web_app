@@ -457,6 +457,22 @@ class SliceRequest(BaseModel):
     new_node_name: Optional[str] = None
 
 
+class PaginationInfo(BaseModel):
+    page: int
+    page_size: int
+    total_rows: int
+    total_pages: int
+    has_next: bool
+    has_prev: bool
+
+
+class FilterPreviewResponse(BaseModel):
+    data: List[Dict[str, Any]]
+    columns: List[str]
+    dtypes: Dict[str, str]
+    pagination: PaginationInfo
+
+
 # =============================================================================
 # TOKEN FREQUENCY MODELS
 # =============================================================================
