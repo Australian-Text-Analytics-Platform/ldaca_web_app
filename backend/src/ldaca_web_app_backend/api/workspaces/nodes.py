@@ -383,6 +383,124 @@ async def get_column_unique_values(
         )
 
 
+@router.get("/{workspace_id}/nodes/{node_id}/columns/{column_name}/describe")
+async def describe_column(
+    workspace_id: str,
+    node_id: str,
+    column_name: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Get descriptive statistics for a column using Polars describe with 'nearest' interpolation."""
+    from ...models import ColumnDescribeResponse
+
+    user_id = current_user["id"]
+    node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
+    if not node:
+        raise HTTPException(status_code=404, detail="Node not found")
+
+    try:
+        data_obj = node.data
+
+        # Get columns
+        if hasattr(data_obj, "columns"):
+            columns = list(data_obj.columns)
+        elif hasattr(data_obj, "schema"):
+            columns = list(data_obj.schema.keys())
+        else:
+            raise HTTPException(status_code=400, detail="Cannot determine columns")
+
+        if column_name not in columns:
+            raise HTTPException(
+                status_code=404, detail=f"Column '{column_name}' not found"
+            )
+
+        # Collect if lazy
+        if hasattr(data_obj, "collect"):
+            df = data_obj.collect()
+        else:
+            df = data_obj
+
+        # Check if column is datetime type
+        import polars as pl
+
+        column_dtype = df.schema[column_name]
+        is_datetime_column = column_dtype in (
+            pl.Datetime,
+            pl.Datetime("ms"),
+            pl.Datetime("us"),
+            pl.Datetime("ns"),
+        )
+
+        # Run describe with 'nearest' interpolation for percentiles
+        # This works for both numeric and datetime columns
+        try:
+            desc_df = df.select(column_name).describe(interpolation="nearest")
+
+            # Convert to dict for easier access
+            desc_dict = {}
+            for row in desc_df.iter_rows(named=True):
+                stat_name = row.get("statistic") or row.get("describe")
+                if stat_name:
+                    desc_dict[stat_name] = row[column_name]
+
+            # Helper function to serialize values
+            def serialize_value(val):
+                if val is None:
+                    return None
+                if isinstance(val, datetime):
+                    return val.isoformat()
+                # For datetime columns, convert string output from describe() to datetime
+                if is_datetime_column and isinstance(val, str) and val != "null":
+                    try:
+                        # Parse datetime string from Polars describe output
+                        # Format: "2023-01-01 10:00:00" or "2023-01-01 10:00:00+00:00"
+                        dt = datetime.fromisoformat(val.replace(" ", "T"))
+                        # Add UTC timezone if not present (Polars datetimes are typically UTC)
+                        if dt.tzinfo is None:
+                            from datetime import timezone
+
+                            dt = dt.replace(tzinfo=timezone.utc)
+                        return dt.isoformat()
+                    except (ValueError, AttributeError):
+                        return val
+                # For numeric columns, convert to float
+                try:
+                    return float(val)
+                except (TypeError, ValueError):
+                    return val
+
+            response = ColumnDescribeResponse(
+                column_name=column_name,
+                count=int(desc_dict.get("count", 0))
+                if desc_dict.get("count") is not None
+                else None,
+                null_count=int(desc_dict.get("null_count", 0))
+                if desc_dict.get("null_count") is not None
+                else None,
+                mean=serialize_value(desc_dict.get("mean")),
+                std=serialize_value(desc_dict.get("std")),
+                min=serialize_value(desc_dict.get("min")),
+                percentile_25=serialize_value(desc_dict.get("25%")),
+                median=serialize_value(desc_dict.get("50%")),
+                percentile_75=serialize_value(desc_dict.get("75%")),
+                max=serialize_value(desc_dict.get("max")),
+            )
+
+            return response
+
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to describe column '{column_name}': {e}",
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to process column describe: {e}"
+        )
+
+
 @router.delete("/{workspace_id}/nodes/{node_id}")
 async def delete_node(
     workspace_id: str, node_id: str, current_user: dict = Depends(get_current_user)

@@ -7,7 +7,7 @@ from pathlib import Path
 import uvicorn
 from IPython.display import Javascript, Markdown, display
 
-from .config import PROJECT_ROOT, settings
+from .config import PACKAGE_ROOT, settings
 from .main import app
 
 # Add Colab detection
@@ -87,7 +87,7 @@ def start_frontend(
         if build_dir is not None:
             DIST_DIR = Path(build_dir).absolute()
 
-    NGINX_CONF_TEMPLATE = PROJECT_ROOT / "configs" / "nginx.conf.template"
+    NGINX_CONF_TEMPLATE = PACKAGE_ROOT / "configs" / "nginx.conf.template"
 
     subprocess.run(
         f"FRONTEND_DIR={DIST_DIR} FRONTEND_PORT={port} BACKEND_PORT={settings.backend_port} envsubst '$FRONTEND_DIR $FRONTEND_PORT $BACKEND_PORT' < {NGINX_CONF_TEMPLATE} > {NGINX_DIR / 'nginx.conf'}",

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import DatePicker from 'react-datepicker';
+import type { ReactDatePickerCustomHeaderProps } from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { useWorkspaceSelection } from '../../hooks/useWorkspaceSelection';
 import { useWorkspaceData } from '../../hooks/useWorkspaceData';
@@ -68,6 +69,24 @@ const getOperatorsForType = (dataType: string) => {
 };
 
 const ISO_PLACEHOLDER = 'YYYY-MM-DDTHH:MM:SS+00:00';
+
+const MONTH_LABELS = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
+
+const YEARS_PAST_WINDOW = 120;
+const YEARS_FUTURE_WINDOW = 50;
 
 const normalizeIsoDraft = (txt: string): string => {
   let s = txt.trim();
@@ -207,6 +226,195 @@ const IsoDateInput = React.forwardRef<HTMLInputElement, IsoDateInputProps>((prop
   );
 });
 
+export const CalendarHeaderWithYearSelect: React.FC<ReactDatePickerCustomHeaderProps> = ({
+  date,
+  decreaseMonth,
+  increaseMonth,
+  changeYear,
+  changeMonth,
+  prevMonthButtonDisabled,
+  nextMonthButtonDisabled,
+}) => {
+  const [pickerOpen, setPickerOpen] = React.useState(false);
+  const headerRef = React.useRef<HTMLDivElement | null>(null);
+  const monthListRef = React.useRef<HTMLDivElement | null>(null);
+  const yearListRef = React.useRef<HTMLDivElement | null>(null);
+  const selectedMonthRef = React.useRef<HTMLButtonElement | null>(null);
+  const selectedYearRef = React.useRef<HTMLButtonElement | null>(null);
+
+  React.useEffect(() => {
+    if (!pickerOpen) return;
+    const handler = (event: MouseEvent) => {
+      if (!headerRef.current) return;
+      if (!headerRef.current.contains(event.target as Node)) {
+        setPickerOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => {
+      document.removeEventListener('mousedown', handler);
+    };
+  }, [pickerOpen]);
+
+  React.useEffect(() => {
+    setPickerOpen(false);
+  }, [date]);
+
+  // Scroll to selected month and year when menu opens
+  React.useEffect(() => {
+    if (pickerOpen) {
+      if (monthListRef.current && selectedMonthRef.current) {
+        const list = monthListRef.current;
+        const selected = selectedMonthRef.current;
+        const listHeight = list.clientHeight;
+        const selectedTop = selected.offsetTop;
+        const selectedHeight = selected.clientHeight;
+        // Center the selected month in the list
+        list.scrollTop = selectedTop - (listHeight / 2) + (selectedHeight / 2);
+      }
+      if (yearListRef.current && selectedYearRef.current) {
+        const list = yearListRef.current;
+        const selected = selectedYearRef.current;
+        const listHeight = list.clientHeight;
+        const selectedTop = selected.offsetTop;
+        const selectedHeight = selected.clientHeight;
+        // Center the selected year in the list
+        list.scrollTop = selectedTop - (listHeight / 2) + (selectedHeight / 2);
+      }
+    }
+  }, [pickerOpen]);
+
+  const years = React.useMemo(() => {
+    const currentYear = date.getFullYear();
+    const todayYear = new Date().getFullYear();
+    const lowerBound = Math.min(currentYear - YEARS_PAST_WINDOW, todayYear - YEARS_PAST_WINDOW);
+    const upperBound = Math.max(currentYear + YEARS_FUTURE_WINDOW, todayYear + YEARS_FUTURE_WINDOW);
+    const list: number[] = [];
+    for (let year = lowerBound; year <= upperBound; year += 1) {
+      list.push(year);
+    }
+    return list;
+  }, [date]);
+
+  const handleTogglePicker = () => {
+    setPickerOpen(open => !open);
+  };
+
+  const handleSelectMonth = (monthIndex: number) => {
+    changeMonth(monthIndex);
+    setPickerOpen(false);
+  };
+
+  const handleSelectYear = (year: number) => {
+    changeYear(year);
+    setPickerOpen(false);
+  };
+
+  const handleDecreaseMonth = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setPickerOpen(false);
+    decreaseMonth();
+  };
+
+  const handleIncreaseMonth = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setPickerOpen(false);
+    increaseMonth();
+  };
+
+  return (
+    <div ref={headerRef} className="flex items-center justify-between px-2 py-1 text-gray-700">
+      <button
+        type="button"
+        onClick={handleDecreaseMonth}
+        disabled={prevMonthButtonDisabled}
+        className="rounded p-1 text-sm hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-40"
+        aria-label="Previous month"
+      >
+        ‹
+      </button>
+      <div className="relative flex-1">
+        <button
+          type="button"
+          onClick={handleTogglePicker}
+          className="w-full rounded px-2 py-1 text-sm font-medium text-gray-800 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          aria-haspopup="dialog"
+          aria-expanded={pickerOpen}
+          aria-label="Select month and year"
+        >
+          {MONTH_LABELS[date.getMonth()]} {date.getFullYear()}
+        </button>
+        {pickerOpen && (
+          <div
+            role="dialog"
+            className="absolute left-1/2 z-10 mt-1 flex -translate-x-1/2 gap-2 rounded border border-gray-200 bg-white p-2 shadow-lg"
+          >
+            {/* Month column */}
+            <div
+              ref={monthListRef}
+              role="listbox"
+              aria-label="Select month"
+              className="max-h-64 w-32 overflow-y-auto rounded border border-gray-100 py-1"
+            >
+              {MONTH_LABELS.map((month, index) => (
+                <button
+                  key={month}
+                  ref={index === date.getMonth() ? selectedMonthRef : null}
+                  type="button"
+                  role="option"
+                  aria-selected={index === date.getMonth()}
+                  className={`block w-full px-3 py-1.5 text-left text-sm ${
+                    index === date.getMonth()
+                      ? 'bg-indigo-50 font-semibold text-indigo-600'
+                      : 'hover:bg-gray-50'
+                  }`}
+                  onClick={() => handleSelectMonth(index)}
+                >
+                  {month}
+                </button>
+              ))}
+            </div>
+            {/* Year column */}
+            <div
+              ref={yearListRef}
+              role="listbox"
+              aria-label="Select year"
+              className="max-h-64 w-24 overflow-y-auto rounded border border-gray-100 py-1"
+            >
+              {years.map(year => (
+                <button
+                  key={year}
+                  ref={year === date.getFullYear() ? selectedYearRef : null}
+                  type="button"
+                  role="option"
+                  aria-selected={year === date.getFullYear()}
+                  className={`block w-full px-3 py-1.5 text-left text-sm ${
+                    year === date.getFullYear()
+                      ? 'bg-indigo-50 font-semibold text-indigo-600'
+                      : 'hover:bg-gray-50'
+                  }`}
+                  onClick={() => handleSelectYear(year)}
+                >
+                  {year}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+      <button
+        type="button"
+        onClick={handleIncreaseMonth}
+        disabled={nextMonthButtonDisabled}
+        className="rounded p-1 text-sm hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-40"
+        aria-label="Next month"
+      >
+        ›
+      </button>
+    </div>
+  );
+};
+
 // Extended interface for UI with tracking ID
 interface FilterConditionWithId extends Omit<FilterCondition, 'value'> {
   id: string;
@@ -311,7 +519,7 @@ const formatPreviewValue = (value: any): string => {
 
 const FilterTab: React.FC = () => {
   const { selectedNodeId, selectedNode } = useWorkspaceSelection();
-  const { nodeData } = useWorkspaceData();
+  const { nodeData, currentWorkspaceId } = useWorkspaceData();
   const { filterNode, filterPreview } = useWorkspaceActions();
   const { isLoading } = useWorkspaceStatus();
 
@@ -534,13 +742,69 @@ const FilterTab: React.FC = () => {
             updated.dataType = columnInfo.dataType;
             updated.operator = 'eq'; // Reset to default operator
             updated.value = ''; // Reset value
+            
+            // Pre-fill datetime values if datetime column
+            if (columnInfo.dataType === 'datetime' && selectedNodeId && currentWorkspaceId) {
+              prefillDatetimeValue(id, value, 'eq');
+            }
           }
+        }
+        
+        // If operator changed for datetime column, pre-fill value
+        if (field === 'operator' && c.dataType === 'datetime' && c.column && selectedNodeId && currentWorkspaceId) {
+          updated.value = ''; // Reset value first
+          prefillDatetimeValue(id, c.column, value as string);
         }
         
         return updated;
       }
       return c;
     }));
+  };
+
+  // Pre-fill datetime values based on operator and column statistics
+  const prefillDatetimeValue = async (conditionId: string, column: string, operator: string) => {
+    if (!selectedNodeId || !currentWorkspaceId) return;
+    
+    try {
+      const describeData = await nodesApi.describeColumn(currentWorkspaceId, selectedNodeId, column);
+      
+      setConditions(prev => prev.map(c => {
+        if (c.id === conditionId) {
+          let newValue: any = '';
+          
+          switch (operator) {
+            case 'eq':
+              // Pre-fill with median
+              newValue = describeData.median || describeData.min || '';
+              break;
+            case 'gte':
+              // Pre-fill with earliest (min)
+              newValue = describeData.min || '';
+              break;
+            case 'lte':
+              // Pre-fill with latest (max)
+              newValue = describeData.max || '';
+              break;
+            case 'between':
+              // Pre-fill with min and max
+              newValue = {
+                start: describeData.min || '',
+                end: describeData.max || ''
+              };
+              break;
+            default:
+              newValue = '';
+          }
+          
+          return { ...c, value: newValue };
+        }
+        return c;
+      }));
+    } catch (error) {
+      console.error('Failed to fetch describe data for pre-filling:', error);
+      // Don't show error to user, just fail silently
+    }
   };
 
   // Render appropriate input based on data type and operator
@@ -589,6 +853,7 @@ const FilterTab: React.FC = () => {
         ) : (
           <DatePicker
             selected={committedDate || undefined}
+            openToDate={committedDate || undefined}
             onChange={(d) => {
               if (d) {
                 const pad = (n:number) => String(n).padStart(2,'0');
@@ -601,6 +866,9 @@ const FilterTab: React.FC = () => {
             showTimeSelect
             timeIntervals={15}
             dateFormat="yyyy-MM-dd'T'HH:mm:ssXXX"
+            renderCustomHeader={(headerProps) => (
+              <CalendarHeaderWithYearSelect {...headerProps} />
+            )}
             customInput={(
               <IsoDateInput
                 committedValue={committedValue}

@@ -8,11 +8,11 @@ from pathlib import Path
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-PROJECT_ROOT = Path(__file__).parent
+PACKAGE_ROOT = Path(__file__).parent
 
 # Determine which .env file to load for settings
-DEFAULT_EXAMPLE_ENV_PATH = PROJECT_ROOT / "configs" / ".env.example"
-DEFAULT_PROD_ENV_PATH = PROJECT_ROOT / "configs" / ".env"
+DEFAULT_EXAMPLE_ENV_PATH = PACKAGE_ROOT / "configs" / ".env.example"
+DEFAULT_PROD_ENV_PATH = PACKAGE_ROOT / "configs" / ".env"
 
 
 class Settings(BaseSettings):
@@ -22,14 +22,13 @@ class Settings(BaseSettings):
         """Resolve the environment file path in priority order (helper local to class body)."""
         if "ENV_PATH" in os.environ:
             env_path = Path(os.environ["ENV_PATH"]).resolve()
-        elif "ENV_LOCATION" in os.environ:
-            env_path = Path(os.environ["ENV_LOCATION"]).resolve()
         elif DEFAULT_PROD_ENV_PATH.exists():
             env_path = DEFAULT_PROD_ENV_PATH
         elif DEFAULT_EXAMPLE_ENV_PATH.exists():
             env_path = DEFAULT_EXAMPLE_ENV_PATH
         else:
-            raise FileNotFoundError("No suitable .env file found")
+            print("No suitable .env file found, using defaults only.")
+            return None
         if not env_path.exists():
             raise FileNotFoundError(f"Specified .env file: {env_path} does not exist")
         else:
@@ -60,7 +59,7 @@ class Settings(BaseSettings):
         default="users", description="User data folder (relative to data_root)"
     )
     sample_data: str = Field(
-        default=str(PROJECT_ROOT / "sample_data"), description="Sample data folder"
+        default=str(PACKAGE_ROOT / "sample_data"), description="Sample data folder"
     )
 
     # Server Configuration
