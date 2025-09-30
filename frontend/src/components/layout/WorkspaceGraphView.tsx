@@ -386,7 +386,16 @@ export const WorkspaceGraphView: React.FC = memo(() => {
   }
 
   return (
-    <div className="h-full w-full">
+    <div className="h-full w-full relative">
+      {/* Node count overlay in upper left */}
+      {workspaceGraph && workspaceGraph.nodes && workspaceGraph.nodes.length > 0 && (
+        <div className="absolute top-4 left-4 z-10 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded shadow-sm border border-border">
+          <span className="text-xs font-medium text-gray-700">
+            {selectedNodeIds?.length ?? 0}/{workspaceGraph.nodes.length} selected
+          </span>
+        </div>
+      )}
+      
       <ReactFlow
         nodes={nodes}
         edges={edges}

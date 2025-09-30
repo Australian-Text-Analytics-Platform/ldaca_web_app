@@ -232,7 +232,7 @@ const CustomNode: React.FC<NodeProps<any>> = ({ data, selected }) => {
     w-64 rounded-lg border-2 bg-white text-sm transition-all duration-150 ease-in-out
     ${isHighlighted
       ? 'border-green-500 bg-green-50 shadow-lg ring-2 ring-green-200'
-      : 'border-gray-400 shadow-md'}
+      : 'border-border shadow-md'}
   `;
 
   dlog('CustomNode rendering:', {
@@ -249,7 +249,7 @@ const CustomNode: React.FC<NodeProps<any>> = ({ data, selected }) => {
     <div className={nodeClasses} style={{ minWidth: '256px', minHeight: '120px', position: 'relative' }}>
       {/* Node Header */}
       <div className={`flex items-start justify-between p-2 rounded-t-lg border-b-2 min-h-fit relative ${
-        isHighlighted ? 'bg-green-100 border-green-300' : 'bg-gray-100 border-gray-200'
+        isHighlighted ? 'bg-green-100 border-green-300' : 'bg-muted border-border'
       }`}>
         <div className="flex items-center flex-1 mr-2">
           {isHighlighted && (
@@ -305,17 +305,17 @@ const CustomNode: React.FC<NodeProps<any>> = ({ data, selected }) => {
             
             {/* Dropdown menu */}
             {showMenu && (
-              <div className="absolute right-0 top-6 bg-white border border-gray-200 rounded-md shadow-lg z-10 min-w-36">
+              <div className="absolute right-0 top-6 bg-white border border-border rounded-md shadow-lg z-10 min-w-36">
                 <button
                   onClick={handleSaveClick}
-                  className="w-full text-left px-3 py-2 text-xs hover:bg-gray-100 rounded-md"
+                  className="w-full text-left px-3 py-2 text-xs hover:bg-muted/60 rounded-md"
                 >
                   Save
                 </button>
                 
                 <button
                   onClick={handleRenameClick}
-                  className="w-full text-left px-3 py-2 text-xs hover:bg-gray-100 border-t border-gray-100"
+                  className="w-full text-left px-3 py-2 text-xs hover:bg-muted/60 border-t border-border/60"
                 >
                   Rename
                 </button>
@@ -325,13 +325,13 @@ const CustomNode: React.FC<NodeProps<any>> = ({ data, selected }) => {
                   <>
                     <button
                       onClick={handleToDocDataFrameClick}
-                      className="w-full text-left px-3 py-2 text-xs hover:bg-gray-100 border-t border-gray-100"
+                      className="w-full text-left px-3 py-2 text-xs hover:bg-muted/60 border-t border-border/60"
                     >
                       to DocDataFrame
                     </button>
                     <button
                       onClick={handleToDocLazyFrameClick}
-                      className="w-full text-left px-3 py-2 text-xs hover:bg-gray-100 border-t border-gray-100"
+                      className="w-full text-left px-3 py-2 text-xs hover:bg-muted/60 border-t border-border/60"
                     >
                       to DocLazyFrame
                     </button>
@@ -339,7 +339,7 @@ const CustomNode: React.FC<NodeProps<any>> = ({ data, selected }) => {
                     {formattedType.full.includes('LazyFrame') && !formattedType.full.includes('Doc') && (
                       <button
                         onClick={handleToDataFrameClick}
-                        className="w-full text-left px-3 py-2 text-xs hover:bg-gray-100 border-t border-gray-100"
+                        className="w-full text-left px-3 py-2 text-xs hover:bg-muted/60 border-t border-border/60"
                       >
                         to DataFrame
                       </button>
@@ -352,20 +352,20 @@ const CustomNode: React.FC<NodeProps<any>> = ({ data, selected }) => {
                   <>
                     <button
                       onClick={handleToDataFrameClick}
-                      className="w-full text-left px-3 py-2 text-xs hover:bg-gray-100 border-t border-gray-100"
+                      className="w-full text-left px-3 py-2 text-xs hover:bg-muted/60 border-t border-border/60"
                     >
                       to DataFrame
                     </button>
                     <button
                       onClick={handleToLazyFrameClick}
-                      className="w-full text-left px-3 py-2 text-xs hover:bg-gray-100 border-t border-gray-100"
+                      className="w-full text-left px-3 py-2 text-xs hover:bg-muted/60 border-t border-border/60"
                     >
                       to LazyFrame
                     </button>
                     {isDocLazyFrame && (
                       <button
                         onClick={handleDocLazyToDocDataFrame}
-                        className="w-full text-left px-3 py-2 text-xs hover:bg-gray-100 border-t border-gray-100"
+                        className="w-full text-left px-3 py-2 text-xs hover:bg-muted/60 border-t border-border/60"
                       >
                         to DocDataFrame
                       </button>
@@ -373,7 +373,7 @@ const CustomNode: React.FC<NodeProps<any>> = ({ data, selected }) => {
                     {isDocDataFrame && (
                       <button
                         onClick={handleDocDataFrameToDocLazy}
-                        className="w-full text-left px-3 py-2 text-xs hover:bg-gray-100 border-t border-gray-100"
+                        className="w-full text-left px-3 py-2 text-xs hover:bg-muted/60 border-t border-border/60"
                       >
                         to DocLazyFrame
                       </button>
@@ -381,7 +381,7 @@ const CustomNode: React.FC<NodeProps<any>> = ({ data, selected }) => {
                     {(isDocDataFrame || isDocLazyFrame) && (
                       <button
                         onClick={handleResetDocument}
-                        className="w-full text-left px-3 py-2 text-xs hover:bg-yellow-50 border-t border-gray-100 text-yellow-700"
+                        className="w-full text-left px-3 py-2 text-xs hover:bg-yellow-50 border-t border-border/60 text-yellow-700"
                         title="Change which column is treated as document"
                       >
                         Reset document column

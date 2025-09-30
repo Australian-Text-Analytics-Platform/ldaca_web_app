@@ -51,7 +51,7 @@ export const WorkspaceLoadingSkeleton: React.FC = () => (
     
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {[...Array(6)].map((_, index) => (
-        <div key={index} className="border border-gray-200 rounded-lg p-4 space-y-3">
+        <div key={index} className="border border-border rounded-lg p-4 space-y-3">
           <LoadingSkeleton className="h-5 w-3/4" />
           <LoadingSkeleton className="h-4 w-1/2" />
           <LoadingSkeleton className="h-3 w-full" />
@@ -76,7 +76,7 @@ export const LoadingSpinner: React.FC<{
   };
 
   return (
-    <div className={`animate-spin rounded-full border-2 border-gray-300 border-t-blue-600 ${sizeClasses[size]} ${className}`} />
+    <div className={`animate-spin rounded-full border-2 border-muted border-t-primary ${sizeClasses[size]} ${className}`} />
   );
 };
 

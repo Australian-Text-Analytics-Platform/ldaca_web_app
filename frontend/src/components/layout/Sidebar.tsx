@@ -8,6 +8,10 @@ import { useAnalysisStore } from '../../stores/analysisStore';
 import { useUIStore } from '../../stores';
 import { useShallow } from 'zustand/react/shallow';
 import { useWorkspaceTaskStream } from '../../hooks/useWorkspaceTaskStream';
+import { 
+  FolderOpen, Filter, TrendingUp, FileText, BarChart3, Puzzle, Quote, Upload, 
+  BookOpen, MessageSquare, Circle, XCircle, Clock, CheckCircle, Square, AlertCircle
+} from 'lucide-react';
 
 const Sidebar: React.FC = () => {
   const { currentView, setCurrentView, openFeedbackModal } = useUIStore(
@@ -32,7 +36,7 @@ const Sidebar: React.FC = () => {
   // Task stream state handled by useWorkspaceTaskStream; reconnectTaskStream available for manual retries.
 
   return (
-    <aside className="w-64 bg-white border-r border-gray-200 p-4 flex flex-col h-full">
+    <aside className="w-64 bg-card border-r border-border p-4 flex flex-col h-full">
       <nav className="space-y-2">
         <button
           onClick={() => setCurrentView('data-loader')}
@@ -42,7 +46,8 @@ const Sidebar: React.FC = () => {
               : 'text-gray-600 hover:bg-gray-100'
           }`}
         >
-          📁 Data Loader
+          <FolderOpen className="inline-block w-4 h-4 mr-2" />
+          Data Loader
         </button>
         <button
           onClick={() => setCurrentView('filter')}
@@ -52,7 +57,8 @@ const Sidebar: React.FC = () => {
               : 'text-gray-600 hover:bg-gray-100'
           }`}
         >
-          🔍 Filter/Slicing
+          <Filter className="inline-block w-4 h-4 mr-2" />
+          Filter/Slicing
         </button>
   <button
           onClick={() => setCurrentView('token-frequency')}
@@ -62,7 +68,8 @@ const Sidebar: React.FC = () => {
               : 'text-gray-600 hover:bg-gray-100'
           }`}
         >
-          📈 Token Frequency
+          <TrendingUp className="inline-block w-4 h-4 mr-2" />
+          Token Frequency
         </button>
         <button
           onClick={() => setCurrentView('concordance')}
@@ -72,7 +79,8 @@ const Sidebar: React.FC = () => {
               : 'text-gray-600 hover:bg-gray-100'
           }`}
         >
-          📝 Concordance
+          <FileText className="inline-block w-4 h-4 mr-2" />
+          Concordance
         </button>
         <button
           onClick={() => setCurrentView('analysis')}
@@ -82,7 +90,8 @@ const Sidebar: React.FC = () => {
               : 'text-gray-600 hover:bg-gray-100'
           }`}
         >
-          📊 Timeline
+          <BarChart3 className="inline-block w-4 h-4 mr-2" />
+          Timeline
         </button>
         <button
           onClick={() => setCurrentView('topic-modeling')}
@@ -92,7 +101,8 @@ const Sidebar: React.FC = () => {
               : 'text-gray-600 hover:bg-gray-100'
           }`}
         >
-          🧩 Topic Modeling
+          <Puzzle className="inline-block w-4 h-4 mr-2" />
+          Topic Modeling
         </button>
         <button
           onClick={() => setCurrentView('quotation')}
@@ -102,7 +112,8 @@ const Sidebar: React.FC = () => {
               : 'text-gray-600 hover:bg-gray-100'
           }`}
         >
-          ❝ Quotation
+          <Quote className="inline-block w-4 h-4 mr-2" />
+          Quotation
         </button>
         <button
           onClick={() => setCurrentView('export')}
@@ -112,14 +123,15 @@ const Sidebar: React.FC = () => {
               : 'text-gray-600 hover:bg-gray-100'
           }`}
         >
-          📤 Export
+          <Upload className="inline-block w-4 h-4 mr-2" />
+          Export
         </button>
       </nav>
   {/* spacer */}
   <div className="mt-6" />
 
       {/* Node list (synced with graph selection) */}
-      <div className="mt-4 pt-3 border-t border-gray-200 flex-1 flex flex-col min-h-0">
+      <div className="mt-4 pt-3 border-t border-border flex-1 flex flex-col min-h-0">
         <div className="flex items-center justify-between mb-2">
           <h4 className="text-sm font-medium text-gray-700">Nodes</h4>
           <span className="text-xs text-gray-500">{nodeCount}</span>
@@ -150,7 +162,7 @@ const Sidebar: React.FC = () => {
       </div>
 
       {/* Tasks list */}
-      <div className="mt-4 pt-3 border-t border-gray-200">
+      <div className="mt-4 pt-3 border-t border-border">
         <div className="flex items-center justify-between mb-2">
           <h4 className="text-sm font-medium text-gray-700">Tasks</h4>
           <div className="flex items-center gap-2">
@@ -161,12 +173,16 @@ const Sidebar: React.FC = () => {
                 title={`${connectionError}. Click to retry.`}
                 onClick={() => reconnectTaskStream()}
               >
-                ❌
+                <XCircle className="w-3 h-3" />
               </button>
             ) : isConnected ? (
-              <span className="text-xs text-green-500" title="Real-time updates active (SSE)">🟢</span>
+              <span title="Real-time updates active (SSE)">
+                <Circle className="w-3 h-3 fill-green-500 text-green-500" />
+              </span>
             ) : (
-              <span className="text-xs text-yellow-500 animate-pulse" title={isConnecting ? 'Connecting…' : 'Waiting for workspace'}>🟡</span>
+              <span title={isConnecting ? 'Connecting…' : 'Waiting for workspace'}>
+                <Circle className="w-3 h-3 fill-yellow-500 text-yellow-500 animate-pulse" />
+              </span>
             )}
           </div>
         </div>
@@ -177,13 +193,15 @@ const Sidebar: React.FC = () => {
             return kb - ka;
           }).map((t:any)=>{
             const status = t.state as string;
-            const icon = status === 'running' ? '⏳' : status === 'successful' ? '✅' : status === 'failed' ? '❌' : status === 'cancelled' ? '⏹️' : '⏺️';
+            const IconComponent = status === 'running' ? Clock : status === 'successful' ? CheckCircle : status === 'failed' ? XCircle : status === 'cancelled' ? Square : AlertCircle;
             const color = status === 'running' ? 'text-amber-600' : status === 'successful' ? 'text-green-600' : status === 'failed' ? 'text-red-600' : status === 'cancelled' ? 'text-gray-600' : 'text-gray-600';
             return (
               <div key={t.task_id} className="flex flex-col px-2 py-1 rounded hover:bg-gray-50">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className={color} title={status}>{icon}</span>
+                    <span title={status}>
+                      <IconComponent className={`w-4 h-4 ${color}`} />
+                    </span>
                     <div className="min-w-0">
                       <div className="text-xs text-gray-800 truncate">{t.task_type?.replace(/_/g,' ') || 'task'}{t.metadata?.name ? `: ${t.metadata.name}` : ''}</div>
                       <div className="text-[10px] text-gray-500 truncate" title={t.message || ''}>{t.message || ''}</div>
@@ -256,18 +274,20 @@ const Sidebar: React.FC = () => {
       </div>
 
       {/* Footer actions */}
-      <div className="pt-3 mt-3 border-t border-gray-200">
+      <div className="pt-3 mt-3 border-t border-border">
         <button
           onClick={() => window.open('#/tutorial', '_blank', 'noopener,noreferrer')}
           className="w-full text-left px-4 py-2 rounded-lg transition-colors text-gray-700 hover:bg-gray-100"
         >
-          📘 Tutorial
+          <BookOpen className="inline-block w-4 h-4 mr-2" />
+          Tutorial
         </button>
         <button
           onClick={openFeedbackModal}
           className="w-full text-left px-4 py-2 rounded-lg transition-colors text-gray-700 hover:bg-gray-100"
         >
-          💬 Feedback
+          <MessageSquare className="inline-block w-4 h-4 mr-2" />
+          Feedback
         </button>
       </div>
     </aside>

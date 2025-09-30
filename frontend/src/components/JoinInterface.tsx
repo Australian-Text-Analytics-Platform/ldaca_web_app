@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { WorkspaceNode } from '../types';
 import { useWorkspaceData } from '../hooks/useWorkspaceData';
 import NodeSelectionPanel, { NodeColumnSelection } from './NodeSelectionPanel';
+import { AlertTriangle } from 'lucide-react';
 
 interface JoinInterfaceProps {
   leftNode: WorkspaceNode;
@@ -105,7 +106,7 @@ const JoinInterface: React.FC<JoinInterfaceProps> = ({
         {findCommonColumns(leftNode.columns, rightNode.columns).length === 0 && (
           <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
             <div className="text-sm text-yellow-800">
-              <span className="font-medium">⚠ No common columns found.</span> Please select columns manually to join on.
+              <span className="font-medium flex items-center gap-1"><AlertTriangle className="w-4 h-4" /> No common columns found.</span> Please select columns manually to join on.
             </div>
           </div>
         )}
@@ -135,7 +136,7 @@ const JoinInterface: React.FC<JoinInterfaceProps> = ({
               <select
                 value={how}
                 onChange={(e) => setHow(e.target.value as 'inner' | 'left' | 'right' | 'full' | 'semi' | 'anti' | 'cross')}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 disabled={loading}
               >
                 <option value="inner">inner</option>
@@ -154,7 +155,7 @@ const JoinInterface: React.FC<JoinInterfaceProps> = ({
                 value={newNodeName}
                 onChange={(e) => setNewNodeName(e.target.value)}
                 placeholder={`${leftNode.name}_${how}_join_${rightNode.name}`}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 disabled={loading || isLoading}
               />
             </div>

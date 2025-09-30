@@ -174,22 +174,29 @@ export const WorkspaceDataView: React.FC = memo(() => {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Node info header */}
-      <div className="flex-shrink-0 p-4 border-b border-gray-200 bg-gray-50">
-        <h3 className="text-lg font-semibold text-gray-800">
-          {selectedNode.data?.nodeName || selectedNode.data?.label || selectedNode.id}
-        </h3>
-        <div className="text-sm text-gray-600 mt-1">
-          Shape: {(() => {
-            const [rows, cols] = getDisplayShape();
-            return `${rows} × ${cols}`;
-          })()} | {nodeData.data.length} rows loaded
+      {/* Consolidated header with title and metadata in one row */}
+      <div className="flex-shrink-0 p-2 border-b border-border bg-muted">
+        <div className="flex items-center gap-3 flex-wrap">
+          <h3 className="text-sm font-medium text-gray-700">Data View</h3>
+          <span className="text-gray-300">|</span>
+          <span className="text-sm font-semibold text-gray-800">
+            {selectedNode.data?.nodeName || selectedNode.data?.label || selectedNode.id}
+          </span>
+          <span className="text-xs text-gray-600">
+            Shape: {(() => {
+              const [rows, cols] = getDisplayShape();
+              return `${rows} × ${cols}`;
+            })()}
+          </span>
+          <span className="text-xs text-gray-600">
+            {nodeData.data.length} rows loaded
+          </span>
+          {Array.isArray(nodeData.data) && nodeData.data.length === 0 && (
+            <span className="text-xs text-gray-500 italic">
+              (empty table)
+            </span>
+          )}
         </div>
-        {Array.isArray(nodeData.data) && nodeData.data.length === 0 && (
-          <div className="text-xs text-gray-500 mt-1">
-            Showing empty table (no rows), based on current schema.
-          </div>
-        )}
       </div>
 
       {/* Data table with column type casting */}

@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, useCallback, Suspense, lazy } from 'react';
-import './App.css';
 import { useAuth } from './hooks/useAuth';
 import { useBackendHealth } from './hooks/useBackendHealth';
 import { QueryProvider } from './providers/QueryProvider';
@@ -43,8 +42,8 @@ const App: React.FC = () => {
   const { ready: backendReady } = useBackendHealth();
 
   // Right panel width and resize handlers must be declared before any early returns (React Hooks rule)
-  const [rightWidth, setRightWidth] = useState<number>(50); // percentage of total width
-  const [lastRightWidth, setLastRightWidth] = useState<number>(50); // remember last width when collapsing
+  const [rightWidth, setRightWidth] = useState<number>(40); // percentage of total width
+  const [lastRightWidth, setLastRightWidth] = useState<number>(40); // remember last width when collapsing
   const [isRightCollapsed, setIsRightCollapsed] = useState<boolean>(false);
   const [isResizing, setIsResizing] = useState(false);
   const layoutRef = useRef<HTMLDivElement>(null);

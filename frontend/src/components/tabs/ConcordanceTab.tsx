@@ -12,6 +12,17 @@ import { workspacesApi } from '../../api/workspaces';
 import { useAnalysisStore } from '../../stores/analysisStore';
 import useAutoNodeColumns from '../../hooks/useAutoNodeColumns';
 import useNodeColumnInfos from '../../hooks/useNodeColumnInfos';
+import { Button } from '../ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../ui/card';
+import { Play, Loader2, Trash2, Link as LinkIcon, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '../ui/table';
 
 interface NodeColumnSelection {
   nodeId: string;
@@ -764,8 +775,8 @@ const ConcordanceTab: React.FC = () => {
     const sortIcon = isSorted ? (nodeState.sortOrder === 'asc' ? '▲' : '▼') : '▲▼';
     
     return (
-      <th 
-        className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+      <TableHead 
+        className={`px-3 py-2 text-left text-xs font-medium uppercase tracking-wider cursor-pointer hover:bg-gray-100 ${isSorted ? 'text-blue-600' : 'text-gray-500'}`}
         onClick={() => handleSort(columnKey, nodeId)}
       >
         <div className="flex items-center space-x-1">
@@ -774,7 +785,7 @@ const ConcordanceTab: React.FC = () => {
             {sortIcon}
           </span>
         </div>
-      </th>
+      </TableHead>
     );
   };
 
@@ -811,7 +822,7 @@ const ConcordanceTab: React.FC = () => {
             <h3 className="text-lg font-semibold text-gray-800">Combined Results</h3>
             <div className="ml-auto flex items-center space-x-2">
               <span className="text-xs text-gray-500">Rows colored by source node</span>
-              <button
+              <Button
                 onClick={async () => {
                   // Use locked snapshot when locked so actions are stable
                   const nodeIdsForDetach = selectedNodes.slice(0,2).map(n => n.id);
@@ -827,15 +838,19 @@ const ConcordanceTab: React.FC = () => {
                   } finally { setCombinedLoading(false); }
                 }}
                 disabled={combinedLoading || !searchWord.trim()}
-                className="px-3 py-1 bg-green-600 text-white rounded text-sm disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-green-700 transition-colors"
-              >Detach Both</button>
+                size="sm"
+                className="bg-green-600 hover:bg-green-700"
+              >
+                <LinkIcon className="mr-2 h-4 w-4" />
+                Detach Both
+              </Button>
             </div>
           </div>
-          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+          <div className="overflow-hidden rounded-lg border border-border bg-card">
             <div className="max-h-96 overflow-y-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50 sticky top-0">
-                  <tr>
+              <Table>
+                <TableHeader className="bg-gray-50">
+                  <TableRow>
                     {displayColumns.map((c: string) => {
                       const lower = c.toLowerCase();
                       const neverSortable = ['left_context','matched_text','right_context'];
@@ -843,23 +858,23 @@ const ConcordanceTab: React.FC = () => {
                       const isSorted = sortable && combinedSorting.sort_by === c;
                       const icon = isSorted ? (combinedSorting.sort_order === 'asc' ? '▲' : '▼') : '▲▼';
                       return sortable ? (
-                        <th
+                        <TableHead
                           key={c}
-                          className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                          className={`px-3 py-2 text-left text-xs font-medium uppercase tracking-wider cursor-pointer hover:bg-gray-100 ${isSorted ? 'text-blue-600' : 'text-gray-500'}`}
                           onClick={() => handleCombinedSort(c)}
                         >
                           <div className="flex items-center space-x-1">
                             <span>{c}</span>
                             <span className={`text-xs ${isSorted ? 'text-blue-600' : 'text-gray-400'}`}>{icon}</span>
                           </div>
-                        </th>
+                        </TableHead>
                       ) : (
-                        <th key={c} className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{c}</th>
+                        <TableHead key={c} className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">{c}</TableHead>
                       );
                     })}
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {rows.map((row:any, idx:number) => {
                     const rawSrc = row.__source_node;
                     const normalized = rawSrc ? rawSrc.toString().toLowerCase() : undefined;
@@ -881,7 +896,7 @@ const ConcordanceTab: React.FC = () => {
                     }
                     const bg = `${color}20`; // light tint
                     return (
-                      <tr key={idx} className="cursor-pointer hover:bg-blue-50" style={{ backgroundColor: bg }} onClick={() => {
+                      <TableRow key={idx} className="cursor-pointer" style={{ backgroundColor: bg }} onClick={() => {
                         if (rawSrc) {
                     const nodesForDetail = selectedNodes;
                     const nodeObj = nodesForDetail.find((n: any) => {
@@ -892,21 +907,35 @@ const ConcordanceTab: React.FC = () => {
                           if (nodeObj && sel) handleRowClick(row, nodeObj.id, sel.column);
                         }
                       }}>
-                        {displayColumns.map((c: string, i: number) => <td key={i} className="px-4 py-2 text-sm text-gray-900">{row[c] !== undefined && row[c] !== null ? String(row[c]) : ''}</td>)}
-                      </tr>
+                        {displayColumns.map((c: string, i: number) => <TableCell key={i}>{row[c] !== undefined && row[c] !== null ? String(row[c]) : ''}</TableCell>)}
+                      </TableRow>
                     );
                   })}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
             {nodeData.pagination && (
               <div className="mt-2 text-sm text-gray-600 text-center p-2">{nodeData.pagination.total_matches} total matches</div>
             )}
             {nodeData.pagination && nodeData.pagination.total_pages > 1 && (
               <div className="mt-4 flex justify-center items-center space-x-2 p-4 pt-0">
-                <button onClick={() => combinedPage > 1 && setCombinedPage(p => p-1)} disabled={combinedPage <= 1} className="px-3 py-1 border border-gray-300 rounded text-sm disabled:bg-gray-100 disabled:text-gray-400 hover:bg-gray-50">Previous</button>
+                <Button
+                  onClick={() => combinedPage > 1 && setCombinedPage(p => p-1)}
+                  disabled={combinedPage <= 1}
+                  variant="outline"
+                  size="sm"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
                 <div className="text-sm text-gray-600">Page {combinedPage} of {nodeData.pagination.total_pages}</div>
-                <button onClick={() => combinedPage < nodeData.pagination.total_pages && setCombinedPage(p => p+1)} disabled={combinedPage >= nodeData.pagination.total_pages} className="px-3 py-1 border border-gray-300 rounded text-sm disabled:bg-gray-100 disabled:text-gray-400 hover:bg-gray-50">Next</button>
+                <Button
+                  onClick={() => combinedPage < nodeData.pagination.total_pages && setCombinedPage(p => p+1)}
+                  disabled={combinedPage >= nodeData.pagination.total_pages}
+                  variant="outline"
+                  size="sm"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
               </div>
             )}
           </div>
@@ -940,11 +969,11 @@ const ConcordanceTab: React.FC = () => {
           <h3 className="text-lg font-semibold text-gray-800 break-words leading-tight w-full">{nodeName}</h3>
         </div>
         
-        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+  <div className="overflow-hidden rounded-lg border border-border bg-card">
           <div className="max-h-96 overflow-y-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50 sticky top-0">
-                <tr>
+            <Table>
+              <TableHeader className="bg-gray-50">
+                <TableRow>
                   {displayColumns.map(key => {
                     const neverSortable = ['left_context','matched_text','right_context'];
                     const keyLower = key.toLowerCase();
@@ -960,35 +989,35 @@ const ConcordanceTab: React.FC = () => {
                     return isSortable ? (
                       <SortableHeader key={key} columnKey={key} label={key} nodeId={nodeId} />
                     ) : (
-                      <th key={key} className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <TableHead key={key} className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                         {key}
-                      </th>
+                      </TableHead>
                     );
                   })}
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {nodeData.data.map((row: any, index: number) => (
-                  <tr 
+                  <TableRow 
                     key={index} 
-                    className={`cursor-pointer hover:bg-blue-50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                    className={`cursor-pointer ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
                     onClick={() => handleRowClick(row, nodeId, column)}
                   >
                     {displayColumns.map((colKey: string, cellIndex) => (
-                      <td key={cellIndex} className="px-4 py-2 text-sm text-gray-900">
+                      <TableCell key={cellIndex}>
                         {row[colKey] !== null && row[colKey] !== undefined ? String(row[colKey]) : ''}
-                      </td>
+                      </TableCell>
                     ))}
-                  </tr>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         </div>
 
         {/* Pagination info for this node */}
         {nodeData.pagination && (
-          <div className="mt-2 text-sm text-gray-600 text-center">
+          <div className="mt-2 text-center text-sm text-muted-foreground">
             {nodeData.pagination.total_matches} total matches
           </div>
         )}
@@ -996,98 +1025,100 @@ const ConcordanceTab: React.FC = () => {
         {/* Individual pagination controls for this node */}
         {nodeData.pagination && nodeData.pagination.total_pages > 1 && (
           <div className="mt-4 flex justify-center items-center space-x-2">
-            <button
+            <Button
               onClick={() => handlePageChange((nodePagination[nodeId]?.currentPage || 1) - 1, nodeId)}
               disabled={(nodePagination[nodeId]?.currentPage || 1) <= 1 || nodeLoading[nodeId]}
-              className="px-3 py-1 border border-gray-300 rounded text-sm disabled:bg-gray-100 disabled:text-gray-400 hover:bg-gray-50"
+              variant="outline"
+              size="sm"
             >
-              Previous
-            </button>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
             
-            <div className="text-sm text-gray-600 flex items-center">
+            <div className="flex items-center text-sm text-muted-foreground">
               {nodeLoading[nodeId] && (
-                <div className="inline-block animate-spin rounded-full h-3 w-3 border-b border-gray-400 mr-2"></div>
+                <div className="mr-2 inline-block h-3 w-3 animate-spin rounded-full border-b border-muted-foreground"></div>
               )}
               Page {nodePagination[nodeId]?.currentPage || 1} of {nodeData.pagination.total_pages}
             </div>
             
-            <button
+            <Button
               onClick={() => handlePageChange((nodePagination[nodeId]?.currentPage || 1) + 1, nodeId)}
               disabled={(nodePagination[nodeId]?.currentPage || 1) >= nodeData.pagination.total_pages || nodeLoading[nodeId]}
-              className="px-3 py-1 border border-gray-300 rounded text-sm disabled:bg-gray-100 disabled:text-gray-400 hover:bg-gray-50"
+              variant="outline"
+              size="sm"
             >
-              Next
-            </button>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
 
             {/* Detach button */}
-            <button
+            <Button
               onClick={() => handleDetach(nodeId, column)}
               disabled={nodeLoading[nodeId] || nodeDetaching[nodeId] || !searchWord.trim()}
-              className="px-3 py-1 bg-green-600 text-white rounded text-sm disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-green-700 transition-colors ml-2"
+              size="sm"
+              className="bg-green-600 hover:bg-green-700 ml-2"
               title="Create a new node with concordance results joined to the original table"
             >
               {nodeDetaching[nodeId] ? (
-                <span className="flex items-center">
-                  <div className="inline-block animate-spin rounded-full h-3 w-3 border-b border-white mr-2"></div>
-                  Detaching...
-                </span>
+                <><Loader2 className="mr-2 h-3 w-3 animate-spin" />Detaching...</>
               ) : (
-                'Detach'
+                <><LinkIcon className="mr-2 h-3 w-3" />Detach</>
               )}
-            </button>
+            </Button>
           </div>
         )}
 
         {/* Pagination controls when only one page OR detach button for nodes without pagination */}
         {(!nodeData.pagination || nodeData.pagination.total_pages <= 1) && searchWord.trim() && (
           <div className="mt-4 flex justify-center">
-            <button
+            <Button
               onClick={() => handleDetach(nodeId, column)}
               disabled={nodeLoading[nodeId] || nodeDetaching[nodeId]}
-              className="px-4 py-2 bg-green-600 text-white rounded text-sm disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-green-700 transition-colors"
+              size="sm"
+              className="bg-green-600 hover:bg-green-700"
               title="Create a new node with concordance results joined to the original table"
             >
               {nodeDetaching[nodeId] ? (
-                <span className="flex items-center">
-                  <div className="inline-block animate-spin rounded-full h-3 w-3 border-b border-white mr-2"></div>
-                  Detaching...
-                </span>
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Detaching...</>
               ) : (
-                'Detach Concordance'
+                <><LinkIcon className="mr-2 h-4 w-4" />Detach Concordance</>
               )}
-            </button>
+            </Button>
           </div>
-        )}
+        )}(
       </div>
     );
   };
 
   return (
     <div className="space-y-6">
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-gray-800">Concordance Search</h2>
-{isLocked && (
-            <div className="relative group flex items-center text-sm text-gray-600 cursor-default">
-              <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
-                <path fillRule="evenodd" d="M5 8V6a5 5 0 1110 0v2h1a1 1 0 011 1v9a1 1 0 01-1 1H4a1 1 0 01-1-1V9a1 1 0 011-1h1zm2-2a3 3 0 116 0v2H7V6zm-2 4h10v7H5v-7z" clipRule="evenodd" />
-              </svg>
-              Locked
-              <div className="absolute right-0 mt-2 w-72 z-10 hidden group-hover:block bg-white border border-gray-200 shadow-lg rounded p-2 text-xs text-gray-700">
-                <div className="font-semibold mb-1">Panel locked</div>
-                <ul className="list-disc ml-4 space-y-1">
-                  <li>Locked to current request/results.</li>
-                  <li>Node selection and backend-used parameters are disabled.</li>
-                  <li>Frontend-only options (e.g., Show Metadata) stay editable.</li>
-                  <li>Clear results to unlock and resync with the graph selection.</li>
-                </ul>
-              </div>
+      <Card>
+        <CardHeader className="space-y-0 pb-4">
+          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+            <div>
+              <CardTitle>Concordance Search</CardTitle>
+              <CardDescription>Find keyword-in-context excerpts across up to two selected nodes.</CardDescription>
             </div>
-          )}
-        </div>
-        
-        <div className="mb-6">
-            <NodeSelectionPanel
+{isLocked && (
+              <div className="relative group flex items-center text-sm text-muted-foreground">
+                <svg className="mr-1 h-4 w-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                  <path fillRule="evenodd" d="M5 8V6a5 5 0 1110 0v2h1a1 1 0 011 1v9a1 1 0 01-1 1H4a1 1 0 01-1-1V9a1 1 0 011-1h1zm2-2a3 3 0 116 0v2H7V6zm-2 4h10v7H5v-7z" clipRule="evenodd" />
+                </svg>
+                Locked
+                <div className="absolute right-0 top-full z-10 mt-2 hidden w-72 rounded border border-border bg-popover p-2 text-xs text-popover-foreground shadow-lg group-hover:block">
+                  <div className="mb-1 font-semibold">Panel locked</div>
+                  <ul className="ml-4 space-y-1 list-disc">
+                    <li>Locked to current request/results.</li>
+                    <li>Node selection and backend-used parameters are disabled.</li>
+                    <li>Frontend-only options (e.g., Show Metadata) stay editable.</li>
+                    <li>Clear results to unlock and resync with the graph selection.</li>
+                  </ul>
+                </div>
+              </div>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6 pt-0">
+          <NodeSelectionPanel
             selectedNodes={displayedNodes}
             nodeColumnSelections={isLocked && lockedNodeSelections ? lockedNodeSelections : nodeColumnSelections}
             onColumnChange={handleColumnChange}
@@ -1102,69 +1133,53 @@ const ConcordanceTab: React.FC = () => {
             getNodeColumns={getColumnInfos}
             allowedDataTypes={['string']}
           />
-        </div>
 
-        {/* Search Configuration */}
-        <div className="mb-6">
-          <div className={`space-y-4`}>
-            <div className="flex flex-col gap-4 md:flex-row md:items-end">
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Search Word/Phrase
-                </label>
+          <div className="space-y-6">
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-foreground">Search word or phrase</label>
                 <input
                   type="text"
                   value={searchWord}
                   onChange={(e) => setSearchWord(e.target.value)}
                   placeholder="Enter word or phrase to search for"
                   disabled={!!isLocked}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
                 />
               </div>
-
-              <div className="md:flex-none">
-                <label className="block text-sm font-medium text-gray-700 mb-2 leading-tight">
-                  <span className="block">Left Context</span>
-                  <span className="block">(tokens)</span>
-                </label>
-                <input
-                  type="number"
-                  value={numLeftTokens}
-                  onChange={(e) => setNumLeftTokens(parseInt(e.target.value) || 10)}
-                  min="1"
-                  max="50"
-                  disabled={!!isLocked}
-                  className="w-full md:w-auto md:max-w-[7rem] px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
-                />
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-foreground">Left context (tokens)</label>
+                  <input
+                    type="number"
+                    value={numLeftTokens}
+                    onChange={(e) => setNumLeftTokens(parseInt(e.target.value) || 10)}
+                    min="1"
+                    max="50"
+                    disabled={!!isLocked}
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-foreground">Right context (tokens)</label>
+                  <input
+                    type="number"
+                    value={numRightTokens}
+                    onChange={(e) => setNumRightTokens(parseInt(e.target.value) || 10)}
+                    min="1"
+                    max="50"
+                    disabled={!!isLocked}
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
+                  />
+                </div>
               </div>
-
-              <div className="md:flex-none">
-                <label className="block text-sm font-medium text-gray-700 mb-2 leading-tight">
-                  <span className="block">Right Context</span>
-                  <span className="block">(tokens)</span>
-                </label>
-                <input
-                  type="number"
-                  value={numRightTokens}
-                  onChange={(e) => setNumRightTokens(parseInt(e.target.value) || 10)}
-                  min="1"
-                  max="50"
-                  disabled={!!isLocked}
-                  className="w-full md:w-auto md:max-w-[7rem] px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
-                />
-              </div>
-
-              <div className="md:flex-none">
-                <label className="block text-sm font-medium text-gray-700 mb-2 leading-tight">
-                  <span className="block">Results per</span>
-                  <span className="block">page</span>
-                </label>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-foreground">Results per page</label>
                 <select
                   value={globalPageSize}
                   onChange={(e) => {
                     const newPageSize = parseInt(e.target.value);
                     setGlobalPageSize(newPageSize);
-                    // Update all node pagination to use new page size and reset to page 1
                     setNodePagination(prev => {
                       const updated = { ...prev };
                       Object.keys(updated).forEach(nodeId => {
@@ -1176,11 +1191,9 @@ const ConcordanceTab: React.FC = () => {
                       });
                       return updated;
                     });
-                    // Trigger search for all visible nodes with new page size
                     setTimeout(() => {
                       if (results && ((results as any).state === 'successful') && (results as any).data) {
                         Object.keys(results.data).forEach(nodeName => {
-                          // Find the corresponding node ID from nodeName
                           let node = selectedNodes.find(n => n.id === nodeName);
                           if (!node) {
                             node = selectedNodes.find(n => n.name === nodeName);
@@ -1196,7 +1209,7 @@ const ConcordanceTab: React.FC = () => {
                       }
                     }, 100);
                   }}
-                  className="w-full md:w-auto md:max-w-[7rem] px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <option value={10}>10</option>
                   <option value={20}>20</option>
@@ -1206,174 +1219,205 @@ const ConcordanceTab: React.FC = () => {
               </div>
             </div>
 
-            {/* Options */}
-            <div className="flex space-x-4">
-              <label className="flex items-center">
+            <div className="flex flex-wrap gap-4 text-sm">
+              <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
                   checked={regex}
                   onChange={(e) => setRegex(e.target.checked)}
-                  className="mr-2"
+                  className="h-4 w-4"
                   disabled={!!isLocked}
                 />
-                <span className="text-sm text-gray-700">Use Regular Expression</span>
+                <span className="text-sm text-foreground">Use regular expression</span>
               </label>
-
-              <label className="flex items-center">
+              <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
                   checked={caseSensitive}
                   onChange={(e) => setCaseSensitive(e.target.checked)}
-                  className="mr-2"
+                  className="h-4 w-4"
                   disabled={!!isLocked}
                 />
-                <span className="text-sm text-gray-700">Case Sensitive</span>
+                <span className="text-sm text-foreground">Case sensitive</span>
               </label>
-
-              <label className="flex items-center">
+              <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
                   checked={showMetadata}
                   onChange={(e) => setShowMetadata(e.target.checked)}
-                  className="mr-2"
+                  className="h-4 w-4"
                 />
-                <span className="text-sm text-gray-700">Show Metadata</span>
+                <span className="text-sm text-foreground">Show metadata</span>
               </label>
             </div>
           </div>
-        </div>
-
-        {/* Action Buttons (view mode toggle now in results section) */}
-        <div className="flex flex-wrap gap-3 items-center">
-          <button
+        </CardContent>
+        <CardFooter className="flex flex-wrap items-center gap-3 pt-0">
+          <Button
             onClick={() => handleSearch(true)}
-              disabled={
-              selectedNodes.length === 0 || 
-              isSearching || 
+            disabled={
+              selectedNodes.length === 0 ||
+              isSearching ||
               !currentWorkspaceId ||
               !searchWord.trim() ||
               nodeColumnSelections.some(sel => !sel.column) ||
               !!isLocked
             }
-            className="w-full md:w-auto px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+            className="w-full md:w-auto"
           >
-            {isSearching ? 'Searching...' : 'Search'}
-          </button>
+            {isSearching ? (
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Searching...</>
+            ) : (
+              <><Play className="mr-2 h-4 w-4" />Search</>
+            )}
+          </Button>
 
           {results && (
-            <button
+            <Button
               onClick={handleClearResults}
-              className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
+              variant="destructive"
             >
+              <Trash2 className="mr-2 h-4 w-4" />
               Clear Results
-            </button>
+            </Button>
           )}
-        </div>
-      </div>
+        </CardFooter>
+      </Card>
 
       {/* Results */}
       {results && (
-        <div ref={resultsRef} className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+        <Card ref={resultsRef}>
           {((results as any)?.state === 'successful') ? (
-            <div>
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
-                <h3 className="text-lg font-semibold text-gray-800">Search Results</h3>
-                <SegmentedControl
-                  options={(() => {
-                    const base: Array<{ value: 'separated' | 'combined'; label: string }> = [
-                      { value: 'separated', label: 'Separated' },
-                    ];
-                    if (results?.combinable) {
-                      base.push({ value: 'combined', label: 'Combined' });
-                    }
-                    return base;
-                  })()}
-                  value={viewMode}
-                  onChange={(val) => {
-                    if (val !== viewMode) {
-                      const mode = val as 'separated'|'combined';
-                      const anchorEl = resultsRef.current;
-                      const prevTop = anchorEl ? anchorEl.getBoundingClientRect().top : 0;
-                      const prevScrollY = window.scrollY;
-                      setViewMode(mode);
-                      setCombinedPage(1);
-                      // Lock current height to reduce layout shift during async fetch
-                      if (anchorEl) {
-                        const h = anchorEl.getBoundingClientRect().height;
-                        anchorEl.style.minHeight = h + 'px';
+            <>
+              <CardHeader className="space-y-4">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div className="space-y-1">
+                    <CardTitle>Search Results</CardTitle>
+                    {results.message && (
+                      <CardDescription className="max-w-2xl text-sm text-muted-foreground">
+                        {results.message}
+                      </CardDescription>
+                    )}
+                  </div>
+                  <SegmentedControl
+                    options={(() => {
+                      const base: Array<{ value: 'separated' | 'combined'; label: string }> = [
+                        { value: 'separated', label: 'Separated' },
+                      ];
+                      if (results?.combinable) {
+                        base.push({ value: 'combined', label: 'Combined' });
                       }
-                      Promise.resolve(handleSearch(true, undefined, mode, undefined, undefined, true)).finally(() => {
-                        // After results update and paint, compensate scroll so anchor stays put
-                        requestAnimationFrame(() => {
+                      return base;
+                    })()}
+                    value={viewMode}
+                    onChange={(mode) => {
+                      const nextMode = mode as 'separated' | 'combined';
+                      setViewMode(nextMode);
+                      if (nextMode === 'combined' && results?.combinable) {
+                        const controller = new AbortController();
+                        const prevAnchor = resultsRef.current;
+                        if (prevAnchor) {
+                          const rect = prevAnchor.getBoundingClientRect();
+                          prevAnchor.style.minHeight = `${rect.height}px`;
+                        }
+                        setTimeout(() => {
+                          if (!controller.signal.aborted) {
+                            const prevTop = prevAnchor?.getBoundingClientRect().top ?? resultsRef.current?.getBoundingClientRect().top ?? 0;
+                            const prevScrollY = window.scrollY;
+                            setCombinedLoading(true);
+                            handleSearch(true, undefined, 'combined', undefined, undefined, true).finally(() => {
+                              setCombinedLoading(false);
+                              requestAnimationFrame(() => {
+                                requestAnimationFrame(() => {
+                                  const newAnchor = resultsRef.current;
+                                  if (newAnchor) {
+                                    const newTop = newAnchor.getBoundingClientRect().top;
+                                    const delta = newTop - prevTop;
+                                    if (Math.abs(delta) > 1) {
+                                      window.scrollTo({ top: prevScrollY + delta });
+                                    }
+                                    newAnchor.style.minHeight = '';
+                                  } else {
+                                    window.scrollTo({ top: prevScrollY });
+                                  }
+                                });
+                              });
+                            });
+                          }
+                        }, 30);
+                        return () => controller.abort();
+                      }
+                      if (nextMode === 'separated') {
+                        const controller = new AbortController();
+                        const prevAnchor = resultsRef.current;
+                        const prevTop = prevAnchor?.getBoundingClientRect().top ?? 0;
+                        const prevScrollY = window.scrollY;
+                        handleSearch(true, undefined, 'separated', undefined, undefined, true).finally(() => {
                           requestAnimationFrame(() => {
-                            const newAnchor = resultsRef.current;
-                            if (newAnchor) {
-                              const newTop = newAnchor.getBoundingClientRect().top;
-                              const delta = newTop - prevTop;
-                              if (Math.abs(delta) > 1) {
-                                window.scrollTo({ top: prevScrollY + delta });
+                            requestAnimationFrame(() => {
+                              const newAnchor = resultsRef.current;
+                              if (newAnchor) {
+                                const newTop = newAnchor.getBoundingClientRect().top;
+                                const delta = newTop - prevTop;
+                                if (Math.abs(delta) > 1) {
+                                  window.scrollTo({ top: prevScrollY + delta });
+                                }
+                                newAnchor.style.minHeight = '';
+                              } else {
+                                window.scrollTo({ top: prevScrollY });
                               }
-                              // Remove temporary minHeight lock
-                              newAnchor.style.minHeight = '';
-                            } else {
-                              // Fallback to original position
-                              window.scrollTo({ top: prevScrollY });
-                            }
+                            });
                           });
                         });
-                      });
-                    }
-                  }}
-                  ariaLabel="Concordance view mode"
-                />
-              </div>
-              <div className="text-sm text-gray-600 mb-6">{results.message}</div>
-              
-              {results.data && Object.keys(results.data).length > 0 ? (
-                <div className={`grid gap-6 ${viewMode==='combined' ? 'grid-cols-1' : 'grid-cols-1'}`}>
-                  {Object.entries(results.data).filter(([k]) => viewMode==='combined' ? k==='__COMBINED__' : k !== '__COMBINED__').map(([nodeName, nodeData]) => {
-                    // Find the corresponding node and column for detail view
-                    // Try multiple ways to match the node
-                    if (localStorage.getItem('debugConc') === '1') console.log('Trying to match nodeName:', nodeName);
-                    if (localStorage.getItem('debugConc') === '1') console.log('Available nodes:', selectedNodes.map(n => ({ id: n.id, name: n.data?.name, nodeName: n.name })));
-                    
-                    const nodesForDetail = selectedNodes;
-                    let node = nodesForDetail.find((n: any) => (n.data?.name || n.id) === nodeName);
-                    if (!node) {
-                      // Try matching by just the ID
-                      node = nodesForDetail.find((n: any) => n.id === nodeName);
-                    }
-                    if (!node) {
-                      // Try matching by node.name property (if it exists)
-                      node = nodesForDetail.find((n: any) => n.name === nodeName);
-                    }
-                    if (!node) {
-                      // Fallback: just use the first available node for this nodeName
-                      // This is needed because the backend might be returning a different format
-                      const nodeIndex = Object.keys(results.data).indexOf(nodeName);
-                      node = (nodesForDetail as any)[nodeIndex];
-                    }
-                    
-                    const nodeId = node?.id || '';
-                    const selection = nodeColumnSelections.find(sel => sel.nodeId === nodeId);
-                    const column = selection?.column || '';
-                    
-                    if (localStorage.getItem('debugConc') === '1') console.log('Final match - nodeId:', nodeId, 'column:', column);
-                    
-                    return renderConcordanceTable(nodeName, nodeData, nodeId, column);
-                  })}
+                        return () => controller.abort();
+                      }
+                    }}
+                    ariaLabel="Concordance view mode"
+                  />
                 </div>
-              ) : (
-                <div className="text-gray-500">No data available</div>
-              )}
-            </div>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {results.data && Object.keys(results.data).length > 0 ? (
+                  <div className={`grid gap-6 ${viewMode==='combined' ? 'grid-cols-1' : 'grid-cols-1'}`}>
+                    {Object.entries(results.data).filter(([k]) => viewMode==='combined' ? k==='__COMBINED__' : k !== '__COMBINED__').map(([nodeName, nodeData]) => {
+                      if (localStorage.getItem('debugConc') === '1') console.log('Trying to match nodeName:', nodeName);
+                      if (localStorage.getItem('debugConc') === '1') console.log('Available nodes:', selectedNodes.map(n => ({ id: n.id, name: n.data?.name, nodeName: n.name })));
+                      
+                      const nodesForDetail = selectedNodes;
+                      let node = nodesForDetail.find((n: any) => (n.data?.name || n.id) === nodeName);
+                      if (!node) {
+                        node = nodesForDetail.find((n: any) => n.id === nodeName);
+                      }
+                      if (!node) {
+                        node = nodesForDetail.find((n: any) => n.name === nodeName);
+                      }
+                      if (!node) {
+                        const nodeIndex = Object.keys(results.data).indexOf(nodeName);
+                        node = (nodesForDetail as any)[nodeIndex];
+                      }
+                      
+                      const nodeId = node?.id || '';
+                      const selection = nodeColumnSelections.find(sel => sel.nodeId === nodeId);
+                      const column = selection?.column || '';
+                      
+                      if (localStorage.getItem('debugConc') === '1') console.log('Final match - nodeId:', nodeId, 'column:', column);
+                      
+                      return renderConcordanceTable(nodeName, nodeData, nodeId, column);
+                    })}
+                  </div>
+                ) : (
+                  <div className="rounded-md border border-muted bg-muted/50 px-4 py-3 text-sm text-muted-foreground">No data available</div>
+                )}
+              </CardContent>
+            </>
           ) : (
-            <div className="text-red-600">
-              <h3 className="text-lg font-semibold mb-2">Error</h3>
-              <p>{results.message}</p>
-            </div>
+            <CardContent>
+              <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                {results?.message ?? 'The search failed. Please try again.'}
+              </div>
+            </CardContent>
           )}
-        </div>
+        </Card>
       )}
 
       {/* Detail Modal */}
@@ -1386,16 +1430,15 @@ const ConcordanceTab: React.FC = () => {
             className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[80vh] overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+            <div className="px-6 py-4 border-b border-border flex justify-between items-center">
               <h3 className="text-lg font-medium text-gray-900">Concordance Detail</h3>
-              <button
+              <Button
                 onClick={() => setShowDetailModal(false)}
-                className="text-gray-400 hover:text-gray-600"
+                variant="ghost"
+                size="icon"
               >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+                <X className="h-5 w-5" />
+              </Button>
             </div>
             
             <div className="p-6 overflow-y-auto max-h-[calc(80vh-120px)]">
@@ -1435,15 +1478,15 @@ const ConcordanceTab: React.FC = () => {
                 {/* Document Metadata Table */}
                 <div>
                   <h4 className="font-medium text-gray-700 mb-2">Document Metadata</h4>
-                  <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Field</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Value</th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
+                  <div className="bg-white border border-border rounded-lg overflow-hidden">
+                    <Table>
+                      <TableHeader className="bg-gray-50">
+                        <TableRow>
+                          <TableHead className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Field</TableHead>
+                          <TableHead className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Value</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
                         {selectedDetail.record && Object.entries(selectedDetail.record).map(([key, value]) => {
                           if (key === selectedDetail.column) {
                             return null;
@@ -1459,9 +1502,9 @@ const ConcordanceTab: React.FC = () => {
                           }
 
                           return (
-                            <tr key={key} className="hover:bg-gray-50">
-                              <td className="px-4 py-2 text-sm font-medium text-gray-900">{key}</td>
-                              <td className="px-4 py-2 text-sm text-gray-700">
+                            <TableRow key={key}>
+                              <TableCell className="font-medium">{key}</TableCell>
+                              <TableCell>
                                 <div className="max-w-md break-words">
                                   {typeof value === 'object' && value !== null ? (
                                     <pre className="text-xs bg-gray-100 p-2 rounded overflow-x-auto">
@@ -1471,12 +1514,12 @@ const ConcordanceTab: React.FC = () => {
                                     displayValue
                                   )}
                                 </div>
-                              </td>
-                            </tr>
+                              </TableCell>
+                            </TableRow>
                           );
                         })}
-                      </tbody>
-                    </table>
+                      </TableBody>
+                    </Table>
                   </div>
                 </div>
               </>

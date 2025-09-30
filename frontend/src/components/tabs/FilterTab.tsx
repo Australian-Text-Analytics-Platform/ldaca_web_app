@@ -2,12 +2,20 @@ import React, { useState, useEffect, useMemo } from 'react';
 import DatePicker from 'react-datepicker';
 import type { ReactDatePickerCustomHeaderProps } from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
+import { Loader2 } from 'lucide-react';
 import { useWorkspaceSelection } from '../../hooks/useWorkspaceSelection';
 import { useWorkspaceData } from '../../hooks/useWorkspaceData';
 import { useWorkspaceActions } from '../../hooks/useWorkspaceActions';
 import { useWorkspaceStatus } from '../../hooks/useWorkspaceStatus';
 // Import nodesApi for filter operation (types redefined locally for UI)
 import { nodesApi } from '../../api/nodes';
+// Import shadcn components
+import { Button } from '../ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Checkbox } from '../ui/checkbox';
+import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../ui/card';
 // Define minimal request types (backend expects these shapes)
 interface FilterCondition { column: string; operator: 'eq' | 'gte' | 'lte' | 'contains' | 'startswith' | 'endswith' | 'is_null' | 'between'; value: any; negate?: boolean; regex?: boolean; }
 interface FilterRequest { conditions: FilterCondition[]; logic?: string; new_node_name?: string; }
@@ -219,7 +227,7 @@ const IsoDateInput = React.forwardRef<HTMLInputElement, IsoDateInputProps>((prop
         }
       }}
       placeholder={placeholder}
-      className={`${parentClassName ? `${parentClassName} ` : ''}px-2 py-1 border border-gray-300 rounded text-sm font-mono`}
+    className={`${parentClassName ? `${parentClassName} ` : ''}px-2 py-1 rounded-md border border-border text-sm font-mono text-foreground`}
       size={28}
       style={{ width: '28ch', minWidth: '28ch', maxWidth: '28ch', flex: 'none' }}
     />
@@ -323,12 +331,12 @@ export const CalendarHeaderWithYearSelect: React.FC<ReactDatePickerCustomHeaderP
   };
 
   return (
-    <div ref={headerRef} className="flex items-center justify-between px-2 py-1 text-gray-700">
+    <div ref={headerRef} className="flex items-center justify-between px-2 py-1 text-muted-foreground">
       <button
         type="button"
         onClick={handleDecreaseMonth}
         disabled={prevMonthButtonDisabled}
-        className="rounded p-1 text-sm hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-40"
+        className="rounded-md p-1 text-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-40"
         aria-label="Previous month"
       >
         ‹
@@ -337,7 +345,7 @@ export const CalendarHeaderWithYearSelect: React.FC<ReactDatePickerCustomHeaderP
         <button
           type="button"
           onClick={handleTogglePicker}
-          className="w-full rounded px-2 py-1 text-sm font-medium text-gray-800 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className="w-full rounded-md px-2 py-1 text-sm font-medium text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           aria-haspopup="dialog"
           aria-expanded={pickerOpen}
           aria-label="Select month and year"
@@ -347,14 +355,14 @@ export const CalendarHeaderWithYearSelect: React.FC<ReactDatePickerCustomHeaderP
         {pickerOpen && (
           <div
             role="dialog"
-            className="absolute left-1/2 z-10 mt-1 flex -translate-x-1/2 gap-2 rounded border border-gray-200 bg-white p-2 shadow-lg"
+            className="absolute left-1/2 z-10 mt-1 flex -translate-x-1/2 gap-2 rounded-md border border-border bg-card p-2 shadow-lg"
           >
             {/* Month column */}
             <div
               ref={monthListRef}
               role="listbox"
               aria-label="Select month"
-              className="max-h-64 w-32 overflow-y-auto rounded border border-gray-100 py-1"
+              className="max-h-64 w-32 overflow-y-auto rounded-md border border-border/70 bg-card py-1"
             >
               {MONTH_LABELS.map((month, index) => (
                 <button
@@ -365,8 +373,8 @@ export const CalendarHeaderWithYearSelect: React.FC<ReactDatePickerCustomHeaderP
                   aria-selected={index === date.getMonth()}
                   className={`block w-full px-3 py-1.5 text-left text-sm ${
                     index === date.getMonth()
-                      ? 'bg-indigo-50 font-semibold text-indigo-600'
-                      : 'hover:bg-gray-50'
+                      ? 'bg-primary/10 font-semibold text-primary'
+                      : 'hover:bg-muted'
                   }`}
                   onClick={() => handleSelectMonth(index)}
                 >
@@ -379,7 +387,7 @@ export const CalendarHeaderWithYearSelect: React.FC<ReactDatePickerCustomHeaderP
               ref={yearListRef}
               role="listbox"
               aria-label="Select year"
-              className="max-h-64 w-24 overflow-y-auto rounded border border-gray-100 py-1"
+              className="max-h-64 w-24 overflow-y-auto rounded-md border border-border/70 bg-card py-1"
             >
               {years.map(year => (
                 <button
@@ -390,8 +398,8 @@ export const CalendarHeaderWithYearSelect: React.FC<ReactDatePickerCustomHeaderP
                   aria-selected={year === date.getFullYear()}
                   className={`block w-full px-3 py-1.5 text-left text-sm ${
                     year === date.getFullYear()
-                      ? 'bg-indigo-50 font-semibold text-indigo-600'
-                      : 'hover:bg-gray-50'
+                      ? 'bg-primary/10 font-semibold text-primary'
+                      : 'hover:bg-muted'
                   }`}
                   onClick={() => handleSelectYear(year)}
                 >
@@ -406,7 +414,7 @@ export const CalendarHeaderWithYearSelect: React.FC<ReactDatePickerCustomHeaderP
         type="button"
         onClick={handleIncreaseMonth}
         disabled={nextMonthButtonDisabled}
-        className="rounded p-1 text-sm hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-40"
+        className="rounded-md p-1 text-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-40"
         aria-label="Next month"
       >
         ›
@@ -542,6 +550,9 @@ const FilterTab: React.FC = () => {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [debouncedRequest, setDebouncedRequest] = useState<{ request: FilterRequest; signature: string } | null>(null);
+  // AlertDialog state
+  const [alertOpen, setAlertOpen] = useState(false);
+  const [alertMessage, setAlertMessage] = useState('');
 
   // Get available columns with their datatypes from node data
   const availableColumns = useMemo(() => {
@@ -816,7 +827,7 @@ const FilterTab: React.FC = () => {
           value={condition.operator === 'between' ? '' : String(condition.value ?? '')}
           disabled
           placeholder={hasSelection ? 'Select a column' : 'Select a node to configure filters'}
-          className="px-2 py-1 border border-gray-200 rounded text-sm flex-1 bg-gray-100 text-gray-500"
+          className="flex-1 rounded-md border border-border/70 bg-muted px-2 py-1 text-sm text-muted-foreground"
         />
       );
     }
@@ -825,16 +836,19 @@ const FilterTab: React.FC = () => {
 
     if (dataType === 'boolean') {
       return (
-        <select
+        <Select
           value={String(condition.value)}
-          onChange={(e) => handleConditionChange(condition.id, 'value', e.target.value === 'true')}
-          className="px-2 py-1 border border-gray-300 rounded text-sm flex-1"
+          onValueChange={(value) => handleConditionChange(condition.id, 'value', value === 'true')}
           disabled={disabled}
         >
-          <option value="">Select value</option>
-          <option value="true">True</option>
-          <option value="false">False</option>
-        </select>
+          <SelectTrigger className="flex-1">
+            <SelectValue placeholder="Select value" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="true">True</SelectItem>
+            <SelectItem value="false">False</SelectItem>
+          </SelectContent>
+        </Select>
       );
     }
 
@@ -848,7 +862,7 @@ const FilterTab: React.FC = () => {
             value={committedValue}
             disabled
             placeholder={ISO_PLACEHOLDER}
-            className="px-2 py-1 border border-gray-200 rounded text-sm font-mono bg-gray-100 text-gray-500"
+            className="rounded-md border border-border/70 bg-muted px-2 py-1 font-mono text-sm text-muted-foreground"
           />
         ) : (
           <DatePicker
@@ -925,7 +939,7 @@ const FilterTab: React.FC = () => {
             handleConditionChange(condition.id, 'value', Number.isNaN(parsed) ? '' : parsed);
           }}
           placeholder="Enter number"
-          className="px-2 py-1 border border-gray-300 rounded text-sm flex-1"
+          className="flex-1 rounded-md border border-input px-2 py-1 text-sm text-foreground"
           disabled={disabled}
         />
       );
@@ -938,7 +952,7 @@ const FilterTab: React.FC = () => {
         value={String(condition.value)}
         onChange={(e) => handleConditionChange(condition.id, 'value', e.target.value)}
         placeholder="Enter value"
-        className="px-2 py-1 border border-gray-300 rounded text-sm flex-1"
+  className="flex-1 rounded-md border border-input px-2 py-1 text-sm text-foreground"
         disabled={disabled}
       />
     );
@@ -946,12 +960,14 @@ const FilterTab: React.FC = () => {
 
   const handleApplyFilter = async () => {
     if (!selectedNodeId) {
-      alert('Please select a node first');
+      setAlertMessage('Please select a node first');
+      setAlertOpen(true);
       return;
     }
 
   if (conditions.length === 0 || conditions.some((condition) => !isConditionComplete(condition))) {
-      alert('Please fill in all filter conditions');
+      setAlertMessage('Please fill in all filter conditions');
+      setAlertOpen(true);
       return;
     }
 
@@ -963,7 +979,8 @@ const FilterTab: React.FC = () => {
       // Success - the graph should automatically refresh due to query invalidation
     } catch (error) {
       console.error('Filter error:', error);
-      alert(`Error applying filter: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setAlertMessage(`Error applying filter: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setAlertOpen(true);
     } finally {
       setIsFiltering(false);
     }
@@ -971,72 +988,78 @@ const FilterTab: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 space-y-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h2 className="text-xl font-semibold text-gray-800">Filter &amp; Slice Data</h2>
-            <p className="text-sm text-gray-600 max-w-2xl">
-              Create a new node by applying column-based filters to the selected dataset. Define one or more conditions and choose how they combine.
-            </p>
+      <Card>
+        <CardHeader className="space-y-0 pb-4">
+          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+            <div>
+              <CardTitle>Filter &amp; Slice Data</CardTitle>
+              <CardDescription>Apply column-based filters to create a new node from the selected dataset.</CardDescription>
+            </div>
+            {isFiltering && (
+              <span className="inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-border bg-muted/60 px-3 py-1 text-xs font-medium text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Running…
+              </span>
+            )}
           </div>
-          {isFiltering && (
-            <span className="px-3 py-1 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-md">
-              Running…
-            </span>
-          )}
-        </div>
-
-        <section className="space-y-4">
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="block text-sm font-medium text-gray-700">
+        </CardHeader>
+        <CardContent className="space-y-6 pt-0">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm font-medium text-muted-foreground">
                 Selected Node ({hasSelection ? 1 : 0}/1)
-              </label>
+              </span>
             </div>
             {!hasSelection ? (
-              <div className="text-sm text-gray-500 italic bg-gray-50 border border-gray-200 p-3 rounded-md">
+              <div className="rounded-md border border-dashed border-muted-foreground/40 bg-muted/40 p-3 text-sm italic text-muted-foreground">
                 No nodes selected. Single click on a node in the workspace view to select it (max 1 for this operation).
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
-                  <div className="text-sm font-medium text-slate-800 break-words">
+                <div className="rounded-lg border border-border bg-muted/40 p-4">
+                  <div className="text-sm font-medium text-foreground break-words">
                     {selectedNode?.data?.nodeName || selectedNode?.data?.label || selectedNode?.data?.name || selectedNode?.label || selectedNode?.id || selectedNodeId}
                   </div>
-                  <div className="text-xs text-slate-500 break-all">{selectedNodeId}</div>
+                  <div className="text-xs text-muted-foreground break-all">{selectedNodeId}</div>
                 </div>
 
                 {isSchemaLoading ? (
-                  <div className="rounded-md border border-dashed border-amber-300 bg-amber-50/80 p-4 text-sm text-amber-700">
+                  <div className="rounded-md border border-dashed border-amber-400/60 bg-amber-100/70 p-4 text-sm text-amber-900">
                     Loading column metadata…
                   </div>
                 ) : hasSchema ? (
                   <div className="space-y-2">
-                    <div className="text-xs font-semibold text-slate-600 tracking-wide">SCHEMA</div>
-                    <div className="overflow-x-auto border border-slate-200 rounded-md bg-white">
-                      <table className="text-[11px] font-mono border-collapse">
-                        <tbody>
-                          <tr className="align-top">
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Schema</div>
+                    <div className="overflow-x-auto rounded-md border border-border bg-card">
+                      <Table>
+                        <TableBody>
+                          <TableRow>
                             {availableColumns.map((col) => (
-                              <td key={`${col.name}-name`} className="px-2 py-1 font-semibold text-slate-700 whitespace-nowrap border-b border-slate-100 min-w-[6rem]">
+                              <TableCell
+                                key={`${col.name}-name`}
+                                className="min-w-[6rem] border-b border-border px-2 py-1 font-mono text-[11px] font-semibold text-foreground"
+                              >
                                 {col.name}
-                              </td>
+                              </TableCell>
                             ))}
-                          </tr>
-                          <tr className="align-top">
+                          </TableRow>
+                          <TableRow>
                             {availableColumns.map((col) => (
-                              <td key={`${col.name}-type`} className="px-2 py-1 text-slate-500 whitespace-nowrap min-w-[6rem]">
+                              <TableCell
+                                key={`${col.name}-type`}
+                                className="min-w-[6rem] px-2 py-1 font-mono text-[11px] text-muted-foreground"
+                              >
                                 {col.dataType}
-                              </td>
+                              </TableCell>
                             ))}
-                          </tr>
-                        </tbody>
-                      </table>
+                          </TableRow>
+                        </TableBody>
+                      </Table>
                     </div>
-                    <div className="text-[10px] text-slate-400">Scroll horizontally to view all {availableColumns.length} column(s).</div>
+                    <div className="text-[10px] text-muted-foreground">Scroll horizontally to view all {availableColumns.length} column(s).</div>
                   </div>
                 ) : (
-                  <div className="rounded-md border border-dashed border-amber-300 bg-amber-50/80 p-4 text-sm text-amber-700">
+                  <div className="rounded-md border border-dashed border-amber-400/60 bg-amber-100/70 p-4 text-sm text-amber-900">
                     No schema information is available for this node yet.
                   </div>
                 )}
@@ -1046,24 +1069,20 @@ const FilterTab: React.FC = () => {
 
           <div className="space-y-4">
             <div className="flex items-center justify-between gap-4">
-              <h3 className="text-lg font-semibold text-gray-800">Filter conditions</h3>
-              <button
-                onClick={handleAddCondition}
-                disabled={isConfigDisabled}
-                className="px-3 py-1.5 rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:text-gray-500"
-              >
+              <h3 className="text-base font-semibold text-foreground">Filter conditions</h3>
+              <Button onClick={handleAddCondition} disabled={isConfigDisabled} size="sm">
                 Add condition
-              </button>
+              </Button>
             </div>
 
             {hasSelection && isSchemaLoading && (
-              <div className="rounded-md border border-dashed border-amber-300 bg-amber-50/80 p-4 text-sm text-amber-700">
+              <div className="rounded-md border border-dashed border-amber-400/60 bg-amber-100/70 p-4 text-sm text-amber-900">
                 Retrieving column information…
               </div>
             )}
 
             {!hasSelection && (
-              <div className="rounded-md border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">
+              <div className="rounded-md border border-dashed border-muted-foreground/40 bg-muted/40 p-4 text-sm text-muted-foreground">
                 Configure conditions once a node is selected.
               </div>
             )}
@@ -1072,76 +1091,85 @@ const FilterTab: React.FC = () => {
               {conditions.map((condition, index) => {
                 const rowDisabled = isConfigDisabled || !condition.column;
                 return (
-                  <div key={condition.id} className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 md:flex-row md:items-center md:gap-3">
+                  <div
+                    key={condition.id}
+                    className="flex flex-col gap-2 rounded-lg border border-border bg-muted/40 p-3 md:flex-row md:items-center md:gap-3"
+                  >
                     <div className="flex items-center gap-2 md:w-auto">
                       {index > 0 && (
-                        <select
+                        <Select
                           value={logic}
-                          onChange={(e) => setLogic(e.target.value as 'and' | 'or')}
+                          onValueChange={(value) => setLogic(value as 'and' | 'or')}
                           disabled={isConfigDisabled}
-                          className="px-2 py-1 border border-slate-300 rounded text-sm bg-white disabled:bg-slate-100 disabled:text-slate-400"
                         >
-                          <option value="and">AND</option>
-                          <option value="or">OR</option>
-                        </select>
+                          <SelectTrigger className="w-20">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="and">AND</SelectItem>
+                            <SelectItem value="or">OR</SelectItem>
+                          </SelectContent>
+                        </Select>
                       )}
 
-                      <label className="flex items-center gap-1 text-xs text-slate-700">
-                        <input
-                          aria-label="negate condition"
-                          type="checkbox"
+                      <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <Checkbox
+                          id={`negate-${condition.id}`}
                           checked={Boolean(condition.negate)}
-                          onChange={(e) => handleConditionChange(condition.id, 'negate' as any, e.target.checked)}
+                          onCheckedChange={(checked) => handleConditionChange(condition.id, 'negate' as any, checked)}
                           disabled={isConfigDisabled}
                         />
-                        negate
+                        <span>negate</span>
                       </label>
 
                       {condition.dataType === 'string' && condition.operator === 'contains' && (
-                        <label className="flex items-center gap-1 text-xs text-slate-700">
-                          <input
-                            aria-label="use regex"
-                            type="checkbox"
+                        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <Checkbox
+                            id={`regex-${condition.id}`}
                             checked={Boolean(condition.regex ?? true)}
-                            onChange={(e) => handleConditionChange(condition.id, 'regex' as any, e.target.checked)}
+                            onCheckedChange={(checked) => handleConditionChange(condition.id, 'regex' as any, checked)}
                             disabled={isConfigDisabled}
                           />
-                          regex
+                          <span>regex</span>
                         </label>
                       )}
                     </div>
 
                     <div className="flex flex-1 flex-col gap-2 md:flex-row md:flex-wrap md:items-center md:gap-x-3 md:gap-y-2">
-                      <select
+                      <Select
                         value={condition.column}
-                        onChange={(e) => handleConditionChange(condition.id, 'column', e.target.value)}
+                        onValueChange={(value) => handleConditionChange(condition.id, 'column', value)}
                         disabled={isConfigDisabled}
-                        className="px-2 py-1 border border-slate-300 rounded text-sm flex-grow min-w-[10rem] bg-white disabled:bg-slate-100 disabled:text-slate-400"
                       >
-                        <option value="">Select column</option>
-                        {availableColumns.map((col) => (
-                          <option key={col.name} value={col.name}>
-                            {col.name} ({col.dataType})
-                          </option>
-                        ))}
-                      </select>
+                        <SelectTrigger className="min-w-[10rem] flex-grow">
+                          <SelectValue placeholder="Select column" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableColumns.map((col) => (
+                            <SelectItem key={col.name} value={col.name}>
+                              {col.name} ({col.dataType})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
 
-                      <select
+                      <Select
                         value={condition.operator}
-                        onChange={(e) => handleConditionChange(condition.id, 'operator', e.target.value)}
+                        onValueChange={(value) => handleConditionChange(condition.id, 'operator', value)}
                         disabled={rowDisabled}
-                        className="px-2 py-1 border border-slate-300 rounded text-sm flex-none w-36 bg-white disabled:bg-slate-100 disabled:text-slate-400"
                       >
-                        {!condition.column ? (
-                          <option value="">Select a column first</option>
-                        ) : (
-                          getOperatorsForType(condition.dataType || 'string').map((op) => (
-                            <option key={op.value} value={op.value}>
-                              {op.label}
-                            </option>
-                          ))
-                        )}
-                      </select>
+                        <SelectTrigger className="w-36 flex-none">
+                          <SelectValue placeholder={!condition.column ? 'Select a column first' : 'Select operator'} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {condition.column &&
+                            getOperatorsForType(condition.dataType || 'string').map((op) => (
+                              <SelectItem key={op.value} value={op.value}>
+                                {op.label}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
 
                       {condition.operator !== 'is_null' && (
                         <div className="flex-1 md:flex-auto md:min-w-[28ch] md:max-w-full">
@@ -1151,13 +1179,14 @@ const FilterTab: React.FC = () => {
                     </div>
 
                     {conditions.length > 1 && (
-                      <button
+                      <Button
                         onClick={() => handleRemoveCondition(condition.id)}
-                        className="px-2 py-1 text-sm rounded-md bg-red-500 text-white hover:bg-red-600"
+                        variant="destructive"
+                        size="sm"
                         type="button"
                       >
                         Remove
-                      </button>
+                      </Button>
                     )}
                   </div>
                 );
@@ -1166,7 +1195,7 @@ const FilterTab: React.FC = () => {
           </div>
 
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-slate-700" htmlFor="filter-new-node-name">
+            <label className="block text-sm font-medium text-muted-foreground" htmlFor="filter-new-node-name">
               New node name
             </label>
             <input
@@ -1176,132 +1205,173 @@ const FilterTab: React.FC = () => {
               onChange={(e) => setNewNodeName(e.target.value)}
               placeholder="Enter name for filtered data"
               disabled={!hasSelection}
-              className="w-full px-3 py-2 border border-slate-300 rounded-md bg-white disabled:bg-slate-100 disabled:text-slate-400"
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
             />
           </div>
-
-          <button
+        </CardContent>
+        <CardFooter className="flex flex-col gap-3 border-t border-border bg-muted/20 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-sm text-muted-foreground">
+            {conditions.length === 0
+              ? 'Define at least one condition to enable preview and filtering.'
+              : `${conditions.length} condition${conditions.length === 1 ? '' : 's'} configured (${logic.toUpperCase()} logic).`}
+          </div>
+          <Button
             onClick={handleApplyFilter}
             disabled={isConfigDisabled || isFiltering || isLoading.operations}
-            className="w-full px-4 py-2 rounded-md text-white font-medium bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:text-gray-500"
+            className="w-full sm:w-auto"
           >
             {isFiltering ? 'Adding to workspace…' : 'Add to Workspace'}
-          </button>
-        </section>
-      </div>
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h3 className="text-lg font-semibold text-gray-800">Preview filtered rows</h3>
-          <div className="flex items-center gap-2 text-sm text-slate-600">
-            <label htmlFor="filter-preview-page-size" className="text-sm text-slate-600">Rows per page</label>
-            <select
-              id="filter-preview-page-size"
-              value={previewPageSize}
-              onChange={handlePreviewPageSizeChange}
-              disabled={!previewReady || previewLoading}
-              className="px-2 py-1 border border-slate-300 rounded text-sm bg-white disabled:bg-slate-100 disabled:text-slate-400"
-            >
-              {PREVIEW_PAGE_SIZE_OPTIONS.map((option) => (
-                <option key={option} value={option}>{option}</option>
-              ))}
-            </select>
-          </div>
-        </div>
+          </Button>
+        </CardFooter>
+      </Card>
 
-        {!hasSelection ? (
-          <div className="rounded-md border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">
-            Select a node to preview filtered results.
+      <Card>
+        <CardHeader className="space-y-0 pb-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <CardTitle>Preview filtered rows</CardTitle>
+              <CardDescription>Review rows that match the current filter configuration.</CardDescription>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <label htmlFor="filter-preview-page-size" className="text-sm text-muted-foreground">
+                Rows per page
+              </label>
+              <Select
+                value={String(previewPageSize)}
+                onValueChange={(value) => handlePreviewPageSizeChange({ target: { value } } as any)}
+                disabled={!previewReady || previewLoading}
+              >
+                <SelectTrigger className="w-24">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PREVIEW_PAGE_SIZE_OPTIONS.map((option) => (
+                    <SelectItem key={option} value={String(option)}>
+                      {option}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-        ) : !previewReady ? (
-          <div className="rounded-md border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">
-            Configure at least one complete condition to see a live preview of the filtered rows.
-          </div>
-        ) : previewError ? (
-          <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-            {previewError}
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="overflow-x-auto border border-slate-200 rounded-md bg-white">
-              <table className="min-w-full divide-y divide-slate-200 text-sm">
-                <thead className="bg-slate-50">
-                  <tr>
-                    {previewColumnsToRender.length > 0 ? (
-                      previewColumnsToRender.map((col) => (
-                        <th key={col} className="px-3 py-2 text-left font-semibold text-slate-700 whitespace-nowrap">
-                          {col}
-                        </th>
-                      ))
+        </CardHeader>
+        <CardContent className="space-y-4 pt-0">
+          {!hasSelection ? (
+            <div className="rounded-md border border-dashed border-muted-foreground/40 bg-muted/40 p-4 text-sm text-muted-foreground">
+              Select a node to preview filtered results.
+            </div>
+          ) : !previewReady ? (
+            <div className="rounded-md border border-dashed border-muted-foreground/40 bg-muted/40 p-4 text-sm text-muted-foreground">
+              Configure at least one complete condition to see a live preview of the filtered rows.
+            </div>
+          ) : previewError ? (
+            <div className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
+              {previewError}
+            </div>
+          ) : (
+            <div className="overflow-hidden rounded-lg border border-border">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader className="bg-muted/40">
+                    <TableRow>
+                      {previewColumnsToRender.length > 0 ? (
+                        previewColumnsToRender.map((col) => (
+                          <TableHead
+                            key={col}
+                            className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground"
+                          >
+                            {col}
+                          </TableHead>
+                        ))
+                      ) : (
+                        <TableHead className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          No columns
+                        </TableHead>
+                      )}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {previewLoading && previewData.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={previewTableColSpan} className="px-3 py-6 text-center text-muted-foreground">
+                          <span className="inline-flex items-center gap-2">
+                            <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                            Loading preview…
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ) : previewData.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={previewTableColSpan} className="px-3 py-6 text-center text-muted-foreground">
+                          No rows match the current filters.
+                        </TableCell>
+                      </TableRow>
                     ) : (
-                      <th className="px-3 py-2 text-left font-semibold text-slate-700">No columns</th>
+                      previewData.map((row, rowIndex) => (
+                        <TableRow key={rowIndex}>
+                          {previewColumnsToRender.map((col) => (
+                            <TableCell
+                              key={`${rowIndex}-${col}`}
+                              className="px-3 py-2 font-mono text-xs text-foreground"
+                            >
+                              {formatPreviewValue((row as any)?.[col])}
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      ))
                     )}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {previewLoading && previewData.length === 0 ? (
-                    <tr>
-                      <td colSpan={previewTableColSpan} className="px-3 py-6 text-center text-slate-500">
-                        <span className="inline-flex items-center gap-2">
-                          <svg className="animate-spin h-5 w-5 text-blue-600" viewBox="0 0 24 24" fill="none">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                          </svg>
-                          Loading preview…
-                        </span>
-                      </td>
-                    </tr>
-                  ) : previewData.length === 0 ? (
-                    <tr>
-                      <td colSpan={previewTableColSpan} className="px-3 py-6 text-center text-slate-500">
-                        No rows match the current filters.
-                      </td>
-                    </tr>
-                  ) : (
-                    previewData.map((row, rowIndex) => (
-                      <tr key={rowIndex} className="bg-white">
-                        {previewColumnsToRender.map((col) => (
-                          <td key={`${rowIndex}-${col}`} className="px-3 py-2 whitespace-nowrap text-slate-700 font-mono text-xs">
-                            {formatPreviewValue((row as any)?.[col])}
-                          </td>
-                        ))}
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="text-sm text-slate-600">
-                {previewPagination
-                  ? `${previewPagination.total_rows} row${previewPagination.total_rows === 1 ? '' : 's'} · page ${currentPreviewPage} of ${displayTotalPages}`
-                  : 'Preview ready'}
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handlePreviewPrev}
-                  disabled={!previewPagination?.has_prev || previewLoading}
-                  className="px-3 py-1 border border-slate-300 rounded-md text-sm bg-white disabled:bg-slate-100 disabled:text-slate-400"
-                >
-                  Previous
-                </button>
-                <span className="text-sm text-slate-600">
-                  Page {currentPreviewPage}
-                </span>
-                <button
-                  type="button"
-                  onClick={handlePreviewNext}
-                  disabled={!previewPagination?.has_next || previewLoading}
-                  className="px-3 py-1 border border-slate-300 rounded-md text-sm bg-white disabled:bg-slate-100 disabled:text-slate-400"
-                >
-                  Next
-                </button>
+                  </TableBody>
+                </Table>
               </div>
             </div>
-          </div>
+          )}
+        </CardContent>
+        {previewReady && !previewError && previewData.length > 0 && (
+          <CardFooter className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-muted/20 py-4">
+            <div className="text-sm text-muted-foreground">
+              {previewPagination
+                ? `${previewPagination.total_rows} row${previewPagination.total_rows === 1 ? '' : 's'} · page ${currentPreviewPage} of ${displayTotalPages}`
+                : 'Preview ready'}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                onClick={handlePreviewPrev}
+                disabled={!previewPagination?.has_prev || previewLoading}
+                variant="outline"
+                size="sm"
+              >
+                Previous
+              </Button>
+              <span className="text-sm text-muted-foreground">Page {currentPreviewPage}</span>
+              <Button
+                type="button"
+                onClick={handlePreviewNext}
+                disabled={!previewPagination?.has_next || previewLoading}
+                variant="outline"
+                size="sm"
+              >
+                Next
+              </Button>
+            </div>
+          </CardFooter>
         )}
-      </div>
+      </Card>
+
+      {/* Alert Dialog for error messages */}
+      <AlertDialog open={alertOpen} onOpenChange={setAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Alert</AlertDialogTitle>
+            <AlertDialogDescription>
+              {alertMessage}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setAlertOpen(false)}>OK</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

@@ -7,6 +7,10 @@ import { nodesApi } from '../../api/nodes';
 import { useAuth } from '../../hooks/useAuth';
 import { TokenFrequencyRequest, TokenFrequencyResponse, textApi } from '../../api/text';
 import { Wordcloud } from '@visx/wordcloud';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
+import { Button } from '../ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../ui/card';
+import { Play, Loader2, Trash2, Table2, Download, X, ChevronLeft, ChevronRight, Lightbulb } from 'lucide-react';
 import { Text } from '@visx/text';
 import useAutoNodeColumns from '../../hooks/useAutoNodeColumns';
 import useNodeColumnInfos from '../../hooks/useNodeColumnInfos';
@@ -561,147 +565,172 @@ const TokenFrequencyTab: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-gray-800">Token Frequency Analysis</h2>
+      <Card>
+        <CardHeader className="space-y-0 pb-4">
+          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+            <div>
+              <CardTitle>Token Frequency Analysis</CardTitle>
+              <CardDescription>Inspect token usage and comparative statistics for selected nodes.</CardDescription>
+            </div>
 {isLocked && (
-            <div className="relative group flex items-center text-sm text-gray-600 cursor-default">
-              <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
-                <path fillRule="evenodd" d="M5 8V6a5 5 0 1110 0v2h1a1 1 0 011 1v9a1 1 0 01-1 1H4a1 1 0 01-1-1V9a1 1 0 011-1h1zm2-2a3 3 0 116 0v2H7V6zm-2 4h10v7H5v-7z" clipRule="evenodd" />
-              </svg>
-              Locked
-              <div className="absolute right-0 mt-2 w-72 z-10 hidden group-hover:block bg-white border border-gray-200 shadow-lg rounded p-2 text-xs text-gray-700">
-                <div className="font-semibold mb-1">Panel locked</div>
-                <ul className="list-disc ml-4 space-y-1">
-                  <li>Locked to current request/results.</li>
-                  <li>Node selection and backend-used parameters are disabled.</li>
-                  <li>Frontend-only options (e.g., Stop words, Token Limit) stay editable.</li>
-                  <li>Clear results to unlock and resync with the graph selection.</li>
-                </ul>
+              <div className="relative group flex items-center text-sm text-muted-foreground">
+                <svg className="mr-1 h-4 w-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                  <path fillRule="evenodd" d="M5 8V6a5 5 0 1110 0v2h1a1 1 0 011 1v9a1 1 0 01-1 1H4a1 1 0 01-1-1V9a1 1 0 011-1h1zm2-2a3 3 0 116 0v2H7V6zm-2 4h10v7H5v-7z" clipRule="evenodd" />
+                </svg>
+                Locked
+                <div className="absolute right-0 top-full z-10 mt-2 hidden w-72 rounded border border-border bg-popover p-2 text-xs text-popover-foreground shadow-lg group-hover:block">
+                  <div className="mb-1 font-semibold">Panel locked</div>
+                  <ul className="ml-4 space-y-1 list-disc">
+                    <li>Locked to current request/results.</li>
+                    <li>Node selection and backend-used parameters are disabled.</li>
+                    <li>Frontend-only options (e.g., Stop words, Token Limit) stay editable.</li>
+                    <li>Clear results to unlock and resync with the graph selection.</li>
+                  </ul>
+                </div>
               </div>
-            </div>
-          )}
-        </div>
-        
-        <NodeSelectionPanel
-          selectedNodes={(isLocked && lockedNodesSnapshot.length) ? lockedNodesSnapshot.map(s=>({ id: s.id, name: s.name, data: { name: s.name, nodeName: s.name, label: s.name, columns: s.columns }, columns: s.columns })) : selectedNodes}
-          nodeColumnSelections={nodeColumnSelections}
-          onColumnChange={handleColumnChange}
-          nodeColors={nodeColors}
-          onColorChange={handleColorChange}
-          defaultPalette={defaultPalette}
-          maxCompare={2}
-          className="mb-6"
-          showShape
-          getNodeShapeFn={getNodeShape}
-          disabled={!!isLocked}
-          showColorPicker={true}
-          getNodeColumns={getColumnInfos}
-          allowedDataTypes={['string']}
-        />
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6 pt-0">
+          <NodeSelectionPanel
+            selectedNodes={(isLocked && lockedNodesSnapshot.length)
+              ? lockedNodesSnapshot.map((s) => ({
+                  id: s.id,
+                  name: s.name,
+                  data: { name: s.name, nodeName: s.name, label: s.name, columns: s.columns },
+                  columns: s.columns,
+                }))
+              : selectedNodes}
+            nodeColumnSelections={nodeColumnSelections}
+            onColumnChange={handleColumnChange}
+            nodeColors={nodeColors}
+            onColorChange={handleColorChange}
+            defaultPalette={defaultPalette}
+            maxCompare={2}
+            className="border border-dashed border-muted-foreground/40 rounded-lg bg-muted/30 p-4"
+            showShape
+            getNodeShapeFn={getNodeShape}
+            disabled={!!isLocked}
+            showColorPicker={true}
+            getNodeColumns={getColumnInfos}
+            allowedDataTypes={['string']}
+          />
 
-        {/* Configuration */}
-        <div className="space-y-4 mb-6">
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="block text-sm font-medium text-gray-700">
-                Stop Words (comma-separated)
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="block text-sm font-medium text-foreground">
+                  Stop words (comma-separated)
+                </label>
+                <Button
+                  onClick={handleFillDefaultStopWords}
+                  disabled={isLoadingStopWords}
+                  variant="outline"
+                  size="sm"
+                >
+                  {isLoadingStopWords ? (
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Loading...</>
+                  ) : (
+                    'Fill Default'
+                  )}
+                </Button>
+              </div>
+              <textarea
+                value={stopWords}
+                onChange={(e) => setStopWords(e.target.value)}
+                onBlur={() => applyStopSetFromText(stopWords)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    applyStopSetFromText(stopWords);
+                  }
+                }}
+                placeholder="the, and, or, but..."
+                rows={4}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+              <p className="text-xs text-muted-foreground">
+                Optional: Enter words to exclude from analysis. Click "Fill Default" to load common English stop words.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-foreground">
+                Token limit
               </label>
-              <button
-                onClick={handleFillDefaultStopWords}
-                disabled={isLoadingStopWords}
-                className="px-3 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 disabled:opacity-50 transition-colors"
-              >
-                {isLoadingStopWords ? 'Loading...' : 'Fill Default'}
-              </button>
-            </div>
-            <textarea
-              value={stopWords}
-              onChange={(e) => setStopWords(e.target.value)}
-              onBlur={() => applyStopSetFromText(stopWords)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  applyStopSetFromText(stopWords);
-                }
-              }}
-              placeholder="the, and, or, but..."
-              rows={4}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-vertical"
-            />
-            <div className="text-xs text-gray-500 mt-1">
-              Optional: Enter words to exclude from analysis. Click "Fill Default" to load common English stop words.
+              <input
+                type="number"
+                value={limit}
+                onChange={(e) => setLimit(parseInt(e.target.value) || 20)}
+                min="1"
+                max="100"
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:w-32"
+              />
+              <p className="text-xs text-muted-foreground">
+                Number of top tokens to display (1-100).
+              </p>
             </div>
           </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Token Limit
-            </label>
-            <input
-              type="number"
-              value={limit}
-              onChange={(e) => setLimit(parseInt(e.target.value) || 20)}
-              min="1"
-              max="100"
-              className="w-full md:w-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-            <div className="text-xs text-gray-500 mt-1">
-              Number of top tokens to display (1-100)
-            </div>
-          </div>
-        </div>
-
-  {/* Action Buttons */}
-  <div className="flex flex-wrap items-center gap-3">
-          <button
+        </CardContent>
+        <CardFooter className="flex flex-wrap items-center gap-3 pt-0">
+          <Button
             onClick={handleAnalyze}
             disabled={
-              selectedNodes.length === 0 || 
-              isAnalyzing || 
+              selectedNodes.length === 0 ||
+              isAnalyzing ||
               !currentWorkspaceId ||
               nodeColumnSelections.some(sel => !sel.column) ||
               !!isLocked
             }
-            className="w-full md:w-auto px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+            className="w-full md:w-auto"
           >
-            {isAnalyzing ? 'Analyzing...' : 'Calculate Token Frequencies'}
-          </button>
+            {isAnalyzing ? (
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Analyzing...</>
+            ) : (
+              <><Play className="mr-2 h-4 w-4" />Calculate Token Frequencies</>
+            )}
+          </Button>
           {results && (
-            <button
+            <Button
               onClick={handleClearResults}
-              className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
+              variant="destructive"
             >
+              <Trash2 className="mr-2 h-4 w-4" />
               Clear Results
-            </button>
+            </Button>
           )}
           {appliedStopSet.size > 0 && (
-            <span className="text-xs text-gray-500">Active filter: {appliedStopSet.size} word{appliedStopSet.size === 1 ? '' : 's'}</span>
+            <span className="text-xs text-muted-foreground">Active filter: {appliedStopSet.size} word{appliedStopSet.size === 1 ? '' : 's'}</span>
           )}
-        </div>
-      </div>
+        </CardFooter>
+
+      </Card>
 
       {/* Results */}
       {results && (
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          {results && (results as any).state === 'successful' ? (
-            <div>
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Results</h3>
-              <div className="text-sm text-gray-600 mb-4">{results.message}</div>
-              
-              {/* Instructions for clickable tokens */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-6">
-                <div className="flex items-start">
-                  <div className="text-blue-600 mr-2">💡</div>
-                  <div className="text-sm text-blue-800">
-                    <strong>Tip:</strong> Click on any token below to automatically search for it in the concordance tab. 
-                    This will switch to the concordance view and perform a search using the same node selections.
+        <Card>
+          <CardHeader className="space-y-1">
+            <CardTitle>Token Frequency Results</CardTitle>
+            {results.message && (
+              <CardDescription className="text-sm text-muted-foreground">
+                {results.message}
+              </CardDescription>
+            )}
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {(results as any).state === 'successful' ? (
+              <>
+                <div className="rounded-md border border-blue-200 bg-blue-50/80 p-3 text-sm text-blue-800 dark:border-blue-500/40 dark:bg-blue-500/10 dark:text-blue-100">
+                  <div className="flex items-start gap-2">
+                    <Lightbulb className="h-5 w-5 flex-shrink-0" />
+                    <div>
+                      <strong>Tip:</strong> Click any token below to open the Concordance tab preloaded with the same node selections.
+                    </div>
                   </div>
                 </div>
-              </div>
               
               {results.data ? (
-                <div>
+                <div className="space-y-8">
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                     {Object.entries((filteredResultsData ?? (results.data as any))).map(([nodeName, freqValue], idx) => {
                       const nodeId = lastCompareNodeIds[idx];
@@ -865,10 +894,10 @@ const TokenFrequencyTab: React.FC = () => {
                             </Wordcloud>
                           </svg>
                         </div>
-                        <p className="text-xs text-gray-500 mt-2 text-center">Selection uses juxRank = log10(O1+O2) × LogRatio: 50% lowest and 50% highest by juxRank (2× token limit = {2 * limit} tokens). Size = (O1+O2). Color uses relative percentage share (%1 vs %2) so differing corpus sizes don't bias color; shifts toward {nodeAName} (left) or {nodeBName} (right).</p>
+                        <p className="mt-2 text-center text-xs text-muted-foreground">Selection uses juxRank = log10(O1+O2) × LogRatio: 50% lowest and 50% highest by juxRank (2× token limit = {2 * limit} tokens). Size = (O1+O2). Color uses relative percentage share (%1 vs %2) so differing corpus sizes don't bias color; shifts toward {nodeAName} (left) or {nodeBName} (right).</p>
                         {/* {debugOn && (
-                          <div className="mt-2 p-2 bg-gray-50 border border-gray-200 rounded">
-                            <div className="text-[11px] text-gray-600 font-mono whitespace-pre-wrap">
+                          <div className="mt-2 rounded border border-border bg-muted/40 p-2">
+                            <div className="whitespace-pre-wrap font-mono text-[11px] text-muted-foreground">
                               {selected
                                 .slice()
                                 .sort((a,b) => a.juxRank - b.juxRank)
@@ -884,25 +913,25 @@ const TokenFrequencyTab: React.FC = () => {
                   {/* Statistical Measures Table */}
                   {results.statistics && results.statistics.length > 0 && (
                     <div className="mt-8">
-                      <h3 className="text-lg font-semibold text-gray-800 mb-4">Statistical Measures</h3>
-                      <div className="flex flex-wrap items-center gap-4 mb-4">
+                      <h3 className="mb-4 text-lg font-semibold text-foreground">Statistical Measures</h3>
+                      <div className="mb-4 flex flex-wrap items-center gap-4">
                         <div>
-                          <label className="block text-xs font-medium text-gray-600 mb-1">Head/Tail Rows (N)</label>
+                          <label className="mb-1 block text-xs font-medium text-muted-foreground">Head/Tail Rows (N)</label>
                           <input
                             type="number"
                             min={1}
                             max={200}
                             value={headTailN}
                             onChange={e => setHeadTailN(Math.max(1, Math.min(200, parseInt(e.target.value) || 1)))}
-                            className="w-28 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                            className="w-28 rounded-md border border-input px-2 py-1 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                           />
                         </div>
-                        <div className="text-xs text-gray-500 max-w-xl">
+                        <div className="max-w-xl text-xs text-muted-foreground">
                           Showing first N and last N rows of the sorted table (with ellipsis if truncated). Sorting always applies to the full set before trimming.
                         </div>
                       </div>
-                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4">
-                        <div className="text-sm text-gray-700">
+                      <div className="mb-4 rounded-lg border border-border bg-muted/40 p-3">
+                        <div className="text-sm text-muted-foreground">
                           <strong>Statistical Analysis Key:</strong>
                           <br />
                           <strong>O1/O2:</strong> Observed frequencies in each dataset &nbsp;&nbsp;
@@ -1005,14 +1034,14 @@ const TokenFrequencyTab: React.FC = () => {
                         // We'll return the truncated table; full modal redefines its own columns
                         return (
                           <div className="overflow-x-auto">
-                            <table className="min-w-full bg-white border border-gray-200 rounded-lg">
-                              <thead className="bg-gray-50">
-                                <tr>
+                            <Table className="rounded-lg border border-border">
+                              <TableHeader className="bg-gray-50">
+                                <TableRow>
                                   {columns.map(col => {
                                     const active = statsSortColumn === col.key;
                                     const dir = active ? (statsSortDirection === 'asc' ? '▲' : '▼') : '';
                                     return (
-                                      <th
+                                      <TableHead
                                         key={col.key}
                                         className={`px-3 py-2 text-left text-xs font-medium uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100 ${active ? 'text-blue-600' : 'text-gray-500'}`}
                                         onClick={() => handleSort(col.key)}
@@ -1021,51 +1050,51 @@ const TokenFrequencyTab: React.FC = () => {
                                           <span>{col.label}</span>
                                           {dir && <span className="text-[10px]">{dir}</span>}
                                         </div>
-                                      </th>
+                                      </TableHead>
                                     );
                                   })}
-                                </tr>
-                              </thead>
-                              <tbody className="bg-white divide-y divide-gray-200">
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody className="bg-white divide-y divide-gray-200">
                                 {display.map((stat, index) => {
                                   if (stat.__showAllButton) {
                                     return (
-                                      <tr key={`showall-${index}`}>
-                                        <td colSpan={columns.length} className="px-3 py-6">
+                                      <TableRow key={`showall-${index}`}>
+                                        <TableCell colSpan={columns.length} className="px-3 py-6">
                                           <div className="w-full flex items-center justify-center">
-                                            <button
+                                            <Button
                                               onClick={() => setShowFullStatsModal(true)}
-                                              className="px-5 py-2.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
                                             >
+                                              <Table2 className="mr-2 h-4 w-4" />
                                               Show complete table ({total} rows)
-                                            </button>
+                                            </Button>
                                           </div>
-                                        </td>
-                                      </tr>
+                                        </TableCell>
+                                      </TableRow>
                                     );
                                   }
                                   return (
-                                    <tr key={stat.token} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                                    <TableRow key={stat.token} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                                       {columns.map(col => {
                                         const rawVal = col.accessor(stat);
                                         const content = col.formatter ? col.formatter(rawVal, stat) : rawVal;
                                         const cellClasses = `px-3 py-2 text-sm ${col.key === 'token' ? 'font-medium text-blue-600 cursor-pointer hover:text-blue-800 hover:bg-blue-50' : 'text-gray-900 font-mono text-center'} `;
                                         if (col.key === 'token') {
                                           return (
-                                            <td key={col.key} className={cellClasses} onClick={() => handleTokenClick(stat.token)}>
+                                            <TableCell key={col.key} className={cellClasses} onClick={() => handleTokenClick(stat.token)}>
                                               {content}
-                                            </td>
+                                            </TableCell>
                                           );
                                         }
                                         return (
-                                          <td key={col.key} className={cellClasses}>{content}</td>
+                                          <TableCell key={col.key} className={cellClasses}>{content}</TableCell>
                                         );
                                       })}
-                                    </tr>
+                                    </TableRow>
                                   );
                                 })}
-                              </tbody>
-                            </table>
+                              </TableBody>
+                            </Table>
                             {truncated && (
                               <div className="text-xs text-gray-500 mt-2">Showing first {n} and last {n} of {total} rows. Click a header to toggle descending/ascending.</div>
                             )}
@@ -1226,25 +1255,32 @@ const TokenFrequencyTab: React.FC = () => {
                                   </label>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                  <button
+                                  <Button
                                     onClick={handleDownloadCSV}
-                                    className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
-                                  >Download CSV</button>
-                                  <button
+                                    size="sm"
+                                  >
+                                    <Download className="mr-2 h-4 w-4" />
+                                    Download CSV
+                                  </Button>
+                                  <Button
                                     onClick={() => setShowFullStatsModal(false)}
-                                    className="px-3 py-1 text-sm bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
-                                  >Close</button>
+                                    variant="outline"
+                                    size="sm"
+                                  >
+                                    <X className="mr-2 h-4 w-4" />
+                                    Close
+                                  </Button>
                                 </div>
                               </div>
-                              <div className="overflow-auto border border-gray-200 rounded">
-                                <table className="min-w-full text-sm">
-                                  <thead className="bg-gray-50">
-                                    <tr>
+                              <div className="overflow-auto rounded border border-border">
+                                <Table className="text-sm">
+                                  <TableHeader className="bg-gray-50">
+                                    <TableRow>
                                       {columns.map((col: any) => {
                                         const active = statsSortColumn === col.key;
                                         const dir = active ? (statsSortDirection === 'asc' ? '▲' : '▼') : '';
                                         return (
-                                          <th
+                                          <TableHead
                                             key={col.key}
                                             className={`px-3 py-2 text-left font-medium uppercase tracking-wider cursor-pointer select-none whitespace-nowrap ${active ? 'text-blue-600' : 'text-gray-500'} hover:bg-gray-100`}
                                             onClick={() => {
@@ -1258,42 +1294,48 @@ const TokenFrequencyTab: React.FC = () => {
                                             }}
                                           >
                                             <div className="flex items-center gap-1"><span>{col.label}</span>{dir && <span className="text-[10px]">{dir}</span>}</div>
-                                          </th>
+                                          </TableHead>
                                         );
                                       })}
-                                    </tr>
-                                  </thead>
-                                  <tbody className="divide-y divide-gray-100">
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody className="divide-y divide-gray-100">
                                     {pageRows.map((stat, i) => (
-                                      <tr key={stat.token + i} className={((startIndex + i) % 2 === 0) ? 'bg-white' : 'bg-gray-50'}>
+                                      <TableRow key={stat.token + i} className={((startIndex + i) % 2 === 0) ? 'bg-white' : 'bg-gray-50'}>
                                         {columns.map((col: any) => {
                                           const rawVal = col.accessor(stat);
                                           const content = col.formatter ? col.formatter(rawVal, stat) : rawVal;
                                           const cellClasses = `px-3 py-1.5 ${col.key === 'token' ? 'font-medium text-blue-600 cursor-pointer hover:text-blue-800 hover:bg-blue-50' : 'font-mono text-gray-900 text-center'} whitespace-nowrap`;
                                           if (col.key === 'token') {
-                                            return <td key={col.key} className={cellClasses} onClick={() => handleTokenClick(stat.token)}>{content}</td>;
+                                            return <TableCell key={col.key} className={cellClasses} onClick={() => handleTokenClick(stat.token)}>{content}</TableCell>;
                                           }
-                                          return <td key={col.key} className={cellClasses}>{content}</td>;
+                                          return <TableCell key={col.key} className={cellClasses}>{content}</TableCell>;
                                         })}
-                                      </tr>
+                                      </TableRow>
                                     ))}
-                                  </tbody>
-                                </table>
+                                  </TableBody>
+                                </Table>
                               </div>
                               <div className="mt-3 flex items-center justify-between">
                                 <div className="text-xs text-gray-500">Click headers to sort; table updates live.</div>
                                 <div className="flex items-center gap-2">
-                                  <button
-                                    className={`px-2 py-1 text-xs rounded ${currentPage <= 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'}`}
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
                                     onClick={() => currentPage > 1 && setModalPage(currentPage - 1)}
                                     disabled={currentPage <= 1}
-                                  >Prev</button>
+                                  >
+                                    <ChevronLeft className="h-4 w-4" />
+                                  </Button>
                                   <span className="text-xs text-gray-700">Page {currentPage} of {totalPages}</span>
-                                  <button
-                                    className={`px-2 py-1 text-xs rounded ${currentPage >= totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'}`}
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
                                     onClick={() => currentPage < totalPages && setModalPage(currentPage + 1)}
                                     disabled={currentPage >= totalPages}
-                                  >Next</button>
+                                  >
+                                    <ChevronRight className="h-4 w-4" />
+                                  </Button>
                                 </div>
                               </div>
                             </div>
@@ -1312,16 +1354,18 @@ const TokenFrequencyTab: React.FC = () => {
                   )}
                 </div>
               ) : (
-                <div className="text-gray-500">No data available</div>
+                <div className="rounded-md border border-muted bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
+                  No data available.
+                </div>
               )}
-            </div>
-          ) : (
-            <div className="text-red-600">
-              <h3 className="text-lg font-semibold mb-2">Error</h3>
-              <p>{results.message}</p>
-            </div>
-          )}
-        </div>
+              </>
+            ) : (
+              <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                {results.message ?? 'The analysis failed. Please try again.'}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       )}
 
       {/* Loading State */}

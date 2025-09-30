@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { NodeSchemaResponse } from '../../types';
 import DatetimeFormatModal from '../modals/DatetimeFormatModal';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './table';
 
 interface DataTableProps {
   data: any[];
@@ -216,23 +217,23 @@ const DataTable: React.FC<DataTableProps> = ({
     const { page, page_size, total_rows, total_pages, has_next, has_prev } = pagination;
 
     return (
-      <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50">
+  <div className="flex items-center justify-between border-t border-border bg-muted/40 px-4 py-3">
         {/* Left side: Page size selector and row info */}
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2">
-            <span className="text-sm text-gray-700">Show</span>
+            <span className="text-sm text-muted-foreground">Show</span>
             <select
               value={page_size}
               onChange={(e) => onPageSizeChange(Number(e.target.value))}
-              className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="rounded-md border border-input bg-background px-2 py-1 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             >
               {PAGE_SIZE_OPTIONS.map(size => (
                 <option key={size} value={size}>{size}</option>
               ))}
             </select>
-            <span className="text-sm text-gray-700">rows</span>
+            <span className="text-sm text-muted-foreground">rows</span>
           </div>
-          <div className="text-sm text-gray-700">
+          <div className="text-sm text-muted-foreground">
             Showing {Math.min((page - 1) * page_size + 1, total_rows)} to {Math.min(page * page_size, total_rows)} of {total_rows} rows
           </div>
         </div>
@@ -242,7 +243,7 @@ const DataTable: React.FC<DataTableProps> = ({
           <button
             onClick={() => onPageChange(1)}
             disabled={!has_prev}
-            className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
+            className="rounded-md border border-input px-3 py-1 text-sm text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
             title="First page"
           >
             ⟨⟨
@@ -250,14 +251,14 @@ const DataTable: React.FC<DataTableProps> = ({
           <button
             onClick={() => onPageChange(page - 1)}
             disabled={!has_prev}
-            className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
+            className="rounded-md border border-input px-3 py-1 text-sm text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
             title="Previous page"
           >
             ⟨
           </button>
           
           <div className="flex items-center space-x-1">
-            <span className="text-sm text-gray-700">Page</span>
+            <span className="text-sm text-muted-foreground">Page</span>
             <input
               type="number"
               value={page}
@@ -267,17 +268,17 @@ const DataTable: React.FC<DataTableProps> = ({
                   onPageChange(newPage);
                 }
               }}
-              className="w-16 px-2 py-1 text-sm border border-gray-300 rounded text-center focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-16 rounded-md border border-input px-2 py-1 text-center text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               min={1}
               max={total_pages}
             />
-            <span className="text-sm text-gray-700">of {total_pages}</span>
+            <span className="text-sm text-muted-foreground">of {total_pages}</span>
           </div>
 
           <button
             onClick={() => onPageChange(page + 1)}
             disabled={!has_next}
-            className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
+            className="rounded-md border border-input px-3 py-1 text-sm text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
             title="Next page"
           >
             ⟩
@@ -285,7 +286,7 @@ const DataTable: React.FC<DataTableProps> = ({
           <button
             onClick={() => onPageChange(total_pages)}
             disabled={!has_next}
-            className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
+            className="rounded-md border border-input px-3 py-1 text-sm text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
             title="Last page"
           >
             ⟩⟩
@@ -298,37 +299,37 @@ const DataTable: React.FC<DataTableProps> = ({
   return (
     <>
       <div className="h-full w-full flex flex-col">
-        <div className="flex-1 overflow-auto border border-gray-200 rounded-t-lg shadow-sm">
-          <table className="border-collapse bg-white" style={{ minWidth: '100%', width: 'max-content' }}>
-            <thead className="bg-gradient-to-r from-gray-50 to-gray-100 sticky top-0 z-10">
-              <tr>
+        <div className="flex-1 overflow-auto rounded-t-lg border border-border shadow-sm">
+          <Table>
+            <TableHeader className="sticky top-0 z-10 bg-muted/40">
+              <TableRow>
                 {columns.map((col) => {
                   const currentType = normalizeTypeName(columnTypes[col] || 'Unknown');
                   const isLoading = loadingCast[col];
                   
                   return (
-                    <th
+                    <TableHead
                       key={col}
-                      className="px-4 py-3 text-left border-r border-gray-200 last:border-r-0 whitespace-nowrap"
-                      style={{ minWidth: '200px' }}
+                      className="whitespace-nowrap border-r border-border/70 px-4 py-3 text-left last:border-r-0"
+                      style={{ minWidth: '250px' }}
                     >
-                      <div className="space-y-2">
+                      <div className="flex items-center gap-2">
                         {/* Column name - keep original case */}
-                        <div className="text-xs font-medium text-gray-900">
+                        <span className="text-xs font-medium text-foreground">
                           {col}
-                        </div>
+                        </span>
                         
-                        {/* Data type dropdown */}
-                        <div className="relative">
+                        {/* Data type dropdown inline */}
+                        <div className="relative flex-shrink-0">
                           <select
                             value={currentType}
                             onChange={(e) => handleTypeChange(col, e.target.value)}
                             disabled={isLoading || !onCast}
                             className={`
-                              w-full text-xs border border-gray-300 rounded px-2 py-1 
-                              bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 
-                              ${isLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
-                              ${!onCast ? 'bg-gray-100 cursor-not-allowed' : ''}
+                              rounded-md border border-input bg-background px-2 py-0.5 text-xs text-foreground shadow-sm 
+                              focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring
+                              ${isLoading ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}
+                              ${!onCast ? 'bg-muted text-muted-foreground' : ''}
                             `}
                           >
                             <option value={currentType}>
@@ -346,8 +347,8 @@ const DataTable: React.FC<DataTableProps> = ({
                           
                           {/* Loading indicator */}
                           {isLoading && (
-                            <div className="absolute right-6 top-1/2 transform -translate-y-1/2">
-                              <svg className="animate-spin h-3 w-3 text-blue-600" fill="none" viewBox="0 0 24 24">
+                            <div className="absolute -right-5 top-1/2 -translate-y-1/2 transform">
+                              <svg className="h-3 w-3 animate-spin text-primary" fill="none" viewBox="0 0 24 24">
                                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                               </svg>
@@ -355,27 +356,27 @@ const DataTable: React.FC<DataTableProps> = ({
                           )}
                         </div>
                       </div>
-                    </th>
+                    </TableHead>
                   );
                 })}
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+              </TableRow>
+            </TableHeader>
+            <TableBody className="bg-white divide-y divide-gray-200">
               {data.map((row, i) => (
-                <tr key={i} className="hover:bg-gray-50 transition-colors duration-150">
+                <TableRow key={i} className="hover:bg-gray-50 transition-colors duration-150">
                   {columns.map((col, j) => (
-                    <td
+                    <TableCell
                       key={j}
-                      className="px-4 py-3 text-sm text-gray-900 border-r border-gray-100 last:border-r-0 whitespace-nowrap"
+                      className="whitespace-nowrap border-r border-border/60 px-4 py-3 text-sm text-foreground last:border-r-0"
                       style={{ minWidth: '200px' }}
                     >
                       {String(row[col] || '')}
-                    </td>
+                    </TableCell>
                   ))}
-                </tr>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
         
         {/* Pagination controls */}

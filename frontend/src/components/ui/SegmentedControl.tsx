@@ -70,13 +70,13 @@ const SegmentedControl: React.FC<SegmentedControlProps> = ({
   return (
     <div
       ref={containerRef}
-      className={`inline-flex relative rounded-xl border border-gray-300 bg-gray-100/70 backdrop-blur-sm shadow-inner p-1 select-none ${disabled ? 'opacity-60 cursor-not-allowed' : ''} ${className}`}
+      className={`relative inline-flex select-none rounded-xl border border-border bg-muted/60 p-1 shadow-inner ${disabled ? 'cursor-not-allowed opacity-60' : ''} ${className}`}
       role="tablist"
       aria-label={ariaLabel}
       onKeyDown={handleKeyDown}
     >
       <div
-        className="absolute top-1 bottom-1 rounded-lg bg-white shadow ring-1 ring-gray-200 transition-all duration-300 ease-out"
+        className="absolute top-1 bottom-1 rounded-lg border border-border/60 bg-card shadow transition-all duration-300 ease-out"
         style={{ width: indicator.width, left: indicator.left }}
         aria-hidden="true"
       />
@@ -92,7 +92,9 @@ const SegmentedControl: React.FC<SegmentedControlProps> = ({
             disabled={disabled}
             onClick={() => !selected && onChange(opt.value)}
             ref={el => { buttonRefs.current[options.indexOf(opt)] = el; }}
-            className={`relative z-10 px-4 py-1.5 text-sm font-medium rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 transition-colors ${selected ? 'text-blue-600' : 'text-gray-600 hover:text-gray-800'} ${disabled ? 'cursor-not-allowed' : ''}`}
+            className={`relative z-10 rounded-lg px-4 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring ${
+              selected ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+            } ${disabled ? 'cursor-not-allowed' : ''}`}
           >
             {opt.label}
           </button>

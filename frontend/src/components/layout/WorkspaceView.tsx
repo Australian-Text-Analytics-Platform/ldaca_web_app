@@ -58,18 +58,11 @@ const WorkspaceView: React.FC = memo(() => {
 
   return (
     <div className="flex flex-col h-full bg-white" ref={containerRef}>
-      {/* Header with controls */}
-      <div className="flex-shrink-0 border-b border-gray-200 flex items-center justify-between">
-        <WorkspaceControls />
-      </div>
-
       <>
           {/* Graph View - Top resizable section */}
-          <div ref={topRef} className="border-b border-gray-200 flex flex-col min-h-[120px]" style={topStyle}>
-            <div className="p-2 bg-gray-50 border-b border-gray-200 flex-shrink-0 flex items-center justify-between">
-              <h3 className="text-sm font-medium text-gray-700">Graph View</h3>
-              {/* Deselect all moved into built-in controls menu */}
-              <div />
+          <div ref={topRef} className="border-b border-border flex flex-col min-h-[120px]" style={topStyle}>
+            <div className="p-2 bg-muted border-b border-border flex-shrink-0">
+              <WorkspaceControls />
             </div>
             <div className="flex-1 min-h-0">
               <WorkspaceGraphView />
@@ -91,9 +84,6 @@ const WorkspaceView: React.FC = memo(() => {
 
           {/* Data View - Bottom resizable section */}
           <div ref={bottomRef} className="flex flex-col min-h-[120px]" style={bottomStyle}>
-            <div className="p-2 bg-gray-50 border-b border-gray-200 flex-shrink-0">
-              <h3 className="text-sm font-medium text-gray-700">Data View</h3>
-            </div>
             <div className="flex-1 min-h-0">
               <WorkspaceDataView />
             </div>

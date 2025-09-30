@@ -1,6 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import ColorSwatchPicker from './ui/ColorSwatchPicker';
 import { ColumnInfo, filterColumnsByType, mapColumnsToInfo, normalizeTypeName } from '../utils/columnTypes';
+import { AlertTriangle } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Card, CardContent, CardHeader } from './ui/card';
+import { cn } from '../lib/utils';
 
 export interface NodeColumnSelection {
   nodeId: string;
@@ -8,6 +12,8 @@ export interface NodeColumnSelection {
 }
 
 type NodeColumnSource = string[] | ColumnInfo[];
+
+const CLEAR_SELECTION_VALUE = '__ldaca__clear__';
 
 interface NodeSelectionPanelProps {
   selectedNodes: any[];
@@ -138,22 +144,27 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
   }, [allowedDataTypes, fallbackToAllColumns, getNodeColumns, normalizeColumnInfos]);
 
   return (
-    <div className={className}>
+    <div className={cn('space-y-3', className)}>
       {showHeaderLabel && (
-        <div className="flex items-center justify-between mb-2">
-          <label className="block text-sm font-medium text-gray-700">
+        <div className="flex items-center justify-between">
+          <label className="block text-sm font-medium text-muted-foreground">
             Selected Nodes ({(originalCount ?? selectedNodes.length)}/{maxCompare})
           </label>
         </div>
       )}
       {selectedNodes.length === 0 ? (
-        <div className="text-sm text-gray-500 italic bg-gray-50 p-3 rounded-md">
+        <div className="rounded-md border border-dashed border-muted-foreground/40 bg-muted/40 p-3 text-sm italic text-muted-foreground">
           { (originalCount && originalCount > 0)
             ? `Over-selected (${originalCount}) but none usable. Reduce to max ${maxCompare}.`
             : `No nodes selected. Single click on nodes in the workspace view to select them (max ${maxCompare} for comparison).` }
         </div>
       ) : (
-        <div className={`flex space-x-3 pb-2 ${selectedNodes.length > maxCompare ? 'overflow-x-auto' : 'overflow-x-hidden'}`}>
+        <div
+          className={cn(
+            'flex gap-3 pb-2',
+            selectedNodes.length > maxCompare ? 'overflow-x-auto' : 'overflow-x-hidden'
+          )}
+        >
           {selectedNodes.map((node: any, idx: number) => {
             const nodeId: string = node.id || node.node_id || node.data?.id || node.data?.node_id || node.unique_id || `node-${idx}`;
             const columnInfos = resolveColumnInfos(node);
@@ -162,55 +173,88 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
             const nodeDisplayName = node.name || node.data?.name || node.data?.nodeName || (node as any).label || node.data?.label || nodeId;
             const nodeColor = getColorForNodeId(nodeId, idx);
             return (
-              <div key={nodeId} className={`bg-gray-50 p-3 rounded-md ${selectedNodes.length > maxCompare ? 'flex-none min-w-[50%]' : 'flex-1 min-w-0'}`}>
-                <div className="mb-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <div
-                        className="font-medium break-words whitespace-normal hyphens-auto pr-2 leading-snug max-w-full"
-                        style={showColorPicker ? { color: nodeColor } : undefined}
-                        title={nodeDisplayName}
-                      >{nodeDisplayName}</div>
-                      {showColorPicker && (
-                        <ColorSwatchPicker color={nodeColor} palette={defaultPalette} onChange={(c)=>onColorChange(nodeId,c)} size={7} />
-                      )}
-                    </div>
-                    <div className="text-xs text-gray-500 break-all">{nodeId}</div>
-                    {renderNodeMeta ? (
-                      <div className="text-xs text-gray-500 mt-1">{renderNodeMeta(node)}</div>
-                    ) : showShape && (
-                      <div className="text-xs text-gray-500 mt-1">Shape: {shapes[nodeId] || '…'}</div>
-                    )}
-                </div>
-                {columns.length > 0 ? (
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">{getColumnLabel(node, idx)}</label>
-                    <select
-                      value={selection?.column || ''}
-                      onChange={(e) => onColumnChange(nodeId, e.target.value)}
-                      disabled={disabled}
-                      aria-disabled={disabled}
-                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
-                    >
-                      <option value="">Select a column...</option>
-                      {columns.map((column: string) => (
-                        <option key={column} value={column}>{column}</option>
-                      ))}
-                      {/* Ensure locked selection stays visible even if not present in inferred columns */}
-                      {selection?.column && !columns.includes(selection.column) && (
-                        <option key={`__locked__:${selection.column}`} value={selection.column}>{selection.column}</option>
-                      )}
-                    </select>
-                  </div>
-                ) : (
-                  <div className="text-xs text-red-500">No columns available for this node</div>
+              <Card
+                key={nodeId}
+                className={cn(
+                  'border border-border/60 bg-card shadow-sm transition-colors',
+                  selectedNodes.length > maxCompare ? 'flex-none min-w-[50%]' : 'flex-1 min-w-0'
                 )}
-              </div>
+              >
+                <CardHeader className="space-y-2 pb-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div
+                      className="max-w-full break-words pr-2 text-sm font-semibold leading-snug text-foreground"
+                      style={showColorPicker ? { color: nodeColor } : undefined}
+                      title={nodeDisplayName}
+                    >
+                      {nodeDisplayName}
+                    </div>
+                    {showColorPicker && (
+                      <ColorSwatchPicker
+                        color={nodeColor}
+                        palette={defaultPalette}
+                        onChange={(c) => onColorChange(nodeId, c)}
+                        size={7}
+                      />
+                    )}
+                  </div>
+                  <div className="break-all text-xs text-muted-foreground">{nodeId}</div>
+                  {renderNodeMeta ? (
+                    <div className="text-xs text-muted-foreground">{renderNodeMeta(node)}</div>
+                  ) : (
+                    showShape && (
+                      <div className="text-xs text-muted-foreground">Shape: {shapes[nodeId] || '…'}</div>
+                    )
+                  )}
+                </CardHeader>
+                <CardContent className="space-y-2 pt-0">
+                  {columns.length > 0 ? (
+                    <div className="space-y-1">
+                      <span className="block text-xs font-medium text-muted-foreground">
+                        {getColumnLabel(node, idx)}
+                      </span>
+                      <Select
+                        value={selection?.column ? selection.column : undefined}
+                        onValueChange={(value) => {
+                          const nextValue = value === CLEAR_SELECTION_VALUE ? '' : value;
+                          onColumnChange(nodeId, nextValue ?? '');
+                        }}
+                        disabled={disabled}
+                      >
+                        <SelectTrigger className="w-full text-sm">
+                          <SelectValue placeholder="Select column" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={CLEAR_SELECTION_VALUE}>Select column…</SelectItem>
+                          {columns.map((column: string) => (
+                            <SelectItem key={column} value={column}>
+                              {column}
+                            </SelectItem>
+                          ))}
+                          {selection?.column && !columns.includes(selection.column) && (
+                            <SelectItem value={selection.column}>
+                              {selection.column}
+                            </SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ) : (
+                    <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                      No columns available for this node
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             );
           })}
         </div>
       )}
       {(originalCount ?? selectedNodes.length) > maxCompare && (
-        <div className="text-sm text-orange-600 mt-2">⚠️ Maximum {maxCompare} node allowed here. Currently {(originalCount ?? selectedNodes.length)} selected in workspace; only the first {maxCompare} is used.</div>
+        <div className="mt-1 flex items-center gap-1 text-sm text-amber-600">
+          <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+          Maximum {maxCompare} node allowed here. Currently {(originalCount ?? selectedNodes.length)} selected in workspace; only the first {maxCompare} is used.
+        </div>
       )}
     </div>
   );

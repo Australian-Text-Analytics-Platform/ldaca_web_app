@@ -1,6 +1,19 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import SegmentedControl from '../ui/SegmentedControl';
+import { Button } from '../ui/button';
+import {
+  Save,
+  FileEdit,
+  Download,
+  Trash2,
+  Plus,
+  Loader2,
+  LogIn,
+  LogOut,
+  PackagePlus,
+  CheckCircle2
+} from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useWorkspaceData } from '../../hooks/useWorkspaceData';
 import { useWorkspaceStatus } from '../../hooks/useWorkspaceStatus';
@@ -138,35 +151,47 @@ const DataLoaderTab: React.FC = () => {
           />
         </div>
         <div className="mb-4 flex items-center space-x-3">
-          <button
+          <Button
             onClick={handleImportSamples}
             disabled={importingSamples || uploading || isLoading.operations}
-            className="px-3 py-1.5 text-sm bg-purple-100 text-purple-700 rounded hover:bg-purple-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            size="sm"
+            variant="ghost"
+            className="text-sm bg-purple-100 text-purple-700 hover:bg-purple-200 disabled:cursor-not-allowed"
           >
-            {importingSamples ? 'Importing Samples...' : 'Import Sample Data'}
-          </button>
+            {importingSamples ? (
+              <span className="inline-flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Importing Samples...
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-2">
+                <PackagePlus className="h-4 w-4" />
+                Import Sample Data
+              </span>
+            )}
+          </Button>
         </div>
 
         {/* File Upload Tab */}
         {activeLoader === 'file' && (
           <div className="space-y-4">
             {!currentWorkspace && (
-              <div className="flex space-x-4 mb-4">
+              <div className="mb-4 flex space-x-4">
                 <input
                   type="text"
                   value={newWorkspaceName}
                   onChange={(e) => setNewWorkspaceName(e.target.value)}
                   placeholder="Workspace name (optional)"
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 />
               </div>
             )}
             
             {/* Standalone drop-zone removed; users can drop directly onto the list below */}
-            <div className="flex items-center justify-between text-sm text-gray-600">
+            <div className="flex items-center justify-between text-sm text-muted-foreground">
               <div>
                 Drag & drop files onto the list below to upload, or
-                <label className="text-blue-600 hover:text-blue-700 cursor-pointer ml-1">
+                <label className="ml-1 cursor-pointer text-primary hover:text-primary/80">
                   browse
                   <input
                     type="file"
@@ -183,10 +208,10 @@ const DataLoaderTab: React.FC = () => {
             </div>
             
             {uploading && (
-              <div className="text-center py-4">
+              <div className="py-4 text-center">
                 <div className="inline-flex items-center space-x-2">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
-                  <span className="text-sm text-gray-600">Uploading...</span>
+                  <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-primary"></div>
+                  <span className="text-sm text-muted-foreground">Uploading...</span>
                 </div>
               </div>
             )}
@@ -195,10 +220,10 @@ const DataLoaderTab: React.FC = () => {
             {files.length > 0 && (
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-medium text-gray-700">Available Files</h3>
+                  <h3 className="font-medium text-foreground">Available Files</h3>
                 </div>
                 <div
-                  className="space-y-2 max-h-[28rem] overflow-y-auto border border-gray-200 rounded-md p-1"
+                  className="max-h-[28rem] space-y-2 overflow-y-auto rounded-md border border-border p-1"
                   onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
                   onDrop={async (e) => {
                     e.preventDefault();
@@ -214,27 +239,27 @@ const DataLoaderTab: React.FC = () => {
                   {files.map((file) => (
                     <div
                       key={file.filename}
-                      className="flex items-center justify-between p-2 border border-gray-200 rounded hover:bg-gray-50 cursor-pointer"
+                      className="flex cursor-pointer items-center justify-between rounded border border-border p-2 hover:bg-muted/60"
                       onClick={() => setPreviewFile(file.filename)}
                     >
                       <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-800">{file.full_path || file.filename}</p>
+                        <p className="text-sm font-medium text-foreground">{file.full_path || file.filename}</p>
                         {(file.folder || file.display_name) && (
-                          <p className="text-[11px] text-gray-400 truncate">
+                          <p className="truncate text-[11px] text-muted-foreground">
                             {file.folder ? `${file.folder}/` : ''}{file.display_name || ''}
                           </p>
                         )}
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-muted-foreground">
                           {(file.size / 1024).toFixed(1)} KB • {file.file_type}
                           {typeof file.is_sample !== 'undefined' && (
-                            <span className={`ml-2 px-1.5 py-0.5 rounded text-[10px] font-semibold ${file.is_sample ? 'bg-purple-100 text-purple-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                            <span className={`ml-2 rounded px-1.5 py-0.5 text-[10px] font-semibold ${file.is_sample ? 'bg-secondary text-secondary-foreground' : 'bg-accent text-accent-foreground'}`}>
                               {file.is_sample ? 'SAMPLE' : 'USER'}
                             </span>
                           )}
                         </p>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <button
+                        <Button
                           onClick={async (e) => {
                             e.stopPropagation();
                             if (!currentWorkspace) {
@@ -253,23 +278,41 @@ const DataLoaderTab: React.FC = () => {
                             }
                           }}
                           disabled={addingToWorkspace === file.filename || isLoading.operations}
-                          className="px-3 py-1 text-sm bg-green-100 text-green-700 rounded hover:bg-green-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                          size="sm"
+                          variant="ghost"
+                          className="text-sm text-emerald-600 hover:bg-emerald-100/80 disabled:cursor-not-allowed"
                         >
-                          {addingToWorkspace === file.filename
-                            ? 'Adding...'
-                            : currentWorkspace
-                              ? 'Add to Workspace'
-                              : 'Create Workspace'}
-                        </button>
-                        <button
+                          {addingToWorkspace === file.filename ? (
+                            <span className="inline-flex items-center gap-2">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              Adding...
+                            </span>
+                          ) : currentWorkspace ? (
+                            <span className="inline-flex items-center gap-2">
+                              <Plus className="h-4 w-4" />
+                              Add to Workspace
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-2">
+                              <Plus className="h-4 w-4" />
+                              Create Workspace
+                            </span>
+                          )}
+                        </Button>
+                        <Button
                           onClick={(e) => { e.stopPropagation(); downloadFile(file.filename); }}
-                          className="px-2 py-1 text-sm bg-blue-50 text-blue-600 rounded hover:bg-blue-100"
+                          size="sm"
+                          variant="ghost"
+                          className="text-sm text-primary hover:bg-primary/10"
                           title="Download file"
                         >
-                          Download
-                        </button>
+                          <span className="inline-flex items-center gap-2">
+                            <Download className="h-4 w-4" />
+                            Download
+                          </span>
+                        </Button>
                         {!file.is_sample && (
-                          <button
+                          <Button
                             onClick={async (e) => {
                               e.stopPropagation();
                               const confirm = window.confirm(`Delete file "${file.filename}"? This cannot be undone.`);
@@ -282,11 +325,16 @@ const DataLoaderTab: React.FC = () => {
                                 refetchFiles();
                               }
                             }}
-                            className="px-2 py-1 text-sm bg-red-50 text-red-600 rounded hover:bg-red-100"
+                            size="sm"
+                            variant="ghost"
+                            className="text-sm text-destructive hover:bg-destructive/10"
                             title="Delete file"
                           >
-                            Delete
-                          </button>
+                            <span className="inline-flex items-center gap-2">
+                              <Trash2 className="h-4 w-4" />
+                              Delete
+                            </span>
+                          </Button>
                         )}
                       </div>
                     </div>
@@ -317,10 +365,10 @@ const DataLoaderTab: React.FC = () => {
           <div className="space-y-4">
             <h3 className="text-lg font-medium text-gray-700">Available Workspaces</h3>
             {/* Workspace upload (import) */}
-            <div className="flex items-center justify-between text-sm text-gray-600">
+            <div className="flex items-center justify-between text-sm text-muted-foreground">
               <div>
                 Drag & drop files onto the list below to upload, or
-                <label className="text-blue-600 hover:text-blue-700 cursor-pointer ml-1">
+                <label className="ml-1 cursor-pointer text-primary hover:text-primary/80">
                   browse
                   <input
                     type="file"
@@ -348,7 +396,7 @@ const DataLoaderTab: React.FC = () => {
               <p>Loading workspaces...</p>
             ) : (
               <div
-                className="space-y-2 max-h-[28rem] overflow-y-auto border border-gray-200 rounded-md p-1"
+                className="max-h-[28rem] space-y-2 overflow-y-auto rounded-md border border-border p-1"
                 onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
                 onDrop={async (e) => {
                   e.preventDefault(); e.stopPropagation();
@@ -365,26 +413,26 @@ const DataLoaderTab: React.FC = () => {
                 }}
               >
                 {workspaces.length === 0 && (
-                  <div className="p-2 text-gray-500 text-sm">No workspaces available.</div>
+                  <div className="p-2 text-sm text-muted-foreground">No workspaces available.</div>
                 )}
                 {workspaces.map((workspace: any) => (
                   <div
                     key={workspace.workspace_id}
-                    className="flex items-center justify-between p-2 border border-gray-200 rounded hover:bg-gray-50"
+                    className="flex items-center justify-between rounded border border-border p-2 hover:bg-muted/60"
                   >
                     <div className="flex items-center">
                       <span className="mr-3 text-lg" title={workspace.is_saved ? 'Saved' : 'Not Saved'}>
-                        {workspace.is_saved ? '💾' : '📝'}
+                        {workspace.is_saved ? <Save className="w-4 h-4" /> : <FileEdit className="w-4 h-4" />}
                       </span>
                       <div>
-                        <p className="text-sm font-medium text-gray-800">{workspace.name}</p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-sm font-medium text-foreground">{workspace.name}</p>
+                        <p className="text-xs text-muted-foreground">
                           {typeof workspace.node_count !== 'undefined' ? `${workspace.node_count} nodes` : ''}
                           {typeof workspace.file_size !== 'undefined' && (
                             <span className="ml-2">• {(workspace.file_size / 1024).toFixed(1)} KB</span>
                           )}
                         </p>
-                        <p className="text-[11px] text-gray-400">
+                        <p className="text-[11px] text-muted-foreground">
                           {workspace.created_at ? `Created: ${new Date(workspace.created_at).toLocaleString()}` : ''}
                           {workspace.modified_at && (
                             <span className="ml-2">Updated: {new Date(workspace.modified_at).toLocaleString()}</span>
@@ -393,14 +441,26 @@ const DataLoaderTab: React.FC = () => {
                       </div>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <button
+                      <Button
                         onClick={() => handleLoadWorkspace(workspace.workspace_id)}
-                        className="px-3 py-1 text-sm bg-green-100 text-green-700 rounded hover:bg-green-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                        size="sm"
+                        variant="ghost"
+                        className="text-sm text-emerald-600 hover:bg-emerald-100/80 disabled:cursor-not-allowed"
                         disabled={currentWorkspace?.workspace_id === workspace.workspace_id}
                       >
-                        {currentWorkspace?.workspace_id === workspace.workspace_id ? 'Loaded' : 'Load'}
-                      </button>
-                      <button
+                        {currentWorkspace?.workspace_id === workspace.workspace_id ? (
+                          <span className="inline-flex items-center gap-2">
+                            <CheckCircle2 className="h-4 w-4" />
+                            Loaded
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-2">
+                            <LogIn className="h-4 w-4" />
+                            Load
+                          </span>
+                        )}
+                      </Button>
+                      <Button
                         onClick={async () => {
                           try {
                             if (currentWorkspace?.workspace_id === workspace.workspace_id && !workspace.is_saved) {
@@ -420,17 +480,27 @@ const DataLoaderTab: React.FC = () => {
                             alert('Workspace download failed');
                           }
                         }}
-                        className="px-2 py-1 text-sm bg-blue-50 text-blue-600 rounded hover:bg-blue-100"
+                        size="sm"
+                        variant="ghost"
+                        className="text-sm text-primary hover:bg-primary/10"
                         title="Download workspace JSON"
                       >
-                        Download
-                      </button>
-                      <button
+                        <span className="inline-flex items-center gap-2">
+                          <Download className="h-4 w-4" />
+                          Download
+                        </span>
+                      </Button>
+                      <Button
                         onClick={() => handleDeleteWorkspace(workspace.workspace_id)}
-                        className="px-2 py-1 text-sm bg-red-50 text-red-600 rounded hover:bg-red-100"
+                        size="sm"
+                        variant="ghost"
+                        className="text-sm text-destructive hover:bg-destructive/10"
                       >
-                        Delete
-                      </button>
+                        <span className="inline-flex items-center gap-2">
+                          <Trash2 className="h-4 w-4" />
+                          Delete
+                        </span>
+                      </Button>
                     </div>
                   </div>
                 ))}
@@ -438,13 +508,17 @@ const DataLoaderTab: React.FC = () => {
             )}
 
             {currentWorkspace && (
-              <div className="mt-4 pt-4 border-t">
-                <button
+              <div className="mt-4 border-t pt-4">
+                <Button
                   onClick={handleUnloadWorkspace}
-                  className="w-full px-4 py-2 text-sm font-medium text-white bg-gray-600 rounded-md hover:bg-gray-700"
+                  variant="secondary"
+                  className="w-full text-sm font-medium"
                 >
-                  Unload Current Workspace
-                </button>
+                  <span className="inline-flex items-center justify-center gap-2">
+                    <LogOut className="h-4 w-4" />
+                    Unload Current Workspace
+                  </span>
+                </Button>
               </div>
             )}
           </div>

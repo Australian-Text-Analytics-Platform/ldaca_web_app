@@ -1,5 +1,21 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import columnPersistence from '../../utils/columnPersistence';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../ui/select';
+import { Button } from '../ui/button';
 
 interface DocumentColumnModalProps {
   isOpen: boolean;
@@ -64,60 +80,55 @@ const DocumentColumnModal: React.FC<DocumentColumnModalProps> = ({
   };
 
   const handleCancel = () => {
-  setSelectedColumn('');
-  setSubmitting(false);
+    setSelectedColumn('');
+    setSubmitting(false);
     onClose();
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-96 max-w-md mx-4">
-        <h3 className="text-lg font-medium text-gray-800 mb-4">
-          Convert to DocDataFrame
-        </h3>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && handleCancel()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Convert to DocDataFrame</DialogTitle>
+          <DialogDescription>
+            Select a column from <strong>{nodeName}</strong> to use as the document column:
+          </DialogDescription>
+        </DialogHeader>
         
-        <p className="text-sm text-gray-600 mb-4">
-          Select a column from <strong>{nodeName}</strong> to use as the document column:
-        </p>
-        
-        <div className="mb-4">
-          <label htmlFor="document-column" className="block text-sm font-medium text-gray-700 mb-2">
+        <div className="py-4">
+          <label htmlFor="document-column" className="block text-sm font-medium mb-2">
             Document Column
           </label>
-          <select
-            id="document-column"
-            value={selectedColumn}
-            onChange={(e) => setSelectedColumn(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="">Select a column...</option>
-            {columns.map((column) => (
-              <option key={column} value={column}>
-                {column}
-              </option>
-            ))}
-          </select>
+          <Select value={selectedColumn} onValueChange={setSelectedColumn}>
+            <SelectTrigger id="document-column">
+              <SelectValue placeholder="Select a column..." />
+            </SelectTrigger>
+            <SelectContent>
+              {columns.map((column) => (
+                <SelectItem key={column} value={column}>
+                  {column}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         
-        <div className="flex justify-end space-x-2">
-          <button
+        <DialogFooter>
+          <Button
+            variant="outline"
             onClick={handleCancel}
-            className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200"
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={handleConfirm}
             disabled={!selectedColumn || submitting}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Convert
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };
 

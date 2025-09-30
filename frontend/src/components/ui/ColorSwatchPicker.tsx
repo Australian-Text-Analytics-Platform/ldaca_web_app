@@ -61,22 +61,22 @@ export const ColorSwatchPicker: React.FC<ColorSwatchPickerProps> = ({
         ref={anchorRef}
         aria-label={ariaLabel}
         onClick={() => (open ? setOpen(false) : openPicker())}
-        className={`${sizeClass} rounded-full aspect-square flex-shrink-0 ring-2 ring-offset-1 ring-gray-300 hover:ring-blue-400 focus:outline-none focus:ring-blue-500 transition-shadow shadow-sm`}
+        className={`${sizeClass} aspect-square flex-shrink-0 rounded-full ring-2 ring-border ring-offset-2 transition-shadow hover:ring-primary focus-visible:outline-none focus-visible:ring-primary shadow-sm`}
         style={{ backgroundColor: color, lineHeight: 0, padding: 0, ...(sizeClass ? {} : { width: size*4, height: size*4 }), borderRadius: '9999px' }}
       />
       {open && pos &&
         ReactDOM.createPortal(
           <div
             ref={popoverRef}
-            className="z-[9999] w-56 p-3 rounded-lg border border-gray-200 bg-white shadow-xl animate-fade-in"
+            className="z-[9999] w-56 rounded-lg border border-border bg-card p-3 shadow-xl animate-in fade-in"
             style={{ position: 'absolute', top: pos.top, left: pos.left }}
           >
-            <div className="text-xs font-medium text-gray-600 mb-2 flex items-center justify-between">
+            <div className="mb-2 flex items-center justify-between text-xs font-medium text-muted-foreground">
               <span>Pick Color</span>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-muted-foreground/70 transition-colors hover:text-foreground"
                 aria-label="Close color picker"
               >
                 ×
@@ -87,7 +87,7 @@ export const ColorSwatchPicker: React.FC<ColorSwatchPickerProps> = ({
                 <button
                   key={p}
                   type="button"
-                  className={`w-6 h-6 rounded-full border border-white shadow-sm hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 transition-transform ${p === color ? 'ring-2 ring-blue-500 ring-offset-1' : ''}`}
+                  className={`h-6 w-6 rounded-full border border-white shadow-sm transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 ${p === color ? 'ring-2 ring-primary ring-offset-1' : ''}`}
                   style={{ backgroundColor: p }}
                   onClick={() => onChange(p)}
                   aria-label={`Set color ${p}`}
@@ -100,7 +100,7 @@ export const ColorSwatchPicker: React.FC<ColorSwatchPickerProps> = ({
                   type="color"
                   value={color}
                   onChange={(e) => onChange(e.target.value)}
-                  className="w-9 h-9 p-0 border border-gray-300 rounded cursor-pointer bg-transparent"
+                  className="h-9 w-9 cursor-pointer rounded border border-input bg-transparent p-0"
                   aria-label="Custom color"
                 />
               </div>
@@ -114,7 +114,7 @@ export const ColorSwatchPicker: React.FC<ColorSwatchPickerProps> = ({
                     if (/^#[0-9A-Fa-f]{6}$/.test(norm)) onChange(norm);
                   }
                 }}
-                className="flex-1 px-2 py-2 text-xs border border-gray-300 rounded font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="flex-1 rounded border border-input px-2 py-2 text-xs font-mono text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 aria-label="Hex color"
                 placeholder="#000000"
                 maxLength={7}

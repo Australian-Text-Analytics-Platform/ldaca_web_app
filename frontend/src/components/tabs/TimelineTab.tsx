@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useWorkspaceData } from '../../hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '../../hooks/useWorkspaceSelection';
@@ -6,16 +6,25 @@ import { useWorkspaceStatus } from '../../hooks/useWorkspaceStatus';
 import { useAuth } from '../../hooks/useAuth';
 import { FrequencyAnalysisRequest, textApi } from '../../api/text';
 import { nodesApi } from '../../api/index';
-import { workspacesApi } from '../../api/workspaces';
 import NodeSelectionPanel from '../NodeSelectionPanel';
 import { normalizeTypeName } from '../../utils/columnTypes';
+import { Button } from '../ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../ui/select';
+import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '../ui/chart';
+import { Loader2, Play, Plus, Trash2 } from 'lucide-react';
 import {
   LineChart,
   Line,
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
   Legend,
   ResponsiveContainer,
   BarChart,
@@ -325,112 +334,139 @@ const handleClearResults = async () => {
     return Array.from(keys);
   }, [results, chartData, groupByColumns]);
 
-  // Color palette for different groups
-  const colors = [
-    '#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#00ff00', 
-    '#ff00ff', '#00ffff', '#ff8042', '#0088fe', '#00c49f'
-  ];
+  const chartConfig = useMemo<ChartConfig>(() => {
+    if (!groupKeys.length || (groupKeys.length === 1 && groupKeys[0] === 'frequency_count')) {
+      return {
+        frequency_count: {
+          label: 'Frequency Count',
+          color: 'hsl(var(--chart-1))',
+        },
+      };
+    }
 
-  const renderChart = () => {
-    if (!chartData.length) return null;
+    return groupKeys.reduce<ChartConfig>((acc, key, index) => {
+      const colorIndex = (index % 5) + 1;
+      acc[key] = {
+        label: key,
+        color: `hsl(var(--chart-${colorIndex}))`,
+      };
+      return acc;
+    }, {});
+  }, [groupKeys]);
 
-    const commonProps = {
-      width: 800,
-      height: 400,
-      data: chartData,
-      margin: { top: 20, right: 30, left: 20, bottom: 60 }
+  const seriesColor = useCallback((key: string) => {
+    return `var(--color-${key.toString().toLowerCase().replace(/[^a-z0-9]+/g, '-')})`;
+  }, []);
+
+  const formatTimeLabel = useCallback((value?: string | number) => {
+    if (!value) return '—';
+    const str = String(value);
+    const parsed = new Date(str);
+    if (!Number.isNaN(parsed.getTime())) {
+      const options: Intl.DateTimeFormatOptions = {
+        year: 'numeric',
+        month: 'short',
+      };
+      if (!(parsed.getUTCDate() === 1 && parsed.getUTCHours() === 0 && parsed.getUTCMinutes() === 0)) {
+        options.day = 'numeric';
+      }
+      return parsed.toLocaleString(undefined, options);
+    }
+    return str;
+  }, []);
+
+  const renderChart = useCallback(() => {
+    if (!chartData.length) {
+      return (
+        <div className="flex h-40 items-center justify-center rounded-md border border-dashed border-muted-foreground/30 text-sm text-muted-foreground">
+          No timeline data available. Adjust your configuration and try again.
+        </div>
+      );
+    }
+
+    const margin = { top: 20, right: 30, left: 20, bottom: 60 };
+
+    const axisTickProps = {
+      angle: -45,
+      textAnchor: 'end' as const,
+      height: 100,
+      interval: 0 as const,
     };
 
-    switch (chartType) {
-      case 'bar':
-        return (
-          <ResponsiveContainer width="100%" height={400}>
-            <BarChart {...commonProps}>
+    return (
+      <ChartContainer config={chartConfig} className="aspect-auto h-[420px] w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          {chartType === 'bar' ? (
+            <BarChart data={chartData} margin={margin}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis 
-                dataKey="time_period" 
-                angle={-45}
-                textAnchor="end"
-                height={100}
-                interval={0}
-              />
+              <XAxis dataKey="time_period" {...axisTickProps} />
               <YAxis />
-              <Tooltip />
+              <ChartTooltip
+                content={<ChartTooltipContent className="min-w-[200px]" labelFormatter={formatTimeLabel} />}
+              />
               <Legend />
-              {groupKeys.map((key, index) => (
-                <Bar 
-                  key={key}
-                  dataKey={key} 
-                  fill={colors[index % colors.length]} 
-                  name={key}
-                />
+              {groupKeys.map((key) => (
+                <Bar key={key} dataKey={key} fill={seriesColor(key)} radius={[6, 6, 0, 0]} name={key} />
               ))}
             </BarChart>
-          </ResponsiveContainer>
-        );
-
-      case 'area':
-        return (
-          <ResponsiveContainer width="100%" height={400}>
-            <AreaChart {...commonProps}>
+          ) : chartType === 'area' ? (
+            <AreaChart data={chartData} margin={margin}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis 
-                dataKey="time_period" 
-                angle={-45}
-                textAnchor="end"
-                height={100}
-                interval={0}
-              />
+              <XAxis dataKey="time_period" {...axisTickProps} />
               <YAxis />
-              <Tooltip />
+              <ChartTooltip
+                content={<ChartTooltipContent className="min-w-[200px]" labelFormatter={formatTimeLabel} />}
+              />
               <Legend />
-              {groupKeys.map((key, index) => (
-                <Area 
+              {groupKeys.map((key) => (
+                <Area
                   key={key}
-                  type="monotone" 
-                  dataKey={key} 
+                  type="monotone"
+                  dataKey={key}
                   stackId="1"
-                  stroke={colors[index % colors.length]} 
-                  fill={colors[index % colors.length]}
-                  fillOpacity={0.6}
+                  stroke={seriesColor(key)}
+                  fill={seriesColor(key)}
+                  fillOpacity={0.35}
                   name={key}
                 />
               ))}
             </AreaChart>
-          </ResponsiveContainer>
-        );
-
-      default: // line chart
-        return (
-          <ResponsiveContainer width="100%" height={400}>
-            <LineChart {...commonProps}>
+          ) : (
+            <LineChart data={chartData} margin={margin}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis 
-                dataKey="time_period" 
-                angle={-45}
-                textAnchor="end"
-                height={100}
-                interval={0}
-              />
+              <XAxis dataKey="time_period" {...axisTickProps} />
               <YAxis />
-              <Tooltip />
+              <ChartTooltip
+                content={
+                  <ChartTooltipContent
+                    className="min-w-[200px]"
+                    indicator="line"
+                    labelFormatter={formatTimeLabel}
+                  />
+                }
+              />
               <Legend />
-              {groupKeys.map((key, index) => (
-                <Line 
+              {groupKeys.map((key) => (
+                <Line
                   key={key}
-                  type="monotone" 
-                  dataKey={key} 
-                  stroke={colors[index % colors.length]} 
+                  type="monotone"
+                  dataKey={key}
+                  stroke={seriesColor(key)}
                   strokeWidth={2}
-                  dot={{ r: 4 }}
+                  dot={false}
                   name={key}
                 />
               ))}
             </LineChart>
-          </ResponsiveContainer>
-        );
-    }
-  };
+          )}
+        </ResponsiveContainer>
+      </ChartContainer>
+    );
+  }, [chartData, chartConfig, chartType, groupKeys, seriesColor, formatTimeLabel]);
+
+  const summaryTimeColumn = (results?.analysis_params?.time_column as string | undefined) ?? timeColumn;
+  const summaryGroupBy = (results?.analysis_params?.group_by_columns as string[] | undefined) ?? groupByColumns;
+  const summaryFrequency = (results?.analysis_params?.frequency as string | undefined) ?? frequency;
 
   // Hydration from backend once per mount
   const hydratedOnceRef = useRef<boolean>(false);
@@ -498,92 +534,110 @@ const handleClearResults = async () => {
 
   return (
     <div className="p-4 space-y-4">
-      <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-lg font-medium text-gray-900">Timeline Analysis</h3>
+      <Card>
+        <CardHeader className="space-y-0 pb-4">
+          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+            <div>
+              <CardTitle>Timeline Analysis</CardTitle>
+              <CardDescription>Configure a time-series frequency view for the selected node.</CardDescription>
+            </div>
 {isLocked && (
-            <div className="relative group flex items-center text-sm text-gray-600 cursor-default">
-              <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
-                <path fillRule="evenodd" d="M5 8V6a5 5 0 1110 0v2h1a1 1 0 011 1v9a1 1 0 01-1 1H4a1 1 0 01-1-1V9a1 1 0 011-1h1zm2-2a3 3 0 116 0v2H7V6zm-2 4h10v7H5v-7z" clipRule="evenodd" />
-              </svg>
-              Locked
-              <div className="absolute right-0 mt-2 w-72 z-10 hidden group-hover:block bg-white border border-gray-200 shadow-lg rounded p-2 text-xs text-gray-700">
-                <div className="font-semibold mb-1">Panel locked</div>
-                <ul className="list-disc ml-4 space-y-1">
-                  <li>Locked to current request/results.</li>
-                  <li>Node selection and backend-used parameters are disabled.</li>
-                  <li>Frontend-only options (e.g., chart type) stay editable.</li>
-                  <li>Clear results to unlock and resync with the graph selection.</li>
-                </ul>
+              <div className="relative group flex items-center text-sm text-muted-foreground md:self-center">
+                <svg className="mr-1 h-4 w-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                  <path fillRule="evenodd" d="M5 8V6a5 5 0 1110 0v2h1a1 1 0 011 1v9a1 1 0 01-1 1H4a1 1 0 01-1-1V9a1 1 0 011-1h1zm2-2a3 3 0 116 0v2H7V6zm-2 4h10v7H5v-7z" clipRule="evenodd" />
+                </svg>
+                Locked
+                <div className="absolute right-0 top-full z-10 mt-2 hidden w-72 rounded border border-border bg-popover p-2 text-xs text-popover-foreground shadow-lg group-hover:block">
+                  <div className="font-semibold mb-1">Panel locked</div>
+                  <ul className="ml-4 space-y-1 list-disc">
+                    <li>Locked to current request/results.</li>
+                    <li>Node selection and backend-used parameters are disabled.</li>
+                    <li>Frontend-only options (e.g., chart type) stay editable.</li>
+                    <li>Clear results to unlock and resync with the graph selection.</li>
+                  </ul>
+                </div>
               </div>
-            </div>
-          )}
-        </div>
-        <NodeSelectionPanel
-          selectedNodes={(isLocked && lockedNodesSnapshot.length)
-            ? lockedNodesSnapshot.map(s=>({ id: s.id, name: s.name, data: { name: s.name, nodeName: s.name, label: s.name, columns: s.columns }, columns: s.columns }))
-            : (selectedNode ? [{ id: selectedNode.id, name: selectedNode.data?.name, data: selectedNode.data }] : [])}
-          nodeColumnSelections={nodeColumnSelections}
-          onColumnChange={(nodeId, column) => { if (isLocked) return; setNodeColumnSelections([{ nodeId, column }]); setTimeColumn(column); }}
-          nodeColors={{}}
-          onColorChange={()=>{}}
-          getNodeColumns={() => datetimeColumns}
-          defaultPalette={[]}
-          maxCompare={1}
-          className="mb-0"
-          showShape
-          getNodeShapeFn={async (id: string) => {
-            // Reuse unique values query as proxy only if needed; keep shape hidden if not available
-            return null;
-          }}
-          showColorPicker={false}
-          disabled={!!isLocked}
-          locked={!!isLocked}
-          originalCount={selectedNodes?.length || (selectedNode ? 1 : 0)}
-          columnLabelFn={() => 'Time Column *'}
-          allowedDataTypes={['datetime']}
-          renderNodeMeta={() => (
-            <div className="pt-1">
-              <div className="text-xs font-semibold text-gray-600 mb-1 tracking-wide">SCHEMA (on-demand)</div>
-              <div className="overflow-x-auto border border-gray-200 rounded-md bg-white">
-                <table className="text-[11px] font-mono border-collapse">
-                  <tbody>
-                    <tr className="align-top">
-                      {availableColumns.map((col) => (
-                        <td key={col.name + '-name'} className="px-2 py-1 font-semibold text-gray-700 whitespace-nowrap border-b border-gray-100 min-w-[6rem]">{col.name}</td>
-                      ))}
-                    </tr>
-                    <tr className="align-top">
-                      {availableColumns.map((col) => (
-                        <td key={col.name + '-type'} className="px-2 py-1 text-gray-500 whitespace-nowrap min-w-[6rem]">{col.dataType}</td>
-                      ))}
-                    </tr>
-                  </tbody>
-                </table>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6 pt-0">
+          <NodeSelectionPanel
+            selectedNodes={(isLocked && lockedNodesSnapshot.length)
+              ? lockedNodesSnapshot.map((s) => ({
+                  id: s.id,
+                  name: s.name,
+                  data: { name: s.name, nodeName: s.name, label: s.name, columns: s.columns },
+                  columns: s.columns,
+                }))
+              : (selectedNode ? [{ id: selectedNode.id, name: selectedNode.data?.name, data: selectedNode.data }] : [])}
+            nodeColumnSelections={nodeColumnSelections}
+            onColumnChange={(nodeId, column) => {
+              if (isLocked) return;
+              setNodeColumnSelections([{ nodeId, column }]);
+              setTimeColumn(column);
+            }}
+            nodeColors={{}}
+            onColorChange={() => {}}
+            getNodeColumns={() => datetimeColumns}
+            defaultPalette={[]}
+            maxCompare={1}
+            className="border border-dashed border-muted-foreground/40 rounded-lg bg-muted/30 p-4"
+            showShape
+            getNodeShapeFn={async (_id: string) => {
+              return null;
+            }}
+            showColorPicker={false}
+            disabled={!!isLocked}
+            locked={!!isLocked}
+            originalCount={selectedNodes?.length || (selectedNode ? 1 : 0)}
+            columnLabelFn={() => 'Time Column *'}
+            allowedDataTypes={['datetime']}
+            renderNodeMeta={() => (
+              <div className="pt-1">
+                <div className="mb-1 text-xs font-semibold tracking-wide text-muted-foreground">SCHEMA (on-demand)</div>
+                <div className="overflow-x-auto rounded-md border bg-background">
+                  <table className="border-collapse text-[11px] font-mono">
+                    <tbody>
+                      <tr className="align-top">
+                        {availableColumns.map((col) => (
+                          <td key={col.name + '-name'} className="min-w-[6rem] whitespace-nowrap border-b border-border/60 px-2 py-1 font-semibold text-foreground">{col.name}</td>
+                        ))}
+                      </tr>
+                      <tr className="align-top">
+                        {availableColumns.map((col) => (
+                          <td key={col.name + '-type'} className="min-w-[6rem] whitespace-nowrap px-2 py-1 text-muted-foreground">{col.dataType}</td>
+                        ))}
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div className="mt-1 text-[10px] text-muted-foreground">Scroll horizontally to view all {availableColumns.length} column(s).</div>
               </div>
-              <div className="text-[10px] text-gray-400 mt-1">Scroll horizontally to view all {availableColumns.length} column(s).</div>
-            </div>
-          )}
-        />
+            )}
+          />
 
-        {/* Analysis Configuration */}
-        <div className="space-y-4 mt-4">
+          {/* Analysis Configuration */}
+          <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Frequency Selection */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Frequency
               </label>
-              <select
+              <Select
                 value={frequency}
-                onChange={(e) => setFrequency(e.target.value as 'daily' | 'weekly' | 'monthly' | 'yearly')}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                onValueChange={(value) => setFrequency(value as 'daily' | 'weekly' | 'monthly' | 'yearly')}
               >
-                <option value="daily">Daily</option>
-                <option value="weekly">Weekly</option>
-                <option value="monthly">Monthly</option>
-                <option value="yearly">Yearly</option>
-              </select>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select frequency" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="daily">Daily</SelectItem>
+                  <SelectItem value="weekly">Weekly</SelectItem>
+                  <SelectItem value="monthly">Monthly</SelectItem>
+                  <SelectItem value="yearly">Yearly</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
@@ -593,28 +647,35 @@ const handleClearResults = async () => {
               <label className="block text-sm font-medium text-gray-700">
                 Group By Columns (Optional, max 3)
               </label>
-              <button
+              <Button
                 onClick={handleAddGroupByColumn}
                 disabled={groupByColumns.length >= 3 || !!isLocked}
-                className="px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400"
+                size="sm"
+                className="gap-1"
               >
+                <Plus className="h-4 w-4" />
                 Add Group
-              </button>
+              </Button>
             </div>
             
             {groupByColumns.map((column, index) => (
               <div key={index} className="flex items-center space-x-2 mb-2">
-                <select
-                  value={column}
-                  onChange={(e) => handleGroupByColumnChange(index, e.target.value)}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md"
+                <Select
+                  value={column || undefined}
+                  onValueChange={(value) => handleGroupByColumnChange(index, value)}
                   disabled={!!isLocked}
                 >
-                  <option value="">Select Column</option>
-                  {availableColumns.map((col) => (
-                    <option key={col.name} value={col.name}>{col.name} ({col.dataType})</option>
-                  ))}
-                </select>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Select column" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableColumns.map((col) => (
+                      <SelectItem key={col.name} value={col.name}>
+                        {col.name} ({col.dataType})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 {column && (
                   <UniqueValueCount 
                     workspaceId={currentWorkspaceId || ''} 
@@ -622,87 +683,121 @@ const handleClearResults = async () => {
                     columnName={column} 
                   />
                 )}
-                <button
+                <Button
                   onClick={() => handleRemoveGroupByColumn(index)}
-                  className="px-3 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+                  variant="destructive"
+                  size="sm"
                   disabled={!!isLocked}
                 >
+                  <Trash2 className="h-4 w-4" />
                   Remove
-                </button>
+                </Button>
               </div>
             ))}
           </div>
         </div>
 
         {/* Action Buttons */}
-        <div className="flex space-x-2 mt-2">
-          <button
+        <div className="flex flex-wrap items-center gap-3">
+          <Button
             onClick={handleAnalyze}
             disabled={isAnalyzing || isLoading.operations || !selectedNodeId || !timeColumn || !!isLocked}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400"
+            className="w-full md:w-auto"
           >
-            {isAnalyzing ? 'Analyzing...' : 'Analyze Timeline'}
-          </button>
+            {isAnalyzing ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Analyzing...
+              </>
+            ) : (
+              <>
+                <Play className="mr-2 h-4 w-4" />
+                Analyze Timeline
+              </>
+            )}
+          </Button>
 
           {results && (
-            <button
+            <Button
               onClick={handleClearResults}
-              className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
+              variant="outline"
             >
+              <Trash2 className="mr-2 h-4 w-4" />
               Clear Results
-            </button>
+            </Button>
           )}
         </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Results Display */}
       {results && (
-        <div className="mt-6">
-          <div className="flex justify-between items-center mb-4">
-            <h4 className="text-lg font-medium text-gray-900">Timeline Results</h4>
-            <div className="flex space-x-2">
-              <span className="text-sm text-gray-600">Chart Type:</span>
-              <select
+        <Card className="mt-6">
+          <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <CardTitle>Timeline Results</CardTitle>
+              <CardDescription>
+                {summaryTimeColumn
+                  ? `Frequency of records grouped by ${summaryTimeColumn}`
+                  : 'Aggregated frequency over time'}
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Chart Type</span>
+              <Select
                 value={chartType}
-                onChange={(e) => setChartType(e.target.value as 'line' | 'bar' | 'area')}
-                className="px-2 py-1 border border-gray-300 rounded text-sm"
+                onValueChange={(value) => setChartType(value as 'line' | 'bar' | 'area')}
               >
-                <option value="line">Line Chart</option>
-                <option value="bar">Bar Chart</option>
-                <option value="area">Area Chart</option>
-              </select>
+                <SelectTrigger className="w-[140px] text-sm">
+                  <SelectValue placeholder="Select chart" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="line">Line Chart</SelectItem>
+                  <SelectItem value="bar">Bar Chart</SelectItem>
+                  <SelectItem value="area">Area Chart</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-          </div>
-
-          {/* Analysis Summary */}
-          <div className="bg-gray-50 p-3 rounded-lg mb-4">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-              <div>
-                <span className="font-medium text-gray-700">Time Column:</span>
-                <span className="ml-2">{timeColumn}</span>
-              </div>
-              <div>
-                <span className="font-medium text-gray-700">Frequency:</span>
-                <span className="ml-2 capitalize">{frequency}</span>
-              </div>
-              <div>
-                <span className="font-medium text-gray-700">Total Records:</span>
-                <span className="ml-2">{results.total_records}</span>
-              </div>
-              <div>
-                <span className="font-medium text-gray-700">Groups:</span>
-                <span className="ml-2">
-                  {groupByColumns.length ? groupByColumns.join(', ') : 'None'}
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+              <div className="rounded-md border border-border/60 p-3">
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Time Column
                 </span>
+                <div className="mt-1 text-base font-semibold text-foreground">
+                  {summaryTimeColumn || '—'}
+                </div>
+              </div>
+              <div className="rounded-md border border-border/60 p-3">
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Frequency
+                </span>
+                <div className="mt-1 text-base font-semibold capitalize text-foreground">
+                  {summaryFrequency}
+                </div>
+              </div>
+              <div className="rounded-md border border-border/60 p-3">
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Total Records
+                </span>
+                <div className="mt-1 text-base font-semibold text-foreground">
+                  {results?.total_records ?? '—'}
+                </div>
+              </div>
+              <div className="rounded-md border border-border/60 p-3">
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Groups
+                </span>
+                <div className="mt-1 text-base font-semibold text-foreground">
+                  {summaryGroupBy.length ? summaryGroupBy.join(', ') : 'None'}
+                </div>
               </div>
             </div>
-          </div>
-          
-          {/* Chart Visualization */}
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
+
             {renderChart()}
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   );

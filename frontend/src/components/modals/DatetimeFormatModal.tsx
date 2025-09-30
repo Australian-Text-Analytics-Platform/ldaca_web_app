@@ -1,4 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../ui/dialog';
+import { Button } from '../ui/button';
 
 interface DatetimeFormatModalProps {
   isOpen: boolean;
@@ -58,64 +67,53 @@ const DatetimeFormatModal: React.FC<DatetimeFormatModalProps> = ({
     setAutoFillError(null);
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">
-          Convert "{columnName}" to Datetime
-        </h3>
-        
-        <p className="text-sm text-gray-600 mb-4">
-          Provide a custom strftime format. Use Auto Fill to guess from sample values.
-        </p>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && handleCancel()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Convert "{columnName}" to Datetime</DialogTitle>
+          <DialogDescription>
+            Provide a custom strftime format. Use Auto Fill to guess from sample values.
+          </DialogDescription>
+        </DialogHeader>
 
-        <div className="space-y-3 mb-6">
+        <div className="space-y-3 py-4">
           <div className="flex-1">
-            <div className="flex items-center justify-between mb-2">
-              <div className="font-medium text-sm text-gray-900">Custom format</div>
-              <button
+            <div className="mb-2 flex items-center justify-between">
+              <div className="text-sm font-medium text-foreground">Custom format</div>
+              <Button
                 type="button"
                 onClick={handleAutoFill}
-                className="ml-2 px-2 py-0.5 text-xs font-medium bg-gray-200 hover:bg-gray-300 rounded border border-gray-300"
-                title="Infer from sample values"
-              >Auto Fill</button>
+                variant="outline"
+                size="sm"
+                className="h-7 px-2"
+              >Auto Fill</Button>
             </div>
             <input
               type="text"
               placeholder="e.g., %Y-%m-%d %H:%M:%S"
               value={customFormat}
               onChange={(e) => setCustomFormat(e.target.value)}
-              className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             />
-            <div className="text-xs text-gray-500 mt-1">
+            <div className="mt-1 text-xs text-muted-foreground">
               Use Python strftime codes.
-              {autoFillTried && autoFillError && <span className="ml-1 text-red-600">{autoFillError}</span>}
+              {autoFillTried && autoFillError && <span className="ml-1 text-destructive">{autoFillError}</span>}
               {autoFillTried && !autoFillError && customFormat && <span className="ml-1 text-green-600">Inferred.</span>}
             </div>
           </div>
         </div>
 
-        <div className="flex justify-end space-x-3">
-          <button
-            type="button"
-            onClick={handleCancel}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-          >
+        <DialogFooter>
+          <Button variant="outline" onClick={handleCancel}>
             Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleConfirm}
-            disabled={!customFormat}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
+          </Button>
+          <Button onClick={handleConfirm}>
             Convert
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };
 

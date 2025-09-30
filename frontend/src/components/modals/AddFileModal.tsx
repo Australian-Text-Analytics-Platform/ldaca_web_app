@@ -2,6 +2,22 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useFilePreview } from '../../hooks/useFilePreview';
 import columnPersistence from '../../utils/columnPersistence';
 import { useWorkspaceData } from '../../hooks/useWorkspaceData';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../ui/select';
+import { Button } from '../ui/button';
+import { Separator } from '../ui/separator';
 
 interface AddFileModalProps {
   filename: string | null;
@@ -97,90 +113,98 @@ const AddFileModal: React.FC<AddFileModalProps> = ({ filename, isOpen, onClose, 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-3 border-b">
-          <h3 className="font-semibold text-gray-800 truncate">Add File: {filename}</h3>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">✕</button>
-        </div>
-        <div className="p-5 space-y-6 overflow-auto">
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="truncate">Add File: {filename}</DialogTitle>
+        </DialogHeader>
+        
+        <div className="space-y-6 overflow-auto px-1">
           {/* File info and supported types removed per request */}
 
           {/* Excel sheet picker */}
           {fileType === 'excel' && sheetNames && sheetNames.length > 0 && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Sheet</label>
-              <select
-                className="w-full border rounded px-3 py-2 text-sm"
+              <label className="block text-sm font-medium mb-2">Sheet</label>
+              <Select
                 value={selectedSheet || ''}
-                onChange={e => {
-                  const next = e.target.value || null;
+                onValueChange={(value) => {
+                  const next = value || null;
                   setSelectedSheet(next);
                   // refresh preview for the chosen sheet
                   fetchPreview(filename, 0, { sheetName: next || undefined });
                 }}
               >
-                {sheetNames.map(n => (
-                  <option key={n} value={n}>{n}</option>
-                ))}
-              </select>
-              <p className="mt-1 text-xs text-gray-500">First sheet is selected by default. Pick another to update the preview.</p>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {sheetNames.map(n => (
+                    <SelectItem key={n} value={n}>{n}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="mt-1 text-xs text-muted-foreground">First sheet is selected by default. Pick another to update the preview.</p>
             </div>
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Mode</label>
+            <label className="block text-sm font-medium mb-2">Mode</label>
             <div className="grid grid-cols-4 gap-2 w-full">
               {(supportedTypes?.length ? supportedTypes : ['DocLazyFrame','LazyFrame']).map(t => (
                 <label
                   key={t}
-                  className="w-full flex items-center justify-center gap-2 cursor-pointer p-2 border rounded hover:bg-gray-50"
+                  className="w-full flex items-center justify-center gap-2 cursor-pointer p-2 border rounded hover:bg-accent"
                 >
                   <input type="radio" name="add-mode" value={t} checked={mode===t as any} onChange={() => setMode(t as any)} />
                   <span className="text-sm font-medium">{t}</span>
                 </label>
               ))}
             </div>
-            <p className="mt-1 text-xs text-gray-500">Doc* modes enable text-aware operations; plain modes add data without text semantics.</p>
+            <p className="mt-1 text-xs text-muted-foreground">Doc* modes enable text-aware operations; plain modes add data without text semantics.</p>
           </div>
 
           {(mode === 'DocLazyFrame' || mode === 'DocDataFrame') && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Text / document column</label>
+              <label className="block text-sm font-medium mb-2">Text / document column</label>
               {loading ? (
-                <div className="text-sm text-gray-500">Loading preview…</div>
+                <div className="text-sm text-muted-foreground">Loading preview…</div>
               ) : error ? (
-                <div className="text-sm text-red-600">{error}</div>
+                <div className="text-sm text-destructive">{error}</div>
               ) : (
-                <select
-                  className="w-full border rounded px-3 py-2 text-sm"
+                <Select
                   value={documentColumn || ''}
-                  onChange={e => setDocumentColumn(e.target.value || null)}
+                  onValueChange={(value) => setDocumentColumn(value || null)}
                 >
-                  {columns.map(c => (
-                    <option key={c} value={c}>{c}{c===guessed ? ' (guessed)' : ''}</option>
-                  ))}
-                </select>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {columns.map(c => (
+                      <SelectItem key={c} value={c}>{c}{c===guessed ? ' (guessed)' : ''}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               )}
-              <p className="mt-1 text-xs text-gray-500">A preferred column is pre-selected automatically; change it if needed.</p>
+              <p className="mt-1 text-xs text-muted-foreground">A preferred column is pre-selected automatically; change it if needed.</p>
             </div>
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Preview (first rows)</label>
+            <label className="block text-sm font-medium mb-2">Preview (first rows)</label>
             <div className="border rounded overflow-auto max-h-60">
               {loading ? (
-                <div className="p-4 text-sm text-gray-500">Loading…</div>
+                <div className="p-4 text-sm text-muted-foreground">Loading…</div>
               ) : previewData.length === 0 ? (
-                <div className="p-4 text-sm text-gray-500">No preview</div>
+                <div className="p-4 text-sm text-muted-foreground">No preview</div>
               ) : (
                 <table className="min-w-full text-xs">
                   <thead>
-                    <tr className="bg-gray-50">{columns.map(c => <th key={c} className="px-2 py-1 text-left font-medium">{c}</th>)}</tr>
+                    <tr className="bg-muted">{columns.map(c => <th key={c} className="px-2 py-1 text-left font-medium">{c}</th>)}</tr>
                   </thead>
                   <tbody>
                     {previewData.slice(0,10).map((row,i) => (
-                      <tr key={i} className={i%2? 'bg-gray-50':'bg-white'}>
+                      <tr key={i} className={i%2? 'bg-muted/50':'bg-background'}>
                         {columns.map(c => <td key={c} className="px-2 py-1 whitespace-nowrap max-w-[12rem] truncate" title={String(row[c] ?? '')}>{String(row[c] ?? '')}</td>)}
                       </tr>
                     ))}
@@ -190,16 +214,18 @@ const AddFileModal: React.FC<AddFileModalProps> = ({ filename, isOpen, onClose, 
             </div>
           </div>
         </div>
-        <div className="flex items-center justify-end space-x-3 px-5 py-4 border-t bg-gray-50 rounded-b-xl">
-          <button onClick={onClose} className="px-4 py-2 text-sm rounded border bg-white hover:bg-gray-100">Cancel</button>
-          <button
+        
+        <Separator />
+        
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button
             onClick={handleConfirm}
             disabled={submitting}
-            className="px-4 py-2 text-sm font-medium rounded text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
-          >{submitting ? 'Adding…' : 'Add to Workspace'}</button>
-        </div>
-      </div>
-    </div>
+          >{submitting ? 'Adding…' : 'Add to Workspace'}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };
 

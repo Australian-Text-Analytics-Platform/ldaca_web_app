@@ -54,7 +54,7 @@ const TutorialView: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-      <header className="bg-white border-b border-gray-200 px-6 py-4">
+      <header className="bg-card border-b border-border px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <img src={logo} alt="LDaCA Logo" className="h-8 w-auto object-contain" />
@@ -72,7 +72,7 @@ const TutorialView: React.FC = () => {
               <button
                 type="button"
                 onClick={zoomOut}
-                className="px-2 py-1 rounded border border-gray-300 text-gray-700 hover:bg-gray-50"
+                className="px-2 py-1 rounded border border-input text-foreground hover:bg-muted/60"
                 aria-label="Zoom out"
                 title="Zoom out (Ctrl/Cmd -)"
               >
@@ -81,7 +81,7 @@ const TutorialView: React.FC = () => {
               <button
                 type="button"
                 onClick={zoomReset}
-                className="px-2 py-1 rounded border border-gray-300 text-gray-700 hover:bg-gray-50 min-w-[64px]"
+                className="px-2 py-1 rounded border border-input text-foreground hover:bg-muted/60 min-w-[64px]"
                 aria-label="Reset zoom"
                 title="Reset zoom (Ctrl/Cmd 0)"
               >
@@ -90,7 +90,7 @@ const TutorialView: React.FC = () => {
               <button
                 type="button"
                 onClick={zoomIn}
-                className="px-2 py-1 rounded border border-gray-300 text-gray-700 hover:bg-gray-50"
+                className="px-2 py-1 rounded border border-input text-foreground hover:bg-muted/60"
                 aria-label="Zoom in"
                 title="Zoom in (Ctrl/Cmd +)"
               >
@@ -100,7 +100,7 @@ const TutorialView: React.FC = () => {
           </div>
         </div>
       </header>
-      <main className="max-w-4xl mx-auto bg-white shadow-sm rounded-lg border border-gray-200 mt-6 mb-10 p-6">
+      <main className="max-w-4xl mx-auto bg-card shadow-sm rounded-lg border border-border mt-6 mb-10 p-6">
         <div
           className="prose prose-slate prose-img:mx-auto mx-auto"
           style={{

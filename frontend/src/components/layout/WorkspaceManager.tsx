@@ -3,6 +3,7 @@ import { useWorkspaceData } from '../../hooks/useWorkspaceData';
 import { useWorkspaceActions } from '../../hooks/useWorkspaceActions';
 import { useWorkspaceStatus } from '../../hooks/useWorkspaceStatus';
 import { WorkspaceInfo, WorkspaceNode } from '../../types';
+import { Button } from '../ui/button';
 
 const WorkspaceManager: React.FC = () => {
   const [newWorkspaceName, setNewWorkspaceName] = useState('');
@@ -50,101 +51,102 @@ const WorkspaceManager: React.FC = () => {
   const currentWorkspace = workspaces.find((w: WorkspaceInfo) => w.workspace_id === currentWorkspaceId);
 
   return (
-    <div className="p-4 bg-white rounded-lg shadow">
+    <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
       <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-gray-800">Workspace Manager</h2>
-          <button
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-xl font-semibold text-foreground">Workspace Manager</h2>
+          <Button
             onClick={() => setShowCreateForm(!showCreateForm)}
-            className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
             disabled={isLoading.operations}
           >
             {showCreateForm ? 'Cancel' : 'New Workspace'}
-          </button>
+          </Button>
         </div>
 
         {showCreateForm && (
-          <div className="mb-4 p-4 bg-gray-50 rounded-md">
+          <div className="mb-4 rounded-md border border-border bg-muted/40 p-4">
             <input
               type="text"
               value={newWorkspaceName}
               onChange={(e) => setNewWorkspaceName(e.target.value)}
               placeholder="Enter workspace name"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3"
+              className="mb-3 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             />
             <div className="flex gap-2">
-              <button
+              <Button
                 onClick={handleCreateWorkspace}
                 disabled={!newWorkspaceName.trim() || isLoading.operations}
-                className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors disabled:bg-gray-400"
+                className="w-fit"
               >
                 {isLoading.operations ? 'Creating...' : 'Create'}
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={() => {
                   setShowCreateForm(false);
                   setNewWorkspaceName('');
                 }}
-                className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
+                variant="outline"
               >
                 Cancel
-              </button>
+              </Button>
             </div>
           </div>
         )}
 
         {errors.operations && (
-          <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+          <div className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
             {errors.operations}
           </div>
         )}
 
         {isLoading.workspaces && (
-          <div className="mb-4 text-center text-gray-600">Loading workspaces...</div>
+          <div className="mb-4 text-center text-muted-foreground">Loading workspaces...</div>
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         {/* Workspaces List */}
         <div>
-          <h3 className="text-lg font-medium text-gray-700 mb-3">Available Workspaces</h3>
-          <div className="space-y-2 max-h-64 overflow-y-auto">
+          <h3 className="mb-3 text-lg font-medium text-foreground">Available Workspaces</h3>
+          <div className="max-h-64 space-y-2 overflow-y-auto">
             {workspaces.map((workspace: WorkspaceInfo) => (
               <div
                 key={workspace.workspace_id}
-                className={`p-3 border rounded-md cursor-pointer transition-colors ${
+                className={`cursor-pointer rounded-md border p-3 transition-colors ${
                   workspace.workspace_id === currentWorkspaceId
-                    ? 'border-blue-500 bg-blue-50'
-                    : 'border-gray-300 hover:border-gray-400'
+                    ? 'border-primary/50 bg-primary/10'
+                    : 'border-border hover:border-primary/40'
                 }`}
                 onClick={() => handleWorkspaceChange(workspace.workspace_id)}
               >
                 <div className="flex justify-between items-center">
                   <div>
-                    <h4 className="font-medium text-gray-800">{workspace.name}</h4>
+                    <h4 className="font-medium text-foreground">{workspace.name}</h4>
                     {workspace.description && (
-                      <p className="text-sm text-gray-600">{workspace.description}</p>
+                      <p className="text-sm text-muted-foreground">{workspace.description}</p>
                     )}
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-muted-foreground">
                       ID: {workspace.workspace_id}
                     </p>
                   </div>
                   <div className="flex gap-1">
                     {workspace.workspace_id === currentWorkspaceId && (
-                      <span className="px-2 py-1 text-xs bg-blue-500 text-white rounded">
+                      <span className="rounded bg-primary px-2 py-1 text-xs text-primary-foreground">
                         Active
                       </span>
                     )}
-                    <button
+                    <Button
                       onClick={(e) => {
                         e.stopPropagation();
                         handleDeleteWorkspace(workspace.workspace_id);
                       }}
-                      className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
+                      size="sm"
+                      variant="destructive"
+                      className="px-2 text-xs"
                       disabled={isLoading.operations}
                     >
                       Delete
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -154,39 +156,39 @@ const WorkspaceManager: React.FC = () => {
 
         {/* Current Workspace Details */}
         <div>
-          <h3 className="text-lg font-medium text-gray-700 mb-3">
+          <h3 className="mb-3 text-lg font-medium text-foreground">
             {currentWorkspace ? `Workspace: ${currentWorkspace.name}` : 'No Workspace Selected'}
           </h3>
           
           {currentWorkspace && (
             <div>
               {isLoading.nodes && (
-                <div className="text-center text-gray-600 mb-4">Loading nodes...</div>
+                <div className="mb-4 text-center text-muted-foreground">Loading nodes...</div>
               )}
               
               {errors.nodes && (
-                <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+                <div className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
                   Error loading nodes: {errors.nodes}
                 </div>
               )}
 
-              <div className="space-y-2 max-h-64 overflow-y-auto">
+              <div className="max-h-64 space-y-2 overflow-y-auto">
                 {nodes.map((node: WorkspaceNode) => (
                   <div
                     key={node.node_id}
-                    className="p-2 border border-gray-300 rounded cursor-pointer hover:bg-gray-50 transition-colors"
+                    className="cursor-pointer rounded-md border border-border p-2 transition-colors hover:bg-muted"
                     onClick={() => handleNodeSelect(node.node_id)}
                   >
-                    <div className="font-medium text-gray-800">{node.name}</div>
-                    <div className="text-sm text-gray-600">
+                    <div className="font-medium text-foreground">{node.name}</div>
+                    <div className="text-sm text-muted-foreground">
                       Columns: {node.columns?.length || 0} | Rows: {node.shape?.[0] || 0}
                     </div>
-                    <div className="text-xs text-gray-500">ID: {node.node_id}</div>
+                    <div className="text-xs text-muted-foreground">ID: {node.node_id}</div>
                   </div>
                 ))}
                 
                 {nodes.length === 0 && !isLoading.nodes && (
-                  <div className="text-center text-gray-500 py-4">
+                  <div className="py-4 text-center text-muted-foreground">
                     No nodes in this workspace
                   </div>
                 )}
