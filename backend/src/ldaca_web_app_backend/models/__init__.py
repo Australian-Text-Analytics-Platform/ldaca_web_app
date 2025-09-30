@@ -679,3 +679,23 @@ class ConcordanceAnalysisResponse(BaseModel):
         str, Dict[str, Any]
     ]  # node label -> ConcordanceNodeResult | combined summary
     analysis_params: Optional[Dict[str, Any]] = None
+
+
+# =============================================================================
+# COLUMN DESCRIBE MODELS
+# =============================================================================
+
+
+class ColumnDescribeResponse(BaseModel):
+    """Response model for column describe statistics."""
+
+    column_name: str
+    count: Optional[int] = None
+    null_count: Optional[int] = None
+    mean: Optional[Any] = None  # Can be float (numeric) or str (datetime ISO format)
+    std: Optional[Any] = None  # Can be float (numeric) or None (datetime)
+    min: Optional[Any] = None
+    percentile_25: Optional[Any] = None
+    median: Optional[Any] = None
+    percentile_75: Optional[Any] = None
+    max: Optional[Any] = None
