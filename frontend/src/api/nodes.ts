@@ -4,6 +4,19 @@ export type ConversionTarget = 'docdataframe' | 'dataframe' | 'doclazyframe' | '
 
 export interface ColumnUniqueValuesResponse { unique_count: number; sample_values: any[]; has_more: boolean; }
 
+export interface ColumnDescribeResponse {
+  column_name: string;
+  count?: number;
+  null_count?: number;
+  mean?: number;
+  std?: number;
+  min?: any;
+  percentile_25?: any;
+  median?: any;
+  percentile_75?: any;
+  max?: any;
+}
+
 export interface FilterCondition {
   column: string;
   operator: 'eq' | 'gte' | 'lte' | 'contains' | 'startswith' | 'endswith' | 'is_null' | 'between';
@@ -34,6 +47,7 @@ export const nodesApi = {
   data: (ws: string, node: string, page = 0, pageSize = 20, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/nodes/${node}/data`, { method: 'GET', headers, params: { page, page_size: pageSize } }),
   shape: (ws: string, node: string, headers: Record<string,string> = {}) => get(`/workspaces/${ws}/nodes/${node}/shape`, headers),
   uniqueValues: (ws: string, node: string, col: string, headers: Record<string,string> = {}) => get<ColumnUniqueValuesResponse>(`/workspaces/${ws}/nodes/${node}/columns/${col}/unique`, headers),
+  describeColumn: (ws: string, node: string, col: string, headers: Record<string,string> = {}) => get<ColumnDescribeResponse>(`/workspaces/${ws}/nodes/${node}/columns/${col}/describe`, headers),
   delete: (ws: string, node: string, headers: Record<string,string> = {}) => del(`/workspaces/${ws}/nodes/${node}`, headers),
   rename: (ws: string, node: string, newName: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/nodes/${node}/name`, { method: 'PUT', headers, params: { new_name: newName } }),
   createFromFile: (ws: string, filename: string, nodeName?: string, headers: Record<string,string> = {}, options?: { mode?: string; document_column?: string | null }) => httpRequest(`/workspaces/${ws}/nodes`, { method: 'POST', headers, params: { filename, node_name: nodeName, mode: options?.mode ?? 'DocLazyFrame', document_column: options?.document_column ?? undefined } }),
