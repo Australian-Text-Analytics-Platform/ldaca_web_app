@@ -4,6 +4,7 @@ import { WorkspaceNode } from '../types';
 import DocumentColumnModal from './modals/DocumentColumnModal';
 import { formatDataType, getTypeStyleClass } from '../utils/typeFormatting';
 import { useWorkspaceData } from '../hooks/useWorkspaceData';
+import { Badge } from './ui/badge';
 
 interface CustomNodeData {
   node: WorkspaceNode;
@@ -412,9 +413,9 @@ const CustomNode: React.FC<NodeProps<any>> = ({ data, selected }) => {
         >
           {formattedType.display}
           {node?.is_lazy && (
-            <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+            <Badge variant="secondary" className="ml-2 border border-amber-200 bg-amber-100 text-amber-800">
               lazy
-            </span>
+            </Badge>
           )}
         </div>
         {documentColumn && (formattedType.full.includes('DocDataFrame') || formattedType.full.includes('DocLazyFrame')) && (

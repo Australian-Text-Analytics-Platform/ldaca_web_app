@@ -1,7 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { NodeSchemaResponse } from '../../types';
 import DatetimeFormatModal from '../modals/DatetimeFormatModal';
+import { Input } from './input';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from './Pagination';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './table';
+import { cn } from '@/lib/utils';
 
 interface DataTableProps {
   data: any[];
@@ -32,6 +43,36 @@ const DATA_TYPES = [
   { value: 'datetime', label: 'datetime', category: 'Temporal' },
   { value: 'array', label: 'array', category: 'Array' },
 ];
+
+type PaginationRangeItem = number | 'dots';
+
+const buildPaginationRange = (current: number, total: number): PaginationRangeItem[] => {
+  const normalizedTotal = Math.max(total, 1);
+  const output: PaginationRangeItem[] = [];
+  let previous: number | null = null;
+
+  for (let page = 1; page <= normalizedTotal; page++) {
+    const isBoundary = page === 1 || page === normalizedTotal;
+    const isNearCurrent = Math.abs(page - current) <= 1;
+    const shouldShow = normalizedTotal <= 5 || isBoundary || isNearCurrent;
+
+    if (!shouldShow) continue;
+
+    if (previous !== null) {
+      const gap = page - previous;
+      if (gap === 2) {
+        output.push(previous + 1);
+      } else if (gap > 2) {
+        output.push('dots');
+      }
+    }
+
+    output.push(page);
+    previous = page;
+  }
+
+  return output;
+};
 
 const DataTable: React.FC<DataTableProps> = ({ 
   data, 
@@ -215,82 +256,110 @@ const DataTable: React.FC<DataTableProps> = ({
     }
 
     const { page, page_size, total_rows, total_pages, has_next, has_prev } = pagination;
+    const safeTotalPages = Math.max(total_pages || 1, 1);
+    const safeTotalRows = typeof total_rows === 'number' ? total_rows : 0;
+    const startRow = safeTotalRows === 0 ? 0 : Math.min((page - 1) * page_size + 1, safeTotalRows);
+    const endRow = safeTotalRows === 0 ? 0 : Math.min(page * page_size, safeTotalRows);
+    const pageSizeOptions = Array.from(new Set([...PAGE_SIZE_OPTIONS, page_size])).sort((a, b) => a - b);
+    const paginationRange = buildPaginationRange(page, safeTotalPages);
+    const prevDisabled = !has_prev;
+    const nextDisabled = !has_next;
 
     return (
-  <div className="flex items-center justify-between border-t border-border bg-muted/40 px-4 py-3">
-        {/* Left side: Page size selector and row info */}
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2">
+      <div className="flex flex-col gap-4 border-t border-border bg-muted/40 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">Show</span>
             <select
               value={page_size}
               onChange={(e) => onPageSizeChange(Number(e.target.value))}
-              className="rounded-md border border-input bg-background px-2 py-1 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              className="h-9 rounded-md border border-input bg-background px-2 py-1 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             >
-              {PAGE_SIZE_OPTIONS.map(size => (
-                <option key={size} value={size}>{size}</option>
+              {pageSizeOptions.map((size) => (
+                <option key={size} value={size}>
+                  {size}
+                </option>
               ))}
             </select>
             <span className="text-sm text-muted-foreground">rows</span>
           </div>
           <div className="text-sm text-muted-foreground">
-            Showing {Math.min((page - 1) * page_size + 1, total_rows)} to {Math.min(page * page_size, total_rows)} of {total_rows} rows
+            {`Showing ${startRow} to ${endRow} of ${safeTotalRows} rows`}
           </div>
         </div>
 
-        {/* Right side: Navigation controls */}
-        <div className="flex items-center space-x-2">
-          <button
-            onClick={() => onPageChange(1)}
-            disabled={!has_prev}
-            className="rounded-md border border-input px-3 py-1 text-sm text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
-            title="First page"
-          >
-            ⟨⟨
-          </button>
-          <button
-            onClick={() => onPageChange(page - 1)}
-            disabled={!has_prev}
-            className="rounded-md border border-input px-3 py-1 text-sm text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
-            title="Previous page"
-          >
-            ⟨
-          </button>
-          
-          <div className="flex items-center space-x-1">
-            <span className="text-sm text-muted-foreground">Page</span>
-            <input
+        <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:gap-4">
+          <div className="flex items-center justify-end gap-2 text-sm text-muted-foreground">
+            <span>Page</span>
+            <Input
               type="number"
               value={page}
               onChange={(e) => {
                 const newPage = Number(e.target.value);
-                if (newPage >= 1 && newPage <= total_pages) {
+                if (!Number.isNaN(newPage) && newPage >= 1 && newPage <= safeTotalPages) {
                   onPageChange(newPage);
                 }
               }}
-              className="w-16 rounded-md border border-input px-2 py-1 text-center text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              className="h-9 w-16 text-center"
               min={1}
-              max={total_pages}
+              max={safeTotalPages}
             />
-            <span className="text-sm text-muted-foreground">of {total_pages}</span>
+            <span>of {safeTotalPages}</span>
           </div>
 
-          <button
-            onClick={() => onPageChange(page + 1)}
-            disabled={!has_next}
-            className="rounded-md border border-input px-3 py-1 text-sm text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
-            title="Next page"
-          >
-            ⟩
-          </button>
-          <button
-            onClick={() => onPageChange(total_pages)}
-            disabled={!has_next}
-            className="rounded-md border border-input px-3 py-1 text-sm text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
-            title="Last page"
-          >
-            ⟩⟩
-          </button>
+          <Pagination className="w-full justify-center sm:w-auto sm:justify-end">
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    if (!prevDisabled) {
+                      onPageChange(page - 1);
+                    }
+                  }}
+                  className={cn(prevDisabled && 'pointer-events-none opacity-50')}
+                  aria-disabled={prevDisabled}
+                  tabIndex={prevDisabled ? -1 : undefined}
+                />
+              </PaginationItem>
+              {paginationRange.map((item, index) => (
+                <PaginationItem key={`${item}-${index}`}>
+                  {item === 'dots' ? (
+                    <PaginationEllipsis />
+                  ) : (
+                    <PaginationLink
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (item !== page) {
+                          onPageChange(item);
+                        }
+                      }}
+                      isActive={item === page}
+                      size="default"
+                    >
+                      {item}
+                    </PaginationLink>
+                  )}
+                </PaginationItem>
+              ))}
+              <PaginationItem>
+                <PaginationNext
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    if (!nextDisabled) {
+                      onPageChange(page + 1);
+                    }
+                  }}
+                  className={cn(nextDisabled && 'pointer-events-none opacity-50')}
+                  aria-disabled={nextDisabled}
+                  tabIndex={nextDisabled ? -1 : undefined}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
         </div>
       </div>
     );

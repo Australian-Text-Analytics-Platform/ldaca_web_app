@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useWorkspaceData } from '../../hooks/useWorkspaceData';
@@ -39,6 +40,23 @@ interface UniqueValueCountProps {
   nodeId: string;
   columnName: string;
 }
+
+type TimelineDatum = Record<string, unknown>;
+
+const TIMELINE_PALETTE = [
+  '#2563eb', // blue
+  '#16a34a', // green
+  '#f59e0b', // amber
+  '#ef4444', // red
+  '#8b5cf6', // violet
+  '#14b8a6', // teal
+  '#f97316', // orange
+  '#ec4899', // pink
+  '#0ea5e9', // sky
+  '#22c55e', // emerald
+] as const;
+
+const getPaletteColor = (index: number) => TIMELINE_PALETTE[index % TIMELINE_PALETTE.length];
 
 const UniqueValueCount: React.FC<UniqueValueCountProps> = ({ workspaceId, nodeId, columnName }) => {
   const { getAuthHeaders } = useAuth();
@@ -85,6 +103,7 @@ const TimelineTab: React.FC = () => {
   const [lockedSchema, setLockedSchema] = useState<Record<string,string> | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [results, setResults] = useState<any>(null);
+  const [hydratingSelection, setHydratingSelection] = useState(false);
 
   // Get available columns from schema (prefer fetched schema; fallback to nodeData/selectedNode) preserving types
   const availableColumns = useMemo(() => {
@@ -149,7 +168,7 @@ const TimelineTab: React.FC = () => {
   }, [selectedNodeId, isLocked, currentWorkspaceId, getAuthHeaders]);
 
   useEffect(() => {
-    if (isLocked) return;
+    if (isLocked || hydratingSelection) return;
     if (!selectedNodeId) {
       setNodeColumnSelections([]);
       setTimeColumn('');
@@ -180,7 +199,7 @@ const TimelineTab: React.FC = () => {
       }
       return [{ nodeId: selectedNodeId, column: desired }];
     });
-  }, [isLocked, selectedNodeId, timeColumn, timeColumnOptions]);
+  }, [isLocked, hydratingSelection, selectedNodeId, timeColumn, timeColumnOptions]);
 
   const handleAddGroupByColumn = () => {
     if (groupByColumns.length < 3) {
@@ -271,7 +290,7 @@ const handleClearResults = async () => {
   };
 
   // Prepare data for chart visualization
-  const chartData = useMemo(() => {
+  const chartData = useMemo<TimelineDatum[]>(() => {
     if (!results?.data || !Array.isArray(results.data)) {
       return [];
     }
@@ -283,31 +302,35 @@ const handleClearResults = async () => {
     
     if (!effectiveGroupColumns || effectiveGroupColumns.length === 0) {
       // No grouping - simple time series
-      return results.data.map((item: any) => ({
-        time_period: item.time_period_formatted || item.time_period,
+      return results.data.map((item: Record<string, unknown>) => ({
+        ...item,
+        time_period: (item.time_period_formatted as string | undefined) || (item.time_period as string | undefined),
         frequency_count: item.frequency_count,
-        ...item
       }));
     }
 
     // With grouping - need to reshape data for recharts
-    const timeMap = new Map<string, any>();
+    const timeMap = new Map<string, TimelineDatum>();
     
-    results.data.forEach((item: any) => {
-      const timePeriod = item.time_period_formatted || item.time_period;
-      const groupKey = effectiveGroupColumns.map((col: string) => item[col]).join(' - ');
+    results.data.forEach((item: Record<string, unknown>) => {
+      const timePeriod = (item.time_period_formatted as string | undefined) || (item.time_period as string | undefined) || '';
+      const groupKey = effectiveGroupColumns.map((col: string) => String(item[col] ?? '')).join(' - ');
       
       if (!timeMap.has(timePeriod)) {
         timeMap.set(timePeriod, { time_period: timePeriod });
       }
       
       const timeEntry = timeMap.get(timePeriod);
-      timeEntry[groupKey] = item.frequency_count;
+      if (timeEntry) {
+        timeEntry[groupKey] = item.frequency_count;
+      }
     });
     
-    return Array.from(timeMap.values()).sort((a, b) => 
-      a.time_period.localeCompare(b.time_period)
-    );
+    return Array.from(timeMap.values()).sort((a, b) => {
+      const aTime = String(a.time_period ?? '');
+      const bTime = String(b.time_period ?? '');
+      return aTime.localeCompare(bTime);
+    });
   }, [results, groupByColumns]);
 
   // Get unique group values for legend colors
@@ -339,24 +362,19 @@ const handleClearResults = async () => {
       return {
         frequency_count: {
           label: 'Frequency Count',
-          color: 'hsl(var(--chart-1))',
+          color: getPaletteColor(0),
         },
       };
     }
 
     return groupKeys.reduce<ChartConfig>((acc, key, index) => {
-      const colorIndex = (index % 5) + 1;
       acc[key] = {
         label: key,
-        color: `hsl(var(--chart-${colorIndex}))`,
+        color: getPaletteColor(index),
       };
       return acc;
     }, {});
   }, [groupKeys]);
-
-  const seriesColor = useCallback((key: string) => {
-    return `var(--color-${key.toString().toLowerCase().replace(/[^a-z0-9]+/g, '-')})`;
-  }, []);
 
   const formatTimeLabel = useCallback((value?: string | number) => {
     if (!value) return '—';
@@ -374,6 +392,22 @@ const handleClearResults = async () => {
     }
     return str;
   }, []);
+
+  const groupPointCounts = useMemo(() => {
+    if (!chartData.length) return {} as Record<string, number>;
+
+    const counts: Record<string, number> = {};
+    chartData.forEach((row) => {
+      const typedRow = row as Record<string, unknown>;
+      groupKeys.forEach((key) => {
+        const value = typedRow[key];
+        if (value !== undefined && value !== null) {
+          counts[key] = (counts[key] ?? 0) + 1;
+        }
+      });
+    });
+    return counts;
+  }, [chartData, groupKeys]);
 
   const renderChart = useCallback(() => {
     if (!chartData.length) {
@@ -405,9 +439,12 @@ const handleClearResults = async () => {
                 content={<ChartTooltipContent className="min-w-[200px]" labelFormatter={formatTimeLabel} />}
               />
               <Legend />
-              {groupKeys.map((key) => (
-                <Bar key={key} dataKey={key} fill={seriesColor(key)} radius={[6, 6, 0, 0]} name={key} />
-              ))}
+              {groupKeys.map((key, idx) => {
+                const color = chartConfig[key]?.color ?? getPaletteColor(idx);
+                return (
+                  <Bar key={key} dataKey={key} fill={color} radius={[6, 6, 0, 0]} name={key} />
+                );
+              })}
             </BarChart>
           ) : chartType === 'area' ? (
             <AreaChart data={chartData} margin={margin}>
@@ -418,18 +455,21 @@ const handleClearResults = async () => {
                 content={<ChartTooltipContent className="min-w-[200px]" labelFormatter={formatTimeLabel} />}
               />
               <Legend />
-              {groupKeys.map((key) => (
-                <Area
-                  key={key}
-                  type="monotone"
-                  dataKey={key}
-                  stackId="1"
-                  stroke={seriesColor(key)}
-                  fill={seriesColor(key)}
-                  fillOpacity={0.35}
-                  name={key}
-                />
-              ))}
+              {groupKeys.map((key, idx) => {
+                const color = chartConfig[key]?.color ?? getPaletteColor(idx);
+                return (
+                  <Area
+                    key={key}
+                    type="monotone"
+                    dataKey={key}
+                    stackId="1"
+                    stroke={color}
+                    fill={color}
+                    fillOpacity={0.35}
+                    name={key}
+                  />
+                );
+              })}
             </AreaChart>
           ) : (
             <LineChart data={chartData} margin={margin}>
@@ -446,23 +486,28 @@ const handleClearResults = async () => {
                 }
               />
               <Legend />
-              {groupKeys.map((key) => (
-                <Line
-                  key={key}
-                  type="monotone"
-                  dataKey={key}
-                  stroke={seriesColor(key)}
-                  strokeWidth={2}
-                  dot={false}
-                  name={key}
-                />
-              ))}
+              {groupKeys.map((key, idx) => {
+                const color = chartConfig[key]?.color ?? getPaletteColor(idx);
+                const shouldShowDot = (groupPointCounts[key] ?? chartData.length) <= 1;
+                return (
+                  <Line
+                    key={key}
+                    type="monotone"
+                    dataKey={key}
+                    stroke={color}
+                    strokeWidth={2}
+                    dot={shouldShowDot ? { r: 4, strokeWidth: 0 } : false}
+                    activeDot={{ r: 5 }}
+                    name={key}
+                  />
+                );
+              })}
             </LineChart>
           )}
         </ResponsiveContainer>
       </ChartContainer>
     );
-  }, [chartData, chartConfig, chartType, groupKeys, seriesColor, formatTimeLabel]);
+  }, [chartData, chartConfig, chartType, groupKeys, groupPointCounts, formatTimeLabel]);
 
   const summaryTimeColumn = (results?.analysis_params?.time_column as string | undefined) ?? timeColumn;
   const summaryGroupBy = (results?.analysis_params?.group_by_columns as string[] | undefined) ?? groupByColumns;
@@ -471,49 +516,55 @@ const handleClearResults = async () => {
   // Hydration from backend once per mount
   const hydratedOnceRef = useRef<boolean>(false);
   useEffect(() => {
-    (async () => {
-      if (hydratedOnceRef.current) return;
+    let cancelled = false;
+    const hydrate = async () => {
+      if (hydratedOnceRef.current || !currentWorkspaceId) return;
       hydratedOnceRef.current = true;
-      if (!currentWorkspaceId) return;
+      setHydratingSelection(true);
       try {
-        // First check current-request; if null, don't request current-result
         const reqResp = await textApi.getFrequencyCurrentRequest(currentWorkspaceId, getAuthHeaders());
-        if (!reqResp) {
-          // No current request - fresh state
-          return;
-        }
-        
+        if (!reqResp || cancelled) return;
+
         const req = (reqResp as any)?.data;
         if (req) {
           const nodeId = String(req.node_id || req.nodeId || selectedNodeId || '');
           const col = String(req.time_column || '');
-          if (!isLocked) {
-            setNodeColumnSelections(nodeId ? [{ nodeId, column: col }] : []);
-            setTimeColumn(col);
-          }
+          setNodeColumnSelections(nodeId ? [{ nodeId, column: col }] : []);
+          setTimeColumn(col);
           setGroupByColumns(Array.isArray(req.group_by_columns) ? req.group_by_columns : []);
-          setFrequency(req.frequency as any);
-          
-          // Lock and snapshot node
-          try {
-            const nodeIdStr = String(req.node_id || req.nodeId || selectedNodeId || '');
-            if (nodeIdStr) {
+          if (req.frequency) setFrequency(req.frequency as any);
+
+          const nodeIdStr = String(req.node_id || req.nodeId || selectedNodeId || '');
+          if (nodeIdStr) {
+            setIsLocked(true);
+            try {
               const info = await nodesApi.info(currentWorkspaceId, nodeIdStr, getAuthHeaders());
+              if (cancelled) return;
               const name = (info as any)?.name || (info as any)?.data?.name || nodeIdStr;
-              const columns = Array.isArray((info as any)?.columns) ? (info as any).columns : (Array.isArray((info as any)?.data?.columns) ? (info as any).data.columns : []);
+              const columns = Array.isArray((info as any)?.columns)
+                ? (info as any).columns
+                : (Array.isArray((info as any)?.data?.columns) ? (info as any).data.columns : []);
               setLockedNodesSnapshot([{ id: nodeIdStr, name: String(name), columns }]);
-              setIsLocked(true);
+              const rawSchema = (info as any)?.schema;
+              if (Array.isArray(rawSchema)) {
+                setLockedSchema(Object.fromEntries(rawSchema.map((c: any) => [c.name, c.js_type || 'string'])));
+              } else if (rawSchema && typeof rawSchema === 'object') {
+                setLockedSchema(
+                  Object.fromEntries(
+                    Object.entries(rawSchema).map(([k, v]) => [k, typeof v === 'string' ? normalizeTypeName(v) : 'string'])
+                  )
+                );
+              }
+            } catch {
+              if (!cancelled) {
+                setLockedSchema((prev) => prev ?? currentSchema);
+              }
             }
-          } catch { /* ignore */ }
+          }
         }
-        
-        // Now get current-result
+
         const resResp = await textApi.getFrequencyCurrentResult(currentWorkspaceId, getAuthHeaders());
-        if (!resResp) {
-          // No result yet
-          return;
-        }
-        
+        if (!resResp || cancelled) return;
         const res = (resResp as any)?.data;
         if (res) {
           const groupCols = Array.isArray((req as any)?.group_by_columns) ? (req as any).group_by_columns : [];
@@ -528,9 +579,18 @@ const handleClearResults = async () => {
           };
           setResults(enriched);
         }
-      } catch { /* ignore */ }
-    })();
-  }, [currentWorkspaceId, getAuthHeaders]);
+      } catch {
+        /* ignore */
+      } finally {
+        if (!cancelled) setHydratingSelection(false);
+      }
+    };
+
+    void hydrate();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentWorkspaceId, getAuthHeaders, currentSchema, frequency, selectedNodeId]);
 
   return (
     <div className="p-4 space-y-4">
@@ -720,7 +780,7 @@ const handleClearResults = async () => {
           {results && (
             <Button
               onClick={handleClearResults}
-              variant="outline"
+              variant="destructive"
             >
               <Trash2 className="mr-2 h-4 w-4" />
               Clear Results

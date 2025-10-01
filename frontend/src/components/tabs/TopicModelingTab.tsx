@@ -11,6 +11,12 @@ import { nodesApi } from '../../api/nodes';
 import { useAnalysisStore } from '../../stores/analysisStore';
 import useAutoNodeColumns from '../../hooks/useAutoNodeColumns';
 import useNodeColumnInfos from '../../hooks/useNodeColumnInfos';
+import { Button } from '../ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
+import { Input } from '../ui/input';
+import { Checkbox } from '../ui/checkbox';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
+import { AlertTriangle, Loader2, Lock, Play, Trash2 } from 'lucide-react';
 // Define local lightweight response/topic interfaces if not exported (legacy code referenced these)
 interface TopicModelingTopic { id: number; label: string; size: number[]; total_size: number; x: number; y: number; }
 interface TopicModelingResponse { state?: 'running' | 'successful' | 'failed' | 'cancelled'; message?: string; data?: { topics: TopicModelingTopic[]; corpus_sizes?: number[] }; metadata?: { task_id?: string; [k: string]: any } }
@@ -452,164 +458,214 @@ const TopicModelingTab: React.FC = () => {
   }, [result]);
 
   return (
-    <div className="space-y-6">
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-gray-800">Topic Modeling (BERTopic)</h2>
-{isLocked && (
-            <div className="relative group flex items-center text-sm text-gray-600 cursor-default">
-              <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
-                <path fillRule="evenodd" d="M5 8V6a5 5 0 1110 0v2h1a1 1 0 011 1v9a1 1 0 01-1 1H4a1 1 0 01-1-1V9a1 1 0 011-1h1zm2-2a3 3 0 116 0v2H7V6zm-2 4h10v7H5v-7z" clipRule="evenodd" />
-              </svg>
-              Locked
-              <div className="absolute right-0 mt-2 w-72 z-10 hidden group-hover:block bg-white border border-gray-200 shadow-lg rounded p-2 text-xs text-gray-700">
-                <div className="font-semibold mb-1">Panel locked</div>
-                <ul className="list-disc ml-4 space-y-1">
-                  <li>Locked to current request/results.</li>
-                  <li>Node selection and backend-used parameters are disabled.</li>
-                  <li>Clear results to unlock and resync with the graph selection.</li>
-                </ul>
+    <TooltipProvider delayDuration={200}>
+      <div className="space-y-6">
+        <Card>
+          <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="space-y-1">
+              <CardTitle>Topic Modeling (BERTopic)</CardTitle>
+              <CardDescription>Compare up to two nodes to uncover shared topics.</CardDescription>
+            </div>
+            {isLocked && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-2" disabled>
+                    <Lock className="h-4 w-4" />
+                    Locked
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent className="w-72 text-left">
+                  <p className="font-semibold text-primary-foreground">Panel locked</p>
+                  <ul className="mt-2 space-y-1 text-xs leading-relaxed text-primary-foreground/90">
+                    <li>Locked to current request/results.</li>
+                    <li>Node selection and backend-used parameters are disabled.</li>
+                    <li>Clear results to unlock and resync with the graph selection.</li>
+                  </ul>
+                </TooltipContent>
+              </Tooltip>
+            )}
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <NodeSelectionPanel
+              selectedNodes={(isLocked && lockedNodesSnapshot.length)
+                ? lockedNodesSnapshot.map(s=>({ id: s.id, name: s.name, data: { name: s.name, nodeName: s.name, label: s.name, columns: s.columns }, columns: s.columns }))
+                : selectedNodes}
+              nodeColumnSelections={(isLocked && lockedNodeSelections) ? lockedNodeSelections : nodeColumnSelections}
+              onColumnChange={handleColumnChange}
+              nodeColors={nodeColors}
+              onColorChange={handleColorChange}
+              getNodeColumns={getColumnInfos}
+              defaultPalette={defaultPalette}
+              maxCompare={2}
+              disabled={!!isLocked}
+              showShape
+              getNodeShapeFn={getNodeShape}
+              showColorPicker
+              locked={!!isLocked}
+              allowedDataTypes={['string']}
+            />
+
+            <div className="grid gap-4 md:grid-cols-2 md:items-end">
+              <div className="space-y-2 md:max-w-xs">
+                <label htmlFor="minTopicSize" className="text-sm font-medium text-foreground">
+                  Min Topic Size
+                </label>
+                <Input
+                  id="minTopicSize"
+                  type="number"
+                  min={2}
+                  value={minTopicSize}
+                  onChange={e=>setMinTopicSize(parseInt(e.target.value, 10) || 5)}
+                  disabled={!!isLocked}
+                  className="md:w-40"
+                />
+              </div>
+              <div className="flex items-start gap-3 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/40 p-3">
+                <Checkbox
+                  id="useCtTfidf"
+                  checked={useCtTfidf}
+                  onCheckedChange={checked=>setUseCtTfidf(checked === true)}
+                  disabled={!!isLocked}
+                />
+                <label htmlFor="useCtTfidf" className="text-sm leading-tight text-muted-foreground">
+                  Use c-TF-IDF embeddings
+                </label>
               </div>
             </div>
-          )}
-        </div>
-        <div className="mb-6">
-          <NodeSelectionPanel
-            selectedNodes={(isLocked && lockedNodesSnapshot.length)
-              ? lockedNodesSnapshot.map(s=>({ id: s.id, name: s.name, data: { name: s.name, nodeName: s.name, label: s.name, columns: s.columns }, columns: s.columns }))
-              : selectedNodes}
-            nodeColumnSelections={(isLocked && lockedNodeSelections) ? lockedNodeSelections : nodeColumnSelections}
-            onColumnChange={handleColumnChange}
-            nodeColors={nodeColors}
-            onColorChange={handleColorChange}
-            getNodeColumns={getColumnInfos}
-            defaultPalette={defaultPalette}
-            maxCompare={2}
-            disabled={!!isLocked}
-            showShape
-            getNodeShapeFn={getNodeShape}
-            showColorPicker
-            locked={!!isLocked}
-            allowedDataTypes={['string']}
-          />
-        </div>
 
-        {/* Configuration */}
-        <div className="space-y-4 mb-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Min Topic Size</label>
-            <input
-              type="number"
-              min={2}
-              value={minTopicSize}
-              onChange={e=>setMinTopicSize(parseInt(e.target.value)||5)}
-              disabled={!!isLocked}
-              className="w-full md:w-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
-            />
-          </div>
-          <div>
-            <label className="flex items-center">
-              <input id="useCtTfidf" type="checkbox" checked={useCtTfidf} onChange={e=>setUseCtTfidf(e.target.checked)} disabled={!!isLocked} className="mr-2" />
-              <span className="text-sm text-gray-700">Use c-TF-IDF embeddings</span>
-            </label>
-          </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex flex-wrap gap-3 items-center">
-          <button
-            onClick={handleRun}
-            disabled={isRunning || !!isLocked || !!result || !selectedNodes.length || selectedNodes.slice(0,2).some(n=> !nodeColumnSelections.find(s=>s.nodeId===n.id)?.column)}
-            className="w-full md:w-auto px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-          >
-            {isRunning ? 'Running...' : 'Run Topic Modeling'}
-          </button>
-          <button
-            onClick={async () => {
-              if (!currentWorkspaceId) return;
-              setIsClearing(true);
-              try {
-                // Cancel any running topic_modeling tasks first
-                try { await workspacesApi.cancelTasks(currentWorkspaceId, { task_type: 'topic_modeling' }, getAuthHeaders()); } catch {}
-                // Clear saved analyses
-                try { await workspacesApi.clearAnalysis(currentWorkspaceId, 'topic_modeling', getAuthHeaders()); } catch {}
-              } finally {
-                setIsClearing(false);
-                // Reset local state
-                setResultSafely(null);
-                setIsLocked(false);
-                setLockedNodesSnapshot([]);
-                setLockedNodeSelections(null);
-                setIsRunning(false);
-                runningRef.current = false;
-                resetTopicModelingReady();
-                lastFetchedRef.current = { taskId: null, state: null };
-                setNodeColumnSelectionsRaw([], { replace: true, persist: false });
-                recomputeAutoColumns();
-              }
-            }}
-            disabled={isClearing || (!result && !isLocked && !isRunning) || !currentWorkspaceId}
-            className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
-            title={!result && !isLocked && !isRunning ? 'No results to clear' : 'Clear results'}
-          >
-            {isClearing ? 'Clearing…' : 'Clear Results'}
-          </button>
-        </div>
-
-        {error && <div className="mt-3 text-sm text-red-600">{error}</div>}
-  {result && result.state === 'running' && (
-          <div className="mt-3 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
-            Topic modeling task started and is running in the background{result?.metadata?.task_id ? ` (task ${result.metadata.task_id})` : ''}. See Tasks list for progress.
-          </div>
-        )}
-  {result && result.state === 'failed' && (
-          <div className="mt-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded p-2">
-            {result.message || 'Topic modeling failed'}
-          </div>
-        )}
-      </div>
-  {result && result.state === 'successful' && (
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200" ref={containerRef}>
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-md font-semibold text-gray-800">Topics ({topics.length})</h3>
-            <div className="text-xs text-gray-500">Colors blend by proportion of first vs second corpus</div>
-          </div>
-          <div className="relative w-full" ref={chartRef}>
-            {bubbleElements}
-            {tooltip.topic && (
-              <div
-                className="absolute pointer-events-none bg-white border border-gray-300 shadow-lg rounded p-3 text-xs z-10 max-w-xs"
-                style={{ left: tooltip.x, top: tooltip.y }}
+            <div className="flex flex-wrap gap-3">
+              <Button
+                type="button"
+                className="w-full sm:w-auto"
+                onClick={handleRun}
+                disabled={isRunning || !!isLocked || !!result || !selectedNodes.length || selectedNodes.slice(0,2).some(n=> !nodeColumnSelections.find(s=>s.nodeId===n.id)?.column)}
               >
-                <div className="text-sm font-semibold mb-1">Topic {tooltip.topic.id}</div>
-                <div className="text-[10px] text-gray-600 leading-snug mb-1 break-words">{tooltip.topic.label}</div>
-                <div className="mt-1">{renderSizeComposition(tooltip.topic.size, tooltip.topic.total_size)}</div>
+                {isRunning ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Running...
+                  </>
+                ) : (
+                  <>
+                    <Play className="mr-2 h-4 w-4" />
+                    Run Topic Modeling
+                  </>
+                )}
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                className="w-full sm:w-auto"
+                onClick={async () => {
+                  if (!currentWorkspaceId) return;
+                  setIsClearing(true);
+                  try {
+                    try {
+                      await workspacesApi.cancelTasks(currentWorkspaceId, { task_type: 'topic_modeling' }, getAuthHeaders());
+                    } catch {
+                      /* ignore cancellation errors */
+                    }
+                    try {
+                      await workspacesApi.clearAnalysis(currentWorkspaceId, 'topic_modeling', getAuthHeaders());
+                    } catch {
+                      /* ignore clear errors */
+                    }
+                  } finally {
+                    setIsClearing(false);
+                    setResultSafely(null);
+                    setIsLocked(false);
+                    setLockedNodesSnapshot([]);
+                    setLockedNodeSelections(null);
+                    setIsRunning(false);
+                    runningRef.current = false;
+                    resetTopicModelingReady();
+                    lastFetchedRef.current = { taskId: null, state: null };
+                    setNodeColumnSelectionsRaw([], { replace: true, persist: false });
+                    recomputeAutoColumns();
+                  }
+                }}
+                disabled={isClearing || (!result && !isLocked && !isRunning) || !currentWorkspaceId}
+                title={!result && !isLocked && !isRunning ? 'No results to clear' : 'Clear results'}
+              >
+                {isClearing ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Clearing…
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Clear Results
+                  </>
+                )}
+              </Button>
+            </div>
+
+            {error && result?.state !== 'failed' && (
+              <p className="text-sm font-medium text-destructive">{error}</p>
+            )}
+            {result && result.state === 'running' && (
+              <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                <Loader2 className="mt-0.5 h-4 w-4 animate-spin" />
+                <p>
+                  Topic modeling task started and is running in the background
+                  {result?.metadata?.task_id ? ` (task ${result.metadata.task_id})` : ''}. See Tasks list for progress.
+                </p>
               </div>
             )}
-          </div>
-          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-            {topics.slice(0,10).map(t=> {
-              const isHovered = hoveredTopicId === t.id;
-              return (
-                <div
-                  key={t.id}
-                  className={`p-2 rounded border bg-gray-50 transition-shadow ${isHovered ? 'ring-2 ring-blue-500 shadow-md' : ''}`}
-                  onMouseEnter={()=>setHoveredTopicId(t.id)}
-                  onMouseLeave={()=>setHoveredTopicId(null)}
-                >
-                  <div className="font-medium text-gray-700">Topic {t.id}</div>
-                  <div className="text-xs text-gray-600 truncate" title={t.label}>{t.label}</div>
-                  <div className="mt-1">{renderSizeComposition(t.size, t.total_size)}</div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-  {result && result.state === 'failed' && (
-        <div className="bg-white p-4 rounded border text-sm text-red-600">{result.message}</div>
-      )}
-    </div>
+            {result && result.state === 'failed' && (
+              <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+                <AlertTriangle className="mt-0.5 h-4 w-4" />
+                <p>{result.message || 'Topic modeling failed'}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {result && result.state === 'successful' && (
+          <Card ref={containerRef}>
+            <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <CardTitle>Topics ({topics.length})</CardTitle>
+                <CardDescription>Colors blend by proportion of first vs second corpus.</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="relative w-full overflow-hidden rounded-lg border border-muted-foreground/30 bg-background" ref={chartRef}>
+                {bubbleElements}
+                {tooltip.topic && (
+                  <div
+                    className="pointer-events-none absolute z-10 max-w-xs rounded-md border border-border bg-card p-3 text-xs shadow-lg"
+                    style={{ left: tooltip.x, top: tooltip.y }}
+                  >
+                    <div className="text-sm font-semibold">Topic {tooltip.topic.id}</div>
+                    <div className="mt-1 break-words text-[10px] leading-snug text-muted-foreground">{tooltip.topic.label}</div>
+                    <div className="mt-2">{renderSizeComposition(tooltip.topic.size, tooltip.topic.total_size)}</div>
+                  </div>
+                )}
+              </div>
+              <div className="grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
+                {topics.slice(0,10).map(t=> {
+                  const isHovered = hoveredTopicId === t.id;
+                  return (
+                    <div
+                      key={t.id}
+                      className={`rounded-lg border border-border bg-muted/50 p-3 transition-shadow ${isHovered ? 'ring-2 ring-primary shadow-md' : ''}`}
+                      onMouseEnter={()=>setHoveredTopicId(t.id)}
+                      onMouseLeave={()=>setHoveredTopicId(null)}
+                    >
+                      <div className="font-medium text-foreground">Topic {t.id}</div>
+                      <div className="truncate text-xs text-muted-foreground" title={t.label}>{t.label}</div>
+                      <div className="mt-2">{renderSizeComposition(t.size, t.total_size)}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    </TooltipProvider>
   );
 };
 

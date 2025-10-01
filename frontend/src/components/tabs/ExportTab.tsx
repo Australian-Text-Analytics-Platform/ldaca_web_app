@@ -1,8 +1,17 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useCallback, useMemo } from 'react';
+import { Download } from 'lucide-react';
 import { useWorkspaceSelection } from '../../hooks/useWorkspaceSelection';
 import { useWorkspaceData } from '../../hooks/useWorkspaceData';
 import { useAuth } from '../../hooks/useAuth';
 import { getApiBase } from '../../api/env';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
+import { Button } from '../ui/button';
+import { Badge } from '../ui/badge';
+import { Label } from '../ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+
+type DownloadStatus = 'idle' | 'downloading';
 
 // Supported formats aligned with backend / Polars write_* methods
 const FORMATS = [
@@ -16,11 +25,11 @@ const FORMATS = [
 const ExportTab: React.FC = () => {
   const { selectedNodes: rawSelectedNodes } = useWorkspaceSelection();
   const { currentWorkspaceId } = useWorkspaceData();
-  const selectedNodes = rawSelectedNodes ?? [];
+  const selectedNodes = useMemo(() => rawSelectedNodes ?? [], [rawSelectedNodes]);
   const { getAuthHeaders } = useAuth();
   const [format, setFormat] = useState('csv');
   const [exporting, setExporting] = useState(false);
-  const [downloadingIds, setDownloadingIds] = useState<Record<string, boolean>>({});
+  const [downloadingIds, setDownloadingIds] = useState<Record<string, DownloadStatus>>({});
 
   const nodeIds = useMemo(() => selectedNodes.map((n: any, idx: number) => n.id || n.node_id || n.data?.id || n.data?.node_id || n.unique_id || `node-${idx}`), [selectedNodes]);
 
@@ -48,13 +57,13 @@ const ExportTab: React.FC = () => {
       const multiple = nodeIds.length > 1;
       const ext = multiple ? 'zip' : 'csv';
       const filename = multiple ? `export_${currentWorkspaceId}.csv.zip` : `${(toDisplay(selectedNodes[0]).name || nodeIds[0])}.${ext}`;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
     } catch (e) {
       console.error(e);
       alert('Failed to export nodes');
@@ -68,7 +77,7 @@ const ExportTab: React.FC = () => {
     if (!currentWorkspaceId) return;
     const { id, name } = toDisplay(node);
     if (!id) return;
-    setDownloadingIds((s) => ({ ...s, [id]: true }));
+  setDownloadingIds((s) => ({ ...s, [id]: 'downloading' }));
     try {
       const params = new URLSearchParams({ node_ids: id, format });
       const apiBase = getApiBase();
@@ -79,76 +88,114 @@ const ExportTab: React.FC = () => {
       const blob = await resp.blob();
       const ext = format === 'ipc' ? 'arrow' : format;
       const filename = `${name || id}.${ext}`;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
     } catch (e) {
       console.error(e);
       alert('Failed to download node');
     } finally {
-      setDownloadingIds((s) => ({ ...s, [id]: false }));
+      setDownloadingIds((s) => ({ ...s, [id]: 'idle' }));
     }
   }, [currentWorkspaceId, format, getAuthHeaders, toDisplay]);
 
   return (
-    <div className="bg-white rounded-lg shadow p-6 space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold text-gray-800">Export Nodes</h2>
-        <p className="text-sm text-gray-500 mt-1">Select one or more nodes (checkboxes in left sidebar) and choose a format to download their data.</p>
-      </div>
-      <div className="space-y-2 max-h-[28rem] overflow-y-auto border border-gray-200 rounded-md p-1">
-        {selectedNodes.length === 0 && (
-          <div className="p-2 text-gray-500 text-sm">No nodes selected. Use the checkboxes in the left sidebar.</div>
-        )}
-        {selectedNodes.map((n: any) => {
-          const info = toDisplay(n);
-          return (
-            <div key={info.id} className="flex items-center justify-between p-2 border border-gray-200 rounded hover:bg-gray-50">
-              <div className="flex-1">
-                <p className="text-sm font-medium text-gray-800">{info.name}</p>
-                <p className="text-[11px] text-gray-400 break-all">{info.id}</p>
-                {info.shape && <p className="text-xs text-gray-500">Shape: {info.shape}</p>}
-              </div>
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={() => handleDownloadOne(n)}
-                  disabled={!!downloadingIds[info.id!]}
-                  className="px-2 py-1 text-sm bg-blue-50 text-blue-600 rounded hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="Download this node"
-                >
-                  {downloadingIds[info.id!] ? 'Downloading...' : 'Download'}
-                </button>
-              </div>
+    <div className="space-y-6">
+      <Card>
+        <CardHeader className="space-y-1">
+          <CardTitle>Export Nodes</CardTitle>
+          <CardDescription>
+            Select one or more nodes in the workspace graph and download their data in the format you prefer.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed border-border/50 bg-muted/40 px-4 py-3">
+            <div className="text-sm text-muted-foreground">
+              Workspace ID: <span className="font-mono text-foreground">{currentWorkspaceId ?? '—'}</span>
             </div>
-          );
-        })}
-      </div>
-      <div className="flex items-end gap-4 flex-wrap">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Format</label>
-            <select
-              value={format}
-              onChange={(e) => setFormat(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+            <Badge variant={selectedNodes.length ? 'default' : 'outline'}>
+              {selectedNodes.length ? `${selectedNodes.length} node${selectedNodes.length > 1 ? 's' : ''} selected` : 'No nodes selected'}
+            </Badge>
+          </div>
+
+          <div className="space-y-3">
+            <Label className="text-sm font-medium">Selected Nodes</Label>
+            <div className="max-h-[26rem] space-y-2 overflow-y-auto rounded-lg border border-border/60 bg-background p-2 shadow-sm">
+              {selectedNodes.length === 0 && (
+                <div className="flex items-center justify-center rounded-md border border-dashed border-border/40 bg-muted/30 py-10 text-sm text-muted-foreground">
+                  Choose nodes in the graph sidebar to enable exports.
+                </div>
+              )}
+              {selectedNodes.map((n: any) => {
+                const info = toDisplay(n);
+                const status = downloadingIds[info.id ?? ''] ?? 'idle';
+                const isDownloading = status === 'downloading';
+                return (
+                  <div
+                    key={info.id}
+                    className="flex flex-col gap-3 rounded-md border border-border/40 bg-card/60 p-3 transition hover:bg-card/80 md:flex-row md:items-center md:justify-between"
+                  >
+                    <div className="space-y-1">
+                      <p className="text-sm font-semibold text-foreground">{info.name}</p>
+                      <p className="font-mono text-[11px] text-muted-foreground">{info.id}</p>
+                      {info.shape && <p className="text-xs text-muted-foreground">Shape: {info.shape}</p>}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={isDownloading}
+                      onClick={() => handleDownloadOne(n)}
+                      className="gap-1"
+                    >
+                      <Download className="h-4 w-4" />
+                      {isDownloading ? 'Downloading…' : 'Download'}
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
+            <div className="w-full max-w-xs">
+              <Label className="mb-2 block text-sm font-medium text-foreground">Format</Label>
+              <Select value={format} onValueChange={(value) => setFormat(value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose a format" />
+                </SelectTrigger>
+                <SelectContent>
+                  {FORMATS.map((f) => (
+                    <SelectItem key={f.value} value={f.value}>
+                      {f.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              onClick={handleExportAll}
+              disabled={exporting || nodeIds.length === 0 || !currentWorkspaceId}
+              className="gap-2"
             >
-              {FORMATS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
-            </select>
-        </div>
-        <button
-          onClick={handleExportAll}
-          disabled={exporting || nodeIds.length === 0 || !currentWorkspaceId}
-          className="px-5 py-2 mt-1.5 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-        >
-          {exporting && <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />}
-          {exporting ? 'Exporting...' : 'Export All (CSV .zip)'}
-        </button>
-      </div>
-      {nodeIds.length === 0 && (
-        <div className="text-sm text-gray-500">Select nodes in the left sidebar to enable export.</div>
+              {exporting && (
+                <span className="inline-flex h-4 w-4 animate-spin rounded-full border-[1.5px] border-current border-t-transparent" />
+              )}
+              {exporting ? 'Exporting…' : 'Export All (ZIP bundle)'}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {!selectedNodes.length && (
+        <Card className="border-dashed border-border/50 bg-muted/30">
+          <CardContent className="py-8 text-center text-sm text-muted-foreground">
+            Tip: open the Data tab and use the node checkbox to mark items for export.
+          </CardContent>
+        </Card>
       )}
     </div>
   );

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import NodeSelectionPanel from '../NodeSelectionPanel';
 import { useWorkspaceData } from '../../hooks/useWorkspaceData';
@@ -9,6 +10,13 @@ import { nodesApi } from '../../api/nodes';
 import { workspacesApi } from '../../api/workspaces';
 import useAutoNodeColumns from '../../hooks/useAutoNodeColumns';
 import useNodeColumnInfos from '../../hooks/useNodeColumnInfos';
+import { Button } from '../ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
+import { Checkbox } from '../ui/checkbox';
+import { Input } from '../ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2, Lock, Search, Trash2, Unlink } from 'lucide-react';
 
 interface NodeColumnSelection {
   nodeId: string;
@@ -24,6 +32,8 @@ const QuotationTab: React.FC = () => {
   // Show metadata by default so the table mirrors original columns
   const [showMetadata, setShowMetadata] = useState(true);
   const [hasLoaded, setHasLoaded] = useState(false);
+  const [isLoadingQuotations, setIsLoadingQuotations] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
   const [lockedNodesSnapshot, setLockedNodesSnapshot] = useState<Array<{ id: string; name: string; columns: string[] }>>([]);
   const [lockedNodeSelections, setLockedNodeSelections] = useState<NodeColumnSelection[] | null>(null);
@@ -251,23 +261,29 @@ const fetchQuotations = async (nodeId: string, _page?: number, _sortBy?: string,
   };
 
 const handleSearchAll = async () => {
-  setHasLoaded(true);
   const runNodes = selectedNodes.slice(0,1);
   if (!runNodes.length) return;
-  await Promise.all(runNodes.map(n => fetchQuotations(n.id, 1)));
-  // Lock with snapshot
+  setIsLoadingQuotations(true);
+  setHasLoaded(true);
   try {
+    await Promise.all(runNodes.map(n => fetchQuotations(n.id, 1)));
     const nodeId = runNodes[0].id;
-    const lockedSelections = activeSelections.filter(sel => sel.nodeId === nodeId && sel.column);
-    if (lockedSelections.length) {
-      setLockedNodeSelections(lockedSelections);
+    try {
+      const lockedSelections = activeSelections.filter(sel => sel.nodeId === nodeId && sel.column);
+      if (lockedSelections.length) {
+        setLockedNodeSelections(lockedSelections);
+      }
+      const info = await nodesApi.info(currentWorkspaceId!, nodeId, getAuthHeaders());
+      const name = (info as any)?.name || (info as any)?.data?.name || nodeId;
+      const columns = Array.isArray((info as any)?.columns) ? (info as any).columns : (Array.isArray((info as any)?.data?.columns) ? (info as any).data.columns : []);
+      setLockedNodesSnapshot([{ id: nodeId, name: String(name), columns }]);
+      setIsLocked(true);
+    } catch {
+      /* ignore */
     }
-    const info = await nodesApi.info(currentWorkspaceId!, nodeId, getAuthHeaders());
-    const name = (info as any)?.name || (info as any)?.data?.name || nodeId;
-    const columns = Array.isArray((info as any)?.columns) ? (info as any).columns : (Array.isArray((info as any)?.data?.columns) ? (info as any).data.columns : []);
-    setLockedNodesSnapshot([{ id: nodeId, name: String(name), columns }]);
-    setIsLocked(true);
-  } catch { /* ignore */ }
+  } finally {
+    setIsLoadingQuotations(false);
+  }
 };
 
   const handlePageChange = (newPage: number) => {
@@ -351,219 +367,325 @@ const handleSearchAll = async () => {
         }
       } catch { /* ignore */ }
     })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentWorkspaceId, getAuthHeaders]);
 
   return (
-    <div className="space-y-6">
-      <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-semibold text-gray-800">Quotation Extraction</h2>
-{isLocked && (
-            <div className="relative group flex items-center text-sm text-gray-600 cursor-default">
-              <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
-                <path fillRule="evenodd" d="M5 8V6a5 5 0 1110 0v2h1a1 1 0 011 1v9a1 1 0 01-1 1H4a1 1 0 01-1-1V9a1 1 0 011-1h1zm2-2a3 3 0 116 0v2H7V6zm-2 4h10v7H5v-7z" clipRule="evenodd" />
-              </svg>
-              Locked
-              <div className="absolute right-0 mt-2 w-72 z-10 hidden group-hover:block bg-white border border-gray-200 shadow-lg rounded p-2 text-xs text-gray-700">
-                <div className="font-semibold mb-1">Panel locked</div>
-                <ul className="list-disc ml-4 space-y-1">
-                  <li>Locked to current request/results.</li>
-                  <li>Node selection and backend-used parameters are disabled.</li>
-                  <li>Frontend-only options (e.g., Show metadata) stay editable.</li>
-                  <li>Clear results to unlock and resync with the graph selection.</li>
-                </ul>
-              </div>
+    <TooltipProvider delayDuration={200}>
+      <div className="space-y-6">
+        <Card>
+          <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="space-y-1">
+              <CardTitle>Quotation Extraction</CardTitle>
+              <CardDescription>Load quotations for a single node and highlight speaker, quote, and verb spans.</CardDescription>
             </div>
-          )}
-        </div>
-        <div>
-          <NodeSelectionPanel
-            selectedNodes={(isLocked && lockedNodesSnapshot.length) ? lockedNodesSnapshot.map(s=>({ id: s.id, name: s.name, data: { name: s.name, nodeName: s.name, label: s.name, columns: s.columns }, columns: s.columns })) : selectedNodes.slice(0,1)}
-            nodeColumnSelections={activeSelections}
-            onColumnChange={handleColumnChange}
-            nodeColors={{}}
-            onColorChange={()=>{}}
-            getNodeColumns={getColumnInfos}
-            defaultPalette={[]}
-            maxCompare={1}
-            className="mb-0"
-            showShape
-            getNodeShapeFn={getNodeShape}
-            showColorPicker={false}
-            disabled={!!isLocked}
-            allowedDataTypes={['string']}
-          />
-        </div>
+            {isLocked && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-2" disabled>
+                    <Lock className="h-4 w-4" />
+                    Locked
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent className="w-72 text-left">
+                  <p className="font-semibold text-primary-foreground">Panel locked</p>
+                  <ul className="mt-2 space-y-1 text-xs leading-relaxed text-primary-foreground/90">
+                    <li>Locked to current request/results.</li>
+                    <li>Node selection and backend-used parameters are disabled.</li>
+                    <li>Frontend-only options (e.g., Show metadata) stay editable.</li>
+                    <li>Clear results to unlock and resync with the graph selection.</li>
+                  </ul>
+                </TooltipContent>
+              </Tooltip>
+            )}
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <NodeSelectionPanel
+              selectedNodes={(isLocked && lockedNodesSnapshot.length)
+                ? lockedNodesSnapshot.map(s=>({ id: s.id, name: s.name, data: { name: s.name, nodeName: s.name, label: s.name, columns: s.columns }, columns: s.columns }))
+                : selectedNodes.slice(0,1)}
+              nodeColumnSelections={activeSelections}
+              onColumnChange={handleColumnChange}
+              nodeColors={{}}
+              onColorChange={()=>{}}
+              getNodeColumns={getColumnInfos}
+              defaultPalette={[]}
+              maxCompare={1}
+              showShape
+              getNodeShapeFn={getNodeShape}
+              showColorPicker={false}
+              disabled={!!isLocked}
+              allowedDataTypes={['string']}
+            />
 
-        {/* Configuration */}
-        <div className="mt-4 mb-4">
-          <label className="flex items-center">
-            <input type="checkbox" className="mr-2" checked={showMetadata} onChange={(e)=>setShowMetadata(e.target.checked)} />
-            <span className="text-sm text-gray-700">Show metadata</span>
-          </label>
-        </div>
+            <div className="flex items-center gap-3 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/40 p-3">
+              <Checkbox
+                id="showMetadata"
+                checked={showMetadata}
+                onCheckedChange={checked => setShowMetadata(checked === true)}
+              />
+              <label htmlFor="showMetadata" className="text-sm text-muted-foreground">
+                Show metadata
+              </label>
+            </div>
 
-        {/* Action Buttons */}
-        <div className="flex flex-wrap gap-3 items-center">
-          <button
-            onClick={handleSearchAll}
-            disabled={!selectedNodes.length || activeSelections.some(s=>!s.column) || !!isLocked}
-            className="w-full md:w-auto px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-          >
-            Load Quotations
-          </button>
-          {hasLoaded && (
-            <button
-              onClick={async () => {
-                try {
-                  if (currentWorkspaceId) await workspacesApi.clearAnalysis(currentWorkspaceId, 'quotation', getAuthHeaders());
-                } catch {/* ignore */}
-                setHasLoaded(false);
-                setSpanMap({});
-                setLockedNodesSnapshot([]);
-                setLockedNodeSelections(null);
-                setIsLocked(false);
-                setNodeColumnSelectionsRaw([], { replace: true, persist: false });
-                recomputeAutoColumns();
-              }}
-              className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
-            >
-              Clear Results
-            </button>
-          )}
-        </div>
-      </div>
+            <div className="flex flex-wrap gap-3">
+              <Button
+                type="button"
+                className="w-full sm:w-auto"
+                onClick={handleSearchAll}
+                disabled={!selectedNodes.length || activeSelections.some(s=>!s.column) || !!isLocked || isLoadingQuotations}
+              >
+                {isLoadingQuotations ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Loading…
+                  </>
+                ) : (
+                  <>
+                    <Search className="mr-2 h-4 w-4" />
+                    Load Quotations
+                  </>
+                )}
+              </Button>
+              {hasLoaded && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  className="w-full sm:w-auto"
+                  onClick={async () => {
+                    if (!currentWorkspaceId) return;
+                    setIsClearing(true);
+                    try {
+                      try {
+                        await workspacesApi.clearAnalysis(currentWorkspaceId, 'quotation', getAuthHeaders());
+                      } catch {
+                        /* ignore */
+                      }
+                    } finally {
+                      setIsClearing(false);
+                      setHasLoaded(false);
+                      setSpanMap({});
+                      setLockedNodesSnapshot([]);
+                      setLockedNodeSelections(null);
+                      setIsLocked(false);
+                      setNodeColumnSelectionsRaw([], { replace: true, persist: false });
+                      recomputeAutoColumns();
+                    }
+                  }}
+                  disabled={isClearing}
+                >
+                  {isClearing ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Clearing…
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Clear Results
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
-      {/* Results - render only after user clicks Load quotations */}
-      {hasLoaded && selectedNodes.slice(0,1).map((node)=>{
-        const nodeId = node.id;
-  // const nodeRes = results[nodeId]; // no longer needed; we use base table pagination
-  // Determine which columns to show: mirror original node columns only
-  const originalColumns = getStringColumns(node);
-  const selection = activeSelections.find(s => s.nodeId === nodeId);
-        const textCol = selection?.column || '';
-        const cols = originalColumns;
-  // Use base table rows as the source of truth
-  const baseRows: any[] = Array.isArray(nodeData?.data) ? nodeData.data : [];
-  const rowsForRender = baseRows;
-        return (
-          <div key={nodeId} className="bg-white rounded-lg shadow-sm border border-gray-200">
-            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden h-[70vh] flex flex-col">
-              <div className="flex-1 overflow-y-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50 sticky top-0">
-                    <tr>
-                      {cols.map((c: string) => (
-                        <th
-                          key={c}
-                          className="px-4 py-2 text-left text-xs font-medium text-gray-500 tracking-wider cursor-pointer hover:bg-gray-100"
-                          onClick={()=>handleSort(nodeId, c)}
-                        >
-                          <div className="flex items-center space-x-1">
-                            <span>{c}</span>
-                            <span className="text-xs text-gray-400">▲▼</span>
-                          </div>
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {rowsForRender.length === 0 ? (
-                      <tr><td className="px-4 py-6 text-center text-gray-500" colSpan={cols.length || 1}>No quotations</td></tr>
-                    ) : (
-                      rowsForRender.map((row:any, idx:number)=> {
-                        return (
-                          <tr key={idx} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
-                            {cols.map((c: string, i: number) => {
-                              const val = row[c];
-                              // compute signature to find spans for this row
-                              const signature = JSON.stringify(cols.map((oc: string) => row?.[oc]));
-                              const spansForRow = (spanMap[nodeId] && spanMap[nodeId][signature]) || [];
-                              const rowWithSpans = { ...row, __spans: spansForRow };
-                              const cellKey = `${nodeId}:${idx}:${i}`;
-                              const content = (c === textCol)
-                                ? renderHighlightedText(typeof val === 'string' ? val : (val ?? ''), rowWithSpans, cellKey)
-                                : (val !== undefined && val !== null ? String(val) : '');
-                              return (
-                                <td
-                                  key={i}
-                                  className="px-4 py-2 text-sm text-gray-900 align-top"
-                                  style={{ lineHeight: 1.6 }}
-                                >
-                                  {content}
-                                </td>
-                              );
-                            })}
+        {hasLoaded && selectedNodes.slice(0,1).map((node)=>{
+          const nodeId = node.id;
+          const nodeLabel = node.name || node.data?.name || node.data?.label || node.id;
+          const originalColumns = getStringColumns(node);
+          const selection = activeSelections.find(s => s.nodeId === nodeId);
+          const textCol = selection?.column || '';
+          const cols = originalColumns;
+          const baseRows: any[] = Array.isArray(nodeData?.data) ? nodeData.data : [];
+          const rowsForRender = baseRows;
+          return (
+            <Card key={nodeId} className="overflow-hidden">
+              <CardHeader className="gap-1 border-b bg-muted/40">
+                <CardTitle className="text-base">Quotations for {nodeLabel}</CardTitle>
+                <CardDescription>Text column: {textCol || 'Select a text column to view highlighted quotations.'}</CardDescription>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="flex h-[70vh] flex-col">
+                  <div className="flex-1 overflow-y-auto">
+                    <table className="min-w-full divide-y divide-border">
+                      <thead className="sticky top-0 bg-muted/50">
+                        <tr>
+                          {cols.map((c: string) => (
+                            <th
+                              key={c}
+                              className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground transition-colors hover:bg-muted cursor-pointer"
+                              onClick={()=>handleSort(nodeId, c)}
+                            >
+                              <span className="flex items-center gap-1">
+                                <span>{c}</span>
+                                <span className="text-[10px] text-muted-foreground/70">▲▼</span>
+                              </span>
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border bg-card">
+                        {rowsForRender.length === 0 ? (
+                          <tr>
+                            <td className="px-4 py-6 text-center text-sm text-muted-foreground" colSpan={cols.length || 1}>
+                              No quotations
+                            </td>
                           </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
-              {/* DataView-style pagination controls + detach */}
-              {(() => {
-                const pag = (nodeData as any)?.pagination || {};
-                const page = Number(pag.page) || 1;
-                const page_size = Number(pag.page_size) || 20;
-                const total_rows = Number(pag.total_rows) || (Array.isArray(nodeData?.data) ? nodeData.data.length : 0);
-                const total_pages = Number(pag.total_pages) || (page_size > 0 ? Math.max(1, Math.ceil(total_rows / page_size)) : 1);
-                const has_prev = !!pag.has_prev || page > 1;
-                const has_next = !!pag.has_next || page < total_pages;
-                return (
-                  <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50">
-                    {/* Left: page size + row info */}
-                    <div className="flex items-center space-x-4">
-                      <div className="flex items-center space-x-2">
-                        <span className="text-sm text-gray-700">Show</span>
-                        <select
-                          value={page_size}
-                          onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-                          className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        >
-                          {[10,20,50,100].map(sz => (<option key={sz} value={sz}>{sz}</option>))}
-                        </select>
-                        <span className="text-sm text-gray-700">rows</span>
-                      </div>
-                      <div className="text-sm text-gray-700">
-                        Showing {Math.min((page - 1) * page_size + 1, total_rows)} to {Math.min(page * page_size, total_rows)} of {total_rows} rows
-                      </div>
-                    </div>
-
-                    {/* Right: nav + detach */}
-                    <div className="flex items-center space-x-2">
-                      <button onClick={() => handlePageChange(1)} disabled={!has_prev} className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100" title="First page">⟨⟨</button>
-                      <button onClick={() => handlePageChange(page - 1)} disabled={!has_prev} className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100" title="Previous page">⟨</button>
-                      <div className="flex items-center space-x-1">
-                        <span className="text-sm text-gray-700">Page</span>
-                        <input
-                          type="number"
-                          value={page}
-                          onChange={(e) => {
-                            const newPage = Number(e.target.value);
-                            if (newPage >= 1 && newPage <= total_pages) handlePageChange(newPage);
-                          }}
-                          className="w-16 px-2 py-1 text-sm border border-gray-300 rounded text-center focus:outline-none focus:ring-1 focus:ring-blue-500"
-                          min={1}
-                          max={total_pages}
-                        />
-                        <span className="text-sm text-gray-700">of {total_pages}</span>
-                      </div>
-                      <button onClick={() => handlePageChange(page + 1)} disabled={!has_next} className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100" title="Next page">⟩</button>
-                      <button onClick={() => handlePageChange(total_pages)} disabled={!has_next} className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100" title="Last page">⟩⟩</button>
-                      <button onClick={()=>handleDetach(nodeId)} disabled={nodeDetaching[nodeId]} className="ml-3 px-3 py-1 bg-green-600 text-white rounded text-sm disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-green-700 transition-colors">
-                        {nodeDetaching[nodeId] ? 'Detaching...' : 'Detach'}
-                      </button>
-                    </div>
+                        ) : (
+                          rowsForRender.map((row:any, idx:number)=> (
+                            <tr key={idx} className={idx % 2 === 0 ? 'bg-background' : 'bg-muted/30'}>
+                              {cols.map((c: string, i: number) => {
+                                const val = row[c];
+                                const signature = JSON.stringify(cols.map((oc: string) => row?.[oc]));
+                                const spansForRow = (spanMap[nodeId] && spanMap[nodeId][signature]) || [];
+                                const rowWithSpans = { ...row, __spans: spansForRow };
+                                const cellKey = `${nodeId}:${idx}:${i}`;
+                                const content = (c === textCol)
+                                  ? renderHighlightedText(typeof val === 'string' ? val : (val ?? ''), rowWithSpans, cellKey)
+                                  : (val !== undefined && val !== null ? String(val) : '');
+                                return (
+                                  <td
+                                    key={i}
+                                    className="px-4 py-2 text-sm text-foreground align-top"
+                                    style={{ lineHeight: 1.6 }}
+                                  >
+                                    {content}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
                   </div>
-                );
-              })()}
-            </div>
-          </div>
-        );
-      })}
-  {/* Intentionally render nothing before user loads quotations */}
-    </div>
+                  {(() => {
+                    const pag = (nodeData as any)?.pagination || {};
+                    const page = Number(pag.page) || 1;
+                    const page_size = Number(pag.page_size) || 20;
+                    const total_rows = Number(pag.total_rows) || (Array.isArray(nodeData?.data) ? nodeData.data.length : 0);
+                    const total_pages = Number(pag.total_pages) || (page_size > 0 ? Math.max(1, Math.ceil(total_rows / page_size)) : 1);
+                    const has_prev = !!pag.has_prev || page > 1;
+                    const has_next = !!pag.has_next || page < total_pages;
+                    return (
+                      <div className="flex flex-col gap-4 border-t border-border bg-muted/30 px-4 py-3 md:flex-row md:items-center md:justify-between">
+                        <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                          <div className="flex items-center gap-2">
+                            <span>Show</span>
+                            <Select value={String(page_size)} onValueChange={(value) => handlePageSizeChange(Number(value))}>
+                              <SelectTrigger className="h-8 w-[110px] text-left">
+                                <SelectValue placeholder="Rows" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {[10, 20, 50, 100].map(sz => (
+                                  <SelectItem key={sz} value={String(sz)}>
+                                    {sz}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <span>rows</span>
+                          </div>
+                          <div>
+                            Showing {Math.min((page - 1) * page_size + 1, total_rows)} to {Math.min(page * page_size, total_rows)} of {total_rows} rows
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => handlePageChange(1)}
+                            disabled={!has_prev}
+                            title="First page"
+                          >
+                            <ChevronsLeft className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => handlePageChange(page - 1)}
+                            disabled={!has_prev}
+                            title="Previous page"
+                          >
+                            <ChevronLeft className="h-4 w-4" />
+                          </Button>
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <span>Page</span>
+                            <Input
+                              type="number"
+                              value={page}
+                              onChange={(e) => {
+                                const newPage = Number(e.target.value);
+                                if (Number.isFinite(newPage) && newPage >= 1 && newPage <= total_pages) {
+                                  handlePageChange(newPage);
+                                }
+                              }}
+                              className="h-8 w-20 text-center"
+                              min={1}
+                              max={total_pages}
+                            />
+                            <span>of {total_pages}</span>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => handlePageChange(page + 1)}
+                            disabled={!has_next}
+                            title="Next page"
+                          >
+                            <ChevronRight className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => handlePageChange(total_pages)}
+                            disabled={!has_next}
+                            title="Last page"
+                          >
+                            <ChevronsRight className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            onClick={()=>handleDetach(nodeId)}
+                            disabled={nodeDetaching[nodeId]}
+                          >
+                            {nodeDetaching[nodeId] ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Detaching…
+                              </>
+                            ) : (
+                              <>
+                                <Unlink className="mr-2 h-4 w-4" />
+                                Detach
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+    </TooltipProvider>
   );
 };
 
