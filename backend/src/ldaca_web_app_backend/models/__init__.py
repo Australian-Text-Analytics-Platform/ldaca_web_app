@@ -4,7 +4,7 @@ Pydantic models for the ATAP Web App API
 
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 # =============================================================================
 # AUTHENTICATION MODELS
@@ -275,12 +275,10 @@ class ConcordanceAnalysisRequest(BaseModel):
     regex: bool = False
     case_sensitive: bool = False
     combined: bool = False  # if true, backend builds a combined view across nodes
-    # Pagination parameters (apply to all requested nodes unless a subset call is made)
-    page: int = 1
-    page_size: int = 50
     # Sorting parameters
     sort_by: Optional[str] = None  # column name to sort by
-    sort_order: str = "asc"  # "asc" or "desc"
+
+    model_config = ConfigDict(extra="forbid")
 
 
 class ConcordanceDetachRequest(BaseModel):
@@ -488,20 +486,28 @@ class TokenFrequencyRequest(BaseModel):
         None  # Maps node_id -> column_name (optional for auto-detection)
     )
     stop_words: Optional[List[str]] = None
-    # Make limit required so missing field triggers 422; enforce >0 in endpoint logic
-    limit: int
+    token_limit: Optional[int] = Field(default=None, alias="limit")
 
     # Pydantic v2 model config
     model_config = ConfigDict(
+        populate_by_name=True,
         json_schema_extra={
             "example": {
                 "node_ids": ["node1", "node2"],
                 "node_columns": {"node1": "text_column", "node2": "content_column"},
                 "stop_words": ["the", "and", "or"],
-                "limit": 50,
+                "token_limit": 50,
             }
-        }
+        },
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _support_token_limit_alias(cls, values: Dict[str, Any]):
+        if isinstance(values, dict):
+            if "token_limit" not in values and "limit" in values:
+                values["token_limit"] = values["limit"]
+        return values
 
 
 class TokenFrequencyData(BaseModel):
@@ -555,6 +561,10 @@ class TokenFrequencyResponse(BaseModel):
     statistics: Optional[List[TokenStatisticsData]] = (
         None  # Statistical measures (only when comparing 2 nodes)
     )
+    token_limit: Optional[int] = None
+    analysis_params: Optional[Dict[str, Any]] = None
+    metadata: Optional[Dict[str, Any]] = None
+    stop_words: Optional[List[str]] = None
 
 
 # =============================================================================

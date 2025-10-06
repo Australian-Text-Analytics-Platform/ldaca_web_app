@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Enhanced TypeScript types for the ATAP Web App
  * Provides type safety and better development experience
@@ -140,10 +141,7 @@ export interface ConcordanceRequest {
   num_right_tokens?: number;
   regex?: boolean;
   case_sensitive?: boolean;
-  page?: number;
-  page_size?: number;
   sort_by?: string;
-  sort_order?: 'asc' | 'desc';
 }
 
 // File Types

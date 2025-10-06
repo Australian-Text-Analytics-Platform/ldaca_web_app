@@ -1,6 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { useFilePreview } from '../hooks/useFilePreview';
-import FilePreviewTooltip from './ui/FilePreviewTooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
+import { Loader2 } from 'lucide-react';
 import { FileInfo } from '../types';
 
 interface FileListProps {
@@ -20,42 +21,18 @@ const FileList: React.FC<FileListProps> = ({
   onDelete,
   onDownload
 }) => {
-  const [hoveredFile, setHoveredFile] = useState<string | null>(null);
-  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
   const [actionLoading, setActionLoading] = useState<{ [key: string]: 'delete' | 'download' | null }>({});
-  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { previewData, loading: previewLoading, error, fetchPreview, clearPreview } = useFilePreview();
+  const [hoveredFile, setHoveredFile] = useState<string | null>(null);
 
-  const handleMouseEnter = (filename: string, event: React.MouseEvent) => {
-    // Clear any existing timeout
-    if (hoverTimeoutRef.current) {
-      clearTimeout(hoverTimeoutRef.current);
-    }
-
-    // Set tooltip position
-    setTooltipPosition({ x: event.clientX, y: event.clientY });
+  const handleMouseEnter = (filename: string) => {
     setHoveredFile(filename);
-
-    // Delay before showing tooltip and fetching preview
-    hoverTimeoutRef.current = setTimeout(() => {
-      fetchPreview(filename);
-    }, 500); // 500ms delay before showing preview
+    fetchPreview(filename);
   };
 
   const handleMouseLeave = () => {
-    // Clear timeout and hide tooltip
-    if (hoverTimeoutRef.current) {
-      clearTimeout(hoverTimeoutRef.current);
-      hoverTimeoutRef.current = null;
-    }
     setHoveredFile(null);
     clearPreview();
-  };
-
-  const handleMouseMove = (event: React.MouseEvent) => {
-    if (hoveredFile) {
-      setTooltipPosition({ x: event.clientX, y: event.clientY });
-    }
   };
 
   const handleDelete = async (filename: string, event: React.MouseEvent) => {
@@ -157,22 +134,22 @@ const FileList: React.FC<FileListProps> = ({
   }
 
   return (
-    <>
+    <TooltipProvider delayDuration={300}>
       <ul className="divide-y divide-gray-100">
         {files.map((file) => (
-          <li
-            key={file.filename}
-            className={`p-3 cursor-pointer transition-all duration-200 hover:bg-blue-50 ${
-              selectedFile === file.filename 
-                ? 'bg-blue-100 border-l-4 border-blue-500' 
-                : 'hover:text-blue-700'
-            }`}
-            onClick={() => onFileSelect(file.filename)}
-            onMouseEnter={(e) => handleMouseEnter(file.filename, e)}
-            onMouseLeave={handleMouseLeave}
-            onMouseMove={handleMouseMove}
-          >
-            <div className="flex items-center justify-between">
+          <Tooltip key={file.filename} open={hoveredFile === file.filename}>
+            <TooltipTrigger asChild>
+              <li
+                className={`p-3 cursor-pointer transition-all duration-200 hover:bg-blue-50 ${
+                  selectedFile === file.filename 
+                    ? 'bg-blue-100 border-l-4 border-blue-500' 
+                    : 'hover:text-blue-700'
+                }`}
+                onClick={() => onFileSelect(file.filename)}
+                onMouseEnter={() => handleMouseEnter(file.filename)}
+                onMouseLeave={handleMouseLeave}
+              >
+                <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3 min-w-0 flex-1">
                 {getFileIcon(file.file_type || file.type || 'unknown')}
                 <div className="min-w-0 flex-1">
@@ -249,17 +226,85 @@ const FileList: React.FC<FileListProps> = ({
               )}
             </div>
           </li>
+        </TooltipTrigger>
+        <TooltipContent 
+          side="right" 
+          className="max-w-2xl max-h-96 overflow-auto bg-card text-card-foreground border shadow-lg p-0"
+          sideOffset={10}
+        >
+          {previewLoading ? (
+            <div className="flex items-center gap-2 p-4">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span className="text-sm">Loading preview...</span>
+            </div>
+          ) : error ? (
+            <div className="flex items-center gap-2 p-4 text-destructive">
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+              <span className="text-sm">{error}</span>
+            </div>
+          ) : !previewData || previewData.length === 0 ? (
+            <div className="p-4 text-sm text-muted-foreground">No preview available</div>
+          ) : (
+            <>
+              <div className="bg-muted px-4 py-3 border-b">
+                <div className="flex items-center gap-2">
+                  <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <span className="font-semibold text-sm">
+                    File Preview ({previewData.length} rows)
+                  </span>
+                </div>
+              </div>
+              <div className="overflow-auto max-h-80">
+                <table className="w-full text-xs">
+                  <thead className="bg-muted/50 sticky top-0">
+                    <tr>
+                      {Object.keys(previewData[0]).map((col, idx) => (
+                        <th
+                          key={idx}
+                          className="border-r border-border last:border-r-0 px-2 py-1 text-left font-medium max-w-24 truncate"
+                          title={col}
+                        >
+                          {col}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {previewData.slice(0, 10).map((row, rowIdx) => (
+                      <tr key={rowIdx} className="hover:bg-muted/50">
+                        {Object.keys(previewData[0]).map((col, colIdx) => (
+                          <td
+                            key={colIdx}
+                            className="border-r border-border last:border-r-0 px-2 py-1 max-w-24 truncate"
+                            title={String(row[col] || '')}
+                          >
+                            {String(row[col] || '').substring(0, 20)}
+                            {String(row[col] || '').length > 20 ? '...' : ''}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {previewData.length > 10 && (
+                <div className="bg-muted/50 px-4 py-2 border-t border-border">
+                  <div className="text-xs text-muted-foreground text-center">
+                    ... and {previewData.length - 10} more rows
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </TooltipContent>
+      </Tooltip>
         ))}
       </ul>
-      
-      <FilePreviewTooltip
-        previewData={previewData}
-        loading={previewLoading}
-        error={error}
-        visible={!!hoveredFile}
-        position={tooltipPosition}
-      />
-    </>
+    </TooltipProvider>
   );
 };
 

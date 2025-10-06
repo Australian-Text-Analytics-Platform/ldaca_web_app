@@ -1,8 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import DatePicker from 'react-datepicker';
-import type { ReactDatePickerCustomHeaderProps } from 'react-datepicker';
-import 'react-datepicker/dist/react-datepicker.css';
-import { Loader2 } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { CalendarIcon, Clock2Icon, Loader2 } from 'lucide-react';
 import { useWorkspaceSelection } from '../../hooks/useWorkspaceSelection';
 import { useWorkspaceData } from '../../hooks/useWorkspaceData';
 import { useWorkspaceActions } from '../../hooks/useWorkspaceActions';
@@ -16,8 +13,20 @@ import { Checkbox } from '../ui/checkbox';
 import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../ui/card';
+import { Label } from '../ui/label';
+import { Input } from '../ui/input';
+import { Calendar } from '../ui/calendar';
 // Define minimal request types (backend expects these shapes)
-interface FilterCondition { column: string; operator: 'eq' | 'gte' | 'lte' | 'contains' | 'startswith' | 'endswith' | 'is_null' | 'between'; value: any; negate?: boolean; regex?: boolean; }
+type ConditionRange = { start: string | Date | null; end: string | Date | null };
+type ConditionValue = string | number | boolean | Date | ConditionRange | null;
+
+interface FilterCondition {
+  column: string;
+  operator: 'eq' | 'gte' | 'lte' | 'contains' | 'startswith' | 'endswith' | 'is_null' | 'between';
+  value: ConditionValue;
+  negate?: boolean;
+  regex?: boolean;
+}
 interface FilterRequest { conditions: FilterCondition[]; logic?: string; new_node_name?: string; }
 
 // (Removed unused DATA_TYPES constant to satisfy lint)
@@ -78,23 +87,6 @@ const getOperatorsForType = (dataType: string) => {
 
 const ISO_PLACEHOLDER = 'YYYY-MM-DDTHH:MM:SS+00:00';
 
-const MONTH_LABELS = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-];
-
-const YEARS_PAST_WINDOW = 120;
-const YEARS_FUTURE_WINDOW = 50;
 
 const normalizeIsoDraft = (txt: string): string => {
   let s = txt.trim();
@@ -227,207 +219,198 @@ const IsoDateInput = React.forwardRef<HTMLInputElement, IsoDateInputProps>((prop
         }
       }}
       placeholder={placeholder}
-    className={`${parentClassName ? `${parentClassName} ` : ''}px-2 py-1 rounded-md border border-border text-sm font-mono text-foreground`}
+      className={`${parentClassName ? `${parentClassName} ` : ''}px-2 py-1 rounded-md border border-border text-sm font-mono text-foreground`}
       size={28}
       style={{ width: '28ch', minWidth: '28ch', maxWidth: '28ch', flex: 'none' }}
     />
   );
 });
 
-export const CalendarHeaderWithYearSelect: React.FC<ReactDatePickerCustomHeaderProps> = ({
-  date,
-  decreaseMonth,
-  increaseMonth,
-  changeYear,
-  changeMonth,
-  prevMonthButtonDisabled,
-  nextMonthButtonDisabled,
-}) => {
-  const [pickerOpen, setPickerOpen] = React.useState(false);
-  const headerRef = React.useRef<HTMLDivElement | null>(null);
-  const monthListRef = React.useRef<HTMLDivElement | null>(null);
-  const yearListRef = React.useRef<HTMLDivElement | null>(null);
-  const selectedMonthRef = React.useRef<HTMLButtonElement | null>(null);
-  const selectedYearRef = React.useRef<HTMLButtonElement | null>(null);
+IsoDateInput.displayName = 'IsoDateInput';
+
+const padNumber = (value: number): string => value.toString().padStart(2, '0');
+
+const toIsoUtcString = (date: Date): string => {
+  return `${date.getFullYear()}-${padNumber(date.getMonth() + 1)}-${padNumber(date.getDate())}T${padNumber(date.getHours())}:${padNumber(date.getMinutes())}:${padNumber(date.getSeconds())}+00:00`;
+};
+
+const formatTimeInputValue = (date: Date | null | undefined): string => {
+  if (!date) {
+    return '00:00:00';
+  }
+  return `${padNumber(date.getHours())}:${padNumber(date.getMinutes())}:${padNumber(date.getSeconds())}`;
+};
+
+const parseTimeSegments = (value: string): [number, number, number] => {
+  const [hours = '0', minutes = '0', seconds = '0'] = value.split(':');
+  const parsedHours = Number(hours);
+  const parsedMinutes = Number(minutes);
+  const parsedSeconds = Number(seconds);
+  return [Number.isFinite(parsedHours) ? parsedHours : 0, Number.isFinite(parsedMinutes) ? parsedMinutes : 0, Number.isFinite(parsedSeconds) ? parsedSeconds : 0];
+};
+
+const combineDateAndTime = (date: Date, timeValue: string): Date => {
+  const [hours, minutes, seconds] = parseTimeSegments(timeValue);
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), hours, minutes, seconds, 0);
+};
+
+const normalizeTimeValue = (value: string): string => {
+  const [hours, minutes, seconds] = parseTimeSegments(value);
+  return `${padNumber(Math.max(0, Math.min(23, hours)))}:${padNumber(Math.max(0, Math.min(59, minutes)))}:${padNumber(Math.max(0, Math.min(59, seconds)))}`;
+};
+
+interface DateTimePickerFieldProps {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  disabled?: boolean;
+}
+
+const DateTimePickerField: React.FC<DateTimePickerFieldProps> = ({ value, onChange, placeholder = ISO_PLACEHOLDER, disabled = false }) => {
+  const containerRef = React.useRef<HTMLDivElement | null>(null);
+  const [open, setOpen] = React.useState(false);
+  const parsedValue = React.useMemo(() => (value ? parseIsoToLocalDate(value) : null), [value]);
+  const [draftDate, setDraftDate] = React.useState<Date | undefined>(parsedValue ?? undefined);
+  const [timeValue, setTimeValue] = React.useState<string>(formatTimeInputValue(parsedValue));
+  const timeInputId = React.useId();
 
   React.useEffect(() => {
-    if (!pickerOpen) return;
-    const handler = (event: MouseEvent) => {
-      if (!headerRef.current) return;
-      if (!headerRef.current.contains(event.target as Node)) {
-        setPickerOpen(false);
+    setDraftDate(parsedValue ?? undefined);
+    setTimeValue(formatTimeInputValue(parsedValue));
+  }, [parsedValue, open]);
+
+  React.useEffect(() => {
+    if (!open) {
+      return;
+    }
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!containerRef.current) return;
+      if (!containerRef.current.contains(event.target as Node)) {
+        setOpen(false);
       }
     };
-    document.addEventListener('mousedown', handler);
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
     return () => {
-      document.removeEventListener('mousedown', handler);
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [pickerOpen]);
+  }, [open]);
 
-  React.useEffect(() => {
-    setPickerOpen(false);
-  }, [date]);
-
-  // Scroll to selected month and year when menu opens
-  React.useEffect(() => {
-    if (pickerOpen) {
-      if (monthListRef.current && selectedMonthRef.current) {
-        const list = monthListRef.current;
-        const selected = selectedMonthRef.current;
-        const listHeight = list.clientHeight;
-        const selectedTop = selected.offsetTop;
-        const selectedHeight = selected.clientHeight;
-        // Center the selected month in the list
-        list.scrollTop = selectedTop - (listHeight / 2) + (selectedHeight / 2);
+  const commitDate = useCallback(
+    (date: Date | undefined) => {
+      if (!date) {
+        onChange('');
+        return;
       }
-      if (yearListRef.current && selectedYearRef.current) {
-        const list = yearListRef.current;
-        const selected = selectedYearRef.current;
-        const listHeight = list.clientHeight;
-        const selectedTop = selected.offsetTop;
-        const selectedHeight = selected.clientHeight;
-        // Center the selected year in the list
-        list.scrollTop = selectedTop - (listHeight / 2) + (selectedHeight / 2);
+      onChange(toIsoUtcString(date));
+    },
+    [onChange]
+  );
+
+  const handleSelectDate = useCallback(
+    (day: Date | undefined) => {
+      if (!day) {
+        setDraftDate(undefined);
+        commitDate(undefined);
+        return;
       }
-    }
-  }, [pickerOpen]);
+      const combined = combineDateAndTime(day, timeValue);
+      setDraftDate(combined);
+      commitDate(combined);
+    },
+    [commitDate, timeValue]
+  );
 
-  const years = React.useMemo(() => {
-    const currentYear = date.getFullYear();
-    const todayYear = new Date().getFullYear();
-    const lowerBound = Math.min(currentYear - YEARS_PAST_WINDOW, todayYear - YEARS_PAST_WINDOW);
-    const upperBound = Math.max(currentYear + YEARS_FUTURE_WINDOW, todayYear + YEARS_FUTURE_WINDOW);
-    const list: number[] = [];
-    for (let year = lowerBound; year <= upperBound; year += 1) {
-      list.push(year);
-    }
-    return list;
-  }, [date]);
+  const handleTimeChange = useCallback(
+    (nextValue: string) => {
+      const normalized = normalizeTimeValue(nextValue);
+      setTimeValue(normalized);
+      setDraftDate((current) => {
+        if (!current) {
+          return current;
+        }
+        const updated = combineDateAndTime(current, normalized);
+        commitDate(updated);
+        return updated;
+      });
+    },
+    [commitDate]
+  );
 
-  const handleTogglePicker = () => {
-    setPickerOpen(open => !open);
-  };
-
-  const handleSelectMonth = (monthIndex: number) => {
-    changeMonth(monthIndex);
-    setPickerOpen(false);
-  };
-
-  const handleSelectYear = (year: number) => {
-    changeYear(year);
-    setPickerOpen(false);
-  };
-
-  const handleDecreaseMonth = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setPickerOpen(false);
-    decreaseMonth();
-  };
-
-  const handleIncreaseMonth = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setPickerOpen(false);
-    increaseMonth();
-  };
+  const selectedDate = draftDate ?? parsedValue ?? undefined;
 
   return (
-    <div ref={headerRef} className="flex items-center justify-between px-2 py-1 text-muted-foreground">
-      <button
-        type="button"
-        onClick={handleDecreaseMonth}
-        disabled={prevMonthButtonDisabled}
-        className="rounded-md p-1 text-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-40"
-        aria-label="Previous month"
-      >
-        ‹
-      </button>
-      <div className="relative flex-1">
-        <button
-          type="button"
-          onClick={handleTogglePicker}
-          className="w-full rounded-md px-2 py-1 text-sm font-medium text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-          aria-haspopup="dialog"
-          aria-expanded={pickerOpen}
-          aria-label="Select month and year"
-        >
-          {MONTH_LABELS[date.getMonth()]} {date.getFullYear()}
-        </button>
-        {pickerOpen && (
-          <div
-            role="dialog"
-            className="absolute left-1/2 z-10 mt-1 flex -translate-x-1/2 gap-2 rounded-md border border-border bg-card p-2 shadow-lg"
-          >
-            {/* Month column */}
-            <div
-              ref={monthListRef}
-              role="listbox"
-              aria-label="Select month"
-              className="max-h-64 w-32 overflow-y-auto rounded-md border border-border/70 bg-card py-1"
-            >
-              {MONTH_LABELS.map((month, index) => (
-                <button
-                  key={month}
-                  ref={index === date.getMonth() ? selectedMonthRef : null}
-                  type="button"
-                  role="option"
-                  aria-selected={index === date.getMonth()}
-                  className={`block w-full px-3 py-1.5 text-left text-sm ${
-                    index === date.getMonth()
-                      ? 'bg-primary/10 font-semibold text-primary'
-                      : 'hover:bg-muted'
-                  }`}
-                  onClick={() => handleSelectMonth(index)}
-                >
-                  {month}
-                </button>
-              ))}
-            </div>
-            {/* Year column */}
-            <div
-              ref={yearListRef}
-              role="listbox"
-              aria-label="Select year"
-              className="max-h-64 w-24 overflow-y-auto rounded-md border border-border/70 bg-card py-1"
-            >
-              {years.map(year => (
-                <button
-                  key={year}
-                  ref={year === date.getFullYear() ? selectedYearRef : null}
-                  type="button"
-                  role="option"
-                  aria-selected={year === date.getFullYear()}
-                  className={`block w-full px-3 py-1.5 text-left text-sm ${
-                    year === date.getFullYear()
-                      ? 'bg-primary/10 font-semibold text-primary'
-                      : 'hover:bg-muted'
-                  }`}
-                  onClick={() => handleSelectYear(year)}
-                >
-                  {year}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-      <button
-        type="button"
-        onClick={handleIncreaseMonth}
-        disabled={nextMonthButtonDisabled}
-        className="rounded-md p-1 text-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-40"
-        aria-label="Next month"
-      >
-        ›
-      </button>
+    <div ref={containerRef} className="relative flex items-center">
+      <IsoDateInput
+        committedValue={value}
+        onCommit={onChange}
+        placeholder={placeholder}
+        readOnly={disabled}
+        className="pr-10"
+        onFocus={() => {
+          if (!disabled) {
+            setOpen(true);
+          }
+        }}
+        onClick={() => {
+          if (!disabled) {
+            setOpen(true);
+          }
+        }}
+      />
+      <CalendarIcon className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+      {open && !disabled && (
+        <div className="absolute left-0 top-full z-50 mt-2 w-max">
+          <Card className="w-fit py-4 shadow-lg">
+            <CardContent className="px-4">
+              <Calendar
+                mode="single"
+                selected={selectedDate}
+                defaultMonth={selectedDate ?? new Date()}
+                onSelect={handleSelectDate}
+                numberOfMonths={1}
+                captionLayout="dropdown"
+                className="bg-transparent p-0"
+                formatters={{
+                  formatMonthDropdown: (date) => date.toLocaleString('default', { month: 'long' }),
+                }}
+              />
+            </CardContent>
+            <CardFooter className="flex w-full flex-col gap-6 border-t px-4 !pt-4">
+              <div className="flex w-full flex-col gap-3">
+                <Label htmlFor={timeInputId}>Time</Label>
+                <div className="relative flex w-full items-center">
+                  <Clock2Icon className="pointer-events-none absolute left-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id={timeInputId}
+                    type="time"
+                    step={1}
+                    value={timeValue}
+                    onChange={(event) => handleTimeChange(event.target.value)}
+                    className="appearance-none pl-8 [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
+                  />
+                </div>
+              </div>
+            </CardFooter>
+          </Card>
+        </div>
+      )}
     </div>
   );
 };
+
 
 // Extended interface for UI with tracking ID
 interface FilterConditionWithId extends Omit<FilterCondition, 'value'> {
   id: string;
   dataType?: string;
-  value: string | number | boolean | Date | { start: string | Date | null; end: string | Date | null } | null;
+  value: ConditionValue;
   negate?: boolean;
   regex?: boolean;
 }
@@ -443,49 +426,59 @@ type PreviewPagination = {
 
 const PREVIEW_PAGE_SIZE_OPTIONS = [10, 20, 50];
 
-const hasNonEmptyValue = (value: any): boolean => {
+type PreviewRow = Record<string, unknown>;
+
+const hasNonEmptyValue = (value: unknown): boolean => {
   if (value === null || value === undefined) return false;
   if (typeof value === 'string') return value.trim().length > 0;
-  if (typeof value === 'number') return true;
-  if (typeof value === 'boolean') return true;
+  if (typeof value === 'number' || typeof value === 'boolean') return true;
   if (value instanceof Date) return true;
+  if (Array.isArray(value)) {
+    return value.some((entry) => hasNonEmptyValue(entry));
+  }
   if (typeof value === 'object') {
-    if ('start' in value || 'end' in value) {
-      return hasNonEmptyValue((value as any).start) || hasNonEmptyValue((value as any).end);
+    const maybeRange = value as Partial<ConditionRange>;
+    if ('start' in maybeRange || 'end' in maybeRange) {
+      return hasNonEmptyValue(maybeRange.start) || hasNonEmptyValue(maybeRange.end);
     }
-    return Object.values(value).some((entry) => hasNonEmptyValue(entry));
+    return Object.values(value as Record<string, unknown>).some((entry) => hasNonEmptyValue(entry));
   }
   return true;
 };
 
 const serializeConditionsForRequest = (conditions: FilterConditionWithId[]) => {
-  return conditions.map((c) => {
-    let value: any;
-    if (c.operator === 'is_null') {
+  return conditions.map<FilterCondition>((condition) => {
+    let value: ConditionValue;
+    if (condition.operator === 'is_null') {
       value = null;
-    } else if (c.value instanceof Date) {
-      value = c.value.toISOString();
-    } else if (c.value && typeof c.value === 'object' && 'start' in c.value) {
-      const range: any = c.value;
-      const normalizeEdge = (edge: any) => {
+    } else if (condition.value instanceof Date) {
+      value = condition.value.toISOString();
+    } else if (condition.value && typeof condition.value === 'object' && 'start' in condition.value) {
+      const range = condition.value as ConditionRange;
+      const normalizeEdge = (edge: ConditionRange['start']): string | null => {
+        if (!edge) return null;
         if (edge instanceof Date) return edge.toISOString();
-        if (typeof edge === 'string') {
-          const trimmed = edge.trim();
-          return trimmed.length ? trimmed : null;
-        }
-        return edge ?? null;
+        const trimmed = typeof edge === 'string' ? edge.trim() : '';
+        return trimmed.length > 0 ? trimmed : null;
       };
       value = {
         start: normalizeEdge(range.start),
         end: normalizeEdge(range.end),
       };
     } else {
-      value = c.value;
+      const fallback = condition.value;
+      value = fallback ?? '';
     }
 
-    const payload: any = { column: c.column, operator: c.operator, value };
-    if (c.negate !== undefined) payload.negate = Boolean(c.negate);
-    if (c.regex !== undefined) payload.regex = Boolean(c.regex);
+    const payload: FilterCondition = {
+      column: condition.column,
+      operator: condition.operator,
+      value,
+    };
+
+    if (condition.negate !== undefined) payload.negate = Boolean(condition.negate);
+    if (condition.regex !== undefined) payload.regex = Boolean(condition.regex);
+
     return payload;
   });
 };
@@ -510,9 +503,12 @@ const isConditionComplete = (condition: FilterConditionWithId): boolean => {
   return hasNonEmptyValue(condition.value);
 };
 
-const formatPreviewValue = (value: any): string => {
+const formatPreviewValue = (value: unknown): string => {
   if (value === null || value === undefined) return '';
   if (value instanceof Date) return value.toISOString();
+  if (Array.isArray(value)) {
+    return value.map((item) => formatPreviewValue(item)).join(', ');
+  }
   if (typeof value === 'object') {
     try {
       return JSON.stringify(value);
@@ -523,7 +519,7 @@ const formatPreviewValue = (value: any): string => {
   return String(value);
 };
 
-// Removed DatePicker & custom time input: now using direct ISO8601 text input for timezone-aware datetime entry.
+// Date-time picker now uses shadcn calendar + manual time inputs to produce ISO8601 strings.
 
 const FilterTab: React.FC = () => {
   const { selectedNodeId, selectedNode } = useWorkspaceSelection();
@@ -544,7 +540,7 @@ const FilterTab: React.FC = () => {
   const [isFiltering, setIsFiltering] = useState(false);
   const [previewPage, setPreviewPage] = useState(1);
   const [previewPageSize, setPreviewPageSize] = useState(10);
-  const [previewData, setPreviewData] = useState<any[]>([]);
+  const [previewData, setPreviewData] = useState<PreviewRow[]>([]);
   const [previewColumns, setPreviewColumns] = useState<string[]>([]);
   const [previewPagination, setPreviewPagination] = useState<PreviewPagination | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -632,8 +628,8 @@ const FilterTab: React.FC = () => {
     }
   };
 
-  const handlePreviewPageSizeChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    const nextSize = Number(event.target.value);
+  const handlePreviewPageSizeChange = (value: string) => {
+    const nextSize = Number(value);
     if (!Number.isNaN(nextSize)) {
       setPreviewPageSize(nextSize);
       setPreviewPage(1);
@@ -689,7 +685,7 @@ const FilterTab: React.FC = () => {
     filterPreview(selectedNodeId, debouncedRequest.request, previewPage, previewPageSize)
       .then((resp) => {
         if (cancelled) return;
-        const rows = Array.isArray(resp?.data) ? resp.data : [];
+        const rows: PreviewRow[] = Array.isArray(resp?.data) ? (resp.data as PreviewRow[]) : [];
         const cols = Array.isArray(resp?.columns) ? resp.columns : [];
         setPreviewData(rows);
         setPreviewColumns(cols);
@@ -702,9 +698,9 @@ const FilterTab: React.FC = () => {
           setPreviewPagination(null);
         }
       })
-      .catch((error: any) => {
+      .catch((error: unknown) => {
         if (cancelled) return;
-        const message = error?.message || 'Failed to load preview data';
+        const message = error instanceof Error ? error.message : 'Failed to load preview data';
         setPreviewError(message);
         setPreviewData([]);
         setPreviewColumns([]);
@@ -741,8 +737,12 @@ const FilterTab: React.FC = () => {
     }
   };
 
-  const handleConditionChange = (id: string, field: keyof FilterConditionWithId, value: any) => {
-    setConditions(conditions.map(c => {
+  const handleConditionChange = <Key extends keyof FilterConditionWithId>(
+    id: string,
+    field: Key,
+    value: FilterConditionWithId[Key]
+  ) => {
+          setConditions(conditions.map((c) => {
       if (c.id === id) {
         const updated = { ...c, [field]: value };
         
@@ -756,7 +756,7 @@ const FilterTab: React.FC = () => {
             
             // Pre-fill datetime values if datetime column
             if (columnInfo.dataType === 'datetime' && selectedNodeId && currentWorkspaceId) {
-              prefillDatetimeValue(id, value, 'eq');
+              prefillDatetimeValue(id, columnInfo.name, 'eq');
             }
           }
         }
@@ -764,7 +764,7 @@ const FilterTab: React.FC = () => {
         // If operator changed for datetime column, pre-fill value
         if (field === 'operator' && c.dataType === 'datetime' && c.column && selectedNodeId && currentWorkspaceId) {
           updated.value = ''; // Reset value first
-          prefillDatetimeValue(id, c.column, value as string);
+          prefillDatetimeValue(id, c.column, value as FilterCondition['operator']);
         }
         
         return updated;
@@ -782,7 +782,7 @@ const FilterTab: React.FC = () => {
       
       setConditions(prev => prev.map(c => {
         if (c.id === conditionId) {
-          let newValue: any = '';
+          let newValue: ConditionValue = '';
           
           switch (operator) {
             case 'eq':
@@ -800,8 +800,8 @@ const FilterTab: React.FC = () => {
             case 'between':
               // Pre-fill with min and max
               newValue = {
-                start: describeData.min || '',
-                end: describeData.max || ''
+                start: (describeData.min as ConditionRange['start']) || '',
+                end: (describeData.max as ConditionRange['end']) || ''
               };
               break;
             default:
@@ -853,48 +853,32 @@ const FilterTab: React.FC = () => {
     }
 
     if (dataType === 'datetime') {
-      const buildPicker = (committedValue: string, commitValue: (v: string)=>void) => {
-        const committedDate = parseIsoToLocalDate(committedValue);
+      const renderPicker = (committedValue: string, commitValue: (next: string) => void) => {
+        if (disabled) {
+          return (
+            <input
+              type="text"
+              value={committedValue}
+              disabled
+              placeholder={ISO_PLACEHOLDER}
+              className="rounded-md border border-border/70 bg-muted px-2 py-1 font-mono text-sm text-muted-foreground"
+            />
+          );
+        }
 
-        return disabled ? (
-          <input
-            type="text"
+        return (
+          <DateTimePickerField
             value={committedValue}
-            disabled
+            onChange={commitValue}
             placeholder={ISO_PLACEHOLDER}
-            className="rounded-md border border-border/70 bg-muted px-2 py-1 font-mono text-sm text-muted-foreground"
-          />
-        ) : (
-          <DatePicker
-            selected={committedDate || undefined}
-            openToDate={committedDate || undefined}
-            onChange={(d) => {
-              if (d) {
-                const pad = (n:number) => String(n).padStart(2,'0');
-                const iso = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}+00:00`;
-                commitValue(iso);
-              } else {
-                commitValue('');
-              }
-            }}
-            showTimeSelect
-            timeIntervals={15}
-            dateFormat="yyyy-MM-dd'T'HH:mm:ssXXX"
-            renderCustomHeader={(headerProps) => (
-              <CalendarHeaderWithYearSelect {...headerProps} />
-            )}
-            customInput={(
-              <IsoDateInput
-                committedValue={committedValue}
-                onCommit={(value) => commitValue(value)}
-              />
-            )}
-            popperClassName="z-50"
           />
         );
       };
       if (condition.operator === 'between') {
-        const rangeValue = (condition.value as { start?: string | Date | null; end?: string | Date | null }) || {};
+        const rangeValue: ConditionRange =
+          condition.value && typeof condition.value === 'object' && 'start' in (condition.value as Record<string, unknown>)
+            ? (condition.value as ConditionRange)
+            : { start: null, end: null };
         const startStr =
           typeof rangeValue.start === 'string'
             ? rangeValue.start
@@ -909,8 +893,22 @@ const FilterTab: React.FC = () => {
               : '';
         return (
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex-none">{buildPicker(startStr, (v) => handleConditionChange(condition.id, 'value', { ...rangeValue, start: v }))}</div>
-            <div className="flex-none">{buildPicker(endStr, (v) => handleConditionChange(condition.id, 'value', { ...rangeValue, end: v }))}</div>
+            <div className="flex-none">
+              {renderPicker(startStr, (v) =>
+                handleConditionChange(condition.id, 'value', {
+                  start: v,
+                  end: rangeValue.end ?? null,
+                })
+              )}
+            </div>
+            <div className="flex-none">
+              {renderPicker(endStr, (v) =>
+                handleConditionChange(condition.id, 'value', {
+                  start: rangeValue.start ?? null,
+                  end: v,
+                })
+              )}
+            </div>
           </div>
         );
       }
@@ -920,7 +918,7 @@ const FilterTab: React.FC = () => {
           : condition.value instanceof Date
             ? condition.value.toISOString()
             : '';
-      return buildPicker(singleVal, (v) => handleConditionChange(condition.id, 'value', v));
+      return renderPicker(singleVal, (v) => handleConditionChange(condition.id, 'value', v));
     }
 
     if (dataType === 'integer' || dataType === 'float') {
@@ -952,7 +950,7 @@ const FilterTab: React.FC = () => {
         value={String(condition.value)}
         onChange={(e) => handleConditionChange(condition.id, 'value', e.target.value)}
         placeholder="Enter value"
-  className="flex-1 rounded-md border border-input px-2 py-1 text-sm text-foreground"
+        className="flex-1 rounded-md border border-input px-2 py-1 text-sm text-foreground"
         disabled={disabled}
       />
     );
@@ -1116,7 +1114,7 @@ const FilterTab: React.FC = () => {
                         <Checkbox
                           id={`negate-${condition.id}`}
                           checked={Boolean(condition.negate)}
-                          onCheckedChange={(checked) => handleConditionChange(condition.id, 'negate' as any, checked)}
+                          onCheckedChange={(checked) => handleConditionChange(condition.id, 'negate', checked === true)}
                           disabled={isConfigDisabled}
                         />
                         <span>negate</span>
@@ -1127,7 +1125,7 @@ const FilterTab: React.FC = () => {
                           <Checkbox
                             id={`regex-${condition.id}`}
                             checked={Boolean(condition.regex ?? true)}
-                            onCheckedChange={(checked) => handleConditionChange(condition.id, 'regex' as any, checked)}
+                            onCheckedChange={(checked) => handleConditionChange(condition.id, 'regex', checked === true)}
                             disabled={isConfigDisabled}
                           />
                           <span>regex</span>
@@ -1155,7 +1153,13 @@ const FilterTab: React.FC = () => {
 
                       <Select
                         value={condition.operator}
-                        onValueChange={(value) => handleConditionChange(condition.id, 'operator', value)}
+                        onValueChange={(value) =>
+                          handleConditionChange(
+                            condition.id,
+                            'operator',
+                            value as FilterCondition['operator']
+                          )
+                        }
                         disabled={rowDisabled}
                       >
                         <SelectTrigger className="w-36 flex-none">
@@ -1238,7 +1242,7 @@ const FilterTab: React.FC = () => {
               </label>
               <Select
                 value={String(previewPageSize)}
-                onValueChange={(value) => handlePreviewPageSizeChange({ target: { value } } as any)}
+                onValueChange={handlePreviewPageSizeChange}
                 disabled={!previewReady || previewLoading}
               >
                 <SelectTrigger className="w-24">
@@ -1314,7 +1318,7 @@ const FilterTab: React.FC = () => {
                               key={`${rowIndex}-${col}`}
                               className="px-3 py-2 font-mono text-xs text-foreground"
                             >
-                              {formatPreviewValue((row as any)?.[col])}
+                              {formatPreviewValue(row[col])}
                             </TableCell>
                           ))}
                         </TableRow>

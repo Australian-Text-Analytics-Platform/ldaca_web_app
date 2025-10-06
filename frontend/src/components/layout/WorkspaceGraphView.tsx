@@ -16,13 +16,15 @@ import {
   BezierEdge,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import { Loader2, Network } from 'lucide-react';
 import { useWorkspaceData } from '../../hooks/useWorkspaceData';
 import { useWorkspaceActions } from '../../hooks/useWorkspaceActions';
 import { useWorkspaceSelection } from '../../hooks/useWorkspaceSelection';
 import { useWorkspaceStatus } from '../../hooks/useWorkspaceStatus';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '../../lib/queryKeys';
-import { GraphLoadingSkeleton, EmptyState } from '../ui/LoadingStates';
+import { Card, CardDescription, CardHeader, CardTitle } from '../ui/card';
+import { Skeleton } from '../ui/skeleton';
 import CustomNode from '../CustomNode';
 
 // Static registrations to avoid re-creation
@@ -368,20 +370,37 @@ export const WorkspaceGraphView: React.FC = memo(() => {
   }, [onNodesChange, selectedNodeIds]);
 
   if (isLoading.graph) {
-    return <GraphLoadingSkeleton />;
+    return (
+      <div className="flex h-full items-center justify-center bg-muted/20">
+        <div className="flex flex-col items-center gap-4">
+          <div className="grid grid-cols-2 gap-3">
+            <Skeleton className="h-24 w-36 rounded-lg" />
+            <Skeleton className="h-24 w-36 rounded-lg" />
+            <Skeleton className="h-24 w-24 rounded-lg" />
+            <Skeleton className="h-24 w-48 rounded-lg" />
+          </div>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span>Loading workspace graph…</span>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (!workspaceGraph || initialNodes.length === 0) {
     return (
-      <EmptyState
-        title="No nodes in workspace"
-        description="Add some data to your workspace to see the graph visualization"
-        icon={
-          <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-          </svg>
-        }
-      />
+      <Card className="mx-auto mt-12 max-w-lg text-center">
+        <CardHeader className="flex flex-col items-center space-y-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+            <Network className="h-6 w-6" />
+          </div>
+          <CardTitle>No nodes in workspace</CardTitle>
+          <CardDescription>
+            Add some data to your workspace to see the graph visualization
+          </CardDescription>
+        </CardHeader>
+      </Card>
     );
   }
 

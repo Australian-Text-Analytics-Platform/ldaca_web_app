@@ -19,6 +19,7 @@ frontend/test regressions.
 
 import logging
 import time
+from copy import deepcopy
 from typing import Any, Dict, List, Optional, Tuple
 
 import polars as pl
@@ -97,6 +98,31 @@ CORE_CONCORDANCE_COLUMNS = {
     "l1_freq",
     "r1_freq",
 }
+
+
+DEFAULT_CONCORDANCE_PAGE = 1
+DEFAULT_CONCORDANCE_PAGE_SIZE = 20
+DEFAULT_CONCORDANCE_SORT_ORDER = "asc"
+
+
+_REQUEST_STORAGE_EXCLUDE_KEYS = {
+    "page",
+    "page_size",
+    "sort_by",
+    "sort_order",
+    "pagination",
+}
+
+
+def _sanitize_request_for_storage(request_dict: Dict[str, Any]) -> Dict[str, Any]:
+    sanitized: Dict[str, Any] = {}
+    for key, value in request_dict.items():
+        if key in _REQUEST_STORAGE_EXCLUDE_KEYS:
+            continue
+        if value is None:
+            continue
+        sanitized[key] = value
+    return sanitized
 
 
 def _normalize_sort_order(sort_order: Optional[str]) -> str:
@@ -333,6 +359,8 @@ class ConcordanceResultQuery(BaseModel):
     page_size: Optional[int] = None
     sort_by: Optional[str] = None
     sort_order: Optional[str] = None
+    show_metadata: Optional[bool] = None
+    update_only: bool = False
 
 
 def _normalize_saved_request(
@@ -341,26 +369,26 @@ def _normalize_saved_request(
     if not raw_request:
         return None
     if "node_ids" in raw_request and "node_columns" in raw_request:
-        return raw_request
-    analysis_params = (raw_result or {}).get("analysis_params") or {}
-    node_id = analysis_params.get("node_id") or raw_request.get("node_id")
-    column = analysis_params.get("column") or raw_request.get("column")
-    if not node_id or not column:
-        return None
-    return {
-        "node_ids": [node_id],
-        "node_columns": {node_id: column},
-        "search_word": raw_request.get("search_word", ""),
-        "num_left_tokens": raw_request.get("num_left_tokens", 10),
-        "num_right_tokens": raw_request.get("num_right_tokens", 10),
-        "regex": bool(raw_request.get("regex", False)),
-        "case_sensitive": bool(raw_request.get("case_sensitive", False)),
-        "combined": bool(raw_request.get("combined", False)),
-        "page": raw_request.get("page", 1),
-        "page_size": raw_request.get("page_size", 50),
-        "sort_by": raw_request.get("sort_by"),
-        "sort_order": raw_request.get("sort_order", "asc"),
-    }
+        normalized_request = dict(raw_request)
+    else:
+        analysis_params = (raw_result or {}).get("analysis_params") or {}
+        node_id = analysis_params.get("node_id") or raw_request.get("node_id")
+        column = analysis_params.get("column") or raw_request.get("column")
+        if not node_id or not column:
+            return None
+        normalized_request = {
+            "node_ids": [node_id],
+            "node_columns": {node_id: column},
+            "search_word": raw_request.get("search_word", ""),
+            "num_left_tokens": raw_request.get("num_left_tokens", 10),
+            "num_right_tokens": raw_request.get("num_right_tokens", 10),
+            "regex": bool(raw_request.get("regex", False)),
+            "case_sensitive": bool(raw_request.get("case_sensitive", False)),
+            "combined": bool(raw_request.get("combined", False)),
+        }
+    for field in ("page", "page_size", "sort_by", "sort_order", "pagination"):
+        normalized_request.pop(field, None)
+    return normalized_request
 
 
 def _normalize_saved_result(
@@ -392,8 +420,8 @@ def _normalize_saved_result(
             all_columns=columns,
         ).model_dump()
     )
-    page = normalized_request.get("page", 1)
-    page_size = normalized_request.get("page_size", 50)
+    page = normalized_request.get("page", DEFAULT_CONCORDANCE_PAGE)
+    page_size = normalized_request.get("page_size", DEFAULT_CONCORDANCE_PAGE_SIZE)
     total_matches = raw_result.get("total_matches", 0)
     pagination = raw_result.get("pagination") or {
         "page": page,
@@ -406,6 +434,24 @@ def _normalize_saved_result(
         "sort_by": normalized_request.get("sort_by"),
         "sort_order": normalized_request.get("sort_order", "asc"),
     }
+    pagination_summary = {
+        "page": pagination.get("page"),
+        "page_size": pagination.get("page_size"),
+        "sort_by": sorting.get("sort_by"),
+        "sort_order": sorting.get("sort_order"),
+    }
+    if isinstance(analysis_params, dict):
+        combined_params = dict(analysis_params)
+    else:
+        combined_params = dict(normalized_request)
+    combined_params.update({
+        "page": pagination_summary["page"],
+        "page_size": pagination_summary["page_size"],
+        "sort_by": pagination_summary["sort_by"],
+        "sort_order": pagination_summary["sort_order"],
+        "pagination": pagination_summary,
+    })
+
     return {
         "state": raw_result.get("state", "successful"),
         "message": raw_result.get("message", "ok"),
@@ -419,7 +465,7 @@ def _normalize_saved_result(
                 "sorting": sorting,
             }
         },
-        "analysis_params": analysis_params or normalized_request,
+        "analysis_params": combined_params,
         "combinable": raw_result.get("combinable", False),
     }
 
@@ -511,6 +557,12 @@ async def _execute_concordance(
     workspace_id: str,
     request: ConcordanceAnalysisRequest,
     current_user: dict,
+    *,
+    page_override: Optional[int] = None,
+    page_size_override: Optional[int] = None,
+    sort_by_override: Optional[str] = None,
+    sort_order_override: Optional[str] = None,
+    show_metadata_override: Optional[bool] = None,
 ):
     user_id = current_user["id"]
     if not request.node_ids:
@@ -522,9 +574,28 @@ async def _execute_concordance(
             status_code=400, detail="Maximum 2 nodes supported for comparison"
         )
 
-    page = max(1, request.page)
-    page_size = max(1, request.page_size)
-    sort_order = _normalize_sort_order(request.sort_order)
+    page = max(
+        1, page_override if page_override is not None else DEFAULT_CONCORDANCE_PAGE
+    )
+    page_size = max(
+        1,
+        page_size_override
+        if page_size_override is not None
+        else DEFAULT_CONCORDANCE_PAGE_SIZE,
+    )
+    requested_sort_by = (
+        sort_by_override
+        if sort_by_override is not None
+        else getattr(request, "sort_by", None)
+    )
+    sort_order = _normalize_sort_order(
+        sort_order_override or DEFAULT_CONCORDANCE_SORT_ORDER
+    )
+    show_metadata = (
+        bool(show_metadata_override)
+        if show_metadata_override is not None
+        else bool(getattr(request, "show_metadata", False))
+    )
 
     results: Dict[str, Dict[str, Any]] = {}
     combined_frames: List[pl.DataFrame] = []
@@ -577,8 +648,10 @@ async def _execute_concordance(
             "data": node_result["full_frame"].to_dicts()
             if hasattr(node_result["full_frame"], "to_dicts")
             else [],
-            "default_sort_by": request.sort_by,
+            "default_sort_by": requested_sort_by,
             "default_sort_order": sort_order,
+            "default_page_size": page_size,
+            "default_page": page,
         }
         node_label_map[node_id] = node_label
 
@@ -620,10 +693,10 @@ async def _execute_concordance(
             aligned_frames.append(frame.select(ordered_columns))
         combined_df = pl.concat(aligned_frames, how="vertical")
         effective_sort_by = None
-        if request.sort_by and request.sort_by in combined_df.columns:
-            effective_sort_by = request.sort_by
+        if requested_sort_by and requested_sort_by in combined_df.columns:
+            effective_sort_by = requested_sort_by
             combined_df = combined_df.sort(
-                pl.col(request.sort_by),
+                pl.col(requested_sort_by),
                 descending=sort_order == "desc",
             )
         elif "document_idx" in combined_df.columns:
@@ -669,6 +742,8 @@ async def _execute_concordance(
             "data": combined_df.to_dicts(),
             "default_sort_by": effective_sort_by,
             "default_sort_order": sort_order,
+            "default_page_size": page_size,
+            "default_page": page,
         }
 
     has_combined_result = "__COMBINED__" in results
@@ -687,9 +762,28 @@ async def _execute_concordance(
             else "Combined concordance view unavailable due to schema mismatch."
         )
 
-    analysis_params_dict = request.model_dump()
-    analysis_params_dict["combined"] = effective_combined
-    analysis_params_dict["combinable"] = combinable
+    raw_request_dict = request.model_dump()
+    pagination_info = {
+        "page": page,
+        "page_size": page_size,
+        "sort_by": requested_sort_by,
+        "sort_order": sort_order,
+    }
+    analysis_params_dict = {
+        **raw_request_dict,
+        "combined": effective_combined,
+        "combinable": combinable,
+        "page": page,
+        "page_size": page_size,
+        "sort_by": requested_sort_by,
+        "sort_order": sort_order,
+        "pagination": pagination_info,
+        "show_metadata": show_metadata,
+        "preferences": {
+            "page_size": page_size,
+            "show_metadata": show_metadata,
+        },
+    }
 
     result_payload = {
         "state": "successful",
@@ -697,6 +791,7 @@ async def _execute_concordance(
         "data": results,
         "analysis_params": analysis_params_dict,
         "combinable": combinable,
+        "preferences": analysis_params_dict["preferences"],
     }
 
     storage_blob = {
@@ -708,8 +803,11 @@ async def _execute_concordance(
         "default_page": {
             "page": page,
             "page_size": page_size,
+            "sort_by": requested_sort_by,
+            "sort_order": sort_order,
         },
         "combinable": combinable,
+        "preferences": analysis_params_dict["preferences"],
     }
 
     storage_blob["combined_available"] = should_build_combined
@@ -717,7 +815,7 @@ async def _execute_concordance(
     try:  # pragma: no cover
         from ....core.analysis_store import save_analysis
 
-        request_for_storage = request.model_dump()
+        request_for_storage = _sanitize_request_for_storage(raw_request_dict)
         request_for_storage["combined"] = effective_combined
 
         persist_payload = {
@@ -725,6 +823,7 @@ async def _execute_concordance(
             "message": result_payload["message"],
             "data": result_payload["data"],
             "analysis_params": result_payload["analysis_params"],
+            "preferences": result_payload.get("preferences"),
             "combinable": combinable,
             "_stored": storage_blob,
         }
@@ -828,63 +927,243 @@ async def concordance_current_result_post(
     stored_blob = base_result.get("_stored") if isinstance(base_result, dict) else None
 
     if stored_blob:
-        default_page_info = stored_blob.get("default_page", {})
+        mutable_result = deepcopy(base_result) if isinstance(base_result, dict) else {}
+        if not isinstance(mutable_result, dict):
+            mutable_result = {}
+        stored_blob = mutable_result.get("_stored") or {}
+        if not isinstance(stored_blob, dict):
+            stored_blob = {}
+
+        preferences = stored_blob.get("preferences") or {}
+        if not isinstance(preferences, dict):
+            preferences = {}
+        show_metadata_pref = bool(preferences.get("show_metadata", False))
+        preferences_changed = False
+
+        default_page_info = dict(stored_blob.get("default_page") or {})
+        base_default_page = default_page_info.get("page", DEFAULT_CONCORDANCE_PAGE)
+        base_default_sort_by = default_page_info.get("sort_by")
+        base_default_sort_order = default_page_info.get("sort_order")
+
+        existing_default_page_size = default_page_info.get("page_size")
+        effective_page_size = (
+            existing_default_page_size
+            if isinstance(existing_default_page_size, int)
+            and existing_default_page_size > 0
+            else DEFAULT_CONCORDANCE_PAGE_SIZE
+        )
+        pref_page_size = preferences.get("page_size")
+        if isinstance(pref_page_size, int) and pref_page_size > 0:
+            effective_page_size = pref_page_size
+
+        if query.page_size is not None:
+            normalized_page_size = max(1, int(query.page_size))
+            if normalized_page_size != pref_page_size:
+                preferences["page_size"] = normalized_page_size
+                preferences_changed = True
+            effective_page_size = normalized_page_size
+
         requested_page = (
             query.page_number
             if query.page_number is not None
             else query.page
             if query.page is not None
-            else default_page_info.get("page", 1)
+            else base_default_page
         )
-        requested_page_size = (
-            query.page_size
-            if query.page_size is not None
-            else default_page_info.get("page_size", 50)
+        if requested_page is None:
+            requested_page = DEFAULT_CONCORDANCE_PAGE
+        requested_page = max(1, int(requested_page))
+
+        if query.show_metadata is not None:
+            normalized_show_metadata = bool(query.show_metadata)
+            if normalized_show_metadata != show_metadata_pref:
+                preferences_changed = True
+            show_metadata_pref = normalized_show_metadata
+            preferences["show_metadata"] = show_metadata_pref
+
+        stored_blob["preferences"] = preferences
+
+        requested_page_size = effective_page_size
+        requested_sort_by = (
+            query.sort_by if query.sort_by is not None else base_default_sort_by
         )
-        requested_sort_by = query.sort_by
-        requested_sort_order = query.sort_order
+        requested_sort_order = (
+            query.sort_order
+            if query.sort_order is not None
+            else base_default_sort_order
+        )
+        if requested_sort_order is None:
+            requested_sort_order = DEFAULT_CONCORDANCE_SORT_ORDER
 
-        nodes_map: Dict[str, Dict[str, Any]] = stored_blob.get("nodes", {})
-        label_to_node: Dict[str, str] = stored_blob.get("label_to_node_map", {})
-
-        response_data: Dict[str, Dict[str, Any]] = {}
-        target_nodes: List[Tuple[str, Dict[str, Any]]] = []
-
-        if query.combined or (query.node_id == "__COMBINED__"):
-            combined_entry = nodes_map.get("__COMBINED__")
-            if not combined_entry:
-                return {
-                    "state": "failed",
-                    "message": "Combined concordance view not available",
-                    "data": None,
-                }
-            target_nodes.append(("__COMBINED__", combined_entry))
-        elif query.node_id:
-            lookup_key = query.node_id
-            if lookup_key not in nodes_map and lookup_key in label_to_node:
-                lookup_key = label_to_node[lookup_key]
-            entry = nodes_map.get(lookup_key)
-            if not entry:
-                return {
-                    "state": "failed",
-                    "message": f"No stored concordance found for node {query.node_id}",
-                    "data": None,
-                }
-            label = entry.get("label") or lookup_key
-            target_nodes.append((label, entry))
+        nodes_source = stored_blob.get("nodes") or {}
+        if isinstance(nodes_source, dict):
+            nodes_map: Dict[str, Dict[str, Any]] = {
+                key: deepcopy(value) if isinstance(value, dict) else value
+                for key, value in nodes_source.items()
+            }
         else:
-            for node_key, entry in nodes_map.items():
-                if node_key == "__COMBINED__":
-                    continue
-                label = entry.get("label") or node_key
-                target_nodes.append((label, entry))
+            nodes_map = {}
+        label_to_node_source = stored_blob.get("label_to_node_map") or {}
+        label_to_node: Dict[str, str] = (
+            dict(label_to_node_source) if isinstance(label_to_node_source, dict) else {}
+        )
+
+        base_state = base_result.get("state", "successful")
+        base_message = base_result.get("message", "ok")
+        existing_params: Dict[str, Any] = {}
+        if isinstance(mutable_result.get("analysis_params"), dict):
+            existing_params = dict(mutable_result["analysis_params"])
+        elif isinstance(normalized_request, dict):
+            existing_params = dict(normalized_request)
 
         derived_page = requested_page
         derived_page_size = requested_page_size
         derived_sort_by = requested_sort_by
         derived_sort_order = requested_sort_order
 
-        for label, entry in target_nodes:
+        fetch_intent = (
+            (query.page is not None)
+            or (query.page_number is not None)
+            or (query.node_id is not None)
+            or (query.combined is True)
+            or (query.sort_by is not None)
+            or (query.sort_order is not None)
+        )
+        preference_only_request = (
+            query.page_size is not None or query.show_metadata is not None
+        ) and not fetch_intent
+        update_only = bool(query.update_only) or preference_only_request
+
+        response_data: Dict[str, Dict[str, Any]] = {}
+        target_nodes: List[Tuple[str, str, Dict[str, Any]]] = []
+
+        if not update_only:
+            if query.combined or (query.node_id == "__COMBINED__"):
+                combined_entry = nodes_map.get("__COMBINED__")
+                if not isinstance(combined_entry, dict):
+                    return {
+                        "state": "failed",
+                        "message": "Combined concordance view not available",
+                        "data": None,
+                    }
+                target_nodes.append(("__COMBINED__", "__COMBINED__", combined_entry))
+            elif query.node_id:
+                lookup_key = query.node_id
+                if lookup_key not in nodes_map and lookup_key in label_to_node:
+                    lookup_key = label_to_node[lookup_key]
+                entry = nodes_map.get(lookup_key)
+                if not isinstance(entry, dict):
+                    return {
+                        "state": "failed",
+                        "message": f"No stored concordance found for node {query.node_id}",
+                        "data": None,
+                    }
+                label = entry.get("label") or lookup_key
+                target_nodes.append((label, lookup_key, entry))
+            else:
+                for node_key, entry in nodes_map.items():
+                    if node_key == "__COMBINED__":
+                        continue
+                    if not isinstance(entry, dict):
+                        continue
+                    label = entry.get("label") or node_key
+                    target_nodes.append((label, node_key, entry))
+
+        if update_only:
+            preferences["page_size"] = derived_page_size
+            preferences["show_metadata"] = show_metadata_pref
+            stored_blob["preferences"] = preferences
+            if preferences_changed:
+                for node_key, entry in nodes_map.items():
+                    if isinstance(entry, dict):
+                        entry["default_page_size"] = derived_page_size
+                stored_blob["nodes"] = nodes_map
+            stored_blob["default_page"] = {
+                "page": derived_page,
+                "page_size": derived_page_size,
+                "sort_by": derived_sort_by,
+                "sort_order": derived_sort_order,
+            }
+
+            existing_preferences = (
+                existing_params.get("preferences")
+                if isinstance(existing_params.get("preferences"), dict)
+                else {}
+            )
+            merged_preferences = {
+                **existing_preferences,
+                "page_size": derived_page_size,
+                "show_metadata": show_metadata_pref,
+            }
+            analysis_params = {
+                **existing_params,
+                "page": derived_page,
+                "page_size": derived_page_size,
+                "sort_by": derived_sort_by,
+                "sort_order": derived_sort_order,
+                "pagination": {
+                    "page": derived_page,
+                    "page_size": derived_page_size,
+                    "sort_by": derived_sort_by,
+                    "sort_order": derived_sort_order,
+                },
+                "show_metadata": show_metadata_pref,
+                "preferences": merged_preferences,
+            }
+
+            updated_payloads: Dict[str, Dict[str, Any]] = {}
+            for node_key, entry in nodes_map.items():
+                if not isinstance(entry, dict):
+                    continue
+                label = entry.get("label") or node_key
+                try:
+                    paginated = _paginate_stored_entry(
+                        entry,
+                        derived_page,
+                        derived_page_size,
+                        derived_sort_by,
+                        derived_sort_order,
+                    )
+                except HTTPException:
+                    continue
+                updated_payloads[label] = paginated
+                entry["default_sort_by"] = paginated["sorting"].get("sort_by")
+                entry["default_sort_order"] = paginated["sorting"].get("sort_order")
+                entry["default_page_size"] = paginated["pagination"]["page_size"]
+                entry["default_page"] = paginated["pagination"]["page"]
+                nodes_map[node_key] = entry
+
+            stored_blob["nodes"] = nodes_map
+
+            mutable_result["data"] = updated_payloads or mutable_result.get("data")
+            mutable_result["analysis_params"] = analysis_params
+            mutable_result["preferences"] = merged_preferences
+            mutable_result["_stored"] = stored_blob
+
+            try:
+                from ....core.analysis_store import save_analysis
+
+                request_dict = (
+                    dict(rec.request) if isinstance(rec.request, dict) else {}
+                )
+                save_analysis(
+                    user_id=user_id,
+                    workspace_id=workspace_id,
+                    task=rec.task,
+                    request_dict=request_dict,
+                    result_dict=mutable_result,
+                )
+            except Exception as exc:  # pragma: no cover
+                logger.warning(
+                    "Failed to persist concordance preference update: %s", exc
+                )
+
+            return {
+                "state": "successful",
+                "message": "saved",
+            }
+
+        for label, node_key, entry in target_nodes:
             payload = _paginate_stored_entry(
                 entry,
                 requested_page,
@@ -897,20 +1176,50 @@ async def concordance_current_result_post(
             derived_page_size = payload["pagination"]["page_size"]
             derived_sort_by = payload["sorting"].get("sort_by")
             derived_sort_order = payload["sorting"].get("sort_order")
+            if isinstance(entry, dict):
+                entry["default_sort_by"] = derived_sort_by
+                entry["default_sort_order"] = derived_sort_order
+                entry["default_page_size"] = derived_page_size
+                entry["default_page"] = derived_page
+                nodes_map[node_key] = entry
 
-        base_state = base_result.get("state", "successful")
-        base_message = base_result.get("message", "ok")
-        analysis_params = (
-            base_result.get("analysis_params") or normalized_request or {}
-        ).copy()
-        if analysis_params is None:
-            analysis_params = {}
-        analysis_params.update({
+        preferences["page_size"] = derived_page_size
+        preferences["show_metadata"] = show_metadata_pref
+        stored_blob["preferences"] = preferences
+        stored_blob["nodes"] = nodes_map
+        stored_blob["default_page"] = {
             "page": derived_page,
             "page_size": derived_page_size,
             "sort_by": derived_sort_by,
             "sort_order": derived_sort_order,
-        })
+        }
+
+        existing_preferences = (
+            existing_params.get("preferences")
+            if isinstance(existing_params.get("preferences"), dict)
+            else {}
+        )
+        merged_preferences = {
+            **existing_preferences,
+            "page_size": derived_page_size,
+            "show_metadata": show_metadata_pref,
+        }
+
+        analysis_params = {
+            **existing_params,
+            "page": derived_page,
+            "page_size": derived_page_size,
+            "sort_by": derived_sort_by,
+            "sort_order": derived_sort_order,
+            "pagination": {
+                "page": derived_page,
+                "page_size": derived_page_size,
+                "sort_by": derived_sort_by,
+                "sort_order": derived_sort_order,
+            },
+            "show_metadata": show_metadata_pref,
+            "preferences": merged_preferences,
+        }
         if query.combined or (query.node_id == "__COMBINED__"):
             analysis_params["combined"] = True
         if query.node_id:
@@ -919,11 +1228,38 @@ async def concordance_current_result_post(
                 lookup_key = label_to_node[lookup_key]
             analysis_params["selected_node_id"] = lookup_key
 
+        existing_data = mutable_result.get("data")
+        if isinstance(existing_data, dict):
+            merged_data = {**existing_data, **response_data}
+        else:
+            merged_data = dict(response_data)
+        mutable_result["data"] = merged_data
+        mutable_result["analysis_params"] = analysis_params
+        mutable_result["preferences"] = merged_preferences
+        mutable_result["_stored"] = stored_blob
+
+        try:
+            from ....core.analysis_store import save_analysis
+
+            request_dict = dict(rec.request) if isinstance(rec.request, dict) else {}
+            save_analysis(
+                user_id=user_id,
+                workspace_id=workspace_id,
+                task=rec.task,
+                request_dict=request_dict,
+                result_dict=mutable_result,
+            )
+        except Exception as exc:  # pragma: no cover
+            logger.warning(
+                "Failed to persist concordance current-result update: %s", exc
+            )
+
         return {
             "state": base_state,
             "message": base_message,
             "data": response_data,
             "analysis_params": analysis_params,
+            "preferences": merged_preferences,
             "combinable": stored_blob.get("combinable", False),
         }
 
@@ -952,21 +1288,25 @@ async def concordance_current_result_post(
     if query.combined is not None:
         request_payload["combined"] = query.combined
     page_override = query.page_number if query.page_number is not None else query.page
-    if page_override is not None:
-        request_payload["page"] = page_override
-    if query.page_size is not None:
-        request_payload["page_size"] = query.page_size
-    if query.sort_by is not None:
-        request_payload["sort_by"] = query.sort_by
-    if query.sort_order is not None:
-        request_payload["sort_order"] = query.sort_order
+    page_size_override = query.page_size
+    sort_by_override = query.sort_by
+    sort_order_override = query.sort_order
 
     try:
         next_request = ConcordanceAnalysisRequest(**request_payload)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid request parameters: {e}")
 
-    return await _execute_concordance(workspace_id, next_request, current_user)
+    return await _execute_concordance(
+        workspace_id,
+        next_request,
+        current_user,
+        page_override=page_override,
+        page_size_override=page_size_override,
+        sort_by_override=sort_by_override,
+        sort_order_override=sort_order_override,
+        show_metadata_override=query.show_metadata,
+    )
 
 
 @router.post("/{workspace_id}/concordance/clear")

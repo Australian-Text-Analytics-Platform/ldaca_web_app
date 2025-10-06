@@ -593,7 +593,7 @@ const handleClearResults = async () => {
   }, [currentWorkspaceId, getAuthHeaders, currentSchema, frequency, selectedNodeId]);
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="space-y-6">
       <Card>
         <CardHeader className="space-y-0 pb-4">
           <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">

@@ -1,6 +1,6 @@
 // Component index - organized by category
 export * from './tabs';
-export * from './modals';
+export * from './panels';
 export * from './layout';
 export * from './ui';
 

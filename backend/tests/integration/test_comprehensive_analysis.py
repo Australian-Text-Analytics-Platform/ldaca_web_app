@@ -3,6 +3,11 @@ Parametrized and comprehensive tests for analysis persistence.
 """
 
 import pytest
+from ldaca_web_app_backend.api.workspaces.analyses.token_frequencies import (
+    DEFAULT_TOKEN_LIMIT,
+    MAX_SERVER_TOKEN_LIMIT,
+    SERVER_LIMIT_MULTIPLIER,
+)
 from ldaca_web_app_backend.core.analysis_store import list_analyses
 
 # Analysis type configurations for parametrized testing
@@ -13,7 +18,6 @@ ANALYSIS_CONFIGS = [
         "request_template": {
             "node_ids": [],  # Will be filled by test
             "node_columns": {},  # Will be filled by test
-            "limit": 10,
         },
         "expected_result_keys": {"state", "data"},
     },
@@ -83,7 +87,36 @@ class TestParametrizedAnalysisPersistence:
 
         record = analyses[0]
         assert record.task == analysis_config["task"]
-        assert record.request == request_payload
+        if analysis_config["task"] == "token_frequencies":
+            expected_limit = request_payload.get("token_limit", DEFAULT_TOKEN_LIMIT)
+            expected_stop_words = [
+                str(word).strip()
+                for word in request_payload.get("stop_words", [])
+                if str(word).strip()
+            ]
+            assert result_data.get("token_limit") == expected_limit
+            assert (
+                result_data.get("analysis_params", {}).get("token_limit")
+                == expected_limit
+            )
+            assert result_data.get("stop_words") == expected_stop_words
+            assert record.request["node_ids"] == request_payload["node_ids"]
+            assert record.request["node_columns"] == request_payload["node_columns"]
+            assert "limit" not in record.request
+            assert record.request.get("token_limit") == expected_limit
+            assert record.request.get("stop_words") == expected_stop_words
+            assert record.result.get("token_limit") == expected_limit
+            assert record.result.get("stop_words") == expected_stop_words
+            assert (
+                record.result.get("metadata", {}).get("stop_words")
+                == expected_stop_words
+            )
+            assert (
+                record.result.get("analysis_params", {}).get("stop_words")
+                == expected_stop_words
+            )
+        else:
+            assert record.request == request_payload
 
         # Verify result structure matches response
         for key in analysis_config["expected_result_keys"]:
@@ -100,8 +133,8 @@ class TestAnalysisErrorHandling:
         [
             ({"node_ids": []}, 400),  # Empty node list
             ({"node_ids": ["nonexistent"]}, 404),  # Nonexistent node
-            ({"limit": -1}, 400),  # Invalid limit
-            ({"limit": "not_a_number"}, 422),  # Type error
+            ({"token_limit": -1}, 400),  # Invalid limit
+            ({"token_limit": "not_a_number"}, 422),  # Type error
         ],
     )
     async def test_token_frequency_validation_errors(
@@ -112,7 +145,6 @@ class TestAnalysisErrorHandling:
         base_request = {
             "node_ids": ["dummy"],
             "node_columns": {"dummy": "document"},
-            "limit": 10,
         }
         base_request.update(invalid_param)
 
@@ -132,7 +164,6 @@ class TestAnalysisErrorHandling:
         request_payload = {
             "node_ids": [tiny_node_id],
             "node_columns": {tiny_node_id: "document"},
-            "limit": 10,
         }
 
         # When: We call the endpoint with nonexistent workspace
@@ -144,7 +175,7 @@ class TestAnalysisErrorHandling:
         # Then: The response indicates not found
         assert response.status_code == 404
 
-    @pytest.mark.parametrize("missing_field", ["node_ids", "limit"])
+    @pytest.mark.parametrize("missing_field", ["node_ids"])
     async def test_missing_required_fields(
         self, authenticated_client, workspace_id, tiny_node_id, missing_field
     ):
@@ -153,7 +184,6 @@ class TestAnalysisErrorHandling:
         complete_request = {
             "node_ids": [tiny_node_id],
             "node_columns": {tiny_node_id: "document"},
-            "limit": 10,
         }
         incomplete_request = {
             k: v for k, v in complete_request.items() if k != missing_field
@@ -180,7 +210,6 @@ class TestAnalysisDataIntegrity:
         request_payload = {
             "node_ids": [sample_node_id],
             "node_columns": {sample_node_id: "document"},
-            "limit": 15,
         }
 
         # When: We call the endpoint
@@ -190,10 +219,26 @@ class TestAnalysisDataIntegrity:
 
         assert response.status_code == 200
         api_result = response.json()
+        expected_limit = DEFAULT_TOKEN_LIMIT
+        assert api_result.get("token_limit") == expected_limit
+        assert (
+            api_result.get("analysis_params", {}).get("token_limit") == expected_limit
+        )
 
         # Then: The persisted data matches the API response
         analyses = list_analyses(test_user["id"], workspace_id)
         persisted_result = analyses[0].result
+        assert persisted_result.get("token_limit") == expected_limit
+        assert (
+            persisted_result.get("analysis_params", {}).get("token_limit")
+            == expected_limit
+        )
+        assert analyses[0].request.get("token_limit") == expected_limit
+        assert "limit" not in analyses[0].request
+        assert api_result.get("stop_words") == []
+        assert persisted_result.get("stop_words") == []
+        assert persisted_result.get("metadata", {}).get("stop_words") == []
+        assert persisted_result.get("analysis_params", {}).get("stop_words") == []
 
         # Key fields should match exactly
         assert persisted_result["state"] == api_result["state"]
@@ -236,7 +281,6 @@ emoji test 🚀 🎉 💫"""
         request_payload = {
             "node_ids": [unicode_node_id],
             "node_columns": {unicode_node_id: "document"},
-            "limit": 20,
         }
 
         response = await authenticated_client.post(
@@ -285,11 +329,10 @@ emoji test 🚀 🎉 💫"""
         assert node_response.status_code == 200
         large_node_id = node_response.json()["id"]
 
-        # When: We analyze with a high limit to get large results
+        # When: We analyze with default limits to ensure persistence works on large inputs
         request_payload = {
             "node_ids": [large_node_id],
             "node_columns": {large_node_id: "document"},
-            "limit": 200,  # High limit to get many results
         }
 
         response = await authenticated_client.post(
@@ -307,4 +350,14 @@ emoji test 🚀 🎉 💫"""
 
         # Verify we got substantial results
         total_tokens = sum(len(node_data["data"]) for node_data in result_data.values())
-        assert total_tokens > 50  # Should have many token frequency results
+        assert total_tokens >= DEFAULT_TOKEN_LIMIT
+
+        metadata = analyses[0].result.get("metadata", {})
+        expected_server_limit = min(
+            DEFAULT_TOKEN_LIMIT * SERVER_LIMIT_MULTIPLIER,
+            MAX_SERVER_TOKEN_LIMIT,
+        )
+        assert metadata.get("token_limit") == DEFAULT_TOKEN_LIMIT
+        assert metadata.get("server_limit") == expected_server_limit
+        assert analyses[0].request.get("token_limit") == DEFAULT_TOKEN_LIMIT
+        assert "limit" not in analyses[0].request

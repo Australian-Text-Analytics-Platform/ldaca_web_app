@@ -1,14 +1,16 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// NodeSelectionPanel now handles color selection UI inline
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import NodeSelectionPanel from '../NodeSelectionPanel';
-import SegmentedControl from '../ui/SegmentedControl';
+import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
 import { useWorkspaceSelection } from '../../hooks/useWorkspaceSelection';
 import { useWorkspaceStatus } from '../../hooks/useWorkspaceStatus';
 import { useWorkspaceData } from '../../hooks/useWorkspaceData';
 import { useWorkspaceActions } from '../../hooks/useWorkspaceActions';
 import { useAuth } from '../../hooks/useAuth';
 import { ConcordanceAnalysisRequest, ConcordanceAnalysisResponse, textApi } from '../../api/text';
+import { httpRequest } from '../../api/http';
 import { nodesApi } from '../../api/nodes';
-import { workspacesApi } from '../../api/workspaces';
 import { useAnalysisStore } from '../../stores/analysisStore';
 import useAutoNodeColumns from '../../hooks/useAutoNodeColumns';
 import useNodeColumnInfos from '../../hooks/useNodeColumnInfos';
@@ -79,11 +81,16 @@ const ConcordanceTab: React.FC = () => {
       const mergedParams = incoming.analysis_params
         ? { ...(prev.analysis_params || {}), ...incoming.analysis_params }
         : prev.analysis_params;
+      const mergedPreferences = incoming.preferences
+        ? { ...(prev.preferences || {}), ...incoming.preferences }
+        : prev.preferences;
       return {
+        ...prev,
         state: incoming.state ?? prev.state,
         message: incoming.message ?? prev.message,
         data: mergedData,
         analysis_params: mergedParams,
+        preferences: mergedPreferences,
         combinable: incoming.combinable ?? prev.combinable,
       };
     });
@@ -93,8 +100,6 @@ const ConcordanceTab: React.FC = () => {
   const defaultPalette = useMemo(() => [
     '#2563eb', '#dc2626', '#16a34a', '#9333ea', '#d97706', '#0d9488', '#db2777', '#4f46e5', '#65a30d', '#0891b2', '#92400e', '#6b7280'
   ], []);
-  // Track the last pair of node IDs used when results were generated
-  const [lastCompareNodeIds, setLastCompareNodeIds] = useState<string[]>([]);
   // legacy inline picker state removed in favor of shared component
   const [viewMode, setViewMode] = useState<'separated'|'combined'>('separated');
   const [combinedPage, setCombinedPage] = useState(1);
@@ -148,15 +153,16 @@ const ConcordanceTab: React.FC = () => {
 
   // Debug results changes
   useEffect(() => {
-      if (results) {
-      if (localStorage.getItem('debugConc') === '1') {
-  console.log('Concordance results updated:', results);
-	console.log('Results state:', (results as any)?.state);
-        console.log('Results data:', (results as any)?.data);
-      }
-      if ((results as any)?.data) {
-  if (localStorage.getItem('debugConc') === '1') console.log('Data entries:', Object.entries(results.data));
-      }
+    if (!results || localStorage.getItem('debugConc') !== '1') {
+      return;
+    }
+
+    console.debug('Concordance results updated:', results);
+    console.debug('Results state:', results.state);
+    console.debug('Results data:', results.data);
+
+    if (results.data) {
+      console.debug('Data entries:', Object.entries(results.data));
     }
   }, [results]);
 
@@ -165,6 +171,35 @@ const ConcordanceTab: React.FC = () => {
       setViewMode('separated');
     }
   }, [viewMode, results]);
+
+  useEffect(() => {
+    if (!results) {
+      return;
+    }
+
+    const analysisParams = (results as any)?.analysis_params ?? {};
+    const preferenceSource = (results as any)?.preferences ?? analysisParams?.preferences ?? {};
+
+    const nextPageSize = preferenceSource?.page_size ?? analysisParams?.page_size;
+    if (typeof nextPageSize === 'number' && Number.isFinite(nextPageSize) && nextPageSize > 0 && nextPageSize !== globalPageSize) {
+      setGlobalPageSize(nextPageSize);
+      setNodePagination(prev => {
+        const updated = { ...prev };
+        Object.keys(updated).forEach((nodeId) => {
+          updated[nodeId] = {
+            ...updated[nodeId],
+            pageSize: nextPageSize,
+          };
+        });
+        return updated;
+      });
+    }
+
+    const nextShowMetadata = preferenceSource?.show_metadata ?? analysisParams?.show_metadata;
+    if (typeof nextShowMetadata === 'boolean' && nextShowMetadata !== showMetadata) {
+      setShowMetadata(nextShowMetadata);
+    }
+  }, [results, globalPageSize, showMetadata, setNodePagination]);
 
   // Preserve results across transient graph refetches: only clear when the actual set of selected IDs changes
   const selectedNodeIds = useMemo(() => selectedNodes.map(node => node.id).sort(), [selectedNodes]);
@@ -187,7 +222,9 @@ const ConcordanceTab: React.FC = () => {
     }
     lastPendingConcordanceRef.current = pendingConcordance.timestamp;
 
-    if (localStorage.getItem('debugConc') === '1') console.log('Processing pending concordance search:', pendingConcordance);
+    if (localStorage.getItem('debugConc') === '1') {
+      console.debug('Processing pending concordance search:', pendingConcordance);
+    }
 
     if (pendingConcordance.searchWord) {
       setSearchWord(pendingConcordance.searchWord);
@@ -210,7 +247,11 @@ const ConcordanceTab: React.FC = () => {
     let timeoutId: number | null = null;
     if (pendingConcordance.searchWord && selectedNodes.length > 0) {
       timeoutId = window.setTimeout(() => {
-        if (localStorage.getItem('debugConc') === '1') console.log(`Auto-triggering concordance search for: ${pendingConcordance.searchWord} (delay=${delay}ms, autoRun=${pendingConcordance.autoRun})`);
+        if (localStorage.getItem('debugConc') === '1') {
+          console.debug(
+            `Auto-triggering concordance search for: ${pendingConcordance.searchWord} (delay=${delay}ms, autoRun=${pendingConcordance.autoRun})`
+          );
+        }
         setShouldAutoSearch(true);
       }, delay);
     }
@@ -229,6 +270,7 @@ const ConcordanceTab: React.FC = () => {
       recomputeAutoColumns();
     }
   }, [isLocked, selectedNodes, nodeColumnSelections, recomputeAutoColumns]);
+
 
   // Ensure every selected node has a color
   useEffect(() => {
@@ -249,7 +291,6 @@ const ConcordanceTab: React.FC = () => {
     });
   }, [selectedNodes, defaultPalette]);
 
-  // Removed old color popover logic (centralized in ColorSwatchPicker)
 
   const handleColorChange = (nodeId: string, color: string) => setNodeColors(prev => ({ ...prev, [nodeId]: color }));
   // Color assignments now handled by NodeSelectionPanel; retain helper for any future use
@@ -366,16 +407,17 @@ const ConcordanceTab: React.FC = () => {
           num_right_tokens: numRightTokens,
           regex,
           case_sensitive: caseSensitive,
-          page: firstNodePagination.currentPage,
-          page_size: firstNodePagination.pageSize,
-          sort_by: (overrideSortBy ?? firstNodePagination.sortBy) || undefined,
-          sort_order: overrideSortOrder ?? firstNodePagination.sortOrder,
           combined: false,
         };
+        const requestedSortBy = overrideSortBy ?? firstNodePagination.sortBy;
+        if (requestedSortBy) {
+          request.sort_by = requestedSortBy;
+        }
         response = await textApi.concordance(currentWorkspaceId, request, authHeaders);
-        if (localStorage.getItem('debugConc') === '1') console.log('Multi-Node Concordance Response:', response);
+        if (localStorage.getItem('debugConc') === '1') {
+          console.debug('Multi-Node Concordance Response:', response);
+        }
         setResults(response);
-        setLastCompareNodeIds(selectedNodes.slice(0, 2).map(n => n.id));
         // Lock UI and snapshot nodes
         try {
           const ids = selectedNodes.slice(0, 2).map(n => n.id);
@@ -408,7 +450,15 @@ const ConcordanceTab: React.FC = () => {
     } finally {
       setIsSearching(false);
     }
-  }, [currentWorkspaceId, selectedNodes, searchWord, nodeColumnSelections, nodePagination, globalPageSize, numLeftTokens, numRightTokens, regex, caseSensitive, showMetadata, getAuthHeaders, viewMode, combinedPage, combinedPageSize, isLocked]);
+  }, [currentWorkspaceId, selectedNodes, searchWord, nodeColumnSelections, nodePagination, globalPageSize, numLeftTokens, numRightTokens, regex, caseSensitive, getAuthHeaders, viewMode, combinedPage, combinedPageSize, isLocked, mergeConcordanceResults]);
+
+  useEffect(() => {
+    if (!shouldAutoSearch) {
+      return;
+    }
+    setShouldAutoSearch(false);
+    void handleSearch(true);
+  }, [shouldAutoSearch, handleSearch]);
 
   // Hydrate from backend current-request/result once per mount
   const hydratedOnceRef = useRef<boolean>(false);
@@ -439,7 +489,6 @@ const ConcordanceTab: React.FC = () => {
           setCaseSensitive(!!req.case_sensitive);
           const hydratedMode: 'separated' | 'combined' = req.combined && req.combinable !== false ? 'combined' : 'separated';
           setViewMode(hydratedMode);
-          setLastCompareNodeIds(nodeIds);
           
           // Build snapshot and lock
           try {
@@ -472,9 +521,9 @@ const ConcordanceTab: React.FC = () => {
         if (res) {
           setResults(resResp as any);
         }
-      } catch (_) { /* ignore */ }
+      } catch { /* ignore */ }
     })();
-  }, [currentWorkspaceId, getAuthHeaders]);
+  }, [currentWorkspaceId, getAuthHeaders, setNodeColumnSelectionsRaw]);
 
   const handleClearResults = async () => {
     try {
@@ -489,6 +538,76 @@ const ConcordanceTab: React.FC = () => {
     setCombinedPage(1);
     setLockedNodesSnapshot([]);
     setIsLocked(false);
+  };
+
+  const handleViewModeChange = (nextMode: 'separated' | 'combined') => {
+    if (nextMode === viewMode) {
+      return;
+    }
+
+    setViewMode(nextMode);
+
+    if (nextMode === 'combined' && results?.combinable) {
+      const prevAnchor = resultsRef.current;
+      if (prevAnchor) {
+        const rect = prevAnchor.getBoundingClientRect();
+        prevAnchor.style.minHeight = `${rect.height}px`;
+      }
+
+      setTimeout(() => {
+        const prevTop =
+          prevAnchor?.getBoundingClientRect().top ??
+          resultsRef.current?.getBoundingClientRect().top ??
+          0;
+        const prevScrollY = window.scrollY;
+
+        setCombinedLoading(true);
+        handleSearch(true, undefined, 'combined', undefined, undefined, true).finally(() => {
+          setCombinedLoading(false);
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              const newAnchor = resultsRef.current;
+              if (newAnchor) {
+                const newTop = newAnchor.getBoundingClientRect().top;
+                const delta = newTop - prevTop;
+                if (Math.abs(delta) > 1) {
+                  window.scrollTo({ top: prevScrollY + delta });
+                }
+                newAnchor.style.minHeight = '';
+              } else {
+                window.scrollTo({ top: prevScrollY });
+              }
+            });
+          });
+        });
+      }, 30);
+
+      return;
+    }
+
+    if (nextMode === 'separated') {
+      const prevAnchor = resultsRef.current;
+      const prevTop = prevAnchor?.getBoundingClientRect().top ?? 0;
+      const prevScrollY = window.scrollY;
+
+      handleSearch(true, undefined, 'separated', undefined, undefined, true).finally(() => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            const newAnchor = resultsRef.current;
+            if (newAnchor) {
+              const newTop = newAnchor.getBoundingClientRect().top;
+              const delta = newTop - prevTop;
+              if (Math.abs(delta) > 1) {
+                window.scrollTo({ top: prevScrollY + delta });
+              }
+              newAnchor.style.minHeight = '';
+            } else {
+              window.scrollTo({ top: prevScrollY });
+            }
+          });
+        });
+      });
+    }
   };
 
   // Refetch combined results when combined page changes
@@ -518,12 +637,20 @@ const ConcordanceTab: React.FC = () => {
 
       // Trigger backend resort using current-result POST
       const pageSize = currentNodePagination.pageSize;
-      void (async () => {
-    if (!currentWorkspaceId) return;
-    const overrides = { node_id: nodeId, sort_by: columnName, sort_order: newSortOrder, page: 1, page_size: pageSize } as any;
-    const resp: any = await textApi.postConcordanceCurrentResult(currentWorkspaceId, overrides, getAuthHeaders());
-    if (resp?.data) mergeConcordanceResults(resp as ConcordanceAnalysisResponse);
-      })();
+      const workspaceId = currentWorkspaceId;
+      if (!workspaceId) {
+        return prev;
+      }
+      void (async (wid: string) => {
+        setNodeLoading(prev => ({ ...prev, [nodeId]: true }));
+        try {
+          const overrides = { node_id: nodeId, sort_by: columnName, sort_order: newSortOrder, page: 1, page_size: pageSize } as any;
+          const resp: any = await textApi.postConcordanceCurrentResult(wid, overrides, getAuthHeaders());
+          if (resp?.data) mergeConcordanceResults(resp as ConcordanceAnalysisResponse);
+        } finally {
+          setNodeLoading(prev => ({ ...prev, [nodeId]: false }));
+        }
+      })(workspaceId);
 
       return {
         ...prev,
@@ -547,18 +674,26 @@ const ConcordanceTab: React.FC = () => {
       };
 
       // Trigger backend page update using current-result POST
-      void (async () => {
-        if (!currentWorkspaceId) return;
-        const overrides = {
-          node_id: nodeId,
-          page: newPage,
-          page_size: currentNodePagination.pageSize,
-          sort_by: currentNodePagination.sortBy || undefined,
-          sort_order: currentNodePagination.sortOrder,
-        } as any;
-        const resp: any = await textApi.postConcordanceCurrentResult(currentWorkspaceId, overrides, getAuthHeaders());
-        if (resp?.data) mergeConcordanceResults(resp as ConcordanceAnalysisResponse);
-      })();
+      const workspaceId = currentWorkspaceId;
+      if (!workspaceId) {
+        return prev;
+      }
+      void (async (wid: string) => {
+        setNodeLoading(prev => ({ ...prev, [nodeId]: true }));
+        try {
+          const overrides = {
+            node_id: nodeId,
+            page: newPage,
+            page_size: currentNodePagination.pageSize,
+            sort_by: currentNodePagination.sortBy || undefined,
+            sort_order: currentNodePagination.sortOrder,
+          } as any;
+          const resp: any = await textApi.postConcordanceCurrentResult(wid, overrides, getAuthHeaders());
+          if (resp?.data) mergeConcordanceResults(resp as ConcordanceAnalysisResponse);
+        } finally {
+          setNodeLoading(prev => ({ ...prev, [nodeId]: false }));
+        }
+      })(workspaceId);
 
       return {
         ...prev,
@@ -570,58 +705,54 @@ const ConcordanceTab: React.FC = () => {
     });
   };
 
-  // New function to search a single node (for pagination and sorting)
-  const handleSingleNodeSearch = async (nodeId: string, overridePage?: number, overrideSortBy?: string, overrideSortOrder?: 'asc'|'desc') => {
-    if (!currentWorkspaceId || !searchWord.trim()) {
+  const persistResultPreferences = useCallback(async (partial: { pageSize?: number; showMetadata?: boolean }) => {
+    const workspaceId = currentWorkspaceId;
+    if (!workspaceId) {
       return;
     }
 
-    // Find the node and its column selection
-    const node = selectedNodes.find(n => n.id === nodeId);
-    if (!node) return;
-
-    const selection = nodeColumnSelections.find(sel => sel.nodeId === nodeId);
-    if (!selection?.column) return;
-
-    const nodeState = nodePagination[nodeId] || {
-      currentPage: 1,
-      pageSize: globalPageSize,
-      sortBy: '',
-      sortOrder: 'asc' as 'asc' | 'desc'
-    };
-
-    // Use override page if provided, otherwise use state
-  const currentPage = overridePage !== undefined ? overridePage : nodeState.currentPage;
-
-    // Set loading for this specific node
-    setNodeLoading(prev => ({ ...prev, [nodeId]: true }));
-    
-    try {
-      const overrides = {
-        node_id: nodeId,
-        combined: false,
-        page: currentPage,
-        page_size: nodeState.pageSize,
-        sort_by: (overrideSortBy ?? nodeState.sortBy) || undefined,
-        sort_order: overrideSortOrder ?? nodeState.sortOrder,
-      };
-
-      const response = await textApi.postConcordanceCurrentResult(currentWorkspaceId, overrides, getAuthHeaders()) as ConcordanceAnalysisResponse;
-
-      if (localStorage.getItem('debugConc') === '1') console.log('Single Node Concordance Response:', response);
-
-      if (response?.data) {
-        mergeConcordanceResults(response);
-      } else if (response) {
-        setResults(response);
-      }
-    } catch (error) {
-      console.error('Error performing single node concordance search:', error);
-    } finally {
-      // Clear loading for this specific node
-      setNodeLoading(prev => ({ ...prev, [nodeId]: false }));
+    const preferenceUpdates: Record<string, unknown> = {};
+    if (partial.pageSize !== undefined) {
+      preferenceUpdates.page_size = partial.pageSize;
     }
-  };
+    if (partial.showMetadata !== undefined) {
+      preferenceUpdates.show_metadata = partial.showMetadata;
+    }
+
+    if (Object.keys(preferenceUpdates).length === 0) {
+      return;
+    }
+
+    const headers = getAuthHeaders();
+
+    try {
+      await textApi.postConcordanceCurrentResult(
+        workspaceId,
+        { ...preferenceUpdates, update_only: true } as any,
+        headers,
+      );
+
+      const params: Record<string, unknown> = { combined: viewMode === 'combined' };
+      if (viewMode === 'combined') {
+        params.page = combinedPage;
+        params.page_size = partial.pageSize ?? combinedPageSize;
+      } else {
+        params.page = 1;
+        params.page_size = partial.pageSize ?? globalPageSize;
+      }
+
+      const refreshed = await httpRequest<ConcordanceAnalysisResponse>(
+        `/workspaces/${workspaceId}/concordance/current-result`,
+        { method: 'GET', headers, params },
+      );
+
+      mergeConcordanceResults(refreshed);
+      return refreshed;
+    } catch (error) {
+      console.error('Failed to persist concordance preferences', error);
+      throw error;
+    }
+  }, [combinedPage, combinedPageSize, currentWorkspaceId, getAuthHeaders, globalPageSize, mergeConcordanceResults, viewMode]);
 
   const handleRowClick = (row: any, nodeId: string, column: string) => {
     if (!currentWorkspaceId || row.document_idx === undefined) return;
@@ -795,6 +926,17 @@ const ConcordanceTab: React.FC = () => {
     ]
   ), []);
 
+  const dedupeColumns = useCallback((cols: string[]): string[] => {
+    const seen = new Set<string>();
+    return cols.filter(col => {
+      if (seen.has(col)) {
+        return false;
+      }
+      seen.add(col);
+      return true;
+    });
+  }, []);
+
   const renderConcordanceTable = (nodeName: string, nodeData: any, nodeId: string, column: string) => {
     if (nodeName === '__COMBINED__') {
       const rows = nodeData.data || [];
@@ -814,7 +956,10 @@ const ConcordanceTab: React.FC = () => {
       // Derive display columns: core first, then metadata (columns minus core and internal)
       const coreSet = new Set(coreCols);
       const metaCols = columns.filter(c => !coreSet.has(c) && c !== '__source_node');
-      const displayColumns = showMetadata ? [...coreCols.filter(c => columns.includes(c)), ...metaCols] : coreCols.filter(c => columns.includes(c));
+      const rawDisplayColumns = showMetadata
+        ? [...coreCols.filter(c => columns.includes(c)), ...metaCols]
+        : coreCols.filter(c => columns.includes(c));
+      const displayColumns = dedupeColumns(rawDisplayColumns);
 
       return (
         <div key="__COMBINED__" className="mb-6">
@@ -946,7 +1091,10 @@ const ConcordanceTab: React.FC = () => {
     const rows = nodeData.data || [];
     const allCols: string[] = (nodeData.columns || (rows.length ? Object.keys(rows[0]) : [])) as string[];
     const metaCols: string[] = (nodeData.metadata?.metadata_columns as string[] | undefined) ?? allCols.filter(c => !coreCols.includes(c));
-    const displayColumns = showMetadata ? [...coreCols.filter(c => allCols.includes(c)), ...metaCols.filter(c => allCols.includes(c))] : coreCols.filter(c => allCols.includes(c));
+    const rawDisplayColumns = showMetadata
+      ? [...coreCols.filter(c => allCols.includes(c)), ...metaCols.filter(c => allCols.includes(c))]
+      : coreCols.filter(c => allCols.includes(c));
+    const displayColumns = dedupeColumns(rawDisplayColumns);
 
     if (!nodeData.data || nodeData.data.length === 0) {
       return (
@@ -956,7 +1104,7 @@ const ConcordanceTab: React.FC = () => {
           </div>
           <div className="bg-white p-4 rounded-lg border">
             <div className="text-center text-gray-500">
-              No results found for "{searchWord}"
+              No results found for “{searchWord}”
             </div>
           </div>
         </div>
@@ -1084,7 +1232,7 @@ const ConcordanceTab: React.FC = () => {
               )}
             </Button>
           </div>
-        )}(
+        )}
       </div>
     );
   };
@@ -1173,50 +1321,6 @@ const ConcordanceTab: React.FC = () => {
                   />
                 </div>
               </div>
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-foreground">Results per page</label>
-                <select
-                  value={globalPageSize}
-                  onChange={(e) => {
-                    const newPageSize = parseInt(e.target.value);
-                    setGlobalPageSize(newPageSize);
-                    setNodePagination(prev => {
-                      const updated = { ...prev };
-                      Object.keys(updated).forEach(nodeId => {
-                        updated[nodeId] = {
-                          ...updated[nodeId],
-                          pageSize: newPageSize,
-                          currentPage: 1
-                        };
-                      });
-                      return updated;
-                    });
-                    setTimeout(() => {
-                      if (results && ((results as any).state === 'successful') && (results as any).data) {
-                        Object.keys(results.data).forEach(nodeName => {
-                          let node = selectedNodes.find(n => n.id === nodeName);
-                          if (!node) {
-                            node = selectedNodes.find(n => n.name === nodeName);
-                          }
-                          if (!node) {
-                            const nodeIndex = Object.keys(results.data!).indexOf(nodeName);
-                            node = selectedNodes[nodeIndex];
-                          }
-                          if (node) {
-                            handleSingleNodeSearch(node.id);
-                          }
-                        });
-                      }
-                    }, 100);
-                  }}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <option value={10}>10</option>
-                  <option value={20}>20</option>
-                  <option value={50}>50</option>
-                  <option value={100}>100</option>
-                </select>
-              </div>
             </div>
 
             <div className="flex flex-wrap gap-4 text-sm">
@@ -1239,15 +1343,6 @@ const ConcordanceTab: React.FC = () => {
                   disabled={!!isLocked}
                 />
                 <span className="text-sm text-foreground">Case sensitive</span>
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={showMetadata}
-                  onChange={(e) => setShowMetadata(e.target.checked)}
-                  className="h-4 w-4"
-                />
-                <span className="text-sm text-foreground">Show metadata</span>
               </label>
             </div>
           </div>
@@ -1299,89 +1394,109 @@ const ConcordanceTab: React.FC = () => {
                       </CardDescription>
                     )}
                   </div>
-                  <SegmentedControl
-                    options={(() => {
-                      const base: Array<{ value: 'separated' | 'combined'; label: string }> = [
-                        { value: 'separated', label: 'Separated' },
-                      ];
-                      if (results?.combinable) {
-                        base.push({ value: 'combined', label: 'Combined' });
-                      }
-                      return base;
-                    })()}
+                  <Tabs
                     value={viewMode}
-                    onChange={(mode) => {
-                      const nextMode = mode as 'separated' | 'combined';
-                      setViewMode(nextMode);
-                      if (nextMode === 'combined' && results?.combinable) {
-                        const controller = new AbortController();
-                        const prevAnchor = resultsRef.current;
-                        if (prevAnchor) {
-                          const rect = prevAnchor.getBoundingClientRect();
-                          prevAnchor.style.minHeight = `${rect.height}px`;
+                    onValueChange={(mode) => handleViewModeChange(mode as 'separated' | 'combined')}
+                    className="w-full md:w-auto"
+                  >
+                    <TabsList aria-label="Concordance view mode">
+                      <TabsTrigger value="separated">Separated</TabsTrigger>
+                      {results?.combinable && (
+                        <TabsTrigger value="combined">
+                          {combinedLoading ? (
+                            <span className="flex items-center gap-1">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              Combined
+                            </span>
+                          ) : (
+                            'Combined'
+                          )}
+                        </TabsTrigger>
+                      )}
+                    </TabsList>
+                  </Tabs>
+                </div>
+                <div className="flex flex-wrap items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <label htmlFor="concordance-page-size" className="text-sm font-medium text-foreground">
+                      Results per page
+                    </label>
+                    <select
+                      id="concordance-page-size"
+                      value={globalPageSize}
+                      onChange={(e) => {
+                        const parsed = parseInt(e.target.value, 10);
+                        if (!Number.isFinite(parsed) || parsed <= 0) {
+                          return;
                         }
-                        setTimeout(() => {
-                          if (!controller.signal.aborted) {
-                            const prevTop = prevAnchor?.getBoundingClientRect().top ?? resultsRef.current?.getBoundingClientRect().top ?? 0;
-                            const prevScrollY = window.scrollY;
-                            setCombinedLoading(true);
-                            handleSearch(true, undefined, 'combined', undefined, undefined, true).finally(() => {
-                              setCombinedLoading(false);
-                              requestAnimationFrame(() => {
-                                requestAnimationFrame(() => {
-                                  const newAnchor = resultsRef.current;
-                                  if (newAnchor) {
-                                    const newTop = newAnchor.getBoundingClientRect().top;
-                                    const delta = newTop - prevTop;
-                                    if (Math.abs(delta) > 1) {
-                                      window.scrollTo({ top: prevScrollY + delta });
-                                    }
-                                    newAnchor.style.minHeight = '';
-                                  } else {
-                                    window.scrollTo({ top: prevScrollY });
-                                  }
-                                });
-                              });
-                            });
-                          }
-                        }, 30);
-                        return () => controller.abort();
-                      }
-                      if (nextMode === 'separated') {
-                        const controller = new AbortController();
-                        const prevAnchor = resultsRef.current;
-                        const prevTop = prevAnchor?.getBoundingClientRect().top ?? 0;
-                        const prevScrollY = window.scrollY;
-                        handleSearch(true, undefined, 'separated', undefined, undefined, true).finally(() => {
-                          requestAnimationFrame(() => {
-                            requestAnimationFrame(() => {
-                              const newAnchor = resultsRef.current;
-                              if (newAnchor) {
-                                const newTop = newAnchor.getBoundingClientRect().top;
-                                const delta = newTop - prevTop;
-                                if (Math.abs(delta) > 1) {
-                                  window.scrollTo({ top: prevScrollY + delta });
-                                }
-                                newAnchor.style.minHeight = '';
-                              } else {
-                                window.scrollTo({ top: prevScrollY });
-                              }
-                            });
+                        const newPageSize = parsed;
+                        const previousPageSize = globalPageSize;
+                        const previousPagination = Object.fromEntries(
+                          Object.entries(nodePagination).map(([key, value]) => [key, { ...value }])
+                        ) as typeof nodePagination;
+
+                        setGlobalPageSize(newPageSize);
+                        setNodePagination((prev) => {
+                          const updated = { ...prev };
+                          Object.keys(updated).forEach((nodeId) => {
+                            updated[nodeId] = {
+                              ...updated[nodeId],
+                              pageSize: newPageSize,
+                              currentPage: 1,
+                            };
                           });
+                          return updated;
                         });
-                        return () => controller.abort();
-                      }
-                    }}
-                    ariaLabel="Concordance view mode"
-                  />
+
+                        void (async () => {
+                          try {
+                            await persistResultPreferences({ pageSize: newPageSize });
+                          } catch (error) {
+                            console.error('Failed to persist concordance page size preference', error);
+                            setGlobalPageSize(previousPageSize);
+                            setNodePagination(previousPagination);
+                          }
+                        })();
+                      }}
+                      className="w-32 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <option value={10}>10</option>
+                      <option value={20}>20</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                    </select>
+                  </div>
+                  <label className="flex items-center gap-2 text-sm text-foreground">
+                    <input
+                      type="checkbox"
+                      checked={showMetadata}
+                      onChange={(e) => {
+                        const nextValue = e.target.checked;
+                        const previousValue = showMetadata;
+                        setShowMetadata(nextValue);
+                        void (async () => {
+                          try {
+                            await persistResultPreferences({ showMetadata: nextValue });
+                          } catch (error) {
+                            console.error('Failed to persist concordance metadata preference', error);
+                            setShowMetadata(previousValue);
+                          }
+                        })();
+                      }}
+                      className="h-4 w-4"
+                    />
+                    <span>Show metadata</span>
+                  </label>
                 </div>
               </CardHeader>
               <CardContent className="space-y-6">
                 {results.data && Object.keys(results.data).length > 0 ? (
                   <div className={`grid gap-6 ${viewMode==='combined' ? 'grid-cols-1' : 'grid-cols-1'}`}>
                     {Object.entries(results.data).filter(([k]) => viewMode==='combined' ? k==='__COMBINED__' : k !== '__COMBINED__').map(([nodeName, nodeData]) => {
-                      if (localStorage.getItem('debugConc') === '1') console.log('Trying to match nodeName:', nodeName);
-                      if (localStorage.getItem('debugConc') === '1') console.log('Available nodes:', selectedNodes.map(n => ({ id: n.id, name: n.data?.name, nodeName: n.name })));
+                      if (localStorage.getItem('debugConc') === '1') {
+                        console.debug('Trying to match nodeName:', nodeName);
+                        console.debug('Available nodes:', selectedNodes.map(n => ({ id: n.id, name: n.data?.name, nodeName: n.name })));
+                      }
                       
                       const nodesForDetail = selectedNodes;
                       let node = nodesForDetail.find((n: any) => (n.data?.name || n.id) === nodeName);
@@ -1400,7 +1515,9 @@ const ConcordanceTab: React.FC = () => {
                       const selection = nodeColumnSelections.find(sel => sel.nodeId === nodeId);
                       const column = selection?.column || '';
                       
-                      if (localStorage.getItem('debugConc') === '1') console.log('Final match - nodeId:', nodeId, 'column:', column);
+                      if (localStorage.getItem('debugConc') === '1') {
+                        console.debug('Final match - nodeId:', nodeId, 'column:', column);
+                      }
                       
                       return renderConcordanceTable(nodeName, nodeData, nodeId, column);
                     })}

@@ -7,7 +7,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import GoogleLogin from './components/GoogleLogin';
 import { WorkspaceView, Sidebar } from './components/layout';
 import logo from './logo.png';
-import { FeedbackModal } from './components/modals';
+import FeedbackPanel from './components/panels/FeedbackPanel';
 import { useUIStore } from './stores';
 import { useShallow } from 'zustand/react/shallow';
 import { SidebarInset, SidebarProvider, SidebarTrigger } from './components/ui/sidebar';
@@ -193,7 +193,7 @@ const App: React.FC = () => {
               </ErrorBoundary>
 
               <SidebarInset className="flex h-screen flex-1 flex-col overflow-hidden bg-transparent">
-                <FeedbackModal isOpen={feedbackOpen} onClose={closeFeedbackModal} />
+                <FeedbackPanel open={feedbackOpen} onClose={closeFeedbackModal} />
 
                 <header className="border-b border-border/40 bg-white px-4 py-3 md:hidden">
                   <div className="flex items-center justify-between">
@@ -208,7 +208,7 @@ const App: React.FC = () => {
                       className={`relative h-full flex-1 overflow-y-auto p-6 ${isResizing ? 'transition-none' : 'transition-all duration-300 ease-in-out'}`}
                       style={{ width: isRightCollapsed ? '100%' : `${100 - rightWidth}%`, minWidth: 280 }}
                     >
-                      <div className={`${isRightCollapsed ? 'w-full max-w-none mx-0' : 'w-full max-w-4xl mx-auto'}`}>
+                      <div className="w-full max-w-none mx-0">
                         <ErrorBoundary>
                           <Suspense fallback={
                             <div className="flex items-center justify-center py-12">

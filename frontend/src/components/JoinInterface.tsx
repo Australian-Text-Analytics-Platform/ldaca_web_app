@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { WorkspaceNode } from '../types';
 import { useWorkspaceData } from '../hooks/useWorkspaceData';
-import NodeSelectionPanel, { NodeColumnSelection } from './NodeSelectionPanel';
+import NodeSelectionPanel, { NodeColumnSelection, WorkspaceNodeLike } from './NodeSelectionPanel';
 import { AlertTriangle } from 'lucide-react';
 
 interface JoinInterfaceProps {
@@ -83,7 +83,7 @@ const JoinInterface: React.FC<JoinInterfaceProps> = ({
   };
 
   // Prepare props for NodeSelectionPanel reusing its UI (without color picker)
-  const selectedNodes = [leftNode, rightNode];
+  const selectedNodes: WorkspaceNodeLike[] = [leftNode, rightNode];
   const nodeColumnSelections: NodeColumnSelection[] = [
     { nodeId: leftNode.node_id, column: leftOn || '' },
     { nodeId: rightNode.node_id, column: rightOn || '' },

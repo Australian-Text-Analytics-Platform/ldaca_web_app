@@ -1,9 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import ColorSwatchPicker from './ui/ColorSwatchPicker';
 import { ColumnInfo, filterColumnsByType, mapColumnsToInfo, normalizeTypeName } from '../utils/columnTypes';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Lock } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Card, CardContent, CardHeader } from './ui/card';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from './ui/dropdown-menu';
+import { Input } from './ui/input';
 import { cn } from '../lib/utils';
 
 export interface NodeColumnSelection {
@@ -15,20 +20,54 @@ type NodeColumnSource = string[] | ColumnInfo[];
 
 const CLEAR_SELECTION_VALUE = '__ldaca__clear__';
 
+export type WorkspaceNodeLike = Record<string, unknown> & {
+  id?: string;
+  node_id?: string;
+  data?: Record<string, unknown> & {
+    id?: string;
+    node_id?: string;
+    nodeName?: string;
+    name?: string;
+    label?: string;
+    shape?: [number, number];
+    columns?: string[];
+    schema?: unknown;
+  };
+  name?: string;
+  label?: string;
+  unique_id?: string;
+};
+
+const getNodeIdentifier = (node: WorkspaceNodeLike, fallbackIndex: number): string =>
+  node.id ||
+  node.node_id ||
+  (node.data?.id as string | undefined) ||
+  (node.data?.node_id as string | undefined) ||
+  (node.unique_id as string | undefined) ||
+  `node-${fallbackIndex}`;
+
+const getNodeDisplayName = (node: WorkspaceNodeLike, fallbackId: string): string =>
+  (node.name as string | undefined) ||
+  (node.data?.name as string | undefined) ||
+  (node.data?.nodeName as string | undefined) ||
+  (node.label as string | undefined) ||
+  (node.data?.label as string | undefined) ||
+  fallbackId;
+
 interface NodeSelectionPanelProps {
-  selectedNodes: any[];
+  selectedNodes: WorkspaceNodeLike[];
   nodeColumnSelections: NodeColumnSelection[];
   onColumnChange: (nodeId: string, column: string) => void;
   nodeColors: Record<string,string>;
   onColorChange: (nodeId: string, color: string) => void;
-  getNodeColumns?: (node: any) => NodeColumnSource;
+  getNodeColumns?: (node: WorkspaceNodeLike) => NodeColumnSource;
   defaultPalette: string[];
   maxCompare?: number;
   className?: string;
   showHeaderLabel?: boolean;
   showColorPicker?: boolean;
-  columnLabelFn?: (node: any, idx: number) => string;
-  renderNodeMeta?: (node: any) => React.ReactNode;
+  columnLabelFn?: (node: WorkspaceNodeLike, idx: number) => string;
+  renderNodeMeta?: (node: WorkspaceNodeLike) => React.ReactNode;
   showShape?: boolean; // fetch shape if available and not supplied via renderNodeMeta
   getNodeShapeFn?: (nodeId: string) => Promise<{ shape: [number, number]; is_lazy: boolean; calculated: boolean } | null>;
   disabled?: boolean; // disables interactions but keeps UI fully visible
@@ -70,14 +109,12 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
     if (!defaultPalette.length) return '#000000';
     return defaultPalette[idx % defaultPalette.length];
   };
-  const getColumnLabel = (node: any, idx: number) => (columnLabelFn ? columnLabelFn(node, idx) : 'Text Column:');
+  const getColumnLabel = (node: WorkspaceNodeLike, idx: number) => (columnLabelFn ? columnLabelFn(node, idx) : 'Text Column:');
   const [shapes, setShapes] = useState<Record<string,string>>({});
 
   // Compute stable list of selected node ids to avoid retriggering on object identity changes
   const selectedNodeIds = useMemo(() => (
-    selectedNodes.map((node: any, idx: number) => (
-      node.id || node.node_id || node.data?.id || node.data?.node_id || node.unique_id || `node-${idx}`
-    ))
+    selectedNodes.map((node, idx) => getNodeIdentifier(node, idx))
   ), [selectedNodes]);
 
   useEffect(() => {
@@ -95,20 +132,30 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
             if (!cancelled) setShapes(prev => ({ ...prev, [nodeId]: cached }));
             return;
           }
-        } catch (_) { /* ignore storage errors */ }
+        } catch {
+          // ignore storage errors
+        }
         try {
           const res = await getNodeShapeFn(nodeId);
           if (!cancelled && res?.shape) {
             const val = `${res.shape[0]} × ${res.shape[1]}`;
             setShapes(prev => ({ ...prev, [nodeId]: val }));
-            try { if (typeof window !== 'undefined') window.sessionStorage.setItem(`node-shape:${nodeId}`, val); } catch (_) { /* ignore */ }
+            try {
+              if (typeof window !== 'undefined') {
+                window.sessionStorage.setItem(`node-shape:${nodeId}`, val);
+              }
+            } catch {
+              // ignore storage errors
+            }
           }
-        } catch (e) { /* silent */ }
+        } catch {
+          // ignore fetch errors
+        }
       }));
     };
     fetchShapes();
     return () => { cancelled = true; };
-  }, [showShape, getNodeShapeFn, selectedNodeIds]);
+  }, [getNodeShapeFn, selectedNodeIds, shapes, showShape]);
   const normalizeColumnInfos = useCallback((source: NodeColumnSource | undefined): ColumnInfo[] => {
     if (!source) return [];
     if (!Array.isArray(source) || source.length === 0) return [];
@@ -122,13 +169,13 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
     }));
   }, []);
 
-  const resolveColumnInfos = useCallback((node: any): ColumnInfo[] => {
+  const resolveColumnInfos = useCallback((node: WorkspaceNodeLike): ColumnInfo[] => {
     let infos: ColumnInfo[] = [];
     if (getNodeColumns) {
-  const provided = normalizeColumnInfos(getNodeColumns(node));
+      const provided = normalizeColumnInfos(getNodeColumns(node));
       infos = provided;
     } else {
-      infos = mapColumnsToInfo(node);
+      infos = mapColumnsToInfo(node as unknown as Record<string, unknown>);
     }
 
     if (allowedDataTypes && allowedDataTypes.length) {
@@ -150,6 +197,11 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
           <label className="block text-sm font-medium text-muted-foreground">
             Selected Nodes ({(originalCount ?? selectedNodes.length)}/{maxCompare})
           </label>
+          {locked && (
+            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-border bg-muted text-muted-foreground">
+              <Lock className="h-3.5 w-3.5" aria-hidden="true" />
+            </span>
+          )}
         </div>
       )}
       {selectedNodes.length === 0 ? (
@@ -165,12 +217,12 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
             selectedNodes.length > maxCompare ? 'overflow-x-auto' : 'overflow-x-hidden'
           )}
         >
-          {selectedNodes.map((node: any, idx: number) => {
-            const nodeId: string = node.id || node.node_id || node.data?.id || node.data?.node_id || node.unique_id || `node-${idx}`;
+          {selectedNodes.map((node, idx) => {
+            const nodeId = getNodeIdentifier(node, idx);
             const columnInfos = resolveColumnInfos(node);
             const columns = columnInfos.map((info) => info.name);
             const selection = nodeColumnSelections.find(sel => sel.nodeId === nodeId);
-            const nodeDisplayName = node.name || node.data?.name || node.data?.nodeName || (node as any).label || node.data?.label || nodeId;
+            const nodeDisplayName = getNodeDisplayName(node, nodeId);
             const nodeColor = getColorForNodeId(nodeId, idx);
             return (
               <Card
@@ -190,11 +242,10 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
                       {nodeDisplayName}
                     </div>
                     {showColorPicker && (
-                      <ColorSwatchPicker
+                      <NodeColorDropdown
                         color={nodeColor}
                         palette={defaultPalette}
                         onChange={(c) => onColorChange(nodeId, c)}
-                        size={7}
                       />
                     )}
                   </div>
@@ -261,3 +312,86 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
 };
 
 export default NodeSelectionPanel;
+
+interface NodeColorDropdownProps {
+  color: string;
+  palette: string[];
+  onChange: (color: string) => void;
+}
+
+const NodeColorDropdown: React.FC<NodeColorDropdownProps> = ({ color, palette, onChange }) => {
+  const [hexInput, setHexInput] = useState(color.toUpperCase());
+
+  useEffect(() => {
+    setHexInput(color.toUpperCase());
+  }, [color]);
+
+  const handleHexChange = useCallback(
+    (value: string) => {
+      const trimmed = value.trim().toUpperCase();
+      setHexInput(trimmed.startsWith('#') ? trimmed : `#${trimmed}`);
+      const normalized = trimmed.startsWith('#') ? trimmed : `#${trimmed}`;
+      if (/^#[0-9A-F]{6}$/.test(normalized)) {
+        onChange(normalized);
+      }
+    },
+    [onChange]
+  );
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className={cn(
+            'h-7 w-7 aspect-square rounded-full ring-2 ring-border ring-offset-2 transition-shadow hover:ring-primary focus-visible:outline-none focus-visible:ring-primary shadow-sm'
+          )}
+          style={{ backgroundColor: color }}
+          aria-label="Select color"
+        />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56 p-3 space-y-3">
+        <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
+          <span>Pick color</span>
+          <span className="font-mono text-[10px] text-muted-foreground/80">{color.toUpperCase()}</span>
+        </div>
+        <div className="grid grid-cols-6 gap-1">
+          {palette.map((swatch) => (
+            <button
+              key={swatch}
+              type="button"
+              className={cn(
+                'h-6 w-6 rounded-full border border-white shadow-sm transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1',
+                swatch.toLowerCase() === color.toLowerCase() && 'ring-2 ring-primary ring-offset-1'
+              )}
+              style={{ backgroundColor: swatch }}
+              onClick={() => onChange(swatch)}
+              aria-label={`Set color ${swatch}`}
+            />
+          ))}
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            type="color"
+            value={color}
+            onChange={(event) => {
+              const next = event.target.value.toUpperCase();
+              setHexInput(next);
+              onChange(next);
+            }}
+            className="h-9 w-9 cursor-pointer rounded border border-input bg-transparent p-0"
+            aria-label="Custom color"
+          />
+          <Input
+            value={hexInput}
+            onChange={(event) => handleHexChange(event.target.value)}
+            maxLength={7}
+            placeholder="#000000"
+            aria-label="Hex color"
+            className="flex-1 text-xs font-mono"
+          />
+        </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+};

@@ -110,6 +110,15 @@ app.include_router(workspaces_router, prefix="/api", tags=["workspace_management
 app.include_router(users_router, prefix="/api", tags=["user_management"])
 app.include_router(admin_router, prefix="/api", tags=["administration"])
 
+# Legacy compatibility: expose workspace routes without the /api prefix for tests and
+# older clients that expect the original path structure. Hidden from OpenAPI docs to
+# avoid duplicate entries.
+app.include_router(
+    workspaces_router,
+    tags=["workspace_management"],
+    include_in_schema=False,
+)
+
 
 # =============================================================================
 # ROOT ENDPOINTS

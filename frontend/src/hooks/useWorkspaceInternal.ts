@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, no-console */
 import { useCallback, useMemo, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSelectionStore } from '../stores/selectionStore';
@@ -246,7 +247,7 @@ export const useWorkspaceInternal = () => {
           }
         }
       }
-    } catch (_) { /* ignore */ }
+  } catch { /* ignore */ }
 
     try {
       const shapeData = await nodesApi.shape(currentWorkspaceId, nodeId, authHeaders);
@@ -254,7 +255,7 @@ export const useWorkspaceInternal = () => {
         if (shapeData?.shape && typeof window !== 'undefined') {
           window.sessionStorage.setItem(cacheKey, `${shapeData.shape[0]} × ${shapeData.shape[1]}`);
         }
-      } catch (_) { /* ignore */ }
+  } catch { /* ignore */ }
       return shapeData;
     } catch (error) {
       console.error('Failed to get node shape:', error);
@@ -476,7 +477,7 @@ export const useWorkspaceInternal = () => {
           const prevGraph: any = queryClient.getQueryData(queryKeys.workspaceGraph(currentWorkspaceId));
           previousNodeIds = (prevGraph?.nodes || []).map((n: any) => n.id);
         }
-      } catch (_) { /* ignore */ }
+  } catch { /* ignore */ }
       // Proactively clear existing selection so parent nodes lose highlight immediately
       clearSelection();
       return { previousNodeIds };
@@ -497,7 +498,7 @@ export const useWorkspaceInternal = () => {
           }
         }
         if (newId) setSelectedNodes([newId]); else clearSelection();
-      } catch (_) {
+      } catch {
         // Non-fatal; proceed with graph refresh
         clearSelection();
       }
@@ -548,12 +549,11 @@ export const useWorkspaceInternal = () => {
         num_right_tokens: request.num_right_tokens,
         regex: request.regex,
         case_sensitive: request.case_sensitive,
-        page: request.page,
-        page_size: request.page_size,
-        sort_by: request.sort_by ?? undefined,
-        sort_order: request.sort_order ?? 'asc',
         combined: false,
       };
+      if (request.sort_by) {
+        unifiedRequest.sort_by = request.sort_by;
+      }
       return textApi.concordance(workspaceId, unifiedRequest, authHeaders);
     },
     onMutate: () => {
@@ -921,7 +921,7 @@ export const useWorkspaceInternal = () => {
       
       try {
   const schema = await nodesApi.info(currentWorkspaceId, nodeId, authHeaders).then((d:any)=> d.schema || {});
-        // Return in the format expected by DataTable component
+  // Return in the format expected by DataTable component
         return {
           node_id: nodeId,
           schema: schema,  // Record<string, string> with js_type compatible values

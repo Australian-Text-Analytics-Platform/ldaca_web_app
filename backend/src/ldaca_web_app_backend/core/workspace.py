@@ -100,14 +100,14 @@ class WorkspaceManager:
                 print(f"Could not read workspace file for debugging: {read_e}")
             return None
 
-    def _replace_current(self, user_id: str, new_id: str, new_ws: Any) -> None:
+    def _replace_current(self, user_id: str, new_id: str, new_ws: Any):
         current_id, current_ws = self._get_current_entry(user_id)
-        if current_id and current_ws and current_id != new_id:
-            try:
-                self._save(user_id, current_id, current_ws)
-            except Exception as e:  # pragma: no cover
-                print(f"Warning: failed to save previous workspace {current_id}: {e}")
-            self.drop_analysis_state(user_id, current_id)
+        if current_id is not None and current_ws is not None:
+            self._save(user_id, current_id, current_ws)
+            # Don't drop analysis state when switching workspaces - analyses should
+            # persist across workspace switches until explicitly cleared or unloaded
+            # if current_id != new_id:
+            #     self.drop_analysis_state(user_id, current_id)
         self._current[user_id] = {"id": new_id, "ws": new_ws}
         self._ensure_analysis_state(user_id, new_id)
 

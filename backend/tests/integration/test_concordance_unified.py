@@ -1,5 +1,8 @@
 import polars as pl
 import pytest
+from ldaca_web_app_backend.api.workspaces.analyses.concordance import (
+    DEFAULT_CONCORDANCE_PAGE_SIZE,
+)
 from ldaca_web_app_backend.core.workspace import workspace_manager
 
 try:
@@ -47,10 +50,7 @@ async def test_concordance_single_node_roundtrip(authenticated_client, workspace
         "regex": False,
         "case_sensitive": False,
         "combined": False,
-        "page": 1,
-        "page_size": 2,
         "sort_by": "document_idx",
-        "sort_order": "asc",
     }
 
     resp = await authenticated_client.post(
@@ -68,7 +68,19 @@ async def test_concordance_single_node_roundtrip(authenticated_client, workspace
     assert node_result["total_matches"] >= 2
     assert node_result["metadata"]["concordance_columns"]
     assert node_result["metadata"]["metadata_columns"]
-    assert len(node_result["data"]) <= request_payload["page_size"]
+    assert len(node_result["data"]) <= DEFAULT_CONCORDANCE_PAGE_SIZE
+    assert node_result["pagination"]["page_size"] == DEFAULT_CONCORDANCE_PAGE_SIZE
+    assert payload["analysis_params"]["page_size"] == DEFAULT_CONCORDANCE_PAGE_SIZE
+    assert (
+        payload["analysis_params"]["pagination"]["page_size"]
+        == DEFAULT_CONCORDANCE_PAGE_SIZE
+    )
+    assert payload["analysis_params"]["sort_order"] == "asc"
+    assert payload["analysis_params"].get("show_metadata") is False
+    assert (
+        payload.get("preferences", {}).get("page_size") == DEFAULT_CONCORDANCE_PAGE_SIZE
+    )
+    assert payload.get("preferences", {}).get("show_metadata") is False
 
     # Current request should surface the persisted request
     current_req = await authenticated_client.get(
@@ -78,6 +90,21 @@ async def test_concordance_single_node_roundtrip(authenticated_client, workspace
     current_req_payload = current_req.json()
     assert current_req_payload["data"]["node_ids"] == [node.id]
     assert current_req_payload["data"]["node_columns"][node.id] == "text"
+    assert "page" not in current_req_payload["data"]
+    assert "page_size" not in current_req_payload["data"]
+    assert "sort_by" not in current_req_payload["data"]
+    assert "sort_order" not in current_req_payload["data"]
+    assert "pagination" not in current_req_payload["data"]
+
+    record = analysis_store.get_latest_analysis(
+        "test", workspace_id, task="concordance"
+    )
+    assert record is not None
+    assert "page" not in record.request
+    assert "page_size" not in record.request
+    assert "sort_by" not in record.request
+    assert "sort_order" not in record.request
+    assert "pagination" not in record.request
 
     # Current result (GET) should reuse stored results and preserve structure
     current_res = await authenticated_client.get(
@@ -88,6 +115,11 @@ async def test_concordance_single_node_roundtrip(authenticated_client, workspace
     assert current_data["state"] == "successful"
     assert "single_text_node" in current_data["data"]
     assert current_data.get("combinable") is False
+    assert (
+        current_data.get("preferences", {}).get("page_size")
+        == DEFAULT_CONCORDANCE_PAGE_SIZE
+    )
+    assert current_data.get("preferences", {}).get("show_metadata") is False
 
     # POST current-result to request a smaller page size
     current_res_post = await authenticated_client.post(
@@ -96,13 +128,58 @@ async def test_concordance_single_node_roundtrip(authenticated_client, workspace
     )
     assert current_res_post.status_code == 200
     tailored = current_res_post.json()
-    assert tailored["data"]["single_text_node"]["pagination"]["page_size"] == 1
-    assert len(tailored["data"]["single_text_node"]["data"]) <= 1
+    assert tailored == {"state": "successful", "message": "saved"}
+
+    fetch_after_update = await authenticated_client.post(
+        f"/api/workspaces/{workspace_id}/concordance/current-result",
+        json={"node_id": node.id, "page": 1},
+    )
+    assert fetch_after_update.status_code == 200
+    fetch_payload = fetch_after_update.json()
+    node_fetch = fetch_payload["data"]["single_text_node"]
+    assert node_fetch["pagination"]["page_size"] == 1
+    assert len(node_fetch["data"]) <= 1
+    assert fetch_payload["analysis_params"]["page_size"] == 1
+    assert fetch_payload["analysis_params"].get("show_metadata") is False
+    assert fetch_payload.get("preferences", {}).get("page_size") == 1
+
+    persisted_after_post = analysis_store.get_latest_analysis(
+        "test", workspace_id, task="concordance"
+    )
+    assert persisted_after_post is not None
+    stored_blob = persisted_after_post.result.get("_stored", {})
+    assert stored_blob.get("default_page", {}).get("page_size") == 1
+    assert (
+        persisted_after_post.result.get("analysis_params", {})
+        .get("pagination", {})
+        .get("page_size")
+        == 1
+    )
+    assert persisted_after_post.result.get("preferences", {}).get("page_size") == 1
+    assert (
+        persisted_after_post.result.get("preferences", {}).get("show_metadata") is False
+    )
+
+    toggle_metadata = await authenticated_client.post(
+        f"/api/workspaces/{workspace_id}/concordance/current-result",
+        json={"show_metadata": True},
+    )
+    assert toggle_metadata.status_code == 200
+    toggle_payload = toggle_metadata.json()
+    assert toggle_payload == {"state": "successful", "message": "saved"}
+
+    persisted_after_metadata = analysis_store.get_latest_analysis(
+        "test", workspace_id, task="concordance"
+    )
+    assert (
+        persisted_after_metadata.result.get("preferences", {}).get("show_metadata")
+        is True
+    )
 
     # Request the second page explicitly using node_id and page_number alias
     page_two = await authenticated_client.post(
         f"/api/workspaces/{workspace_id}/concordance/current-result",
-        json={"node_id": node.id, "page_number": 2, "page_size": 1},
+        json={"node_id": node.id, "page_number": 2},
     )
     assert page_two.status_code == 200
     page_two_payload = page_two.json()
@@ -111,6 +188,15 @@ async def test_concordance_single_node_roundtrip(authenticated_client, workspace
         page_two_payload["data"]["single_text_node"]["total_matches"]
         == node_result["total_matches"]
     )
+
+    refreshed = await authenticated_client.get(
+        f"/api/workspaces/{workspace_id}/concordance/current-result"
+    )
+    assert refreshed.status_code == 200
+    refreshed_payload = refreshed.json()
+    assert refreshed_payload["data"]["single_text_node"]["pagination"]["page_size"] == 1
+    assert refreshed_payload.get("preferences", {}).get("page_size") == 1
+    assert refreshed_payload.get("preferences", {}).get("show_metadata") is True
 
 
 @pytest.mark.anyio
@@ -157,8 +243,6 @@ async def test_concordance_multi_node_combined(authenticated_client, workspace_i
         "regex": False,
         "case_sensitive": False,
         "combined": True,
-        "page": 1,
-        "page_size": 2,
     }
 
     resp = await authenticated_client.post(
@@ -170,23 +254,28 @@ async def test_concordance_multi_node_combined(authenticated_client, workspace_i
     assert payload["state"] == "successful"
     assert payload.get("combinable") is True
     assert set(payload["data"].keys()) >= {"left_docs", "right_docs", "__COMBINED__"}
+    assert payload["preferences"]["page_size"] == DEFAULT_CONCORDANCE_PAGE_SIZE
+    assert payload["preferences"]["show_metadata"] is False
+    assert payload["analysis_params"].get("show_metadata") is False
 
     combined = payload["data"]["__COMBINED__"]
     assert combined["total_matches"] >= 3
     assert combined["pagination"]["page"] == 1
-    assert combined["sorting"]["sort_order"] in {"asc", "desc"}
-    assert len(combined["data"]) <= request_payload["page_size"]
+    assert combined["sorting"]["sort_order"] == "asc"
+    assert len(combined["data"]) <= DEFAULT_CONCORDANCE_PAGE_SIZE
+    assert combined["pagination"]["page_size"] == DEFAULT_CONCORDANCE_PAGE_SIZE
 
     # Request only left node via current-result POST to ensure overrides work
     current_filtered = await authenticated_client.post(
         f"/api/workspaces/{workspace_id}/concordance/current-result",
-        json={"node_id": left_node.id, "page_size": 2},
+        json={"node_id": left_node.id, "page": 1, "page_size": 2},
     )
     assert current_filtered.status_code == 200
     filtered_payload = current_filtered.json()
     assert filtered_payload.get("combinable") is True
     assert list(filtered_payload["data"].keys()) == ["left_docs"]
     assert filtered_payload["data"]["left_docs"]["pagination"]["page_size"] == 2
+    assert filtered_payload.get("preferences", {}).get("page_size") == 2
 
     # Request combined view second page
     combined_page_two = await authenticated_client.post(
@@ -250,8 +339,6 @@ async def test_concordance_combined_toggle_after_separated_request(
         "regex": False,
         "case_sensitive": False,
         "combined": False,
-        "page": 1,
-        "page_size": 2,
     }
 
     resp = await authenticated_client.post(
@@ -328,8 +415,6 @@ async def test_concordance_combined_handles_mismatched_columns(
         "regex": False,
         "case_sensitive": False,
         "combined": True,
-        "page": 1,
-        "page_size": 10,
     }
 
     resp = await authenticated_client.post(

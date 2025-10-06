@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { post, get, httpRequest } from './http';
 
 // Concordance / Quotation / Token Frequency / Topic Modeling grouped
@@ -8,10 +9,10 @@ export interface ConcordanceMetadata {
   all_columns: string[];          // All available columns
 }
 
-export interface ConcordanceRequest { column: string; search_word: string; num_left_tokens?: number; num_right_tokens?: number; regex?: boolean; case_sensitive?: boolean; page?: number; page_size?: number; sort_by?: string; sort_order?: 'asc' | 'desc'; }
+export interface ConcordanceRequest { column: string; search_word: string; num_left_tokens?: number; num_right_tokens?: number; regex?: boolean; case_sensitive?: boolean; sort_by?: string; }
 export interface ConcordanceDetachRequest { node_id: string; column: string; search_word: string; num_left_tokens?: number; num_right_tokens?: number; regex?: boolean; case_sensitive?: boolean; new_node_name?: string; }
-export interface ConcordanceAnalysisRequest { node_ids: string[]; node_columns: Record<string,string>; search_word: string; num_left_tokens?: number; num_right_tokens?: number; regex?: boolean; case_sensitive?: boolean; page?: number; page_size?: number; sort_by?: string; sort_order?: 'asc' | 'desc'; combined?: boolean; }
-export interface ConcordanceResultQuery { node_id?: string; combined?: boolean; page?: number; page_number?: number; page_size?: number; sort_by?: string; sort_order?: 'asc' | 'desc'; }
+export interface ConcordanceAnalysisRequest { node_ids: string[]; node_columns: Record<string,string>; search_word: string; num_left_tokens?: number; num_right_tokens?: number; regex?: boolean; case_sensitive?: boolean; sort_by?: string; combined?: boolean; }
+export interface ConcordanceResultQuery { node_id?: string; combined?: boolean; page?: number; page_number?: number; page_size?: number; sort_by?: string; sort_order?: 'asc' | 'desc'; show_metadata?: boolean; update_only?: boolean; }
 export interface ConcordanceResultEntry {
   data: any[];
   columns: string[];
@@ -26,18 +27,26 @@ export interface ConcordanceAnalysisResponse {
   data: Record<string, ConcordanceResultEntry>;
   analysis_params?: any;
   combinable?: boolean;
+  preferences?: { page_size?: number; show_metadata?: boolean; [key: string]: unknown };
 }
 export interface QuotationRequest { column: string; page?: number; page_size?: number; sort_by?: string | null; sort_order?: 'asc' | 'desc'; }
 export interface QuotationDetachRequest { node_id: string; column: string; new_node_name?: string; }
 export interface FrequencyAnalysisRequest { time_column: string; group_by_columns?: string[] | null; frequency: 'daily' | 'weekly' | 'monthly' | 'yearly'; sort_by_time: boolean; }
 
-export interface TokenFrequencyRequest { node_ids: string[]; node_columns: Record<string,string>; stop_words?: string[] | null; limit: number; }
-export interface TokenFrequencyNodeResult { data: { token: string; frequency: number }[]; columns: string[]; }
+export interface TokenFrequencyRequest { node_ids: string[]; node_columns: Record<string,string>; stop_words?: string[] | null; }
+export interface TokenFrequencyNodeResult {
+  data: { token: string; frequency: number }[];
+  columns: string[];
+  metadata?: Record<string, any> | null;
+}
 export interface TokenFrequencyResponse {
   state: 'running' | 'successful' | 'failed' | 'cancelled';
   message?: string;
   data: Record<string, TokenFrequencyNodeResult> | null;
   analysis_params?: any;
+  token_limit?: number;
+  metadata?: Record<string, any> | null;
+  stop_words?: string[] | null;
   statistics?: Array<{
     token: string;
     freq_corpus_0: number;
@@ -85,6 +94,7 @@ export const textApi = {
   getTokenFrequenciesCurrentRequest: (ws: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/token-frequencies/current-request`, { method: 'GET', headers }),
   postTokenFrequenciesCurrentRequest: (ws: string, reqUpdate: any, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/token-frequencies/current-request`, reqUpdate, headers),
   getTokenFrequenciesCurrentResult: (ws: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/token-frequencies/current-result`, { method: 'GET', headers }),
+  postTokenFrequenciesCurrentResult: (ws: string, reqUpdate: any, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/token-frequencies/current-result`, reqUpdate, headers),
   clearTokenFrequencies: (ws: string, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/token-frequencies/clear`, {}, headers),
 
   // Topic Modeling

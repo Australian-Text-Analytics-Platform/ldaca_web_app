@@ -3,6 +3,8 @@
 Paths preserved exactly as /workspaces/{workspace_id}/token-frequencies*.
 """
 
+import math
+
 from fastapi import APIRouter, Depends, HTTPException
 
 from ....core.analysis_store import clear_analyses, get_latest_analysis, save_analysis
@@ -19,6 +21,173 @@ from ....models import (
 # to their original definitions when included at top level.
 router = APIRouter(prefix="/workspaces")
 
+DEFAULT_TOKEN_LIMIT = 10
+SERVER_LIMIT_MULTIPLIER = 5
+MAX_SERVER_TOKEN_LIMIT = 5000
+_STOP_WORDS_UNSET = object()
+
+
+def _coerce_limit_value(value) -> int:
+    try:
+        candidate = int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return DEFAULT_TOKEN_LIMIT
+    return candidate if candidate > 0 else DEFAULT_TOKEN_LIMIT
+
+
+def _sanitize_stop_words(value) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        raw_items = value.split(",")
+    elif isinstance(value, (list, tuple, set)):
+        raw_items = list(value)
+    else:
+        return []
+
+    sanitized: list[str] = []
+    seen: set[str] = set()
+    for item in raw_items:
+        if item is None:
+            continue
+        token = str(item).strip()
+        if not token:
+            continue
+        lowered = token.lower()
+        if lowered in seen:
+            continue
+        seen.add(lowered)
+        sanitized.append(token)
+    return sanitized
+
+
+def _safe_float(value, *, default: float | None = 0.0) -> float | None:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return default
+    if math.isnan(number) or math.isinf(number):
+        return default
+    return number
+
+
+def _normalize_limit_payload(payload: dict | None) -> dict:
+    if not isinstance(payload, dict):
+        limit = DEFAULT_TOKEN_LIMIT
+        return {"token_limit": limit, "stop_words": []}
+
+    merged = {**payload}
+    if "token_limit" not in merged and "limit" in merged:
+        merged["token_limit"] = merged["limit"]
+
+    candidate = merged.get("token_limit")
+    if candidate is None:
+        candidate = merged.get("limit")
+
+    limit = _coerce_limit_value(candidate)
+    merged["token_limit"] = limit
+    merged["stop_words"] = _sanitize_stop_words(merged.get("stop_words"))
+    if "limit" in merged:
+        merged.pop("limit", None)
+    return merged
+
+
+def _prepare_result_blob(
+    result_blob: dict,
+    request_payload: dict | None,
+    *,
+    limit_override: int | None = None,
+    stop_words_override=_STOP_WORDS_UNSET,
+):
+    normalized_request = _normalize_limit_payload(request_payload)
+    # Build shallow copies so callers can mutate without affecting stored state
+    normalized_result = {**result_blob}
+    existing_metadata = (
+        {**normalized_result.get("metadata", {})}
+        if isinstance(normalized_result.get("metadata"), dict)
+        else {}
+    )
+    existing_params = (
+        {**normalized_result.get("analysis_params", {})}
+        if isinstance(normalized_result.get("analysis_params"), dict)
+        else {}
+    )
+
+    limit_candidates = [
+        limit_override,
+        normalized_result.get("token_limit"),
+        normalized_result.get("limit"),
+        existing_params.get("token_limit"),
+        existing_params.get("limit"),
+        existing_metadata.get("token_limit"),
+        existing_metadata.get("limit"),
+        normalized_request.get("token_limit"),
+        normalized_request.get("limit"),
+    ]
+
+    limit_value = next(
+        (
+            _coerce_limit_value(candidate)
+            for candidate in limit_candidates
+            if candidate is not None
+        ),
+        DEFAULT_TOKEN_LIMIT,
+    )
+
+    if limit_override is not None:
+        limit_value = _coerce_limit_value(limit_override)
+
+    # Remove legacy limit fields after deriving the effective value
+    for container in (
+        existing_metadata,
+        existing_params,
+        normalized_request,
+        normalized_result,
+    ):
+        if isinstance(container, dict):
+            container.pop("limit", None)
+
+    if stop_words_override is _STOP_WORDS_UNSET:
+        stop_candidates = [
+            normalized_result.get("stop_words"),
+            existing_metadata.get("stop_words"),
+            existing_params.get("stop_words"),
+            normalized_request.get("stop_words"),
+        ]
+        raw_stop_words = next(
+            (candidate for candidate in stop_candidates if candidate is not None),
+            [],
+        )
+    else:
+        raw_stop_words = stop_words_override
+
+    stop_words = _sanitize_stop_words(raw_stop_words)
+
+    server_limit = min(
+        max(limit_value * SERVER_LIMIT_MULTIPLIER, DEFAULT_TOKEN_LIMIT),
+        MAX_SERVER_TOKEN_LIMIT,
+    )
+
+    existing_metadata["token_limit"] = limit_value
+    existing_metadata["server_limit"] = server_limit
+    existing_metadata["stop_words"] = stop_words
+
+    existing_params["token_limit"] = limit_value
+    existing_params["stop_words"] = stop_words
+
+    normalized_request["token_limit"] = limit_value
+    normalized_request["stop_words"] = stop_words
+
+    normalized_result["token_limit"] = limit_value
+    normalized_result["analysis_params"] = existing_params
+    normalized_result["metadata"] = existing_metadata
+    normalized_result["stop_words"] = stop_words
+
+    if "state" not in normalized_result:
+        normalized_result["state"] = "successful"
+
+    return normalized_result, normalized_request, limit_value, stop_words
+
 
 @router.get("/{workspace_id}/token-frequencies/current-request")
 async def token_frequencies_current_request(
@@ -28,7 +197,13 @@ async def token_frequencies_current_request(
     rec = get_latest_analysis(user_id, workspace_id, task="token_frequencies")
     if not rec:
         return None
-    return {"state": "successful", "message": "ok", "data": rec.request}
+    stored_request = rec.request if isinstance(rec.request, dict) else {}
+    normalized_request = _normalize_limit_payload(stored_request)
+    return {
+        "state": "successful",
+        "message": "ok",
+        "data": normalized_request,
+    }
 
 
 @router.post("/{workspace_id}/token-frequencies/current-request")
@@ -47,6 +222,7 @@ async def update_token_frequencies_current_request(
         merged_req.update(request_update or {})
     except Exception:
         pass
+    merged_req = _normalize_limit_payload(merged_req)
     prev_result: dict = prev.result if prev and isinstance(prev.result, dict) else {}
     try:
         save_analysis(
@@ -70,19 +246,72 @@ async def token_frequencies_current_result(
     if not rec:
         return None
     stored = rec.result
-    # Prior implementation attempted to "flatten" the stored result which stripped the
-    # 'statistics' array (and any future metadata) leaving only raw per-node frequencies.
-    # This caused the unified word cloud & stats table to disappear on tab re‑entry.
-    # We now return the full stored TokenFrequencyResponse exactly as it was persisted.
     if isinstance(stored, dict):
-        # Ensure a state field for consistency if missing (legacy records safeguard)
-        if "state" not in stored:
-            stored = {"state": "successful", **stored}
-        return stored
+        request_payload = rec.request if isinstance(rec.request, dict) else {}
+        result_blob, _normalized_request, _limit_value, _stop_words = (
+            _prepare_result_blob(
+                stored,
+                request_payload,
+            )
+        )
+        return result_blob
     # Fallback: wrap non-dict legacy formats
-    with open("~/Sources/test.txt", "wt") as f:
-        f.write(str(stored))
     return {"state": "successful", "message": "ok", "data": stored}
+
+
+@router.post("/{workspace_id}/token-frequencies/current-result")
+async def update_token_frequencies_current_result(
+    workspace_id: str,
+    updates: dict | None,
+    current_user: dict = Depends(get_current_user),
+):
+    user_id = current_user["id"]
+    record = get_latest_analysis(user_id, workspace_id, task="token_frequencies")
+    if not record:
+        raise HTTPException(status_code=404, detail="No token frequency analysis found")
+
+    request_payload = {**record.request} if isinstance(record.request, dict) else {}
+    result_payload = {**record.result} if isinstance(record.result, dict) else {}
+
+    limit_override = None
+    stop_words_override = _STOP_WORDS_UNSET
+    if isinstance(updates, dict):
+        if "token_limit" in updates:
+            limit_override = updates.get("token_limit")
+        elif "limit" in updates:
+            limit_override = updates.get("limit")
+        if "stop_words" in updates:
+            stop_words_override = updates.get("stop_words")
+    else:
+        updates = {}
+
+    result_blob, normalized_request, _limit_value, _stop_words = _prepare_result_blob(
+        result_payload,
+        request_payload,
+        limit_override=limit_override,
+        stop_words_override=stop_words_override,
+    )
+
+    # Merge the normalized request back with any untouched fields (e.g., node selections)
+    request_payload.update(normalized_request)
+    request_payload.pop("limit", None)
+
+    # Preserve an informative message for callers when available
+    try:
+        save_analysis(
+            user_id=user_id,
+            workspace_id=workspace_id,
+            task="token_frequencies",
+            request_dict=request_payload,
+            result_dict=result_blob,
+        )
+    except Exception as exc:  # pragma: no cover
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to persist token frequency preferences: {exc}",
+        )
+
+    return {"state": "successful", "message": "saved"}
 
 
 @router.post("/{workspace_id}/token-frequencies/clear")
@@ -113,16 +342,23 @@ async def calculate_token_frequencies(
             raise HTTPException(
                 status_code=400, detail="At least one node ID must be provided"
             )
-        if request.limit is not None and request.limit <= 0:
-            raise HTTPException(
-                status_code=400, detail="limit must be a positive integer"
-            )
         if len(request.node_ids) > 2:
             raise HTTPException(
                 status_code=400, detail="Maximum of 2 nodes can be compared"
             )
         if not request.node_columns:
             request.node_columns = {}
+
+        requested_token_limit = getattr(request, "token_limit", None)
+        effective_limit = (
+            requested_token_limit
+            if requested_token_limit is not None and requested_token_limit > 0
+            else DEFAULT_TOKEN_LIMIT
+        )
+        if requested_token_limit is not None and requested_token_limit <= 0:
+            raise HTTPException(
+                status_code=400, detail="limit must be a positive integer"
+            )
 
         workspace = workspace_manager.get_workspace(user_id, workspace_id)
         if not workspace:
@@ -280,21 +516,36 @@ async def calculate_token_frequencies(
         # Stop words are purely a frontend display filter; we persist them in the saved request
         # so the UI can restore the user's filter preference without losing raw counts.
         # Previously: frames=frames_dict, stop_words=request.stop_words
+        requested_stop_words = _sanitize_stop_words(request.stop_words)
+
         frequency_results, stats_df = compute_token_frequencies(
             frames=frames_dict, stop_words=None
         )
 
         # Return full vocabulary (no backend truncation); UI limit is purely presentation.
-        response_data = {}
+        response_data: dict[str, dict] = {}
+        server_limit = min(
+            max(effective_limit * SERVER_LIMIT_MULTIPLIER, DEFAULT_TOKEN_LIMIT),
+            MAX_SERVER_TOKEN_LIMIT,
+        )
         for frame_name, freq_dict in frequency_results.items():
             sorted_tokens = sorted(freq_dict.items(), key=lambda x: x[1], reverse=True)
+            total_tokens = sum(1 for token, freq in sorted_tokens if freq > 0)
+            limited_tokens = [
+                (token, freq) for token, freq in sorted_tokens if freq > 0
+            ][:server_limit]
             response_data[frame_name] = {
                 "data": [
                     TokenFrequencyData(token=token, frequency=freq)
-                    for token, freq in sorted_tokens
-                    if freq > 0
+                    for token, freq in limited_tokens
                 ],
                 "columns": ["token", "frequency"],
+                "metadata": {
+                    "applied_server_limit": server_limit,
+                    "total_tokens_before_limit": total_tokens,
+                    "truncated": total_tokens > len(limited_tokens),
+                    "token_limit": effective_limit,
+                },
             }
 
         statistics_data = None
@@ -310,58 +561,84 @@ async def calculate_token_frequencies(
                         token=row["token"],
                         freq_corpus_0=int(row["freq_corpus_0"]),
                         freq_corpus_1=int(row["freq_corpus_1"]),
-                        expected_0=float(row["expected_0"]),
-                        expected_1=float(row["expected_1"]),
+                        expected_0=_safe_float(row["expected_0"]),
+                        expected_1=_safe_float(row["expected_1"]),
                         corpus_0_total=int(row["corpus_0_total"]),
                         corpus_1_total=int(row["corpus_1_total"]),
-                        percent_corpus_0=float(row["percent_corpus_0"]),
-                        percent_corpus_1=float(row["percent_corpus_1"]),
-                        percent_diff=float(row["percent_diff"]),
-                        log_likelihood_llv=float(row["log_likelihood_llv"]),
-                        bayes_factor_bic=float(row["bayes_factor_bic"]),
-                        effect_size_ell=float(row["effect_size_ell"]),
-                        relative_risk=float(row["relative_risk"])
+                        percent_corpus_0=_safe_float(row["percent_corpus_0"]),
+                        percent_corpus_1=_safe_float(row["percent_corpus_1"]),
+                        percent_diff=_safe_float(row["percent_diff"]),
+                        log_likelihood_llv=_safe_float(row["log_likelihood_llv"]),
+                        bayes_factor_bic=_safe_float(row["bayes_factor_bic"]),
+                        effect_size_ell=_safe_float(row["effect_size_ell"]),
+                        relative_risk=_safe_float(row["relative_risk"], default=None)
                         if row["relative_risk"] is not None
                         else None,
-                        log_ratio=float(row["log_ratio"])
+                        log_ratio=_safe_float(row["log_ratio"], default=None)
                         if row["log_ratio"] is not None
                         else None,
-                        odds_ratio=float(row["odds_ratio"])
+                        odds_ratio=_safe_float(row["odds_ratio"], default=None)
                         if row["odds_ratio"] is not None
                         else None,
                         significance=str(row["significance"]),
                     )
                 )
 
-        result = TokenFrequencyResponse(
-            state="successful",
-            message=f"Successfully calculated token frequencies for {len(frames_dict)} node(s)",
-            data=response_data,
-            statistics=statistics_data,
+        request_dict = (
+            request.model_dump(exclude_none=True)
+            if hasattr(request, "model_dump")
+            else request.dict(exclude_none=True)
+        )
+        request_dict["stop_words"] = requested_stop_words
+        if "limit" in request_dict and "token_limit" not in request_dict:
+            request_dict["token_limit"] = request_dict["limit"]
+        request_dict.pop("limit", None)
+
+        analysis_params_dict = {**request_dict}
+        analysis_params_dict["token_limit"] = effective_limit
+        analysis_params_dict["server_limit"] = server_limit
+
+        result_payload = {
+            "state": "successful",
+            "message": f"Successfully calculated token frequencies for {len(frames_dict)} node(s)",
+            "data": response_data,
+            "statistics": statistics_data,
+            "token_limit": effective_limit,
+            "analysis_params": analysis_params_dict,
+            "metadata": {
+                "token_limit": effective_limit,
+                "server_limit": server_limit,
+                "stop_words": requested_stop_words,
+            },
+            "stop_words": requested_stop_words,
+        }
+
+        prepared_result, normalized_request, _limit_value, _stop_words = (
+            _prepare_result_blob(
+                result_payload,
+                request_dict,
+            )
         )
 
+        result_model = TokenFrequencyResponse(**prepared_result)
+
         try:  # pragma: no cover
-            req_dict = (
-                request.model_dump(exclude_none=True)
-                if hasattr(request, "model_dump")
-                else request.dict(exclude_none=True)
-            )
-            result_dict = (
-                result.model_dump(exclude_none=True)
-                if hasattr(result, "model_dump")
-                else result.dict(exclude_none=True)
-            )
             save_analysis(
                 user_id=user_id,
                 workspace_id=workspace_id,
                 task="token_frequencies",
-                request_dict=req_dict,
-                result_dict=result_dict,
+                request_dict=normalized_request,
+                result_dict=prepared_result,
             )
         except Exception as _persist_err:  # pragma: no cover
-            print(f"[analysis_persist] token_frequencies save failed: {_persist_err}")
+            print(
+                f"[analysis_persist] token_frequencies save failed for workspace {workspace_id}: {_persist_err}"
+            )
+            import traceback
 
-        return result
+            traceback.print_exc()
+
+        return result_model
 
     except HTTPException:
         raise

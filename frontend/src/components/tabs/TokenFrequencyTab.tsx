@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+/* eslint-disable @typescript-eslint/no-explicit-any, react/no-unescaped-entities */
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import NodeSelectionPanel from '../NodeSelectionPanel';
 import { useWorkspaceData } from '../../hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '../../hooks/useWorkspaceSelection';
@@ -6,21 +7,18 @@ import { useWorkspaceStatus } from '../../hooks/useWorkspaceStatus';
 import { nodesApi } from '../../api/nodes';
 import { useAuth } from '../../hooks/useAuth';
 import { TokenFrequencyRequest, TokenFrequencyResponse, textApi } from '../../api/text';
+import { createConcordanceSeedRequest, resolveTokenFrequencyNodeContext, type TokenFrequencyAnalysisParams } from './tokenFrequencyHelpers';
 import { Wordcloud } from '@visx/wordcloud';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { Button } from '../ui/button';
+import { Input } from '../ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../ui/card';
 import { Play, Loader2, Trash2, Table2, Download, X, ChevronLeft, ChevronRight, Lightbulb } from 'lucide-react';
 import { Text } from '@visx/text';
-import useAutoNodeColumns from '../../hooks/useAutoNodeColumns';
+import useAutoNodeColumns, { type NodeColumnSelection } from '../../hooks/useAutoNodeColumns';
 import useNodeColumnInfos from '../../hooks/useNodeColumnInfos';
 import { useUIStore } from '../../stores';
 import { useAnalysisStore } from '../../stores/analysisStore';
-
-interface NodeColumnSelection {
-  nodeId: string;
-  column: string;
-}
 
 const toFiniteNumber = (value: unknown): number | null => {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
@@ -48,6 +46,13 @@ const formatNumber = (value: unknown, decimals: number, options: FormatNumberOpt
   return `${sanitized}${suffix}`;
 };
 
+const DEFAULT_TOKEN_LIMIT = 10;
+const SERVER_LIMIT_MULTIPLIER = 5;
+const MAX_SERVER_TOKEN_LIMIT = 5000;
+
+const computeServerLimit = (limit: number) =>
+  Math.min(Math.max(limit * SERVER_LIMIT_MULTIPLIER, DEFAULT_TOKEN_LIMIT), MAX_SERVER_TOKEN_LIMIT);
+
 const TokenFrequencyTab: React.FC = () => {
   const { selectedNodes } = useWorkspaceSelection();
   const { currentWorkspaceId, getNodeShape } = useWorkspaceData();
@@ -72,8 +77,6 @@ const TokenFrequencyTab: React.FC = () => {
   const setPendingConcordance = useAnalysisStore((state) => state.setPendingConcordance);
 
   const [stopWords, setStopWords] = useState<string>('');
-  // Default display limit (frontend-only)
-  const [limit, setLimit] = useState<number>(10);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
   // Shared auto column selection hook (shared scope with Concordance via undefined storageScope)
@@ -83,6 +86,13 @@ const TokenFrequencyTab: React.FC = () => {
     allowedDataTypes: ['string'],
   }, { workspaceId: currentWorkspaceId, maxNodes: 2, isLocked, docTypeOnly: true, enableHeuristicGuess: false });
   const [lockedNodesSnapshot, setLockedNodesSnapshot] = useState<Array<{ id: string; name: string; columns: string[] }>>([]);
+  const lockedNodeNameMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    lockedNodesSnapshot.forEach(({ id, name }) => {
+      map[id] = name;
+    });
+    return map;
+  }, [lockedNodesSnapshot]);
   const [isLoadingStopWords, setIsLoadingStopWords] = useState(false);
   const [results, setResults] = useState<TokenFrequencyResponse | null>(null);
   // Statistical table head/tail preview & sorting
@@ -99,26 +109,307 @@ const TokenFrequencyTab: React.FC = () => {
   const [lastCompareNodeIds, setLastCompareNodeIds] = useState<string[]>([]); // preserves order used in last analysis
   // Locally-applied stop word filter (no recomputation)
   const [appliedStopSet, setAppliedStopSet] = useState<Set<string>>(new Set());
+  const [tokenLimitOverride, setTokenLimitOverride] = useState<number | null>(null);
+  const [tokenLimitInput, setTokenLimitInput] = useState<string>('');
+  const [tokenLimitError, setTokenLimitError] = useState<string | null>(null);
+  const [isApplyingTokenLimit, setIsApplyingTokenLimit] = useState(false);
+  const previousBackendLimitRef = useRef<number | null>(null);
+  const tokenLimitInputChangedRef = useRef(false);
+  const tokenLimitApplyTimeoutRef = useRef<number | null>(null);
+
+  const backendTokenLimit = useMemo(() => {
+    if (!results) return null;
+    const r = results as any;
+    const params = r?.analysis_params ?? {};
+    const metadata = r?.metadata ?? {};
+    const candidates = [
+      r?.token_limit,
+      params?.token_limit,
+      metadata?.token_limit,
+      r?.limit,
+      params?.limit,
+      metadata?.limit,
+    ];
+    for (const candidate of candidates) {
+      if (typeof candidate === 'number' && Number.isFinite(candidate)) {
+        return candidate;
+      }
+    }
+    return null;
+  }, [results]);
+  useEffect(() => {
+    const backendLimit = (typeof backendTokenLimit === 'number' && Number.isFinite(backendTokenLimit))
+      ? backendTokenLimit
+      : null;
+    if (backendLimit !== null) {
+      if (previousBackendLimitRef.current !== backendLimit || tokenLimitOverride !== backendLimit) {
+        if (typeof window !== 'undefined' && tokenLimitApplyTimeoutRef.current !== null) {
+          window.clearTimeout(tokenLimitApplyTimeoutRef.current);
+          tokenLimitApplyTimeoutRef.current = null;
+        }
+        tokenLimitInputChangedRef.current = false;
+        setTokenLimitOverride(backendLimit);
+        setTokenLimitInput(String(backendLimit));
+        setTokenLimitError(null);
+      }
+      previousBackendLimitRef.current = backendLimit;
+    } else if (tokenLimitOverride === null) {
+      if (typeof window !== 'undefined' && tokenLimitApplyTimeoutRef.current !== null) {
+        window.clearTimeout(tokenLimitApplyTimeoutRef.current);
+        tokenLimitApplyTimeoutRef.current = null;
+      }
+      tokenLimitInputChangedRef.current = false;
+      setTokenLimitOverride(DEFAULT_TOKEN_LIMIT);
+      setTokenLimitInput(String(DEFAULT_TOKEN_LIMIT));
+    }
+  }, [backendTokenLimit, tokenLimitOverride]);
+
+  const backendStopWords = useMemo(() => {
+    if (!results) return null;
+    const payload = results as any;
+    const candidates = [
+      Array.isArray(payload?.stop_words) ? payload.stop_words : null,
+      Array.isArray(payload?.metadata?.stop_words) ? payload.metadata.stop_words : null,
+      Array.isArray(payload?.analysis_params?.stop_words) ? payload.analysis_params.stop_words : null,
+    ];
+    for (const candidate of candidates) {
+      if (Array.isArray(candidate)) {
+        return candidate.map((item: any) => String(item));
+      }
+    }
+    return null;
+  }, [results]);
+
+  useEffect(() => {
+    if (!results) {
+      setStopWords('');
+      setAppliedStopSet(new Set());
+      return;
+    }
+    const stops = Array.isArray(backendStopWords) ? backendStopWords : [];
+    const normalized = stops
+      .map((w) => String(w).trim().toLowerCase())
+      .filter((w) => w.length > 0);
+    const joined = normalized.join(', ');
+    setStopWords(joined);
+    setAppliedStopSet(new Set(normalized));
+  }, [backendStopWords, results]);
+
+  const effectiveTokenLimit = useMemo(() => {
+    if (typeof tokenLimitOverride === 'number' && Number.isFinite(tokenLimitOverride)) {
+      return tokenLimitOverride;
+    }
+    if (typeof backendTokenLimit === 'number' && Number.isFinite(backendTokenLimit)) {
+      return backendTokenLimit;
+    }
+    return DEFAULT_TOKEN_LIMIT;
+  }, [tokenLimitOverride, backendTokenLimit]);
+
+  const persistTokenPreferences = useCallback(
+    async (partial: { token_limit?: number; stop_words?: string[] }) => {
+      if (!currentWorkspaceId) return;
+      const payload: Record<string, any> = {};
+      if (partial.token_limit !== undefined) {
+        payload.token_limit = partial.token_limit;
+      }
+      if (partial.stop_words !== undefined) {
+        payload.stop_words = partial.stop_words;
+      }
+      if (Object.keys(payload).length === 0) return;
+      await textApi.postTokenFrequenciesCurrentResult(
+        currentWorkspaceId,
+        payload,
+        getAuthHeaders()
+      );
+    },
+    [currentWorkspaceId, getAuthHeaders]
+  );
+
+  const updateResultsPreferencesLocally = useCallback(
+    (prefs: { tokenLimit?: number; stopWords?: string[] }) => {
+      setResults((prev) => {
+        if (!prev) return prev;
+        const metadata = {
+          ...(((prev as any)?.metadata) ?? {}),
+        } as Record<string, any>;
+        const analysisParams = {
+          ...(prev.analysis_params ?? {}),
+        } as Record<string, any>;
+
+        let nextTokenLimit: number | undefined;
+        const existingTokenLimit =
+          typeof prev.token_limit === 'number' && Number.isFinite(prev.token_limit)
+            ? prev.token_limit
+            : undefined;
+        if (prefs.tokenLimit !== undefined) {
+          nextTokenLimit = prefs.tokenLimit;
+        } else {
+          nextTokenLimit = existingTokenLimit;
+        }
+
+        if (nextTokenLimit !== undefined && Number.isFinite(nextTokenLimit)) {
+          const normalizedLimit = Math.max(1, Math.floor(nextTokenLimit));
+          const serverLimit = computeServerLimit(normalizedLimit);
+          metadata.token_limit = normalizedLimit;
+          metadata.server_limit = serverLimit;
+          analysisParams.token_limit = normalizedLimit;
+          analysisParams.server_limit = serverLimit;
+          nextTokenLimit = normalizedLimit;
+        }
+
+        delete metadata.limit;
+        delete analysisParams.limit;
+
+        const stopWordsArray =
+          prefs.stopWords !== undefined
+            ? prefs.stopWords
+            : Array.isArray(prev.stop_words)
+            ? prev.stop_words
+            : Array.isArray(metadata.stop_words)
+            ? metadata.stop_words
+            : [];
+
+        metadata.stop_words = stopWordsArray;
+        analysisParams.stop_words = stopWordsArray;
+
+        return {
+          ...prev,
+          token_limit: nextTokenLimit ?? undefined,
+          analysis_params: analysisParams,
+          metadata,
+          stop_words: stopWordsArray,
+          message: prev.message,
+          state: prev.state,
+        } as TokenFrequencyResponse;
+      });
+    },
+    [setResults]
+  );
+
+  const applyTokenLimitWithValidation = useCallback(async () => {
+    if (typeof window !== 'undefined' && tokenLimitApplyTimeoutRef.current !== null) {
+      window.clearTimeout(tokenLimitApplyTimeoutRef.current);
+      tokenLimitApplyTimeoutRef.current = null;
+    }
+    tokenLimitInputChangedRef.current = false;
+
+    const parsed = toFiniteNumber(tokenLimitInput);
+    if (parsed === null) {
+      setTokenLimitError('Enter a whole number greater than zero.');
+      return;
+    }
+    const normalized = Math.floor(parsed);
+    if (!Number.isFinite(normalized) || normalized <= 0) {
+      setTokenLimitError('Enter a whole number greater than zero.');
+      return;
+    }
+    if (normalized === effectiveTokenLimit) {
+      setTokenLimitError(null);
+      return;
+    }
+
+    setTokenLimitError(null);
+    setIsApplyingTokenLimit(true);
+    try {
+      if (results) {
+        await persistTokenPreferences({ token_limit: normalized });
+        updateResultsPreferencesLocally({ tokenLimit: normalized });
+      }
+      setTokenLimitOverride(normalized);
+      setTokenLimitInput(String(normalized));
+      previousBackendLimitRef.current = normalized;
+    } catch (error) {
+      console.error('Failed to update token limit', error);
+      setTokenLimitError('Failed to update token limit. Please try again.');
+    } finally {
+      setIsApplyingTokenLimit(false);
+    }
+  }, [tokenLimitInput, effectiveTokenLimit, results, persistTokenPreferences, updateResultsPreferencesLocally]);
+
+  useEffect(() => {
+    if (!tokenLimitInputChangedRef.current) return;
+    if (typeof window === 'undefined') return;
+
+    if (tokenLimitApplyTimeoutRef.current !== null) {
+      window.clearTimeout(tokenLimitApplyTimeoutRef.current);
+      tokenLimitApplyTimeoutRef.current = null;
+    }
+
+    const parsed = toFiniteNumber(tokenLimitInput);
+    if (parsed === null) {
+      setTokenLimitError('Enter a whole number greater than zero.');
+      return;
+    }
+    const normalized = Math.floor(parsed);
+    if (!Number.isFinite(normalized) || normalized <= 0) {
+      setTokenLimitError('Enter a whole number greater than zero.');
+      return;
+    }
+
+    setTokenLimitError(null);
+    tokenLimitApplyTimeoutRef.current = window.setTimeout(() => {
+      void applyTokenLimitWithValidation();
+    }, 600);
+
+    return () => {
+      if (tokenLimitApplyTimeoutRef.current !== null) {
+        window.clearTimeout(tokenLimitApplyTimeoutRef.current);
+        tokenLimitApplyTimeoutRef.current = null;
+      }
+    };
+  }, [tokenLimitInput, applyTokenLimitWithValidation]);
 
   // Helper to compute and apply stop set from a comma-separated string
-  const saveStopWordsToBackend = async (words: string[]) => {
-    try {
-      if (currentWorkspaceId) {
-        await textApi.postTokenFrequenciesCurrentRequest(currentWorkspaceId, { stop_words: words }, getAuthHeaders());
+  const saveStopWordsToBackend = useCallback(
+    async (words: string[]) => {
+      if (!results) return;
+      try {
+        await persistTokenPreferences({ stop_words: words });
+        updateResultsPreferencesLocally({ stopWords: words });
+      } catch (e) {
+        if (localStorage.getItem('debugTF') === '1') console.warn('Failed to save stop words', e);
       }
-    } catch (e) {
-      // non-fatal
-      if (localStorage.getItem('debugTF') === '1') console.warn('Failed to save stop words', e);
-    }
-  };
+    },
+    [results, persistTokenPreferences, updateResultsPreferencesLocally]
+  );
   const applyStopSetFromText = (text: string) => {
     const words = text
       .split(',')
       .map(w => w.trim().toLowerCase())
       .filter(Boolean);
+    setStopWords(words.join(', '));
     setAppliedStopSet(new Set(words));
     // Persist stop words (UI preference) to backend; calculation does not use them
     void saveStopWordsToBackend(words);
+  };
+
+  const handleTokenLimitInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (typeof window !== 'undefined' && tokenLimitApplyTimeoutRef.current !== null) {
+      window.clearTimeout(tokenLimitApplyTimeoutRef.current);
+      tokenLimitApplyTimeoutRef.current = null;
+    }
+    tokenLimitInputChangedRef.current = true;
+    setTokenLimitInput(event.target.value);
+    if (tokenLimitError) setTokenLimitError(null);
+  };
+
+  const handleTokenLimitBlur = () => {
+    if (typeof window !== 'undefined' && tokenLimitApplyTimeoutRef.current !== null) {
+      window.clearTimeout(tokenLimitApplyTimeoutRef.current);
+      tokenLimitApplyTimeoutRef.current = null;
+    }
+    void applyTokenLimitWithValidation();
+  };
+
+  const handleTokenLimitKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      if (typeof window !== 'undefined' && tokenLimitApplyTimeoutRef.current !== null) {
+        window.clearTimeout(tokenLimitApplyTimeoutRef.current);
+        tokenLimitApplyTimeoutRef.current = null;
+      }
+      void applyTokenLimitWithValidation();
+    }
   };
   const defaultPalette = useMemo(
     () => [
@@ -166,11 +457,12 @@ const TokenFrequencyTab: React.FC = () => {
 
   // Hydrate from backend on mount and whenever the tab becomes visible again or we lack statistics
   const hydratingRef = useRef<boolean>(false);
-  const performHydration = async () => {
+  const performHydration = useCallback(async () => {
     if (hydratingRef.current) return;
     if (!currentWorkspaceId) return;
     hydratingRef.current = true;
     try {
+      let fallbackStopWords: string[] = [];
       const reqResp = await textApi.getTokenFrequenciesCurrentRequest(currentWorkspaceId, getAuthHeaders());
       if (!reqResp) {
         // No current request: clear local persisted state and DO NOT fetch current-result
@@ -178,23 +470,47 @@ const TokenFrequencyTab: React.FC = () => {
         setAppliedStopSet(new Set());
         setNodeColumnSelectionsRaw([], { replace: true });
         setLastCompareNodeIds([]);
+        setTokenLimitOverride(DEFAULT_TOKEN_LIMIT);
+        setTokenLimitInput(String(DEFAULT_TOKEN_LIMIT));
+        setTokenLimitError(null);
+        tokenLimitInputChangedRef.current = false;
+        if (typeof window !== 'undefined' && tokenLimitApplyTimeoutRef.current !== null) {
+          window.clearTimeout(tokenLimitApplyTimeoutRef.current);
+          tokenLimitApplyTimeoutRef.current = null;
+        }
         return;
       }
       const req = (reqResp as any)?.data;
       if (req) {
         if (Array.isArray(req.stop_words)) {
-          const joined = req.stop_words.join(', ');
-          setStopWords(joined);
-          setAppliedStopSet(new Set(req.stop_words.map((w: any) => String(w).toLowerCase())));
-        } else {
-          setStopWords('');
-          setAppliedStopSet(new Set());
+          fallbackStopWords = req.stop_words
+            .map((w: any) => String(w).trim().toLowerCase())
+            .filter((w: string) => w.length > 0);
         }
-        const nodeIds: string[] = Array.isArray(req.node_ids) ? req.node_ids.slice(0, 2) : [];
-  const node_columns: Record<string, string> = req.node_columns || {};
-  const sels = nodeIds.map((id: string) => ({ nodeId: id, column: node_columns[id] || '' }));
-  setNodeColumnSelectionsRaw(sels, { replace: true });
+        const nodeIds: string[] = Array.isArray(req.node_ids)
+          ? req.node_ids.slice(0, 2)
+          : [];
+        const nodeColumnsMap: Record<string, string> =
+          req.node_columns && typeof req.node_columns === 'object' ? req.node_columns : {};
+        const selections = nodeIds.map((id: string) => ({
+          nodeId: id,
+          column: nodeColumnsMap[id] || '',
+        }));
+        setNodeColumnSelectionsRaw(selections, { replace: true });
         setLastCompareNodeIds(nodeIds);
+        const limitFromRequest = toFiniteNumber(
+          (req as any).token_limit ?? (req as any).limit
+        );
+        if (limitFromRequest !== null && limitFromRequest > 0) {
+          const normalizedLimit = Math.floor(limitFromRequest);
+          setTokenLimitOverride(normalizedLimit);
+          setTokenLimitInput(String(normalizedLimit));
+          tokenLimitInputChangedRef.current = false;
+          if (typeof window !== 'undefined' && tokenLimitApplyTimeoutRef.current !== null) {
+            window.clearTimeout(tokenLimitApplyTimeoutRef.current);
+            tokenLimitApplyTimeoutRef.current = null;
+          }
+        }
         try {
           const snaps: Array<{ id: string; name: string; columns: string[] }> = [];
           for (const id of nodeIds) {
@@ -215,13 +531,31 @@ const TokenFrequencyTab: React.FC = () => {
       }
       // Only fetch current-result if a request existed
       const resResp = await textApi.getTokenFrequenciesCurrentResult(currentWorkspaceId, getAuthHeaders());
-      if (resResp) setResults(resResp as any);
+      if (resResp) {
+        setResults(resResp as any);
+      } else {
+        setStopWords(fallbackStopWords.join(', '));
+        setAppliedStopSet(new Set(fallbackStopWords));
+      }
     } catch { /* ignore */ }
     finally {
       hydratingRef.current = false;
     }
-  };
-  useEffect(() => { void performHydration(); }, [currentWorkspaceId, getAuthHeaders]);
+  }, [
+    currentWorkspaceId,
+    getAuthHeaders,
+    setStopWords,
+    setAppliedStopSet,
+    setNodeColumnSelectionsRaw,
+    setLastCompareNodeIds,
+    setTokenLimitOverride,
+    setTokenLimitInput,
+    setTokenLimitError,
+    setLockedNodesSnapshot,
+    setIsLocked,
+    setResults,
+  ]);
+  useEffect(() => { void performHydration(); }, [performHydration]);
   useEffect(() => {
     const handleVisibility = () => {
       const shouldRehydrate = document.visibilityState === 'visible' && currentWorkspaceId && (!results || (Array.isArray(results.statistics) && results.statistics.length === 0 && lastCompareNodeIds.length === 2));
@@ -233,19 +567,19 @@ const TokenFrequencyTab: React.FC = () => {
       window.removeEventListener('focus', handleVisibility);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, [results, currentWorkspaceId, lastCompareNodeIds]);
+  }, [results, currentWorkspaceId, lastCompareNodeIds, performHydration]);
 
 
   // Debug results changes
   useEffect(() => {
       if (results) {
       if (localStorage.getItem('debugTF') === '1') {
-        console.log('Results updated:', results);
-  console.log('Results state:', (results as any).state);
-        console.log('Results data:', results.data);
+        console.debug('Results updated:', results);
+        console.debug('Results state:', (results as any).state);
+        console.debug('Results data:', results.data);
       }
       if (results.data) {
-  if (localStorage.getItem('debugTF') === '1') console.log('Data entries:', Object.entries(results.data));
+        if (localStorage.getItem('debugTF') === '1') console.debug('Data entries:', Object.entries(results.data));
       }
     }
   }, [results]);
@@ -297,7 +631,6 @@ const TokenFrequencyTab: React.FC = () => {
       return;
     }
 
-    // Validate that all nodes have columns selected
     const incompleteSelections = nodeColumnSelections.filter(sel => !sel.column);
     if (incompleteSelections.length > 0) {
       alert('Please select a text column for all selected nodes.');
@@ -306,51 +639,67 @@ const TokenFrequencyTab: React.FC = () => {
 
     setIsAnalyzing(true);
     try {
-      const stopWordsArray = stopWords.trim() ? 
-        stopWords.split(',').map(word => word.trim()).filter(word => word) : 
-        undefined;
+      const stopWordsArray = stopWords.trim()
+        ? stopWords
+            .split(',')
+            .map(word => word.trim().toLowerCase())
+            .filter(word => word.length > 0)
+        : undefined;
 
-  // Fetch a larger pool so client-side stop-word filtering can supplement to the UI limit without recomputation
-  const fetchLimit = Math.min(1000, Math.max(200, (limit || 20) * 5));
-
-      // Create node_columns mapping
       const nodeColumns: Record<string, string> = {};
       nodeColumnSelections.forEach(sel => {
-        nodeColumns[sel.nodeId] = sel.column;
+        if (sel.column) nodeColumns[sel.nodeId] = sel.column;
       });
 
       const request: TokenFrequencyRequest = {
-        node_ids: selectedNodes.slice(0, 2).map(node => node.id), // Limit to 2 nodes
+        node_ids: selectedNodes.slice(0, 2).map(node => node.id),
         node_columns: nodeColumns,
         stop_words: stopWordsArray,
-        limit: fetchLimit,
       };
 
-  const response = await textApi.tokenFrequencies(currentWorkspaceId, request, getAuthHeaders());
+      const response = await textApi.tokenFrequencies(currentWorkspaceId, request, getAuthHeaders());
 
-  if (localStorage.getItem('debugTF') === '1') console.log('Token Frequency Response:', response);
-  setResults(response);
-  setLastCompareNodeIds(request.node_ids);
-      // Lock panel with snapshot
+      if (localStorage.getItem('debugTF') === '1') console.debug('Token Frequency Response:', response);
+      setResults(response);
+      setLastCompareNodeIds(request.node_ids);
+
+      if (Array.isArray(response.stop_words)) {
+        const normalizedStops = response.stop_words
+          .map((word: string) => String(word).trim().toLowerCase())
+          .filter(Boolean);
+        setAppliedStopSet(new Set(normalizedStops));
+        setStopWords(normalizedStops.join(', '));
+      }
+
       try {
         const snaps: Array<{ id: string; name: string; columns: string[] }> = [];
         for (const id of request.node_ids) {
           try {
             const info = await nodesApi.info(currentWorkspaceId!, id, getAuthHeaders());
             const name = (info as any)?.name || (info as any)?.data?.name || id;
-            const columns = Array.isArray((info as any)?.columns) ? (info as any).columns : (Array.isArray((info as any)?.data?.columns) ? (info as any).data.columns : []);
+            const columns = Array.isArray((info as any)?.columns)
+              ? (info as any).columns
+              : Array.isArray((info as any)?.data?.columns)
+              ? (info as any).data.columns
+              : [];
             snaps.push({ id, name: String(name), columns });
-          } catch { snaps.push({ id, name: id, columns: [] }); }
+          } catch {
+            snaps.push({ id, name: id, columns: [] });
+          }
         }
-        setLockedNodesSnapshot(snaps);
-        setIsLocked(true);
-      } catch { /* ignore */ }
+        if (snaps.length) {
+          setLockedNodesSnapshot(snaps);
+          setIsLocked(true);
+        }
+      } catch {
+        /* ignore */
+      }
     } catch (error) {
       console.error('Error calculating token frequencies:', error);
       setResults({
         state: 'failed',
         message: error instanceof Error ? error.message : 'Unknown error occurred',
-        data: null
+        data: null,
       } as any);
     } finally {
       setIsAnalyzing(false);
@@ -369,67 +718,91 @@ const TokenFrequencyTab: React.FC = () => {
     setLastCompareNodeIds([]);
     setLockedNodesSnapshot([]);
     setIsLocked(false);
+    setTokenLimitError(null);
+    tokenLimitInputChangedRef.current = false;
+    if (typeof window !== 'undefined' && tokenLimitApplyTimeoutRef.current !== null) {
+      window.clearTimeout(tokenLimitApplyTimeoutRef.current);
+      tokenLimitApplyTimeoutRef.current = null;
+    }
   };
 
   const handleTokenClick = async (token: string) => {
-    // Build a backend concordance request first so Concordance tab hydrates instantly
+    const workspaceId = currentWorkspaceId;
+    const trimmedToken = token?.toString() ?? '';
+    const analysisParams = (results?.analysis_params ?? null) as TokenFrequencyAnalysisParams | null;
+
+    const resolvedContext = resolveTokenFrequencyNodeContext({
+      lastCompareNodeIds,
+      analysisParams,
+      selectedNodes: selectedNodes.map((node) => ({ id: node.id })),
+      nodeColumnSelections,
+      maxNodes: 2,
+    });
+
+    const fallbackNodeIds: string[] = resolvedContext.nodeIds.length > 0
+      ? resolvedContext.nodeIds
+      : selectedNodes
+          .slice(0, 2)
+          .map((node) => node.id)
+          .filter((id): id is string => typeof id === 'string' && id.trim().length > 0);
+
+    const fallbackSelections: NodeColumnSelection[] = resolvedContext.nodeIds.length > 0
+      ? resolvedContext.selections
+      : nodeColumnSelections.filter((sel) => fallbackNodeIds.includes(sel.nodeId) && sel.column);
+
+    const uniqueNodeIds: string[] = fallbackNodeIds
+      .filter((id, index, arr) => arr.indexOf(id) === index)
+      .slice(0, 2);
+
+    const effectiveSelections: NodeColumnSelection[] = fallbackSelections.filter((sel) =>
+      uniqueNodeIds.includes(sel.nodeId)
+    );
+
+    const request = createConcordanceSeedRequest(trimmedToken, {
+      selectedNodes: uniqueNodeIds.map((id) => ({ id })),
+      nodeColumnSelections: effectiveSelections,
+      maxNodes: 2,
+      numLeftTokens: 10,
+      numRightTokens: 10,
+      combined: false,
+    });
+
     try {
-      if (currentWorkspaceId && selectedNodes.length > 0) {
-        const nodeColumns: Record<string, string> = {};
-        selectedNodes.slice(0, 2).forEach(n => {
-          const sel = nodeColumnSelections.find(s => s.nodeId === n.id);
-          if (sel?.column) nodeColumns[n.id] = sel.column;
-        });
-        const nodeIds = Object.keys(nodeColumns);
-        if (nodeIds.length > 0) {
-          const request = {
-            node_ids: nodeIds,
-            node_columns: nodeColumns,
-            search_word: token,
-            num_left_tokens: 10,
-            num_right_tokens: 10,
-            regex: false,
-            case_sensitive: false,
-            page: 1,
-            page_size: 20,
-            combined: false,
-          };
-          await textApi.concordance(currentWorkspaceId, request, getAuthHeaders());
-        }
+      if (workspaceId && request) {
+        await textApi.concordance(workspaceId, request, getAuthHeaders());
       }
     } catch (e) {
-      // Non-fatal if pre-trigger fails; Concordance tab can still run via UI
       if (localStorage.getItem('debugTF') === '1') console.warn('Pre-trigger concordance failed:', e);
     }
 
-    // Store parameters as a fallback and for UI hints
-  // Persist parameters so ConcordanceTab can hydrate & auto-run without user clicking 'Run'.
-  // autoRun flag triggers a short-delay (50ms) immediate execution in ConcordanceTab.
-  const concordanceParams = {
-      searchWord: token,
-      nodeColumnSelections: nodeColumnSelections,
-      selectedNodes: selectedNodes.map(node => ({
-        id: node.id,
-        name: node.data?.name || node.id
-      })),
-      nodeColors,
-      timestamp: Date.now(),
-      autoRun: true, // New flag to force auto execution in Concordance tab
-    };
+    const nodeDetails = uniqueNodeIds.map((id) => ({
+      id,
+      name: lockedNodeNameMap[id] || nodeIdToName[id] || id,
+    }));
+
+    const pendingNodeColors: Record<string, string> = { ...nodeColors };
+    uniqueNodeIds.forEach((id, idx) => {
+      if (!pendingNodeColors[id]) {
+        pendingNodeColors[id] = defaultPalette[idx % defaultPalette.length];
+      }
+    });
+
     setPendingConcordance({
-      ...concordanceParams,
-      nodeColumnSelections: nodeColumnSelections.map((sel) => ({ ...sel })),
-      selectedNodes: selectedNodes.map((node) => ({
-        id: node.id,
-        name: nodeIdToName[node.id] || node.id,
-      })),
-      nodeColors: { ...nodeColors },
+      searchWord: trimmedToken,
+      nodeColumnSelections: effectiveSelections.map((sel) => ({ ...sel })),
+      selectedNodes: nodeDetails,
+      nodeColors: pendingNodeColors,
+      autoRun: true,
       timestamp: Date.now(),
     });
 
     setCurrentView('concordance');
 
-    if (localStorage.getItem('debugTF') === '1') console.log(`Navigating to concordance with token: "${token}" via store`);
+    if (localStorage.getItem('debugTF') === '1') {
+      console.debug(
+        `Navigating to concordance with token: "${trimmedToken}" via store (nodes=${uniqueNodeIds.join(', ') || '∅'})`
+      );
+    }
   };
 
   // Right-click handler: add token to stop word list if not present
@@ -475,7 +848,7 @@ const TokenFrequencyTab: React.FC = () => {
             random={() => 0.5}
           >
             {(cloudWords) =>
-              cloudWords.map((w, i) => (
+              cloudWords.map((w, _i) => (
                 <Text
                   key={w.text}
                   fill={color}
@@ -511,8 +884,8 @@ const TokenFrequencyTab: React.FC = () => {
   }, [results, appliedStopSet]);
 
   const renderChart = (nodeName: string, data: any[], color: string) => {
-    // Find max frequency for bar width calculation
-    const maxFreq = Math.max(...data.map(item => item.frequency));
+    // Find max frequency for bar width calculation (guard against empty arrays)
+    const maxFreq = Math.max(...data.map(item => item.frequency), 1);
 
     return (
       <div key={nodeName} className="mb-6">
@@ -524,35 +897,37 @@ const TokenFrequencyTab: React.FC = () => {
   {renderWordCloud(data, 400, 200, color)}
         
         <div className="bg-white p-4 rounded-lg border">
-          <div className="space-y-2">
+          <div className="space-y-1.5 max-h-36 overflow-y-auto pr-2">
             {data.map((item, index) => (
-              <div key={index} className="flex items-center space-x-3">
+              <div key={index} className="flex items-center gap-2 py-1">
                 {/* Token label - now clickable and right-clickable */}
-                <div 
-                  className="w-20 text-right text-sm text-gray-700 font-medium cursor-pointer hover:bg-blue-100 hover:text-blue-700 px-2 py-1 rounded-md transition-colors"
+                <div
+                  className="w-24 shrink-0 text-right text-xs font-semibold text-gray-700 cursor-pointer hover:bg-blue-100 hover:text-blue-700 px-1.5 py-1 rounded-md transition-colors"
                   onClick={() => handleTokenClick(item.token)}
                   onContextMenu={e => handleTokenRightClick(item.token, e)}
                   title={`Left click: concordance; Right click: add to stop words`}
                 >
-                  {item.token}
+                  <span className="block leading-tight truncate" title={item.token}>
+                    {item.token}
+                  </span>
                 </div>
-                
+
                 {/* Bar container */}
                 <div className="flex-1 relative">
-                  <div className="h-6 bg-gray-100 rounded-full relative overflow-hidden">
-                    <div 
+                  <div className="h-4 bg-muted rounded-full relative overflow-hidden">
+                    <div
                       className="h-full rounded-full transition-all duration-300"
-                      style={{ 
+                      style={{
                         width: `${(item.frequency / maxFreq) * 100}%`,
-                        minWidth: '2px', // Ensure small bars are still visible
-                        backgroundColor: color
+                        minWidth: item.frequency > 0 ? '2px' : '0',
+                        backgroundColor: color,
                       }}
                     />
                   </div>
                 </div>
-                
+
                 {/* Frequency value */}
-                <div className="w-16 text-left text-sm text-gray-600 font-mono">
+                <div className="w-14 text-left text-xs text-gray-600 font-mono tabular-nums leading-tight">
                   {item.frequency}
                 </div>
               </div>
@@ -583,7 +958,7 @@ const TokenFrequencyTab: React.FC = () => {
                   <ul className="ml-4 space-y-1 list-disc">
                     <li>Locked to current request/results.</li>
                     <li>Node selection and backend-used parameters are disabled.</li>
-                    <li>Frontend-only options (e.g., Stop words, Token Limit) stay editable.</li>
+                    <li>Stop words remain editable; token limit now comes from backend results.</li>
                     <li>Clear results to unlock and resync with the graph selection.</li>
                   </ul>
                 </div>
@@ -616,61 +991,6 @@ const TokenFrequencyTab: React.FC = () => {
             allowedDataTypes={['string']}
           />
 
-          <div className="grid gap-4 lg:grid-cols-2">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="block text-sm font-medium text-foreground">
-                  Stop words (comma-separated)
-                </label>
-                <Button
-                  onClick={handleFillDefaultStopWords}
-                  disabled={isLoadingStopWords}
-                  variant="outline"
-                  size="sm"
-                >
-                  {isLoadingStopWords ? (
-                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Loading...</>
-                  ) : (
-                    'Fill Default'
-                  )}
-                </Button>
-              </div>
-              <textarea
-                value={stopWords}
-                onChange={(e) => setStopWords(e.target.value)}
-                onBlur={() => applyStopSetFromText(stopWords)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    applyStopSetFromText(stopWords);
-                  }
-                }}
-                placeholder="the, and, or, but..."
-                rows={4}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              />
-              <p className="text-xs text-muted-foreground">
-                Optional: Enter words to exclude from analysis. Click "Fill Default" to load common English stop words.
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-foreground">
-                Token limit
-              </label>
-              <input
-                type="number"
-                value={limit}
-                onChange={(e) => setLimit(parseInt(e.target.value) || 20)}
-                min="1"
-                max="100"
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:w-32"
-              />
-              <p className="text-xs text-muted-foreground">
-                Number of top tokens to display (1-100).
-              </p>
-            </div>
-          </div>
         </CardContent>
         <CardFooter className="flex flex-wrap items-center gap-3 pt-0">
           <Button
@@ -728,7 +1048,69 @@ const TokenFrequencyTab: React.FC = () => {
                     </div>
                   </div>
                 </div>
-              
+                <div className="rounded-md border border-border/60 bg-muted/20 p-3 space-y-4">
+                  <div className="flex flex-col gap-2">
+                    <span className="uppercase tracking-wide text-[10px] font-semibold text-foreground/80">Number of tokens to show</span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Input
+                        aria-label="Number of tokens to show"
+                        type="number"
+                        min={1}
+                        inputMode="numeric"
+                        value={tokenLimitInput}
+                        onChange={handleTokenLimitInputChange}
+                        onKeyDown={handleTokenLimitKeyDown}
+                        onBlur={handleTokenLimitBlur}
+                        className="h-8 w-24"
+                        disabled={isApplyingTokenLimit}
+                      />
+                      {isApplyingTokenLimit && (
+                        <div className="flex items-center text-xs text-muted-foreground gap-1">
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          <span>Applying…</span>
+                        </div>
+                      )}
+                    </div>
+                    <span className={`text-[11px] ${tokenLimitError ? 'text-destructive' : 'text-muted-foreground'}`}>
+                      {tokenLimitError ?? 'Enter a positive whole number.'}
+                    </span>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <span className="uppercase tracking-wide text-[10px] font-semibold text-foreground/80">Stop words (comma-separated)</span>
+                      <Button
+                        onClick={handleFillDefaultStopWords}
+                        disabled={isLoadingStopWords}
+                        variant="outline"
+                        size="sm"
+                      >
+                        {isLoadingStopWords ? (
+                          <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Loading...</>
+                        ) : (
+                          'Fill Default'
+                        )}
+                      </Button>
+                    </div>
+                    <textarea
+                      value={stopWords}
+                      onChange={(e) => setStopWords(e.target.value)}
+                      onBlur={() => applyStopSetFromText(stopWords)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          applyStopSetFromText(stopWords);
+                        }
+                      }}
+                      placeholder="the, and, or, but..."
+                      rows={4}
+                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    />
+                    <span className="text-[11px] text-muted-foreground">
+                      Optional: Enter words to exclude from charts. The backend keeps full counts; filtering only affects display.
+                    </span>
+                  </div>
+                </div>
+
               {results.data ? (
                 <div className="space-y-8">
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
@@ -736,8 +1118,9 @@ const TokenFrequencyTab: React.FC = () => {
                       const nodeId = lastCompareNodeIds[idx];
                       const color = getColorForNodeId(nodeId, idx);
                       const rows = Array.isArray(freqValue) ? (freqValue as any[]) : ((freqValue as any)?.data ?? []);
-                      // Cap to UI limit after filtering to maintain a stable count
-                      const display = rows.slice(0, Math.max(1, limit || 1));
+                      // Cap to backend-provided limit after filtering to maintain a stable count
+                      const limitForSlice = typeof effectiveTokenLimit === 'number' ? effectiveTokenLimit : rows.length;
+                      const display = rows.slice(0, Math.max(0, limitForSlice));
                       return renderChart(nodeName, display, color);
                     })}
                   </div>
@@ -772,8 +1155,9 @@ const TokenFrequencyTab: React.FC = () => {
                     if (stats.length === 0) return null;
 
                     const sortedAsc = [...stats].sort((a, b) => a.juxRank - b.juxRank);
-                    // Use 2 * limit for unified word cloud
-                    const cloudLimit = 2 * limit;
+                    const limitForCloudBase = typeof effectiveTokenLimit === 'number' ? effectiveTokenLimit : DEFAULT_TOKEN_LIMIT;
+                    const cloudLimit = Math.max(0, limitForCloudBase * 2);
+                    if (cloudLimit === 0) return null;
                     const half = Math.floor(cloudLimit / 2);
                     const low = sortedAsc.slice(0, Math.min(half, sortedAsc.length));
                     const high = sortedAsc.slice(Math.max(sortedAsc.length - half, 0));
@@ -894,7 +1278,7 @@ const TokenFrequencyTab: React.FC = () => {
                             </Wordcloud>
                           </svg>
                         </div>
-                        <p className="mt-2 text-center text-xs text-muted-foreground">Selection uses juxRank = log10(O1+O2) × LogRatio: 50% lowest and 50% highest by juxRank (2× token limit = {2 * limit} tokens). Size = (O1+O2). Color uses relative percentage share (%1 vs %2) so differing corpus sizes don't bias color; shifts toward {nodeAName} (left) or {nodeBName} (right).</p>
+                        <p className="mt-2 text-center text-xs text-muted-foreground">Selection uses juxRank = log10(O1+O2) × LogRatio: 50% lowest and 50% highest by juxRank (2× token limit = {2 * limitForCloudBase} tokens). Size = (O1+O2). Color uses relative percentage share (%1 vs %2) so differing corpus sizes don't bias color; shifts toward {nodeAName} (left) or {nodeBName} (right).</p>
                         {/* {debugOn && (
                           <div className="mt-2 rounded border border-border bg-muted/40 p-2">
                             <div className="whitespace-pre-wrap font-mono text-[11px] text-muted-foreground">

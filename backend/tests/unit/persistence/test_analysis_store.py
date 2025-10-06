@@ -54,7 +54,7 @@ class TestInMemoryPersistence:
                 user_id,
                 wid,
                 "token_frequencies",
-                {"limit": 5},
+                {"token_limit": 5},
                 {"state": "successful", "data": []},
             )
             pre_reload = list_analyses(user_id, wid)
@@ -85,7 +85,7 @@ class TestInMemoryPersistence:
                 user_id,
                 wid,
                 "token_frequencies",
-                {"limit": 5},
+                {"token_limit": 5},
                 {"state": "successful", "data": []},
             )
             workspace_manager.unload_workspace(user_id, save=True)

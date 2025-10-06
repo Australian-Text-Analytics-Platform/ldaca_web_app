@@ -1,6 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useCallback, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import SegmentedControl from '../ui/SegmentedControl';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Button } from '../ui/button';
 import {
   Save,
@@ -21,8 +22,8 @@ import { useWorkspaceActions } from '../../hooks/useWorkspaceActions';
 import { filesApi, workspacesApi } from '../../api/index';
 import { queryKeys } from '../../lib/queryKeys';
 import { useFiles } from '../../hooks/useFiles';
-import FilePreviewModal from '../modals/FilePreviewModal';
-import AddFileModal from '../modals/AddFileModal';
+import FilePreviewPanel from '../panels/FilePreviewPanel';
+import AddFilePanel from '../panels/AddFilePanel';
 
 const DataLoaderTab: React.FC = () => {
   const { getAuthHeaders } = useAuth();
@@ -40,7 +41,7 @@ const DataLoaderTab: React.FC = () => {
     handleUploadFile
   , handleDeleteFile, refetchFiles } = useFiles({ authHeaders });
 
-  const [activeLoader, setActiveLoader] = useState<'file' | 'workspace' | 'filter'>('file');
+  const [activeLoader, setActiveLoader] = useState<'file' | 'workspace'>('file');
   const [newWorkspaceName, setNewWorkspaceName] = useState('');
   const [previewFile, setPreviewFile] = useState<string | null>(null);
   const [addingToWorkspace, setAddingToWorkspace] = useState<string | null>(null);
@@ -60,7 +61,7 @@ const DataLoaderTab: React.FC = () => {
     } finally {
       setImportingSamples(false);
     }
-  }, [authHeaders, refetchFiles]);
+  }, [authHeaders, queryClient, refetchFiles]);
   const downloadFile = useCallback(async (filename: string) => {
     try {
       const blob = await filesApi.download(filename, authHeaders);
@@ -109,7 +110,7 @@ const DataLoaderTab: React.FC = () => {
   const handleLoadWorkspace = useCallback(async (workspaceId: string) => {
     try {
       await setCurrentWorkspace(workspaceId);
-  if (localStorage.getItem('debugApp') === '1') console.log('Workspace loaded successfully');
+  if (localStorage.getItem('debugApp') === '1') console.debug('Workspace loaded successfully');
     } catch (error) {
       console.error('Failed to load workspace:', error);
     }
@@ -119,7 +120,7 @@ const DataLoaderTab: React.FC = () => {
   const handleDeleteWorkspace = useCallback(async (workspaceId: string) => {
     try {
       await deleteWorkspace(workspaceId);
-  if (localStorage.getItem('debugApp') === '1') console.log('Workspace deleted successfully');
+  if (localStorage.getItem('debugApp') === '1') console.debug('Workspace deleted successfully');
     } catch (error) {
       console.error('Failed to delete workspace:', error);
     }
@@ -128,7 +129,7 @@ const DataLoaderTab: React.FC = () => {
   // Unload current workspace
   const handleUnloadWorkspace = useCallback(() => {
     setCurrentWorkspace(null);
-  if (localStorage.getItem('debugApp') === '1') console.log('Workspace unloaded');
+  if (localStorage.getItem('debugApp') === '1') console.debug('Workspace unloaded');
   }, [setCurrentWorkspace]);
 
   // Standalone global DnD removed; list handles DnD directly
@@ -138,43 +139,39 @@ const DataLoaderTab: React.FC = () => {
       <div className="bg-white rounded-lg shadow p-6">
         <h2 className="text-xl font-semibold text-gray-800 mb-4">Data Loader</h2>
         
-        {/* Loader Type Selector */}
-        <div className="mb-6">
-          <SegmentedControl
-            options={[
-              { value: 'file', label: 'File Upload' },
-              { value: 'workspace', label: 'Workspace Manager' }
-            ]}
-            value={activeLoader}
-            onChange={(val: string)=> setActiveLoader(val as 'file'|'workspace')}
-            ariaLabel="Data loader mode"
-          />
-        </div>
-        <div className="mb-4 flex items-center space-x-3">
-          <Button
-            onClick={handleImportSamples}
-            disabled={importingSamples || uploading || isLoading.operations}
-            size="sm"
-            variant="ghost"
-            className="text-sm bg-purple-100 text-purple-700 hover:bg-purple-200 disabled:cursor-not-allowed"
-          >
-            {importingSamples ? (
-              <span className="inline-flex items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Importing Samples...
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-2">
-                <PackagePlus className="h-4 w-4" />
-                Import Sample Data
-              </span>
-            )}
-          </Button>
-        </div>
+        <Tabs
+          value={activeLoader}
+          onValueChange={(val) => setActiveLoader(val as 'file' | 'workspace')}
+          className="space-y-6"
+        >
+          <TabsList className="grid w-full max-w-lg grid-cols-2">
+            <TabsTrigger value="file">File Upload</TabsTrigger>
+            <TabsTrigger value="workspace">Workspace Manager</TabsTrigger>
+          </TabsList>
 
-        {/* File Upload Tab */}
-        {activeLoader === 'file' && (
-          <div className="space-y-4">
+          <div className="flex items-center space-x-3">
+            <Button
+              onClick={handleImportSamples}
+              disabled={importingSamples || uploading || isLoading.operations}
+              size="sm"
+              variant="ghost"
+              className="text-sm bg-purple-100 text-purple-700 hover:bg-purple-200 disabled:cursor-not-allowed"
+            >
+              {importingSamples ? (
+                <span className="inline-flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Importing Samples...
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-2">
+                  <PackagePlus className="h-4 w-4" />
+                  Import Sample Data
+                </span>
+              )}
+            </Button>
+          </div>
+
+          <TabsContent value="file" className="space-y-4">
             {!currentWorkspace && (
               <div className="mb-4 flex space-x-4">
                 <input
@@ -340,14 +337,14 @@ const DataLoaderTab: React.FC = () => {
                     </div>
                   ))}
                 </div>
-                <FilePreviewModal
+                <FilePreviewPanel
                   filename={previewFile}
-                  isOpen={!!previewFile}
+                  open={!!previewFile}
                   onClose={() => setPreviewFile(null)}
                 />
-                <AddFileModal
+                <AddFilePanel
                   filename={fileToAdd}
-                  isOpen={!!fileToAdd}
+                  open={!!fileToAdd}
                   onClose={() => setFileToAdd(null)}
                   onConfirm={async ({ mode, documentColumn }) => {
                     if (!fileToAdd) return;
@@ -357,12 +354,9 @@ const DataLoaderTab: React.FC = () => {
                 />
               </div>
             )}
-          </div>
-        )}
+          </TabsContent>
 
-        {/* Workspace Manager Tab */}
-        {activeLoader === 'workspace' && (
-          <div className="space-y-4">
+          <TabsContent value="workspace" className="space-y-4">
             <h3 className="text-lg font-medium text-gray-700">Available Workspaces</h3>
             {/* Workspace upload (import) */}
             <div className="flex items-center justify-between text-sm text-muted-foreground">
@@ -521,8 +515,8 @@ const DataLoaderTab: React.FC = () => {
                 </Button>
               </div>
             )}
-          </div>
-        )}
+          </TabsContent>
+        </Tabs>
 
         {/* Loading States */}
         {isLoading.operations && (

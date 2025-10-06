@@ -6,5 +6,4 @@ export { default as TopicModelingTab } from './TopicModelingTab';
 export { default as QuotationTab } from './QuotationTab';
 export { default as TimelineTab } from './TimelineTab';
 export { default as DataLoaderTab } from './DataLoaderTab';
-export { default as FileLoaderTab } from './FileLoaderTab';
 export { default as ExportTab } from './ExportTab';

@@ -8,6 +8,11 @@ from datetime import datetime
 
 import pytest
 from httpx import AsyncClient
+from ldaca_web_app_backend.api.workspaces.analyses.token_frequencies import (
+    DEFAULT_TOKEN_LIMIT,
+    MAX_SERVER_TOKEN_LIMIT,
+    SERVER_LIMIT_MULTIPLIER,
+)
 from ldaca_web_app_backend.core.analysis_store import list_analyses
 
 
@@ -56,7 +61,6 @@ class TestTokenFrequencyPersistence:
         request_payload = {
             "node_ids": [tiny_node_id],
             "node_columns": {tiny_node_id: "document"},
-            "limit": 10,
         }
 
         # When: We call the token frequencies endpoint
@@ -80,8 +84,15 @@ class TestTokenFrequencyPersistence:
         # Check that the core request parameters are preserved
         assert record.request["node_ids"] == request_payload["node_ids"]
         assert record.request["node_columns"] == request_payload["node_columns"]
-        assert record.request["limit"] == request_payload["limit"]
+        expected_limit = DEFAULT_TOKEN_LIMIT
+        assert "limit" not in record.request
+        assert record.request["token_limit"] == expected_limit
+        assert record.request.get("stop_words") == []
         assert_successful_result(record.result)
+        assert record.result.get("token_limit") == expected_limit
+        assert record.result.get("stop_words") == []
+        assert record.result.get("metadata", {}).get("stop_words") == []
+        assert record.result.get("analysis_params", {}).get("stop_words") == []
 
         # Validate timestamp
         saved_time = datetime.fromisoformat(record.saved_at)
@@ -91,6 +102,41 @@ class TestTokenFrequencyPersistence:
         assert "data" in record.result
         assert isinstance(record.result["data"], dict)
 
+    async def test_token_frequency_defaults_limit_when_missing(
+        self, authenticated_client, workspace_id, tiny_node_id, test_user
+    ):
+        """Token frequency requests without a limit should fall back to the default."""
+        request_payload = {
+            "node_ids": [tiny_node_id],
+            "node_columns": {tiny_node_id: "document"},
+        }
+
+        response = await post_json(
+            authenticated_client,
+            f"/api/workspaces/{workspace_id}/token-frequencies",
+            request_payload,
+        )
+
+        assert response.status_code == 200
+        result_data = response.json()
+        assert result_data.get("token_limit") == DEFAULT_TOKEN_LIMIT
+        assert (
+            result_data.get("analysis_params", {}).get("token_limit")
+            == DEFAULT_TOKEN_LIMIT
+        )
+        assert result_data.get("stop_words") == []
+
+        analyses = list_analyses(test_user["id"], workspace_id)
+        assert len(analyses) == 1
+        record = analyses[0]
+        assert "limit" not in record.request
+        assert record.request["token_limit"] == DEFAULT_TOKEN_LIMIT
+        assert record.request.get("stop_words") == []
+        assert record.result.get("token_limit") == DEFAULT_TOKEN_LIMIT
+        assert record.result.get("stop_words") == []
+        assert record.result.get("metadata", {}).get("stop_words") == []
+        assert record.result.get("analysis_params", {}).get("stop_words") == []
+
     async def test_token_frequency_overwrites_previous_analysis(
         self, authenticated_client, workspace_id, tiny_node_id, test_user
     ):
@@ -99,13 +145,12 @@ class TestTokenFrequencyPersistence:
         first_request = {
             "node_ids": [tiny_node_id],
             "node_columns": {tiny_node_id: "document"},
-            "limit": 5,
         }
 
         second_request = {
             "node_ids": [tiny_node_id],
             "node_columns": {tiny_node_id: "document"},
-            "limit": 15,
+            "stop_words": ["alpha", "beta"],
         }
 
         # When: We call the endpoint twice
@@ -115,7 +160,7 @@ class TestTokenFrequencyPersistence:
             first_request,
         )
 
-        response = await post_json(
+        await post_json(
             authenticated_client,
             f"/api/workspaces/{workspace_id}/token-frequencies",
             second_request,
@@ -126,8 +171,10 @@ class TestTokenFrequencyPersistence:
         assert len(analyses) == 1
 
         record = analyses[0]
-        assert record.request == second_request  # Latest request
-        assert record.request != first_request  # Not the first request
+        assert record.request["node_ids"] == second_request["node_ids"]
+        assert record.request["token_limit"] == DEFAULT_TOKEN_LIMIT
+        assert record.request.get("stop_words") == ["alpha", "beta"]
+        assert "limit" not in record.request
 
     async def test_token_frequency_with_invalid_node_fails(
         self, authenticated_client, workspace_id
@@ -137,7 +184,6 @@ class TestTokenFrequencyPersistence:
         request_payload = {
             "node_ids": ["nonexistent_node"],
             "node_columns": {"nonexistent_node": "document"},
-            "limit": 10,
         }
 
         # When: We call the token frequencies endpoint
@@ -163,7 +209,6 @@ class TestTokenFrequencyPersistence:
         request_payload = {
             "node_ids": [sample_node_id, tiny_node_id],
             "node_columns": {sample_node_id: "document", tiny_node_id: "document"},
-            "limit": 20,
         }
 
         # When: We call the token frequencies endpoint
@@ -177,6 +222,8 @@ class TestTokenFrequencyPersistence:
         assert response.status_code == 200
         result_data = response.json()
         assert_successful_result(result_data)
+        assert result_data.get("token_limit") == DEFAULT_TOKEN_LIMIT
+        assert result_data.get("stop_words") == []
 
         # And: The analysis record contains both nodes
         analyses = list_analyses(test_user["id"], workspace_id)
@@ -184,6 +231,109 @@ class TestTokenFrequencyPersistence:
 
         record = analyses[0]
         assert set(record.request["node_ids"]) == {sample_node_id, tiny_node_id}
+        assert record.request["token_limit"] == DEFAULT_TOKEN_LIMIT
+        assert record.request.get("stop_words") == []
+        assert record.result.get("token_limit") == DEFAULT_TOKEN_LIMIT
+        assert record.result.get("stop_words") == []
+        assert record.result.get("metadata", {}).get("stop_words") == []
+        assert record.result.get("analysis_params", {}).get("stop_words") == []
+
+    async def test_current_result_update_persists_preferences(
+        self, authenticated_client, workspace_id, tiny_node_id, test_user
+    ):
+        """Updating current-result should synchronize presentation preferences."""
+
+        initial_request = {
+            "node_ids": [tiny_node_id],
+            "node_columns": {tiny_node_id: "document"},
+            "stop_words": ["the", "and"],
+        }
+
+        initial_response = await post_json(
+            authenticated_client,
+            f"/api/workspaces/{workspace_id}/token-frequencies",
+            initial_request,
+        )
+        assert initial_response.status_code == 200
+
+        update_payload = {"token_limit": 30, "stop_words": ["alpha", "beta"]}
+        update_response = await post_json(
+            authenticated_client,
+            f"/api/workspaces/{workspace_id}/token-frequencies/current-result",
+            update_payload,
+        )
+        assert update_response.status_code == 200
+        update_json = update_response.json()
+        assert update_json == {"state": "successful", "message": "saved"}
+
+        current_result_response = await get_json(
+            authenticated_client,
+            f"/api/workspaces/{workspace_id}/token-frequencies/current-result",
+        )
+        assert current_result_response.status_code == 200
+        updated_result = current_result_response.json()
+        assert updated_result["token_limit"] == 30
+        assert updated_result.get("stop_words") == ["alpha", "beta"]
+        assert updated_result.get("metadata", {}).get("stop_words") == [
+            "alpha",
+            "beta",
+        ]
+        assert updated_result.get("analysis_params", {}).get("stop_words") == [
+            "alpha",
+            "beta",
+        ]
+        expected_server_limit = min(
+            max(30 * SERVER_LIMIT_MULTIPLIER, DEFAULT_TOKEN_LIMIT),
+            MAX_SERVER_TOKEN_LIMIT,
+        )
+        assert (
+            updated_result.get("metadata", {}).get("server_limit")
+            == expected_server_limit
+        )
+
+        analyses = list_analyses(test_user["id"], workspace_id)
+        assert len(analyses) == 1
+        record = analyses[0]
+        assert record.request["token_limit"] == 30
+        assert "limit" not in record.request
+        assert record.request.get("stop_words") == ["alpha", "beta"]
+        assert record.result.get("token_limit") == 30
+        assert record.result.get("stop_words") == ["alpha", "beta"]
+        assert record.result.get("metadata", {}).get("stop_words") == [
+            "alpha",
+            "beta",
+        ]
+        assert record.result.get("analysis_params", {}).get("stop_words") == [
+            "alpha",
+            "beta",
+        ]
+
+        clear_response = await post_json(
+            authenticated_client,
+            f"/api/workspaces/{workspace_id}/token-frequencies/current-result",
+            {"stop_words": []},
+        )
+        assert clear_response.status_code == 200
+
+        clear_json = clear_response.json()
+        assert clear_json == {"state": "successful", "message": "saved"}
+
+        analyses = list_analyses(test_user["id"], workspace_id)
+        assert len(analyses) == 1
+        record = analyses[0]
+        assert record.request["token_limit"] == 30  # limit unchanged
+        assert record.request.get("stop_words") == []
+        assert record.result.get("stop_words") == []
+        assert record.result.get("metadata", {}).get("stop_words") == []
+        assert record.result.get("analysis_params", {}).get("stop_words") == []
+        current_result = (
+            await get_json(
+                authenticated_client,
+                f"/api/workspaces/{workspace_id}/token-frequencies/current-result",
+            )
+        ).json()
+        assert current_result.get("token_limit") == 30
+        assert current_result.get("stop_words") == []
 
 
 @pytest.mark.anyio
@@ -215,7 +365,6 @@ class TestWorkspaceGraphEnrichment:
         request_payload = {
             "node_ids": [tiny_node_id],
             "node_columns": {tiny_node_id: "document"},
-            "limit": 10,
         }
 
         await post_json(
@@ -254,7 +403,6 @@ class TestWorkspaceGraphEnrichment:
         tf_request = {
             "node_ids": [sample_node_id],
             "node_columns": {sample_node_id: "document"},
-            "limit": 10,
         }
 
         await post_json(
@@ -295,7 +443,6 @@ class TestAnalysisPersistenceEdgeCases:
         invalid_request = {
             "node_ids": ["invalid_node"],
             "node_columns": {"invalid_node": "document"},
-            "limit": 10,
         }
 
         # When: We call the endpoint with invalid data
@@ -336,36 +483,61 @@ class TestAnalysisPersistenceEdgeCases:
         node2_id = node2_response.json()["id"]  # Changed from node_id to id
 
         # When: We run analyses in both workspaces
-        await post_json(
+        ws1_payload = {
+            "node_ids": [node1_id],
+            "node_columns": {node1_id: "document"},
+            "stop_words": ["alpha"],
+        }
+
+        ws2_payload = {
+            "node_ids": [node2_id],
+            "node_columns": {node2_id: "document"},
+            "stop_words": ["beta"],
+        }
+
+        ws1_response_payload = await post_json(
             authenticated_client,
             f"/api/workspaces/{ws1_id}/token-frequencies",
-            {
-                "node_ids": [node1_id],
-                "node_columns": {node1_id: "document"},
-                "limit": 5,
-            },
+            ws1_payload,
         )
+        assert ws1_response_payload.status_code == 200
+        ws1_result = ws1_response_payload.json()
+        assert ws1_result.get("state") == "successful"
 
-        await post_json(
+        ws2_response_payload = await post_json(
             authenticated_client,
             f"/api/workspaces/{ws2_id}/token-frequencies",
-            {
-                "node_ids": [node2_id],
-                "node_columns": {node2_id: "document"},
-                "limit": 15,
-            },
+            ws2_payload,
         )
+        assert ws2_response_payload.status_code == 200
+        ws2_result = ws2_response_payload.json()
+        assert ws2_result.get("state") == "successful"
 
         # Then: Each workspace has its own isolated analyses
         ws1_analyses = list_analyses(test_user["id"], ws1_id)
         ws2_analyses = list_analyses(test_user["id"], ws2_id)
 
+        # Debug output if assertions fail
+        if len(ws1_analyses) != 1 or len(ws2_analyses) != 1:
+            print(f"\nDEBUG: ws1_analyses count: {len(ws1_analyses)}")
+            print(f"DEBUG: ws2_analyses count: {len(ws2_analyses)}")
+            print(f"DEBUG: ws1_id: {ws1_id}")
+            print(f"DEBUG: ws2_id: {ws2_id}")
+            print(f"DEBUG: test_user: {test_user}")
+            from ldaca_web_app_backend.core.workspace import workspace_manager
+
+            print(
+                f"DEBUG: analysis_state keys: {list(workspace_manager._analysis_state.keys())}"
+            )
+
         assert len(ws1_analyses) == 1
         assert len(ws2_analyses) == 1
 
         # And: The analyses contain different request data
-        assert ws1_analyses[0].request["limit"] == 5
-        assert ws2_analyses[0].request["limit"] == 15
+        assert ws1_analyses[0].request["token_limit"] == DEFAULT_TOKEN_LIMIT
+        assert ws1_analyses[0].request.get("stop_words") == ["alpha"]
+        assert ws2_analyses[0].request["token_limit"] == DEFAULT_TOKEN_LIMIT
+        assert ws2_analyses[0].request.get("stop_words") == ["beta"]
 
 
 @pytest.mark.slow
@@ -377,15 +549,21 @@ class TestAnalysisPersistencePerformance:
         self, authenticated_client, workspace_id, tiny_node_id, test_user
     ):
         """Test that many sequential analyses don't cause performance issues."""
-        # Given: We run many analyses with different limits
-        limits = [5, 10, 15, 20, 25]
+        # Given: We run many analyses with different stop word sets
+        stop_sets = [
+            [],
+            ["alpha"],
+            ["alpha", "beta"],
+            ["gamma"],
+            ["delta", "epsilon"],
+        ]
 
-        for limit in limits:
-            # When: We run analysis with different limit each time
+        for stop_words in stop_sets:
+            # When: We run analysis with different stop word configuration each time
             request_payload = {
                 "node_ids": [tiny_node_id],
                 "node_columns": {tiny_node_id: "document"},
-                "limit": limit,
+                "stop_words": stop_words,
             }
 
             response = await post_json(
@@ -400,4 +578,5 @@ class TestAnalysisPersistencePerformance:
         # And: Only the latest analysis is persisted (overwrites previous)
         analyses = list_analyses(test_user["id"], workspace_id)
         assert len(analyses) == 1
-        assert analyses[0].request["limit"] == 25  # Last limit used
+        assert analyses[0].request["token_limit"] == DEFAULT_TOKEN_LIMIT
+        assert analyses[0].request.get("stop_words") == ["delta", "epsilon"]

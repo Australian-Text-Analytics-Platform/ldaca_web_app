@@ -100,6 +100,7 @@ export interface WorkspaceNode {
   column_schema?: Record<string, string>; // Column name to data type mapping
   dtypes?: Record<string, string>; // Alternative name for column types
   is_lazy?: boolean; // Whether the node uses lazy evaluation
+  [key: string]: unknown;
 }
 
 export interface NodeSchemaResponse {

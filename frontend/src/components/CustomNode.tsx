@@ -1,10 +1,13 @@
 import React, { memo, useState, useEffect, useRef, useCallback } from 'react';
 import { NodeProps, Handle, Position } from '@xyflow/react';
 import { WorkspaceNode } from '../types';
-import DocumentColumnModal from './modals/DocumentColumnModal';
+import DocumentColumnPanel from './panels/DocumentColumnPanel';
 import { formatDataType, getTypeStyleClass } from '../utils/typeFormatting';
 import { useWorkspaceData } from '../hooks/useWorkspaceData';
 import { Badge } from './ui/badge';
+
+type DebugWindow = Window & { __LDACA_DEBUG_GRAPH?: boolean };
+type DocumentAwareNode = WorkspaceNode & { document_column?: string | null };
 
 interface CustomNodeData {
   node: WorkspaceNode;
@@ -18,12 +21,13 @@ interface CustomNodeData {
   onResetDocument?: (nodeId: string, documentColumn?: string) => void;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const CustomNode: React.FC<NodeProps<any>> = ({ data, selected }) => {
   const { node: initialNode, isMultiSelected = false, onDelete, onRename, onConvertToDocDataFrame, onConvertToDataFrame, onConvertToDocLazyFrame, onConvertToLazyFrame, onResetDocument } = data as CustomNodeData;
   // Keep a local state but always sync with props to prevent staleness after in-place updates
   const [node, setNode] = useState(initialNode);
   const [showMenu, setShowMenu] = useState(false);
-  const [showDocColumnModal, setShowDocColumnModal] = useState(false);
+  const [showDocColumnPanel, setShowDocColumnPanel] = useState(false);
   const [docConversionTarget, setDocConversionTarget] = useState<'docdataframe' | 'doclazyframe' | 'reset' | null>(null);
   const [isRenaming, setIsRenaming] = useState(false);
   const [newName, setNewName] = useState('');
@@ -33,11 +37,13 @@ const CustomNode: React.FC<NodeProps<any>> = ({ data, selected }) => {
   const menuRef = useRef<HTMLDivElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
 
-  const { getNodeShape, currentWorkspaceId } = useWorkspaceData() as any;
+  const { getNodeShape, currentWorkspaceId } = useWorkspaceData();
 
-  const DEBUG_GRAPH = (typeof window !== 'undefined' && (window as any).__LDACA_DEBUG_GRAPH) ||
-    (typeof window !== 'undefined' && localStorage.getItem('debugGraph') === '1');
-  const dlog = React.useCallback((...args: any[]) => { if (DEBUG_GRAPH) console.log(...args); }, [DEBUG_GRAPH]);
+  const debugWindow: DebugWindow | null = typeof window !== 'undefined' ? (window as DebugWindow) : null;
+  const DEBUG_GRAPH = Boolean(debugWindow?.__LDACA_DEBUG_GRAPH) || (typeof window !== 'undefined' && localStorage.getItem('debugGraph') === '1');
+  const dlog = React.useCallback((...args: unknown[]) => {
+    if (DEBUG_GRAPH) console.debug(...args);
+  }, [DEBUG_GRAPH]);
 
   useEffect(() => {
     dlog('CustomNode: node updated', {
@@ -52,7 +58,7 @@ const CustomNode: React.FC<NodeProps<any>> = ({ data, selected }) => {
   const nodeName = node?.name || 'Loading...';
   const nodeShape = node?.shape;
   const nodeDataType = node?.data_type || initialNode?.data_type || 'unknown';
-  const documentColumn = (node as any)?.document_column || null;
+  const documentColumn = (node as DocumentAwareNode)?.document_column ?? null;
   const nodeColumns = node?.columns || [];
 
   // Format the data type for better display
@@ -98,7 +104,7 @@ const CustomNode: React.FC<NodeProps<any>> = ({ data, selected }) => {
       }
     };
     document.addEventListener('pointerdown', handlePointerDown, { capture: true });
-    return () => document.removeEventListener('pointerdown', handlePointerDown, { capture: true } as any);
+    return () => document.removeEventListener('pointerdown', handlePointerDown, { capture: true });
   }, [showMenu]);
 
   const handleDeleteClick = (e: React.MouseEvent) => {
@@ -112,14 +118,14 @@ const CustomNode: React.FC<NodeProps<any>> = ({ data, selected }) => {
     e.stopPropagation();
     setShowMenu(false);
     // TODO: Implement save functionality
-    console.log('Save node data:', node.node_id);
+    console.debug('Save node data:', node.node_id);
   };
 
   const handleToDocDataFrameClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     setShowMenu(false);
     setDocConversionTarget('docdataframe');
-    setShowDocColumnModal(true);
+    setShowDocColumnPanel(true);
   };
 
   const handleToDataFrameClick = (e: React.MouseEvent) => {
@@ -134,7 +140,7 @@ const CustomNode: React.FC<NodeProps<any>> = ({ data, selected }) => {
     e.stopPropagation();
     setShowMenu(false);
     setDocConversionTarget('doclazyframe');
-    setShowDocColumnModal(true);
+    setShowDocColumnPanel(true);
   };
 
   const handleToLazyFrameClick = (e: React.MouseEvent) => {
@@ -149,12 +155,11 @@ const CustomNode: React.FC<NodeProps<any>> = ({ data, selected }) => {
     e.stopPropagation();
     setShowMenu(false);
     if (onConvertToDocDataFrame && node?.node_id) {
-      // Reuse existing document column if present, otherwise prompt user
       if (documentColumn) {
         onConvertToDocDataFrame(node.node_id, documentColumn);
       } else {
         setDocConversionTarget('docdataframe');
-        setShowDocColumnModal(true);
+        setShowDocColumnPanel(true);
       }
     }
   };
@@ -167,7 +172,7 @@ const CustomNode: React.FC<NodeProps<any>> = ({ data, selected }) => {
         onConvertToDocLazyFrame(node.node_id, documentColumn);
       } else {
         setDocConversionTarget('doclazyframe');
-        setShowDocColumnModal(true);
+        setShowDocColumnPanel(true);
       }
     }
   };
@@ -176,9 +181,8 @@ const CustomNode: React.FC<NodeProps<any>> = ({ data, selected }) => {
     e.stopPropagation();
     setShowMenu(false);
     if (!node?.node_id || !onResetDocument) return;
-    // If current columns exist, prompt for selection to allow choosing a different column
     setDocConversionTarget('reset');
-    setShowDocColumnModal(true);
+    setShowDocColumnPanel(true);
   };
 
   const handleRenameClick = (e: React.MouseEvent) => {
@@ -186,7 +190,6 @@ const CustomNode: React.FC<NodeProps<any>> = ({ data, selected }) => {
     setShowMenu(false);
     setNewName(node?.name || '');
     setIsRenaming(true);
-    // Focus the input after a brief delay to ensure it's rendered
     setTimeout(() => {
       renameInputRef.current?.focus();
       renameInputRef.current?.select();
@@ -223,7 +226,7 @@ const CustomNode: React.FC<NodeProps<any>> = ({ data, selected }) => {
     } else if (docConversionTarget === 'reset' && onResetDocument) {
       onResetDocument(node.node_id, documentColumn);
     }
-  setShowDocColumnModal(false);
+  setShowDocColumnPanel(false);
   setDocConversionTarget(null);
   };
 
@@ -450,14 +453,17 @@ const CustomNode: React.FC<NodeProps<any>> = ({ data, selected }) => {
         )}
       </div>
 
-  {/* Passive handles so backend edges can attach; UI connections remain disabled by parent ReactFlow props */}
-  <Handle type="target" position={Position.Left} className="!w-2 !h-2 !bg-gray-400 opacity-0 pointer-events-none" />
-  <Handle type="source" position={Position.Right} className="!w-2 !h-2 !bg-gray-400 opacity-0 pointer-events-none" />
+      {/* Passive handles so backend edges can attach; UI connections remain disabled by parent ReactFlow props */}
+      <Handle type="target" position={Position.Left} className="!w-2 !h-2 !bg-gray-400 opacity-0 pointer-events-none" />
+      <Handle type="source" position={Position.Right} className="!w-2 !h-2 !bg-gray-400 opacity-0 pointer-events-none" />
 
-      {/* Modal for selecting document column */}
-      <DocumentColumnModal
-        isOpen={showDocColumnModal}
-  onClose={() => { setShowDocColumnModal(false); setDocConversionTarget(null); }}
+      {/* Panel for selecting document column */}
+      <DocumentColumnPanel
+        open={showDocColumnPanel}
+        onClose={() => {
+          setShowDocColumnPanel(false);
+          setDocConversionTarget(null);
+        }}
         onConfirm={handleDocColumnConfirm}
         columns={nodeColumns}
         nodeName={nodeName}

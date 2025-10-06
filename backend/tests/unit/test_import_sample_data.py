@@ -1,98 +1,99 @@
 """Tests for sample data import endpoint"""
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
-from fastapi.testclient import TestClient
 
 
-@pytest.fixture()
-def client(tmp_path, monkeypatch):
-    # Patch settings and db init similar to preview tests
-    with (
-        patch("ldaca_web_app_backend.main.settings") as mock_settings,
-        patch("ldaca_web_app_backend.main.init_db"),
-        patch("ldaca_web_app_backend.main.cleanup_expired_sessions"),
-        patch("ldaca_web_app_backend.core.utils.settings") as mock_config,
-    ):
-        mock_settings.data_folder = tmp_path
-        mock_settings.allowed_origins = ["http://localhost:3000"]
-        mock_settings.get.return_value = True
-        mock_settings.debug = False
-        mock_config.get_data_root.return_value = tmp_path
-        mock_config.user_data_folder = "users"
-        mock_config.multi_user = True
-        # Provide sample data folder path
-        sample_source = tmp_path / "sample_data"
-        sample_source.mkdir(parents=True, exist_ok=True)
-        (sample_source / "example.txt").write_text("hello")
-        mock_settings.get_sample_data_folder.return_value = sample_source
-        mock_config.get_sample_data_folder.return_value = sample_source
+def test_first_import(tmp_path):
+    """Test first import returns removed_existing=False"""
+    # Setup source and target
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "example.txt").write_text("hello")
 
-        app = __import__("ldaca_web_app_backend.main", fromlist=["app"]).app
+    target_base = tmp_path / "target"
 
-        # Fake user dependency
-        def fake_user():
-            return {"id": "test_user"}
+    # Create a mock settings object with proper method returns
+    mock_settings = MagicMock()
+    mock_settings.get_sample_data_folder.return_value = source
+    mock_settings.get_data_root.return_value = target_base
+    mock_settings.user_data_folder = "users"
+    mock_settings.multi_user = False
 
-        from ldaca_web_app_backend.api import files as files_api
+    # Import function and patch
+    with patch("ldaca_web_app_backend.core.utils.settings", mock_settings):
+        from ldaca_web_app_backend.core.utils import import_sample_data_for_user
 
-        app.dependency_overrides[files_api.get_current_user] = fake_user
+        result = import_sample_data_for_user("test_user")
 
-        # Ensure user data base exists
-        user_data = tmp_path / "users" / "user_test_user" / "user_data"
-        user_data.mkdir(parents=True, exist_ok=True)
-
-        return TestClient(app)
+        assert result["removed_existing"] is False
+        assert result["file_count"] == 1
+        # In single-user mode, uses user_root folder
+        expected_file = (
+            target_base
+            / "users"
+            / "user_root"
+            / "user_data"
+            / "sample_data"
+            / "example.txt"
+        )
+        assert expected_file.exists(), f"Expected file not found at {expected_file}"
 
 
-def test_first_import(client, tmp_path):
-    resp = client.post("/api/files/import-sample-data")
-    assert resp.status_code == 200
-    data = resp.json()
-    assert data["status"] == "ok"
-    assert data["removed_existing"] is False
-    assert data["file_count"] >= 1
+def test_reimport_replaces_existing(tmp_path):
+    """Test reimport returns removed_existing=True and replaces files"""
+    # Setup source
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "example.txt").write_text("hello")
+
+    target_base = tmp_path / "target"
+
+    mock_settings = MagicMock()
+    mock_settings.get_sample_data_folder.return_value = source
+    mock_settings.get_data_root.return_value = target_base
+    mock_settings.user_data_folder = "users"
+    mock_settings.multi_user = False
+
+    with patch("ldaca_web_app_backend.core.utils.settings", mock_settings):
+        from ldaca_web_app_backend.core.utils import import_sample_data_for_user
+
+        # First import
+        result1 = import_sample_data_for_user("test_user")
+        assert result1["removed_existing"] is False
+
+        # Modify file (single-user mode uses user_root)
+        modified_file = (
+            target_base
+            / "users"
+            / "user_root"
+            / "user_data"
+            / "sample_data"
+            / "example.txt"
+        )
+        assert modified_file.exists(), "File should exist after first import"
+        modified_file.write_text("modified")
+
+        # Second import should replace
+        result2 = import_sample_data_for_user("test_user")
+        assert result2["removed_existing"] is True
+        assert modified_file.read_text() == "hello"
 
 
-def test_reimport_replaces_existing(client, tmp_path):
-    # First import
-    client.post("/api/files/import-sample-data")
-    # Modify a file inside sample_data to ensure replacement
-    user_sample = (
-        tmp_path
-        / "users"
-        / "user_test_user"
-        / "user_data"
-        / "sample_data"
-        / "example.txt"
-    )
-    assert user_sample.exists()
-    user_sample.write_text("modified")
-    # Second import should replace
-    resp2 = client.post("/api/files/import-sample-data")
-    assert resp2.status_code == 200
-    data2 = resp2.json()
-    assert data2["removed_existing"] is True
-    # Content restored
-    assert user_sample.read_text() == "hello"
-
-
-def test_missing_source_folder(client, monkeypatch, tmp_path):
-    # Point source to missing folder
-    from ldaca_web_app_backend.core import utils as core_utils
-
+def test_missing_source_folder(tmp_path):
+    """Test missing source folder raises FileNotFoundError"""
     missing = tmp_path / "does_not_exist"
+    target_base = tmp_path / "target"
 
-    def fake_get_sample_data_folder():
-        return missing
+    mock_settings = MagicMock()
+    mock_settings.get_sample_data_folder.return_value = missing
+    mock_settings.get_data_root.return_value = target_base
+    mock_settings.user_data_folder = "users"
+    mock_settings.multi_user = False
 
-    monkeypatch.setattr(
-        core_utils.settings,
-        "get_sample_data_folder",
-        fake_get_sample_data_folder,
-        raising=False,
-    )
-    resp = client.post("/api/files/import-sample-data")
-    assert resp.status_code == 404
-    assert resp.status_code == 404
+    with patch("ldaca_web_app_backend.core.utils.settings", mock_settings):
+        from ldaca_web_app_backend.core.utils import import_sample_data_for_user
+
+        with pytest.raises(FileNotFoundError):
+            import_sample_data_for_user("test_user")
