@@ -64,6 +64,20 @@ const ConcordanceTab: React.FC = () => {
   const [showMetadata, setShowMetadata] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [results, setResults] = useState<ConcordanceAnalysisResponse | null>(null);
+  const labelToNodeId = useMemo(() => {
+    const params = (results as any)?.analysis_params;
+    const mapping = params?.label_to_node_map;
+    if (mapping && typeof mapping === 'object') {
+      const normalized: Record<string, string> = {};
+      Object.entries(mapping).forEach(([label, value]) => {
+        if (typeof label === 'string' && typeof value === 'string' && label) {
+          normalized[label] = value;
+        }
+      });
+      return normalized;
+    }
+    return null;
+  }, [results]);
 
   const mergeConcordanceResults = useCallback((incoming: ConcordanceAnalysisResponse | null) => {
     if (!incoming) return;
@@ -407,8 +421,10 @@ const ConcordanceTab: React.FC = () => {
           num_right_tokens: numRightTokens,
           regex,
           case_sensitive: caseSensitive,
-          combined: false,
         };
+        if (isCombinedQuery) {
+          request.combined = true;
+        }
         const requestedSortBy = overrideSortBy ?? firstNodePagination.sortBy;
         if (requestedSortBy) {
           request.sort_by = requestedSortBy;
@@ -623,9 +639,9 @@ const ConcordanceTab: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [combinedPage]);
 
-  const handleSort = (columnName: string, nodeId: string) => {
+  const handleSort = (columnName: string, nodeKey: string, requestNodeId?: string) => {
     setNodePagination(prev => {
-      const currentNodePagination = prev[nodeId] || {
+      const currentNodePagination = prev[nodeKey] || {
         currentPage: 1,
         pageSize: globalPageSize,
         sortBy: '',
@@ -641,20 +657,21 @@ const ConcordanceTab: React.FC = () => {
       if (!workspaceId) {
         return prev;
       }
+      const targetNodeId = requestNodeId ?? nodeKey;
       void (async (wid: string) => {
-        setNodeLoading(prev => ({ ...prev, [nodeId]: true }));
+        setNodeLoading(prev => ({ ...prev, [nodeKey]: true }));
         try {
-          const overrides = { node_id: nodeId, sort_by: columnName, sort_order: newSortOrder, page: 1, page_size: pageSize } as any;
+          const overrides = { node_id: targetNodeId, sort_by: columnName, sort_order: newSortOrder, page: 1, page_size: pageSize } as any;
           const resp: any = await textApi.postConcordanceCurrentResult(wid, overrides, getAuthHeaders());
           if (resp?.data) mergeConcordanceResults(resp as ConcordanceAnalysisResponse);
         } finally {
-          setNodeLoading(prev => ({ ...prev, [nodeId]: false }));
+          setNodeLoading(prev => ({ ...prev, [nodeKey]: false }));
         }
       })(workspaceId);
 
       return {
         ...prev,
-        [nodeId]: {
+        [nodeKey]: {
           ...currentNodePagination,
           currentPage: 1, // reset to first page on new sort
           sortBy: columnName,
@@ -664,9 +681,9 @@ const ConcordanceTab: React.FC = () => {
     });
   };
 
-  const handlePageChange = (newPage: number, nodeId: string) => {
+  const handlePageChange = (newPage: number, nodeKey: string, requestNodeId?: string) => {
     setNodePagination(prev => {
-      const currentNodePagination = prev[nodeId] || {
+      const currentNodePagination = prev[nodeKey] || {
         currentPage: 1,
         pageSize: globalPageSize,
         sortBy: '',
@@ -678,11 +695,12 @@ const ConcordanceTab: React.FC = () => {
       if (!workspaceId) {
         return prev;
       }
+      const targetNodeId = requestNodeId ?? nodeKey;
       void (async (wid: string) => {
-        setNodeLoading(prev => ({ ...prev, [nodeId]: true }));
+        setNodeLoading(prev => ({ ...prev, [nodeKey]: true }));
         try {
           const overrides = {
-            node_id: nodeId,
+            node_id: targetNodeId,
             page: newPage,
             page_size: currentNodePagination.pageSize,
             sort_by: currentNodePagination.sortBy || undefined,
@@ -691,13 +709,13 @@ const ConcordanceTab: React.FC = () => {
           const resp: any = await textApi.postConcordanceCurrentResult(wid, overrides, getAuthHeaders());
           if (resp?.data) mergeConcordanceResults(resp as ConcordanceAnalysisResponse);
         } finally {
-          setNodeLoading(prev => ({ ...prev, [nodeId]: false }));
+          setNodeLoading(prev => ({ ...prev, [nodeKey]: false }));
         }
       })(workspaceId);
 
       return {
         ...prev,
-        [nodeId]: {
+        [nodeKey]: {
           ...currentNodePagination,
           currentPage: newPage
         }
@@ -900,15 +918,15 @@ const ConcordanceTab: React.FC = () => {
     }
   };
 
-  const SortableHeader: React.FC<{ columnKey: string; label: string; nodeId: string }> = ({ columnKey, label, nodeId }) => {
-    const nodeState = nodePagination[nodeId] || { sortBy: '', sortOrder: 'asc' as 'asc' | 'desc' };
+  const SortableHeader: React.FC<{ columnKey: string; label: string; paginationKey: string; requestNodeId: string }> = ({ columnKey, label, paginationKey, requestNodeId }) => {
+    const nodeState = nodePagination[paginationKey] || { sortBy: '', sortOrder: 'asc' as 'asc' | 'desc' };
     const isSorted = nodeState.sortBy === columnKey;
     const sortIcon = isSorted ? (nodeState.sortOrder === 'asc' ? '▲' : '▼') : '▲▼';
     
     return (
       <TableHead 
         className={`px-3 py-2 text-left text-xs font-medium uppercase tracking-wider cursor-pointer hover:bg-gray-100 ${isSorted ? 'text-blue-600' : 'text-gray-500'}`}
-        onClick={() => handleSort(columnKey, nodeId)}
+        onClick={() => handleSort(columnKey, paginationKey, requestNodeId)}
       >
         <div className="flex items-center space-x-1">
           <span>{label}</span>
@@ -937,7 +955,15 @@ const ConcordanceTab: React.FC = () => {
     });
   }, []);
 
-  const renderConcordanceTable = (nodeName: string, nodeData: any, nodeId: string, column: string) => {
+  const renderConcordanceTable = (
+    nodeName: string,
+    nodeData: any,
+    context: { nodeId: string; paginationKey: string; requestNodeId: string; column: string }
+  ) => {
+    const { nodeId: actualNodeId, paginationKey, requestNodeId, column } = context;
+    const effectiveNodeId = actualNodeId || requestNodeId;
+    const detachNodeId = actualNodeId || (labelToNodeId?.[nodeName] ?? requestNodeId);
+    const canDetach = Boolean(detachNodeId) && detachNodeId !== '__COMBINED__';
     if (nodeName === '__COMBINED__') {
       const rows = nodeData.data || [];
       const columns: string[] = nodeData.columns || [];
@@ -1043,7 +1069,7 @@ const ConcordanceTab: React.FC = () => {
                     return (
                       <TableRow key={idx} className="cursor-pointer" style={{ backgroundColor: bg }} onClick={() => {
                         if (rawSrc) {
-                    const nodesForDetail = selectedNodes;
+                  const nodesForDetail = displayedNodes;
                     const nodeObj = nodesForDetail.find((n: any) => {
                             const candidates = [n.id, n.name, (n as any).name, n.data?.name, (n as any).label, n.data?.label].filter(Boolean).map(v=>v.toString().toLowerCase());
                             return candidates.includes(rawSrc.toString().toLowerCase());
@@ -1111,13 +1137,18 @@ const ConcordanceTab: React.FC = () => {
       );
     }
 
+    const currentNodePagination = nodePagination[paginationKey];
+    const currentPage = currentNodePagination?.currentPage ?? 1;
+    const nodeIsLoading = Boolean(nodeLoading[paginationKey]);
+    const detachingKey = detachNodeId ?? "";
+    const isDetaching = detachingKey ? Boolean(nodeDetaching[detachingKey]) : false;
+
     return (
       <div key={nodeName} className="mb-6">
         <div className="h-16 mb-4 flex items-center">
           <h3 className="text-lg font-semibold text-gray-800 break-words leading-tight w-full">{nodeName}</h3>
         </div>
-        
-  <div className="overflow-hidden rounded-lg border border-border bg-card">
+        <div className="overflow-hidden rounded-lg border border-border bg-card">
           <div className="max-h-96 overflow-y-auto">
             <Table>
               <TableHeader className="bg-gray-50">
@@ -1135,7 +1166,7 @@ const ConcordanceTab: React.FC = () => {
                       isSortable = allowed.includes(keyLower);
                     }
                     return isSortable ? (
-                      <SortableHeader key={key} columnKey={key} label={key} nodeId={nodeId} />
+                      <SortableHeader key={key} columnKey={key} label={key} paginationKey={paginationKey} requestNodeId={requestNodeId} />
                     ) : (
                       <TableHead key={key} className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                         {key}
@@ -1149,7 +1180,11 @@ const ConcordanceTab: React.FC = () => {
                   <TableRow 
                     key={index} 
                     className={`cursor-pointer ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
-                    onClick={() => handleRowClick(row, nodeId, column)}
+                    onClick={() => {
+                      if (effectiveNodeId) {
+                        handleRowClick(row, effectiveNodeId, column);
+                      }
+                    }}
                   >
                     {displayColumns.map((colKey: string, cellIndex) => (
                       <TableCell key={cellIndex}>
@@ -1174,8 +1209,8 @@ const ConcordanceTab: React.FC = () => {
         {nodeData.pagination && nodeData.pagination.total_pages > 1 && (
           <div className="mt-4 flex justify-center items-center space-x-2">
             <Button
-              onClick={() => handlePageChange((nodePagination[nodeId]?.currentPage || 1) - 1, nodeId)}
-              disabled={(nodePagination[nodeId]?.currentPage || 1) <= 1 || nodeLoading[nodeId]}
+              onClick={() => handlePageChange(Math.max(1, currentPage - 1), paginationKey, requestNodeId)}
+              disabled={currentPage <= 1 || nodeIsLoading}
               variant="outline"
               size="sm"
             >
@@ -1183,15 +1218,15 @@ const ConcordanceTab: React.FC = () => {
             </Button>
             
             <div className="flex items-center text-sm text-muted-foreground">
-              {nodeLoading[nodeId] && (
+              {nodeIsLoading && (
                 <div className="mr-2 inline-block h-3 w-3 animate-spin rounded-full border-b border-muted-foreground"></div>
               )}
-              Page {nodePagination[nodeId]?.currentPage || 1} of {nodeData.pagination.total_pages}
+              Page {currentPage} of {nodeData.pagination.total_pages}
             </div>
             
             <Button
-              onClick={() => handlePageChange((nodePagination[nodeId]?.currentPage || 1) + 1, nodeId)}
-              disabled={(nodePagination[nodeId]?.currentPage || 1) >= nodeData.pagination.total_pages || nodeLoading[nodeId]}
+              onClick={() => handlePageChange(Math.min(nodeData.pagination.total_pages, currentPage + 1), paginationKey, requestNodeId)}
+              disabled={currentPage >= nodeData.pagination.total_pages || nodeIsLoading}
               variant="outline"
               size="sm"
             >
@@ -1200,13 +1235,17 @@ const ConcordanceTab: React.FC = () => {
 
             {/* Detach button */}
             <Button
-              onClick={() => handleDetach(nodeId, column)}
-              disabled={nodeLoading[nodeId] || nodeDetaching[nodeId] || !searchWord.trim()}
+              onClick={() => {
+                if (detachNodeId) {
+                  handleDetach(detachNodeId, column);
+                }
+              }}
+              disabled={nodeIsLoading || isDetaching || !searchWord.trim() || !canDetach || !detachNodeId}
               size="sm"
               className="bg-green-600 hover:bg-green-700 ml-2"
               title="Create a new node with concordance results joined to the original table"
             >
-              {nodeDetaching[nodeId] ? (
+              {isDetaching ? (
                 <><Loader2 className="mr-2 h-3 w-3 animate-spin" />Detaching...</>
               ) : (
                 <><LinkIcon className="mr-2 h-3 w-3" />Detach</>
@@ -1219,13 +1258,17 @@ const ConcordanceTab: React.FC = () => {
         {(!nodeData.pagination || nodeData.pagination.total_pages <= 1) && searchWord.trim() && (
           <div className="mt-4 flex justify-center">
             <Button
-              onClick={() => handleDetach(nodeId, column)}
-              disabled={nodeLoading[nodeId] || nodeDetaching[nodeId]}
+              onClick={() => {
+                if (detachNodeId) {
+                  handleDetach(detachNodeId, column);
+                }
+              }}
+              disabled={nodeIsLoading || isDetaching || !canDetach || !detachNodeId}
               size="sm"
               className="bg-green-600 hover:bg-green-700"
               title="Create a new node with concordance results joined to the original table"
             >
-              {nodeDetaching[nodeId] ? (
+              {isDetaching ? (
                 <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Detaching...</>
               ) : (
                 <><LinkIcon className="mr-2 h-4 w-4" />Detach Concordance</>
@@ -1498,7 +1541,7 @@ const ConcordanceTab: React.FC = () => {
                         console.debug('Available nodes:', selectedNodes.map(n => ({ id: n.id, name: n.data?.name, nodeName: n.name })));
                       }
                       
-                      const nodesForDetail = selectedNodes;
+                      const nodesForDetail = displayedNodes;
                       let node = nodesForDetail.find((n: any) => (n.data?.name || n.id) === nodeName);
                       if (!node) {
                         node = nodesForDetail.find((n: any) => n.id === nodeName);
@@ -1506,20 +1549,31 @@ const ConcordanceTab: React.FC = () => {
                       if (!node) {
                         node = nodesForDetail.find((n: any) => n.name === nodeName);
                       }
+                      const mappedNodeId = labelToNodeId?.[nodeName];
+                      if (!node && mappedNodeId) {
+                        node = nodesForDetail.find((n: any) => n.id === mappedNodeId);
+                      }
                       if (!node) {
                         const nodeIndex = Object.keys(results.data).indexOf(nodeName);
                         node = (nodesForDetail as any)[nodeIndex];
                       }
                       
-                      const nodeId = node?.id || '';
-                      const selection = nodeColumnSelections.find(sel => sel.nodeId === nodeId);
+                      const resolvedNodeId = node?.id || mappedNodeId || '';
+                      const paginationKey = resolvedNodeId || nodeName;
+                      const requestNodeId = resolvedNodeId || nodeName;
+                      const selection = nodeColumnSelections.find(sel => sel.nodeId === resolvedNodeId);
                       const column = selection?.column || '';
                       
                       if (localStorage.getItem('debugConc') === '1') {
-                        console.debug('Final match - nodeId:', nodeId, 'column:', column);
+                        console.debug('Final match - nodeId:', resolvedNodeId, 'column:', column, 'paginationKey:', paginationKey);
                       }
                       
-                      return renderConcordanceTable(nodeName, nodeData, nodeId, column);
+                      return renderConcordanceTable(nodeName, nodeData, {
+                        nodeId: node?.id || '',
+                        paginationKey,
+                        requestNodeId,
+                        column,
+                      });
                     })}
                   </div>
                 ) : (

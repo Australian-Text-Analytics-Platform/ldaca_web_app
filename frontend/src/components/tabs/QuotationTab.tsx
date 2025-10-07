@@ -12,7 +12,6 @@ import useAutoNodeColumns from '../../hooks/useAutoNodeColumns';
 import useNodeColumnInfos from '../../hooks/useNodeColumnInfos';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
-import { Checkbox } from '../ui/checkbox';
 import { Input } from '../ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
@@ -418,17 +417,6 @@ const handleSearchAll = async () => {
               allowedDataTypes={['string']}
             />
 
-            <div className="flex items-center gap-3 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/40 p-3">
-              <Checkbox
-                id="showMetadata"
-                checked={showMetadata}
-                onCheckedChange={checked => setShowMetadata(checked === true)}
-              />
-              <label htmlFor="showMetadata" className="text-sm text-muted-foreground">
-                Show metadata
-              </label>
-            </div>
-
             <div className="flex flex-wrap gap-3">
               <Button
                 type="button"
@@ -498,14 +486,44 @@ const handleSearchAll = async () => {
           const originalColumns = getStringColumns(node);
           const selection = activeSelections.find(s => s.nodeId === nodeId);
           const textCol = selection?.column || '';
-          const cols = originalColumns;
+          
+          // Core quotation columns from backend
+          const coreQuotationCols = [
+            'document_idx', 'speaker', 'speaker_start_idx', 'speaker_end_idx',
+            'quote', 'quote_start_idx', 'quote_end_idx',
+            'verb', 'verb_start_idx', 'verb_end_idx',
+            'quote_type', 'quote_token_count', 'is_floating_quote', 'quote_row_idx',
+            textCol // Include the selected text column
+          ].filter(c => c); // Remove empty values
+          
+          // Get all available columns from data
           const baseRows: any[] = Array.isArray(nodeData?.data) ? nodeData.data : [];
+          const allCols = baseRows.length > 0 ? Object.keys(baseRows[0]) : originalColumns;
+          
+          // Filter columns: if showMetadata is false, only show core columns that exist in data
+          const cols = showMetadata 
+            ? allCols 
+            : allCols.filter((c: string) => coreQuotationCols.includes(c));
+          
           const rowsForRender = baseRows;
           return (
             <Card key={nodeId} className="overflow-hidden">
               <CardHeader className="gap-1 border-b bg-muted/40">
-                <CardTitle className="text-base">Quotations for {nodeLabel}</CardTitle>
-                <CardDescription>Text column: {textCol || 'Select a text column to view highlighted quotations.'}</CardDescription>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <CardTitle className="text-base">Quotations for {nodeLabel}</CardTitle>
+                    <CardDescription>Text column: {textCol || 'Select a text column to view highlighted quotations.'}</CardDescription>
+                  </div>
+                  <label className="flex items-center gap-2 text-sm text-foreground whitespace-nowrap">
+                    <input
+                      type="checkbox"
+                      checked={showMetadata}
+                      onChange={(e) => setShowMetadata(e.target.checked)}
+                      className="h-4 w-4"
+                    />
+                    <span>Show metadata</span>
+                  </label>
+                </div>
               </CardHeader>
               <CardContent className="p-0">
                 <div className="flex h-[70vh] flex-col">

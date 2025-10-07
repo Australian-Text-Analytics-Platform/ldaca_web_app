@@ -552,53 +552,55 @@ const TopicModelingTab: React.FC = () => {
                   </>
                 )}
               </Button>
-              <Button
-                type="button"
-                variant="destructive"
-                className="w-full sm:w-auto"
-                onClick={async () => {
-                  if (!currentWorkspaceId) return;
-                  setIsClearing(true);
-                  try {
+
+              {(result || isLocked || isRunning) && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  className="w-full sm:w-auto"
+                  onClick={async () => {
+                    if (!currentWorkspaceId) return;
+                    setIsClearing(true);
                     try {
-                      await workspacesApi.cancelTasks(currentWorkspaceId, { task_type: 'topic_modeling' }, getAuthHeaders());
-                    } catch {
-                      /* ignore cancellation errors */
+                      try {
+                        await workspacesApi.cancelTasks(currentWorkspaceId, { task_type: 'topic_modeling' }, getAuthHeaders());
+                      } catch {
+                        /* ignore cancellation errors */
+                      }
+                      try {
+                        await workspacesApi.clearAnalysis(currentWorkspaceId, 'topic_modeling', getAuthHeaders());
+                      } catch {
+                        /* ignore clear errors */
+                      }
+                    } finally {
+                      setIsClearing(false);
+                      setResultSafely(null);
+                      setIsLocked(false);
+                      setLockedNodesSnapshot([]);
+                      setLockedNodeSelections(null);
+                      setIsRunning(false);
+                      runningRef.current = false;
+                      resetTopicModelingReady();
+                      lastFetchedRef.current = { taskId: null, state: null };
+                      setNodeColumnSelectionsRaw([], { replace: true, persist: false });
+                      recomputeAutoColumns();
                     }
-                    try {
-                      await workspacesApi.clearAnalysis(currentWorkspaceId, 'topic_modeling', getAuthHeaders());
-                    } catch {
-                      /* ignore clear errors */
-                    }
-                  } finally {
-                    setIsClearing(false);
-                    setResultSafely(null);
-                    setIsLocked(false);
-                    setLockedNodesSnapshot([]);
-                    setLockedNodeSelections(null);
-                    setIsRunning(false);
-                    runningRef.current = false;
-                    resetTopicModelingReady();
-                    lastFetchedRef.current = { taskId: null, state: null };
-                    setNodeColumnSelectionsRaw([], { replace: true, persist: false });
-                    recomputeAutoColumns();
-                  }
-                }}
-                disabled={isClearing || (!result && !isLocked && !isRunning) || !currentWorkspaceId}
-                title={!result && !isLocked && !isRunning ? 'No results to clear' : 'Clear results'}
-              >
-                {isClearing ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Clearing…
-                  </>
-                ) : (
-                  <>
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Clear Results
-                  </>
-                )}
-              </Button>
+                  }}
+                  disabled={isClearing || !currentWorkspaceId}
+                >
+                  {isClearing ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Clearing…
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Clear Results
+                    </>
+                  )}
+                </Button>
+              )}
             </div>
 
             {error && result?.state !== 'failed' && (

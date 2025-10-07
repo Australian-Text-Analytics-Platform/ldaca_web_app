@@ -104,6 +104,45 @@ const TimelineTab: React.FC = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [results, setResults] = useState<any>(null);
   const [hydratingSelection, setHydratingSelection] = useState(false);
+  
+  // Track locked parameters and detect changes
+  const [lockedParams, setLockedParams] = useState<{
+    frequency: 'daily' | 'weekly' | 'monthly' | 'yearly';
+    groupByColumns: string[];
+  } | null>(null);
+
+  const currentSchemaRef = useRef(currentSchema);
+  useEffect(() => {
+    currentSchemaRef.current = currentSchema;
+  }, [currentSchema]);
+
+  const frequencyRef = useRef(frequency);
+  useEffect(() => {
+    frequencyRef.current = frequency;
+  }, [frequency]);
+  
+  const hasParamsChanged = useMemo(() => {
+    if (!isLocked || !lockedParams) return false;
+    if (frequency !== lockedParams.frequency) return true;
+    if (groupByColumns.length !== lockedParams.groupByColumns.length) return true;
+    return groupByColumns.some((col, idx) => col !== lockedParams.groupByColumns[idx]);
+  }, [isLocked, lockedParams, frequency, groupByColumns]);
+
+  const activeNodeId = useMemo(() => {
+    if (isLocked && lockedNodesSnapshot.length) {
+      return lockedNodesSnapshot[0].id;
+    }
+    return selectedNodeId ?? '';
+  }, [isLocked, lockedNodesSnapshot, selectedNodeId]);
+
+  const activeTimeColumn = useMemo(() => {
+    if (!activeNodeId) return '';
+    const selection = nodeColumnSelections.find((s) => s.nodeId === activeNodeId);
+    if (selection?.column) return selection.column;
+    if (timeColumn) return timeColumn;
+    const hydratedTime = (results?.analysis_params?.time_column as string | undefined) ?? '';
+    return hydratedTime;
+  }, [activeNodeId, nodeColumnSelections, timeColumn, results]);
 
   // Get available columns from schema (prefer fetched schema; fallback to nodeData/selectedNode) preserving types
   const availableColumns = useMemo(() => {
@@ -218,17 +257,25 @@ const TimelineTab: React.FC = () => {
   };
 
 const handleAnalyze = async () => {
-    if (!selectedNodeId || !currentWorkspaceId) {
+    const nodeIdForAnalysis = activeNodeId;
+    if (!nodeIdForAnalysis || !currentWorkspaceId) {
       alert('Please select a node first');
       return;
     }
 
     // Use column from picker state
-    const picked = nodeColumnSelections.find(s=>s.nodeId===selectedNodeId)?.column || timeColumn;
+    const picked =
+      nodeColumnSelections.find((s) => s.nodeId === nodeIdForAnalysis)?.column ||
+      timeColumn ||
+      (results?.analysis_params?.time_column as string | undefined) ||
+      '';
     if (!picked) {
       alert('Please select a time column');
       return;
     }
+
+    setNodeColumnSelections([{ nodeId: nodeIdForAnalysis, column: picked }]);
+    setTimeColumn(picked);
 
     const validGroupByColumns = groupByColumns.filter(col => col.trim() !== '');
 
@@ -243,7 +290,7 @@ const handleAnalyze = async () => {
       setIsAnalyzing(true);
       const authHeaders = getAuthHeaders();
       const headers = Object.keys(authHeaders).length > 0 ? authHeaders as Record<string, string> : {};
-      const result = await textApi.frequency(currentWorkspaceId, selectedNodeId, request, headers);
+      const result = await textApi.frequency(currentWorkspaceId, nodeIdForAnalysis, request, headers);
       const enrichedResult = {
         ...result,
         analysis_params: {
@@ -254,12 +301,17 @@ const handleAnalyze = async () => {
         },
       };
       setResults(enrichedResult);
-      // Lock with snapshot & preserve schema
+      // Lock with snapshot & preserve schema and params
       try {
-        const info = await nodesApi.info(currentWorkspaceId, selectedNodeId, getAuthHeaders());
-        const name = (info as any)?.name || (info as any)?.data?.name || selectedNodeId;
+        const info = await nodesApi.info(currentWorkspaceId, nodeIdForAnalysis, getAuthHeaders());
+        const name = (info as any)?.name || (info as any)?.data?.name || nodeIdForAnalysis;
         const columns = Array.isArray((info as any)?.columns) ? (info as any).columns : (Array.isArray((info as any)?.data?.columns) ? (info as any).data.columns : []);
-        setLockedNodesSnapshot([{ id: selectedNodeId, name: String(name), columns }]);
+        setLockedNodesSnapshot([{ id: nodeIdForAnalysis, name: String(name), columns }]);
+        // Save locked parameters
+        setLockedParams({
+          frequency,
+          groupByColumns: [...validGroupByColumns],
+        });
         // Capture schema for locked display
         const rawSchema = (info as any)?.schema;
         if (Array.isArray(rawSchema)) {
@@ -279,13 +331,24 @@ const handleAnalyze = async () => {
     }
   };
 
-const handleClearResults = async () => {
+const handleUpdateResults = async () => {
+    // Clear current results and rerun with new parameters
+    try {
+      if (currentWorkspaceId) await textApi.clearFrequencyAnalysis(currentWorkspaceId, getAuthHeaders());
+    } catch { /* ignore */ }
+    setResults(null);
+    // Keep locked state and nodes, just update the analysis with new params
+    await handleAnalyze();
+  };
+
+  const handleClearResults = async () => {
     try {
       if (currentWorkspaceId) await textApi.clearFrequencyAnalysis(currentWorkspaceId, getAuthHeaders());
     } catch { /* ignore */ }
     setResults(null);
     setLockedNodesSnapshot([]);
     setLockedSchema(null);
+    setLockedParams(null);
     setIsLocked(false);
   };
 
@@ -516,6 +579,9 @@ const handleClearResults = async () => {
   // Hydration from backend once per mount
   const hydratedOnceRef = useRef<boolean>(false);
   useEffect(() => {
+    hydratedOnceRef.current = false;
+  }, [currentWorkspaceId]);
+  useEffect(() => {
     let cancelled = false;
     const hydrate = async () => {
       if (hydratedOnceRef.current || !currentWorkspaceId) return;
@@ -526,15 +592,38 @@ const handleClearResults = async () => {
         if (!reqResp || cancelled) return;
 
         const req = (reqResp as any)?.data;
-        if (req) {
-          const nodeId = String(req.node_id || req.nodeId || selectedNodeId || '');
-          const col = String(req.time_column || '');
-          setNodeColumnSelections(nodeId ? [{ nodeId, column: col }] : []);
-          setTimeColumn(col);
-          setGroupByColumns(Array.isArray(req.group_by_columns) ? req.group_by_columns : []);
-          if (req.frequency) setFrequency(req.frequency as any);
+        let lockedGroups: string[] = [];
+        let lockedFrequency: 'daily' | 'weekly' | 'monthly' | 'yearly' = frequencyRef.current;
+        let reqTimeColumn = '';
+        let nodeIdStr = '';
 
-          const nodeIdStr = String(req.node_id || req.nodeId || selectedNodeId || '');
+        if (req) {
+          nodeIdStr = String(req.node_id || req.nodeId || '');
+          reqTimeColumn = typeof req.time_column === 'string' ? req.time_column : '';
+          if (nodeIdStr && reqTimeColumn) {
+            setNodeColumnSelections([{ nodeId: nodeIdStr, column: reqTimeColumn }]);
+            setTimeColumn(reqTimeColumn);
+          }
+
+          const normalizedGroups = Array.isArray(req.group_by_columns)
+            ? req.group_by_columns.filter((col: unknown): col is string => typeof col === 'string' && col.trim() !== '')
+            : [];
+          setGroupByColumns(normalizedGroups.length ? [...normalizedGroups] : []);
+          lockedGroups = normalizedGroups.length ? [...normalizedGroups] : [];
+
+          const validFrequencies: Array<'daily' | 'weekly' | 'monthly' | 'yearly'> = ['daily', 'weekly', 'monthly', 'yearly'];
+          const reqFrequency = typeof req.frequency === 'string' ? (req.frequency as any) : undefined;
+          if (reqFrequency && validFrequencies.includes(reqFrequency)) {
+            lockedFrequency = reqFrequency;
+            if (frequencyRef.current !== lockedFrequency) {
+              setFrequency(lockedFrequency);
+            }
+          } else {
+            lockedFrequency = frequencyRef.current;
+          }
+
+          setLockedParams({ frequency: lockedFrequency, groupByColumns: [...lockedGroups] });
+
           if (nodeIdStr) {
             setIsLocked(true);
             try {
@@ -554,27 +643,40 @@ const handleClearResults = async () => {
                     Object.entries(rawSchema).map(([k, v]) => [k, typeof v === 'string' ? normalizeTypeName(v) : 'string'])
                   )
                 );
+              } else {
+                setLockedSchema((prev) => prev ?? currentSchemaRef.current);
               }
             } catch {
               if (!cancelled) {
-                setLockedSchema((prev) => prev ?? currentSchema);
+                setLockedSchema((prev) => prev ?? currentSchemaRef.current);
               }
             }
+          } else {
+            setIsLocked(false);
+            setLockedNodesSnapshot([]);
+            setLockedSchema(null);
           }
+        } else {
+          setNodeColumnSelections([]);
+          setTimeColumn('');
+          setGroupByColumns([]);
+          setLockedParams(null);
+          setIsLocked(false);
+          setLockedNodesSnapshot([]);
+          setLockedSchema(null);
         }
 
         const resResp = await textApi.getFrequencyCurrentResult(currentWorkspaceId, getAuthHeaders());
         if (!resResp || cancelled) return;
         const res = (resResp as any)?.data;
         if (res) {
-          const groupCols = Array.isArray((req as any)?.group_by_columns) ? (req as any).group_by_columns : [];
           const enriched = {
             ...resResp,
             analysis_params: {
               ...(resResp as any)?.analysis_params,
-              group_by_columns: groupCols,
-              time_column: (req as any)?.time_column || '',
-              frequency: (req as any)?.frequency || frequency,
+              group_by_columns: lockedGroups,
+              time_column: reqTimeColumn,
+              frequency: lockedFrequency,
             },
           };
           setResults(enriched);
@@ -601,23 +703,6 @@ const handleClearResults = async () => {
               <CardTitle>Timeline Analysis</CardTitle>
               <CardDescription>Configure a time-series frequency view for the selected node.</CardDescription>
             </div>
-{isLocked && (
-              <div className="relative group flex items-center text-sm text-muted-foreground md:self-center">
-                <svg className="mr-1 h-4 w-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
-                  <path fillRule="evenodd" d="M5 8V6a5 5 0 1110 0v2h1a1 1 0 011 1v9a1 1 0 01-1 1H4a1 1 0 01-1-1V9a1 1 0 011-1h1zm2-2a3 3 0 116 0v2H7V6zm-2 4h10v7H5v-7z" clipRule="evenodd" />
-                </svg>
-                Locked
-                <div className="absolute right-0 top-full z-10 mt-2 hidden w-72 rounded border border-border bg-popover p-2 text-xs text-popover-foreground shadow-lg group-hover:block">
-                  <div className="font-semibold mb-1">Panel locked</div>
-                  <ul className="ml-4 space-y-1 list-disc">
-                    <li>Locked to current request/results.</li>
-                    <li>Node selection and backend-used parameters are disabled.</li>
-                    <li>Frontend-only options (e.g., chart type) stay editable.</li>
-                    <li>Clear results to unlock and resync with the graph selection.</li>
-                  </ul>
-                </div>
-              </div>
-            )}
           </div>
         </CardHeader>
         <CardContent className="space-y-6 pt-0">
@@ -652,28 +737,6 @@ const handleClearResults = async () => {
             originalCount={selectedNodes?.length || (selectedNode ? 1 : 0)}
             columnLabelFn={() => 'Time Column *'}
             allowedDataTypes={['datetime']}
-            renderNodeMeta={() => (
-              <div className="pt-1">
-                <div className="mb-1 text-xs font-semibold tracking-wide text-muted-foreground">SCHEMA (on-demand)</div>
-                <div className="overflow-x-auto rounded-md border bg-background">
-                  <table className="border-collapse text-[11px] font-mono">
-                    <tbody>
-                      <tr className="align-top">
-                        {availableColumns.map((col) => (
-                          <td key={col.name + '-name'} className="min-w-[6rem] whitespace-nowrap border-b border-border/60 px-2 py-1 font-semibold text-foreground">{col.name}</td>
-                        ))}
-                      </tr>
-                      <tr className="align-top">
-                        {availableColumns.map((col) => (
-                          <td key={col.name + '-type'} className="min-w-[6rem] whitespace-nowrap px-2 py-1 text-muted-foreground">{col.dataType}</td>
-                        ))}
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-                <div className="mt-1 text-[10px] text-muted-foreground">Scroll horizontally to view all {availableColumns.length} column(s).</div>
-              </div>
-            )}
           />
 
           {/* Analysis Configuration */}
@@ -687,6 +750,7 @@ const handleClearResults = async () => {
               <Select
                 value={frequency}
                 onValueChange={(value) => setFrequency(value as 'daily' | 'weekly' | 'monthly' | 'yearly')}
+                disabled={!isLocked && (isAnalyzing || isLoading.operations || !activeNodeId)}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select frequency" />
@@ -709,7 +773,7 @@ const handleClearResults = async () => {
               </label>
               <Button
                 onClick={handleAddGroupByColumn}
-                disabled={groupByColumns.length >= 3 || !!isLocked}
+                disabled={groupByColumns.length >= 3}
                 size="sm"
                 className="gap-1"
               >
@@ -723,7 +787,6 @@ const handleClearResults = async () => {
                 <Select
                   value={column || undefined}
                   onValueChange={(value) => handleGroupByColumnChange(index, value)}
-                  disabled={!!isLocked}
                 >
                   <SelectTrigger className="flex-1">
                     <SelectValue placeholder="Select column" />
@@ -747,7 +810,6 @@ const handleClearResults = async () => {
                   onClick={() => handleRemoveGroupByColumn(index)}
                   variant="destructive"
                   size="sm"
-                  disabled={!!isLocked}
                 >
                   <Trash2 className="h-4 w-4" />
                   Remove
@@ -759,23 +821,43 @@ const handleClearResults = async () => {
 
         {/* Action Buttons */}
         <div className="flex flex-wrap items-center gap-3">
-          <Button
-            onClick={handleAnalyze}
-            disabled={isAnalyzing || isLoading.operations || !selectedNodeId || !timeColumn || !!isLocked}
-            className="w-full md:w-auto"
-          >
-            {isAnalyzing ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Analyzing...
-              </>
-            ) : (
-              <>
-                <Play className="mr-2 h-4 w-4" />
-                Analyze Timeline
-              </>
-            )}
-          </Button>
+          {hasParamsChanged ? (
+            <Button
+              onClick={handleUpdateResults}
+              disabled={isAnalyzing || isLoading.operations || !activeNodeId || !activeTimeColumn}
+              className="w-full md:w-auto"
+            >
+              {isAnalyzing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Updating...
+                </>
+              ) : (
+                <>
+                  <Play className="mr-2 h-4 w-4" />
+                  Update Results
+                </>
+              )}
+            </Button>
+          ) : (
+            <Button
+              onClick={handleAnalyze}
+              disabled={isAnalyzing || isLoading.operations || !activeNodeId || !activeTimeColumn || !!isLocked}
+              className="w-full md:w-auto"
+            >
+              {isAnalyzing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Analyzing...
+                </>
+              ) : (
+                <>
+                  <Play className="mr-2 h-4 w-4" />
+                  Analyze Timeline
+                </>
+              )}
+            </Button>
+          )}
 
           {results && (
             <Button

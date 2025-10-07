@@ -119,6 +119,8 @@ def _sanitize_request_for_storage(request_dict: Dict[str, Any]) -> Dict[str, Any
     for key, value in request_dict.items():
         if key in _REQUEST_STORAGE_EXCLUDE_KEYS:
             continue
+        if key == "combined" and not value:
+            continue
         if value is None:
             continue
         sanitized[key] = value
@@ -384,8 +386,11 @@ def _normalize_saved_request(
             "num_right_tokens": raw_request.get("num_right_tokens", 10),
             "regex": bool(raw_request.get("regex", False)),
             "case_sensitive": bool(raw_request.get("case_sensitive", False)),
-            "combined": bool(raw_request.get("combined", False)),
         }
+        if raw_request.get("combined"):
+            normalized_request["combined"] = True
+    if not normalized_request.get("combined"):
+        normalized_request.pop("combined", None)
     for field in ("page", "page_size", "sort_by", "sort_order", "pagination"):
         normalized_request.pop(field, None)
     return normalized_request
@@ -769,6 +774,10 @@ async def _execute_concordance(
         "sort_by": requested_sort_by,
         "sort_order": sort_order,
     }
+    label_to_node_map = {
+        label: node_id for node_id, label in node_label_map.items()
+    }
+
     analysis_params_dict = {
         **raw_request_dict,
         "combined": effective_combined,
@@ -783,6 +792,8 @@ async def _execute_concordance(
             "page_size": page_size,
             "show_metadata": show_metadata,
         },
+        "node_label_map": node_label_map,
+        "label_to_node_map": label_to_node_map,
     }
 
     result_payload = {
@@ -797,9 +808,7 @@ async def _execute_concordance(
     storage_blob = {
         "nodes": stored_nodes,
         "node_label_map": node_label_map,
-        "label_to_node_map": {
-            label: node_id for node_id, label in node_label_map.items()
-        },
+        "label_to_node_map": label_to_node_map,
         "default_page": {
             "page": page,
             "page_size": page_size,
@@ -816,7 +825,10 @@ async def _execute_concordance(
         from ....core.analysis_store import save_analysis
 
         request_for_storage = _sanitize_request_for_storage(raw_request_dict)
-        request_for_storage["combined"] = effective_combined
+        if effective_combined:
+            request_for_storage["combined"] = True
+        else:
+            request_for_storage.pop("combined", None)
 
         persist_payload = {
             "state": result_payload["state"],
