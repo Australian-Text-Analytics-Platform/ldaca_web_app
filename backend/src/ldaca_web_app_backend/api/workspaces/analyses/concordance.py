@@ -774,9 +774,7 @@ async def _execute_concordance(
         "sort_by": requested_sort_by,
         "sort_order": sort_order,
     }
-    label_to_node_map = {
-        label: node_id for node_id, label in node_label_map.items()
-    }
+    label_to_node_map = {label: node_id for node_id, label in node_label_map.items()}
 
     analysis_params_dict = {
         **raw_request_dict,
