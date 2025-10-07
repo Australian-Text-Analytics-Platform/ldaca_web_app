@@ -86,7 +86,7 @@ type WorkspaceNode = {
 
 const NAV_ITEMS: NavItem[] = [
   { id: 'data-loader', label: 'Data Loader', icon: FolderOpen },
-  { id: 'filter', label: 'Filter/Slicing', icon: Filter },
+  { id: 'filter', label: 'Data Preprocessing', icon: Filter },
   { id: 'token-frequency', label: 'Token Frequency', icon: TrendingUp },
   { id: 'concordance', label: 'Concordance', icon: FileText },
   { id: 'analysis', label: 'Timeline', icon: BarChart3 },

@@ -13,6 +13,7 @@ import { Checkbox } from '../ui/checkbox';
 import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Label } from '../ui/label';
 import { Input } from '../ui/input';
 import { Calendar } from '../ui/calendar';
@@ -28,6 +29,8 @@ interface FilterCondition {
   regex?: boolean;
 }
 interface FilterRequest { conditions: FilterCondition[]; logic?: string; new_node_name?: string; }
+
+type DataPrepSubtab = 'filter' | 'slice' | 'join' | 'concat' | 'aggregate';
 
 // (Removed unused DATA_TYPES constant to satisfy lint)
 
@@ -543,6 +546,7 @@ const FilterTab: React.FC = () => {
   const [previewData, setPreviewData] = useState<PreviewRow[]>([]);
   const [previewColumns, setPreviewColumns] = useState<string[]>([]);
   const [previewPagination, setPreviewPagination] = useState<PreviewPagination | null>(null);
+  const [activeSubtab, setActiveSubtab] = useState<DataPrepSubtab>('filter');
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [debouncedRequest, setDebouncedRequest] = useState<{ request: FilterRequest; signature: string } | null>(null);
@@ -606,7 +610,7 @@ const FilterTab: React.FC = () => {
     return selectedNodeId ? `${selectedNodeId}::${baseSignature}` : baseSignature;
   }, [previewRequest, selectedNodeId]);
 
-  const previewReady = hasSelection && conditions.length > 0 && conditions.every(isConditionComplete);
+  const previewReady = activeSubtab === 'filter' && hasSelection && conditions.length > 0 && conditions.every(isConditionComplete);
 
   const previewColumnsToRender = useMemo(() => {
     if (previewColumns.length > 0) return previewColumns;
@@ -648,8 +652,9 @@ const FilterTab: React.FC = () => {
   const displayTotalPages = resolvedTotalPages > 0 ? resolvedTotalPages : 1;
 
   useEffect(() => {
+    if (activeSubtab !== 'filter') return;
     setPreviewPage(1);
-  }, [previewRequestSignature]);
+  }, [previewRequestSignature, activeSubtab]);
 
   useEffect(() => {
     if (!previewReady || !previewRequest || !previewRequestSignature) {
@@ -986,381 +991,462 @@ const FilterTab: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader className="space-y-0 pb-4">
-          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-            <div>
-              <CardTitle>Filter &amp; Slice Data</CardTitle>
-              <CardDescription>Apply column-based filters to create a new node from the selected dataset.</CardDescription>
-            </div>
-            {isFiltering && (
-              <span className="inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-border bg-muted/60 px-3 py-1 text-xs font-medium text-muted-foreground">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Running…
-              </span>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-6 pt-0">
-          <div className="space-y-3">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-sm font-medium text-muted-foreground">
-                Selected Node ({hasSelection ? 1 : 0}/1)
-              </span>
-            </div>
-            {!hasSelection ? (
-              <div className="rounded-md border border-dashed border-muted-foreground/40 bg-muted/40 p-3 text-sm italic text-muted-foreground">
-                No nodes selected. Single click on a node in the workspace view to select it (max 1 for this operation).
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="rounded-lg border border-border bg-muted/40 p-4">
-                  <div className="text-sm font-medium text-foreground break-words">
-                    {selectedNode?.data?.nodeName || selectedNode?.data?.label || selectedNode?.data?.name || selectedNode?.label || selectedNode?.id || selectedNodeId}
-                  </div>
-                  <div className="text-xs text-muted-foreground break-all">{selectedNodeId}</div>
-                </div>
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-foreground">Data Preprocessing</h1>
+          <p className="text-sm text-muted-foreground">
+            Prepare your dataset with filtering and upcoming slice, join, concat, and aggregate tools.
+          </p>
+        </div>
+      </div>
+      <Tabs
+        value={activeSubtab}
+        onValueChange={(value) => setActiveSubtab(value as DataPrepSubtab)}
+        className="space-y-6"
+      >
+        <TabsList aria-label="Data preprocessing sub-views" className="flex flex-wrap gap-2">
+          <TabsTrigger value="filter">Filter</TabsTrigger>
+          <TabsTrigger value="slice">Slice</TabsTrigger>
+          <TabsTrigger value="join">Join</TabsTrigger>
+          <TabsTrigger value="concat">Concat</TabsTrigger>
+          <TabsTrigger value="aggregate">Aggregate</TabsTrigger>
+        </TabsList>
 
-                {isSchemaLoading ? (
-                  <div className="rounded-md border border-dashed border-amber-400/60 bg-amber-100/70 p-4 text-sm text-amber-900">
-                    Loading column metadata…
-                  </div>
-                ) : hasSchema ? (
-                  <div className="space-y-2">
-                    <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Schema</div>
-                    <div className="overflow-x-auto rounded-md border border-border bg-card">
-                      <Table>
-                        <TableBody>
-                          <TableRow>
-                            {availableColumns.map((col) => (
-                              <TableCell
-                                key={`${col.name}-name`}
-                                className="min-w-[6rem] border-b border-border px-2 py-1 font-mono text-[11px] font-semibold text-foreground"
-                              >
-                                {col.name}
-                              </TableCell>
-                            ))}
-                          </TableRow>
-                          <TableRow>
-                            {availableColumns.map((col) => (
-                              <TableCell
-                                key={`${col.name}-type`}
-                                className="min-w-[6rem] px-2 py-1 font-mono text-[11px] text-muted-foreground"
-                              >
-                                {col.dataType}
-                              </TableCell>
-                            ))}
-                          </TableRow>
-                        </TableBody>
-                      </Table>
-                    </div>
-                    <div className="text-[10px] text-muted-foreground">Scroll horizontally to view all {availableColumns.length} column(s).</div>
+        <TabsContent value="filter" className="space-y-6">
+          <Card>
+            <CardHeader className="space-y-0 pb-4">
+              <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <CardTitle>Filter data</CardTitle>
+                  <CardDescription>Apply column-based filters to create a new node from the selected dataset.</CardDescription>
+                </div>
+                {isFiltering && (
+                  <span className="inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-border bg-muted/60 px-3 py-1 text-xs font-medium text-muted-foreground">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Running…
+                  </span>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6 pt-0">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-medium text-muted-foreground">
+                    Selected Node ({hasSelection ? 1 : 0}/1)
+                  </span>
+                </div>
+                {!hasSelection ? (
+                  <div className="rounded-md border border-dashed border-muted-foreground/40 bg-muted/40 p-3 text-sm italic text-muted-foreground">
+                    No nodes selected. Single click on a node in the workspace view to select it (max 1 for this operation).
                   </div>
                 ) : (
-                  <div className="rounded-md border border-dashed border-amber-400/60 bg-amber-100/70 p-4 text-sm text-amber-900">
-                    No schema information is available for this node yet.
+                  <div className="space-y-4">
+                    <div className="rounded-lg border border-border bg-muted/40 p-4">
+                      <div className="break-words text-sm font-medium text-foreground">
+                        {selectedNode?.data?.nodeName || selectedNode?.data?.label || selectedNode?.data?.name || selectedNode?.label || selectedNode?.id || selectedNodeId}
+                      </div>
+                      <div className="break-all text-xs text-muted-foreground">{selectedNodeId}</div>
+                    </div>
+
+                    {isSchemaLoading ? (
+                      <div className="rounded-md border border-dashed border-amber-400/60 bg-amber-100/70 p-4 text-sm text-amber-900">
+                        Loading column metadata…
+                      </div>
+                    ) : hasSchema ? (
+                      <div className="space-y-2">
+                        <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Schema</div>
+                        <div className="overflow-x-auto rounded-md border border-border bg-card">
+                          <Table>
+                            <TableBody>
+                              <TableRow>
+                                {availableColumns.map((col) => (
+                                  <TableCell
+                                    key={`${col.name}-name`}
+                                    className="min-w-[6rem] border-b border-border px-2 py-1 font-mono text-[11px] font-semibold text-foreground"
+                                  >
+                                    {col.name}
+                                  </TableCell>
+                                ))}
+                              </TableRow>
+                              <TableRow>
+                                {availableColumns.map((col) => (
+                                  <TableCell
+                                    key={`${col.name}-type`}
+                                    className="min-w-[6rem] px-2 py-1 font-mono text-[11px] text-muted-foreground"
+                                  >
+                                    {col.dataType}
+                                  </TableCell>
+                                ))}
+                              </TableRow>
+                            </TableBody>
+                          </Table>
+                        </div>
+                        <div className="text-[10px] text-muted-foreground">Scroll horizontally to view all {availableColumns.length} column(s).</div>
+                      </div>
+                    ) : (
+                      <div className="rounded-md border border-dashed border-amber-400/60 bg-amber-100/70 p-4 text-sm text-amber-900">
+                        No schema information is available for this node yet.
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
-            )}
-          </div>
 
-          <div className="space-y-4">
-            <div className="flex items-center justify-between gap-4">
-              <h3 className="text-base font-semibold text-foreground">Filter conditions</h3>
-              <Button onClick={handleAddCondition} disabled={isConfigDisabled} size="sm">
-                Add condition
-              </Button>
-            </div>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between gap-4">
+                  <h3 className="text-base font-semibold text-foreground">Filter conditions</h3>
+                  <Button onClick={handleAddCondition} disabled={isConfigDisabled} size="sm">
+                    Add condition
+                  </Button>
+                </div>
 
-            {hasSelection && isSchemaLoading && (
-              <div className="rounded-md border border-dashed border-amber-400/60 bg-amber-100/70 p-4 text-sm text-amber-900">
-                Retrieving column information…
-              </div>
-            )}
-
-            {!hasSelection && (
-              <div className="rounded-md border border-dashed border-muted-foreground/40 bg-muted/40 p-4 text-sm text-muted-foreground">
-                Configure conditions once a node is selected.
-              </div>
-            )}
-
-            <div className="space-y-3">
-              {conditions.map((condition, index) => {
-                const rowDisabled = isConfigDisabled || !condition.column;
-                return (
-                  <div
-                    key={condition.id}
-                    className="flex flex-col gap-2 rounded-lg border border-border bg-muted/40 p-3 md:flex-row md:items-center md:gap-3"
-                  >
-                    <div className="flex items-center gap-2 md:w-auto">
-                      {index > 0 && (
-                        <Select
-                          value={logic}
-                          onValueChange={(value) => setLogic(value as 'and' | 'or')}
-                          disabled={isConfigDisabled}
-                        >
-                          <SelectTrigger className="w-20">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="and">AND</SelectItem>
-                            <SelectItem value="or">OR</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      )}
-
-                      <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <Checkbox
-                          id={`negate-${condition.id}`}
-                          checked={Boolean(condition.negate)}
-                          onCheckedChange={(checked) => handleConditionChange(condition.id, 'negate', checked === true)}
-                          disabled={isConfigDisabled}
-                        />
-                        <span>negate</span>
-                      </label>
-
-                      {condition.dataType === 'string' && condition.operator === 'contains' && (
-                        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                          <Checkbox
-                            id={`regex-${condition.id}`}
-                            checked={Boolean(condition.regex ?? true)}
-                            onCheckedChange={(checked) => handleConditionChange(condition.id, 'regex', checked === true)}
-                            disabled={isConfigDisabled}
-                          />
-                          <span>regex</span>
-                        </label>
-                      )}
-                    </div>
-
-                    <div className="flex flex-1 flex-col gap-2 md:flex-row md:flex-wrap md:items-center md:gap-x-3 md:gap-y-2">
-                      <Select
-                        value={condition.column}
-                        onValueChange={(value) => handleConditionChange(condition.id, 'column', value)}
-                        disabled={isConfigDisabled}
-                      >
-                        <SelectTrigger className="min-w-[10rem] flex-grow">
-                          <SelectValue placeholder="Select column" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {availableColumns.map((col) => (
-                            <SelectItem key={col.name} value={col.name}>
-                              {col.name} ({col.dataType})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-
-                      <Select
-                        value={condition.operator}
-                        onValueChange={(value) =>
-                          handleConditionChange(
-                            condition.id,
-                            'operator',
-                            value as FilterCondition['operator']
-                          )
-                        }
-                        disabled={rowDisabled}
-                      >
-                        <SelectTrigger className="w-36 flex-none">
-                          <SelectValue placeholder={!condition.column ? 'Select a column first' : 'Select operator'} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {condition.column &&
-                            getOperatorsForType(condition.dataType || 'string').map((op) => (
-                              <SelectItem key={op.value} value={op.value}>
-                                {op.label}
-                              </SelectItem>
-                            ))}
-                        </SelectContent>
-                      </Select>
-
-                      {condition.operator !== 'is_null' && (
-                        <div className="flex-1 md:flex-auto md:min-w-[28ch] md:max-w-full">
-                          {renderValueInput(condition, rowDisabled)}
-                        </div>
-                      )}
-                    </div>
-
-                    {conditions.length > 1 && (
-                      <Button
-                        onClick={() => handleRemoveCondition(condition.id)}
-                        variant="destructive"
-                        size="sm"
-                        type="button"
-                      >
-                        Remove
-                      </Button>
-                    )}
+                {hasSelection && isSchemaLoading && (
+                  <div className="rounded-md border border-dashed border-amber-400/60 bg-amber-100/70 p-4 text-sm text-amber-900">
+                    Retrieving column information…
                   </div>
-                );
-              })}
-            </div>
-          </div>
+                )}
 
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-muted-foreground" htmlFor="filter-new-node-name">
-              New node name
-            </label>
-            <input
-              id="filter-new-node-name"
-              type="text"
-              value={newNodeName}
-              onChange={(e) => setNewNodeName(e.target.value)}
-              placeholder="Enter name for filtered data"
-              disabled={!hasSelection}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-            />
-          </div>
-        </CardContent>
-        <CardFooter className="flex flex-col gap-3 border-t border-border bg-muted/20 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="text-sm text-muted-foreground">
-            {conditions.length === 0
-              ? 'Define at least one condition to enable preview and filtering.'
-              : `${conditions.length} condition${conditions.length === 1 ? '' : 's'} configured (${logic.toUpperCase()} logic).`}
-          </div>
-          <Button
-            onClick={handleApplyFilter}
-            disabled={isConfigDisabled || isFiltering || isLoading.operations}
-            className="w-full sm:w-auto"
-          >
-            {isFiltering ? 'Adding to workspace…' : 'Add to Workspace'}
-          </Button>
-        </CardFooter>
-      </Card>
+                {!hasSelection && (
+                  <div className="rounded-md border border-dashed border-muted-foreground/40 bg-muted/40 p-4 text-sm text-muted-foreground">
+                    Configure conditions once a node is selected.
+                  </div>
+                )}
 
-      <Card>
-        <CardHeader className="space-y-0 pb-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <CardTitle>Preview filtered rows</CardTitle>
-              <CardDescription>Review rows that match the current filter configuration.</CardDescription>
-            </div>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <label htmlFor="filter-preview-page-size" className="text-sm text-muted-foreground">
-                Rows per page
-              </label>
-              <Select
-                value={String(previewPageSize)}
-                onValueChange={handlePreviewPageSizeChange}
-                disabled={!previewReady || previewLoading}
-              >
-                <SelectTrigger className="w-24">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PREVIEW_PAGE_SIZE_OPTIONS.map((option) => (
-                    <SelectItem key={option} value={String(option)}>
-                      {option}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4 pt-0">
-          {!hasSelection ? (
-            <div className="rounded-md border border-dashed border-muted-foreground/40 bg-muted/40 p-4 text-sm text-muted-foreground">
-              Select a node to preview filtered results.
-            </div>
-          ) : !previewReady ? (
-            <div className="rounded-md border border-dashed border-muted-foreground/40 bg-muted/40 p-4 text-sm text-muted-foreground">
-              Configure at least one complete condition to see a live preview of the filtered rows.
-            </div>
-          ) : previewError ? (
-            <div className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
-              {previewError}
-            </div>
-          ) : (
-            <div className="overflow-hidden rounded-lg border border-border">
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader className="bg-muted/40">
-                    <TableRow>
-                      {previewColumnsToRender.length > 0 ? (
-                        previewColumnsToRender.map((col) => (
-                          <TableHead
-                            key={col}
-                            className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground"
-                          >
-                            {col}
-                          </TableHead>
-                        ))
-                      ) : (
-                        <TableHead className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                          No columns
-                        </TableHead>
-                      )}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {previewLoading && previewData.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={previewTableColSpan} className="px-3 py-6 text-center text-muted-foreground">
-                          <span className="inline-flex items-center gap-2">
-                            <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                            Loading preview…
-                          </span>
-                        </TableCell>
-                      </TableRow>
-                    ) : previewData.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={previewTableColSpan} className="px-3 py-6 text-center text-muted-foreground">
-                          No rows match the current filters.
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      previewData.map((row, rowIndex) => (
-                        <TableRow key={rowIndex}>
-                          {previewColumnsToRender.map((col) => (
-                            <TableCell
-                              key={`${rowIndex}-${col}`}
-                              className="px-3 py-2 font-mono text-xs text-foreground"
+                <div className="space-y-3">
+                  {conditions.map((condition, index) => {
+                    const rowDisabled = isConfigDisabled || !condition.column;
+                    return (
+                      <div
+                        key={condition.id}
+                        className="flex flex-col gap-2 rounded-lg border border-border bg-muted/40 p-3 md:flex-row md:items-center md:gap-3"
+                      >
+                        <div className="flex items-center gap-2 md:w-auto">
+                          {index > 0 && (
+                            <Select
+                              value={logic}
+                              onValueChange={(value) => setLogic(value as 'and' | 'or')}
+                              disabled={isConfigDisabled}
                             >
-                              {formatPreviewValue(row[col])}
-                            </TableCell>
-                          ))}
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
+                              <SelectTrigger className="w-20">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="and">AND</SelectItem>
+                                <SelectItem value="or">OR</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          )}
+
+                          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <Checkbox
+                              id={`negate-${condition.id}`}
+                              checked={Boolean(condition.negate)}
+                              onCheckedChange={(checked) => handleConditionChange(condition.id, 'negate', checked === true)}
+                              disabled={isConfigDisabled}
+                            />
+                            <span>negate</span>
+                          </label>
+
+                          {condition.dataType === 'string' && condition.operator === 'contains' && (
+                            <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                              <Checkbox
+                                id={`regex-${condition.id}`}
+                                checked={Boolean(condition.regex ?? true)}
+                                onCheckedChange={(checked) => handleConditionChange(condition.id, 'regex', checked === true)}
+                                disabled={isConfigDisabled}
+                              />
+                              <span>regex</span>
+                            </label>
+                          )}
+                        </div>
+
+                        <div className="flex flex-1 flex-col gap-2 md:flex-row md:flex-wrap md:items-center md:gap-x-3 md:gap-y-2">
+                          <Select
+                            value={condition.column}
+                            onValueChange={(value) => handleConditionChange(condition.id, 'column', value)}
+                            disabled={isConfigDisabled}
+                          >
+                            <SelectTrigger className="min-w-[10rem] flex-grow">
+                              <SelectValue placeholder="Select column" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {availableColumns.map((col) => (
+                                <SelectItem key={col.name} value={col.name}>
+                                  {col.name} ({col.dataType})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+
+                          <Select
+                            value={condition.operator}
+                            onValueChange={(value) =>
+                              handleConditionChange(
+                                condition.id,
+                                'operator',
+                                value as FilterCondition['operator']
+                              )
+                            }
+                            disabled={rowDisabled}
+                          >
+                            <SelectTrigger className="w-36 flex-none">
+                              <SelectValue placeholder={!condition.column ? 'Select a column first' : 'Select operator'} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {condition.column &&
+                                getOperatorsForType(condition.dataType || 'string').map((op) => (
+                                  <SelectItem key={op.value} value={op.value}>
+                                    {op.label}
+                                  </SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
+
+                          {condition.operator !== 'is_null' && (
+                            <div className="flex-1 md:flex-auto md:min-w-[28ch] md:max-w-full">
+                              {renderValueInput(condition, rowDisabled)}
+                            </div>
+                          )}
+                        </div>
+
+                        {conditions.length > 1 && (
+                          <Button
+                            onClick={() => handleRemoveCondition(condition.id)}
+                            variant="destructive"
+                            size="sm"
+                            type="button"
+                          >
+                            Remove
+                          </Button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          )}
-        </CardContent>
-        {previewReady && !previewError && previewData.length > 0 && (
-          <CardFooter className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-muted/20 py-4">
-            <div className="text-sm text-muted-foreground">
-              {previewPagination
-                ? `${previewPagination.total_rows} row${previewPagination.total_rows === 1 ? '' : 's'} · page ${currentPreviewPage} of ${displayTotalPages}`
-                : 'Preview ready'}
-            </div>
-            <div className="flex items-center gap-2">
+
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-muted-foreground" htmlFor="filter-new-node-name">
+                  New node name
+                </label>
+                <input
+                  id="filter-new-node-name"
+                  type="text"
+                  value={newNodeName}
+                  onChange={(e) => setNewNodeName(e.target.value)}
+                  placeholder="Enter name for filtered data"
+                  disabled={!hasSelection}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                />
+              </div>
+            </CardContent>
+            <CardFooter className="flex flex-col gap-3 border-t border-border bg-muted/20 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="text-sm text-muted-foreground">
+                {conditions.length === 0
+                  ? 'Define at least one condition to enable preview and filtering.'
+                  : `${conditions.length} condition${conditions.length === 1 ? '' : 's'} configured (${logic.toUpperCase()} logic).`}
+              </div>
               <Button
-                type="button"
-                onClick={handlePreviewPrev}
-                disabled={!previewPagination?.has_prev || previewLoading}
-                variant="outline"
-                size="sm"
+                onClick={handleApplyFilter}
+                disabled={isConfigDisabled || isFiltering || isLoading.operations}
+                className="w-full sm:w-auto"
               >
-                Previous
+                {isFiltering ? 'Adding to workspace…' : 'Add to Workspace'}
               </Button>
-              <span className="text-sm text-muted-foreground">Page {currentPreviewPage}</span>
-              <Button
-                type="button"
-                onClick={handlePreviewNext}
-                disabled={!previewPagination?.has_next || previewLoading}
-                variant="outline"
-                size="sm"
-              >
-                Next
-              </Button>
-            </div>
-          </CardFooter>
-        )}
-      </Card>
+            </CardFooter>
+          </Card>
+
+          <Card>
+            <CardHeader className="space-y-0 pb-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <CardTitle>Preview filtered rows</CardTitle>
+                  <CardDescription>Review rows that match the current filter configuration.</CardDescription>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <label htmlFor="filter-preview-page-size" className="text-sm text-muted-foreground">
+                    Rows per page
+                  </label>
+                  <Select
+                    value={String(previewPageSize)}
+                    onValueChange={handlePreviewPageSizeChange}
+                    disabled={!previewReady || previewLoading}
+                  >
+                    <SelectTrigger className="w-24">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PREVIEW_PAGE_SIZE_OPTIONS.map((option) => (
+                        <SelectItem key={option} value={String(option)}>
+                          {option}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-0">
+              {!hasSelection ? (
+                <div className="rounded-md border border-dashed border-muted-foreground/40 bg-muted/40 p-4 text-sm text-muted-foreground">
+                  Select a node to preview filtered results.
+                </div>
+              ) : !previewReady ? (
+                <div className="rounded-md border border-dashed border-muted-foreground/40 bg-muted/40 p-4 text-sm text-muted-foreground">
+                  Configure at least one complete condition to see a live preview of the filtered rows.
+                </div>
+              ) : previewError ? (
+                <div className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
+                  {previewError}
+                </div>
+              ) : (
+                <div className="overflow-hidden rounded-lg border border-border">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader className="bg-muted/40">
+                        <TableRow>
+                          {previewColumnsToRender.length > 0 ? (
+                            previewColumnsToRender.map((col) => (
+                              <TableHead
+                                key={col}
+                                className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground"
+                              >
+                                {col}
+                              </TableHead>
+                            ))
+                          ) : (
+                            <TableHead className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                              No columns
+                            </TableHead>
+                          )}
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {previewLoading && previewData.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={previewTableColSpan} className="px-3 py-6 text-center text-muted-foreground">
+                              <span className="inline-flex items-center gap-2">
+                                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                                Loading preview…
+                              </span>
+                            </TableCell>
+                          </TableRow>
+                        ) : previewData.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={previewTableColSpan} className="px-3 py-6 text-center text-muted-foreground">
+                              No rows match the current filters.
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          previewData.map((row, rowIndex) => (
+                            <TableRow key={rowIndex}>
+                              {previewColumnsToRender.map((col) => (
+                                <TableCell
+                                  key={`${rowIndex}-${col}`}
+                                  className="px-3 py-2 font-mono text-xs text-foreground"
+                                >
+                                  {formatPreviewValue(row[col])}
+                                </TableCell>
+                              ))}
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+            {previewReady && !previewError && previewData.length > 0 && (
+              <CardFooter className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-muted/20 py-4">
+                <div className="text-sm text-muted-foreground">
+                  {previewPagination
+                    ? `${previewPagination.total_rows} row${previewPagination.total_rows === 1 ? '' : 's'} · page ${currentPreviewPage} of ${displayTotalPages}`
+                    : 'Preview ready'}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    onClick={handlePreviewPrev}
+                    disabled={!previewPagination?.has_prev || previewLoading}
+                    variant="outline"
+                    size="sm"
+                  >
+                    Previous
+                  </Button>
+                  <span className="text-sm text-muted-foreground">Page {currentPreviewPage}</span>
+                  <Button
+                    type="button"
+                    onClick={handlePreviewNext}
+                    disabled={!previewPagination?.has_next || previewLoading}
+                    variant="outline"
+                    size="sm"
+                  >
+                    Next
+                  </Button>
+                </div>
+              </CardFooter>
+            )}
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="slice" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Slice datasets</CardTitle>
+              <CardDescription>Define row windows or sampling strategies to create focused subsets. This module is under construction.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                We&apos;re building slicing tools that will let you pick ranges, samples, or stratified splits while keeping lineage intact.
+              </p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="join" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Join datasets</CardTitle>
+              <CardDescription>Combine nodes on matching keys. Join workflows are coming soon.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                Planned join helpers will surface key suggestions and preview resulting columns before you apply the operation.
+              </p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="concat" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Concatenate datasets</CardTitle>
+              <CardDescription>Stack compatible nodes vertically or merge columns. Concat tooling is on the roadmap.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                Upcoming concat operations will help you align schemas, track provenance, and preview row counts before committing.
+              </p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="aggregate" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Aggregate datasets</CardTitle>
+              <CardDescription>Group and summarize data across columns. Aggregation tooling will land here shortly.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                Aggregation presets will let you pick metrics, group keys, and collect results into new workspace nodes.
+              </p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+      </Tabs>
 
       {/* Alert Dialog for error messages */}
       <AlertDialog open={alertOpen} onOpenChange={setAlertOpen}>
