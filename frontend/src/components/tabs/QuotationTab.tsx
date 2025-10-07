@@ -7,23 +7,41 @@ import { useWorkspaceActions } from '../../hooks/useWorkspaceActions';
 import { useAuth } from '../../hooks/useAuth';
 import { textApi } from '../../api/text';
 import { nodesApi } from '../../api/nodes';
-import { workspacesApi } from '../../api/workspaces';
 import useAutoNodeColumns from '../../hooks/useAutoNodeColumns';
 import useNodeColumnInfos from '../../hooks/useNodeColumnInfos';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Input } from '../ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2, Lock, Search, Trash2, Unlink } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2, Search, Trash2, Unlink } from 'lucide-react';
 
 interface NodeColumnSelection {
   nodeId: string;
   column: string;
 }
 
+interface QuotationResultState {
+  rows: any[];
+  columns: string[];
+  pagination: {
+    page: number;
+    page_size: number;
+    total_rows: number;
+    total_pages: number;
+    has_next: boolean;
+    has_prev: boolean;
+  };
+  sorting: {
+    sort_by?: string | null;
+    sort_order: 'asc' | 'desc';
+  };
+  column: string;
+}
+
+const DEFAULT_PAGE_SIZE = 20;
+
 const QuotationTab: React.FC = () => {
-  const { selectedNodes, handlePageChange: baseHandlePageChange, handlePageSizeChange } = useWorkspaceSelection();
+  const { selectedNodes, handlePageChange: baseHandlePageChange, handlePageSizeChange: baseHandlePageSizeChange } = useWorkspaceSelection();
   const { currentWorkspaceId, getNodeShape, nodeData } = useWorkspaceData();
   const { quotationSearch, detachQuotation } = useWorkspaceActions();
   const { getAuthHeaders } = useAuth();
@@ -36,10 +54,26 @@ const QuotationTab: React.FC = () => {
   const [isLocked, setIsLocked] = useState(false);
   const [lockedNodesSnapshot, setLockedNodesSnapshot] = useState<Array<{ id: string; name: string; columns: string[] }>>([]);
   const [lockedNodeSelections, setLockedNodeSelections] = useState<NodeColumnSelection[] | null>(null);
+  const [lockedRequestParams, setLockedRequestParams] = useState<Record<string, unknown> | null>(null);
+
+  const lockedNodeObjects = useMemo(
+    () => lockedNodesSnapshot.map((s) => ({
+      id: s.id,
+      name: s.name,
+      data: { name: s.name, nodeName: s.name, label: s.name, columns: s.columns },
+      columns: s.columns,
+    })),
+    [lockedNodesSnapshot]
+  );
+
+  const columnInfoNodes = useMemo(
+    () => (isLocked && lockedNodeObjects.length ? lockedNodeObjects : selectedNodes),
+    [isLocked, lockedNodeObjects, selectedNodes]
+  );
 
   const { getColumnInfos } = useNodeColumnInfos({
     workspaceId: currentWorkspaceId,
-    nodes: selectedNodes,
+    nodes: columnInfoNodes,
   });
 
   const { selections: nodeColumnSelections, setSelection: setNodeColumnSelection, setSelections: setNodeColumnSelectionsRaw, recompute: recomputeAutoColumns } = useAutoNodeColumns({
@@ -52,7 +86,23 @@ const QuotationTab: React.FC = () => {
     isLocked && lockedNodeSelections ? lockedNodeSelections : nodeColumnSelections
   ), [isLocked, lockedNodeSelections, nodeColumnSelections]);
 
+  const displayedNodes = useMemo(() => (
+    isLocked && lockedNodeObjects.length ? lockedNodeObjects : selectedNodes.slice(0, 1)
+  ), [isLocked, lockedNodeObjects, selectedNodes]);
+
   const getStringColumns = useCallback((node: any) => getColumnInfos(node).map(info => info.name), [getColumnInfos]);
+
+  const hasIncompleteSelections = useMemo(() => (
+    !displayedNodes.length || displayedNodes.some((node, idx) => {
+      const nodeId = node?.id || node?.node_id || node?.data?.id || `node-${idx}`;
+      const selection = activeSelections.find((sel) => sel.nodeId === nodeId);
+      return !selection || !selection.column;
+    })
+  ), [activeSelections, displayedNodes]);
+
+  const canRunQuotation = useMemo(() => (
+    Boolean(currentWorkspaceId) && displayedNodes.length > 0 && !hasIncompleteSelections
+  ), [currentWorkspaceId, displayedNodes, hasIncompleteSelections]);
 
   // Per-node pagination and sorting state
   const [nodeState, setNodeState] = useState<Record<string, {
@@ -63,10 +113,38 @@ const QuotationTab: React.FC = () => {
   }>>({});
   // Deprecated per-node loading indicator; rely on DataView-like UX
   const [nodeDetaching, setNodeDetaching] = useState<Record<string, boolean>>({});
+  const [resultsByNode, setResultsByNode] = useState<Record<string, QuotationResultState>>({});
 
-  // Raw quotation response is reduced into spanMap; we no longer store full pages here
-  // Aggregated spans keyed by a row signature (JSON of original column values)
-  const [spanMap, setSpanMap] = useState<Record<string, Record<string, { start: number; end: number; type: string }[]>>>({});
+  const currentRequestParams = useMemo(() => {
+    const targetNode = (isLocked && lockedNodesSnapshot.length ? lockedNodesSnapshot[0] : displayedNodes[0]) as any;
+    if (!targetNode) {
+      return {} as Record<string, unknown>;
+    }
+    const selection = activeSelections.find((sel) => sel.nodeId === targetNode.id);
+    if (!selection?.column) {
+      return {} as Record<string, unknown>;
+    }
+    const state = nodeState[targetNode.id] || {
+      currentPage: 1,
+      pageSize: DEFAULT_PAGE_SIZE,
+      sortBy: undefined,
+      sortOrder: 'asc' as const,
+    };
+    return {
+      column: selection.column,
+      page: state.currentPage,
+      page_size: state.pageSize,
+      sort_by: state.sortBy ?? null,
+      sort_order: state.sortOrder,
+    } as Record<string, unknown>;
+  }, [activeSelections, displayedNodes, isLocked, lockedNodesSnapshot, nodeState]);
+
+  const hasParamsChanged = useMemo(() => {
+    if (!isLocked || !lockedRequestParams) {
+      return false;
+    }
+    return JSON.stringify(lockedRequestParams) !== JSON.stringify(currentRequestParams);
+  }, [currentRequestParams, isLocked, lockedRequestParams]);
 
   useEffect(() => {
     if (isLocked) return;
@@ -222,81 +300,212 @@ const QuotationTab: React.FC = () => {
     }
   };
 
-const fetchQuotations = async (nodeId: string, _page?: number, _sortBy?: string, _sortOrder?: 'asc'|'desc') => {
-    if (!currentWorkspaceId) return;
-  const selection = activeSelections.find(s => s.nodeId === nodeId);
-    if (!selection?.column) return;
+  const normalizeQuotationResult = (result: any, column: string): QuotationResultState => {
+    const toNumber = (value: unknown, fallback: number) => {
+      const num = Number(value);
+      return Number.isFinite(num) ? num : fallback;
+    };
 
-  // show loading via global UI if desired; skip per-node loading state
-    try {
-      const req = {
-        column: selection.column,
-        page: 1,             // fetch a large slice to aggregate spans client-side
-        page_size: 100000,
-        sort_by: undefined,
-        sort_order: 'asc' as const,
-      } as any;
-    const res = await quotationSearch(nodeId, req);
-      // Build span map keyed by row signature from original columns
-  const node = selectedNodes.find(n => n.id === nodeId);
-  const origCols = node ? getStringColumns(node) : [];
-      const map: Record<string, { start: number; end: number; type: string }[]> = {};
-      const rows: any[] = res?.data || [];
-      const sig = (r: any) => JSON.stringify(origCols.map((c: string) => r?.[c]));
-      for (const r of rows) {
-        const k = sig(r);
-        if (!map[k]) map[k] = [];
-        const add = (s?: any, e?: any, t?: string) => {
-          if (t && Number.isFinite(s) && Number.isFinite(e) && s < e) map[k].push({ start: Number(s), end: Number(e), type: t });
-        };
-        add(r?.speaker_start_idx, r?.speaker_end_idx, 'speaker');
-        add(r?.quote_start_idx, r?.quote_end_idx, 'quote');
-        add(r?.verb_start_idx, r?.verb_end_idx, 'verb');
-      }
-      setSpanMap(prev => ({ ...prev, [nodeId]: map }));
-    } finally {
-      // no-op
+    const rawRows: any[] = Array.isArray(result?.data) ? result.data : [];
+    const rows = rawRows.map((row) => {
+      const spans: { start: number; end: number; type: string }[] = [];
+      const addSpan = (start?: any, end?: any, type?: string) => {
+        if (!type) return;
+        const s = Number(start);
+        const e = Number(end);
+        if (Number.isFinite(s) && Number.isFinite(e) && s < e) {
+          spans.push({ start: s, end: e, type });
+        }
+      };
+      addSpan(row?.speaker_start_idx, row?.speaker_end_idx, 'speaker');
+      addSpan(row?.quote_start_idx, row?.quote_end_idx, 'quote');
+      addSpan(row?.verb_start_idx, row?.verb_end_idx, 'verb');
+      return { ...row, __spans: spans };
+    });
+
+    let columns: string[] = Array.isArray(result?.columns) && result.columns.length
+      ? result.columns.slice()
+      : (rows[0] ? Object.keys(rows[0]).filter((key) => !key.startsWith('__')) : []);
+    if (column && !columns.includes(column)) {
+      columns = [...columns, column];
     }
+
+    const rawPagination = (result?.pagination || {}) as Record<string, unknown>;
+    const pageSize = Math.max(1, toNumber(rawPagination.page_size, rows.length || DEFAULT_PAGE_SIZE));
+    const totalRows = Math.max(0, toNumber(rawPagination.total_rows, rows.length));
+    const pagination = {
+      page: Math.max(1, toNumber(rawPagination.page, 1)),
+      page_size: pageSize,
+      total_rows: totalRows,
+      total_pages: Math.max(1, toNumber(rawPagination.total_pages, pageSize > 0 ? Math.ceil((totalRows || 1) / pageSize) : 1)),
+      has_next: Boolean(rawPagination.has_next ?? false),
+      has_prev: Boolean(rawPagination.has_prev ?? false),
+    };
+
+    const rawSorting = (result?.sorting || {}) as Record<string, unknown>;
+    const sortOrder: 'asc' | 'desc' = rawSorting.sort_order === 'desc' ? 'desc' : 'asc';
+    const sorting = {
+      sort_by: (rawSorting.sort_by ?? null) as string | null | undefined,
+      sort_order: sortOrder,
+    };
+
+    return {
+      rows,
+      columns,
+      pagination,
+      sorting,
+      column,
+    };
   };
 
-const handleSearchAll = async () => {
-  const runNodes = selectedNodes.slice(0,1);
-  if (!runNodes.length) return;
-  setIsLoadingQuotations(true);
-  setHasLoaded(true);
-  try {
-    await Promise.all(runNodes.map(n => fetchQuotations(n.id, 1)));
-    const nodeId = runNodes[0].id;
+  const updateResultState = (nodeId: string, column: string, result: any): QuotationResultState => {
+    const normalized = normalizeQuotationResult(result, column);
+    setResultsByNode((prev) => ({ ...prev, [nodeId]: normalized }));
+    setNodeState((prev) => ({
+      ...prev,
+      [nodeId]: {
+        currentPage: normalized.pagination.page,
+        pageSize: normalized.pagination.page_size,
+        sortBy: normalized.sorting.sort_by ?? undefined,
+        sortOrder: normalized.sorting.sort_order,
+      },
+    }));
+    return normalized;
+  };
+
+  const fetchQuotations = async (
+    nodeId: string,
+    overrides?: {
+      page?: number;
+      pageSize?: number;
+      sortBy?: string;
+      sortOrder?: 'asc' | 'desc';
+      columnOverride?: string;
+    },
+  ) => {
+    if (!currentWorkspaceId) return null;
+    const selection = activeSelections.find((s) => s.nodeId === nodeId);
+    const column = overrides?.columnOverride || selection?.column;
+    if (!column) return null;
+
+    const state = nodeState[nodeId] || {
+      currentPage: 1,
+      pageSize: DEFAULT_PAGE_SIZE,
+      sortBy: undefined,
+      sortOrder: 'asc' as const,
+    };
+
+    const page = overrides?.page ?? state.currentPage ?? 1;
+    const pageSize = overrides?.pageSize ?? state.pageSize ?? DEFAULT_PAGE_SIZE;
+    const sortBy = overrides?.sortBy ?? state.sortBy;
+    const sortOrder: 'asc' | 'desc' = overrides?.sortOrder ?? state.sortOrder ?? 'asc';
+
+    const requestPayload = {
+      column,
+      page,
+      page_size: pageSize,
+      sort_by: sortBy ?? undefined,
+      sort_order: sortOrder,
+    } as const;
+
+    const result = await quotationSearch(nodeId, requestPayload as any);
+    const normalized = updateResultState(nodeId, column, result);
+    return {
+      normalized,
+      request: {
+        column,
+        page: requestPayload.page,
+        page_size: requestPayload.page_size,
+        sort_by: requestPayload.sort_by ?? null,
+        sort_order: requestPayload.sort_order,
+      },
+    };
+  };
+
+  const handleSearchAll = async () => {
+    const targetNode = displayedNodes[0];
+    const nodeId = targetNode?.id;
+    if (!nodeId) return;
+
+    setIsLoadingQuotations(true);
     try {
-      const lockedSelections = activeSelections.filter(sel => sel.nodeId === nodeId && sel.column);
-      if (lockedSelections.length) {
-        setLockedNodeSelections(lockedSelections);
+      const outcome = await fetchQuotations(nodeId, { page: 1 });
+      if (!outcome?.normalized) {
+        return;
       }
-      const info = await nodesApi.info(currentWorkspaceId!, nodeId, getAuthHeaders());
-      const name = (info as any)?.name || (info as any)?.data?.name || nodeId;
-      const columns = Array.isArray((info as any)?.columns) ? (info as any).columns : (Array.isArray((info as any)?.data?.columns) ? (info as any).data.columns : []);
-      setLockedNodesSnapshot([{ id: nodeId, name: String(name), columns }]);
+      setHasLoaded(true);
+      try {
+        const lockedSelections = activeSelections.filter((sel) => sel.nodeId === nodeId && sel.column);
+        if (lockedSelections.length) {
+          setLockedNodeSelections(lockedSelections);
+        }
+        const info = await nodesApi.info(currentWorkspaceId!, nodeId, getAuthHeaders());
+        const name = (info as any)?.name || (info as any)?.data?.name || nodeId;
+        const columns = Array.isArray((info as any)?.columns)
+          ? (info as any).columns
+          : (Array.isArray((info as any)?.data?.columns) ? (info as any).data.columns : []);
+        setLockedNodesSnapshot([{ id: nodeId, name: String(name), columns }]);
+      } catch {
+        /* ignore */
+      }
+      setLockedRequestParams(outcome.request);
       setIsLocked(true);
-    } catch {
-      /* ignore */
+    } finally {
+      setIsLoadingQuotations(false);
     }
-  } finally {
-    setIsLoadingQuotations(false);
-  }
-};
-
-  const handlePageChange = (newPage: number) => {
-    // Use base table pagination; quotes already aggregated in spanMap
-    baseHandlePageChange(newPage);
   };
 
-  const handleSort = (nodeId: string, column: string) => {
-  const defaultPageSize = Number((nodeData as any)?.pagination?.page_size) || 20;
-  const ns = nodeState[nodeId] || { currentPage: 1, pageSize: defaultPageSize, sortBy: undefined, sortOrder: 'asc' as const };
-    const isSame = ns.sortBy === column;
-    const nextOrder: 'asc'|'desc' = isSame && ns.sortOrder === 'asc' ? 'desc' : 'asc';
-    setNodeState(prev => ({ ...prev, [nodeId]: { ...ns, currentPage: 1, sortBy: column, sortOrder: nextOrder } }));
-    fetchQuotations(nodeId, 1, column, nextOrder);
+  const handlePageChange = async (newPage: number) => {
+    const targetNode = (isLocked && lockedNodesSnapshot.length ? lockedNodesSnapshot[0] : displayedNodes[0]) as any;
+    const nodeId = targetNode?.id;
+    if (!nodeId) {
+      baseHandlePageChange(newPage);
+      return;
+    }
+    if (!isLocked) {
+      baseHandlePageChange(newPage);
+      return;
+    }
+    const outcome = await fetchQuotations(nodeId, { page: newPage });
+    if (outcome) {
+      setLockedRequestParams(outcome.request);
+    }
+  };
+
+  const handlePageSizeChange = async (pageSize: number) => {
+    const targetNode = (isLocked && lockedNodesSnapshot.length ? lockedNodesSnapshot[0] : displayedNodes[0]) as any;
+    const nodeId = targetNode?.id;
+    if (!nodeId) {
+      baseHandlePageSizeChange(pageSize);
+      return;
+    }
+    if (!isLocked) {
+      baseHandlePageSizeChange(pageSize);
+      return;
+    }
+    const outcome = await fetchQuotations(nodeId, { page: 1, pageSize });
+    if (outcome) {
+      setLockedRequestParams(outcome.request);
+    }
+  };
+
+  const handleSort = async (nodeId: string, column: string) => {
+    const state = nodeState[nodeId] || {
+      currentPage: 1,
+      pageSize: DEFAULT_PAGE_SIZE,
+      sortBy: undefined,
+      sortOrder: 'asc' as const,
+    };
+    const isSame = state.sortBy === column;
+    const nextOrder: 'asc' | 'desc' = isSame && state.sortOrder === 'asc' ? 'desc' : 'asc';
+    const outcome = await fetchQuotations(nodeId, {
+      page: 1,
+      sortBy: column,
+      sortOrder: nextOrder,
+    });
+    if (outcome) {
+      setLockedRequestParams(outcome.request);
+    }
   };
 
   const handleDetach = async (nodeId: string) => {
@@ -320,89 +529,72 @@ const handleSearchAll = async () => {
       hydratedOnceRef.current = true;
       if (!currentWorkspaceId) return;
       try {
-        // First check current-request; if null, don't request current-result
         const reqResp = await textApi.getQuotationCurrentRequest(currentWorkspaceId, getAuthHeaders());
         if (!reqResp) {
-          // No current request - fresh state
           return;
         }
-        
+
         const req = (reqResp as any)?.data;
-        if (req) {
-          const nodeId = req.node_id || req.nodeId;
-          const column = req.column || '';
-          if (nodeId) {
-            setNodeColumnSelectionsRaw([{ nodeId, column }], { replace: true });
-            if (column) {
-              setLockedNodeSelections([{ nodeId, column }]);
-            }
-          }
-          setShowMetadata(true);
-          
-          // Lock with snapshot
-          try {
-            const info = await nodesApi.info(currentWorkspaceId!, nodeId, getAuthHeaders());
-            const name = (info as any)?.name || (info as any)?.data?.name || nodeId;
-            const columns = Array.isArray((info as any)?.columns) ? (info as any).columns : (Array.isArray((info as any)?.data?.columns) ? (info as any).data.columns : []);
-            setLockedNodesSnapshot([{ id: nodeId, name: String(name), columns }]);
-            setIsLocked(true);
-          } catch { /* ignore */ }
+        const nodeId = req?.node_id || req?.nodeId;
+        const column = req?.column || '';
+        if (!nodeId) {
+          return;
         }
-        
-        // Now get current-result
+
+        setNodeColumnSelectionsRaw([{ nodeId, column }], { replace: true });
+        if (column) {
+          setLockedNodeSelections([{ nodeId, column }]);
+        }
+        setShowMetadata(true);
+
+        try {
+          const info = await nodesApi.info(currentWorkspaceId!, nodeId, getAuthHeaders());
+          const name = (info as any)?.name || (info as any)?.data?.name || nodeId;
+          const columns = Array.isArray((info as any)?.columns)
+            ? (info as any).columns
+            : (Array.isArray((info as any)?.data?.columns) ? (info as any).data.columns : []);
+          setLockedNodesSnapshot([{ id: nodeId, name: String(name), columns }]);
+        } catch {
+          /* ignore */
+        }
+
         const resResp = await textApi.getQuotationCurrentResult(currentWorkspaceId, getAuthHeaders());
         if (!resResp) {
-          // No result yet
           return;
         }
-        
+
         const res = (resResp as any)?.data;
-        if (res) {
-          setHasLoaded(true);
-          const nodeId = req?.node_id || req?.nodeId;
-          if (nodeId) {
-            await fetchQuotations(nodeId, 1);
-          }
+        if (!res) {
+          return;
         }
+
+        const normalized = updateResultState(nodeId, column, res);
+        setLockedRequestParams({
+          column: normalized.column,
+          page: normalized.pagination.page,
+          page_size: normalized.pagination.page_size,
+          sort_by: normalized.sorting.sort_by ?? null,
+          sort_order: normalized.sorting.sort_order,
+        });
+        setHasLoaded(true);
+        setIsLocked(true);
       } catch { /* ignore */ }
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentWorkspaceId, getAuthHeaders]);
 
   return (
-    <TooltipProvider delayDuration={200}>
-      <div className="space-y-6">
-        <Card>
-          <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="space-y-1">
-              <CardTitle>Quotation Extraction</CardTitle>
-              <CardDescription>Load quotations for a single node and highlight speaker, quote, and verb spans.</CardDescription>
-            </div>
-            {isLocked && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-2" disabled>
-                    <Lock className="h-4 w-4" />
-                    Locked
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent className="w-72 text-left">
-                  <p className="font-semibold text-primary-foreground">Panel locked</p>
-                  <ul className="mt-2 space-y-1 text-xs leading-relaxed text-primary-foreground/90">
-                    <li>Locked to current request/results.</li>
-                    <li>Node selection and backend-used parameters are disabled.</li>
-                    <li>Frontend-only options (e.g., Show metadata) stay editable.</li>
-                    <li>Clear results to unlock and resync with the graph selection.</li>
-                  </ul>
-                </TooltipContent>
-              </Tooltip>
-            )}
-          </CardHeader>
+    <div className="space-y-6">
+      <Card>
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="space-y-1">
+            <CardTitle>Quotation Extraction</CardTitle>
+            <CardDescription>Load quotations for a single node and highlight speaker, quote, and verb spans.</CardDescription>
+          </div>
+        </CardHeader>
           <CardContent className="space-y-6">
             <NodeSelectionPanel
-              selectedNodes={(isLocked && lockedNodesSnapshot.length)
-                ? lockedNodesSnapshot.map(s=>({ id: s.id, name: s.name, data: { name: s.name, nodeName: s.name, label: s.name, columns: s.columns }, columns: s.columns }))
-                : selectedNodes.slice(0,1)}
+              selectedNodes={displayedNodes}
               nodeColumnSelections={activeSelections}
               onColumnChange={handleColumnChange}
               nodeColors={{}}
@@ -414,28 +606,50 @@ const handleSearchAll = async () => {
               getNodeShapeFn={getNodeShape}
               showColorPicker={false}
               disabled={!!isLocked}
+              locked={!!isLocked}
               allowedDataTypes={['string']}
             />
 
             <div className="flex flex-wrap gap-3">
-              <Button
-                type="button"
-                className="w-full sm:w-auto"
-                onClick={handleSearchAll}
-                disabled={!selectedNodes.length || activeSelections.some(s=>!s.column) || !!isLocked || isLoadingQuotations}
-              >
-                {isLoadingQuotations ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Loading…
-                  </>
-                ) : (
-                  <>
-                    <Search className="mr-2 h-4 w-4" />
-                    Load Quotations
-                  </>
-                )}
-              </Button>
+              {hasParamsChanged ? (
+                <Button
+                  type="button"
+                  className="w-full sm:w-auto"
+                  onClick={handleSearchAll}
+                  disabled={!canRunQuotation || isLoadingQuotations}
+                >
+                  {isLoadingQuotations ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Updating…
+                    </>
+                  ) : (
+                    <>
+                      <Search className="mr-2 h-4 w-4" />
+                      Update Results
+                    </>
+                  )}
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  className="w-full sm:w-auto"
+                  onClick={handleSearchAll}
+                  disabled={!canRunQuotation || isLoadingQuotations || !!isLocked}
+                >
+                  {isLoadingQuotations ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Loading…
+                    </>
+                  ) : (
+                    <>
+                      <Search className="mr-2 h-4 w-4" />
+                      Load Quotations
+                    </>
+                  )}
+                </Button>
+              )}
               {hasLoaded && (
                 <Button
                   type="button"
@@ -446,16 +660,18 @@ const handleSearchAll = async () => {
                     setIsClearing(true);
                     try {
                       try {
-                        await workspacesApi.clearAnalysis(currentWorkspaceId, 'quotation', getAuthHeaders());
+                        await textApi.clearQuotation(currentWorkspaceId, getAuthHeaders());
                       } catch {
                         /* ignore */
                       }
                     } finally {
                       setIsClearing(false);
                       setHasLoaded(false);
-                      setSpanMap({});
+                      setResultsByNode({});
+                      setNodeState({});
                       setLockedNodesSnapshot([]);
                       setLockedNodeSelections(null);
+                      setLockedRequestParams(null);
                       setIsLocked(false);
                       setNodeColumnSelectionsRaw([], { replace: true, persist: false });
                       recomputeAutoColumns();
@@ -480,7 +696,7 @@ const handleSearchAll = async () => {
           </CardContent>
         </Card>
 
-        {hasLoaded && selectedNodes.slice(0,1).map((node)=>{
+        {hasLoaded && displayedNodes.length > 0 && displayedNodes.map((node)=>{
           const nodeId = node.id;
           const nodeLabel = node.name || node.data?.name || node.data?.label || node.id;
           const originalColumns = getStringColumns(node);
@@ -496,16 +712,20 @@ const handleSearchAll = async () => {
             textCol // Include the selected text column
           ].filter(c => c); // Remove empty values
           
-          // Get all available columns from data
-          const baseRows: any[] = Array.isArray(nodeData?.data) ? nodeData.data : [];
-          const allCols = baseRows.length > 0 ? Object.keys(baseRows[0]) : originalColumns;
-          
-          // Filter columns: if showMetadata is false, only show core columns that exist in data
-          const cols = showMetadata 
-            ? allCols 
+          const resultState = resultsByNode[nodeId];
+          const fallbackRows: any[] = Array.isArray(nodeData?.data) ? nodeData.data : [];
+          const rowsForRender = resultState?.rows?.length ? resultState.rows : fallbackRows;
+          const columnsSource = resultState?.columns?.length
+            ? resultState.columns
+            : (rowsForRender.length > 0
+              ? Object.keys(rowsForRender[0]).filter((key) => !key.startsWith('__'))
+              : originalColumns);
+
+          const allCols = columnsSource.filter((c: string) => !c.startsWith('__'));
+
+          const cols = showMetadata
+            ? allCols
             : allCols.filter((c: string) => coreQuotationCols.includes(c));
-          
-          const rowsForRender = baseRows;
           return (
             <Card key={nodeId} className="overflow-hidden">
               <CardHeader className="gap-1 border-b bg-muted/40">
@@ -556,10 +776,8 @@ const handleSearchAll = async () => {
                           rowsForRender.map((row:any, idx:number)=> (
                             <tr key={idx} className={idx % 2 === 0 ? 'bg-background' : 'bg-muted/30'}>
                               {cols.map((c: string, i: number) => {
-                                const val = row[c];
-                                const signature = JSON.stringify(cols.map((oc: string) => row?.[oc]));
-                                const spansForRow = (spanMap[nodeId] && spanMap[nodeId][signature]) || [];
-                                const rowWithSpans = { ...row, __spans: spansForRow };
+                                const val = row?.[c];
+                                const rowWithSpans = row;
                                 const cellKey = `${nodeId}:${idx}:${i}`;
                                 const content = (c === textCol)
                                   ? renderHighlightedText(typeof val === 'string' ? val : (val ?? ''), rowWithSpans, cellKey)
@@ -581,13 +799,13 @@ const handleSearchAll = async () => {
                     </table>
                   </div>
                   {(() => {
-                    const pag = (nodeData as any)?.pagination || {};
+                    const pag = resultState?.pagination || ((nodeData as any)?.pagination ?? {});
                     const page = Number(pag.page) || 1;
-                    const page_size = Number(pag.page_size) || 20;
-                    const total_rows = Number(pag.total_rows) || (Array.isArray(nodeData?.data) ? nodeData.data.length : 0);
-                    const total_pages = Number(pag.total_pages) || (page_size > 0 ? Math.max(1, Math.ceil(total_rows / page_size)) : 1);
-                    const has_prev = !!pag.has_prev || page > 1;
-                    const has_next = !!pag.has_next || page < total_pages;
+                    const page_size = Number(pag.page_size) || DEFAULT_PAGE_SIZE;
+                    const total_rows = Number(pag.total_rows) || rowsForRender.length;
+                    const total_pages = Number(pag.total_pages) || (page_size > 0 ? Math.max(1, Math.ceil((total_rows || 1) / page_size)) : 1);
+                    const has_prev = typeof pag.has_prev === 'boolean' ? pag.has_prev : page > 1;
+                    const has_next = typeof pag.has_next === 'boolean' ? pag.has_next : page < total_pages;
                     return (
                       <div className="flex flex-col gap-4 border-t border-border bg-muted/30 px-4 py-3 md:flex-row md:items-center md:justify-between">
                         <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
@@ -703,7 +921,6 @@ const handleSearchAll = async () => {
           );
         })}
       </div>
-    </TooltipProvider>
   );
 };
 

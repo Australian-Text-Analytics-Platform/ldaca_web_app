@@ -81,6 +81,7 @@ export const textApi = {
   quotationDetach: (ws: string, node: string, req: QuotationDetachRequest, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/nodes/${node}/quotation/detach`, req, headers),
   getQuotationCurrentRequest: (ws: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/quotation/current-request`, { method: 'GET', headers }),
   getQuotationCurrentResult: (ws: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/quotation/current-result`, { method: 'GET', headers }),
+  clearQuotation: (ws: string, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/quotation/clear`, {}, headers),
 
   // Timeline / Frequency analysis
   frequency: (ws: string, node: string, req: FrequencyAnalysisRequest, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/nodes/${node}/frequency-analysis`, req, headers),

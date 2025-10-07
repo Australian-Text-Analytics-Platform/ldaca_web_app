@@ -57,6 +57,20 @@ async def quotation_current_result(
     return {"state": "successful", "message": "ok", "data": rec.result}
 
 
+@router.post("/{workspace_id}/quotation/clear")
+async def clear_quotation_results(
+    workspace_id: str, current_user: dict = Depends(get_current_user)
+):
+    user_id = current_user["id"]
+    try:
+        from ....core.analysis_store import clear_analyses
+    except Exception as e:  # pragma: no cover
+        raise HTTPException(status_code=500, detail=f"analysis_store unavailable: {e}")
+
+    removed = clear_analyses(user_id, workspace_id, task="quotation")
+    return {"state": "successful", "cleared": {"analyses_removed": removed}}
+
+
 @router.post("/{workspace_id}/nodes/{node_id}/quotation")
 async def get_quotation(
     workspace_id: str,
