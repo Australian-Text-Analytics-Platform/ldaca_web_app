@@ -233,9 +233,7 @@ def _get_concat_nodes(
                 status_code=400,
                 detail=f"Duplicate node id '{node_id}' provided",
             )
-        node = workspace_manager.get_node_from_workspace(
-            user_id, workspace_id, node_id
-        )
+        node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
         if not node:
             raise HTTPException(
                 status_code=404,
@@ -276,9 +274,7 @@ def _extract_lazy_schema(
 def _validate_and_align_concat_nodes(
     nodes: List[Any],
 ) -> tuple[List[pl.LazyFrame], List[str], dict[str, str]]:
-    lazy_frames: List[pl.LazyFrame] = [
-        _ensure_lazyframe(node.data) for node in nodes
-    ]
+    lazy_frames: List[pl.LazyFrame] = [_ensure_lazyframe(node.data) for node in nodes]
     base_columns, base_dtypes = _extract_lazy_schema(lazy_frames[0])
     if not base_columns:
         raise HTTPException(
@@ -302,13 +298,9 @@ def _validate_and_align_concat_nodes(
         if missing or extra or mismatched:
             detail_parts: List[str] = []
             if missing:
-                detail_parts.append(
-                    "missing columns: " + ", ".join(sorted(missing))
-                )
+                detail_parts.append("missing columns: " + ", ".join(sorted(missing)))
             if extra:
-                detail_parts.append(
-                    "unexpected columns: " + ", ".join(sorted(extra))
-                )
+                detail_parts.append("unexpected columns: " + ", ".join(sorted(extra)))
             if mismatched:
                 mismatch_details = ", ".join(
                     f"{col} ({base_dtypes.get(col)} vs {dtypes.get(col)})"
@@ -346,9 +338,7 @@ def _calculate_concat_row_count(
     return total
 
 
-def _derive_concat_node_name(
-    nodes: List[Any], desired_name: Optional[str]
-) -> str:
+def _derive_concat_node_name(nodes: List[Any], desired_name: Optional[str]) -> str:
     if desired_name:
         return desired_name
     labels = [_get_node_display_name(node) for node in nodes]
@@ -1127,9 +1117,7 @@ async def concat_nodes_preview(
                 math.ceil(total_rows / normalized_page_size) if total_rows else 0
             )
             normalized_page = min(max(page, 1), total_pages or 1)
-            offset = (
-                (normalized_page - 1) * normalized_page_size if total_rows else 0
-            )
+            offset = (normalized_page - 1) * normalized_page_size if total_rows else 0
         else:
             total_pages = None
             normalized_page = max(page, 1)
@@ -1140,8 +1128,8 @@ async def concat_nodes_preview(
 
         if total_rows is None:
             has_next = len(data_rows) == normalized_page_size
-            inferred_total = offset + len(data_rows) + (
-                normalized_page_size if has_next else 0
+            inferred_total = (
+                offset + len(data_rows) + (normalized_page_size if has_next else 0)
             )
             total_rows_value = inferred_total
             total_pages_value = max(1, normalized_page + (1 if has_next else 0))
@@ -1156,8 +1144,7 @@ async def concat_nodes_preview(
             "total_rows": total_rows_value,
             "total_pages": total_pages_value,
             "has_next": has_next,
-            "has_prev": normalized_page > 1
-            and (total_rows is None or total_rows > 0),
+            "has_prev": normalized_page > 1 and (total_rows is None or total_rows > 0),
         }
 
         return {

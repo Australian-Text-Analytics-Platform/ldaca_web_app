@@ -5,13 +5,14 @@ from __future__ import annotations
 import polars as pl
 import pytest
 from fastapi import HTTPException
-
 from ldaca_web_app_backend.api.workspaces import nodes as nodes_api
 from ldaca_web_app_backend.models import ConcatPreviewRequest, ConcatRequest
 
 
 class DummyNode:
-    def __init__(self, node_id: str, data: pl.LazyFrame, name: str | None = None) -> None:
+    def __init__(
+        self, node_id: str, data: pl.LazyFrame, name: str | None = None
+    ) -> None:
         self.node_id = node_id
         self.name = name or node_id
         self.data = data
@@ -42,21 +43,17 @@ class DummyNode:
 
 @pytest.fixture
 def sample_nodes() -> dict[str, DummyNode]:
-    df_one = pl.DataFrame(
-        {
-            "id": [1, 2],
-            "name": ["alpha", "beta"],
-            "value": [10.0, 20.0],
-        }
-    )
+    df_one = pl.DataFrame({
+        "id": [1, 2],
+        "name": ["alpha", "beta"],
+        "value": [10.0, 20.0],
+    })
     # Same columns, different order to verify reordering is allowed
-    df_two = pl.DataFrame(
-        {
-            "value": [30.0, 40.0],
-            "name": ["gamma", "delta"],
-            "id": [3, 4],
-        }
-    )
+    df_two = pl.DataFrame({
+        "value": [30.0, 40.0],
+        "name": ["gamma", "delta"],
+        "id": [3, 4],
+    })
     df_bad = pl.DataFrame({"id": [1, 2], "other": [100, 200]})
 
     return {
@@ -73,7 +70,9 @@ def fake_workspace_manager(monkeypatch: pytest.MonkeyPatch, sample_nodes):
             self.nodes = nodes
             self.add_calls: list[dict[str, object]] = []
 
-        def get_node_from_workspace(self, user_id: str, workspace_id: str, node_id: str):
+        def get_node_from_workspace(
+            self, user_id: str, workspace_id: str, node_id: str
+        ):
             return self.nodes.get(node_id)
 
         def add_node_to_workspace(self, **kwargs):
