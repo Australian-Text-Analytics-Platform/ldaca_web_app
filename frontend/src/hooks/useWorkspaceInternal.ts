@@ -514,6 +514,51 @@ export const useWorkspaceInternal = () => {
     },
   });
 
+  const concatNodesMutation = useMutation({
+    mutationFn: ({ workspaceId, nodeIds, newNodeName }: {
+      workspaceId: string;
+      nodeIds: string[];
+      newNodeName?: string;
+    }) => nodesApi.concat(workspaceId, { node_ids: nodeIds, new_node_name: newNodeName }, authHeaders),
+    onMutate: async () => {
+      startOperation('concatNodes');
+      let previousNodeIds: string[] = [];
+      try {
+        if (currentWorkspaceId) {
+          const prevGraph: any = queryClient.getQueryData(queryKeys.workspaceGraph(currentWorkspaceId));
+          previousNodeIds = (prevGraph?.nodes || []).map((n: any) => n.id);
+        }
+      } catch { /* ignore */ }
+      clearSelection();
+      return { previousNodeIds };
+    },
+    onSuccess: async (createdNode: any, _vars, context: any) => {
+      try {
+        let newId = createdNode?.node_id || createdNode?.id;
+        if (!newId && currentWorkspaceId) {
+          await queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
+          const freshGraph: any = queryClient.getQueryData(queryKeys.workspaceGraph(currentWorkspaceId));
+          if (freshGraph?.nodes) {
+            const prevIds: string[] = context?.previousNodeIds || [];
+            const diff = freshGraph.nodes.map((n: any) => n.id).filter((id: string) => !prevIds.includes(id));
+            if (diff.length === 1) newId = diff[0];
+          }
+        }
+        if (newId) setSelectedNodes([newId]); else clearSelection();
+      } catch {
+        clearSelection();
+      }
+      if (currentWorkspaceId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
+      }
+      endOperation('concatNodes');
+    },
+    onError: (error: any) => {
+      setOperationError('concatNodes', error.message);
+      endOperation('concatNodes');
+    },
+  });
+
   const filterNodeMutation = useMutation({
     mutationFn: ({ workspaceId, nodeId, request }: {
       workspaceId: string;
@@ -845,6 +890,16 @@ export const useWorkspaceInternal = () => {
     newNodeName,
       });
     },
+
+    concatNodes: (nodeIds: string[], newNodeName?: string) => {
+      if (!currentWorkspaceId) return Promise.reject(new Error('No workspace selected'));
+      return concatNodesMutation.mutateAsync({ workspaceId: currentWorkspaceId, nodeIds, newNodeName });
+    },
+
+    concatPreview: (nodeIds: string[], page = 1, pageSize = 10) => {
+      if (!currentWorkspaceId) return Promise.reject(new Error('No workspace selected'));
+      return nodesApi.concatPreview(currentWorkspaceId, { node_ids: nodeIds }, page, pageSize, authHeaders);
+    },
     
     castColumn: (nodeId: string, column: string, targetType: string, format?: string) => {
       if (!currentWorkspaceId) return Promise.reject(new Error('No workspace selected'));
@@ -962,6 +1017,7 @@ export const useWorkspaceInternal = () => {
   saveWorkspaceMutation,
   saveWorkspaceAsMutation,
   updateWorkspaceNameMutation,
+    concatNodesMutation,
     getNodeShapeStable,
     currentWorkspaceId,
     authHeaders,

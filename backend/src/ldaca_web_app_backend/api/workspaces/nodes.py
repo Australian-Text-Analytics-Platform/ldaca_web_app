@@ -8,7 +8,7 @@ from __future__ import annotations
 import math
 import re
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, List, Optional
 
 import polars as pl
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -16,7 +16,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from ...core.auth import get_current_user
 from ...core.docworkspace_api import DocWorkspaceAPIUtils
 from ...core.workspace import workspace_manager
-from ...models import FilterPreviewResponse, FilterRequest, SliceRequest
+from ...models import (
+    ConcatPreviewRequest,
+    ConcatRequest,
+    FilterPreviewResponse,
+    FilterRequest,
+    SliceRequest,
+)
 from .utils import _handle_operation_result
 
 router = APIRouter(prefix="/workspaces", tags=["nodes"])
@@ -196,6 +202,163 @@ def _ensure_lazyframe(data: Any) -> pl.LazyFrame:
     raise HTTPException(
         status_code=500, detail="Unsupported data type for filtering preview"
     )
+
+
+def _get_node_display_name(node: Any) -> str:
+    name = getattr(node, "name", None)
+    if name:
+        return str(name)
+    for attr in ("node_id", "id", "pk", "uuid"):
+        value = getattr(node, attr, None)
+        if value is not None:
+            return str(value)
+    return "node"
+
+
+def _get_concat_nodes(
+    user_id: str, workspace_id: str, node_ids: List[str]
+) -> List[Any]:
+    if not node_ids:
+        raise HTTPException(
+            status_code=400, detail="At least two node IDs are required"
+        )
+    nodes: List[Any] = []
+    seen: set[str] = set()
+    for raw_node_id in node_ids:
+        node_id = raw_node_id.strip()
+        if not node_id:
+            continue
+        if node_id in seen:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Duplicate node id '{node_id}' provided",
+            )
+        node = workspace_manager.get_node_from_workspace(
+            user_id, workspace_id, node_id
+        )
+        if not node:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Node '{node_id}' not found in workspace",
+            )
+        nodes.append(node)
+        seen.add(node_id)
+    if len(nodes) < 2:
+        raise HTTPException(
+            status_code=400,
+            detail="At least two distinct nodes are required for concatenation",
+        )
+    return nodes
+
+
+def _extract_lazy_schema(
+    lazy_frame: pl.LazyFrame,
+) -> tuple[List[str], dict[str, str]]:
+    schema_candidate = None
+    if hasattr(lazy_frame, "collect_schema"):
+        try:
+            schema_candidate = lazy_frame.collect_schema()
+        except Exception:
+            schema_candidate = None
+    if schema_candidate is None:
+        schema_candidate = lazy_frame.schema
+
+    schema_dict = (
+        schema_candidate
+        if isinstance(schema_candidate, dict)
+        else dict(schema_candidate)
+    )
+    columns = list(schema_dict.keys())
+    dtypes = {col: str(dtype) for col, dtype in schema_dict.items()}
+    return columns, dtypes
+
+
+def _validate_and_align_concat_nodes(
+    nodes: List[Any],
+) -> tuple[List[pl.LazyFrame], List[str], dict[str, str]]:
+    lazy_frames: List[pl.LazyFrame] = [
+        _ensure_lazyframe(node.data) for node in nodes
+    ]
+    base_columns, base_dtypes = _extract_lazy_schema(lazy_frames[0])
+    if not base_columns:
+        raise HTTPException(
+            status_code=400,
+            detail="Unable to determine schema for the first node.",
+        )
+
+    select_expr = [pl.col(column) for column in base_columns]
+    aligned_frames: List[pl.LazyFrame] = [lazy_frames[0].select(select_expr)]
+
+    for node, lazy_frame in zip(nodes[1:], lazy_frames[1:]):
+        columns, dtypes = _extract_lazy_schema(lazy_frame)
+        missing = [col for col in base_columns if col not in columns]
+        extra = [col for col in columns if col not in base_columns]
+        mismatched = [
+            col
+            for col in base_columns
+            if col in dtypes and base_dtypes.get(col) != dtypes.get(col)
+        ]
+
+        if missing or extra or mismatched:
+            detail_parts: List[str] = []
+            if missing:
+                detail_parts.append(
+                    "missing columns: " + ", ".join(sorted(missing))
+                )
+            if extra:
+                detail_parts.append(
+                    "unexpected columns: " + ", ".join(sorted(extra))
+                )
+            if mismatched:
+                mismatch_details = ", ".join(
+                    f"{col} ({base_dtypes.get(col)} vs {dtypes.get(col)})"
+                    for col in sorted(mismatched)
+                )
+                detail_parts.append(f"type mismatches: {mismatch_details}")
+            detail = (
+                "Schema mismatch for node '"
+                + _get_node_display_name(node)
+                + "': "
+                + "; ".join(detail_parts)
+            )
+            raise HTTPException(status_code=400, detail=detail)
+
+        aligned_frames.append(lazy_frame.select(select_expr))
+
+    return aligned_frames, base_columns, base_dtypes
+
+
+def _calculate_concat_row_count(
+    aligned_frames: List[pl.LazyFrame],
+) -> Optional[int]:
+    total = 0
+    for lazy_frame in aligned_frames:
+        try:
+            count_df = lazy_frame.select(pl.len().alias("_len")).collect()
+            polars_df = (
+                count_df.to_dataframe()
+                if hasattr(count_df, "to_dataframe")
+                else count_df
+            )
+            total += int(polars_df.to_series(0).item())
+        except Exception:
+            return None
+    return total
+
+
+def _derive_concat_node_name(
+    nodes: List[Any], desired_name: Optional[str]
+) -> str:
+    if desired_name:
+        return desired_name
+    labels = [_get_node_display_name(node) for node in nodes]
+    if not labels:
+        return "Concat Result"
+    if len(labels) <= 3:
+        label_str = ", ".join(labels)
+    else:
+        label_str = ", ".join(labels[:3]) + ", ..."
+    return f"Concat({label_str})"
 
 
 @router.get("/{workspace_id}/nodes/{node_id}")
@@ -941,6 +1104,200 @@ async def slice_node(
     if not success:
         raise HTTPException(status_code=400, detail=message)
     return result_obj
+
+
+@router.post("/{workspace_id}/nodes/concat/preview")
+async def concat_nodes_preview(
+    workspace_id: str,
+    request: ConcatPreviewRequest,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=500),
+    current_user: dict = Depends(get_current_user),
+):
+    user_id = current_user["id"]
+    try:
+        nodes = _get_concat_nodes(user_id, workspace_id, request.node_ids)
+        aligned_frames, columns, dtypes = _validate_and_align_concat_nodes(nodes)
+        concat_lazy = pl.concat(aligned_frames, how="vertical")
+        total_rows = _calculate_concat_row_count(aligned_frames)
+
+        normalized_page_size = page_size
+        if total_rows is not None:
+            total_pages = (
+                math.ceil(total_rows / normalized_page_size) if total_rows else 0
+            )
+            normalized_page = min(max(page, 1), total_pages or 1)
+            offset = (
+                (normalized_page - 1) * normalized_page_size if total_rows else 0
+            )
+        else:
+            total_pages = None
+            normalized_page = max(page, 1)
+            offset = (normalized_page - 1) * normalized_page_size
+
+        preview_df = concat_lazy.slice(offset, normalized_page_size).collect()
+        data_rows = preview_df.to_dicts()
+
+        if total_rows is None:
+            has_next = len(data_rows) == normalized_page_size
+            inferred_total = offset + len(data_rows) + (
+                normalized_page_size if has_next else 0
+            )
+            total_rows_value = inferred_total
+            total_pages_value = max(1, normalized_page + (1 if has_next else 0))
+        else:
+            has_next = offset + normalized_page_size < total_rows
+            total_rows_value = total_rows
+            total_pages_value = total_pages
+
+        pagination = {
+            "page": normalized_page,
+            "page_size": normalized_page_size,
+            "total_rows": total_rows_value,
+            "total_pages": total_pages_value,
+            "has_next": has_next,
+            "has_prev": normalized_page > 1
+            and (total_rows is None or total_rows > 0),
+        }
+
+        return {
+            "data": data_rows,
+            "columns": columns,
+            "dtypes": dtypes,
+            "pagination": pagination,
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500, detail=f"Concat preview failed: {exc}"
+        ) from exc
+
+
+@router.post("/{workspace_id}/nodes/concat")
+async def concat_nodes(
+    workspace_id: str,
+    request: ConcatRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    user_id = current_user["id"]
+    try:
+        nodes = _get_concat_nodes(user_id, workspace_id, request.node_ids)
+        aligned_frames, _, _ = _validate_and_align_concat_nodes(nodes)
+        concat_lazy = pl.concat(aligned_frames, how="vertical")
+        node_name = _derive_concat_node_name(nodes, request.new_node_name)
+        labels = [_get_node_display_name(node) for node in nodes]
+        if len(labels) > 3:
+            operation_args = ", ".join(labels[:3]) + ", ..."
+        else:
+            operation_args = ", ".join(labels)
+        operation_label = f"concat({operation_args})"
+        new_node = workspace_manager.add_node_to_workspace(
+            user_id=user_id,
+            workspace_id=workspace_id,
+            data=concat_lazy,
+            node_name=node_name,
+            operation=operation_label,
+            parents=nodes,
+        )
+        return DocWorkspaceAPIUtils.convert_node_info_for_api(new_node)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Concat failed: {exc}")
+
+
+@router.post("/{workspace_id}/nodes/join/preview")
+async def join_nodes_preview(
+    workspace_id: str,
+    left_node_id: str,
+    right_node_id: str,
+    left_on: Optional[str] = None,
+    right_on: Optional[str] = None,
+    how: str = "inner",
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=200),
+    current_user: dict = Depends(get_current_user),
+):
+    user_id = current_user["id"]
+    try:
+        left_node = workspace_manager.get_node_from_workspace(
+            user_id, workspace_id, left_node_id
+        )
+        right_node = workspace_manager.get_node_from_workspace(
+            user_id, workspace_id, right_node_id
+        )
+        if not left_node or not right_node:
+            raise HTTPException(status_code=404, detail="One or both nodes not found")
+
+        allowed_hows = {"inner", "left", "right", "full", "semi", "anti", "cross"}
+        how_val = (how or "inner").lower()
+        if how_val not in allowed_hows:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid join type. Allowed values: inner, left, right, full, semi, anti, cross",
+            )
+
+        left_lazy = _ensure_lazyframe(left_node.data)
+        right_lazy = _ensure_lazyframe(right_node.data)
+
+        if how_val == "cross":
+            joined_lazy = left_lazy.join(right_lazy, how="cross")
+        else:
+            if not left_on or not right_on:
+                raise HTTPException(
+                    status_code=400,
+                    detail="left_on and right_on must be provided for non-cross joins",
+                )
+            joined_lazy = left_lazy.join(
+                right_lazy, left_on=left_on, right_on=right_on, how=how_val
+            )
+
+        try:
+            total_rows_series = (
+                joined_lazy.select(pl.len().alias("_len")).collect().to_series(0)
+            )
+            total_rows = int(total_rows_series.item())
+        except Exception:
+            total_rows = None
+
+        offset = (page - 1) * page_size
+        try:
+            preview_df = joined_lazy.slice(offset, page_size).collect()
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"Join preview failed: {exc}")
+
+        preview_rows = preview_df.to_dicts()
+        preview_columns = list(preview_df.columns)
+        dtypes = {col: str(dtype) for col, dtype in preview_df.schema.items()}
+
+        if total_rows is None:
+            has_next = len(preview_rows) == page_size
+            inferred_total = offset + len(preview_rows) + (page_size if has_next else 0)
+            total_rows_value = inferred_total
+            total_pages = max(1, page + (1 if has_next else 0))
+        else:
+            has_next = offset + page_size < total_rows
+            total_rows_value = total_rows
+            total_pages = max(1, math.ceil(total_rows / page_size))
+
+        return {
+            "data": preview_rows,
+            "columns": preview_columns,
+            "dtypes": dtypes,
+            "pagination": {
+                "page": page,
+                "page_size": page_size,
+                "total_rows": total_rows_value,
+                "total_pages": total_pages,
+                "has_next": has_next,
+                "has_prev": page > 1,
+            },
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Join preview failed: {e}")
 
 
 @router.post("/{workspace_id}/nodes/join")

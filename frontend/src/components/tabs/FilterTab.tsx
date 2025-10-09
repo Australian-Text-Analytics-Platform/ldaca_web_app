@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { CalendarIcon, Clock2Icon, Loader2 } from 'lucide-react';
 import { useWorkspaceSelection } from '../../hooks/useWorkspaceSelection';
 import { useWorkspaceData } from '../../hooks/useWorkspaceData';
@@ -17,6 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Label } from '../ui/label';
 import { Input } from '../ui/input';
 import { Calendar } from '../ui/calendar';
+import NodeSelectionPanel, { NodeColumnSelection, WorkspaceNodeLike } from '../NodeSelectionPanel';
 // Define minimal request types (backend expects these shapes)
 type ConditionRange = { start: string | Date | null; end: string | Date | null };
 type ConditionValue = string | number | boolean | Date | ConditionRange | null;
@@ -428,8 +429,77 @@ type PreviewPagination = {
 };
 
 const PREVIEW_PAGE_SIZE_OPTIONS = [10, 20, 50];
+const MAX_CONCAT_NODES = 6;
 
 type PreviewRow = Record<string, unknown>;
+
+type JoinType = 'inner' | 'left' | 'right' | 'full' | 'semi' | 'anti' | 'cross';
+
+const JOIN_TYPE_OPTIONS: Array<{ value: JoinType; description: string }> = [
+  {
+    value: 'inner',
+    description: 'Only rows with matching keys in both nodes.',
+  },
+  {
+    value: 'left',
+    description: 'All rows from the left node plus matching rows from the right.',
+  },
+  {
+    value: 'right',
+    description: 'All rows from the right node plus matching rows from the left.',
+  },
+  {
+    value: 'full',
+    description: 'All rows from both nodes; missing matches become nulls.',
+  },
+  {
+    value: 'semi',
+    description: 'Rows from the left node that have at least one match in the right.',
+  },
+  {
+    value: 'anti',
+    description: 'Rows from the left node that do not match anything in the right.',
+  },
+  {
+    value: 'cross',
+    description: 'Cartesian product of all rows; ignores column selections.',
+  },
+];
+
+interface JoinPreviewRequestSignature {
+  leftNodeId: string;
+  rightNodeId: string;
+  leftOn?: string;
+  rightOn?: string;
+  joinType: JoinType;
+  page: number;
+  pageSize: number;
+}
+
+interface ConcatPreviewRequestSignature {
+  nodeIds: string[];
+  page: number;
+  pageSize: number;
+}
+
+interface ConcatNodeSummary {
+  nodeId: string;
+  displayName: string;
+  columns: string[];
+  normalizedColumns: string[];
+  dtypes: Record<string, string>;
+  rawDtypes: Record<string, string>;
+  columnCount: number;
+}
+
+interface ConcatSchemaAnalysis {
+  summaries: ConcatNodeSummary[];
+  ready: boolean;
+  issues: string;
+  mismatches: Array<{ nodeId: string; nodeName: string; details: string[] }>;
+  baseColumns: string[];
+  baseColumnCount: number;
+}
 
 const hasNonEmptyValue = (value: unknown): boolean => {
   if (value === null || value === undefined) return false;
@@ -525,9 +595,9 @@ const formatPreviewValue = (value: unknown): string => {
 // Date-time picker now uses shadcn calendar + manual time inputs to produce ISO8601 strings.
 
 const FilterTab: React.FC = () => {
-  const { selectedNodeId, selectedNode } = useWorkspaceSelection();
-  const { nodeData, currentWorkspaceId } = useWorkspaceData();
-  const { filterNode, filterPreview } = useWorkspaceActions();
+  const { selectedNodeId, selectedNode, selectedNodes, selectedNodeIds } = useWorkspaceSelection();
+  const { nodeData, currentWorkspaceId, nodes: workspaceNodes = [], getNodeShape } = useWorkspaceData();
+  const { filterNode, filterPreview, joinNodes, concatNodes, concatPreview } = useWorkspaceActions();
   const { isLoading } = useWorkspaceStatus();
 
   const [conditions, setConditions] = useState<FilterConditionWithId[]>([{
@@ -553,6 +623,713 @@ const FilterTab: React.FC = () => {
   // AlertDialog state
   const [alertOpen, setAlertOpen] = useState(false);
   const [alertMessage, setAlertMessage] = useState('');
+
+
+  const [joinLeftNodeId, setJoinLeftNodeId] = useState('');
+  const [joinRightNodeId, setJoinRightNodeId] = useState('');
+  const [joinLeftColumn, setJoinLeftColumn] = useState('');
+  const [joinRightColumn, setJoinRightColumn] = useState('');
+  const [joinType, setJoinType] = useState<JoinType>('inner');
+  const [joinNewNodeName, setJoinNewNodeName] = useState('');
+  const [isJoining, setIsJoining] = useState(false);
+  const [joinPreviewPage, setJoinPreviewPage] = useState(1);
+  const [joinPreviewPageSize, setJoinPreviewPageSize] = useState(10);
+  const [joinPreviewData, setJoinPreviewData] = useState<PreviewRow[]>([]);
+  const [joinPreviewColumns, setJoinPreviewColumns] = useState<string[]>([]);
+  const [joinPreviewPagination, setJoinPreviewPagination] = useState<PreviewPagination | null>(null);
+  const [joinPreviewLoading, setJoinPreviewLoading] = useState(false);
+  const [joinPreviewError, setJoinPreviewError] = useState<string | null>(null);
+  const [joinDebouncedRequest, setJoinDebouncedRequest] = useState<JoinPreviewRequestSignature | null>(null);
+  const joinNameAutofillRef = useRef<string>('');
+
+  const [concatNewNodeName, setConcatNewNodeName] = useState('');
+  const [isConcatenating, setIsConcatenating] = useState(false);
+  const [concatPreviewPage, setConcatPreviewPage] = useState(1);
+  const [concatPreviewPageSize, setConcatPreviewPageSize] = useState(10);
+  const [concatPreviewData, setConcatPreviewData] = useState<PreviewRow[]>([]);
+  const [concatPreviewColumns, setConcatPreviewColumns] = useState<string[]>([]);
+  const [concatPreviewPagination, setConcatPreviewPagination] = useState<PreviewPagination | null>(null);
+  const [concatPreviewLoading, setConcatPreviewLoading] = useState(false);
+  const [concatPreviewError, setConcatPreviewError] = useState<string | null>(null);
+  const [concatDebouncedRequest, setConcatDebouncedRequest] = useState<ConcatPreviewRequestSignature | null>(null);
+  const concatNameAutofillRef = useRef<string>('');
+
+  const deriveNodeLabel = useCallback((node: WorkspaceNodeLike | null | undefined): string => {
+    if (!node) return '';
+    const data = (node?.data ?? {}) as Record<string, unknown>;
+    return (
+      (node as Record<string, unknown>).name as string | undefined ??
+      (data.nodeName as string | undefined) ??
+      (data.label as string | undefined) ??
+      ((node as Record<string, unknown>).label as string | undefined) ??
+      (node.id as string | undefined) ??
+      ((node as Record<string, unknown>).node_id as string | undefined) ??
+      ''
+    );
+  }, []);
+
+  const workspaceNodeMap = useMemo(() => {
+    const map = new Map<string, WorkspaceNodeLike>();
+    workspaceNodes.forEach((node: WorkspaceNodeLike) => {
+      const key = (node.id as string | undefined) ?? ((node as Record<string, unknown>).node_id as string | undefined);
+      if (key) {
+        map.set(key, node);
+      }
+    });
+    return map;
+  }, [workspaceNodes]);
+
+  const filterSelectedNodesForPanel = useMemo<WorkspaceNodeLike[]>(() => {
+    if (!selectedNodeId) return [];
+    const node = workspaceNodeMap.get(selectedNodeId);
+    return node ? [node] : [];
+  }, [selectedNodeId, workspaceNodeMap]);
+
+  const filterDefaultPalette = useMemo(
+    () => ['#2563eb', '#dc2626', '#16a34a', '#f97316', '#d946ef', '#0ea5e9'],
+    [],
+  );
+
+  const filterNodeColors = useMemo(() => {
+    if (!selectedNodeId) return {} as Record<string, string>;
+    return { [selectedNodeId]: filterDefaultPalette[0] ?? '#2563eb' };
+  }, [selectedNodeId, filterDefaultPalette]);
+
+  const filterNodeSelections = useMemo<NodeColumnSelection[]>(() => (
+    selectedNodeId ? [{ nodeId: selectedNodeId, column: '' }] : []
+  ), [selectedNodeId]);
+
+  const joinLeftNode = joinLeftNodeId ? workspaceNodeMap.get(joinLeftNodeId) : undefined;
+  const joinRightNode = joinRightNodeId ? workspaceNodeMap.get(joinRightNodeId) : undefined;
+
+  const joinNeedsColumns = joinType !== 'cross';
+
+  const getNodeColumnsForJoin = useCallback((nodeId: string): string[] => {
+    const node = workspaceNodeMap.get(nodeId);
+    if (!node) return [];
+    const data = (node.data ?? {}) as Record<string, unknown>;
+    if (Array.isArray(data.columns)) {
+      return (data.columns as unknown[]).map((entry) => String(entry));
+    }
+    if (data.dtypes && typeof data.dtypes === 'object') {
+      return Object.keys(data.dtypes as Record<string, unknown>);
+    }
+    if (data.schema && typeof data.schema === 'object') {
+      return Object.keys(data.schema as Record<string, unknown>);
+    }
+    return [];
+  }, [workspaceNodeMap]);
+
+  const joinDefaultPalette = useMemo(
+    () => ['#2563eb', '#dc2626', '#16a34a', '#f97316', '#d946ef', '#0ea5e9'],
+    [],
+  );
+
+  const joinNodeSelections = useMemo<NodeColumnSelection[]>(() => {
+    const selections: NodeColumnSelection[] = [];
+    if (joinLeftNodeId) {
+      selections.push({ nodeId: joinLeftNodeId, column: joinLeftColumn });
+    }
+    if (joinRightNodeId && joinRightNodeId !== joinLeftNodeId) {
+      selections.push({ nodeId: joinRightNodeId, column: joinRightColumn });
+    }
+    return selections;
+  }, [joinLeftNodeId, joinLeftColumn, joinRightNodeId, joinRightColumn]);
+
+  const joinNodeColors = useMemo(() => {
+    const colors: Record<string, string> = {};
+    if (joinLeftNodeId) colors[joinLeftNodeId] = '#2563eb';
+    if (joinRightNodeId) colors[joinRightNodeId] = '#dc2626';
+    return colors;
+  }, [joinLeftNodeId, joinRightNodeId]);
+
+  const getNodeKeyFromNode = useCallback((node: WorkspaceNodeLike): string => {
+    return (
+      (node.id as string | undefined) ??
+      (node.node_id as string | undefined) ??
+      ((node.data as Record<string, unknown> | undefined)?.id as string | undefined) ??
+      ((node.data as Record<string, unknown> | undefined)?.node_id as string | undefined) ??
+      ''
+    );
+  }, []);
+
+  const joinSelectedNodesForPanel = useMemo<WorkspaceNodeLike[]>(() => {
+    const nodes: WorkspaceNodeLike[] = [];
+    selectedNodeIds.slice(0, 2).forEach((nodeId) => {
+      const node = workspaceNodeMap.get(nodeId);
+      if (node) {
+        nodes.push(node);
+      }
+    });
+    return nodes;
+  }, [selectedNodeIds, workspaceNodeMap]);
+
+  const joinConfigReady = Boolean(
+    joinLeftNode &&
+    joinRightNode &&
+    joinLeftNodeId &&
+    joinRightNodeId &&
+    joinLeftNodeId !== joinRightNodeId &&
+    (!joinNeedsColumns || (joinLeftColumn && joinRightColumn))
+  );
+
+  const joinPreviewReady = activeSubtab === 'join' && joinConfigReady;
+
+  const joinPreviewColumnsToRender = useMemo(() => {
+    if (joinPreviewColumns.length > 0) return joinPreviewColumns;
+    if (joinPreviewData.length > 0 && typeof joinPreviewData[0] === 'object' && joinPreviewData[0] !== null) {
+      return Object.keys(joinPreviewData[0]);
+    }
+    return [];
+  }, [joinPreviewColumns, joinPreviewData]);
+
+  const joinPreviewTableColSpan = Math.max(joinPreviewColumnsToRender.length, 1);
+  const joinPreviewCurrentPage = joinPreviewPagination?.page ?? joinPreviewPage;
+  const joinDisplayTotalPages = joinPreviewPagination?.total_pages ?? Math.max(1, joinPreviewCurrentPage);
+
+  const joinSharedColumns = useMemo(() => {
+    if (!joinLeftNodeId || !joinRightNodeId) return [] as string[];
+    const leftColumns = getNodeColumnsForJoin(joinLeftNodeId);
+    const rightColumns = getNodeColumnsForJoin(joinRightNodeId);
+    return leftColumns.filter((column) => rightColumns.includes(column));
+  }, [joinLeftNodeId, joinRightNodeId, getNodeColumnsForJoin]);
+
+  const joinConfigIssues = useMemo(() => {
+    if (!joinLeftNodeId || !joinRightNodeId) {
+      return 'Pick two nodes to configure a join.';
+    }
+    if (joinLeftNodeId === joinRightNodeId) {
+      return 'Select two different nodes to join—joining a node to itself is not supported yet.';
+    }
+    if (joinNeedsColumns && (!joinLeftColumn || !joinRightColumn)) {
+      return 'Choose the columns that should match between the two nodes.';
+    }
+    if (joinNeedsColumns && joinSharedColumns.length === 0) {
+      return 'No matching column names detected. Select compatible columns manually or rename them to match.';
+    }
+    return '';
+  }, [joinLeftNodeId, joinRightNodeId, joinNeedsColumns, joinLeftColumn, joinRightColumn, joinSharedColumns]);
+
+  const joinStatusMessage = useMemo(() => {
+    if (joinConfigReady) {
+      if (joinNeedsColumns) {
+        return `Ready to join ${deriveNodeLabel(joinLeftNode)} and ${deriveNodeLabel(joinRightNode)} on ${joinLeftColumn} = ${joinRightColumn}.`;
+      }
+        return `Ready to run a ${joinType} join between ${deriveNodeLabel(joinLeftNode)} and ${deriveNodeLabel(joinRightNode)}.`;
+    }
+    return joinConfigIssues || 'Configure the join to preview results.';
+  }, [joinConfigReady, joinNeedsColumns, joinLeftNode, joinRightNode, joinLeftColumn, joinRightColumn, joinType, deriveNodeLabel, joinConfigIssues]);
+
+  const currentJoinTypeInfo = useMemo(() => JOIN_TYPE_OPTIONS.find((option) => option.value === joinType), [joinType]);
+
+  const handleJoinColorChange = useCallback(() => undefined, []);
+  const handleFilterColorChange = useCallback(() => undefined, []);
+
+  const handleJoinColumnChange = useCallback((nodeId: string, column: string) => {
+    if (nodeId === joinLeftNodeId) {
+      setJoinLeftColumn(column);
+    } else if (nodeId === joinRightNodeId) {
+      setJoinRightColumn(column);
+    }
+  }, [joinLeftNodeId, joinRightNodeId]);
+
+  const handleFilterColumnChange = useCallback(() => undefined, []);
+
+  const handleJoinPreviewPrev = useCallback(() => {
+    if (joinPreviewPagination?.has_prev && !joinPreviewLoading) {
+      setJoinPreviewPage((prev) => Math.max(1, prev - 1));
+    }
+  }, [joinPreviewPagination, joinPreviewLoading]);
+
+  const handleJoinPreviewNext = useCallback(() => {
+    if (joinPreviewPagination?.has_next && !joinPreviewLoading) {
+      setJoinPreviewPage((prev) => prev + 1);
+    }
+  }, [joinPreviewPagination, joinPreviewLoading]);
+
+  const handleJoinPreviewPageSizeChange = useCallback((value: string) => {
+    const nextSize = Number(value);
+    if (!Number.isNaN(nextSize)) {
+      setJoinPreviewPageSize(nextSize);
+      setJoinPreviewPage(1);
+    }
+  }, []);
+
+  const autoJoinName = useMemo(() => {
+    if (!joinLeftNodeId || !joinRightNodeId || joinLeftNodeId === joinRightNodeId) return '';
+    const leftName = deriveNodeLabel(joinLeftNode);
+    const rightName = deriveNodeLabel(joinRightNode);
+    if (!leftName || !rightName) return '';
+    return `${leftName}_${joinType}_join_${rightName}`.replace(/\s+/g, '_');
+  }, [joinLeftNodeId, joinRightNodeId, joinLeftNode, joinRightNode, joinType, deriveNodeLabel]);
+
+  useEffect(() => {
+    joinNameAutofillRef.current = autoJoinName || '';
+  }, [autoJoinName]);
+
+  useEffect(() => {
+    const nextLeft = selectedNodeIds[0] ?? '';
+    const nextRight = selectedNodeIds[1] ?? '';
+
+    setJoinLeftNodeId((prev) => (prev === nextLeft ? prev : nextLeft));
+    setJoinRightNodeId((prev) => (prev === nextRight ? prev : nextRight));
+  }, [selectedNodeIds]);
+
+  useEffect(() => {
+    if (joinType === 'cross') {
+      setJoinLeftColumn('');
+      setJoinRightColumn('');
+      return;
+    }
+    const leftColumns = joinLeftNodeId ? getNodeColumnsForJoin(joinLeftNodeId) : [];
+    const rightColumns = joinRightNodeId ? getNodeColumnsForJoin(joinRightNodeId) : [];
+    if (!leftColumns.length || !rightColumns.length) {
+      setJoinLeftColumn('');
+      setJoinRightColumn('');
+      return;
+    }
+    const common = leftColumns.filter((column) => rightColumns.includes(column));
+    setJoinLeftColumn((prev) => (prev && leftColumns.includes(prev) ? prev : common[0] ?? leftColumns[0] ?? ''));
+    setJoinRightColumn((prev) => (prev && rightColumns.includes(prev) ? prev : common[0] ?? rightColumns[0] ?? ''));
+  }, [joinLeftNodeId, joinRightNodeId, joinType, getNodeColumnsForJoin]);
+
+  useEffect(() => {
+    setJoinPreviewPage(1);
+  }, [joinLeftNodeId, joinRightNodeId, joinLeftColumn, joinRightColumn, joinType]);
+
+  const joinPreviewParams = useMemo<JoinPreviewRequestSignature | null>(() => {
+    if (!joinPreviewReady) return null;
+    return {
+      leftNodeId: joinLeftNodeId,
+      rightNodeId: joinRightNodeId,
+      leftOn: joinNeedsColumns ? joinLeftColumn : undefined,
+      rightOn: joinNeedsColumns ? joinRightColumn : undefined,
+      joinType,
+      page: joinPreviewPage,
+      pageSize: joinPreviewPageSize,
+    };
+  }, [joinPreviewReady, joinLeftNodeId, joinRightNodeId, joinNeedsColumns, joinLeftColumn, joinRightColumn, joinType, joinPreviewPage, joinPreviewPageSize]);
+
+  useEffect(() => {
+    if (activeSubtab !== 'join') {
+      setJoinDebouncedRequest(null);
+      setJoinPreviewLoading(false);
+      return;
+    }
+    if (!joinPreviewParams) {
+      setJoinDebouncedRequest(null);
+      setJoinPreviewData([]);
+      setJoinPreviewColumns([]);
+      setJoinPreviewPagination(null);
+      setJoinPreviewError(null);
+      setJoinPreviewLoading(false);
+      return;
+    }
+    const timeoutId = window.setTimeout(() => {
+      setJoinDebouncedRequest(joinPreviewParams);
+    }, 600);
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [joinPreviewParams, activeSubtab]);
+
+  useEffect(() => {
+    if (activeSubtab !== 'join') return;
+    if (!joinDebouncedRequest || !currentWorkspaceId) return;
+
+    let cancelled = false;
+    setJoinPreviewLoading(true);
+    setJoinPreviewError(null);
+
+    nodesApi.joinPreview(
+      currentWorkspaceId,
+      {
+        left_node_id: joinDebouncedRequest.leftNodeId,
+        right_node_id: joinDebouncedRequest.rightNodeId,
+        left_on: joinDebouncedRequest.leftOn,
+        right_on: joinDebouncedRequest.rightOn,
+        how: joinDebouncedRequest.joinType,
+      },
+      joinDebouncedRequest.page,
+      joinDebouncedRequest.pageSize,
+    )
+      .then((resp) => {
+        if (cancelled) return;
+        const rows: PreviewRow[] = Array.isArray(resp?.data) ? (resp.data as PreviewRow[]) : [];
+        const cols = Array.isArray(resp?.columns) ? resp.columns : [];
+        setJoinPreviewData(rows);
+        setJoinPreviewColumns(cols);
+        if (resp?.pagination) {
+          setJoinPreviewPagination(resp.pagination);
+          if (resp.pagination.page && resp.pagination.page !== joinPreviewPage) {
+            setJoinPreviewPage(resp.pagination.page);
+          }
+        } else {
+          setJoinPreviewPagination(null);
+        }
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        const message = error instanceof Error ? error.message : 'Failed to load join preview data';
+        setJoinPreviewError(message);
+        setJoinPreviewData([]);
+        setJoinPreviewColumns([]);
+        setJoinPreviewPagination(null);
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setJoinPreviewLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [joinDebouncedRequest, currentWorkspaceId, activeSubtab, joinPreviewPage]);
+
+  const handleApplyJoin = useCallback(async () => {
+    if (!joinConfigReady) {
+      setAlertMessage('Please select two different nodes and matching columns to join.');
+      setAlertOpen(true);
+      return;
+    }
+    const leftColumns = joinNeedsColumns ? [joinLeftColumn] : [];
+    const rightColumns = joinNeedsColumns ? [joinRightColumn] : [];
+    const requestedName = joinNewNodeName.trim() || joinNameAutofillRef.current || undefined;
+    try {
+      setIsJoining(true);
+      await joinNodes(joinLeftNodeId, joinRightNodeId, joinType, leftColumns, rightColumns, requestedName);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error applying join';
+      setAlertMessage(`Error applying join: ${message}`);
+      setAlertOpen(true);
+    } finally {
+      setIsJoining(false);
+    }
+  }, [joinConfigReady, joinNeedsColumns, joinLeftColumn, joinRightColumn, joinNewNodeName, joinLeftNodeId, joinRightNodeId, joinType, joinNodes]);
+
+  const uniqueConcatNodeIds = useMemo(() => {
+    const seen = new Set<string>();
+    return selectedNodeIds.filter((nodeId) => {
+      if (!nodeId || seen.has(nodeId)) return false;
+      seen.add(nodeId);
+      return true;
+    });
+  }, [selectedNodeIds]);
+
+  const concatNodeIds = useMemo(() => uniqueConcatNodeIds.slice(0, MAX_CONCAT_NODES), [uniqueConcatNodeIds]);
+  const concatOriginalCount = uniqueConcatNodeIds.length;
+
+  const concatSelectedNodes = useMemo<WorkspaceNodeLike[]>(() => {
+    return concatNodeIds
+      .map((nodeId) => workspaceNodeMap.get(nodeId))
+      .filter((node): node is WorkspaceNodeLike => Boolean(node));
+  }, [concatNodeIds, workspaceNodeMap]);
+
+  const concatNodeSummaries = useMemo<ConcatNodeSummary[]>(() => {
+    return concatSelectedNodes.map((node) => {
+      const nodeId = getNodeKeyFromNode(node);
+      const displayName = deriveNodeLabel(node) || nodeId;
+      const data = (node.data ?? {}) as Record<string, unknown>;
+
+      let columns: string[] = [];
+      if (Array.isArray(data.columns)) {
+        columns = (data.columns as unknown[]).map((entry) => String(entry));
+      }
+
+      let rawDtypes: Record<string, string> = {};
+      if (data.dtypes && typeof data.dtypes === 'object') {
+        rawDtypes = Object.entries(data.dtypes as Record<string, unknown>).reduce<Record<string, string>>((acc, [col, dtype]) => {
+          acc[col] = String(dtype);
+          return acc;
+        }, {});
+      } else if (data.schema && typeof data.schema === 'object') {
+        rawDtypes = Object.entries(data.schema as Record<string, unknown>).reduce<Record<string, string>>((acc, [col, dtype]) => {
+          acc[col] = String(dtype);
+          return acc;
+        }, {});
+      }
+
+      if (!columns.length) {
+        columns = Object.keys(rawDtypes);
+      }
+
+      const uniqueColumns = Array.from(new Set(columns.map((name) => String(name))));
+      const normalizedColumns = [...uniqueColumns].sort((a, b) => a.localeCompare(b));
+      const normalizedDtypes = normalizedColumns.reduce<Record<string, string>>((acc, column) => {
+        const dtype = rawDtypes[column];
+        acc[column] = dtype ? dtype.toString().toLowerCase() : '';
+        return acc;
+      }, {});
+
+      return {
+        nodeId,
+        displayName,
+        columns: uniqueColumns,
+        normalizedColumns,
+        dtypes: normalizedDtypes,
+        rawDtypes,
+        columnCount: uniqueColumns.length,
+      };
+    });
+  }, [concatSelectedNodes, deriveNodeLabel, getNodeKeyFromNode]);
+
+  const concatDefaultPalette = useMemo(
+    () => ['#2563eb', '#dc2626', '#16a34a', '#f97316', '#d946ef', '#0ea5e9', '#f59e0b', '#14b8a6'],
+    [],
+  );
+
+  const concatNodeColors = useMemo(() => {
+    const colors: Record<string, string> = {};
+    concatNodeIds.forEach((nodeId, index) => {
+      colors[nodeId] = concatDefaultPalette[index % concatDefaultPalette.length];
+    });
+    return colors;
+  }, [concatNodeIds, concatDefaultPalette]);
+
+  const concatNodeSelections = useMemo<NodeColumnSelection[]>(() => (
+    concatNodeIds.map((nodeId) => ({ nodeId, column: '' }))
+  ), [concatNodeIds]);
+
+  const handleConcatColumnChange = useCallback(() => undefined, []);
+  const handleConcatColorChange = useCallback(() => undefined, []);
+
+  const concatAnalysis = useMemo<ConcatSchemaAnalysis>(() => {
+    const result: ConcatSchemaAnalysis = {
+      summaries: concatNodeSummaries,
+      ready: false,
+      issues: '',
+      mismatches: [],
+      baseColumns: [],
+      baseColumnCount: 0,
+    };
+
+    if (concatNodeSummaries.length === 0) {
+      result.issues = 'Select nodes in the workspace to enable concatenation.';
+      return result;
+    }
+
+    if (concatNodeSummaries.length < 2) {
+      result.issues = 'Pick at least two nodes to concatenate.';
+      return result;
+    }
+
+    const base = concatNodeSummaries[0];
+    if (!base.normalizedColumns.length) {
+      result.issues = `${base.displayName || base.nodeId} has no columns to align.`;
+      return result;
+    }
+
+    result.baseColumns = base.normalizedColumns;
+    result.baseColumnCount = base.normalizedColumns.length;
+
+    const baseColumnSet = new Set(base.normalizedColumns);
+    const baseDtypes = base.normalizedColumns.reduce<Record<string, string>>((acc, column) => {
+      acc[column] = base.dtypes[column] ?? '';
+      return acc;
+    }, {});
+
+    concatNodeSummaries.slice(1).forEach((summary) => {
+      const summaryColumnSet = new Set(summary.normalizedColumns);
+      const missing = Array.from(baseColumnSet).filter((column) => !summaryColumnSet.has(column));
+      const extra = Array.from(summaryColumnSet).filter((column) => !baseColumnSet.has(column));
+      const typeMismatches = Array.from(baseColumnSet).filter((column) => {
+        if (!summaryColumnSet.has(column)) return false;
+        const baseType = baseDtypes[column] ?? '';
+        const summaryType = summary.dtypes[column] ?? '';
+        return baseType && summaryType && baseType !== summaryType;
+      });
+
+      const details: string[] = [];
+      if (missing.length) {
+        details.push(`Missing columns: ${missing.sort().join(', ')}`);
+      }
+      if (extra.length) {
+        details.push(`Extra columns: ${extra.sort().join(', ')}`);
+      }
+      if (typeMismatches.length) {
+        const mismatchText = typeMismatches
+          .sort()
+          .map((column) => `${column} (${baseDtypes[column] || 'unknown'} vs ${summary.dtypes[column] || 'unknown'})`)
+          .join(', ');
+        details.push(`Type mismatches: ${mismatchText}`);
+      }
+
+      if (details.length) {
+        result.mismatches.push({
+          nodeId: summary.nodeId,
+          nodeName: summary.displayName || summary.nodeId,
+          details,
+        });
+      }
+    });
+
+    if (result.mismatches.length === 0) {
+      result.ready = true;
+      result.issues = `Ready to concatenate ${concatNodeSummaries.length} nodes (${result.baseColumnCount} columns).`;
+    } else {
+      result.issues = 'Resolve schema mismatches before concatenating.';
+    }
+
+    return result;
+  }, [concatNodeSummaries]);
+
+  const concatUsedNodeIds = useMemo(() => concatAnalysis.summaries.map((summary) => summary.nodeId), [concatAnalysis.summaries]);
+  const concatUsedNodeIdsSignature = useMemo(() => concatUsedNodeIds.join('|'), [concatUsedNodeIds]);
+
+  const concatPreviewReady = activeSubtab === 'concat' && concatAnalysis.ready;
+
+  const concatPreviewColumnsToRender = useMemo(() => {
+    if (concatPreviewColumns.length > 0) return concatPreviewColumns;
+    if (concatPreviewData.length > 0 && typeof concatPreviewData[0] === 'object' && concatPreviewData[0] !== null) {
+      return Object.keys(concatPreviewData[0]);
+    }
+    return [];
+  }, [concatPreviewColumns, concatPreviewData]);
+
+  const concatPreviewTableColSpan = Math.max(concatPreviewColumnsToRender.length, 1);
+  const concatPreviewCurrentPage = concatPreviewPagination?.page ?? concatPreviewPage;
+  const concatDisplayTotalPages = concatPreviewPagination?.total_pages ?? Math.max(1, concatPreviewCurrentPage);
+  const concatStatusMessage = concatAnalysis.issues;
+
+  const autoConcatName = useMemo(() => {
+    if (!concatAnalysis.summaries.length) return '';
+    const labels = concatAnalysis.summaries.map((summary) => summary.displayName || summary.nodeId).filter(Boolean);
+    if (!labels.length) return '';
+    if (labels.length <= 3) {
+      return `Concat(${labels.join(', ')})`;
+    }
+    const shortened = `${labels.slice(0, 3).join(', ')}, …`;
+    return `Concat(${shortened})`;
+  }, [concatAnalysis.summaries]);
+
+  useEffect(() => {
+    concatNameAutofillRef.current = autoConcatName || '';
+  }, [autoConcatName]);
+
+  useEffect(() => {
+    setConcatPreviewPage(1);
+  }, [concatUsedNodeIdsSignature]);
+
+  const concatPreviewParams = useMemo<ConcatPreviewRequestSignature | null>(() => {
+    if (!concatPreviewReady) return null;
+    return {
+      nodeIds: concatUsedNodeIds,
+      page: concatPreviewPage,
+      pageSize: concatPreviewPageSize,
+    };
+  }, [concatPreviewReady, concatUsedNodeIds, concatPreviewPage, concatPreviewPageSize]);
+
+  useEffect(() => {
+    if (activeSubtab !== 'concat') {
+      setConcatDebouncedRequest(null);
+      setConcatPreviewLoading(false);
+      return;
+    }
+    if (!concatPreviewParams) {
+      setConcatDebouncedRequest(null);
+      setConcatPreviewData([]);
+      setConcatPreviewColumns([]);
+      setConcatPreviewPagination(null);
+      setConcatPreviewError(null);
+      setConcatPreviewLoading(false);
+      return;
+    }
+    const timeoutId = window.setTimeout(() => {
+      setConcatDebouncedRequest(concatPreviewParams);
+    }, 600);
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [concatPreviewParams, activeSubtab]);
+
+  useEffect(() => {
+    if (activeSubtab !== 'concat') return;
+    if (!concatDebouncedRequest) return;
+
+    let cancelled = false;
+    setConcatPreviewLoading(true);
+    setConcatPreviewError(null);
+
+    concatPreview(concatDebouncedRequest.nodeIds, concatDebouncedRequest.page, concatDebouncedRequest.pageSize)
+      .then((resp) => {
+        if (cancelled) return;
+        const rows: PreviewRow[] = Array.isArray(resp?.data) ? (resp.data as PreviewRow[]) : [];
+        const cols = Array.isArray(resp?.columns) ? resp.columns : [];
+        setConcatPreviewData(rows);
+        setConcatPreviewColumns(cols);
+        if (resp?.pagination) {
+          setConcatPreviewPagination(resp.pagination);
+          if (resp.pagination.page && resp.pagination.page !== concatPreviewPage) {
+            setConcatPreviewPage(resp.pagination.page);
+          }
+        } else {
+          setConcatPreviewPagination(null);
+        }
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        const message = error instanceof Error ? error.message : 'Failed to load concat preview data';
+        setConcatPreviewError(message);
+        setConcatPreviewData([]);
+        setConcatPreviewColumns([]);
+        setConcatPreviewPagination(null);
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setConcatPreviewLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [concatDebouncedRequest, concatPreview, activeSubtab, concatPreviewPage]);
+
+  const handleConcatPreviewPrev = useCallback(() => {
+    if (concatPreviewPagination?.has_prev && !concatPreviewLoading) {
+      setConcatPreviewPage((prev) => Math.max(1, prev - 1));
+    }
+  }, [concatPreviewPagination, concatPreviewLoading]);
+
+  const handleConcatPreviewNext = useCallback(() => {
+    if (concatPreviewPagination?.has_next && !concatPreviewLoading) {
+      setConcatPreviewPage((prev) => prev + 1);
+    }
+  }, [concatPreviewPagination, concatPreviewLoading]);
+
+  const handleConcatPreviewPageSizeChange = useCallback((value: string) => {
+    const nextSize = Number(value);
+    if (!Number.isNaN(nextSize)) {
+      setConcatPreviewPageSize(nextSize);
+      setConcatPreviewPage(1);
+    }
+  }, []);
+
+  const handleApplyConcat = useCallback(async () => {
+    if (!concatAnalysis.ready) {
+      setAlertMessage(concatStatusMessage || 'Select at least two compatible nodes to concatenate.');
+      setAlertOpen(true);
+      return;
+    }
+    const nodeIds = concatAnalysis.summaries.map((summary) => summary.nodeId);
+    if (nodeIds.length < 2) {
+      setAlertMessage('Pick at least two nodes to concatenate.');
+      setAlertOpen(true);
+      return;
+    }
+    const requestedName = concatNewNodeName.trim() || concatNameAutofillRef.current || undefined;
+    try {
+      setIsConcatenating(true);
+      await concatNodes(nodeIds, requestedName);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error applying concat';
+      setAlertMessage(`Error applying concat: ${message}`);
+      setAlertOpen(true);
+    } finally {
+      setIsConcatenating(false);
+    }
+  }, [concatAnalysis, concatStatusMessage, concatNewNodeName, concatNodes]);
 
   // Get available columns with their datatypes from node data
   const availableColumns = useMemo(() => {
@@ -1029,68 +1806,35 @@ const FilterTab: React.FC = () => {
               </div>
             </CardHeader>
             <CardContent className="space-y-6 pt-0">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-medium text-muted-foreground">
-                    Selected Node ({hasSelection ? 1 : 0}/1)
-                  </span>
-                </div>
-                {!hasSelection ? (
-                  <div className="rounded-md border border-dashed border-muted-foreground/40 bg-muted/40 p-3 text-sm italic text-muted-foreground">
-                    No nodes selected. Single click on a node in the workspace view to select it (max 1 for this operation).
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="rounded-lg border border-border bg-muted/40 p-4">
-                      <div className="break-words text-sm font-medium text-foreground">
-                        {selectedNode?.data?.nodeName || selectedNode?.data?.label || selectedNode?.data?.name || selectedNode?.label || selectedNode?.id || selectedNodeId}
-                      </div>
-                      <div className="break-all text-xs text-muted-foreground">{selectedNodeId}</div>
-                    </div>
+              <NodeSelectionPanel
+                selectedNodes={filterSelectedNodesForPanel}
+                nodeColumnSelections={filterNodeSelections}
+                onColumnChange={handleFilterColumnChange}
+                nodeColors={filterNodeColors}
+                onColorChange={handleFilterColorChange}
+                defaultPalette={filterDefaultPalette}
+                maxCompare={1}
+                className="rounded-lg border border-border/60 bg-muted/40"
+                showColorPicker={false}
+                showColumnPicker={false}
+                showHeaderLabel
+                showShape
+                getNodeShapeFn={getNodeShape}
+                disabled={filterSelectedNodesForPanel.length === 0}
+                originalCount={selectedNodes.length}
+              />
 
-                    {isSchemaLoading ? (
-                      <div className="rounded-md border border-dashed border-amber-400/60 bg-amber-100/70 p-4 text-sm text-amber-900">
-                        Loading column metadata…
-                      </div>
-                    ) : hasSchema ? (
-                      <div className="space-y-2">
-                        <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Schema</div>
-                        <div className="overflow-x-auto rounded-md border border-border bg-card">
-                          <Table>
-                            <TableBody>
-                              <TableRow>
-                                {availableColumns.map((col) => (
-                                  <TableCell
-                                    key={`${col.name}-name`}
-                                    className="min-w-[6rem] border-b border-border px-2 py-1 font-mono text-[11px] font-semibold text-foreground"
-                                  >
-                                    {col.name}
-                                  </TableCell>
-                                ))}
-                              </TableRow>
-                              <TableRow>
-                                {availableColumns.map((col) => (
-                                  <TableCell
-                                    key={`${col.name}-type`}
-                                    className="min-w-[6rem] px-2 py-1 font-mono text-[11px] text-muted-foreground"
-                                  >
-                                    {col.dataType}
-                                  </TableCell>
-                                ))}
-                              </TableRow>
-                            </TableBody>
-                          </Table>
-                        </div>
-                        <div className="text-[10px] text-muted-foreground">Scroll horizontally to view all {availableColumns.length} column(s).</div>
-                      </div>
-                    ) : (
-                      <div className="rounded-md border border-dashed border-amber-400/60 bg-amber-100/70 p-4 text-sm text-amber-900">
-                        No schema information is available for this node yet.
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
+              {hasSelection && isSchemaLoading && (
+                <div className="rounded-md border border-dashed border-amber-400/60 bg-amber-100/70 p-4 text-sm text-amber-900">
+                  Loading column metadata…
+                </div>
+              )}
+
+              {hasSelection && !isSchemaLoading && !hasSchema && (
+                <div className="rounded-md border border-dashed border-amber-400/60 bg-amber-100/70 p-4 text-sm text-amber-900">
+                  No schema information is available for this node yet.
+                </div>
+              )}
 
               <div className="space-y-4">
                 <div className="flex items-center justify-between gap-4">
@@ -1406,29 +2150,492 @@ const FilterTab: React.FC = () => {
 
         <TabsContent value="join" className="space-y-6">
           <Card>
-            <CardHeader>
-              <CardTitle>Join datasets</CardTitle>
-              <CardDescription>Combine nodes on matching keys. Join workflows are coming soon.</CardDescription>
+            <CardHeader className="space-y-0 pb-4">
+              <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <CardTitle>Join datasets</CardTitle>
+                  <CardDescription>
+                    Combine two workspace nodes using relational joins and preview the result before committing it to the graph.
+                  </CardDescription>
+                </div>
+                {(isJoining || isLoading.operations) && (
+                  <span className="inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-border bg-muted/60 px-3 py-1 text-xs font-medium text-muted-foreground">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Joining…
+                  </span>
+                )}
+              </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-6 pt-0">
               <p className="text-sm text-muted-foreground">
-                Planned join helpers will surface key suggestions and preview resulting columns before you apply the operation.
+                Select up to two nodes in the workspace (Shift/⌘-click) to configure a join. Column pickers will appear below for the current selection.
               </p>
+
+              {joinConfigIssues && !joinConfigReady && (
+                <div className="rounded-md border border-amber-500/50 bg-amber-100/60 p-3 text-sm text-amber-900">
+                  {joinConfigIssues}
+                </div>
+              )}
+
+              <NodeSelectionPanel
+                selectedNodes={joinSelectedNodesForPanel}
+                nodeColumnSelections={joinNodeSelections}
+                onColumnChange={handleJoinColumnChange}
+                nodeColors={joinNodeColors}
+                onColorChange={handleJoinColorChange}
+                getNodeColumns={(node) => {
+                  const key = getNodeKeyFromNode(node);
+                  return key ? getNodeColumnsForJoin(key) : [];
+                }}
+                defaultPalette={joinDefaultPalette}
+                maxCompare={2}
+                className="rounded-lg border border-border/60 bg-muted/40"
+                showColorPicker={false}
+                showHeaderLabel
+                showShape
+                getNodeShapeFn={getNodeShape}
+                disabled={joinSelectedNodesForPanel.length < 2}
+                originalCount={selectedNodes.length}
+                columnLabelFn={(node) => {
+                  const nodeId = getNodeKeyFromNode(node);
+                  if (nodeId === joinLeftNodeId) return 'Left column:';
+                  if (nodeId === joinRightNodeId) return 'Right column:';
+                  return 'Join column:';
+                }}
+              />
+
+              {joinNeedsColumns && joinLeftNodeId && joinRightNodeId && joinLeftNodeId !== joinRightNodeId && (
+                <div className="text-xs text-muted-foreground">
+                  {joinSharedColumns.length > 0
+                    ? `Found ${joinSharedColumns.length} shared column${joinSharedColumns.length === 1 ? '' : 's'} (${joinSharedColumns.slice(0, 4).join(', ')}${joinSharedColumns.length > 4 ? ', …' : ''}).`
+                    : 'No matching column names detected. Select compatible columns manually.'}
+                </div>
+              )}
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="join-type">Join type</Label>
+                  <Select value={joinType} onValueChange={(value) => setJoinType(value as JoinType)}>
+                    <SelectTrigger id="join-type">
+                      <SelectValue placeholder="Select join type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {JOIN_TYPE_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.value}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {currentJoinTypeInfo && (
+                    <p className="text-xs text-muted-foreground">{currentJoinTypeInfo.description}</p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="join-new-node-name">New node name</Label>
+                  <Input
+                    id="join-new-node-name"
+                    value={joinNewNodeName}
+                    placeholder={autoJoinName || 'Joined dataset'}
+                    onChange={(event) => setJoinNewNodeName(event.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">Leave blank to use the suggested name shown in gray.</p>
+                </div>
+              </div>
             </CardContent>
+            <CardFooter className="flex flex-col gap-3 border-t pt-4 md:flex-row md:items-center md:justify-between">
+              <div className="text-sm text-muted-foreground">{joinStatusMessage}</div>
+              <Button
+                type="button"
+                onClick={handleApplyJoin}
+                disabled={!joinConfigReady || !currentWorkspaceId || isJoining || isLoading.operations}
+              >
+                {isJoining ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Joining…
+                  </>
+                ) : (
+                  'Add to Workspace'
+                )}
+              </Button>
+            </CardFooter>
+          </Card>
+
+          <Card>
+            <CardHeader className="space-y-0 pb-4">
+              <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <CardTitle>Preview join output</CardTitle>
+                  <CardDescription>Inspect a sample of the joined rows before creating the node.</CardDescription>
+                </div>
+                {joinPreviewLoading && (
+                  <span className="inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-border bg-muted/60 px-3 py-1 text-xs font-medium text-muted-foreground">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Loading preview…
+                  </span>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-0">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                  <span>Rows per page</span>
+                  <Select
+                    value={String(joinPreviewPageSize)}
+                    onValueChange={handleJoinPreviewPageSizeChange}
+                    disabled={!joinPreviewReady || joinPreviewLoading}
+                  >
+                    <SelectTrigger className="w-[5.5rem]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PREVIEW_PAGE_SIZE_OPTIONS.map((size) => (
+                        <SelectItem key={`join-page-size-${size}`} value={String(size)}>
+                          {size}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {joinPreviewPagination?.total_rows !== undefined && joinPreviewPagination?.total_rows !== null && (
+                  <div className="text-xs text-muted-foreground">
+                    Estimated total rows: {joinPreviewPagination.total_rows.toLocaleString()}
+                  </div>
+                )}
+              </div>
+
+              {!joinConfigReady ? (
+                <div className="rounded-md border border-dashed border-muted-foreground/50 bg-muted/30 p-4 text-sm text-muted-foreground">
+                  {joinConfigIssues || 'Select two nodes and configure the join to view a preview.'}
+                </div>
+              ) : joinPreviewError ? (
+                <div className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
+                  {joinPreviewError}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {joinType === 'cross' && (
+                    <div className="rounded-md border border-amber-500/50 bg-amber-100/60 p-3 text-xs text-amber-900">
+                      Cross joins can create very large outputs. The preview only displays {joinPreviewPageSize} rows at a time.
+                    </div>
+                  )}
+                  <div className="overflow-x-auto rounded-md border border-border bg-card">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          {joinPreviewColumnsToRender.length > 0 ? (
+                            joinPreviewColumnsToRender.map((column) => (
+                              <TableHead
+                                key={`join-preview-header-${column}`}
+                                className="min-w-[8rem] px-2 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                              >
+                                {column}
+                              </TableHead>
+                            ))
+                          ) : (
+                            <TableHead className="px-2 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                              Preview
+                            </TableHead>
+                          )}
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {joinPreviewLoading && joinPreviewData.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={joinPreviewTableColSpan} className="py-8 text-center text-sm text-muted-foreground">
+                              Loading preview rows…
+                            </TableCell>
+                          </TableRow>
+                        ) : joinPreviewData.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={joinPreviewTableColSpan} className="py-8 text-center text-sm text-muted-foreground">
+                              No rows returned for this configuration.
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          joinPreviewData.map((row, rowIndex) => (
+                            <TableRow key={`join-preview-row-${rowIndex}`}>
+                              {joinPreviewColumnsToRender.map((column) => (
+                                <TableCell
+                                  key={`join-preview-cell-${rowIndex}-${column}`}
+                                  className="whitespace-pre-wrap px-2 py-1 text-sm font-mono text-foreground"
+                                >
+                                  {formatPreviewValue((row as PreviewRow)[column])}
+                                </TableCell>
+                              ))}
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+            {joinPreviewReady && (
+              <CardFooter className="flex items-center justify-between border-t pt-4">
+                <div className="text-sm text-muted-foreground">
+                  Page {joinPreviewCurrentPage} of {joinDisplayTotalPages}
+                </div>
+                <div className="flex items-center gap-3">
+                  <Button
+                    type="button"
+                    onClick={handleJoinPreviewPrev}
+                    disabled={!joinPreviewPagination?.has_prev || joinPreviewLoading}
+                    size="sm"
+                    variant="outline"
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={handleJoinPreviewNext}
+                    disabled={!joinPreviewPagination?.has_next || joinPreviewLoading}
+                    size="sm"
+                    variant="outline"
+                  >
+                    Next
+                  </Button>
+                </div>
+              </CardFooter>
+            )}
           </Card>
         </TabsContent>
 
         <TabsContent value="concat" className="space-y-6">
           <Card>
-            <CardHeader>
-              <CardTitle>Concatenate datasets</CardTitle>
-              <CardDescription>Stack compatible nodes vertically or merge columns. Concat tooling is on the roadmap.</CardDescription>
+            <CardHeader className="space-y-0 pb-4">
+              <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <CardTitle>Concatenate datasets</CardTitle>
+                  <CardDescription>Stack compatible nodes vertically into a single dataset.</CardDescription>
+                </div>
+                {(isConcatenating || isLoading.operations) && (
+                  <span className="inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-border bg-muted/60 px-3 py-1 text-xs font-medium text-muted-foreground">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Concatenating…
+                  </span>
+                )}
+              </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-6 pt-0">
               <p className="text-sm text-muted-foreground">
-                Upcoming concat operations will help you align schemas, track provenance, and preview row counts before committing.
+                Multi-select nodes in the workspace (Shift/⌘-click) to stack them vertically. We′ll align schemas and preserve column order.
               </p>
+
+              <NodeSelectionPanel
+                selectedNodes={concatSelectedNodes}
+                nodeColumnSelections={concatNodeSelections}
+                onColumnChange={handleConcatColumnChange}
+                nodeColors={concatNodeColors}
+                onColorChange={handleConcatColorChange}
+                defaultPalette={concatDefaultPalette}
+                maxCompare={MAX_CONCAT_NODES}
+                className="rounded-lg border border-border/60 bg-muted/40"
+                showColorPicker={false}
+                showColumnPicker={false}
+                showHeaderLabel
+                showShape
+                getNodeShapeFn={getNodeShape}
+                disabled={concatSelectedNodes.length < 2}
+                originalCount={concatOriginalCount}
+              />
+
+              {concatOriginalCount > MAX_CONCAT_NODES && (
+                <div className="rounded-md border border-amber-500/50 bg-amber-100/60 p-3 text-sm text-amber-900">
+                  Using the first {MAX_CONCAT_NODES} of {concatOriginalCount} selected nodes. Deselect extras to include them.
+                </div>
+              )}
+
+              {concatAnalysis.mismatches.length > 0 && (
+                <div className="space-y-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+                  <div className="font-semibold">Schema mismatches detected:</div>
+                  <ul className="space-y-2">
+                    {concatAnalysis.mismatches.map((mismatch) => (
+                      <li key={`concat-mismatch-${mismatch.nodeId}`} className="space-y-1">
+                        <div className="font-medium">{mismatch.nodeName}</div>
+                        {mismatch.details.map((detail, idx) => (
+                          <div key={`concat-mismatch-${mismatch.nodeId}-${idx}`} className="text-destructive">
+                            {detail}
+                          </div>
+                        ))}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="concat-new-node-name">New node name</Label>
+                  <Input
+                    id="concat-new-node-name"
+                    value={concatNewNodeName}
+                    placeholder={autoConcatName || 'Concatenated dataset'}
+                    onChange={(event) => setConcatNewNodeName(event.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">Leave blank to use the suggested name shown in gray.</p>
+                </div>
+                <div className="space-y-2">
+                  <Label>Schema status</Label>
+                  <div className="rounded-md border border-muted-foreground/40 bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+                    {concatStatusMessage}
+                  </div>
+                </div>
+              </div>
             </CardContent>
+            <CardFooter className="flex flex-col gap-3 border-t pt-4 md:flex-row md:items-center md:justify-between">
+              <div className="text-sm text-muted-foreground">{concatStatusMessage}</div>
+              <Button
+                type="button"
+                onClick={handleApplyConcat}
+                disabled={!concatAnalysis.ready || !currentWorkspaceId || isConcatenating || isLoading.operations}
+              >
+                {isConcatenating ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Concatenating…
+                  </>
+                ) : (
+                  'Add to Workspace'
+                )}
+              </Button>
+            </CardFooter>
+          </Card>
+
+          <Card>
+            <CardHeader className="space-y-0 pb-4">
+              <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <CardTitle>Preview concat output</CardTitle>
+                  <CardDescription>Inspect a sample of the stacked rows before creating the node.</CardDescription>
+                </div>
+                {concatPreviewLoading && (
+                  <span className="inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-border bg-muted/60 px-3 py-1 text-xs font-medium text-muted-foreground">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Loading preview…
+                  </span>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-0">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                  <span>Rows per page</span>
+                  <Select
+                    value={String(concatPreviewPageSize)}
+                    onValueChange={handleConcatPreviewPageSizeChange}
+                    disabled={!concatPreviewReady || concatPreviewLoading}
+                  >
+                    <SelectTrigger className="w-[5.5rem]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PREVIEW_PAGE_SIZE_OPTIONS.map((size) => (
+                        <SelectItem key={`concat-page-size-${size}`} value={String(size)}>
+                          {size}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {concatPreviewPagination?.total_rows !== undefined && concatPreviewPagination?.total_rows !== null && (
+                  <div className="text-xs text-muted-foreground">
+                    Estimated total rows: {concatPreviewPagination.total_rows.toLocaleString()}
+                  </div>
+                )}
+              </div>
+
+              {!concatPreviewReady ? (
+                <div className="rounded-md border border-dashed border-muted-foreground/50 bg-muted/30 p-4 text-sm text-muted-foreground">
+                  {concatAnalysis.summaries.length < 2
+                    ? 'Select at least two nodes to generate a concat preview.'
+                    : concatStatusMessage}
+                </div>
+              ) : concatPreviewError ? (
+                <div className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
+                  {concatPreviewError}
+                </div>
+              ) : (
+                <div className="overflow-x-auto rounded-md border border-border bg-card">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        {concatPreviewColumnsToRender.length > 0 ? (
+                          concatPreviewColumnsToRender.map((column) => (
+                            <TableHead
+                              key={`concat-preview-header-${column}`}
+                              className="min-w-[8rem] px-2 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                            >
+                              {column}
+                            </TableHead>
+                          ))
+                        ) : (
+                          <TableHead className="px-2 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            Preview
+                          </TableHead>
+                        )}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {concatPreviewLoading && concatPreviewData.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={concatPreviewTableColSpan} className="py-8 text-center text-sm text-muted-foreground">
+                            Loading preview rows…
+                          </TableCell>
+                        </TableRow>
+                      ) : concatPreviewData.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={concatPreviewTableColSpan} className="py-8 text-center text-sm text-muted-foreground">
+                            No rows returned for this configuration.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        concatPreviewData.map((row, rowIndex) => (
+                          <TableRow key={`concat-preview-row-${rowIndex}`}>
+                            {concatPreviewColumnsToRender.map((column) => (
+                              <TableCell
+                                key={`concat-preview-cell-${rowIndex}-${column}`}
+                                className="whitespace-pre-wrap px-2 py-1 text-sm font-mono text-foreground"
+                              >
+                                {formatPreviewValue((row as PreviewRow)[column])}
+                              </TableCell>
+                            ))}
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+            {concatPreviewReady && (
+              <CardFooter className="flex items-center justify-between border-t pt-4">
+                <div className="text-sm text-muted-foreground">
+                  Page {concatPreviewCurrentPage} of {concatDisplayTotalPages}
+                </div>
+                <div className="flex items-center gap-3">
+                  <Button
+                    type="button"
+                    onClick={handleConcatPreviewPrev}
+                    disabled={!concatPreviewPagination?.has_prev || concatPreviewLoading}
+                    size="sm"
+                    variant="outline"
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={handleConcatPreviewNext}
+                    disabled={!concatPreviewPagination?.has_next || concatPreviewLoading}
+                    size="sm"
+                    variant="outline"
+                  >
+                    Next
+                  </Button>
+                </div>
+              </CardFooter>
+            )}
           </Card>
         </TabsContent>
 

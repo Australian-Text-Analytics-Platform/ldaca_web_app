@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { get, post, del, httpRequest } from './http';
 
 export type ConversionTarget = 'docdataframe' | 'dataframe' | 'doclazyframe' | 'lazyframe';
@@ -27,7 +28,10 @@ export interface FilterCondition {
 export interface FilterRequest { conditions: FilterCondition[]; logic?: string; new_node_name?: string; }
 export interface SliceRequest { start_row?: number; end_row?: number; columns?: string[]; new_node_name?: string; }
 export interface JoinNodesRequest { left_node_id: string; right_node_id: string; left_on: string; right_on: string; how?: string; new_node_name?: string; }
+export interface JoinPreviewParams { left_node_id: string; right_node_id: string; left_on?: string; right_on?: string; how?: string; }
 export interface CastNodeRequest { column: string; target_type: string; format?: string; }
+export interface ConcatPreviewRequest { node_ids: string[]; }
+export interface ConcatRequest extends ConcatPreviewRequest { new_node_name?: string }
 export interface FilterPreviewResponse {
   data: any[];
   columns: string[];
@@ -41,6 +45,7 @@ export interface FilterPreviewResponse {
     has_prev: boolean;
   };
 }
+export type JoinPreviewResponse = FilterPreviewResponse;
 
 export const nodesApi = {
   info: (ws: string, node: string, headers: Record<string,string> = {}) => get(`/workspaces/${ws}/nodes/${node}`, headers),
@@ -54,6 +59,38 @@ export const nodesApi = {
   convert: (ws: string, node: string, target: ConversionTarget, documentColumn?: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/nodes/${node}/convert`, { method: 'POST', headers, params: { target, ...(documentColumn && { document_column: documentColumn }) } }),
   resetDocument: (ws: string, node: string, documentColumn?: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/nodes/${node}/reset-document`, { method: 'POST', headers, params: documentColumn ? { document_column: documentColumn } : {} }),
   join: (ws: string, req: JoinNodesRequest, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/nodes/join`, { method: 'POST', headers, params: req }),
+  joinPreview: (
+    ws: string,
+    req: JoinPreviewParams,
+    page = 1,
+    pageSize = 10,
+    headers: Record<string,string> = {},
+  ) => {
+    const params: Record<string, string | number | undefined> = {
+      left_node_id: req.left_node_id,
+      right_node_id: req.right_node_id,
+      how: req.how ?? 'inner',
+      page,
+      page_size: pageSize,
+    };
+    if (req.left_on) params.left_on = req.left_on;
+    if (req.right_on) params.right_on = req.right_on;
+    return httpRequest<FilterPreviewResponse>(
+      `/workspaces/${ws}/nodes/join/preview`,
+      { method: 'POST', headers, params }
+    );
+  },
+  concatPreview: (
+    ws: string,
+    req: ConcatPreviewRequest,
+    page = 1,
+    pageSize = 10,
+    headers: Record<string,string> = {},
+  ) => httpRequest<FilterPreviewResponse>(
+    `/workspaces/${ws}/nodes/concat/preview`,
+    { method: 'POST', headers, params: { page, page_size: pageSize }, body: req }
+  ),
+  concat: (ws: string, req: ConcatRequest, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/nodes/concat`, req, headers),
   cast: (ws: string, node: string, req: CastNodeRequest, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/nodes/${node}/cast`, req, headers),
   filter: (ws: string, node: string, req: FilterRequest, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/nodes/${node}/filter`, req, headers),
   filterPreview: (ws: string, node: string, req: FilterRequest, page = 1, pageSize = 10, headers: Record<string,string> = {}) => httpRequest<FilterPreviewResponse>(

@@ -234,6 +234,14 @@ class JoinRequest(BaseModel):
     suffix: str = "_right"
 
 
+class ConcatPreviewRequest(BaseModel):
+    node_ids: List[str] = Field(..., min_length=2)
+
+
+class ConcatRequest(ConcatPreviewRequest):
+    new_node_name: Optional[str] = None
+
+
 class DataFrameOperationRequest(BaseModel):
     workspace_id: str
     parent_node_id: str

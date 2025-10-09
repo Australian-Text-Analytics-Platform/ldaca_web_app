@@ -66,6 +66,7 @@ interface NodeSelectionPanelProps {
   className?: string;
   showHeaderLabel?: boolean;
   showColorPicker?: boolean;
+  showColumnPicker?: boolean;
   columnLabelFn?: (node: WorkspaceNodeLike, idx: number) => string;
   renderNodeMeta?: (node: WorkspaceNodeLike) => React.ReactNode;
   showShape?: boolean; // fetch shape if available and not supplied via renderNodeMeta
@@ -94,6 +95,7 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
   className = '',
   showHeaderLabel = true,
   showColorPicker = true,
+  showColumnPicker = true,
   columnLabelFn,
   renderNodeMeta,
   showShape = false,
@@ -191,9 +193,9 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
   }, [allowedDataTypes, fallbackToAllColumns, getNodeColumns, normalizeColumnInfos]);
 
   return (
-    <div className={cn('space-y-3', className)}>
+    <div className={cn('space-y-4', className)}>
       {showHeaderLabel && (
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between px-1">
           <label className="block text-sm font-medium text-muted-foreground">
             Selected Nodes ({(originalCount ?? selectedNodes.length)}/{maxCompare})
           </label>
@@ -213,14 +215,14 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
       ) : (
         <div
           className={cn(
-            'flex gap-3 pb-2',
+            'flex gap-3 px-1 pb-2 pt-1',
             selectedNodes.length > maxCompare ? 'overflow-x-auto' : 'overflow-x-hidden'
           )}
         >
           {selectedNodes.map((node, idx) => {
             const nodeId = getNodeIdentifier(node, idx);
-            const columnInfos = resolveColumnInfos(node);
-            const columns = columnInfos.map((info) => info.name);
+            const columnInfos = showColumnPicker ? resolveColumnInfos(node) : [];
+            const columns = showColumnPicker ? columnInfos.map((info) => info.name) : [];
             const selection = nodeColumnSelections.find(sel => sel.nodeId === nodeId);
             const nodeDisplayName = getNodeDisplayName(node, nodeId);
             const nodeColor = getColorForNodeId(nodeId, idx);
@@ -258,44 +260,46 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
                     )
                   )}
                 </CardHeader>
-                <CardContent className="space-y-2 pt-0">
-                  {columns.length > 0 ? (
-                    <div className="space-y-1">
-                      <span className="block text-xs font-medium text-muted-foreground">
-                        {getColumnLabel(node, idx)}
-                      </span>
-                      <Select
-                        value={selection?.column ? selection.column : undefined}
-                        onValueChange={(value) => {
-                          const nextValue = value === CLEAR_SELECTION_VALUE ? '' : value;
-                          onColumnChange(nodeId, nextValue ?? '');
-                        }}
-                        disabled={disabled}
-                      >
-                        <SelectTrigger className="w-full text-sm">
-                          <SelectValue placeholder="Select column" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={CLEAR_SELECTION_VALUE}>Select column…</SelectItem>
-                          {columns.map((column: string) => (
-                            <SelectItem key={column} value={column}>
-                              {column}
-                            </SelectItem>
-                          ))}
-                          {selection?.column && !columns.includes(selection.column) && (
-                            <SelectItem value={selection.column}>
-                              {selection.column}
-                            </SelectItem>
-                          )}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  ) : (
-                    <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                      No columns available for this node
-                    </div>
-                  )}
-                </CardContent>
+                {showColumnPicker && (
+                  <CardContent className="space-y-2 pt-0">
+                    {columns.length > 0 ? (
+                      <div className="space-y-1">
+                        <span className="block text-xs font-medium text-muted-foreground">
+                          {getColumnLabel(node, idx)}
+                        </span>
+                        <Select
+                          value={selection?.column ? selection.column : undefined}
+                          onValueChange={(value) => {
+                            const nextValue = value === CLEAR_SELECTION_VALUE ? '' : value;
+                            onColumnChange(nodeId, nextValue ?? '');
+                          }}
+                          disabled={disabled}
+                        >
+                          <SelectTrigger className="w-full text-sm">
+                            <SelectValue placeholder="Select column" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={CLEAR_SELECTION_VALUE}>Select column…</SelectItem>
+                            {columns.map((column: string) => (
+                              <SelectItem key={column} value={column}>
+                                {column}
+                              </SelectItem>
+                            ))}
+                            {selection?.column && !columns.includes(selection.column) && (
+                              <SelectItem value={selection.column}>
+                                {selection.column}
+                              </SelectItem>
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ) : (
+                      <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                        No columns available for this node
+                      </div>
+                    )}
+                  </CardContent>
+                )}
               </Card>
             );
           })}

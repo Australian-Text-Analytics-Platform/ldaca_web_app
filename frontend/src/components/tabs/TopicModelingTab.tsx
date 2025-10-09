@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import NodeSelectionPanel from '../NodeSelectionPanel';
+import NodeSelectionPanel, { NodeColumnSelection, WorkspaceNodeLike } from '../NodeSelectionPanel';
 import { useWorkspaceData } from '../../hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '../../hooks/useWorkspaceSelection';
 import { useAuth } from '../../hooks/useAuth';
@@ -21,7 +21,37 @@ import { AlertTriangle, Loader2, Lock, Play, Trash2 } from 'lucide-react';
 interface TopicModelingTopic { id: number; label: string; size: number[]; total_size: number; x: number; y: number; }
 interface TopicModelingResponse { state?: 'running' | 'successful' | 'failed' | 'cancelled'; message?: string; data?: { topics: TopicModelingTopic[]; corpus_sizes?: number[] }; metadata?: { task_id?: string; [k: string]: any } }
 
-interface NodeColumnSelection { nodeId: string; column: string; }
+const mapSnapshotToWorkspaceNode = (snapshot: { id: string; name: string; columns: string[] }): WorkspaceNodeLike => ({
+  id: snapshot.id,
+  name: snapshot.name,
+  data: {
+    id: snapshot.id,
+    node_id: snapshot.id,
+    nodeName: snapshot.name,
+    name: snapshot.name,
+    label: snapshot.name,
+    columns: snapshot.columns,
+  },
+  columns: snapshot.columns,
+});
+
+const resolveWorkspaceNodeId = (node: WorkspaceNodeLike, fallbackIndex: number): string => {
+  const candidates = [
+    node.id,
+    node.node_id,
+    node.data?.id,
+    node.data?.node_id,
+    node.unique_id,
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string' && candidate.length > 0) {
+      return candidate;
+    }
+  }
+
+  return `node-${fallbackIndex}`;
+};
 
 // Simple linear gradient between two colors given t in [0,1]
 function interpolateColor(c1: string, c2: string, t: number) {
@@ -130,6 +160,19 @@ const TopicModelingTab: React.FC = () => {
 
   const defaultPalette = useMemo(()=>['#2563eb','#dc2626','#16a34a','#9333ea','#0d9488','#db2777'],[]);
 
+  const panelNodes = useMemo<WorkspaceNodeLike[]>(() => {
+    if (isLocked && lockedNodesSnapshot.length) {
+      return lockedNodesSnapshot.map(mapSnapshotToWorkspaceNode);
+    }
+    return (selectedNodes.slice(0, 2) as WorkspaceNodeLike[]);
+  }, [isLocked, lockedNodesSnapshot, selectedNodes]);
+
+  const panelNodeIds = useMemo<string[]>(() => (
+    panelNodes
+      .map((node, idx) => resolveWorkspaceNodeId(node, idx))
+      .filter((id): id is string => Boolean(id))
+  ), [panelNodes]);
+
   const { getColumnInfos } = useNodeColumnInfos({
     workspaceId: currentWorkspaceId,
     nodes: selectedNodes,
@@ -141,20 +184,39 @@ const TopicModelingTab: React.FC = () => {
     allowedDataTypes: ['string'],
   }, { workspaceId: currentWorkspaceId, maxNodes: 2, isLocked, docTypeOnly: true, enableHeuristicGuess: false });
 
+  const panelSelections = useMemo<NodeColumnSelection[]>(() => (
+    isLocked && lockedNodeSelections ? lockedNodeSelections : nodeColumnSelections
+  ), [isLocked, lockedNodeSelections, nodeColumnSelections]);
+
+  const panelHasMissingColumns = useMemo(() => (
+    panelNodeIds.some((nodeId) => {
+      const selection = nodeColumnSelections.find((sel) => sel.nodeId === nodeId);
+      return !selection || !selection.column;
+    })
+  ), [panelNodeIds, nodeColumnSelections]);
+
   // Ensure colors assigned
   useEffect(()=>{
     setNodeColors(prev=>{
       const out = { ...prev };
-      let i=0; selectedNodes.forEach(n=>{ if(!out[n.id]) { out[n.id] = defaultPalette[i % defaultPalette.length]; i++; } });
+      let paletteIndex = 0;
+      panelNodes.forEach((node, idx) => {
+        const nodeId = resolveWorkspaceNodeId(node, idx);
+        if (!nodeId || out[nodeId]) {
+          return;
+        }
+        out[nodeId] = defaultPalette[paletteIndex % defaultPalette.length];
+        paletteIndex += 1;
+      });
       return out;
     });
-  },[selectedNodes, defaultPalette]);
+  },[panelNodes, defaultPalette]);
 
   useEffect(() => {
-    if (!isLocked && selectedNodes.length > 0 && nodeColumnSelections.length === 0) {
+    if (!isLocked && panelNodeIds.length > 0 && nodeColumnSelections.length === 0) {
       recomputeAutoColumns();
     }
-  }, [isLocked, selectedNodes, nodeColumnSelections, recomputeAutoColumns]);
+  }, [isLocked, panelNodeIds, nodeColumnSelections.length, recomputeAutoColumns]);
 
   const handleColumnChange = (nodeId: string, column: string) => {
     if (isLocked) return;
@@ -163,12 +225,13 @@ const TopicModelingTab: React.FC = () => {
   const handleColorChange = (nodeId: string, color: string) => setNodeColors(p=>({...p,[nodeId]:color}));
 
   const handleRun = async () => {
-    if (!currentWorkspaceId || !selectedNodes.length) return;
+    if (!currentWorkspaceId || panelNodeIds.length === 0) return;
     if (runningRef.current) return; // guard double click
-    const firstTwo = selectedNodes.slice(0,2);
-    if (firstTwo.some(n=> !nodeColumnSelections.find(s=>s.nodeId===n.id)?.column)) {
-      alert('Select a text column for all selected nodes'); return;
+    if (panelHasMissingColumns) {
+      alert('Select a text column for all selected nodes');
+      return;
     }
+    const activeNodeIds = panelNodeIds.slice(0, 2);
     lastFetchedRef.current = { taskId: null, state: null };
     resetTopicModelingReady();
     // Optimistically enter running state immediately
@@ -178,9 +241,9 @@ const TopicModelingTab: React.FC = () => {
     setResultSafely(null);
     try {
   const node_columns: Record<string,string> = {};
-  nodeColumnSelections.forEach(s=>{ if(s.column) node_columns[s.nodeId]=s.column; });
+  nodeColumnSelections.forEach(s=>{ if(s.column && activeNodeIds.includes(s.nodeId)) node_columns[s.nodeId]=s.column; });
       const req: TopicModelingRequest = {
-        node_ids: firstTwo.map(n=>n.id),
+        node_ids: activeNodeIds,
         node_columns,
         min_topic_size: minTopicSize,
         use_ctfidf: useCtTfidf
@@ -200,7 +263,7 @@ const TopicModelingTab: React.FC = () => {
   if (res.state !== 'successful' && res.state !== 'running') setError(res.message || 'Topic modeling failed');
       // Lock with snapshot
       try {
-        const ids = firstTwo.map(n=>n.id);
+        const ids = activeNodeIds;
         const snaps: Array<{ id: string; name: string; columns: string[] }> = [];
         for (const id of ids) {
           try {
@@ -228,6 +291,17 @@ const TopicModelingTab: React.FC = () => {
   const topics: TopicModelingTopic[] = useMemo(()=> result?.data?.topics || [], [result]);
   const corpusCount = result?.data?.corpus_sizes?.length || 0;
 
+  const fallbackPrimaryColor = defaultPalette[0] ?? '#2563eb';
+  const fallbackSecondaryColor = defaultPalette[1] ?? '#dc2626';
+
+  const getPanelColor = useCallback((index: number, fallback: string) => {
+    const nodeId = panelNodeIds[index];
+    if (nodeId) {
+      return nodeColors[nodeId] || defaultPalette[index] || fallback;
+    }
+    return fallback;
+  }, [panelNodeIds, nodeColors, defaultPalette]);
+
   // Helpers to render colored size boxes
   const getReadableTextColor = (hex: string) => {
     if(!hex) return '#ffffff';
@@ -241,7 +315,7 @@ const TopicModelingTab: React.FC = () => {
   const renderSizeComposition = (sizes: number[], total: number) => {
     if (corpusCount === 0) return null;
     if (sizes.length === 1) {
-      const color = selectedNodes[0] ? nodeColors[selectedNodes[0].id] : '#2563eb';
+      const color = getPanelColor(0, fallbackPrimaryColor);
       const fg = getReadableTextColor(color);
       return (
         <span className="inline-flex items-center gap-1">
@@ -251,8 +325,8 @@ const TopicModelingTab: React.FC = () => {
       );
     }
     // Two corpora: show N + M = Z boxes with colors
-    const colorA = selectedNodes[0] ? nodeColors[selectedNodes[0].id] : '#2563eb';
-    const colorB = selectedNodes[1] ? nodeColors[selectedNodes[1].id] : '#dc2626';
+    const colorA = getPanelColor(0, fallbackPrimaryColor);
+    const colorB = getPanelColor(1, fallbackSecondaryColor);
     const fgA = getReadableTextColor(colorA);
     const fgB = getReadableTextColor(colorB);
     return (
@@ -286,8 +360,8 @@ const TopicModelingTab: React.FC = () => {
         {topics.map((t)=>{
           const sizes = t.size || [];
             const prop = (corpusCount===2 && (t.total_size>0)) ? (sizes[0]/t.total_size) : 0.5;
-            const colorA = selectedNodes[0] ? nodeColors[selectedNodes[0].id] : '#2563eb';
-            const colorB = selectedNodes[1] ? nodeColors[selectedNodes[1].id] : '#dc2626';
+            const colorA = getPanelColor(0, fallbackPrimaryColor);
+            const colorB = getPanelColor(1, fallbackSecondaryColor);
             const fill = interpolateColor(colorA, colorB, prop);
             const r = 10 + 40 * Math.sqrt(t.total_size / (maxSize || 1));
             const cx = scaleX(t.x); const cy = scaleY(t.y);
@@ -323,7 +397,7 @@ const TopicModelingTab: React.FC = () => {
         })}
       </svg>
     );
-  },[topics, corpusCount, selectedNodes, nodeColors, chartWidth, hoveredTopicId]);
+  },[topics, corpusCount, chartWidth, hoveredTopicId, getPanelColor, fallbackPrimaryColor, fallbackSecondaryColor]);
 
 // Hydration from backend once per mount - simplified to avoid race conditions
   const hydratedOnceRef = useRef<boolean>(false);
@@ -487,16 +561,16 @@ const TopicModelingTab: React.FC = () => {
           </CardHeader>
           <CardContent className="space-y-6">
             <NodeSelectionPanel
-              selectedNodes={(isLocked && lockedNodesSnapshot.length)
-                ? lockedNodesSnapshot.map(s=>({ id: s.id, name: s.name, data: { name: s.name, nodeName: s.name, label: s.name, columns: s.columns }, columns: s.columns }))
-                : selectedNodes}
-              nodeColumnSelections={(isLocked && lockedNodeSelections) ? lockedNodeSelections : nodeColumnSelections}
+              selectedNodes={panelNodes}
+              nodeColumnSelections={panelSelections}
               onColumnChange={handleColumnChange}
               nodeColors={nodeColors}
               onColorChange={handleColorChange}
               getNodeColumns={getColumnInfos}
               defaultPalette={defaultPalette}
               maxCompare={2}
+              className="border border-dashed border-muted-foreground/40 rounded-lg bg-muted/30 p-4"
+              originalCount={selectedNodes.length}
               disabled={!!isLocked}
               showShape
               getNodeShapeFn={getNodeShape}
@@ -538,7 +612,7 @@ const TopicModelingTab: React.FC = () => {
                 type="button"
                 className="w-full sm:w-auto"
                 onClick={handleRun}
-                disabled={isRunning || !!isLocked || !!result || !selectedNodes.length || selectedNodes.slice(0,2).some(n=> !nodeColumnSelections.find(s=>s.nodeId===n.id)?.column)}
+                disabled={isRunning || !!isLocked || !!result || panelNodeIds.length === 0 || panelHasMissingColumns}
               >
                 {isRunning ? (
                   <>

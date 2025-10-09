@@ -6,7 +6,7 @@ import { useWorkspaceStatus } from '../../hooks/useWorkspaceStatus';
 import { NodeSchemaResponse } from '../../types';
 import { Card, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Skeleton } from '../ui/skeleton';
-import { Loader2 } from 'lucide-react';
+import { Loader2, X } from 'lucide-react';
 import {
   Pagination,
   PaginationContent,
@@ -19,7 +19,6 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import DatetimeFormatPanel from '../panels/DatetimeFormatPanel';
 import { cn } from '@/lib/utils';
-import JoinInterface from '../JoinInterface';
 
 const EmptyStateCard: React.FC<{ title: string; description?: string; icon?: React.ReactNode }> = ({
   title,
@@ -129,24 +128,6 @@ const extractColumnTypes = (schema: NodeSchemaResponse | null | undefined): Reco
 
   if (schema.schema && typeof schema.schema === 'object') {
     return schema.schema as Record<string, string>;
-  }
-
-  return {};
-};
-
-const schemaEntriesToColumnMap = (schema?: unknown): Record<string, string> => {
-  if (!schema) {
-    return {};
-  }
-
-  if (isLegacySchemaArray(schema)) {
-    return Object.fromEntries(schema.map(({ name, js_type }) => [name, js_type ?? 'string']));
-  }
-
-  if (typeof schema === 'object' && schema !== null) {
-    return Object.fromEntries(
-      Object.entries(schema as Record<string, unknown>).map(([key, value]) => [key, String(value ?? '')])
-    );
   }
 
   return {};
@@ -514,9 +495,72 @@ const WorkspaceTable: React.FC<WorkspaceTableProps> = ({
  */
 export const WorkspaceDataView: React.FC = memo(() => {
   const { currentWorkspaceId, nodeData, getNodeShape } = useWorkspaceData();
-  const { selectedNode, selectedNodes, handlePageChange, handlePageSizeChange } = useWorkspaceSelection();
-  const { joinNodes, castColumn, refreshNodeSchema, clearSelection } = useWorkspaceActions();
+  const { selectedNode, selectedNodes, selectedNodeIds, handlePageChange, handlePageSizeChange } = useWorkspaceSelection();
+  const { castColumn, refreshNodeSchema, selectNodes, toggleNodeSelection } = useWorkspaceActions();
   const { isLoading } = useWorkspaceStatus();
+
+  const multiSelectedNodes = useMemo(() => selectedNodes.filter(Boolean), [selectedNodes]);
+  const activeNodeId = selectedNode?.id ?? (multiSelectedNodes[0]?.id ?? null);
+  const shouldShowTabs = multiSelectedNodes.length > 1;
+  const [tabOrder, setTabOrder] = useState<string[]>(() => [...selectedNodeIds]);
+  const nodeById = useMemo(() => {
+    const map = new Map<string, (typeof multiSelectedNodes)[number]>();
+    multiSelectedNodes.forEach((node) => {
+      if (node?.id) {
+        map.set(node.id, node);
+      }
+    });
+    return map;
+  }, [multiSelectedNodes]);
+
+  useEffect(() => {
+    setTabOrder((current) => {
+      const filtered = current.filter((id) => selectedNodeIds.includes(id));
+      const additions = selectedNodeIds.filter((id) => !filtered.includes(id));
+      if (
+        filtered.length === current.length &&
+        additions.length === 0 &&
+        current.length === selectedNodeIds.length
+      ) {
+        return current;
+      }
+      return [...filtered, ...additions];
+    });
+  }, [selectedNodeIds]);
+
+  const displayTabIds = useMemo(
+    () => (shouldShowTabs ? tabOrder.filter((id) => nodeById.has(id)) : []),
+    [shouldShowTabs, tabOrder, nodeById]
+  );
+
+  const activeTabIndex = useMemo(
+    () => displayTabIds.findIndex((id) => id === activeNodeId),
+    [activeNodeId, displayTabIds]
+  );
+  const tabPosition = activeTabIndex >= 0 ? activeTabIndex + 1 : displayTabIds.length > 0 ? 1 : 0;
+
+  const handleTabChange = useCallback(
+    (nodeId: string) => {
+      if (!nodeId || nodeId === activeNodeId || !selectedNodeIds.includes(nodeId)) {
+        return;
+      }
+
+      const reordered = [nodeId, ...selectedNodeIds.filter((id) => id !== nodeId)];
+      selectNodes(reordered);
+    },
+    [activeNodeId, selectNodes, selectedNodeIds]
+  );
+
+  const handleTabClose = useCallback(
+    (nodeId: string) => {
+      if (!nodeId) {
+        return;
+      }
+      setTabOrder((current) => current.filter((id) => id !== nodeId));
+      toggleNodeSelection(nodeId);
+    },
+    [setTabOrder, toggleNodeSelection]
+  );
 
   const [actualShape, setActualShape] = useState<[number, number] | null>(null);
   const [isLoadingShape, setIsLoadingShape] = useState(false);
@@ -591,92 +635,6 @@ export const WorkspaceDataView: React.FC = memo(() => {
     );
   }
 
-  // Handle multi-selection: show join interface when multiple nodes are selected
-  if (selectedNodes.length > 1) {
-    // For now, only handle exactly 2 nodes (binary join)
-    if (selectedNodes.length === 2) {
-      const [leftNode, rightNode] = selectedNodes;
-      
-      // Create WorkspaceNode-compatible objects from React Flow nodes
-      const leftSchemaMap = schemaEntriesToColumnMap(leftNode.data?.schema);
-      const leftNodeForJoin = {
-        node_id: leftNode.id,
-        name: leftNode.data?.nodeName || leftNode.data?.label || leftNode.id,
-        shape: leftNode.data?.shape || [0, 0],
-        columns: leftNode.data?.columns || [],
-        preview: [],
-        is_text_data: leftNode.data?.isTextData || false,
-        data_type: leftNode.data?.dataType || 'unknown',
-        column_schema: leftSchemaMap,
-        dtypes: leftSchemaMap,
-        is_lazy: leftNode.data?.isLazy || false,
-      };
-      
-      const rightSchemaMap = schemaEntriesToColumnMap(rightNode.data?.schema);
-      const rightNodeForJoin = {
-        node_id: rightNode.id,
-        name: rightNode.data?.nodeName || rightNode.data?.label || rightNode.id,
-        shape: rightNode.data?.shape || [0, 0],
-        columns: rightNode.data?.columns || [],
-        preview: [],
-        is_text_data: rightNode.data?.isTextData || false,
-        data_type: rightNode.data?.dataType || 'unknown',
-        column_schema: rightSchemaMap,
-        dtypes: rightSchemaMap,
-        is_lazy: rightNode.data?.isLazy || false,
-      };
-      
-      const handleJoin = async (
-        leftNodeId: string,
-        rightNodeId: string,
-        joinColumns: { left: string; right: string },
-        joinType: 'inner' | 'left' | 'right' | 'full' | 'semi' | 'anti' | 'cross',
-        newNodeName: string
-      ) => {
-        const result = await joinNodes(
-          leftNodeId,
-          rightNodeId,
-          joinType,
-          [joinColumns.left],
-          [joinColumns.right],
-          newNodeName
-        );
-        return result;
-      };
-
-      const handleCancel = () => {
-        clearSelection();
-      };
-
-      return (
-        <div className="p-6">
-          <JoinInterface
-            leftNode={leftNodeForJoin}
-            rightNode={rightNodeForJoin}
-            onJoin={handleJoin}
-            onCancel={handleCancel}
-            loading={isLoading.operations}
-          />
-        </div>
-      );
-    } else {
-      // More than 2 nodes selected - not supported yet
-      return (
-        <div className="p-6">
-          <EmptyStateCard
-            title="Multiple Nodes Selected"
-            description={`${selectedNodes.length} nodes selected. Join operations currently support only 2 nodes at a time.`}
-            icon={
-              <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            }
-          />
-        </div>
-      );
-    }
-  }
-
   if (!selectedNode) {
     return (
       <div className="p-6">
@@ -697,49 +655,110 @@ export const WorkspaceDataView: React.FC = memo(() => {
   // Do not short-circuit on empty data; allow table to render headers only
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Consolidated header with title and metadata in one row */}
-      <div className="flex-shrink-0 p-2 border-b border-border bg-muted">
-        <div className="flex items-center gap-3 flex-wrap">
-          <h3 className="text-sm font-medium text-gray-700">Data View</h3>
-          <span className="text-gray-300">|</span>
-          <span className="text-sm font-semibold text-gray-800">
-            {selectedNode.data?.nodeName || selectedNode.data?.label || selectedNode.id}
-          </span>
-          <span className="text-xs text-gray-600">
-            Shape: {(() => {
-              const [rows, cols] = getDisplayShape();
-              return `${rows} × ${cols}`;
-            })()}
-          </span>
-          <span className="text-xs text-gray-600">
-            {nodeData.data.length} rows loaded
-          </span>
-          {Array.isArray(nodeData.data) && nodeData.data.length === 0 && (
-            <span className="text-xs text-gray-500 italic">
-              (empty table)
-            </span>
-          )}
-        </div>
-      </div>
+    <div className="flex h-full flex-col">
+      {shouldShowTabs && (
+        <div className="border-b border-border/70 bg-muted/60">
+          <div className="flex items-end gap-1 overflow-x-auto px-2 pt-2">
+            {displayTabIds.map((nodeId) => {
+              const node = nodeById.get(nodeId);
+              if (!node) {
+                return null;
+              }
 
-      {/* Data table with column type casting */}
-      <div className="flex-1 overflow-auto">
-        <WorkspaceTable
-          data={nodeData.data}
-          loading={isLoading.nodeData}
-          workspaceId={currentWorkspaceId || undefined}
-          nodeId={selectedNode.id}
-          onCast={async (column: string, targetType: string, format?: string) => {
-            await castColumn(selectedNode.id, column, targetType, format);
-          }}
-          onRefreshSchema={async () => {
-            return await refreshNodeSchema(selectedNode.id);
-          }}
-          pagination={nodeData.pagination}
-          onPageChange={handlePageChange}
-          onPageSizeChange={handlePageSizeChange}
-        />
+              const label = node?.data?.nodeName || node?.data?.label || nodeId;
+              const isActive = nodeId === activeNodeId;
+
+              return (
+                <div
+                  key={nodeId}
+                  className={cn(
+                    'group flex min-w-[140px] max-w-[240px] items-center rounded-t-md border border-border/60 bg-muted/60 pr-1 text-xs font-medium transition-all',
+                    isActive
+                      ? 'border-b-transparent bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'
+                  )}
+                >
+                  <button
+                    type="button"
+                    onClick={() => handleTabChange(nodeId)}
+                    className={cn(
+                      'flex-1 truncate px-3 py-2 text-left',
+                      isActive ? 'text-foreground' : 'text-muted-foreground'
+                    )}
+                    aria-pressed={isActive}
+                    aria-selected={isActive}
+                  >
+                    <span className="block truncate" title={label}>
+                      {label}
+                    </span>
+                    {isActive && (
+                      <span className="sr-only"> (active)</span>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleTabClose(nodeId)}
+                    className="ml-1 inline-flex h-5 w-5 items-center justify-center rounded-full text-muted-foreground/70 transition hover:bg-muted-foreground/10 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    aria-label={`Remove ${label} from selection`}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              );
+            })}
+            <div className="flex-1 border-b border-transparent" aria-hidden />
+          </div>
+        </div>
+      )}
+
+      <div className="flex h-full flex-col">
+        {/* Consolidated header with title and metadata in one row */}
+        <div className="flex-shrink-0 border-b border-border bg-muted p-2">
+          <div className="flex flex-wrap items-center gap-3">
+            <h3 className="text-sm font-medium text-gray-700">Data View</h3>
+            <span className="text-gray-300">|</span>
+            <span className="text-sm font-semibold text-gray-800">
+              {selectedNode.data?.nodeName || selectedNode.data?.label || selectedNode.id}
+            </span>
+            <span className="text-xs text-gray-600">
+              Shape:{' '}
+              {(() => {
+                const [rows, cols] = getDisplayShape();
+                return `${rows} × ${cols}`;
+              })()}
+            </span>
+            <span className="text-xs text-gray-600">{nodeData.data.length} rows loaded</span>
+            {shouldShowTabs && (
+              <span className="text-xs text-gray-500">
+                Viewing tab {tabPosition} of {multiSelectedNodes.length}
+              </span>
+            )}
+            {Array.isArray(nodeData.data) && nodeData.data.length === 0 && (
+              <span className="text-xs italic text-gray-500" aria-live="polite">
+                (empty table)
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Data table with column type casting */}
+        <div className="flex-1 overflow-auto">
+          <WorkspaceTable
+            data={nodeData.data}
+            loading={isLoading.nodeData}
+            workspaceId={currentWorkspaceId || undefined}
+            nodeId={selectedNode.id}
+            onCast={async (column: string, targetType: string, format?: string) => {
+              await castColumn(selectedNode.id, column, targetType, format);
+            }}
+            onRefreshSchema={async () => {
+              return await refreshNodeSchema(selectedNode.id);
+            }}
+            pagination={nodeData.pagination}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
+          />
+        </div>
       </div>
     </div>
   );
