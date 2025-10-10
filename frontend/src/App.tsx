@@ -15,7 +15,7 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from './components/ui/s
 // Lazy load components for code splitting
 const TutorialView = lazy(() => import('./components/TutorialView'));
 const DataLoaderTab = lazy(() => import('./components/tabs/DataLoaderTab'));
-const FilterTab = lazy(() => import('./components/tabs/FilterTab'));
+const DataPreprocessingTab = lazy(() => import('./components/tabs/DataPreprocessingTab'));
 const ConcordanceTab = lazy(() => import('./components/tabs/ConcordanceTab'));
 const QuotationTab = lazy(() => import('./components/tabs/QuotationTab'));
 const TopicModelingTab = lazy(() => import('./components/tabs/TopicModelingTab'));
@@ -219,7 +219,7 @@ const App: React.FC = () => {
                             </div>
                           }>
                             {currentView === 'data-loader' && <DataLoaderTab />}
-                            {currentView === 'filter' && <FilterTab />}
+                            {currentView === 'filter' && <DataPreprocessingTab />}
                             {currentView === 'token-frequency' && <TokenFrequencyTab />}
                             {currentView === 'concordance' && <ConcordanceTab />}
                             {currentView === 'analysis' && <TimelineTab />}
