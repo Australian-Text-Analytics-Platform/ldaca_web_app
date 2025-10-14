@@ -15,7 +15,7 @@ import {
   PaginationLink,
   PaginationNext,
   PaginationPrevious,
-} from '../ui/pagination';
+} from '../ui/Pagination';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import DatetimeFormatPanel from '../panels/DatetimeFormatPanel';
 import { cn } from '@/lib/utils';

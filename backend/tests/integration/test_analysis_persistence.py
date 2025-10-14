@@ -337,6 +337,180 @@ class TestTokenFrequencyPersistence:
 
 
 @pytest.mark.anyio
+class TestFrequencyAnalysisPersistence:
+    """Test frequency analysis persistence and presentation preferences."""
+
+    async def _run_frequency_analysis(
+        self,
+        client: AsyncClient,
+        workspace_id: str,
+        node_id: str,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> dict:
+        from types import SimpleNamespace
+
+        from ldaca_web_app_backend.api.workspaces.analyses import (
+            frequency_analysis as frequency_module,
+        )
+
+        request_payload = {
+            "time_column": "published_at",
+            "group_by_columns": ["category"],
+            "frequency": "daily",
+            "sort_by_time": True,
+        }
+
+        class DummyResult:
+            def __init__(self) -> None:
+                self._rows = [
+                    {
+                        "time_period": "2024-01-01",
+                        "time_period_formatted": "2024-01-01",
+                        "frequency_count": 2,
+                        "category": "alpha",
+                    },
+                    {
+                        "time_period": "2024-01-02",
+                        "time_period_formatted": "2024-01-02",
+                        "frequency_count": 1,
+                        "category": "beta",
+                    },
+                ]
+                self.columns = list(self._rows[0].keys()) if self._rows else []
+
+            def to_dicts(self) -> list[dict[str, object]]:
+                return list(self._rows)
+
+            def __len__(self) -> int:
+                return len(self._rows)
+
+        class DummyTextOps:
+            @staticmethod
+            def frequency_analysis(*_args, **_kwargs) -> DummyResult:
+                return DummyResult()
+
+        dummy_node = SimpleNamespace(
+            data=SimpleNamespace(
+                columns=["published_at", "category"],
+                schema=[
+                    {"name": "published_at", "js_type": "datetime"},
+                    {"name": "category", "js_type": "string"},
+                ],
+                text=DummyTextOps(),
+            )
+        )
+
+        monkeypatch.setattr(
+            frequency_module.workspace_manager,
+            "get_node_from_workspace",
+            lambda *_args, **_kwargs: dummy_node,
+        )
+
+        response = await post_json(
+            client,
+            f"/api/workspaces/{workspace_id}/nodes/{node_id}/frequency-analysis",
+            request_payload,
+        )
+
+        assert response.status_code == 200
+        result_data = response.json()
+        assert_successful_result(result_data)
+        return result_data
+
+    async def test_frequency_analysis_includes_chart_type(
+        self,
+        authenticated_client,
+        workspace_id,
+        timeline_node_id,
+        test_user,
+        monkeypatch,
+    ):
+        """Frequency analysis responses should include a default chart type."""
+
+        result_data = await self._run_frequency_analysis(
+            authenticated_client, workspace_id, timeline_node_id, monkeypatch
+        )
+
+        assert result_data.get("chart_type") == "line"
+
+        analyses = list_analyses(test_user["id"], workspace_id)
+        assert len(analyses) == 1
+        record = analyses[0]
+        assert record.task == "frequency_analysis"
+        assert record.result.get("chart_type") == "line"
+
+        current_result_response = await get_json(
+            authenticated_client,
+            f"/api/workspaces/{workspace_id}/frequency-analysis/current-result",
+        )
+        assert current_result_response.status_code == 200
+        current_payload = current_result_response.json()
+        assert current_payload["data"]["chart_type"] == "line"
+
+    async def test_frequency_analysis_chart_type_update_persists(
+        self,
+        authenticated_client,
+        workspace_id,
+        timeline_node_id,
+        test_user,
+        monkeypatch,
+    ):
+        """Updating the chart type should persist via current-result endpoint."""
+
+        await self._run_frequency_analysis(
+            authenticated_client, workspace_id, timeline_node_id, monkeypatch
+        )
+
+        update_response = await post_json(
+            authenticated_client,
+            f"/api/workspaces/{workspace_id}/frequency-analysis/current-result",
+            {"chart_type": "bar"},
+        )
+        assert update_response.status_code == 200
+        update_json = update_response.json()
+        assert update_json == {
+            "state": "successful",
+            "message": "saved",
+            "data": {"chart_type": "bar"},
+        }
+
+        current_result_response = await get_json(
+            authenticated_client,
+            f"/api/workspaces/{workspace_id}/frequency-analysis/current-result",
+        )
+        assert current_result_response.status_code == 200
+        current_payload = current_result_response.json()
+        assert current_payload["data"]["chart_type"] == "bar"
+
+        analyses = list_analyses(test_user["id"], workspace_id)
+        assert len(analyses) == 1
+        record = analyses[0]
+        assert record.result.get("chart_type") == "bar"
+
+    async def test_frequency_analysis_rejects_invalid_chart_type(
+        self,
+        authenticated_client,
+        workspace_id,
+        timeline_node_id,
+        monkeypatch,
+    ):
+        """Invalid chart types should be rejected with clear feedback."""
+
+        await self._run_frequency_analysis(
+            authenticated_client, workspace_id, timeline_node_id, monkeypatch
+        )
+
+        invalid_response = await post_json(
+            authenticated_client,
+            f"/api/workspaces/{workspace_id}/frequency-analysis/current-result",
+            {"chart_type": "scatter"},
+        )
+        assert invalid_response.status_code == 400
+        error_payload = invalid_response.json()
+        assert "Invalid chart type" in error_payload["detail"]
+
+
+@pytest.mark.anyio
 class TestWorkspaceGraphEnrichment:
     """Test workspace graph enrichment with analysis data."""
 

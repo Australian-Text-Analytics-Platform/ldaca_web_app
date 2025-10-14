@@ -87,6 +87,7 @@ export const textApi = {
   frequency: (ws: string, node: string, req: FrequencyAnalysisRequest, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/nodes/${node}/frequency-analysis`, req, headers),
   getFrequencyCurrentRequest: (ws: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/frequency-analysis/current-request`, { method: 'GET', headers }),
   getFrequencyCurrentResult: (ws: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/frequency-analysis/current-result`, { method: 'GET', headers }),
+  postFrequencyCurrentResult: (ws: string, body: Record<string,unknown>, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/frequency-analysis/current-result`, body, headers),
   clearFrequencyAnalysis: (ws: string, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/frequency-analysis/clear`, {}, headers),
 
   // Token Frequency

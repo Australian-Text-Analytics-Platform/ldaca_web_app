@@ -12,7 +12,7 @@ import { ConcordanceAnalysisRequest, ConcordanceAnalysisResponse, textApi } from
 import { httpRequest } from '../../api/http';
 import { nodesApi } from '../../api/nodes';
 import { useAnalysisStore } from '../../stores/analysisStore';
-import useAutoNodeColumns from '../../hooks/useAutoNodeColumns';
+import { useAnalysisLockState } from '../../hooks/useAnalysisLockState';
 import useNodeColumnInfos from '../../hooks/useNodeColumnInfos';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../ui/card';
@@ -25,11 +25,8 @@ import {
   TableHeader,
   TableRow,
 } from '../ui/table';
-
-interface NodeColumnSelection {
-  nodeId: string;
-  column: string;
-}
+import { applySelectedColumnsToSnapshots } from '../../hooks/useSchemaManagement';
+import AnalysisLockedNotice from './AnalysisLockedNotice';
 
 const ConcordanceTab: React.FC = () => {
   // Anchor ref for results container to stabilize scroll on view mode toggle
@@ -48,14 +45,24 @@ const ConcordanceTab: React.FC = () => {
   const pendingConcordance = useAnalysisStore((state) => state.pendingConcordance);
   const clearPendingConcordance = useAnalysisStore((state) => state.clearPendingConcordance);
 
-  const [isLocked, setIsLocked] = useState(false);
-  // Shared auto column selection (shared with TokenFrequencyTab via undefined storageScope)
-  const { selections: nodeColumnSelections, setSelection: setNodeColumnSelection, setSelections: setNodeColumnSelectionsRaw, recompute: recomputeAutoColumns } = useAutoNodeColumns({
-    selectedNodes,
-    getNodeColumns: getColumnInfos,
-    allowedDataTypes: ['string']
-  }, { workspaceId: currentWorkspaceId, maxNodes: 2, isLocked, docTypeOnly: true, enableHeuristicGuess: false });
-  const [lockedNodeSelections, setLockedNodeSelections] = useState<NodeColumnSelection[] | null>(null);
+  const {
+    isLocked,
+    lockWithSnapshots,
+    unlockSelection,
+    nodeColumnSelections,
+    setNodeColumnSelection,
+    setNodeColumnSelections,
+    recomputeAutoColumns,
+    activeNodeColumnSelections,
+    activeNodeIds,
+    panelSelectedNodes,
+    displayNodeCount,
+  } = useAnalysisLockState({
+    allowedDataTypes: ['string'],
+    maxNodes: 2,
+    docTypeOnly: true,
+    enableHeuristicGuess: false,
+  });
   const [searchWord, setSearchWord] = useState('');
   const [numLeftTokens, setNumLeftTokens] = useState(10);
   const [numRightTokens, setNumRightTokens] = useState(10);
@@ -122,23 +129,37 @@ const ConcordanceTab: React.FC = () => {
 
   // Map any node's id/name variants to its assigned color (used in combined table)
   const sourceColorMap = useMemo(() => {
-    // Build a CASE-INSENSITIVE lookup of every plausible identifier for a node
-    const map: Record<string,string> = {};
-    selectedNodes.forEach((n, idx) => {
-      const assigned = nodeColors[n.id] || defaultPalette[idx % defaultPalette.length];
+    const map: Record<string, string> = {};
+    panelSelectedNodes.forEach((node, idx) => {
+      const candidateIds = [
+        node.id,
+        (node as any)?.node_id,
+        node.data?.id,
+        node.data?.node_id,
+      ].map((val) => (typeof val === 'string' ? val : null)).filter(Boolean) as string[];
+      const primaryId = candidateIds[0] ?? `node-${idx}`;
+      const assigned = nodeColors[primaryId] || defaultPalette[idx % defaultPalette.length];
       const variants = new Set<string>();
-      if (n.id) variants.add(n.id);
-      if ((n as any).name) variants.add((n as any).name);
-      if (n.name) variants.add(n.name);
-      if (n.data?.name) variants.add(n.data.name);
-      if ((n as any).label) variants.add((n as any).label);
-      if (n.data?.label) variants.add(n.data.label);
-      variants.forEach(v => { if (v) map[v.toString().toLowerCase()] = assigned; });
+      [
+        primaryId,
+        node.name,
+        (node as any)?.name,
+        node.data?.name,
+        node.label,
+        (node as any)?.label,
+        node.data?.label,
+      ].forEach((value) => {
+        if (typeof value === 'string' && value.trim()) {
+          variants.add(value);
+        }
+      });
+      variants.forEach((value) => {
+        map[value.toLowerCase()] = assigned;
+      });
     });
     return map;
-  }, [selectedNodes, nodeColors, defaultPalette]);
+  }, [panelSelectedNodes, nodeColors, defaultPalette]);
   
-  const [lockedNodesSnapshot, setLockedNodesSnapshot] = useState<Array<{ id: string; name: string; columns: string[] }>>([]);
   const lastPendingConcordanceRef = useRef<number | null>(null);
 
   // Pagination and sorting state - separate for each node
@@ -164,6 +185,10 @@ const ConcordanceTab: React.FC = () => {
   
   // State for auto-triggering search from TokenFrequencyTab
   const [shouldAutoSearch, setShouldAutoSearch] = useState(false);
+
+  const effectiveNodeColumnSelections = useMemo(() => (
+    isLocked ? activeNodeColumnSelections : nodeColumnSelections
+  ), [isLocked, activeNodeColumnSelections, nodeColumnSelections]);
 
   // Debug results changes
   useEffect(() => {
@@ -249,7 +274,7 @@ const ConcordanceTab: React.FC = () => {
         selectedNodes.some((node: any) => node.id === sel.nodeId)
       );
       if (matchingSelections.length > 0) {
-        setNodeColumnSelectionsRaw(matchingSelections, { replace: true });
+        setNodeColumnSelections(matchingSelections, { replace: true });
       }
     }
 
@@ -276,7 +301,7 @@ const ConcordanceTab: React.FC = () => {
         window.clearTimeout(timeoutId);
       }
     };
-  }, [pendingConcordance, selectedNodes, setNodeColumnSelectionsRaw, clearPendingConcordance]);
+  }, [pendingConcordance, selectedNodes, setNodeColumnSelections, clearPendingConcordance]);
 
   // Recompute auto columns if unlocked and selections empty but nodes exist
   useEffect(() => {
@@ -288,73 +313,75 @@ const ConcordanceTab: React.FC = () => {
 
   // Ensure every selected node has a color
   useEffect(() => {
-    if (!selectedNodes.length) return;
+    if (!activeNodeIds.length) return;
     setNodeColors(prev => {
       const updated = { ...prev };
       let paletteIndex = 0;
-      selectedNodes.forEach(n => {
-        if (!updated[n.id]) {
+      activeNodeIds.slice(0, 2).forEach((nodeId) => {
+        if (!updated[nodeId]) {
           while (Object.values(updated).includes(defaultPalette[paletteIndex % defaultPalette.length]) && paletteIndex < defaultPalette.length * 2) {
             paletteIndex++;
           }
-          updated[n.id] = defaultPalette[paletteIndex % defaultPalette.length];
+          updated[nodeId] = defaultPalette[paletteIndex % defaultPalette.length];
           paletteIndex++;
         }
       });
       return updated;
     });
-  }, [selectedNodes, defaultPalette]);
+  }, [activeNodeIds, defaultPalette]);
 
 
   const handleColorChange = (nodeId: string, color: string) => setNodeColors(prev => ({ ...prev, [nodeId]: color }));
-  // Color assignments now handled by NodeSelectionPanel; retain helper for any future use
-  const getColorForNodeId = (nodeId: string, idx: number) => nodeColors[nodeId] || defaultPalette[idx % defaultPalette.length]; // eslint-disable-line @typescript-eslint/no-unused-vars
-
-  // Stabilize the selectedNodes passed to NodeSelectionPanel to avoid repeated shape fetches
-  const displayedNodes = useMemo(() => {
-    if (isLocked && lockedNodesSnapshot.length) {
-      return lockedNodesSnapshot.map(s => ({ id: s.id, name: s.name, data: { name: s.name, nodeName: s.name, label: s.name, columns: s.columns }, columns: s.columns }));
-    }
-    return selectedNodes;
-  }, [isLocked, lockedNodesSnapshot, selectedNodes]);
 
   const handleColumnChange = (nodeId: string, column: string) => setNodeColumnSelection(nodeId, column);
 
   const handleSearch = useCallback(async (
     resetPage = true,
     targetNodeId?: string,
-    forceMode?: 'separated'|'combined',
+    forceMode?: 'separated' | 'combined',
     overrideSortBy?: string,
-    overrideSortOrder?: 'asc'|'desc',
+    overrideSortOrder?: 'asc' | 'desc',
     allowWhenLocked: boolean = false
   ) => {
+    if (!currentWorkspaceId) return;
     if (isLocked && !allowWhenLocked) return;
-    if (!currentWorkspaceId || selectedNodes.length === 0) {
-      return;
-    }
 
-    if (!searchWord.trim()) {
+    const trimmedSearch = searchWord.trim();
+    if (!trimmedSearch) {
       alert('Please enter a search word.');
       return;
     }
 
-    // Validate that all nodes have columns selected
-    const incompleteSelections = nodeColumnSelections.filter(sel => !sel.column);
+    const requestNodeIds = (() => {
+      const baseIds = activeNodeIds.slice(0, 2);
+      if (targetNodeId && !baseIds.includes(targetNodeId)) {
+        return [...baseIds, targetNodeId];
+      }
+      return baseIds;
+    })();
+
+    if (requestNodeIds.length === 0) {
+      return;
+    }
+
+    const effectiveSelections = effectiveNodeColumnSelections.filter((sel) =>
+      requestNodeIds.includes(sel.nodeId)
+    );
+
+    const incompleteSelections = effectiveSelections.filter((sel) => !sel.column);
     if (incompleteSelections.length > 0) {
       alert('Please select a text column for all selected nodes.');
       return;
     }
 
-    // Reset or update pagination
     const updatedPagination = { ...nodePagination };
-    selectedNodes.forEach(node => {
-      const nodeId = node.id;
+    requestNodeIds.forEach((nodeId) => {
       if (!updatedPagination[nodeId]) {
         updatedPagination[nodeId] = {
           currentPage: 1,
           pageSize: globalPageSize,
           sortBy: '',
-          sortOrder: 'asc' as 'asc' | 'desc'
+          sortOrder: 'asc' as 'asc' | 'desc',
         };
       }
       if (resetPage && (!targetNodeId || targetNodeId === nodeId)) {
@@ -372,16 +399,19 @@ const ConcordanceTab: React.FC = () => {
       setCombinedPage(1);
     }
 
+    const firstNodeId = requestNodeIds[0];
+    const firstNodePagination = updatedPagination[firstNodeId];
+    if (!firstNodePagination) {
+      return;
+    }
+
+    const nodeColumns: Record<string, string> = {};
+    effectiveSelections.forEach((sel) => {
+      nodeColumns[sel.nodeId] = sel.column;
+    });
+
     setIsSearching(true);
     try {
-      // Create node_columns mapping
-      const nodeColumns: Record<string, string> = {};
-      nodeColumnSelections.forEach(sel => {
-        nodeColumns[sel.nodeId] = sel.column;
-      });
-
-      const firstNodeId = selectedNodes[0].id;
-      const firstNodePagination = updatedPagination[firstNodeId];
       const authHeaders = getAuthHeaders();
       const isCombinedQuery = effectiveMode === 'combined';
       const useStoredResult = forceMode !== undefined || (isLocked && allowWhenLocked);
@@ -402,7 +432,7 @@ const ConcordanceTab: React.FC = () => {
           overrides.page_size = firstNodePagination.pageSize;
         }
 
-        response = await textApi.postConcordanceCurrentResult(currentWorkspaceId, overrides, authHeaders) as ConcordanceAnalysisResponse;
+        response = (await textApi.postConcordanceCurrentResult(currentWorkspaceId, overrides, authHeaders)) as ConcordanceAnalysisResponse;
         if (response?.data) {
           mergeConcordanceResults(response);
         } else if (response) {
@@ -414,9 +444,9 @@ const ConcordanceTab: React.FC = () => {
         }
       } else {
         const request: ConcordanceAnalysisRequest = {
-          node_ids: selectedNodes.slice(0, 2).map(node => node.id),
+          node_ids: requestNodeIds,
           node_columns: nodeColumns,
-          search_word: searchWord.trim(),
+          search_word: trimmedSearch,
           num_left_tokens: numLeftTokens,
           num_right_tokens: numRightTokens,
           regex,
@@ -429,28 +459,32 @@ const ConcordanceTab: React.FC = () => {
         if (requestedSortBy) {
           request.sort_by = requestedSortBy;
         }
+
         response = await textApi.concordance(currentWorkspaceId, request, authHeaders);
         if (localStorage.getItem('debugConc') === '1') {
           console.debug('Multi-Node Concordance Response:', response);
         }
         setResults(response);
-        // Lock UI and snapshot nodes
+
         try {
-          const ids = selectedNodes.slice(0, 2).map(n => n.id);
           const snaps: Array<{ id: string; name: string; columns: string[] }> = [];
-          for (const id of ids) {
+          for (const id of requestNodeIds) {
             try {
               const info = await nodesApi.info(currentWorkspaceId!, id, authHeaders);
               const name = (info as any)?.name || (info as any)?.data?.name || id;
-              const columns = Array.isArray((info as any)?.columns) ? (info as any).columns : (Array.isArray((info as any)?.data?.columns) ? (info as any).data.columns : []);
+              const columns = Array.isArray((info as any)?.columns)
+                ? (info as any).columns
+                : (Array.isArray((info as any)?.data?.columns) ? (info as any).data.columns : []);
               snaps.push({ id, name: String(name), columns });
             } catch {
               snaps.push({ id, name: id, columns: [] });
             }
           }
-          setLockedNodesSnapshot(snaps);
-          setIsLocked(true);
-        } catch { /* ignore */ }
+          const normalizedSnapshots = applySelectedColumnsToSnapshots(snaps, nodeColumns);
+          lockWithSnapshots(normalizedSnapshots);
+        } catch {
+          /* ignore */
+        }
 
         if (response?.combinable === false && viewMode === 'combined') {
           setViewMode('separated');
@@ -461,12 +495,35 @@ const ConcordanceTab: React.FC = () => {
       setResults({
         state: 'failed',
         message: error instanceof Error ? error.message : 'Unknown error occurred',
-        data: {}
+        data: {},
       } as any);
     } finally {
       setIsSearching(false);
     }
-  }, [currentWorkspaceId, selectedNodes, searchWord, nodeColumnSelections, nodePagination, globalPageSize, numLeftTokens, numRightTokens, regex, caseSensitive, getAuthHeaders, viewMode, combinedPage, combinedPageSize, isLocked, mergeConcordanceResults]);
+  }, [
+    currentWorkspaceId,
+    isLocked,
+    searchWord,
+    activeNodeIds,
+  effectiveNodeColumnSelections,
+    nodePagination,
+    globalPageSize,
+    numLeftTokens,
+    numRightTokens,
+    regex,
+    caseSensitive,
+    getAuthHeaders,
+    viewMode,
+    combinedPage,
+    combinedPageSize,
+    mergeConcordanceResults,
+    lockWithSnapshots,
+    setNodePagination,
+    setViewMode,
+    setCombinedPage,
+    setIsSearching,
+    setResults,
+  ]);
 
   useEffect(() => {
     if (!shouldAutoSearch) {
@@ -496,8 +553,7 @@ const ConcordanceTab: React.FC = () => {
           const nodeIds: string[] = Array.isArray(req.node_ids) ? req.node_ids.slice(0,2) : [];
           const node_columns: Record<string,string> = req.node_columns || {};
           const sels = nodeIds.map((id: string) => ({ nodeId: id, column: node_columns[id] || '' }));
-          setNodeColumnSelectionsRaw(sels, { replace: true });
-          setLockedNodeSelections(sels);
+          setNodeColumnSelections(sels, { replace: true });
           setSearchWord(String(req.search_word || ''));
           setNumLeftTokens(Number(req.num_left_tokens ?? 10));
           setNumRightTokens(Number(req.num_right_tokens ?? 10));
@@ -519,8 +575,11 @@ const ConcordanceTab: React.FC = () => {
                 snaps.push({ id, name: id, columns: [] });
               }
             }
-            setLockedNodesSnapshot(snaps);
-            setIsLocked(true);
+            const normalizedSnapshots = applySelectedColumnsToSnapshots(
+              snaps,
+              node_columns
+            );
+            lockWithSnapshots(normalizedSnapshots);
           } catch { /* ignore */ }
         }
         
@@ -539,7 +598,7 @@ const ConcordanceTab: React.FC = () => {
         }
       } catch { /* ignore */ }
     })();
-  }, [currentWorkspaceId, getAuthHeaders, setNodeColumnSelectionsRaw]);
+  }, [currentWorkspaceId, getAuthHeaders, setNodeColumnSelections, lockWithSnapshots, setViewMode]);
 
   const handleClearResults = async () => {
     try {
@@ -552,8 +611,7 @@ const ConcordanceTab: React.FC = () => {
     setResults(null);
     setNodePagination({});
     setCombinedPage(1);
-    setLockedNodesSnapshot([]);
-    setIsLocked(false);
+    unlockSelection();
   };
 
   const handleViewModeChange = (nextMode: 'separated' | 'combined') => {
@@ -1002,7 +1060,7 @@ const ConcordanceTab: React.FC = () => {
                   try {
                     for (const nid of nodeIdsForDetach.slice(0,2)) {
                       // Prefer lockedNodeColumns when available to ensure correct column
-                      const col = (nodeColumnSelections.find(s => s.nodeId === nid)?.column || '');
+                      const col = effectiveNodeColumnSelections.find(s => s.nodeId === nid)?.column || '';
                       if (!col) continue;
                       await handleDetach(nid, col);
                     }
@@ -1069,13 +1127,13 @@ const ConcordanceTab: React.FC = () => {
                     return (
                       <TableRow key={idx} className="cursor-pointer" style={{ backgroundColor: bg }} onClick={() => {
                         if (rawSrc) {
-                  const nodesForDetail = displayedNodes;
+                  const nodesForDetail = panelSelectedNodes;
                     const nodeObj = nodesForDetail.find((n: any) => {
                             const candidates = [n.id, n.name, (n as any).name, n.data?.name, (n as any).label, n.data?.label].filter(Boolean).map(v=>v.toString().toLowerCase());
                             return candidates.includes(rawSrc.toString().toLowerCase());
                           });
-                          const sel = nodeObj && nodeColumnSelections.find(s => s.nodeId === nodeObj.id);
-                          if (nodeObj && sel) handleRowClick(row, nodeObj.id, sel.column);
+                          const sel = nodeObj && effectiveNodeColumnSelections.find(s => s.nodeId === nodeObj.id);
+                          if (nodeObj && sel?.column) handleRowClick(row, String(nodeObj.id ?? ''), sel.column);
                         }
                       }}>
                         {displayColumns.map((c: string, i: number) => <TableCell key={i}>{row[c] !== undefined && row[c] !== null ? String(row[c]) : ''}</TableCell>)}
@@ -1289,40 +1347,27 @@ const ConcordanceTab: React.FC = () => {
               <CardTitle>Concordance Search</CardTitle>
               <CardDescription>Find keyword-in-context excerpts across up to two selected nodes.</CardDescription>
             </div>
-{isLocked && (
-              <div className="relative group flex items-center text-sm text-muted-foreground">
-                <svg className="mr-1 h-4 w-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
-                  <path fillRule="evenodd" d="M5 8V6a5 5 0 1110 0v2h1a1 1 0 011 1v9a1 1 0 01-1 1H4a1 1 0 01-1-1V9a1 1 0 011-1h1zm2-2a3 3 0 116 0v2H7V6zm-2 4h10v7H5v-7z" clipRule="evenodd" />
-                </svg>
-                Locked
-                <div className="absolute right-0 top-full z-10 mt-2 hidden w-72 rounded border border-border bg-popover p-2 text-xs text-popover-foreground shadow-lg group-hover:block">
-                  <div className="mb-1 font-semibold">Panel locked</div>
-                  <ul className="ml-4 space-y-1 list-disc">
-                    <li>Locked to current request/results.</li>
-                    <li>Node selection and backend-used parameters are disabled.</li>
-                    <li>Frontend-only options (e.g., Show Metadata) stay editable.</li>
-                    <li>Clear results to unlock and resync with the graph selection.</li>
-                  </ul>
-                </div>
-              </div>
-            )}
           </div>
         </CardHeader>
         <CardContent className="space-y-6 pt-0">
           <NodeSelectionPanel
-            selectedNodes={displayedNodes}
-            nodeColumnSelections={isLocked && lockedNodeSelections ? lockedNodeSelections : nodeColumnSelections}
+            selectedNodes={panelSelectedNodes}
+            nodeColumnSelections={effectiveNodeColumnSelections}
             onColumnChange={handleColumnChange}
             nodeColors={nodeColors}
             onColorChange={handleColorChange}
             defaultPalette={defaultPalette}
             maxCompare={2}
+            className="border border-dashed border-muted-foreground/40 rounded-lg bg-muted/30 p-4"
             showShape
             getNodeShapeFn={getNodeShape}
             disabled={!!isLocked}
+            locked={!!isLocked}
             showColorPicker={true}
             getNodeColumns={getColumnInfos}
             allowedDataTypes={['string']}
+            originalCount={displayNodeCount}
+            lockedMessage={<AnalysisLockedNotice />}
           />
 
           <div className="space-y-6">
@@ -1394,11 +1439,11 @@ const ConcordanceTab: React.FC = () => {
           <Button
             onClick={() => handleSearch(true)}
             disabled={
-              selectedNodes.length === 0 ||
+              panelSelectedNodes.length === 0 ||
               isSearching ||
               !currentWorkspaceId ||
               !searchWord.trim() ||
-              nodeColumnSelections.some(sel => !sel.column) ||
+              effectiveNodeColumnSelections.some(sel => !sel.column) ||
               !!isLocked
             }
             className="w-full md:w-auto"
@@ -1541,7 +1586,7 @@ const ConcordanceTab: React.FC = () => {
                         console.debug('Available nodes:', selectedNodes.map(n => ({ id: n.id, name: n.data?.name, nodeName: n.name })));
                       }
                       
-                      const nodesForDetail = displayedNodes;
+                      const nodesForDetail = panelSelectedNodes;
                       let node = nodesForDetail.find((n: any) => (n.data?.name || n.id) === nodeName);
                       if (!node) {
                         node = nodesForDetail.find((n: any) => n.id === nodeName);
@@ -1561,7 +1606,7 @@ const ConcordanceTab: React.FC = () => {
                       const resolvedNodeId = node?.id || mappedNodeId || '';
                       const paginationKey = resolvedNodeId || nodeName;
                       const requestNodeId = resolvedNodeId || nodeName;
-                      const selection = nodeColumnSelections.find(sel => sel.nodeId === resolvedNodeId);
+                      const selection = effectiveNodeColumnSelections.find(sel => sel.nodeId === resolvedNodeId);
                       const column = selection?.column || '';
                       
                       if (localStorage.getItem('debugConc') === '1') {

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ColumnInfo, filterColumnsByType, mapColumnsToInfo, normalizeTypeName } from '../utils/columnTypes';
 import { AlertTriangle, Lock } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -80,6 +80,7 @@ interface NodeSelectionPanelProps {
    */
   allowedDataTypes?: string[];
   fallbackToAllColumns?: boolean; // if true, when filtering removes all columns we fall back to the unfiltered list
+  lockedMessage?: ReactNode; // optional message shown when locked
 }
 
 /** Shared node + text-column + color selection panel reused across analysis tabs */
@@ -105,6 +106,7 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
   originalCount,
   allowedDataTypes,
   fallbackToAllColumns = false,
+  lockedMessage,
 }) => {
   const getColorForNodeId = (nodeId: string, idx: number) => {
     if (nodeColors[nodeId]) return nodeColors[nodeId];
@@ -309,6 +311,17 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
         <div className="mt-1 flex items-center gap-1 text-sm text-amber-600">
           <AlertTriangle className="h-4 w-4 flex-shrink-0" />
           Maximum {maxCompare} node allowed here. Currently {(originalCount ?? selectedNodes.length)} selected in workspace; only the first {maxCompare} is used.
+        </div>
+      )}
+      {locked && lockedMessage && (
+        <div className="pt-0">
+          {typeof lockedMessage === 'string' ? (
+            <div className="rounded-md border border-dashed border-muted-foreground/50 bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+              {lockedMessage}
+            </div>
+          ) : (
+            lockedMessage
+          )}
         </div>
       )}
     </div>

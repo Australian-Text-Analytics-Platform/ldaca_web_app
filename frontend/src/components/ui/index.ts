@@ -1,5 +1,5 @@
 // UI Components
-export * from './pagination';
+export * from './Pagination';
 
 // shadcn/ui Components
 export * from './button';

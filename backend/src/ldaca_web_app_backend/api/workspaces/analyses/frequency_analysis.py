@@ -16,6 +16,10 @@ from ....models import FrequencyAnalysisRequest
 router = APIRouter(prefix="/workspaces")
 
 
+VALID_CHART_TYPES = {"line", "bar", "area"}
+DEFAULT_CHART_TYPE = "line"
+
+
 @router.get("/{workspace_id}/frequency-analysis/current-request")
 async def frequency_analysis_current_request(
     workspace_id: str, current_user: dict = Depends(get_current_user)
@@ -35,7 +39,16 @@ async def frequency_analysis_current_result(
     rec = get_latest_analysis(user_id, workspace_id, task="frequency_analysis")
     if not rec:
         return None
-    return {"state": "successful", "message": "ok", "data": rec.result}
+    stored_result = rec.result if isinstance(rec.result, dict) else {}
+    chart_type = (
+        stored_result.get("chart_type") if isinstance(stored_result, dict) else None
+    )
+    if not isinstance(chart_type, str) or chart_type not in VALID_CHART_TYPES:
+        stored_result = {
+            **(stored_result or {}),
+            "chart_type": DEFAULT_CHART_TYPE,
+        }
+    return {"state": "successful", "message": "ok", "data": stored_result}
 
 
 @router.post("/{workspace_id}/nodes/{node_id}/frequency-analysis")
@@ -98,6 +111,18 @@ async def get_frequency_analysis(
             sort_by_time=request.sort_by_time,
         )
 
+        previous_record = get_latest_analysis(
+            user_id, workspace_id, task="frequency_analysis"
+        )
+        inherited_chart_type = DEFAULT_CHART_TYPE
+        if (
+            previous_record
+            and isinstance(previous_record.result, dict)
+            and isinstance(previous_record.result.get("chart_type"), str)
+            and previous_record.result["chart_type"] in VALID_CHART_TYPES
+        ):
+            inherited_chart_type = previous_record.result["chart_type"]
+
         if hasattr(frequency_result, "to_dicts"):
             result_payload = {
                 "state": "successful",
@@ -112,6 +137,8 @@ async def get_frequency_analysis(
                 "columns": [],
                 "total_records": 0,
             }
+
+        result_payload["chart_type"] = inherited_chart_type
 
         try:  # best-effort persistence
             req_dict = (
@@ -149,3 +176,53 @@ async def clear_frequency_analysis_results(
     user_id = current_user["id"]
     removed = clear_analyses(user_id, workspace_id, task="frequency_analysis")
     return {"state": "successful", "cleared": {"analyses_removed": removed}}
+
+
+@router.post("/{workspace_id}/frequency-analysis/current-result")
+async def update_frequency_analysis_current_result(
+    workspace_id: str,
+    updates: dict | None,
+    current_user: dict = Depends(get_current_user),
+):
+    user_id = current_user["id"]
+    record = get_latest_analysis(user_id, workspace_id, task="frequency_analysis")
+    if not record:
+        raise HTTPException(status_code=404, detail="No frequency analysis found")
+
+    request_payload = {**record.request} if isinstance(record.request, dict) else {}
+    result_payload = {**record.result} if isinstance(record.result, dict) else {}
+
+    chart_type = result_payload.get("chart_type")
+    if not isinstance(chart_type, str) or chart_type not in VALID_CHART_TYPES:
+        chart_type = DEFAULT_CHART_TYPE
+
+    if isinstance(updates, dict) and "chart_type" in updates:
+        candidate = updates["chart_type"]
+        if not isinstance(candidate, str) or candidate not in VALID_CHART_TYPES:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid chart type. Valid options are: line, bar, area",
+            )
+        chart_type = candidate
+
+    result_payload["chart_type"] = chart_type
+
+    try:
+        save_analysis(
+            user_id=user_id,
+            workspace_id=workspace_id,
+            task="frequency_analysis",
+            request_dict=request_payload,
+            result_dict=result_payload,
+        )
+    except Exception as exc:  # pragma: no cover
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to persist frequency analysis preferences: {exc}",
+        )
+
+    return {
+        "state": "successful",
+        "message": "saved",
+        "data": {"chart_type": chart_type},
+    }

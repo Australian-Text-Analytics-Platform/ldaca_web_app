@@ -7,6 +7,7 @@ import { useWorkspaceActions } from '../../hooks/useWorkspaceActions';
 import { useAuth } from '../../hooks/useAuth';
 import { textApi } from '../../api/text';
 import { nodesApi } from '../../api/nodes';
+import { applySelectedColumnsToSnapshots } from '../../hooks/useSchemaManagement';
 import useAutoNodeColumns from '../../hooks/useAutoNodeColumns';
 import useNodeColumnInfos from '../../hooks/useNodeColumnInfos';
 import { Button } from '../ui/button';
@@ -444,7 +445,18 @@ const QuotationTab: React.FC = () => {
         const columns = Array.isArray((info as any)?.columns)
           ? (info as any).columns
           : (Array.isArray((info as any)?.data?.columns) ? (info as any).data.columns : []);
-        setLockedNodesSnapshot([{ id: nodeId, name: String(name), columns }]);
+        const columnMap: Record<string, string | undefined> = lockedSelections.reduce(
+          (acc, sel) => {
+            acc[sel.nodeId] = sel.column;
+            return acc;
+          },
+          {} as Record<string, string | undefined>
+        );
+        const normalizedSnapshots = applySelectedColumnsToSnapshots(
+          [{ id: nodeId, name: String(name), columns }],
+          columnMap
+        );
+        setLockedNodesSnapshot(normalizedSnapshots);
       } catch {
         /* ignore */
       }
@@ -553,7 +565,11 @@ const QuotationTab: React.FC = () => {
           const columns = Array.isArray((info as any)?.columns)
             ? (info as any).columns
             : (Array.isArray((info as any)?.data?.columns) ? (info as any).data.columns : []);
-          setLockedNodesSnapshot([{ id: nodeId, name: String(name), columns }]);
+          const normalizedSnapshots = applySelectedColumnsToSnapshots(
+            [{ id: nodeId, name: String(name), columns }],
+            column ? { [nodeId]: column } : {}
+          );
+          setLockedNodesSnapshot(normalizedSnapshots);
         } catch {
           /* ignore */
         }

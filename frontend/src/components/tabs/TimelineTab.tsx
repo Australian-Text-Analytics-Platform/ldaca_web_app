@@ -5,9 +5,12 @@ import { useWorkspaceData } from '../../hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '../../hooks/useWorkspaceSelection';
 import { useWorkspaceStatus } from '../../hooks/useWorkspaceStatus';
 import { useAuth } from '../../hooks/useAuth';
+import { useAnalysisLockState, useParameterChangeDetection } from '../../hooks/useAnalysisLockState';
+import { useSchemaManagement, useLatestRef, createNodeSnapshot, applySelectedColumnsToSnapshots } from '../../hooks/useSchemaManagement';
 import { FrequencyAnalysisRequest, textApi } from '../../api/text';
 import { nodesApi } from '../../api/index';
 import NodeSelectionPanel from '../NodeSelectionPanel';
+import AnalysisLockedNotice from './AnalysisLockedNotice';
 import { normalizeTypeName } from '../../utils/columnTypes';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
@@ -42,6 +45,12 @@ interface UniqueValueCountProps {
 }
 
 type TimelineDatum = Record<string, unknown>;
+
+type ChartTypeOption = 'line' | 'bar' | 'area';
+
+const CHART_TYPE_OPTIONS: ChartTypeOption[] = ['line', 'bar', 'area'];
+const isChartTypeOption = (value: unknown): value is ChartTypeOption =>
+  typeof value === 'string' && CHART_TYPE_OPTIONS.includes(value as ChartTypeOption);
 
 const TIMELINE_PALETTE = [
   '#2563eb', // blue
@@ -83,24 +92,50 @@ const UniqueValueCount: React.FC<UniqueValueCountProps> = ({ workspaceId, nodeId
 };
 
 const TimelineTab: React.FC = () => {
-  const { selectedNodeId, selectedNode, selectedNodes } = useWorkspaceSelection();
+  const { selectedNodeId, selectedNode } = useWorkspaceSelection();
   const { nodeData, currentWorkspaceId } = useWorkspaceData();
   const { isLoading } = useWorkspaceStatus();
 
   const { getAuthHeaders } = useAuth();
 
-  // Node selection via shared panel (single node)
-  const [nodeColumnSelections, setNodeColumnSelections] = useState<Array<{ nodeId: string; column: string }>>([]);
+  // Use shared analysis lock state hook
+  const {
+    isLocked,
+    setIsLocked,
+    lockedNodesSnapshot,
+    setLockedNodesSnapshot,
+    activeNodeId,
+    nodeColumnSelections,
+    setNodeColumnSelections,
+    displayNodeCount,
+  } = useAnalysisLockState({
+    allowedDataTypes: ['datetime'],
+    maxNodes: 1,
+    docTypeOnly: false,
+    enableHeuristicGuess: false,
+    storageScope: 'timeline', // Separate from other tabs
+  });
 
   const [timeColumn, setTimeColumn] = useState('');
   const [groupByColumns, setGroupByColumns] = useState<string[]>([]);
   const [frequency, setFrequency] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('daily');
-  const [chartType, setChartType] = useState<'line' | 'bar' | 'area'>('line');
-  const [isLocked, setIsLocked] = useState(false);
-  const [lockedNodesSnapshot, setLockedNodesSnapshot] = useState<Array<{ id: string; name: string; columns: string[] }>>([]);
-  // Store schema (column -> js_type) separately so we don't lose types when locking/unlocking
-  const [currentSchema, setCurrentSchema] = useState<Record<string,string>>({});
-  const [lockedSchema, setLockedSchema] = useState<Record<string,string> | null>(null);
+  const [chartType, setChartType] = useState<ChartTypeOption>('line');
+  
+  // Use schema management hook
+  const {
+    setLockedSchema,
+    availableColumns,
+    lockCurrentSchema,
+    currentSchemaRef,
+  } = useSchemaManagement({
+    nodeId: activeNodeId,
+    isLocked,
+    workspaceId: currentWorkspaceId || undefined,
+    getAuthHeaders,
+    nodeData,
+    selectedNode,
+  });
+
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [results, setResults] = useState<any>(null);
   const [hydratingSelection, setHydratingSelection] = useState(false);
@@ -111,29 +146,16 @@ const TimelineTab: React.FC = () => {
     groupByColumns: string[];
   } | null>(null);
 
-  const currentSchemaRef = useRef(currentSchema);
-  useEffect(() => {
-    currentSchemaRef.current = currentSchema;
-  }, [currentSchema]);
+  // Ref for hydration logic (needed to access latest values in async effect)
+  const frequencyRef = useLatestRef(frequency);
+  const chartTypeRef = useLatestRef(chartType);
 
-  const frequencyRef = useRef(frequency);
-  useEffect(() => {
-    frequencyRef.current = frequency;
-  }, [frequency]);
-  
-  const hasParamsChanged = useMemo(() => {
-    if (!isLocked || !lockedParams) return false;
-    if (frequency !== lockedParams.frequency) return true;
-    if (groupByColumns.length !== lockedParams.groupByColumns.length) return true;
-    return groupByColumns.some((col, idx) => col !== lockedParams.groupByColumns[idx]);
-  }, [isLocked, lockedParams, frequency, groupByColumns]);
-
-  const activeNodeId = useMemo(() => {
-    if (isLocked && lockedNodesSnapshot.length) {
-      return lockedNodesSnapshot[0].id;
-    }
-    return selectedNodeId ?? '';
-  }, [isLocked, lockedNodesSnapshot, selectedNodeId]);
+  // Use parameter change detection hook
+  const hasParamsChanged = useParameterChangeDetection(
+    isLocked,
+    { frequency, groupByColumns },
+    lockedParams
+  );
 
   const activeTimeColumn = useMemo(() => {
     if (!activeNodeId) return '';
@@ -143,38 +165,6 @@ const TimelineTab: React.FC = () => {
     const hydratedTime = (results?.analysis_params?.time_column as string | undefined) ?? '';
     return hydratedTime;
   }, [activeNodeId, nodeColumnSelections, timeColumn, results]);
-
-  // Get available columns from schema (prefer fetched schema; fallback to nodeData/selectedNode) preserving types
-  const availableColumns = useMemo(() => {
-    const effectiveSchema = isLocked ? (lockedSchema || currentSchema) : currentSchema;
-    if (effectiveSchema && Object.keys(effectiveSchema).length > 0) {
-      return Object.entries(effectiveSchema).map(([name, jsType]) => ({ name, dataType: jsType }));
-    }
-    // Fallback logic (legacy) only if schema not yet fetched
-    const columns: Array<{ name: string; dataType: string }> = [];
-    if (nodeData?.columns && Array.isArray(nodeData.columns) && nodeData?.dtypes) {
-      nodeData.columns.forEach((colName: string) => {
-        const rawDataType = nodeData.dtypes[colName] || 'unknown';
-        const normalizedDataType = normalizeTypeName(rawDataType);
-        columns.push({ name: colName, dataType: normalizedDataType });
-      });
-    } else if (nodeData?.dtypes && typeof nodeData.dtypes === 'object') {
-      Object.keys(nodeData.dtypes).forEach(colName => {
-        const rawDataType = nodeData.dtypes[colName] || 'unknown';
-        const normalizedDataType = normalizeTypeName(rawDataType);
-        columns.push({ name: colName, dataType: normalizedDataType });
-      });
-    } else if (selectedNode?.data?.schema) {
-      // selectedNode.data.schema may already be array of objects or mapping; attempt to parse
-      const schemaObj = Array.isArray(selectedNode.data.schema)
-        ? Object.fromEntries(selectedNode.data.schema.map((c:any)=>[c.name, c.js_type || 'string']))
-        : selectedNode.data.schema;
-      Object.entries(schemaObj).forEach(([colName, jsType]) => {
-        columns.push({ name: colName, dataType: typeof jsType === 'string' ? normalizeTypeName(jsType) : 'string' });
-      });
-    }
-    return columns;
-  }, [isLocked, lockedSchema, currentSchema, nodeData?.columns, nodeData?.dtypes, selectedNode?.data?.schema]);
 
   const datetimeColumns = useMemo(
     () => availableColumns.filter((column) => column.dataType === 'datetime'),
@@ -186,26 +176,6 @@ const TimelineTab: React.FC = () => {
     [datetimeColumns]
   );
 
-  // Fetch schema on-demand when selected node changes (and not locked)
-  useEffect(() => {
-    if (!selectedNodeId || isLocked) return;
-    (async () => {
-      try {
-        if (!currentWorkspaceId) return;
-        const info = await nodesApi.info(currentWorkspaceId, selectedNodeId, getAuthHeaders());
-        // info.schema could be array (NodeSummary) or mapping (legacy). Normalize to mapping of js_type.
-        let schemaMap: Record<string,string> = {};
-        const rawSchema = (info as any)?.schema;
-        if (Array.isArray(rawSchema)) {
-          schemaMap = Object.fromEntries(rawSchema.map((c:any)=>[c.name, c.js_type || 'string']));
-        } else if (rawSchema && typeof rawSchema === 'object') {
-          schemaMap = Object.fromEntries(Object.entries(rawSchema).map(([k,v])=>[k, typeof v === 'string' ? normalizeTypeName(v) : 'string']));
-        }
-        if (Object.keys(schemaMap).length > 0) setCurrentSchema(schemaMap);
-      } catch { /* ignore schema fetch errors */ }
-    })();
-  }, [selectedNodeId, isLocked, currentWorkspaceId, getAuthHeaders]);
-
   useEffect(() => {
     if (isLocked || hydratingSelection) return;
     if (!selectedNodeId) {
@@ -215,12 +185,11 @@ const TimelineTab: React.FC = () => {
     }
 
     if (!timeColumnOptions.length) {
-      setNodeColumnSelections((prev) => {
-        if (prev.length === 1 && prev[0].nodeId === selectedNodeId && prev[0].column === '') {
-          return prev;
-        }
-        return [{ nodeId: selectedNodeId, column: '' }];
-      });
+      // Check current state before updating to avoid infinite loop
+      const currentSelection = nodeColumnSelections.find(s => s.nodeId === selectedNodeId);
+      if (!currentSelection || currentSelection.column !== '') {
+        setNodeColumnSelections([{ nodeId: selectedNodeId, column: '' }]);
+      }
       if (timeColumn !== '') {
         setTimeColumn('');
       }
@@ -232,13 +201,15 @@ const TimelineTab: React.FC = () => {
       setTimeColumn(desired);
     }
 
-    setNodeColumnSelections((prev) => {
-      if (prev.length === 1 && prev[0].nodeId === selectedNodeId && prev[0].column === desired) {
-        return prev;
-      }
-      return [{ nodeId: selectedNodeId, column: desired }];
-    });
-  }, [isLocked, hydratingSelection, selectedNodeId, timeColumn, timeColumnOptions]);
+    // Check current state before updating to avoid infinite loop
+    const currentSelection = nodeColumnSelections.find(s => s.nodeId === selectedNodeId);
+    if (!currentSelection || currentSelection.column !== desired) {
+      setNodeColumnSelections([{ nodeId: selectedNodeId, column: desired }]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLocked, hydratingSelection, selectedNodeId, timeColumn, timeColumnOptions, setNodeColumnSelections]);
+  // Note: nodeColumnSelections intentionally excluded from deps to prevent infinite loop
+  // We read it directly inside the effect to check current state
 
   const handleAddGroupByColumn = () => {
     if (groupByColumns.length < 3) {
@@ -300,27 +271,33 @@ const handleAnalyze = async () => {
           frequency,
         },
       };
-      setResults(enrichedResult);
+      const resolvedChartType = isChartTypeOption((enrichedResult as any)?.chart_type)
+        ? (enrichedResult as any).chart_type
+        : chartTypeRef.current;
+      const normalizedResult = {
+        ...enrichedResult,
+        chart_type: resolvedChartType,
+      };
+      setResults(normalizedResult);
+      setChartType(resolvedChartType);
       // Lock with snapshot & preserve schema and params
       try {
-        const info = await nodesApi.info(currentWorkspaceId, nodeIdForAnalysis, getAuthHeaders());
-        const name = (info as any)?.name || (info as any)?.data?.name || nodeIdForAnalysis;
-        const columns = Array.isArray((info as any)?.columns) ? (info as any).columns : (Array.isArray((info as any)?.data?.columns) ? (info as any).data.columns : []);
-        setLockedNodesSnapshot([{ id: nodeIdForAnalysis, name: String(name), columns }]);
+        const snapshot = await createNodeSnapshot(currentWorkspaceId, nodeIdForAnalysis, () => getAuthHeaders());
+        const [normalizedSnapshot] = applySelectedColumnsToSnapshots(
+          [snapshot],
+          { [nodeIdForAnalysis]: picked }
+        );
+        if (normalizedSnapshot) {
+          setLockedNodesSnapshot([{ id: normalizedSnapshot.id, name: normalizedSnapshot.name, columns: normalizedSnapshot.columns }]);
+          lockCurrentSchema(normalizedSnapshot.schema);
+        }
+
         // Save locked parameters
         setLockedParams({
           frequency,
           groupByColumns: [...validGroupByColumns],
         });
-        // Capture schema for locked display
-        const rawSchema = (info as any)?.schema;
-        if (Array.isArray(rawSchema)) {
-          setLockedSchema(Object.fromEntries(rawSchema.map((c:any)=>[c.name, c.js_type || 'string'])));
-        } else if (rawSchema && typeof rawSchema === 'object') {
-          setLockedSchema(Object.fromEntries(Object.entries(rawSchema).map(([k,v])=>[k, typeof v === 'string' ? normalizeTypeName(v) : 'string'])));
-        } else {
-          setLockedSchema(currentSchema);
-        }
+
         setIsLocked(true);
       } catch { /* ignore */ }
     } catch (error) {
@@ -350,7 +327,29 @@ const handleUpdateResults = async () => {
     setLockedSchema(null);
     setLockedParams(null);
     setIsLocked(false);
+    setChartType('line');
   };
+
+  const handleChartTypeChange = useCallback(
+    async (value: ChartTypeOption) => {
+      setChartType(value);
+  setResults((prev: any) => (prev ? { ...prev, chart_type: value } : prev));
+
+      if (!currentWorkspaceId) {
+        return;
+      }
+
+      const authHeaders = getAuthHeaders();
+      const headers = Object.keys(authHeaders).length > 0 ? (authHeaders as Record<string, string>) : {};
+
+      try {
+        await textApi.postFrequencyCurrentResult(currentWorkspaceId, { chart_type: value }, headers);
+      } catch (error) {
+        console.error('Failed to update frequency analysis chart type:', error);
+      }
+    },
+    [currentWorkspaceId, getAuthHeaders]
+  );
 
   // Prepare data for chart visualization
   const chartData = useMemo<TimelineDatum[]>(() => {
@@ -582,117 +581,136 @@ const handleUpdateResults = async () => {
     hydratedOnceRef.current = false;
   }, [currentWorkspaceId]);
   useEffect(() => {
+    if (!currentWorkspaceId || hydratedOnceRef.current) {
+      return;
+    }
+
     let cancelled = false;
-    const hydrate = async () => {
-      if (hydratedOnceRef.current || !currentWorkspaceId) return;
-      hydratedOnceRef.current = true;
-      setHydratingSelection(true);
-      try {
-        const reqResp = await textApi.getFrequencyCurrentRequest(currentWorkspaceId, getAuthHeaders());
-        if (!reqResp || cancelled) return;
+    const frameId = requestAnimationFrame(() => {
+      void (async () => {
+        if (cancelled || hydratedOnceRef.current || !currentWorkspaceId) return;
 
-        const req = (reqResp as any)?.data;
-        let lockedGroups: string[] = [];
-        let lockedFrequency: 'daily' | 'weekly' | 'monthly' | 'yearly' = frequencyRef.current;
-        let reqTimeColumn = '';
-        let nodeIdStr = '';
+        hydratedOnceRef.current = true;
+        setHydratingSelection(true);
+        try {
+          const reqResp = await textApi.getFrequencyCurrentRequest(currentWorkspaceId, getAuthHeaders());
+          if (!reqResp || cancelled) return;
 
-        if (req) {
-          nodeIdStr = String(req.node_id || req.nodeId || '');
-          reqTimeColumn = typeof req.time_column === 'string' ? req.time_column : '';
-          if (nodeIdStr && reqTimeColumn) {
-            setNodeColumnSelections([{ nodeId: nodeIdStr, column: reqTimeColumn }]);
-            setTimeColumn(reqTimeColumn);
-          }
+          const req = (reqResp as any)?.data;
+          let lockedGroups: string[] = [];
+          let lockedFrequency: 'daily' | 'weekly' | 'monthly' | 'yearly' = frequencyRef.current;
+          let reqTimeColumn = '';
+          let nodeIdStr = '';
 
-          const normalizedGroups = Array.isArray(req.group_by_columns)
-            ? req.group_by_columns.filter((col: unknown): col is string => typeof col === 'string' && col.trim() !== '')
-            : [];
-          setGroupByColumns(normalizedGroups.length ? [...normalizedGroups] : []);
-          lockedGroups = normalizedGroups.length ? [...normalizedGroups] : [];
-
-          const validFrequencies: Array<'daily' | 'weekly' | 'monthly' | 'yearly'> = ['daily', 'weekly', 'monthly', 'yearly'];
-          const reqFrequency = typeof req.frequency === 'string' ? (req.frequency as any) : undefined;
-          if (reqFrequency && validFrequencies.includes(reqFrequency)) {
-            lockedFrequency = reqFrequency;
-            if (frequencyRef.current !== lockedFrequency) {
-              setFrequency(lockedFrequency);
+          if (req) {
+            nodeIdStr = String(req.node_id || req.nodeId || '');
+            reqTimeColumn = typeof req.time_column === 'string' ? req.time_column : '';
+            if (nodeIdStr && reqTimeColumn) {
+              setNodeColumnSelections([{ nodeId: nodeIdStr, column: reqTimeColumn }]);
+              setTimeColumn(reqTimeColumn);
             }
-          } else {
-            lockedFrequency = frequencyRef.current;
-          }
 
-          setLockedParams({ frequency: lockedFrequency, groupByColumns: [...lockedGroups] });
+            const normalizedGroups = Array.isArray(req.group_by_columns)
+              ? req.group_by_columns.filter((col: unknown): col is string => typeof col === 'string' && col.trim() !== '')
+              : [];
+            setGroupByColumns(normalizedGroups.length ? [...normalizedGroups] : []);
+            lockedGroups = normalizedGroups.length ? [...normalizedGroups] : [];
 
-          if (nodeIdStr) {
-            setIsLocked(true);
-            try {
-              const info = await nodesApi.info(currentWorkspaceId, nodeIdStr, getAuthHeaders());
-              if (cancelled) return;
-              const name = (info as any)?.name || (info as any)?.data?.name || nodeIdStr;
-              const columns = Array.isArray((info as any)?.columns)
-                ? (info as any).columns
-                : (Array.isArray((info as any)?.data?.columns) ? (info as any).data.columns : []);
-              setLockedNodesSnapshot([{ id: nodeIdStr, name: String(name), columns }]);
-              const rawSchema = (info as any)?.schema;
-              if (Array.isArray(rawSchema)) {
-                setLockedSchema(Object.fromEntries(rawSchema.map((c: any) => [c.name, c.js_type || 'string'])));
-              } else if (rawSchema && typeof rawSchema === 'object') {
-                setLockedSchema(
-                  Object.fromEntries(
-                    Object.entries(rawSchema).map(([k, v]) => [k, typeof v === 'string' ? normalizeTypeName(v) : 'string'])
-                  )
+            const validFrequencies: Array<'daily' | 'weekly' | 'monthly' | 'yearly'> = ['daily', 'weekly', 'monthly', 'yearly'];
+            const reqFrequency = typeof req.frequency === 'string' ? (req.frequency as any) : undefined;
+            if (reqFrequency && validFrequencies.includes(reqFrequency)) {
+              lockedFrequency = reqFrequency;
+              if (frequencyRef.current !== lockedFrequency) {
+                setFrequency(lockedFrequency);
+              }
+            } else {
+              lockedFrequency = frequencyRef.current;
+            }
+
+            setLockedParams({ frequency: lockedFrequency, groupByColumns: [...lockedGroups] });
+
+            if (nodeIdStr) {
+              setIsLocked(true);
+              try {
+                const info = await nodesApi.info(currentWorkspaceId, nodeIdStr, getAuthHeaders());
+                if (cancelled) return;
+                const name = (info as any)?.name || (info as any)?.data?.name || nodeIdStr;
+                const columns = Array.isArray((info as any)?.columns)
+                  ? (info as any).columns
+                  : (Array.isArray((info as any)?.data?.columns) ? (info as any).data.columns : []);
+                const [normalizedSnapshot] = applySelectedColumnsToSnapshots(
+                  [{ id: nodeIdStr, name: String(name), columns }],
+                  { [nodeIdStr]: reqTimeColumn }
                 );
-              } else {
-                setLockedSchema((prev) => prev ?? currentSchemaRef.current);
+                setLockedNodesSnapshot([{ id: normalizedSnapshot.id, name: normalizedSnapshot.name, columns: normalizedSnapshot.columns }]);
+                const rawSchema = (info as any)?.schema;
+                if (Array.isArray(rawSchema)) {
+                  setLockedSchema(Object.fromEntries(rawSchema.map((c: any) => [c.name, c.js_type || 'string'])));
+                } else if (rawSchema && typeof rawSchema === 'object') {
+                  setLockedSchema(
+                    Object.fromEntries(
+                      Object.entries(rawSchema).map(([k, v]) => [k, typeof v === 'string' ? normalizeTypeName(v) : 'string'])
+                    )
+                  );
+                } else {
+                  setLockedSchema((prev) => prev ?? currentSchemaRef.current);
+                }
+              } catch {
+                if (!cancelled) {
+                  setLockedSchema((prev) => prev ?? currentSchemaRef.current);
+                }
               }
-            } catch {
-              if (!cancelled) {
-                setLockedSchema((prev) => prev ?? currentSchemaRef.current);
-              }
+            } else {
+              setIsLocked(false);
+              setLockedNodesSnapshot([]);
+              setLockedSchema(null);
             }
           } else {
+            setNodeColumnSelections([]);
+            setTimeColumn('');
+            setGroupByColumns([]);
+            setLockedParams(null);
             setIsLocked(false);
             setLockedNodesSnapshot([]);
             setLockedSchema(null);
           }
-        } else {
-          setNodeColumnSelections([]);
-          setTimeColumn('');
-          setGroupByColumns([]);
-          setLockedParams(null);
-          setIsLocked(false);
-          setLockedNodesSnapshot([]);
-          setLockedSchema(null);
-        }
 
-        const resResp = await textApi.getFrequencyCurrentResult(currentWorkspaceId, getAuthHeaders());
-        if (!resResp || cancelled) return;
-        const res = (resResp as any)?.data;
-        if (res) {
-          const enriched = {
-            ...resResp,
-            analysis_params: {
-              ...(resResp as any)?.analysis_params,
-              group_by_columns: lockedGroups,
-              time_column: reqTimeColumn,
-              frequency: lockedFrequency,
-            },
-          };
-          setResults(enriched);
+          const resResp = await textApi.getFrequencyCurrentResult(currentWorkspaceId, getAuthHeaders());
+          if (!resResp || cancelled) return;
+          const res = (resResp as any)?.data;
+          if (res) {
+            const enriched = {
+              ...resResp,
+              analysis_params: {
+                ...(resResp as any)?.analysis_params,
+                group_by_columns: lockedGroups,
+                time_column: reqTimeColumn,
+                frequency: lockedFrequency,
+              },
+            };
+            const resolvedChartType = isChartTypeOption((resResp as any)?.chart_type)
+              ? (resResp as any).chart_type
+              : chartTypeRef.current;
+            const normalizedResult = {
+              ...enriched,
+              chart_type: resolvedChartType,
+            };
+            setResults(normalizedResult);
+            setChartType(resolvedChartType);
+          }
+        } catch {
+          /* ignore */
+        } finally {
+          if (!cancelled) setHydratingSelection(false);
         }
-      } catch {
-        /* ignore */
-      } finally {
-        if (!cancelled) setHydratingSelection(false);
-      }
-    };
+      })();
+    });
 
-    void hydrate();
     return () => {
       cancelled = true;
+      cancelAnimationFrame(frameId);
     };
-  }, [currentWorkspaceId, getAuthHeaders, currentSchema, frequency, selectedNodeId]);
+  }, [currentWorkspaceId, getAuthHeaders, currentSchemaRef, frequencyRef, chartTypeRef, setIsLocked, setLockedNodesSnapshot, setLockedSchema, setNodeColumnSelections]);
 
   return (
     <div className="space-y-6">
@@ -734,9 +752,10 @@ const handleUpdateResults = async () => {
             showColorPicker={false}
             disabled={!!isLocked}
             locked={!!isLocked}
-            originalCount={selectedNodes?.length || (selectedNode ? 1 : 0)}
+            originalCount={displayNodeCount}
             columnLabelFn={() => 'Time Column *'}
             allowedDataTypes={['datetime']}
+            lockedMessage={<AnalysisLockedNotice />}
           />
 
           {/* Analysis Configuration */}
@@ -888,7 +907,7 @@ const handleUpdateResults = async () => {
               <span className="text-sm text-muted-foreground">Chart Type</span>
               <Select
                 value={chartType}
-                onValueChange={(value) => setChartType(value as 'line' | 'bar' | 'area')}
+                onValueChange={(value) => handleChartTypeChange(value as ChartTypeOption)}
               >
                 <SelectTrigger className="w-[140px] text-sm">
                   <SelectValue placeholder="Select chart" />

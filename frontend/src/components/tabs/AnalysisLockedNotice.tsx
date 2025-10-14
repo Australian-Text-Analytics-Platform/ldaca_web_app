@@ -1,0 +1,17 @@
+import React from 'react';
+import { cn } from '../../lib/utils';
+
+const DEFAULT_MESSAGE = 'Analysis locked to the last request. Clear results to unlock and resync node choices.';
+
+type AnalysisLockedNoticeProps = {
+  message?: string;
+  className?: string;
+};
+
+const AnalysisLockedNotice: React.FC<AnalysisLockedNoticeProps> = ({ message = DEFAULT_MESSAGE, className }) => (
+  <div className={cn('rounded-md border border-dashed border-muted-foreground/50 bg-muted/40 px-3 py-2 text-xs text-muted-foreground', className)}>
+    {message}
+  </div>
+);
+
+export default AnalysisLockedNotice;

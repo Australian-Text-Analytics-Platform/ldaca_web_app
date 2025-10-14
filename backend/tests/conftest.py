@@ -3,8 +3,6 @@ Configuration for pytest tests
 Provides shared fixtures and setup for all tests
 """
 
-import asyncio
-import glob
 import shutil
 import tempfile
 from pathlib import Path
@@ -12,7 +10,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from ldaca_web_app_backend import db
-
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -146,7 +143,9 @@ async def authenticated_client(settings_override):
 
     try:
         transport = httpx.ASGITransport(app)
-        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://test"
+        ) as client:
             yield client
     finally:
         app.dependency_overrides.clear()
@@ -175,7 +174,9 @@ async def test_client(settings_override):
 
     try:
         transport = httpx.ASGITransport(app)
-        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://test"
+        ) as client:
             yield client
     finally:
         for p in patches:
@@ -353,10 +354,6 @@ SAMPLE_TEXT_DATA = [
 ]
 
 
-
-
-
-
 # Analysis persistence test fixtures
 
 
@@ -429,6 +426,29 @@ def sample_text_file(test_user):
 
 
 @pytest.fixture
+def timeline_csv_file(test_user):
+    """Create a CSV file with timestamped records for frequency analysis tests."""
+    import csv
+
+    from ldaca_web_app_backend.core.utils import get_user_data_folder
+
+    user_data_dir = get_user_data_folder(test_user["id"])
+    user_data_dir.mkdir(parents=True, exist_ok=True)
+
+    timeline_file = user_data_dir / "timeline.csv"
+    with open(timeline_file, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+    writer.writerow(["document", "published_at", "category"])
+    writer.writerow(["Entry one", "2024-01-01T08:15:00Z", "alpha"])
+    writer.writerow(["Entry two", "2024-01-02T09:00:00Z", "beta"])
+    writer.writerow(["Entry three", "2024-01-02T11:30:00Z", "alpha"])
+    writer.writerow(["Entry four", "2024-01-03T14:45:00Z", "beta"])
+    writer.writerow(["Entry five", "2024-01-03T16:00:00Z", "gamma"])
+
+    return timeline_file
+
+
+@pytest.fixture
 async def tiny_node_id(authenticated_client, workspace_id, tiny_text_file):
     """Add a tiny node to the workspace and return its ID."""
     response = await authenticated_client.post(
@@ -451,4 +471,16 @@ async def sample_node_id(authenticated_client, workspace_id, sample_text_file):
     assert response.status_code == 200
     result = response.json()
     # The API returns 'id', not 'node_id'
+    return result["id"]
+
+
+@pytest.fixture
+async def timeline_node_id(authenticated_client, workspace_id, timeline_csv_file):
+    """Add a timeline-friendly node to the workspace and return its ID."""
+    response = await authenticated_client.post(
+        f"/api/workspaces/{workspace_id}/nodes",
+        params={"filename": timeline_csv_file.name},
+    )
+    assert response.status_code == 200
+    result = response.json()
     return result["id"]

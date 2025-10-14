@@ -4,10 +4,10 @@ import NodeSelectionPanel from '../NodeSelectionPanel';
 import { useWorkspaceData } from '../../hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '../../hooks/useWorkspaceSelection';
 import { useWorkspaceStatus } from '../../hooks/useWorkspaceStatus';
-import { nodesApi } from '../../api/nodes';
 import { useAuth } from '../../hooks/useAuth';
 import { TokenFrequencyRequest, TokenFrequencyResponse, textApi } from '../../api/text';
 import { createConcordanceSeedRequest, resolveTokenFrequencyNodeContext, type TokenFrequencyAnalysisParams } from './tokenFrequencyHelpers';
+import AnalysisLockedNotice from './AnalysisLockedNotice';
 import { Wordcloud } from '@visx/wordcloud';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { Button } from '../ui/button';
@@ -15,7 +15,9 @@ import { Input } from '../ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../ui/card';
 import { Play, Loader2, Trash2, Table2, Download, X, ChevronLeft, ChevronRight, Lightbulb } from 'lucide-react';
 import { Text } from '@visx/text';
-import useAutoNodeColumns, { type NodeColumnSelection } from '../../hooks/useAutoNodeColumns';
+import { useAnalysisLockState } from '../../hooks/useAnalysisLockState';
+import { createNodeSnapshots, applySelectedColumnsToSnapshots } from '../../hooks/useSchemaManagement';
+import { type NodeColumnSelection } from '../../hooks/useAutoNodeColumns';
 import useNodeColumnInfos from '../../hooks/useNodeColumnInfos';
 import { useUIStore } from '../../stores';
 import { useAnalysisStore } from '../../stores/analysisStore';
@@ -63,36 +65,34 @@ const TokenFrequencyTab: React.FC = () => {
     nodes: selectedNodes,
   });
 
-  const nodeIdToName = useMemo(() => {
-    const map: Record<string,string> = {};
-    selectedNodes.forEach(n => {
-      const name = (n.name || n.data?.name || (n as any).label || n.data?.label || n.data?.nodeName || n.id);
-      map[n.id] = String(name);
-    });
-    return map;
-  }, [selectedNodes]);
-
   const { getAuthHeaders } = useAuth();
   const setCurrentView = useUIStore((state) => state.setCurrentView);
   const setPendingConcordance = useAnalysisStore((state) => state.setPendingConcordance);
 
+  const {
+    isLocked,
+    lockWithSnapshots,
+    unlockSelection,
+    nodeColumnSelections,
+    setNodeColumnSelection,
+    setNodeColumnSelections,
+    recomputeAutoColumns,
+    activeNodeColumnSelections,
+    nodeIdToName,
+    lockedNodeNameMap,
+    displayNodeCount,
+    panelSelectedNodes,
+  } = useAnalysisLockState({
+    allowedDataTypes: ['string'],
+    maxNodes: 2,
+    docTypeOnly: true,
+    enableHeuristicGuess: false,
+  });
+
+  const effectiveNodeColumnSelections = isLocked ? activeNodeColumnSelections : nodeColumnSelections;
+
   const [stopWords, setStopWords] = useState<string>('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [isLocked, setIsLocked] = useState(false);
-  // Shared auto column selection hook (shared scope with Concordance via undefined storageScope)
-  const { selections: nodeColumnSelections, setSelection: setNodeColumnSelection, setSelections: setNodeColumnSelectionsRaw, recompute: recomputeAutoColumns } = useAutoNodeColumns({
-    selectedNodes,
-    getNodeColumns: getColumnInfos,
-    allowedDataTypes: ['string'],
-  }, { workspaceId: currentWorkspaceId, maxNodes: 2, isLocked, docTypeOnly: true, enableHeuristicGuess: false });
-  const [lockedNodesSnapshot, setLockedNodesSnapshot] = useState<Array<{ id: string; name: string; columns: string[] }>>([]);
-  const lockedNodeNameMap = useMemo(() => {
-    const map: Record<string, string> = {};
-    lockedNodesSnapshot.forEach(({ id, name }) => {
-      map[id] = name;
-    });
-    return map;
-  }, [lockedNodesSnapshot]);
   const [isLoadingStopWords, setIsLoadingStopWords] = useState(false);
   const [results, setResults] = useState<TokenFrequencyResponse | null>(null);
   // Statistical table head/tail preview & sorting
@@ -468,11 +468,12 @@ const TokenFrequencyTab: React.FC = () => {
         // No current request: clear local persisted state and DO NOT fetch current-result
         setStopWords('');
         setAppliedStopSet(new Set());
-        setNodeColumnSelectionsRaw([], { replace: true });
+        setNodeColumnSelections([], { replace: true });
         setLastCompareNodeIds([]);
         setTokenLimitOverride(DEFAULT_TOKEN_LIMIT);
         setTokenLimitInput(String(DEFAULT_TOKEN_LIMIT));
         setTokenLimitError(null);
+        unlockSelection();
         tokenLimitInputChangedRef.current = false;
         if (typeof window !== 'undefined' && tokenLimitApplyTimeoutRef.current !== null) {
           window.clearTimeout(tokenLimitApplyTimeoutRef.current);
@@ -496,7 +497,7 @@ const TokenFrequencyTab: React.FC = () => {
           nodeId: id,
           column: nodeColumnsMap[id] || '',
         }));
-        setNodeColumnSelectionsRaw(selections, { replace: true });
+        setNodeColumnSelections(selections, { replace: true });
         setLastCompareNodeIds(nodeIds);
         const limitFromRequest = toFiniteNumber(
           (req as any).token_limit ?? (req as any).limit
@@ -512,20 +513,10 @@ const TokenFrequencyTab: React.FC = () => {
           }
         }
         try {
-          const snaps: Array<{ id: string; name: string; columns: string[] }> = [];
-          for (const id of nodeIds) {
-            try {
-              const info = await nodesApi.info(currentWorkspaceId!, id, getAuthHeaders());
-              const name = (info as any)?.name || (info as any)?.data?.name || id;
-              const columns = Array.isArray((info as any)?.columns) ? (info as any).columns : (Array.isArray((info as any)?.data?.columns) ? (info as any).data.columns : []);
-              snaps.push({ id, name: String(name), columns });
-            } catch {
-              snaps.push({ id, name: id, columns: [] });
-            }
-          }
-          if (snaps.length) {
-            setLockedNodesSnapshot(snaps);
-            setIsLocked(true);
+          if (nodeIds.length) {
+            const snapshots = await createNodeSnapshots(currentWorkspaceId!, nodeIds, getAuthHeaders);
+            const normalizedSnapshots = applySelectedColumnsToSnapshots(snapshots, nodeColumnsMap);
+            lockWithSnapshots(normalizedSnapshots);
           }
         } catch { /* ignore */ }
       }
@@ -546,13 +537,13 @@ const TokenFrequencyTab: React.FC = () => {
     getAuthHeaders,
     setStopWords,
     setAppliedStopSet,
-    setNodeColumnSelectionsRaw,
+    setNodeColumnSelections,
     setLastCompareNodeIds,
     setTokenLimitOverride,
     setTokenLimitInput,
     setTokenLimitError,
-    setLockedNodesSnapshot,
-    setIsLocked,
+    lockWithSnapshots,
+    unlockSelection,
     setResults,
   ]);
   useEffect(() => { void performHydration(); }, [performHydration]);
@@ -631,7 +622,7 @@ const TokenFrequencyTab: React.FC = () => {
       return;
     }
 
-    const incompleteSelections = nodeColumnSelections.filter(sel => !sel.column);
+    const incompleteSelections = effectiveNodeColumnSelections.filter((sel) => !sel.column);
     if (incompleteSelections.length > 0) {
       alert('Please select a text column for all selected nodes.');
       return;
@@ -647,7 +638,7 @@ const TokenFrequencyTab: React.FC = () => {
         : undefined;
 
       const nodeColumns: Record<string, string> = {};
-      nodeColumnSelections.forEach(sel => {
+      effectiveNodeColumnSelections.forEach((sel) => {
         if (sel.column) nodeColumns[sel.nodeId] = sel.column;
       });
 
@@ -672,24 +663,10 @@ const TokenFrequencyTab: React.FC = () => {
       }
 
       try {
-        const snaps: Array<{ id: string; name: string; columns: string[] }> = [];
-        for (const id of request.node_ids) {
-          try {
-            const info = await nodesApi.info(currentWorkspaceId!, id, getAuthHeaders());
-            const name = (info as any)?.name || (info as any)?.data?.name || id;
-            const columns = Array.isArray((info as any)?.columns)
-              ? (info as any).columns
-              : Array.isArray((info as any)?.data?.columns)
-              ? (info as any).data.columns
-              : [];
-            snaps.push({ id, name: String(name), columns });
-          } catch {
-            snaps.push({ id, name: id, columns: [] });
-          }
-        }
-        if (snaps.length) {
-          setLockedNodesSnapshot(snaps);
-          setIsLocked(true);
+        if (request.node_ids.length) {
+          const snapshots = await createNodeSnapshots(currentWorkspaceId!, request.node_ids, getAuthHeaders);
+          const normalizedSnapshots = applySelectedColumnsToSnapshots(snapshots, nodeColumns);
+          lockWithSnapshots(normalizedSnapshots);
         }
       } catch {
         /* ignore */
@@ -716,8 +693,7 @@ const TokenFrequencyTab: React.FC = () => {
     }
     setResults(null);
     setLastCompareNodeIds([]);
-    setLockedNodesSnapshot([]);
-    setIsLocked(false);
+  unlockSelection();
     setTokenLimitError(null);
     tokenLimitInputChangedRef.current = false;
     if (typeof window !== 'undefined' && tokenLimitApplyTimeoutRef.current !== null) {
@@ -735,7 +711,7 @@ const TokenFrequencyTab: React.FC = () => {
       lastCompareNodeIds,
       analysisParams,
       selectedNodes: selectedNodes.map((node) => ({ id: node.id })),
-      nodeColumnSelections,
+      nodeColumnSelections: effectiveNodeColumnSelections,
       maxNodes: 2,
     });
 
@@ -748,7 +724,7 @@ const TokenFrequencyTab: React.FC = () => {
 
     const fallbackSelections: NodeColumnSelection[] = resolvedContext.nodeIds.length > 0
       ? resolvedContext.selections
-      : nodeColumnSelections.filter((sel) => fallbackNodeIds.includes(sel.nodeId) && sel.column);
+      : effectiveNodeColumnSelections.filter((sel) => fallbackNodeIds.includes(sel.nodeId) && sel.column);
 
     const uniqueNodeIds: string[] = fallbackNodeIds
       .filter((id, index, arr) => arr.indexOf(id) === index)
@@ -947,36 +923,12 @@ const TokenFrequencyTab: React.FC = () => {
               <CardTitle>Token Frequency Analysis</CardTitle>
               <CardDescription>Inspect token usage and comparative statistics for selected nodes.</CardDescription>
             </div>
-{isLocked && (
-              <div className="relative group flex items-center text-sm text-muted-foreground">
-                <svg className="mr-1 h-4 w-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
-                  <path fillRule="evenodd" d="M5 8V6a5 5 0 1110 0v2h1a1 1 0 011 1v9a1 1 0 01-1 1H4a1 1 0 01-1-1V9a1 1 0 011-1h1zm2-2a3 3 0 116 0v2H7V6zm-2 4h10v7H5v-7z" clipRule="evenodd" />
-                </svg>
-                Locked
-                <div className="absolute right-0 top-full z-10 mt-2 hidden w-72 rounded border border-border bg-popover p-2 text-xs text-popover-foreground shadow-lg group-hover:block">
-                  <div className="mb-1 font-semibold">Panel locked</div>
-                  <ul className="ml-4 space-y-1 list-disc">
-                    <li>Locked to current request/results.</li>
-                    <li>Node selection and backend-used parameters are disabled.</li>
-                    <li>Stop words remain editable; token limit now comes from backend results.</li>
-                    <li>Clear results to unlock and resync with the graph selection.</li>
-                  </ul>
-                </div>
-              </div>
-            )}
           </div>
         </CardHeader>
         <CardContent className="space-y-6 pt-0">
           <NodeSelectionPanel
-            selectedNodes={(isLocked && lockedNodesSnapshot.length)
-              ? lockedNodesSnapshot.map((s) => ({
-                  id: s.id,
-                  name: s.name,
-                  data: { name: s.name, nodeName: s.name, label: s.name, columns: s.columns },
-                  columns: s.columns,
-                }))
-              : selectedNodes}
-            nodeColumnSelections={nodeColumnSelections}
+            selectedNodes={panelSelectedNodes}
+            nodeColumnSelections={effectiveNodeColumnSelections}
             onColumnChange={handleColumnChange}
             nodeColors={nodeColors}
             onColorChange={handleColorChange}
@@ -986,11 +938,13 @@ const TokenFrequencyTab: React.FC = () => {
             showShape
             getNodeShapeFn={getNodeShape}
             disabled={!!isLocked}
+            locked={!!isLocked}
             showColorPicker={true}
             getNodeColumns={getColumnInfos}
             allowedDataTypes={['string']}
+            originalCount={displayNodeCount}
+            lockedMessage={<AnalysisLockedNotice />}
           />
-
         </CardContent>
         <CardFooter className="flex flex-wrap items-center gap-3 pt-0">
           <Button
@@ -999,7 +953,7 @@ const TokenFrequencyTab: React.FC = () => {
               selectedNodes.length === 0 ||
               isAnalyzing ||
               !currentWorkspaceId ||
-              nodeColumnSelections.some(sel => !sel.column) ||
+              effectiveNodeColumnSelections.some((sel) => !sel.column) ||
               !!isLocked
             }
             className="w-full md:w-auto"
