@@ -103,6 +103,7 @@ export const textApi = {
   topicModeling: (ws: string, req: TopicModelingRequest, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/topic-modeling`, req, headers),
   getTopicModelingCurrentRequest: (ws: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/topic-modeling/current-request`, { method: 'GET', headers }),
   getTopicModelingCurrentResult: (ws: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/topic-modeling/current-result`, { method: 'GET', headers }),
+  clearTopicModeling: (ws: string, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/topic-modeling/clear`, {}, headers),
 
   // Legacy compatibility shims (no-ops retained for import stability)
 };

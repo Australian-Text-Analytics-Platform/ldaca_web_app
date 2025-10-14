@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import NodeSelectionPanel, { WorkspaceNodeLike } from '../NodeSelectionPanel';
 import { useWorkspaceData } from '../../hooks/useWorkspaceData';
@@ -15,8 +16,7 @@ import { Button } from '../ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Input } from '../ui/input';
 import { Checkbox } from '../ui/checkbox';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
-import { AlertTriangle, Loader2, Lock, Play, Trash2 } from 'lucide-react';
+import { AlertTriangle, Loader2, Play, Trash2 } from 'lucide-react';
 import { applySelectedColumnsToSnapshots } from '../../hooks/useSchemaManagement';
 import AnalysisLockedNotice from './AnalysisLockedNotice';
 // Define local lightweight response/topic interfaces if not exported (legacy code referenced these)
@@ -86,7 +86,7 @@ const TopicModelingTab: React.FC = () => {
   const setResultSafely = useCallback((newResult: TopicModelingResponse | null) => {
     // Prevent downgrading from successful to running (race condition fix)
     if (resultRef.current?.state === 'successful' && newResult?.state === 'running') {
-      console.log('TopicModelingTab: Ignoring stale running update that would hide successful results');
+      console.debug('TopicModelingTab: Ignoring stale running update that would hide successful results');
       return;
     }
 
@@ -144,7 +144,7 @@ const TopicModelingTab: React.FC = () => {
         console.warn('Failed to fetch topic modeling result', error);
       }
     },
-    [currentWorkspaceId, getAuthHeaders, setResultSafely]
+  [currentWorkspaceId, getAuthHeaders, setIsLocked, setResultSafely]
   );
 
   // Observe container width for responsive sizing
@@ -529,7 +529,7 @@ const TopicModelingTab: React.FC = () => {
       runningRef.current = false;
       void fetchTopicModelingResult(failedTask.task_id, 'failed');
     }
-  }, [tasks, fetchTopicModelingResult]);
+  }, [tasks, fetchTopicModelingResult, setIsLocked]);
 
   // React to explicit ready markers from task stream (covers persisted results without state change yet)
   useEffect(() => {
@@ -548,37 +548,20 @@ const TopicModelingTab: React.FC = () => {
       setIsRunning(false);
       runningRef.current = false;
     }
-  }, [result]);
+  }, [result, setIsLocked]);
 
   return (
-    <TooltipProvider delayDuration={200}>
-      <div className="space-y-6">
-        <Card>
-          <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="space-y-1">
+    <div className="space-y-6">
+      <Card>
+        <CardHeader className="space-y-0 pb-4">
+          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+            <div>
               <CardTitle>Topic Modeling (BERTopic)</CardTitle>
               <CardDescription>Compare up to two nodes to uncover shared topics.</CardDescription>
             </div>
-            {isLocked && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-2" disabled>
-                    <Lock className="h-4 w-4" />
-                    Locked
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent className="w-72 text-left">
-                  <p className="font-semibold text-primary-foreground">Panel locked</p>
-                  <ul className="mt-2 space-y-1 text-xs leading-relaxed text-primary-foreground/90">
-                    <li>Locked to current request/results.</li>
-                    <li>Node selection and backend-used parameters are disabled.</li>
-                    <li>Clear results to unlock and resync with the graph selection.</li>
-                  </ul>
-                </TooltipContent>
-              </Tooltip>
-            )}
-          </CardHeader>
-          <CardContent className="space-y-6">
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6 pt-0">
             <NodeSelectionPanel
               selectedNodes={panelSelectedNodes}
               nodeColumnSelections={effectiveNodeColumnSelections}
@@ -662,7 +645,7 @@ const TopicModelingTab: React.FC = () => {
                         /* ignore cancellation errors */
                       }
                       try {
-                        await workspacesApi.clearAnalysis(currentWorkspaceId, 'topic_modeling', getAuthHeaders());
+                        await textApi.clearTopicModeling(currentWorkspaceId, getAuthHeaders());
                       } catch {
                         /* ignore clear errors */
                       }
@@ -699,15 +682,6 @@ const TopicModelingTab: React.FC = () => {
             {error && result?.state !== 'failed' && (
               <p className="text-sm font-medium text-destructive">{error}</p>
             )}
-            {result && result.state === 'running' && (
-              <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                <Loader2 className="mt-0.5 h-4 w-4 animate-spin" />
-                <p>
-                  Topic modeling task started and is running in the background
-                  {result?.metadata?.task_id ? ` (task ${result.metadata.task_id})` : ''}. See Tasks list for progress.
-                </p>
-              </div>
-            )}
             {result && result.state === 'failed' && (
               <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
                 <AlertTriangle className="mt-0.5 h-4 w-4" />
@@ -716,6 +690,20 @@ const TopicModelingTab: React.FC = () => {
             )}
           </CardContent>
         </Card>
+
+        {result && result.state === 'running' && (
+          <Card className="border border-amber-200 bg-amber-50/80 shadow-sm">
+            <CardContent className="flex items-center gap-3 py-4 text-sm text-amber-900">
+              <div className="flex h-6 w-6 items-center justify-center rounded-full border border-amber-300 bg-white/70">
+                <Loader2 className="h-4 w-4 animate-spin" />
+              </div>
+              <p className="leading-tight">
+                Topic modeling task started and is running in the background
+                {result?.metadata?.task_id ? ` (task ${result.metadata.task_id})` : ''}. See Tasks list for progress.
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
         {result && result.state === 'successful' && (
           <Card ref={containerRef}>
@@ -760,7 +748,6 @@ const TopicModelingTab: React.FC = () => {
           </Card>
         )}
       </div>
-    </TooltipProvider>
   );
 };
 

@@ -1,0 +1,3 @@
+## TODO
+- [ ] Now because topic modeling registers a background task in the task center, the clear endpoint should also clear the corresponding task in the task center.
+I also want you to modify the saved result a bit to include the task_id, and the frontend can show the task id somewhere small. And when calling the clear endpoint, it should include that task_id so that the backend knows which task to delete in the task center. Also, make the task_id.

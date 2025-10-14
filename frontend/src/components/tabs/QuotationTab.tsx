@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import NodeSelectionPanel from '../NodeSelectionPanel';
+import AnalysisLockedNotice from './AnalysisLockedNotice';
 import { useWorkspaceData } from '../../hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '../../hooks/useWorkspaceSelection';
 import { useWorkspaceActions } from '../../hooks/useWorkspaceActions';
@@ -8,18 +9,13 @@ import { useAuth } from '../../hooks/useAuth';
 import { textApi } from '../../api/text';
 import { nodesApi } from '../../api/nodes';
 import { applySelectedColumnsToSnapshots } from '../../hooks/useSchemaManagement';
-import useAutoNodeColumns from '../../hooks/useAutoNodeColumns';
 import useNodeColumnInfos from '../../hooks/useNodeColumnInfos';
+import { useAnalysisLockState, useParameterChangeDetection } from '../../hooks/useAnalysisLockState';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Input } from '../ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2, Search, Trash2, Unlink } from 'lucide-react';
-
-interface NodeColumnSelection {
-  nodeId: string;
-  column: string;
-}
 
 interface QuotationResultState {
   rows: any[];
@@ -41,61 +37,74 @@ interface QuotationResultState {
 
 const DEFAULT_PAGE_SIZE = 20;
 
+const resolveNodeId = (node: any, fallbackIndex = 0): string => {
+  if (!node) return `node-${fallbackIndex}`;
+  const candidates = [
+    node.id,
+    node.node_id,
+    node.data?.id,
+    node.data?.node_id,
+  ];
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string' && candidate.length) {
+      return candidate;
+    }
+  }
+  return `node-${fallbackIndex}`;
+};
+
 const QuotationTab: React.FC = () => {
   const { selectedNodes, handlePageChange: baseHandlePageChange, handlePageSizeChange: baseHandlePageSizeChange } = useWorkspaceSelection();
   const { currentWorkspaceId, getNodeShape, nodeData } = useWorkspaceData();
   const { quotationSearch, detachQuotation } = useWorkspaceActions();
   const { getAuthHeaders } = useAuth();
 
+  const {
+    isLocked,
+    lockWithSnapshots,
+    unlockSelection,
+    lockedNodesSnapshot,
+    nodeColumnSelections,
+    setNodeColumnSelection,
+    setNodeColumnSelections,
+    recomputeAutoColumns,
+    activeNodeColumnSelections,
+    panelSelectedNodes,
+    displayNodeCount,
+  } = useAnalysisLockState({
+    allowedDataTypes: ['string'],
+    maxNodes: 1,
+    docTypeOnly: true,
+    enableHeuristicGuess: false,
+  });
+
   // Show metadata by default so the table mirrors original columns
   const [showMetadata, setShowMetadata] = useState(true);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [isLoadingQuotations, setIsLoadingQuotations] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
-  const [isLocked, setIsLocked] = useState(false);
-  const [lockedNodesSnapshot, setLockedNodesSnapshot] = useState<Array<{ id: string; name: string; columns: string[] }>>([]);
-  const [lockedNodeSelections, setLockedNodeSelections] = useState<NodeColumnSelection[] | null>(null);
   const [lockedRequestParams, setLockedRequestParams] = useState<Record<string, unknown> | null>(null);
-
-  const lockedNodeObjects = useMemo(
-    () => lockedNodesSnapshot.map((s) => ({
-      id: s.id,
-      name: s.name,
-      data: { name: s.name, nodeName: s.name, label: s.name, columns: s.columns },
-      columns: s.columns,
-    })),
-    [lockedNodesSnapshot]
-  );
-
-  const columnInfoNodes = useMemo(
-    () => (isLocked && lockedNodeObjects.length ? lockedNodeObjects : selectedNodes),
-    [isLocked, lockedNodeObjects, selectedNodes]
-  );
 
   const { getColumnInfos } = useNodeColumnInfos({
     workspaceId: currentWorkspaceId,
-    nodes: columnInfoNodes,
+    nodes: panelSelectedNodes,
   });
 
-  const { selections: nodeColumnSelections, setSelection: setNodeColumnSelection, setSelections: setNodeColumnSelectionsRaw, recompute: recomputeAutoColumns } = useAutoNodeColumns({
-    selectedNodes,
-    getNodeColumns: getColumnInfos,
-    allowedDataTypes: ['string'],
-  }, { workspaceId: currentWorkspaceId, maxNodes: 1, isLocked, docTypeOnly: true, enableHeuristicGuess: false });
+  type ColumnSelection = (typeof nodeColumnSelections)[number];
 
-  const activeSelections = useMemo(() => (
-    isLocked && lockedNodeSelections ? lockedNodeSelections : nodeColumnSelections
-  ), [isLocked, lockedNodeSelections, nodeColumnSelections]);
+  const activeSelections = useMemo<ColumnSelection[]>(() => (
+    isLocked ? activeNodeColumnSelections : nodeColumnSelections
+  ), [isLocked, activeNodeColumnSelections, nodeColumnSelections]);
 
   const displayedNodes = useMemo(() => (
-    isLocked && lockedNodeObjects.length ? lockedNodeObjects : selectedNodes.slice(0, 1)
-  ), [isLocked, lockedNodeObjects, selectedNodes]);
+    panelSelectedNodes.slice(0, 1)
+  ), [panelSelectedNodes]);
 
   const getStringColumns = useCallback((node: any) => getColumnInfos(node).map(info => info.name), [getColumnInfos]);
 
   const hasIncompleteSelections = useMemo(() => (
     !displayedNodes.length || displayedNodes.some((node, idx) => {
-      const nodeId = node?.id || node?.node_id || node?.data?.id || `node-${idx}`;
+      const nodeId = resolveNodeId(node, idx);
       const selection = activeSelections.find((sel) => sel.nodeId === nodeId);
       return !selection || !selection.column;
     })
@@ -121,11 +130,12 @@ const QuotationTab: React.FC = () => {
     if (!targetNode) {
       return {} as Record<string, unknown>;
     }
-    const selection = activeSelections.find((sel) => sel.nodeId === targetNode.id);
+    const nodeId = resolveNodeId(targetNode, 0);
+    const selection = activeSelections.find((sel) => sel.nodeId === nodeId);
     if (!selection?.column) {
       return {} as Record<string, unknown>;
     }
-    const state = nodeState[targetNode.id] || {
+    const state = nodeState[nodeId] || {
       currentPage: 1,
       pageSize: DEFAULT_PAGE_SIZE,
       sortBy: undefined,
@@ -140,25 +150,24 @@ const QuotationTab: React.FC = () => {
     } as Record<string, unknown>;
   }, [activeSelections, displayedNodes, isLocked, lockedNodesSnapshot, nodeState]);
 
-  const hasParamsChanged = useMemo(() => {
-    if (!isLocked || !lockedRequestParams) {
-      return false;
-    }
-    return JSON.stringify(lockedRequestParams) !== JSON.stringify(currentRequestParams);
-  }, [currentRequestParams, isLocked, lockedRequestParams]);
+  const hasParamsChanged = useParameterChangeDetection<Record<string, unknown>>(
+    isLocked,
+    currentRequestParams,
+    lockedRequestParams
+  );
 
   useEffect(() => {
     if (isLocked) return;
     if (!selectedNodes.length) {
       if (nodeColumnSelections.length) {
-        setNodeColumnSelectionsRaw([], { replace: true, persist: false });
+        setNodeColumnSelections([], { replace: true, persist: false });
       }
       return;
     }
     if (nodeColumnSelections.length === 0) {
       recomputeAutoColumns();
     }
-  }, [isLocked, selectedNodes, nodeColumnSelections, recomputeAutoColumns, setNodeColumnSelectionsRaw]);
+  }, [isLocked, selectedNodes, nodeColumnSelections, recomputeAutoColumns, setNodeColumnSelections]);
 
   const handleColumnChange = (nodeId: string, column: string) => {
     if (isLocked) return;
@@ -425,7 +434,7 @@ const QuotationTab: React.FC = () => {
 
   const handleSearchAll = async () => {
     const targetNode = displayedNodes[0];
-    const nodeId = targetNode?.id;
+    const nodeId = targetNode ? resolveNodeId(targetNode, 0) : '';
     if (!nodeId) return;
 
     setIsLoadingQuotations(true);
@@ -437,31 +446,27 @@ const QuotationTab: React.FC = () => {
       setHasLoaded(true);
       try {
         const lockedSelections = activeSelections.filter((sel) => sel.nodeId === nodeId && sel.column);
-        if (lockedSelections.length) {
-          setLockedNodeSelections(lockedSelections);
-        }
         const info = await nodesApi.info(currentWorkspaceId!, nodeId, getAuthHeaders());
         const name = (info as any)?.name || (info as any)?.data?.name || nodeId;
         const columns = Array.isArray((info as any)?.columns)
           ? (info as any).columns
           : (Array.isArray((info as any)?.data?.columns) ? (info as any).data.columns : []);
-        const columnMap: Record<string, string | undefined> = lockedSelections.reduce(
+        const columnMap = lockedSelections.reduce<Record<string, string | undefined>>(
           (acc, sel) => {
             acc[sel.nodeId] = sel.column;
             return acc;
           },
-          {} as Record<string, string | undefined>
+          {}
         );
         const normalizedSnapshots = applySelectedColumnsToSnapshots(
           [{ id: nodeId, name: String(name), columns }],
           columnMap
         );
-        setLockedNodesSnapshot(normalizedSnapshots);
+        lockWithSnapshots(normalizedSnapshots);
       } catch {
         /* ignore */
       }
       setLockedRequestParams(outcome.request);
-      setIsLocked(true);
     } finally {
       setIsLoadingQuotations(false);
     }
@@ -469,7 +474,7 @@ const QuotationTab: React.FC = () => {
 
   const handlePageChange = async (newPage: number) => {
     const targetNode = (isLocked && lockedNodesSnapshot.length ? lockedNodesSnapshot[0] : displayedNodes[0]) as any;
-    const nodeId = targetNode?.id;
+    const nodeId = targetNode ? resolveNodeId(targetNode, 0) : '';
     if (!nodeId) {
       baseHandlePageChange(newPage);
       return;
@@ -486,7 +491,7 @@ const QuotationTab: React.FC = () => {
 
   const handlePageSizeChange = async (pageSize: number) => {
     const targetNode = (isLocked && lockedNodesSnapshot.length ? lockedNodesSnapshot[0] : displayedNodes[0]) as any;
-    const nodeId = targetNode?.id;
+    const nodeId = targetNode ? resolveNodeId(targetNode, 0) : '';
     if (!nodeId) {
       baseHandlePageSizeChange(pageSize);
       return;
@@ -553,10 +558,7 @@ const QuotationTab: React.FC = () => {
           return;
         }
 
-        setNodeColumnSelectionsRaw([{ nodeId, column }], { replace: true });
-        if (column) {
-          setLockedNodeSelections([{ nodeId, column }]);
-        }
+        setNodeColumnSelections([{ nodeId, column }], { replace: true });
         setShowMetadata(true);
 
         try {
@@ -569,7 +571,7 @@ const QuotationTab: React.FC = () => {
             [{ id: nodeId, name: String(name), columns }],
             column ? { [nodeId]: column } : {}
           );
-          setLockedNodesSnapshot(normalizedSnapshots);
+          lockWithSnapshots(normalizedSnapshots);
         } catch {
           /* ignore */
         }
@@ -593,7 +595,6 @@ const QuotationTab: React.FC = () => {
           sort_order: normalized.sorting.sort_order,
         });
         setHasLoaded(true);
-        setIsLocked(true);
       } catch { /* ignore */ }
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -602,15 +603,17 @@ const QuotationTab: React.FC = () => {
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div className="space-y-1">
-            <CardTitle>Quotation Extraction</CardTitle>
-            <CardDescription>Load quotations for a single node and highlight speaker, quote, and verb spans.</CardDescription>
+        <CardHeader className="space-y-0 pb-4">
+          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+            <div>
+              <CardTitle>Quotation Extraction</CardTitle>
+              <CardDescription>Load quotations for a single node and highlight speaker, quote, and verb spans.</CardDescription>
+            </div>
           </div>
         </CardHeader>
-          <CardContent className="space-y-6">
+        <CardContent className="space-y-6 pt-0">
             <NodeSelectionPanel
-              selectedNodes={displayedNodes}
+              selectedNodes={panelSelectedNodes}
               nodeColumnSelections={activeSelections}
               onColumnChange={handleColumnChange}
               nodeColors={{}}
@@ -618,12 +621,15 @@ const QuotationTab: React.FC = () => {
               getNodeColumns={getColumnInfos}
               defaultPalette={[]}
               maxCompare={1}
+              className="border border-dashed border-muted-foreground/40 rounded-lg bg-muted/30 p-4"
               showShape
               getNodeShapeFn={getNodeShape}
               showColorPicker={false}
               disabled={!!isLocked}
               locked={!!isLocked}
+              originalCount={displayNodeCount}
               allowedDataTypes={['string']}
+              lockedMessage={<AnalysisLockedNotice />}
             />
 
             <div className="flex flex-wrap gap-3">
@@ -685,11 +691,9 @@ const QuotationTab: React.FC = () => {
                       setHasLoaded(false);
                       setResultsByNode({});
                       setNodeState({});
-                      setLockedNodesSnapshot([]);
-                      setLockedNodeSelections(null);
                       setLockedRequestParams(null);
-                      setIsLocked(false);
-                      setNodeColumnSelectionsRaw([], { replace: true, persist: false });
+                      unlockSelection();
+                      setNodeColumnSelections([], { replace: true, persist: false });
                       recomputeAutoColumns();
                     }
                   }}
@@ -712,11 +716,11 @@ const QuotationTab: React.FC = () => {
           </CardContent>
         </Card>
 
-        {hasLoaded && displayedNodes.length > 0 && displayedNodes.map((node)=>{
-          const nodeId = node.id;
-          const nodeLabel = node.name || node.data?.name || node.data?.label || node.id;
+        {hasLoaded && displayedNodes.length > 0 && displayedNodes.map((node, idx) => {
+          const nodeId = resolveNodeId(node, idx);
+          const nodeLabel = node.name || node.data?.name || node.data?.label || nodeId;
           const originalColumns = getStringColumns(node);
-          const selection = activeSelections.find(s => s.nodeId === nodeId);
+          const selection = activeSelections.find((s) => s.nodeId === nodeId);
           const textCol = selection?.column || '';
           
           // Core quotation columns from backend
@@ -771,7 +775,7 @@ const QuotationTab: React.FC = () => {
                             <th
                               key={c}
                               className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground transition-colors hover:bg-muted cursor-pointer"
-                              onClick={()=>handleSort(nodeId, c)}
+                              onClick={() => handleSort(nodeId, c)}
                             >
                               <span className="flex items-center gap-1">
                                 <span>{c}</span>
@@ -912,8 +916,8 @@ const QuotationTab: React.FC = () => {
                             type="button"
                             variant="secondary"
                             size="sm"
-                            onClick={()=>handleDetach(nodeId)}
-                            disabled={nodeDetaching[nodeId]}
+                            onClick={() => handleDetach(nodeId)}
+                            disabled={Boolean(nodeDetaching[nodeId])}
                           >
                             {nodeDetaching[nodeId] ? (
                               <>

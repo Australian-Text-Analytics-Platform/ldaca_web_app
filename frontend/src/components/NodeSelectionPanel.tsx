@@ -195,7 +195,7 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
   }, [allowedDataTypes, fallbackToAllColumns, getNodeColumns, normalizeColumnInfos]);
 
   return (
-    <div className={cn('space-y-4', className)}>
+    <div className={cn('space-y-3', className)}>
       {showHeaderLabel && (
         <div className="flex items-center justify-between px-1">
           <label className="block text-sm font-medium text-muted-foreground">
@@ -217,7 +217,7 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
       ) : (
         <div
           className={cn(
-            'flex gap-3 px-1 pb-2 pt-1',
+            'flex gap-2 px-1.5 pb-2 pt-0',
             selectedNodes.length > maxCompare ? 'overflow-x-auto' : 'overflow-x-hidden'
           )}
         >
@@ -232,28 +232,27 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
               <Card
                 key={nodeId}
                 className={cn(
-                  'border border-border/60 bg-card shadow-sm transition-colors',
+                  'relative border border-border/60 bg-card shadow-sm transition-colors',
                   selectedNodes.length > maxCompare ? 'flex-none min-w-[50%]' : 'flex-1 min-w-0'
                 )}
               >
-                <CardHeader className="space-y-2 pb-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div
-                      className="max-w-full break-words pr-2 text-sm font-semibold leading-snug text-foreground"
-                      style={showColorPicker ? { color: nodeColor } : undefined}
-                      title={nodeDisplayName}
-                    >
-                      {nodeDisplayName}
-                    </div>
-                    {showColorPicker && (
-                      <NodeColorDropdown
-                        color={nodeColor}
-                        palette={defaultPalette}
-                        onChange={(c) => onColorChange(nodeId, c)}
-                      />
-                    )}
+                {showColorPicker && (
+                  <div className="pointer-events-auto absolute top-2 right-2">
+                    <NodeColorDropdown
+                      color={nodeColor}
+                      palette={defaultPalette}
+                      onChange={(c) => onColorChange(nodeId, c)}
+                    />
                   </div>
-                  <div className="break-all text-xs text-muted-foreground">{nodeId}</div>
+                )}
+                <CardHeader className={cn('space-y-1.5 px-4 pb-2', showColorPicker ? 'pt-4' : 'pt-3')}>
+                  <div
+                    className="max-w-full break-words pr-2 text-sm font-semibold leading-snug text-foreground"
+                    style={showColorPicker ? { color: nodeColor } : undefined}
+                    title={nodeDisplayName}
+                  >
+                    {nodeDisplayName}
+                  </div>
                   {renderNodeMeta ? (
                     <div className="text-xs text-muted-foreground">{renderNodeMeta(node)}</div>
                   ) : (
@@ -263,7 +262,7 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
                   )}
                 </CardHeader>
                 {showColumnPicker && (
-                  <CardContent className="space-y-2 pt-0">
+                  <CardContent className="space-y-2 px-4 pb-4 pt-0">
                     {columns.length > 0 ? (
                       <div className="space-y-1">
                         <span className="block text-xs font-medium text-muted-foreground">
@@ -361,7 +360,7 @@ const NodeColorDropdown: React.FC<NodeColorDropdownProps> = ({ color, palette, o
         <button
           type="button"
           className={cn(
-            'h-7 w-7 aspect-square rounded-full ring-2 ring-border ring-offset-2 transition-shadow hover:ring-primary focus-visible:outline-none focus-visible:ring-primary shadow-sm'
+            'h-6 w-6 aspect-square rounded-full ring-2 ring-border ring-offset-1 transition-shadow hover:ring-primary focus-visible:outline-none focus-visible:ring-primary shadow-sm'
           )}
           style={{ backgroundColor: color }}
           aria-label="Select color"
@@ -378,7 +377,7 @@ const NodeColorDropdown: React.FC<NodeColorDropdownProps> = ({ color, palette, o
               key={swatch}
               type="button"
               className={cn(
-                'h-6 w-6 rounded-full border border-white shadow-sm transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1',
+                'h-5 w-5 rounded-full border border-white shadow-sm transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1',
                 swatch.toLowerCase() === color.toLowerCase() && 'ring-2 ring-primary ring-offset-1'
               )}
               style={{ backgroundColor: swatch }}

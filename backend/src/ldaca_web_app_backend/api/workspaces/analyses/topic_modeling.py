@@ -92,6 +92,23 @@ async def topic_modeling_current_result(
     }
 
 
+@router.post("/{workspace_id}/topic-modeling/clear")
+async def clear_topic_modeling_results(
+    workspace_id: str, current_user: dict = Depends(get_current_user)
+):
+    """Clear persisted topic modeling analyses for the workspace."""
+    user_id = current_user["id"]
+    try:
+        from ldaca_web_app_backend.core.analysis_store import clear_analyses
+    except Exception as e:  # pragma: no cover
+        raise HTTPException(status_code=500, detail=f"analysis_store unavailable: {e}")
+
+    removed = await asyncio.to_thread(
+        clear_analyses, user_id, workspace_id, "topic_modeling"
+    )
+    return {"state": "successful", "cleared": {"analyses_removed": removed}}
+
+
 @router.post(
     "/{workspace_id}/topic-modeling",
     response_model=TopicModelingResponse,
