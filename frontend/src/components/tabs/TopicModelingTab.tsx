@@ -8,7 +8,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { textApi } from '../../api/text';
 import type { TopicModelingRequest } from '../../api/text';
 import { workspacesApi } from '../../api/workspaces';
-import { nodesApi } from '../../api/nodes';
+import { getNodeInfo } from '../../lib/nodeInfoCache';
 import { useAnalysisStore } from '../../stores/analysisStore';
 import useNodeColumnInfos from '../../hooks/useNodeColumnInfos';
 import { useAnalysisLockState } from '../../hooks/useAnalysisLockState';
@@ -271,11 +271,11 @@ const TopicModelingTab: React.FC = () => {
 
         for (const id of ids) {
           try {
-            const info = await nodesApi.info(currentWorkspaceId!, id, getAuthHeaders());
-            const name = (info as any)?.name || (info as any)?.data?.name || id;
-            const columns = Array.isArray((info as any)?.columns)
-              ? (info as any).columns
-              : (Array.isArray((info as any)?.data?.columns) ? (info as any).data.columns : []);
+            const info = await getNodeInfo({ workspaceId: currentWorkspaceId!, nodeId: id, getAuthHeaders });
+            const name = info?.name || info?.data?.name || id;
+            const columns = Array.isArray(info?.columns)
+              ? info.columns
+              : (Array.isArray(info?.data?.columns) ? info.data.columns : []);
             snaps.push({ id, name: String(name), columns });
           } catch {
             snaps.push({ id, name: id, columns: [] });
@@ -439,9 +439,11 @@ const TopicModelingTab: React.FC = () => {
           const snaps: Array<{ id: string; name: string; columns: string[] }> = [];
           for (const id of nodeIds) {
             try {
-              const info = await nodesApi.info(currentWorkspaceId!, id, getAuthHeaders());
-              const name = (info as any)?.name || (info as any)?.data?.name || id;
-              const columns = Array.isArray((info as any)?.columns) ? (info as any).columns : (Array.isArray((info as any)?.data?.columns) ? (info as any).data.columns : []);
+              const info = await getNodeInfo({ workspaceId: currentWorkspaceId!, nodeId: id, getAuthHeaders });
+              const name = info?.name || info?.data?.name || id;
+              const columns = Array.isArray(info?.columns)
+                ? info.columns
+                : (Array.isArray(info?.data?.columns) ? info.data.columns : []);
               snaps.push({ id, name: String(name), columns });
             } catch { 
               snaps.push({ id, name: id, columns: [] }); 

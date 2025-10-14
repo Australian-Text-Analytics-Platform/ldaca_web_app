@@ -11,6 +11,8 @@ import { workspacesApi } from '../api/workspaces';
 import { nodesApi, FilterRequest } from '../api/nodes';
 import { textApi, ConcordanceRequest, ConcordanceDetachRequest, QuotationRequest, QuotationDetachRequest, ConcordanceAnalysisRequest } from '../api/text';
 import { queryKeys } from '../lib/queryKeys';
+import { getNodeInfo } from '../lib/nodeInfoCache';
+import { normalizeSchemaFromInfo } from './useSchemaManagement';
 
 /**
  * Improved workspace hook that consolidates all workspace functionality
@@ -975,14 +977,15 @@ export const useWorkspaceInternal = () => {
       }
       
       try {
-  const schema = await nodesApi.info(currentWorkspaceId, nodeId, authHeaders).then((d:any)=> d.schema || {});
-  // Return in the format expected by DataTable component
+        const info = await getNodeInfo({ workspaceId: currentWorkspaceId, nodeId, headers: authHeaders, force: true });
+        const schemaMap = normalizeSchemaFromInfo(info);
+        const schema = schemaMap;
         return {
           node_id: nodeId,
-          schema: schema,  // Record<string, string> with js_type compatible values
+          schema,
           columns: Object.keys(schema),
-          column_types: schema,  // Also provide as column_types for fallback
-          is_text_data: false
+          column_types: schema,
+          is_text_data: false,
         };
       } catch (error) {
         console.error('Failed to refresh node schema:', error);

@@ -228,6 +228,7 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
             const selection = nodeColumnSelections.find(sel => sel.nodeId === nodeId);
             const nodeDisplayName = getNodeDisplayName(node, nodeId);
             const nodeColor = getColorForNodeId(nodeId, idx);
+            const selectValue = selection?.column && selection.column.length > 0 ? selection.column : CLEAR_SELECTION_VALUE;
             return (
               <Card
                 key={nodeId}
@@ -269,7 +270,7 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
                           {getColumnLabel(node, idx)}
                         </span>
                         <Select
-                          value={selection?.column ? selection.column : undefined}
+                          value={selectValue}
                           onValueChange={(value) => {
                             const nextValue = value === CLEAR_SELECTION_VALUE ? '' : value;
                             onColumnChange(nodeId, nextValue ?? '');

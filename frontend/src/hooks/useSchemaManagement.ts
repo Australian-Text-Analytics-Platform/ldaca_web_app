@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { nodesApi } from '../api/index';
 import { normalizeTypeName } from '../utils/columnTypes';
+import { getNodeInfo } from '../lib/nodeInfoCache';
 
 export interface NodeSnapshot {
   id: string;
@@ -40,7 +40,7 @@ export async function createNodeSnapshot(
   nodeId: string,
   getAuthHeaders: () => Record<string, string>
 ): Promise<NodeSnapshot> {
-  const info = await nodesApi.info(workspaceId, nodeId, getAuthHeaders());
+  const info = await getNodeInfo({ workspaceId, nodeId, getAuthHeaders });
   
   const name = info?.name || info?.data?.name || nodeId;
   const columns = Array.isArray(info?.columns)
@@ -165,7 +165,7 @@ export function useSchemaManagement(config: SchemaManagementConfig) {
 
     (async () => {
       try {
-        const info = await nodesApi.info(workspaceId, nodeId, getAuthHeaders());
+        const info = await getNodeInfo({ workspaceId, nodeId, getAuthHeaders, force: true });
         if (cancelled) return;
         
         const schemaMap = normalizeSchemaFromInfo(info);

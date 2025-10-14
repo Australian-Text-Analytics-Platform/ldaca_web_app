@@ -10,8 +10,9 @@ import { useSchemaManagement, useLatestRef, createNodeSnapshot, applySelectedCol
 import { FrequencyAnalysisRequest, textApi } from '../../api/text';
 import { nodesApi } from '../../api/index';
 import NodeSelectionPanel from '../NodeSelectionPanel';
+import { getNodeInfo } from '../../lib/nodeInfoCache';
 import AnalysisLockedNotice from './AnalysisLockedNotice';
-import { normalizeTypeName } from '../../utils/columnTypes';
+import { normalizeSchemaFromInfo } from '../../hooks/useSchemaManagement';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import {
@@ -632,26 +633,20 @@ const handleUpdateResults = async () => {
             if (nodeIdStr) {
               setIsLocked(true);
               try {
-                const info = await nodesApi.info(currentWorkspaceId, nodeIdStr, getAuthHeaders());
+                const info = await getNodeInfo({ workspaceId: currentWorkspaceId, nodeId: nodeIdStr, getAuthHeaders });
                 if (cancelled) return;
-                const name = (info as any)?.name || (info as any)?.data?.name || nodeIdStr;
-                const columns = Array.isArray((info as any)?.columns)
-                  ? (info as any).columns
-                  : (Array.isArray((info as any)?.data?.columns) ? (info as any).data.columns : []);
+                const name = info?.name || info?.data?.name || nodeIdStr;
+                const columns = Array.isArray(info?.columns)
+                  ? info.columns
+                  : (Array.isArray(info?.data?.columns) ? info.data.columns : []);
                 const [normalizedSnapshot] = applySelectedColumnsToSnapshots(
                   [{ id: nodeIdStr, name: String(name), columns }],
                   { [nodeIdStr]: reqTimeColumn }
                 );
                 setLockedNodesSnapshot([{ id: normalizedSnapshot.id, name: normalizedSnapshot.name, columns: normalizedSnapshot.columns }]);
-                const rawSchema = (info as any)?.schema;
-                if (Array.isArray(rawSchema)) {
-                  setLockedSchema(Object.fromEntries(rawSchema.map((c: any) => [c.name, c.js_type || 'string'])));
-                } else if (rawSchema && typeof rawSchema === 'object') {
-                  setLockedSchema(
-                    Object.fromEntries(
-                      Object.entries(rawSchema).map(([k, v]) => [k, typeof v === 'string' ? normalizeTypeName(v) : 'string'])
-                    )
-                  );
+                const normalizedSchema = normalizeSchemaFromInfo(info);
+                if (Object.keys(normalizedSchema).length > 0) {
+                  setLockedSchema(normalizedSchema);
                 } else {
                   setLockedSchema((prev) => prev ?? currentSchemaRef.current);
                 }

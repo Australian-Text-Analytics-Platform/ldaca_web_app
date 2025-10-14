@@ -7,7 +7,7 @@ import { useWorkspaceSelection } from '../../hooks/useWorkspaceSelection';
 import { useWorkspaceActions } from '../../hooks/useWorkspaceActions';
 import { useAuth } from '../../hooks/useAuth';
 import { textApi } from '../../api/text';
-import { nodesApi } from '../../api/nodes';
+import { getNodeInfo } from '../../lib/nodeInfoCache';
 import { applySelectedColumnsToSnapshots } from '../../hooks/useSchemaManagement';
 import useNodeColumnInfos from '../../hooks/useNodeColumnInfos';
 import { useAnalysisLockState, useParameterChangeDetection } from '../../hooks/useAnalysisLockState';
@@ -446,11 +446,11 @@ const QuotationTab: React.FC = () => {
       setHasLoaded(true);
       try {
         const lockedSelections = activeSelections.filter((sel) => sel.nodeId === nodeId && sel.column);
-        const info = await nodesApi.info(currentWorkspaceId!, nodeId, getAuthHeaders());
-        const name = (info as any)?.name || (info as any)?.data?.name || nodeId;
-        const columns = Array.isArray((info as any)?.columns)
-          ? (info as any).columns
-          : (Array.isArray((info as any)?.data?.columns) ? (info as any).data.columns : []);
+        const info = await getNodeInfo({ workspaceId: currentWorkspaceId!, nodeId, getAuthHeaders });
+        const name = info?.name || info?.data?.name || nodeId;
+        const columns = Array.isArray(info?.columns)
+          ? info.columns
+          : (Array.isArray(info?.data?.columns) ? info.data.columns : []);
         const columnMap = lockedSelections.reduce<Record<string, string | undefined>>(
           (acc, sel) => {
             acc[sel.nodeId] = sel.column;
@@ -562,11 +562,11 @@ const QuotationTab: React.FC = () => {
         setShowMetadata(true);
 
         try {
-          const info = await nodesApi.info(currentWorkspaceId!, nodeId, getAuthHeaders());
-          const name = (info as any)?.name || (info as any)?.data?.name || nodeId;
-          const columns = Array.isArray((info as any)?.columns)
-            ? (info as any).columns
-            : (Array.isArray((info as any)?.data?.columns) ? (info as any).data.columns : []);
+          const info = await getNodeInfo({ workspaceId: currentWorkspaceId!, nodeId, getAuthHeaders });
+          const name = info?.name || info?.data?.name || nodeId;
+          const columns = Array.isArray(info?.columns)
+            ? info.columns
+            : (Array.isArray(info?.data?.columns) ? info.data.columns : []);
           const normalizedSnapshots = applySelectedColumnsToSnapshots(
             [{ id: nodeId, name: String(name), columns }],
             column ? { [nodeId]: column } : {}

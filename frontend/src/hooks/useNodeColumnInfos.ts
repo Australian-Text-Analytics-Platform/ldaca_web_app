@@ -1,9 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { nodesApi } from '../api/nodes';
 import { useAuth } from './useAuth';
 import { ColumnInfo, mapColumnsToInfo } from '../utils/columnTypes';
+import { getNodeInfo } from '../lib/nodeInfoCache';
 
-const resolveNodeId = (node: any, fallbackIndex: number): string | null => {
+type NodeLike = Record<string, unknown> & {
+  id?: string;
+  node_id?: string;
+  data?: Record<string, unknown> & {
+    id?: string;
+    node_id?: string;
+  };
+  unique_id?: string;
+};
+
+const resolveNodeId = (node: NodeLike | null | undefined, fallbackIndex: number): string | null => {
   if (!node) return null;
   const candidates = [
     node.id,
@@ -27,7 +37,7 @@ export interface UseNodeColumnInfosResult {
    * has not been hydrated yet, ensuring the selector always renders something while the typed
    * schema is loading.
    */
-  getColumnInfos: (node: any, idx?: number) => ColumnInfo[];
+  getColumnInfos: (node: NodeLike | null | undefined, idx?: number) => ColumnInfo[];
   /** True while one or more schemas are being fetched. */
   isLoading: boolean;
 }
@@ -35,7 +45,7 @@ export interface UseNodeColumnInfosResult {
 export const useNodeColumnInfos = (
   params: {
     workspaceId?: string | null;
-    nodes: any[];
+  nodes: NodeLike[];
     enabled?: boolean;
   },
 ): UseNodeColumnInfosResult => {
@@ -51,19 +61,24 @@ export const useNodeColumnInfos = (
 
   useEffect(() => {
     if (!enabled || !workspaceId) return;
-    const headers = getAuthHeaders();
-    const idsToFetch = nodeIds.filter((id) => id && !cache[id] && !pendingRef.current.has(id));
+    const pendingSet = pendingRef.current;
+    const idsToFetch = nodeIds.filter((id) => id && !cache[id] && !pendingSet.has(id));
     if (!idsToFetch.length) return;
 
     let cancelled = false;
-    idsToFetch.forEach((id) => pendingRef.current.add(id));
+    idsToFetch.forEach((id) => pendingSet.add(id));
     forceTick((tick) => tick + 1);
 
     (async () => {
       try {
         await Promise.all(idsToFetch.map(async (nodeId) => {
           try {
-            const info = await nodesApi.info(workspaceId, nodeId, headers);
+            const info = await getNodeInfo({
+              workspaceId,
+              nodeId,
+              getAuthHeaders,
+              force: true,
+            });
             if (cancelled) return;
             const infos = mapColumnsToInfo(info);
             setCache((prev) => {
@@ -73,30 +88,30 @@ export const useNodeColumnInfos = (
               }
               return { ...prev, [nodeId]: infos };
             });
-          } catch (error) {
+          } catch {
             if (!cancelled) {
               setCache((prev) => ({ ...prev, [nodeId]: prev[nodeId] || [] }));
             }
           } finally {
-            pendingRef.current.delete(nodeId);
+            pendingSet.delete(nodeId);
             if (!cancelled) forceTick((tick) => tick + 1);
           }
         }));
-      } catch (error) {
-        idsToFetch.forEach((id) => pendingRef.current.delete(id));
+      } catch {
+        idsToFetch.forEach((id) => pendingSet.delete(id));
         forceTick((tick) => tick + 1);
       }
     })();
 
     return () => {
       cancelled = true;
-      idsToFetch.forEach((id) => pendingRef.current.delete(id));
+      idsToFetch.forEach((id) => pendingSet.delete(id));
       forceTick((tick) => tick + 1);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, workspaceId, getAuthHeaders, nodeIds.join('|'), cache]);
 
-  const getColumnInfos = useCallback((node: any, idx = 0): ColumnInfo[] => {
+  const getColumnInfos = useCallback((node: NodeLike | null | undefined, idx = 0): ColumnInfo[] => {
     const nodeId = resolveNodeId(node, idx);
     if (!nodeId) return [];
     const cached = cache[nodeId];
