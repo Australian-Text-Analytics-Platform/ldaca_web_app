@@ -1,7 +1,20 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import ReactMarkdown from 'react-markdown';
+import ReactMarkdown, { type Components } from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import logo from '../logo.png';
+
+const markdownComponents: Components = {
+  img: ({ node: _node, className, alt, ...props }) => {
+    const mergedClassName = ['max-w-full h-auto', className].filter(Boolean).join(' ');
+    const resolvedAlt = typeof alt === 'string' ? alt : '';
+    return <img {...props} className={mergedClassName.trim()} alt={resolvedAlt} />;
+  },
+  a: ({ node: _node, children, target, rel, ...props }) => (
+    <a {...props} target={target ?? '_blank'} rel={rel ?? 'noopener noreferrer'}>
+      {children}
+    </a>
+  ),
+};
 
 /**
  * TutorialView: renders the markdown from public/tutorial.md.
@@ -12,6 +25,28 @@ const TutorialView: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [zoom, setZoom] = useState<number>(1);
+
+  const resolveTutorialUrl = useCallback((): string => {
+    if (typeof window === 'undefined') {
+      return 'tutorial.md';
+    }
+
+    const baseHref = document.querySelector('base')?.href;
+    if (baseHref) {
+      try {
+        return new URL('tutorial.md', baseHref).toString();
+      } catch {
+        // ignore invalid base href and fall back to location-based resolution
+      }
+    }
+
+    try {
+      const base = window.location.href.split('#')[0];
+      return new URL('tutorial.md', base).toString();
+    } catch {
+      return 'tutorial.md';
+    }
+  }, []);
 
   const clamp = (v: number) => Math.min(2, Math.max(0.5, v));
   const zoomIn = useCallback(() => setZoom((z) => clamp(parseFloat((z + 0.1).toFixed(2)))), []);
@@ -24,21 +59,23 @@ const TutorialView: React.FC = () => {
       setLoading(true);
       setError(null);
       try {
-        const base = (process.env.PUBLIC_URL || '').replace(/\/$/, '');
-        const url = `${base}/tutorial.md`; // resolves to './tutorial.md' in CRA with homepage='.'
+        const url = resolveTutorialUrl();
         const resp = await fetch(url, { cache: 'no-store' });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const text = await resp.text();
         if (!cancelled) setContent(text);
-      } catch (e: any) {
-        if (!cancelled) setError(e?.message || 'Failed to load tutorial');
+      } catch (error: unknown) {
+        if (!cancelled) {
+          const message = error instanceof Error && error.message ? error.message : 'Failed to load tutorial';
+          setError(message);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
     };
     load();
     return () => { cancelled = true; };
-  }, []);
+  }, [resolveTutorialUrl]);
 
   // Keyboard shortcuts: Cmd/Ctrl +/- and 0 to reset
   useEffect(() => {
@@ -115,20 +152,7 @@ const TutorialView: React.FC = () => {
           <div className="text-red-600">{error}</div>
         )}
         {!loading && !error && (
-          <ReactMarkdown
-            // Allow literal HTML in markdown (e.g., <p align="center">)
-            rehypePlugins={[rehypeRaw]}
-            components={{
-              // Ensure images scale nicely within prose container
-              img: (props) => (
-                // eslint-disable-next-line jsx-a11y/alt-text
-                <img {...props} className={`max-w-full h-auto ${props.className || ''}`} />
-              ),
-              a: ({ children, ...props }) => (
-                <a {...props as any} target={(props as any).target || '_blank'} rel="noopener noreferrer">{children}</a>
-              ),
-            }}
-          >
+          <ReactMarkdown rehypePlugins={[rehypeRaw]} components={markdownComponents}>
             {content}
           </ReactMarkdown>
         )}

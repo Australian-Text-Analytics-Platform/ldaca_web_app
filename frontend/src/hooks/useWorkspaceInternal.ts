@@ -729,6 +729,46 @@ export const useWorkspaceInternal = () => {
     },
   });
 
+  const renameColumnMutation = useMutation({
+    mutationFn: ({ nodeId, column, newName }: { nodeId: string; column: string; newName: string }) =>
+      nodesApi.renameColumn(currentWorkspaceId!, nodeId, column, newName, authHeaders),
+    onMutate: () => {
+      startOperation('renameColumn');
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId!) });
+      if (variables?.nodeId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.nodeData(currentWorkspaceId!, variables.nodeId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.nodeSchema(currentWorkspaceId!, variables.nodeId) });
+      }
+      endOperation('renameColumn');
+    },
+    onError: (error: any) => {
+      setOperationError('renameColumn', error.message);
+      endOperation('renameColumn');
+    },
+  });
+
+  const deleteColumnMutation = useMutation({
+    mutationFn: ({ nodeId, column }: { nodeId: string; column: string }) =>
+      nodesApi.deleteColumn(currentWorkspaceId!, nodeId, column, authHeaders),
+    onMutate: () => {
+      startOperation('deleteColumn');
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId!) });
+      if (variables?.nodeId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.nodeData(currentWorkspaceId!, variables.nodeId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.nodeSchema(currentWorkspaceId!, variables.nodeId) });
+      }
+      endOperation('deleteColumn');
+    },
+    onError: (error: any) => {
+      setOperationError('deleteColumn', error.message);
+      endOperation('deleteColumn');
+    },
+  });
+
   // Conversions
   const convertToDocDataFrameMutation = useMutation({
     mutationFn: ({ nodeId, documentColumn }: { nodeId: string; documentColumn: string; }) => {
@@ -929,6 +969,16 @@ export const useWorkspaceInternal = () => {
       return castNodeMutation.mutateAsync({ nodeId, column, targetType, format });
     },
 
+    renameColumn: (nodeId: string, column: string, newName: string) => {
+      if (!currentWorkspaceId) return Promise.reject(new Error('No workspace selected'));
+      return renameColumnMutation.mutateAsync({ nodeId, column, newName });
+    },
+
+    deleteColumn: (nodeId: string, column: string) => {
+      if (!currentWorkspaceId) return Promise.reject(new Error('No workspace selected'));
+      return deleteColumnMutation.mutateAsync({ nodeId, column });
+    },
+
     convertToDocDataFrame: (nodeId: string, documentColumn: string) => {
       if (!currentWorkspaceId) return Promise.reject(new Error('No workspace selected'));
       return convertToDocDataFrameMutation.mutateAsync({ nodeId, documentColumn });
@@ -1043,6 +1093,8 @@ export const useWorkspaceInternal = () => {
   quotationMutation,
   detachQuotationMutation,
     castNodeMutation,
+  renameColumnMutation,
+  deleteColumnMutation,
   convertToDocDataFrameMutation,
   convertToDataFrameMutation,
   convertToDocLazyFrameMutation,

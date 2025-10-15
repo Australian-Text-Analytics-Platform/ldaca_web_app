@@ -10,7 +10,7 @@ import os
 from typing import Optional, cast
 
 import polars as pl
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 
 from ...core.auth import get_current_user
 from ...core.docworkspace_api import DocWorkspaceAPIUtils
@@ -38,6 +38,246 @@ except Exception:  # pragma: no cover
     DocLazyFrame = None  # type: ignore
 
 logger = logging.getLogger(__name__)
+
+
+def _drop_column_from_data(data: object, column_name: str) -> object:
+    """Return a copy of ``data`` with ``column_name`` removed."""
+
+    if DocDataFrame is not None and isinstance(data, DocDataFrame):  # type: ignore[arg-type]
+        doc_col = data.document_column
+        if column_name == doc_col:
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot delete the active document column from a DocDataFrame.",
+            )
+        if column_name not in data.dataframe.columns:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Column '{column_name}' not found in node data.",
+            )
+        return DocDataFrame(data.dataframe.drop(column_name), document_column=doc_col)  # type: ignore[call-arg]
+
+    if DocLazyFrame is not None and isinstance(data, DocLazyFrame):  # type: ignore[arg-type]
+        doc_col = data.document_column
+        schema_names = data.lazyframe.collect_schema().names()
+        if column_name not in schema_names:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Column '{column_name}' not found in node data.",
+            )
+        if column_name == doc_col:
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot delete the active document column from a DocLazyFrame.",
+            )
+        return DocLazyFrame(data.lazyframe.drop([column_name]), document_column=doc_col)  # type: ignore[misc]
+
+    if isinstance(data, pl.DataFrame):
+        if column_name not in data.columns:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Column '{column_name}' not found in node data.",
+            )
+        return data.drop(column_name)
+
+    if isinstance(data, pl.LazyFrame):
+        schema_names = data.collect_schema().names()
+        if column_name not in schema_names:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Column '{column_name}' not found in node data.",
+            )
+        return data.drop([column_name])
+
+    if hasattr(data, "drop"):
+        try:
+            return data.drop(column_name)
+        except Exception as exc:  # pragma: no cover - unexpected backend types
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to delete column '{column_name}': {exc}",
+            ) from exc
+
+    raise HTTPException(
+        status_code=400,
+        detail=f"Unsupported data type '{type(data).__name__}' for column deletion.",
+    )
+
+
+def _rename_column_in_data(data: object, column_name: str, new_name: str) -> object:
+    """Return a copy of ``data`` with ``column_name`` renamed to ``new_name``."""
+
+    if not new_name or not new_name.strip():
+        raise HTTPException(
+            status_code=400, detail="New column name must be a non-empty string."
+        )
+
+    trimmed_name = new_name.strip()
+
+    if DocDataFrame is not None and isinstance(data, DocDataFrame):  # type: ignore[arg-type]
+        doc_col = data.document_column
+        if column_name == doc_col:
+            if trimmed_name == column_name:
+                return data
+            try:
+                return data.rename_document(trimmed_name)
+            except Exception as exc:  # pragma: no cover
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Failed to rename document column: {exc}",
+                ) from exc
+        if column_name not in data.dataframe.columns:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Column '{column_name}' not found in node data.",
+            )
+        if trimmed_name in data.dataframe.columns and trimmed_name != column_name:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Column '{trimmed_name}' already exists in node data.",
+            )
+        renamed_df = data.dataframe.rename({column_name: trimmed_name})
+        return DocDataFrame(renamed_df, document_column=doc_col)  # type: ignore[call-arg]
+
+    if DocLazyFrame is not None and isinstance(data, DocLazyFrame):  # type: ignore[arg-type]
+        doc_col = data.document_column
+        schema = data.lazyframe.collect_schema()
+        columns = schema.names()
+        if column_name not in columns:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Column '{column_name}' not found in node data.",
+            )
+        if trimmed_name in columns and trimmed_name != column_name:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Column '{trimmed_name}' already exists in node data.",
+            )
+        renamed_lazy = data.lazyframe.rename({column_name: trimmed_name})
+        updated_doc_col = trimmed_name if column_name == doc_col else doc_col
+        return DocLazyFrame(renamed_lazy, document_column=updated_doc_col)  # type: ignore[misc]
+
+    if isinstance(data, pl.DataFrame):
+        if column_name not in data.columns:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Column '{column_name}' not found in node data.",
+            )
+        if trimmed_name in data.columns and trimmed_name != column_name:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Column '{trimmed_name}' already exists in node data.",
+            )
+        return data.rename({column_name: trimmed_name})
+
+    if isinstance(data, pl.LazyFrame):
+        columns = data.collect_schema().names()
+        if column_name not in columns:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Column '{column_name}' not found in node data.",
+            )
+        if trimmed_name in columns and trimmed_name != column_name:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Column '{trimmed_name}' already exists in node data.",
+            )
+        return data.rename({column_name: trimmed_name})
+
+    if hasattr(data, "rename"):
+        try:
+            return data.rename({column_name: trimmed_name})
+        except Exception as exc:  # pragma: no cover
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to rename column '{column_name}': {exc}",
+            ) from exc
+
+    raise HTTPException(
+        status_code=400,
+        detail=f"Unsupported data type '{type(data).__name__}' for column rename.",
+    )
+
+
+@router.delete("/{workspace_id}/nodes/{node_id}/columns/{column_name}")
+async def delete_node_column(
+    workspace_id: str,
+    node_id: str,
+    column_name: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Delete a column from a node's data (in-place)."""
+
+    user_id = current_user["id"]
+    node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
+    if not node:
+        raise HTTPException(status_code=404, detail="Node not found")
+
+    data = getattr(node, "data", None)
+    if data is None:
+        raise HTTPException(status_code=400, detail="Node has no data")
+
+    try:
+        node.data = _drop_column_from_data(data, column_name)  # type: ignore[assignment]
+        try:
+            node.operation += f"\ndrop_column({column_name})"
+        except Exception:  # pragma: no cover - non-critical history update
+            pass
+        workspace_manager.persist(user_id, workspace_id)
+        return DocWorkspaceAPIUtils.convert_node_info_for_api(node)
+    except HTTPException:
+        raise
+    except Exception as exc:  # pragma: no cover - defensive
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to delete column '{column_name}': {exc}",
+        ) from exc
+
+
+@router.put("/{workspace_id}/nodes/{node_id}/columns/{column_name}")
+async def rename_node_column(
+    workspace_id: str,
+    node_id: str,
+    column_name: str,
+    payload: dict = Body(...),
+    current_user: dict = Depends(get_current_user),
+):
+    """Rename a column within a node's data (in-place)."""
+
+    user_id = current_user["id"]
+    new_name = payload.get("new_name") if isinstance(payload, dict) else None
+    if not isinstance(new_name, str):
+        raise HTTPException(
+            status_code=400,
+            detail="Request body must include a 'new_name' string field.",
+        )
+
+    node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
+    if not node:
+        raise HTTPException(status_code=404, detail="Node not found")
+
+    data = getattr(node, "data", None)
+    if data is None:
+        raise HTTPException(status_code=400, detail="Node has no data")
+
+    trimmed_name = new_name.strip()
+
+    try:
+        node.data = _rename_column_in_data(data, column_name, trimmed_name)  # type: ignore[assignment]
+        if trimmed_name != column_name:
+            try:
+                node.operation += f"\nrename_column({column_name}->{trimmed_name})"
+            except Exception:  # pragma: no cover
+                pass
+        workspace_manager.persist(user_id, workspace_id)
+        return DocWorkspaceAPIUtils.convert_node_info_for_api(node)
+    except HTTPException:
+        raise
+    except Exception as exc:  # pragma: no cover
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to rename column '{column_name}': {exc}",
+        ) from exc
 
 
 # -----------------------------------------------------------------------------

@@ -55,6 +55,17 @@ export const nodesApi = {
   describeColumn: (ws: string, node: string, col: string, headers: Record<string,string> = {}) => get<ColumnDescribeResponse>(`/workspaces/${ws}/nodes/${node}/columns/${col}/describe`, headers),
   delete: (ws: string, node: string, headers: Record<string,string> = {}) => del(`/workspaces/${ws}/nodes/${node}`, headers),
   rename: (ws: string, node: string, newName: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/nodes/${node}/name`, { method: 'PUT', headers, params: { new_name: newName } }),
+  renameColumn: (ws: string, node: string, column: string, newName: string, headers: Record<string,string> = {}) =>
+    httpRequest(`/workspaces/${ws}/nodes/${node}/columns/${encodeURIComponent(column)}`, {
+      method: 'PUT',
+      headers,
+      body: { new_name: newName },
+    }),
+  deleteColumn: (ws: string, node: string, column: string, headers: Record<string,string> = {}) =>
+    httpRequest(`/workspaces/${ws}/nodes/${node}/columns/${encodeURIComponent(column)}`, {
+      method: 'DELETE',
+      headers,
+    }),
   createFromFile: (ws: string, filename: string, nodeName?: string, headers: Record<string,string> = {}, options?: { mode?: string; document_column?: string | null }) => httpRequest(`/workspaces/${ws}/nodes`, { method: 'POST', headers, params: { filename, node_name: nodeName, mode: options?.mode ?? 'DocLazyFrame', document_column: options?.document_column ?? undefined } }),
   convert: (ws: string, node: string, target: ConversionTarget, documentColumn?: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/nodes/${node}/convert`, { method: 'POST', headers, params: { target, ...(documentColumn && { document_column: documentColumn }) } }),
   resetDocument: (ws: string, node: string, documentColumn?: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/nodes/${node}/reset-document`, { method: 'POST', headers, params: documentColumn ? { document_column: documentColumn } : {} }),

@@ -1,12 +1,22 @@
-import React, { memo, useState, useEffect, useMemo, useCallback } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronDown, Loader2, Settings2, X } from 'lucide-react';
+
+import { useWorkspaceActions } from '../../hooks/useWorkspaceActions';
 import { useWorkspaceData } from '../../hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '../../hooks/useWorkspaceSelection';
-import { useWorkspaceActions } from '../../hooks/useWorkspaceActions';
 import { useWorkspaceStatus } from '../../hooks/useWorkspaceStatus';
 import { NodeSchemaResponse } from '../../types';
-import { Card, CardDescription, CardHeader, CardTitle } from '../ui/card';
-import { Skeleton } from '../ui/skeleton';
-import { Loader2, X } from 'lucide-react';
+import { cn } from '../../lib/utils';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from '../ui/dropdown-menu';
 import {
   Pagination,
   PaginationContent,
@@ -16,37 +26,26 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '../ui/Pagination';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
-import DatetimeFormatPanel from '../panels/DatetimeFormatPanel';
-import { cn } from '@/lib/utils';
-
-const EmptyStateCard: React.FC<{ title: string; description?: string; icon?: React.ReactNode }> = ({
-  title,
-  description,
-  icon,
-}) => (
-  <Card className="mx-auto max-w-lg text-center">
-    <CardHeader className="flex flex-col items-center space-y-3">
-      {icon && (
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
-          {icon}
-        </div>
-      )}
-      <CardTitle>{title}</CardTitle>
-      {description && <CardDescription>{description}</CardDescription>}
-    </CardHeader>
-  </Card>
-);
+import { Skeleton } from '../ui/skeleton';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '../ui/table';
+import { DatetimeFormatPanel } from '../panels/DatetimeFormatPanel';
 
 type DataRow = Record<string, unknown>;
 
-interface TablePagination {
+interface PaginationInfo {
   page: number;
   page_size: number;
-  total_rows: number;
   total_pages: number;
   has_next: boolean;
   has_prev: boolean;
+  [key: string]: unknown;
 }
 
 interface WorkspaceTableProps {
@@ -55,8 +54,10 @@ interface WorkspaceTableProps {
   workspaceId?: string;
   nodeId?: string;
   onCast?: (column: string, targetType: string, format?: string) => Promise<void>;
-  onRefreshSchema?: () => Promise<NodeSchemaResponse | null>;
-  pagination?: TablePagination;
+  onRenameColumn?: (column: string, nextName: string) => Promise<void>;
+  onDeleteColumn?: (column: string) => Promise<void>;
+  onRefreshSchema?: () => Promise<NodeSchemaResponse | null | undefined>;
+  pagination?: PaginationInfo | null;
   onPageChange?: (page: number) => void;
   onPageSizeChange?: (pageSize: number) => void;
 }
@@ -139,6 +140,8 @@ const WorkspaceTable: React.FC<WorkspaceTableProps> = ({
   workspaceId,
   nodeId,
   onCast,
+  onRenameColumn,
+  onDeleteColumn,
   onRefreshSchema,
   pagination,
   onPageChange,
@@ -151,6 +154,9 @@ const WorkspaceTable: React.FC<WorkspaceTableProps> = ({
     column: '',
     targetType: '',
   });
+  const [columnActionLoading, setColumnActionLoading] = useState<Record<string, boolean>>({});
+  const [renameState, setRenameState] = useState<{ column: string; value: string } | null>(null);
+  const renameInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const debugEnabled = useMemo(() => {
     if (typeof window === 'undefined') {
@@ -164,6 +170,18 @@ const WorkspaceTable: React.FC<WorkspaceTableProps> = ({
     }
   }, []);
 
+  const applySchema = useCallback(
+    (schema: NodeSchemaResponse | null | undefined) => {
+      const mapping = extractColumnTypes(schema);
+      if (debugEnabled) {
+        console.debug('WorkspaceTable: loaded column types', mapping);
+      }
+      setColumnTypes(mapping);
+      return mapping;
+    },
+    [debugEnabled]
+  );
+
   useEffect(() => {
     if (!workspaceId || !nodeId || !onRefreshSchema) {
       return;
@@ -172,23 +190,34 @@ const WorkspaceTable: React.FC<WorkspaceTableProps> = ({
     let cancelled = false;
     onRefreshSchema()
       .then((schema) => {
-        if (cancelled || !schema) {
-          return;
+        if (!cancelled) {
+          applySchema(schema);
         }
-        const mapping = extractColumnTypes(schema);
-        if (debugEnabled) {
-          console.debug('WorkspaceTable: loaded column types', mapping);
-        }
-        setColumnTypes(mapping);
       })
       .catch((error) => {
-        console.error('WorkspaceTable: failed to refresh schema', error);
+        if (!cancelled) {
+          console.error('WorkspaceTable: failed to refresh schema', error);
+        }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [workspaceId, nodeId, onRefreshSchema, debugEnabled]);
+  }, [workspaceId, nodeId, onRefreshSchema, applySchema]);
+
+  useEffect(() => {
+    if (!renameState) {
+      return;
+    }
+    const input = renameInputRefs.current[renameState.column];
+    if (input) {
+      // Use a longer delay to ensure the dropdown has closed and input is fully rendered
+      setTimeout(() => {
+        input.focus();
+        input.select();
+      }, 10);
+    }
+  }, [renameState]);
 
   useEffect(() => {
     if (!debugEnabled) {
@@ -238,11 +267,7 @@ const WorkspaceTable: React.FC<WorkspaceTableProps> = ({
           return;
         }
         const schema = await onRefreshSchema();
-        const mapping = extractColumnTypes(schema);
-        if (debugEnabled) {
-          console.debug('WorkspaceTable: column types after cast', mapping);
-        }
-        setColumnTypes(mapping);
+        applySchema(schema);
       } catch (error) {
         console.error('WorkspaceTable: cast error', error);
         const message = error instanceof Error ? error.message : String(error);
@@ -255,7 +280,7 @@ const WorkspaceTable: React.FC<WorkspaceTableProps> = ({
         setLoadingCast((prev) => ({ ...prev, [column]: false }));
       }
     },
-    [onCast, onRefreshSchema, debugEnabled]
+    [onCast, onRefreshSchema, applySchema]
   );
 
   const handleTypeChange = useCallback(
@@ -266,6 +291,10 @@ const WorkspaceTable: React.FC<WorkspaceTableProps> = ({
 
       const currentType = normalizeTypeName(columnTypes[column] ?? 'string');
       const targetType = newType.toLowerCase();
+
+      if (targetType === currentType.toLowerCase()) {
+        return;
+      }
 
       const isStringToDatetime =
         targetType === 'datetime' && (currentType === 'string' || currentType.includes('utf8'));
@@ -289,6 +318,145 @@ const WorkspaceTable: React.FC<WorkspaceTableProps> = ({
       }
     },
     [datetimeModal, performCast]
+  );
+
+  const beginRename = useCallback((column: string) => {
+    setRenameState({ column, value: column });
+    // Additional focus management after state update
+    setTimeout(() => {
+      const input = renameInputRefs.current[column];
+      if (input) {
+        input.focus();
+        input.select();
+      }
+    }, 20);
+  }, []);
+
+  const updateRenameDraft = useCallback((column: string, nextValue: string) => {
+    setRenameState((prev) => (prev && prev.column === column ? { column, value: nextValue } : prev));
+  }, []);
+
+  const setColumnBusy = useCallback((column: string, active: boolean) => {
+    setColumnActionLoading((prev) => {
+      if (active) {
+        if (prev[column]) {
+          return prev;
+        }
+        return { ...prev, [column]: true };
+      }
+      if (!(column in prev)) {
+        return prev;
+      }
+      const next = { ...prev };
+      delete next[column];
+      return next;
+    });
+  }, []);
+
+  const submitRename = useCallback(
+    async (column: string, value: string) => {
+      if (!renameState || renameState.column !== column) {
+        return;
+      }
+      if (!onRenameColumn) {
+        setRenameState(null);
+        return;
+      }
+
+      const trimmed = value.trim();
+      if (!trimmed) {
+        try {
+          alert('Column name cannot be empty.');
+        } catch {
+          /* ignore */
+        }
+        return;
+      }
+
+      if (trimmed === column) {
+        setRenameState(null);
+        return;
+      }
+
+      const nameConflict = columns.some((existing) => existing !== column && existing === trimmed);
+      if (nameConflict) {
+        try {
+          alert(`A column named "${trimmed}" already exists.`);
+        } catch {
+          /* ignore */
+        }
+        return;
+      }
+
+      setColumnBusy(column, true);
+      try {
+        await onRenameColumn(column, trimmed);
+        if (onRefreshSchema) {
+          const schema = await onRefreshSchema();
+          applySchema(schema);
+        }
+        setRenameState(null);
+      } catch (error) {
+        console.error('WorkspaceTable: rename column error', error);
+        const message = error instanceof Error ? error.message : String(error);
+        try {
+          alert(`Failed to rename column "${column}": ${message}`);
+        } catch {
+          /* ignore */
+        }
+      } finally {
+        setColumnBusy(column, false);
+      }
+    },
+    [renameState, onRenameColumn, columns, onRefreshSchema, applySchema, setColumnBusy]
+  );
+
+  const requestDeleteColumn = useCallback(
+    async (column: string) => {
+      if (!onDeleteColumn) {
+        return;
+      }
+
+      const confirmation =
+        typeof window === 'undefined'
+          ? true
+          : window.confirm(`Delete column "${column}"? This operation cannot be undone.`);
+      if (!confirmation) {
+        return;
+      }
+
+      setColumnBusy(column, true);
+      try {
+        await onDeleteColumn(column);
+        if (onRefreshSchema) {
+          const schema = await onRefreshSchema();
+          applySchema(schema);
+        } else {
+          setColumnTypes((prev) => {
+            if (!(column in prev)) {
+              return prev;
+            }
+            const next = { ...prev };
+            delete next[column];
+            return next;
+          });
+        }
+        if (renameState?.column === column) {
+          setRenameState(null);
+        }
+      } catch (error) {
+        console.error('WorkspaceTable: delete column error', error);
+        const message = error instanceof Error ? error.message : String(error);
+        try {
+          alert(`Failed to delete column "${column}": ${message}`);
+        } catch {
+          /* ignore */
+        }
+      } finally {
+        setColumnBusy(column, false);
+      }
+    },
+    [onDeleteColumn, onRefreshSchema, applySchema, renameState, setColumnBusy]
   );
 
   if (loading) {
@@ -399,6 +567,17 @@ const WorkspaceTable: React.FC<WorkspaceTableProps> = ({
                 {columns.map((column) => {
                   const currentType = normalizeTypeName(columnTypes[column] ?? 'string');
                   const isColumnLoading = Boolean(loadingCast[column]);
+                  const isColumnMutating = Boolean(columnActionLoading[column]);
+                  const isColumnBusy = isColumnLoading || isColumnMutating;
+                  const displayLabel = getTypeDisplayName(currentType);
+                  const availableTypes = [
+                    { value: currentType, label: displayLabel },
+                    ...DATA_TYPES.filter((type) => type.value !== currentType),
+                  ];
+                  const isRenaming = renameState?.column === column;
+                  const renameDraftValue = isRenaming ? renameState.value : column;
+                  const canRename = Boolean(onRenameColumn);
+                  const canDelete = Boolean(onDeleteColumn);
 
                   return (
                     <TableHead
@@ -406,30 +585,153 @@ const WorkspaceTable: React.FC<WorkspaceTableProps> = ({
                       className="whitespace-nowrap border-r border-border/70 px-4 py-3 text-left last:border-r-0"
                       style={{ minWidth: '250px' }}
                     >
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-medium text-foreground">{column}</span>
-                        <div className="relative flex-shrink-0">
-                          <select
-                            value={currentType}
-                            onChange={(event) => handleTypeChange(column, event.target.value)}
-                            disabled={isColumnLoading || !onCast}
-                            className={cn(
-                              'rounded-md border border-input bg-background px-2 py-0.5 text-xs text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
-                              isColumnLoading && 'cursor-not-allowed opacity-50',
-                              !onCast && 'bg-muted text-muted-foreground'
-                            )}
-                          >
-                            <option value={currentType}>{getTypeDisplayName(currentType)}</option>
-                            {DATA_TYPES.filter((type) => type.value !== currentType).map((type) => (
-                              <option key={type.value} value={type.value}>
-                                {type.label}
-                              </option>
-                            ))}
-                          </select>
-                          {isColumnLoading && (
-                            <div className="absolute -right-5 top-1/2 -translate-y-1/2">
-                              <Loader2 className="h-3 w-3 animate-spin text-primary" />
-                            </div>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex min-w-0 items-center gap-2">
+                          {isRenaming ? (
+                            <Input
+                              ref={(element) => {
+                                if (element) {
+                                  renameInputRefs.current[column] = element;
+                                } else {
+                                  delete renameInputRefs.current[column];
+                                }
+                              }}
+                              value={renameDraftValue}
+                              disabled={isColumnBusy}
+                              onChange={(event) => updateRenameDraft(column, event.target.value)}
+                              onBlur={() => {
+                                if (!isColumnBusy) {
+                                  void submitRename(column, renameDraftValue);
+                                }
+                              }}
+                              onKeyDown={(event) => {
+                                if (event.key === 'Enter') {
+                                  event.preventDefault();
+                                  if (!isColumnBusy) {
+                                    void submitRename(column, renameDraftValue);
+                                  }
+                                } else if (event.key === 'Escape') {
+                                  setRenameState(null);
+                                }
+                              }}
+                              className="h-7 w-40 truncate text-xs"
+                              aria-label={`Rename column ${column}`}
+                            />
+                          ) : canRename ? (
+                            <button
+                              type="button"
+                              className="max-w-[160px] truncate text-left text-xs font-medium text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                              onClick={() => {
+                                if (!isColumnBusy) {
+                                  beginRename(column);
+                                }
+                              }}
+                              disabled={isColumnBusy}
+                              title={column}
+                            >
+                              {column}
+                            </button>
+                          ) : (
+                            <span className="block max-w-[160px] truncate text-xs font-medium text-foreground" title={column}>
+                              {column}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={isColumnBusy || !onCast}
+                                className={cn(
+                                  'h-7 min-w-[104px] justify-between gap-2 px-2 text-xs font-medium',
+                                  isColumnBusy && 'cursor-progress opacity-80'
+                                )}
+                                aria-label={`Change data type for column ${column}`}
+                              >
+                                <span className="truncate">{displayLabel}</span>
+                                {isColumnBusy ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                                ) : (
+                                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                                )}
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start" className="w-40 p-1">
+                              <DropdownMenuRadioGroup
+                                value={currentType}
+                                onValueChange={(value) => {
+                                  if (!isColumnBusy) {
+                                    handleTypeChange(column, value);
+                                  }
+                                }}
+                              >
+                                {availableTypes.map((type) => (
+                                  <DropdownMenuRadioItem
+                                    key={type.value}
+                                    value={type.value}
+                                    className="text-xs"
+                                  >
+                                    {type.label}
+                                  </DropdownMenuRadioItem>
+                                ))}
+                              </DropdownMenuRadioGroup>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                          {(canRename || canDelete) && (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  disabled={isColumnBusy}
+                                  className={cn(
+                                    'h-7 w-7 text-muted-foreground hover:text-primary',
+                                    isColumnBusy && 'cursor-progress opacity-80'
+                                  )}
+                                  aria-label={`Column settings for ${column}`}
+                                >
+                                  {isColumnBusy ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  ) : (
+                                    <Settings2 className="h-3.5 w-3.5" />
+                                  )}
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-40 p-1">
+                                {canRename && (
+                                  <DropdownMenuItem
+                                    disabled={isColumnBusy}
+                                    onSelect={() => {
+                                      if (isColumnBusy) {
+                                        return;
+                                      }
+                                      beginRename(column);
+                                    }}
+                                    className="text-xs"
+                                  >
+                                    Rename
+                                  </DropdownMenuItem>
+                                )}
+                                {canDelete && (
+                                  <DropdownMenuItem
+                                    disabled={isColumnBusy}
+                                    onSelect={() => {
+                                      if (isColumnBusy) {
+                                        return;
+                                      }
+                                      void requestDeleteColumn(column);
+                                    }}
+                                    className="text-xs text-destructive focus:text-destructive"
+                                  >
+                                    Delete
+                                  </DropdownMenuItem>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           )}
                         </div>
                       </div>
@@ -496,7 +798,7 @@ const WorkspaceTable: React.FC<WorkspaceTableProps> = ({
 export const WorkspaceDataView: React.FC = memo(() => {
   const { currentWorkspaceId, nodeData, getNodeShape } = useWorkspaceData();
   const { selectedNode, selectedNodes, selectedNodeIds, handlePageChange, handlePageSizeChange } = useWorkspaceSelection();
-  const { castColumn, refreshNodeSchema, selectNodes, toggleNodeSelection } = useWorkspaceActions();
+  const { castColumn, renameColumn, deleteColumn, refreshNodeSchema, selectNodes, toggleNodeSelection } = useWorkspaceActions();
   const { isLoading } = useWorkspaceStatus();
 
   const multiSelectedNodes = useMemo(() => selectedNodes.filter(Boolean), [selectedNodes]);
@@ -638,15 +940,24 @@ export const WorkspaceDataView: React.FC = memo(() => {
   if (!selectedNode) {
     return (
       <div className="p-6">
-        <EmptyStateCard
-          title="No Node Selected"
-          description="Select a node from the graph to view its data"
-          icon={
-            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-            </svg>
-          }
-        />
+        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border/50 bg-muted/40 p-6 text-center">
+          <svg
+            className="h-6 w-6 text-muted-foreground"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+            />
+          </svg>
+          <h3 className="mt-3 text-sm font-semibold text-foreground">No Node Selected</h3>
+          <p className="mt-1 text-xs text-muted-foreground">Select a node from the graph to view its data.</p>
+        </div>
       </div>
     );
   }
@@ -750,6 +1061,12 @@ export const WorkspaceDataView: React.FC = memo(() => {
             nodeId={selectedNode.id}
             onCast={async (column: string, targetType: string, format?: string) => {
               await castColumn(selectedNode.id, column, targetType, format);
+            }}
+            onRenameColumn={async (column: string, nextName: string) => {
+              await renameColumn(selectedNode.id, column, nextName);
+            }}
+            onDeleteColumn={async (column: string) => {
+              await deleteColumn(selectedNode.id, column);
             }}
             onRefreshSchema={async () => {
               return await refreshNodeSchema(selectedNode.id);
