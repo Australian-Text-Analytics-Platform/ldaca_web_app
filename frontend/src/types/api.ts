@@ -129,8 +129,8 @@ export interface CastRequest {
 }
 
 export interface SliceRequest {
-  start_row: number;
-  end_row: number;
+  offset: number;
+  length?: number;
   description?: string;
 }
 

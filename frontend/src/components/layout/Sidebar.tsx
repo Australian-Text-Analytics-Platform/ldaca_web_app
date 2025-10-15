@@ -45,6 +45,8 @@ import {
   TrendingUp,
   Upload,
   XCircle,
+  Copy,
+  Check,
 } from 'lucide-react';
 import type { ViewType } from '@/stores';
 import logo from '@/logo.png';
@@ -113,7 +115,7 @@ const Sidebar: React.FC = () => {
   const { currentView, setCurrentView, openFeedbackModal } = useUIStore(
     useShallow(({ currentView, setCurrentView, openFeedbackModal }) => ({ currentView, setCurrentView, openFeedbackModal }))
   );
-  const { workspaceGraph, currentWorkspaceId } = useWorkspaceData();
+  const { workspaceGraph, currentWorkspaceId, getNodeShape } = useWorkspaceData();
   const { selectedNodeIds } = useWorkspaceSelection();
   const { toggleNodeSelection } = useWorkspaceActions();
   const { getAuthHeaders, user, logout } = useAuth();
@@ -150,6 +152,102 @@ const Sidebar: React.FC = () => {
   const isConnected = taskStreamStatus === 'open';
   const isConnecting = taskStreamStatus === 'connecting';
   const connectionError = taskStreamStatus === 'error' ? taskStreamError : null;
+
+  const [copiedField, setCopiedField] = React.useState<{ nodeId: string; field: 'name' | 'id' } | null>(null);
+  const copyTimeoutRef = React.useRef<number | null>(null);
+  const [hoveredNodeId, setHoveredNodeId] = React.useState<string | null>(null);
+  const [nodeShapes, setNodeShapes] = React.useState<Record<string, string>>({});
+
+  const handleCopy = React.useCallback(
+    async (value: string | undefined | null, nodeId: string, field: 'name' | 'id') => {
+      if (!value || typeof value !== 'string') {
+        return;
+      }
+      if (typeof window === 'undefined') {
+        return;
+      }
+
+      try {
+        if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(value);
+        } else if (typeof document !== 'undefined') {
+          const textarea = document.createElement('textarea');
+          textarea.value = value;
+          textarea.style.position = 'fixed';
+          textarea.style.opacity = '0';
+          document.body.appendChild(textarea);
+          textarea.select();
+          document.execCommand('copy');
+          document.body.removeChild(textarea);
+        }
+
+        setCopiedField({ nodeId, field });
+        if (copyTimeoutRef.current) {
+          window.clearTimeout(copyTimeoutRef.current);
+        }
+        copyTimeoutRef.current = window.setTimeout(() => {
+          setCopiedField(null);
+        }, 1600);
+      } catch (error) {
+        console.error('Sidebar: failed to copy value', error);
+      }
+    },
+    []
+  );
+
+  React.useEffect(() => () => {
+    if (copyTimeoutRef.current) {
+      window.clearTimeout(copyTimeoutRef.current);
+    }
+  }, []);
+
+  // Fetch shapes for visible nodes
+  React.useEffect(() => {
+    if (!getNodeShape || nodes.length === 0) return;
+    
+    let cancelled = false;
+    
+    const fetchShapes = async () => {
+      const promises = nodes.map(async (node) => {
+        if (nodeShapes[node.id]) return; // Already have this shape
+        
+        try {
+          const cacheKey = `node-shape:${node.id}`;
+          const cached = typeof window !== 'undefined' ? window.sessionStorage.getItem(cacheKey) : null;
+          if (cached) {
+            if (!cancelled) {
+              setNodeShapes(prev => ({ ...prev, [node.id]: cached }));
+            }
+            return;
+          }
+          
+          const shapeData = await getNodeShape(node.id);
+          if (!cancelled && shapeData?.shape) {
+            const shapeStr = `${shapeData.shape[0]} × ${shapeData.shape[1]}`;
+            setNodeShapes(prev => ({ ...prev, [node.id]: shapeStr }));
+            
+            try {
+              if (typeof window !== 'undefined') {
+                window.sessionStorage.setItem(cacheKey, shapeStr);
+              }
+            } catch {
+              // ignore storage errors
+            }
+          }
+        } catch {
+          // ignore fetch errors
+        }
+      });
+      
+      await Promise.all(promises);
+    };
+    
+    fetchShapes();
+    
+    return () => {
+      cancelled = true;
+    };
+  }, [getNodeShape, nodes, nodeShapes]);
 
   const handleCancelTask = React.useCallback(
     async (task: TaskRecord) => {
@@ -228,29 +326,98 @@ const Sidebar: React.FC = () => {
             <span>Nodes</span>
             <span className="text-xs text-muted-foreground">{nodeCount}</span>
           </SidebarGroupLabel>
-          <SidebarGroupContent className="flex-1 space-y-1 overflow-y-auto pr-1">
+          <SidebarGroupContent className="flex-1 space-y-2 overflow-y-auto pr-1">
             {nodes.length ? (
               nodes.map((node) => {
-                const name = node?.data?.nodeName || node?.data?.label || node?.label || node?.id;
+                const name = node?.data?.nodeName || node?.data?.label || node?.label || '';
                 const dtype = node?.data?.nodeType || node?.data?.dataType || node?.type || 'unknown';
-                const shape = Array.isArray(node?.data?.shape)
-                  ? `${node.data.shape[0]} × ${node.data.shape[1]}`
-                  : '';
-                const title = `Name: ${name}\nID: ${node.id}\nType: ${dtype}${shape ? `\nShape: ${shape}` : ''}`;
+                const shape = nodeShapes[node.id] || '—';
                 const checked = selectedNodeIds?.includes(node.id);
+                const copyNameValue = name && name.length > 0 ? name : node.id;
+                const displayName = copyNameValue || 'Untitled node';
+                const isNameCopied = copiedField?.nodeId === node.id && copiedField.field === 'name';
+                const isIdCopied = copiedField?.nodeId === node.id && copiedField.field === 'id';
+                const isExpanded = hoveredNodeId === node.id;
+
                 return (
-                  <label
+                  <div
                     key={node.id}
-                    className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent"
-                    title={title}
+                    className={cn(
+                      'group relative overflow-hidden rounded-md border border-transparent bg-background/40 px-2 py-2 text-sm transition-all duration-200 ease-out focus-within:border-border/60 focus-within:bg-accent/60',
+                      checked
+                        ? 'border-primary/60 bg-primary/10'
+                        : 'hover:border-border/60 hover:bg-accent/60',
+                      isExpanded && !checked && 'border-border/60 bg-accent/60 shadow-sm'
+                    )}
+                    onMouseEnter={() => setHoveredNodeId(node.id)}
+                    onMouseLeave={() => setHoveredNodeId((prev) => (prev === node.id ? null : prev))}
+                    onFocusCapture={() => setHoveredNodeId(node.id)}
+                    onBlurCapture={(event) => {
+                      const related = event.relatedTarget as Node | null;
+                      if (!related || !event.currentTarget.contains(related)) {
+                        setHoveredNodeId((prev) => (prev === node.id ? null : prev));
+                      }
+                    }}
                   >
-                    <Checkbox
-                      checked={checked}
-                      onCheckedChange={() => toggleNodeSelection(node.id)}
-                      className="h-4 w-4"
-                    />
-                    <span className="flex-1 truncate text-sm">{name}</span>
-                  </label>
+                    <div className="flex items-center gap-3">
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={() => toggleNodeSelection(node.id)}
+                        className="h-5 w-5 shrink-0 rounded-full border-border/70 text-primary-foreground data-[state=checked]:border-primary data-[state=checked]:bg-primary"
+                        aria-label={`Select ${displayName}`}
+                      />
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void handleCopy(copyNameValue, node.id, 'name');
+                        }}
+                        className="flex flex-1 min-w-0 items-center gap-2 bg-transparent text-left text-sm font-medium text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                        title={displayName}
+                      >
+                        <span className="flex-1 min-w-0 truncate">{displayName}</span>
+                        <span className="flex items-center shrink-0 text-xs text-muted-foreground transition-opacity duration-200 ease-out opacity-0 group-hover:opacity-100 group-focus-within:opacity-100">
+                          {isNameCopied ? (
+                            <Check className="h-3.5 w-3.5 text-emerald-500" aria-hidden="true" />
+                          ) : (
+                            <Copy className="h-3.5 w-3.5" aria-hidden="true" />
+                          )}
+                        </span>
+                      </button>
+                    </div>
+                    <div
+                      className={cn(
+                        'ml-[1.75rem] mt-0 flex max-h-0 flex-wrap items-center gap-x-4 gap-y-1 overflow-hidden text-xs text-muted-foreground opacity-0 transition-all duration-200 ease-out',
+                        isExpanded && 'mt-2 max-h-40 opacity-100'
+                      )}
+                    >
+                      <span className="flex items-center gap-1">
+                        <span className="text-[10px] uppercase tracking-wide text-muted-foreground/80">Type</span>
+                        <span className="font-medium text-foreground">{dtype}</span>
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span className="text-[10px] uppercase tracking-wide text-muted-foreground/80">Shape</span>
+                        <span className="font-medium text-foreground">{shape}</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void handleCopy(node.id, node.id, 'id');
+                        }}
+                        className="flex items-center gap-1 text-left text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                        title="Copy node id"
+                      >
+                        <span className="text-[10px] uppercase tracking-wide text-muted-foreground/80">ID</span>
+                        <span className="max-w-[160px] truncate font-mono text-[11px] text-foreground">{node.id}</span>
+                        {isIdCopied ? (
+                          <Check className="h-3.5 w-3.5 text-emerald-500" aria-hidden="true" />
+                        ) : (
+                          <Copy className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
                 );
               })
             ) : (

@@ -1061,28 +1061,29 @@ async def slice_node(
         node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
         if not node:
             raise ValueError("Node not found")
+        offset = int(request.offset or 0)
+        length = request.length
         sliced_data = node.data
-        if request.start_row is not None or request.end_row is not None:
-            start = request.start_row or 0
-            length = None
-            if request.end_row is not None:
-                length = request.end_row - start
+        try:
             if hasattr(sliced_data, "slice"):
-                sliced_data = sliced_data.slice(start, length)
+                sliced_data = sliced_data.slice(offset, length)
+            elif hasattr(sliced_data, "lazy"):
+                sliced_data = sliced_data.lazy().slice(offset, length)
             else:
-                sliced_data = sliced_data.lazy().slice(start, length)
-        if request.columns:
-            if hasattr(sliced_data, "select"):
-                sliced_data = sliced_data.select(request.columns)
-            else:
-                sliced_data = sliced_data.lazy().select(request.columns)
+                raise ValueError("Node data does not support slicing")
+        except Exception as exc:  # pragma: no cover - defensive guard
+            raise ValueError(f"Failed to slice node data: {exc}") from exc
+
         new_node_name = request.new_node_name or f"{node.name}_sliced"
+        slice_args = f"offset={offset}"
+        if length is not None:
+            slice_args = f"{slice_args}, length={length}"
         new_node = workspace_manager.add_node_to_workspace(
             user_id=user_id,
             workspace_id=workspace_id,
             data=sliced_data,
             node_name=new_node_name,
-            operation=f"slice({node.name})",
+            operation=f"slice({node.name}, {slice_args})",
             parents=[node],
         )
         return new_node
@@ -1094,6 +1095,67 @@ async def slice_node(
     if not success:
         raise HTTPException(status_code=400, detail=message)
     return result_obj
+
+
+@router.post("/{workspace_id}/nodes/{node_id}/slice/preview")
+async def slice_preview(
+    workspace_id: str,
+    node_id: str,
+    request: SliceRequest,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=500),
+    current_user: dict = Depends(get_current_user),
+) -> FilterPreviewResponse:
+    user_id = current_user["id"]
+    node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
+    if not node:
+        raise HTTPException(status_code=404, detail="Node not found")
+
+    offset = int(request.offset or 0)
+    length = request.length if request.length is None else int(request.length)
+
+    try:
+        lazy_data = _ensure_lazyframe(node.data)
+        sliced_lazy = lazy_data.slice(offset, length)
+
+        total_rows_series = (
+            sliced_lazy.select(pl.len().alias("_len")).collect().to_series(0)
+        )
+        total_rows = int(total_rows_series.item()) if total_rows_series.len() else 0
+
+        normalized_page_size = page_size
+        total_pages = math.ceil(total_rows / normalized_page_size) if total_rows else 0
+        normalized_page = min(max(page, 1), total_pages or 1)
+        preview_offset = (
+            (normalized_page - 1) * normalized_page_size if total_rows else 0
+        )
+
+        preview_df = sliced_lazy.slice(preview_offset, normalized_page_size).collect()
+    except HTTPException:
+        raise
+    except Exception as exc:  # pragma: no cover
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to generate slice preview: {exc}",
+        ) from exc
+
+    columns = list(preview_df.columns)
+    dtypes = {col: str(dtype) for col, dtype in preview_df.schema.items()}
+    data_rows = preview_df.to_dicts()
+
+    return {
+        "data": data_rows,
+        "columns": columns,
+        "dtypes": dtypes,
+        "pagination": {
+            "page": normalized_page,
+            "page_size": normalized_page_size,
+            "total_rows": total_rows,
+            "total_pages": total_pages,
+            "has_next": preview_offset + normalized_page_size < total_rows,
+            "has_prev": normalized_page > 1 and total_rows > 0,
+        },
+    }
 
 
 @router.post("/{workspace_id}/nodes/concat/preview")

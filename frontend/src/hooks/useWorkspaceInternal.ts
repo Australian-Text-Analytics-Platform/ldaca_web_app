@@ -8,7 +8,7 @@ import { useAuth } from './useAuth';
 import { NodeSchemaResponse } from '../types';
 // New modular API imports
 import { workspacesApi } from '../api/workspaces';
-import { nodesApi, FilterRequest } from '../api/nodes';
+import { nodesApi, FilterRequest, SliceRequest } from '../api/nodes';
 import { textApi, ConcordanceRequest, ConcordanceDetachRequest, QuotationRequest, QuotationDetachRequest, ConcordanceAnalysisRequest } from '../api/text';
 import { queryKeys } from '../lib/queryKeys';
 import { getNodeInfo } from '../lib/nodeInfoCache';
@@ -582,6 +582,27 @@ export const useWorkspaceInternal = () => {
     },
   });
 
+  const sliceNodeMutation = useMutation({
+    mutationFn: ({ workspaceId, nodeId, request }: {
+      workspaceId: string;
+      nodeId: string;
+      request: SliceRequest;
+    }) => nodesApi.slice(workspaceId, nodeId, request, authHeaders),
+    onMutate: () => {
+      startOperation('sliceNode');
+    },
+    onSuccess: () => {
+      if (currentWorkspaceId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
+      }
+      endOperation('sliceNode');
+    },
+    onError: (error: any) => {
+      setOperationError('sliceNode', error.message);
+      endOperation('sliceNode');
+    },
+  });
+
   const concordanceMutation = useMutation({
     mutationFn: ({ workspaceId, nodeId, request }: {
       workspaceId: string;
@@ -938,9 +959,19 @@ export const useWorkspaceInternal = () => {
       return filterNodeMutation.mutateAsync({ workspaceId: currentWorkspaceId, nodeId, request });
     },
 
+    sliceNode: (nodeId: string, request: SliceRequest) => {
+      if (!currentWorkspaceId) return Promise.reject(new Error('No workspace selected'));
+      return sliceNodeMutation.mutateAsync({ workspaceId: currentWorkspaceId, nodeId, request });
+    },
+
     filterPreview: (nodeId: string, request: FilterRequest, page = 1, pageSize = 10) => {
       if (!currentWorkspaceId) return Promise.reject(new Error('No workspace selected'));
       return nodesApi.filterPreview(currentWorkspaceId, nodeId, request, page, pageSize, authHeaders);
+    },
+
+    slicePreview: (nodeId: string, request: SliceRequest, page = 1, pageSize = 10) => {
+      if (!currentWorkspaceId) return Promise.reject(new Error('No workspace selected'));
+      return nodesApi.slicePreview(currentWorkspaceId, nodeId, request, page, pageSize, authHeaders);
     },
     
     concordanceSearch: (nodeId: string, request: ConcordanceRequest) => {
@@ -1021,6 +1052,7 @@ export const useWorkspaceInternal = () => {
   saveWorkspaceAsMutation,
   updateWorkspaceNameMutation,
     concatNodesMutation,
+    sliceNodeMutation,
     getNodeShapeStable,
     currentWorkspaceId,
     authHeaders,

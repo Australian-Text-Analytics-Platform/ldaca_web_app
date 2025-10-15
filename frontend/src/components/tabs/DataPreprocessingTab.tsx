@@ -16,7 +16,7 @@ type DataPrepSubtab = 'filter' | 'slice' | 'join' | 'concat' | 'aggregate';
 const DataPreprocessingTab: React.FC = () => {
   const { selectedNodeId, selectedNode, selectedNodes, selectedNodeIds } = useWorkspaceSelection();
   const { nodeData, currentWorkspaceId, nodes: workspaceNodes = [], getNodeShape } = useWorkspaceData();
-  const { filterNode, filterPreview, joinNodes, concatNodes, concatPreview } = useWorkspaceActions();
+  const { filterNode, filterPreview, joinNodes, concatNodes, concatPreview, sliceNode, slicePreview } = useWorkspaceActions();
   const { isLoading } = useWorkspaceStatus();
 
   const [activeSubtab, setActiveSubtab] = useState<DataPrepSubtab>('filter');
@@ -34,7 +34,7 @@ const DataPreprocessingTab: React.FC = () => {
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Data Preprocessing</h1>
           <p className="text-sm text-muted-foreground">
-            Prepare your dataset with filtering and upcoming slice, join, concat, and aggregate tools.
+            Prepare your dataset with filtering, slicing, join, concat, and aggregate tools.
           </p>
         </div>
       </div>
@@ -69,7 +69,17 @@ const DataPreprocessingTab: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="slice" className="space-y-6">
-          <SliceSubTab />
+          <SliceSubTab
+            selectedNodeId={selectedNodeId}
+            selectedNode={selectedNode}
+            selectedNodes={selectedNodes}
+            workspaceNodes={workspaceNodes}
+            getNodeShape={getNodeShape}
+            sliceNode={sliceNode}
+            slicePreview={slicePreview}
+            isLoading={isLoading}
+            onAlert={handleAlert}
+          />
         </TabsContent>
 
         <TabsContent value="join" className="space-y-6">

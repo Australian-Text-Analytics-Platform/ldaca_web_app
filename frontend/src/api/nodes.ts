@@ -26,7 +26,7 @@ export interface FilterCondition {
   regex?: boolean;
 }
 export interface FilterRequest { conditions: FilterCondition[]; logic?: string; new_node_name?: string; }
-export interface SliceRequest { start_row?: number; end_row?: number; columns?: string[]; new_node_name?: string; }
+export interface SliceRequest { offset: number; length?: number; new_node_name?: string; }
 export interface JoinNodesRequest { left_node_id: string; right_node_id: string; left_on: string; right_on: string; how?: string; new_node_name?: string; }
 export interface JoinPreviewParams { left_node_id: string; right_node_id: string; left_on?: string; right_on?: string; how?: string; }
 export interface CastNodeRequest { column: string; target_type: string; format?: string; }
@@ -95,6 +95,10 @@ export const nodesApi = {
   filter: (ws: string, node: string, req: FilterRequest, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/nodes/${node}/filter`, req, headers),
   filterPreview: (ws: string, node: string, req: FilterRequest, page = 1, pageSize = 10, headers: Record<string,string> = {}) => httpRequest<FilterPreviewResponse>(
     `/workspaces/${ws}/nodes/${node}/filter/preview`,
+    { method: 'POST', headers, params: { page, page_size: pageSize }, body: req }
+  ),
+  slicePreview: (ws: string, node: string, req: SliceRequest, page = 1, pageSize = 10, headers: Record<string,string> = {}) => httpRequest<FilterPreviewResponse>(
+    `/workspaces/${ws}/nodes/${node}/slice/preview`,
     { method: 'POST', headers, params: { page, page_size: pageSize }, body: req }
   ),
   slice: (ws: string, node: string, req: SliceRequest, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/nodes/${node}/slice`, req, headers),

@@ -457,9 +457,8 @@ class FilterRequest(BaseModel):
 
 
 class SliceRequest(BaseModel):
-    start_row: Optional[int] = None
-    end_row: Optional[int] = None
-    columns: Optional[List[str]] = None
+    offset: int = Field(default=0, ge=0)
+    length: Optional[int] = Field(default=None, ge=0)
     new_node_name: Optional[str] = None
 
 
