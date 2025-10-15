@@ -1,5 +1,6 @@
 import React, { memo, useState, useEffect, useRef, useCallback } from 'react';
 import { NodeProps, Handle, Position } from '@xyflow/react';
+import { Settings2, Trash2 } from 'lucide-react';
 import { WorkspaceNode } from '../types';
 import DocumentColumnPanel from './panels/DocumentColumnPanel';
 import { formatDataType, getTypeStyleClass } from '../utils/typeFormatting';
@@ -263,7 +264,7 @@ const CustomNode: React.FC<NodeProps<any>> = ({ data, selected }) => {
             ></div>
           )}
           {isRenaming ? (
-            <form onSubmit={handleRenameSubmit} className="flex-1">
+            <form onSubmit={handleRenameSubmit} className="flex-1 relative z-50">
               <input
                 ref={renameInputRef}
                 type="text"
@@ -271,7 +272,10 @@ const CustomNode: React.FC<NodeProps<any>> = ({ data, selected }) => {
                 onChange={(e) => setNewName(e.target.value)}
                 onBlur={handleRenameCancel}
                 onKeyDown={handleRenameKeyDown}
-                className="w-full text-sm font-bold bg-white border border-blue-300 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
+                className="w-full text-sm font-bold bg-white border border-blue-300 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 relative z-50"
                 style={{ 
                   fontSize: '14px',
                   lineHeight: '1.2'
@@ -303,8 +307,9 @@ const CustomNode: React.FC<NodeProps<any>> = ({ data, selected }) => {
               }}
               className="w-5 h-5 flex items-center justify-center text-gray-500 hover:text-gray-700 rounded transition-colors"
               title="More options"
+              aria-label="Node settings"
             >
-              ⋯
+              <Settings2 className="h-3.5 w-3.5" />
             </button>
             
             {/* Dropdown menu */}
@@ -402,8 +407,9 @@ const CustomNode: React.FC<NodeProps<any>> = ({ data, selected }) => {
             onClick={handleDeleteClick}
             className="w-5 h-5 flex items-center justify-center text-red-500 hover:text-red-700 rounded transition-colors"
             title="Delete node"
+            aria-label="Delete node"
           >
-            ✕
+            <Trash2 className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
