@@ -149,26 +149,29 @@ export const FilterSubTab: React.FC<FilterSubTabProps> = ({
   const [debouncedRequest, setDebouncedRequest] = useState<{ request: FilterRequest; signature: string } | null>(null);
 
   const availableColumns = useMemo(() => {
-    const columns: Array<{name: string, dataType: string}> = [];
-    
-    if (nodeData?.columns && Array.isArray(nodeData.columns) && nodeData?.dtypes) {
+    const columns: Array<{ name: string; dataType: string }> = [];
+    const dtypes =
+      nodeData?.dtypes && typeof nodeData.dtypes === 'object'
+        ? (nodeData.dtypes as Record<string, string | undefined>)
+        : undefined;
+
+    if (Array.isArray(nodeData?.columns) && dtypes) {
       nodeData.columns.forEach((colName: string) => {
-        const rawDataType = nodeData.dtypes[colName] || 'unknown';
+        const rawDataType = dtypes[colName] ?? 'unknown';
         const normalizedDataType = normalizeTypeName(rawDataType);
         columns.push({ name: colName, dataType: normalizedDataType });
       });
-    } else if (nodeData?.dtypes && typeof nodeData.dtypes === 'object') {
-      Object.keys(nodeData.dtypes).forEach(colName => {
-        const rawDataType = nodeData.dtypes[colName] || 'unknown';
-        const normalizedDataType = normalizeTypeName(rawDataType);
+    } else if (dtypes) {
+      Object.entries(dtypes).forEach(([colName, rawType]) => {
+        const normalizedDataType = normalizeTypeName(rawType ?? 'unknown');
         columns.push({ name: colName, dataType: normalizedDataType });
       });
     } else if (selectedNode?.data?.schema) {
-      Object.keys(selectedNode.data.schema).forEach(colName => {
+      Object.keys(selectedNode.data.schema).forEach((colName) => {
         columns.push({ name: colName, dataType: 'string' });
       });
     }
-    
+
     return columns;
   }, [nodeData?.columns, nodeData?.dtypes, selectedNode?.data?.schema]);
 
