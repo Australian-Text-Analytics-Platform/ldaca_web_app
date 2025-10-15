@@ -13,7 +13,6 @@ import {
   Node,
   Edge,
   Connection,
-  BezierEdge,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { Loader2, Network } from 'lucide-react';
@@ -29,7 +28,6 @@ import CustomNode from '../CustomNode';
 
 // Static registrations to avoid re-creation
 const nodeTypes = { customNode: CustomNode } as const;
-const edgeTypes = { bezier: BezierEdge } as const;
 
 // Dagre-based auto-layout (left-to-right) respecting edges and grouping branches
 const computeDagreLayout = (
@@ -243,15 +241,21 @@ export const WorkspaceGraphView: React.FC = memo(() => {
   }, [workspaceGraph, handleDelete, handleRename, handleConvertToDocDataFrame, handleConvertToDataFrame, handleConvertToDocLazyFrame, handleConvertToLazyFrame, handleResetDocument, selectedNodeIds, dlog]);
 
   // Build edges with bezier style for smooth curves
+  const EDGE_STROKE = '#0f172a';
   const initialEdges = useMemo(() => {
     if (!workspaceGraph || !workspaceGraph.edges) return [];
     return workspaceGraph.edges.map((e: any, idx: number) => ({
       id: e.id || `edge-${idx}`,
       source: e.source,
       target: e.target,
-      type: 'bezier',
-      animated: !!e.animated,
+      type: 'default',
+      animated: true,
       label: e.label,
+      style: {
+        strokeDasharray: '6 4',
+        strokeWidth: 2.5,
+        stroke: EDGE_STROKE,
+      },
     }));
   }, [workspaceGraph]);
   
@@ -419,7 +423,6 @@ export const WorkspaceGraphView: React.FC = memo(() => {
         nodes={nodes}
         edges={edges}
   nodeTypes={nodeTypes as any}
-  edgeTypes={edgeTypes as any}
   onNodesChange={handleNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeClick={onNodeClick}
@@ -428,7 +431,15 @@ export const WorkspaceGraphView: React.FC = memo(() => {
           setNodes((ns) => ns.map((n) => ({ ...n, selected: selectedNodeIds?.includes?.(n.id) ?? false })) as any);
         }}
   connectionLineType={ConnectionLineType.Bezier}
-        defaultEdgeOptions={{ type: 'bezier' }}
+        defaultEdgeOptions={{
+          type: 'default',
+          animated: true,
+          style: {
+            strokeDasharray: '6 4',
+            strokeWidth: 2.5,
+            stroke: EDGE_STROKE,
+          },
+        }}
         // One-time fit handled in onInit to avoid repeated resize-triggered layout loops
         onInit={(instance) => {
           try {
@@ -453,7 +464,7 @@ export const WorkspaceGraphView: React.FC = memo(() => {
         onConnectStart={(event, params) => {
           dlog('WorkspaceGraphView: onConnectStart blocked', params);
         }}
-        onConnectEnd={(event) => {
+        onConnectEnd={(_event) => {
           dlog('WorkspaceGraphView: onConnectEnd blocked');
         }}
       >
