@@ -103,13 +103,13 @@ export const PreviewTable: React.FC<PreviewTableProps> = ({
                       columnsToRender.map((col) => (
                         <TableHead
                           key={col}
-                          className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground"
+                          className="px-3 py-2 text-left text-xs font-medium tracking-wide text-muted-foreground"
                         >
                           {col}
                         </TableHead>
                       ))
                     ) : (
-                      <TableHead className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      <TableHead className="px-3 py-2 text-left text-xs font-medium tracking-wide text-muted-foreground">
                         No columns
                       </TableHead>
                     )}

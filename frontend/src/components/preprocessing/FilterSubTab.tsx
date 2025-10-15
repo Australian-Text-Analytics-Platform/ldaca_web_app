@@ -8,9 +8,17 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import NodeSelectionPanel, { NodeColumnSelection, WorkspaceNodeLike } from '../NodeSelectionPanel';
 import { PreviewTable } from './PreviewTable';
 import { DateTimePickerField } from './utils/dateTimeUtils';
-import { normalizeTypeName, getOperatorsForType } from './utils/typeUtils';
+import { normalizeTypeName, getOperatorsForType, formatPreviewValue } from './utils/typeUtils';
 import { ISO_PLACEHOLDER } from './utils/dateTimeHelpers';
-import type { FilterCondition, FilterConditionWithId, FilterRequest, PreviewPagination, PreviewRow } from './types';
+import type {
+  ConditionRange,
+  ConditionValue,
+  FilterCondition,
+  FilterConditionWithId,
+  FilterRequest,
+  PreviewPagination,
+  PreviewRow,
+} from './types';
 
 interface FilterSubTabProps {
   selectedNodeId: string | null;
@@ -37,8 +45,37 @@ interface FilterSubTabProps {
   onAlert: (message: string) => void;
 }
 
-type ConditionRange = { start: string | Date | null; end: string | Date | null };
-type ConditionValue = string | number | boolean | Date | ConditionRange | null;
+type CategoricalPrimitive = string | number | boolean | null;
+
+interface CategoricalOptionEntry {
+  key: string;
+  value: CategoricalPrimitive;
+  label: string;
+  isNull: boolean;
+}
+
+const NULL_OPTION_KEY = '__LDACA_NULL__';
+
+const toCategoricalPrimitive = (value: unknown): CategoricalPrimitive => {
+  if (value === null) return null;
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return value;
+  }
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  return String(value);
+};
+
+const getCategoricalOptionKey = (value: CategoricalPrimitive): string => {
+  if (value === null) return NULL_OPTION_KEY;
+  return `${typeof value}::${String(value)}`;
+};
+
+const getDefaultOperatorForType = (dataType: string): FilterCondition['operator'] => {
+  const operators = getOperatorsForType(dataType);
+  return (operators[0]?.value as FilterCondition['operator']) ?? 'eq';
+};
 
 const hasNonEmptyValue = (value: unknown): boolean => {
   if (value === null || value === undefined) return false;
@@ -46,7 +83,8 @@ const hasNonEmptyValue = (value: unknown): boolean => {
   if (typeof value === 'number' || typeof value === 'boolean') return true;
   if (value instanceof Date) return true;
   if (Array.isArray(value)) {
-    return value.some((entry) => hasNonEmptyValue(entry));
+    if (value.length === 0) return false;
+    return value.some((entry) => (entry === null ? true : hasNonEmptyValue(entry)));
   }
   if (typeof value === 'object') {
     const maybeRange = value as Partial<ConditionRange>;
@@ -65,6 +103,8 @@ const serializeConditionsForRequest = (conditions: FilterConditionWithId[]) => {
       value = null;
     } else if (condition.value instanceof Date) {
       value = condition.value.toISOString();
+    } else if (Array.isArray(condition.value)) {
+      value = condition.value.map((entry) => (entry instanceof Date ? entry.toISOString() : entry));
     } else if (condition.value && typeof condition.value === 'object' && 'start' in condition.value) {
       const range = condition.value as ConditionRange;
       const normalizeEdge = (edge: ConditionRange['start']): string | null => {
@@ -147,6 +187,12 @@ export const FilterSubTab: React.FC<FilterSubTabProps> = ({
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [debouncedRequest, setDebouncedRequest] = useState<{ request: FilterRequest; signature: string } | null>(null);
+  const [categoricalOptions, setCategoricalOptions] = useState<Record<string, {
+    options: CategoricalOptionEntry[];
+    hasNull: boolean;
+    loading: boolean;
+    error: string | null;
+  }>>({});
 
   const availableColumns = useMemo(() => {
     const columns: Array<{ name: string; dataType: string }> = [];
@@ -197,6 +243,91 @@ export const FilterSubTab: React.FC<FilterSubTabProps> = ({
     return node ? [node] : [];
   }, [selectedNodeId, workspaceNodeMap]);
 
+  const getCategoricalKey = useCallback(
+    (column: string) => `${currentWorkspaceId ?? 'none'}::${selectedNodeId ?? 'none'}::${column}`,
+    [currentWorkspaceId, selectedNodeId]
+  );
+
+  const ensureCategoricalOptions = useCallback(
+    async (column: string) => {
+      if (!currentWorkspaceId || !selectedNodeId || !column) {
+        return;
+      }
+
+      const key = getCategoricalKey(column);
+      setCategoricalOptions((prev) => {
+        const existing = prev[key];
+        if (existing?.loading) {
+          return prev;
+        }
+        return {
+          ...prev,
+          [key]: {
+            options: existing?.options ?? [],
+            hasNull: existing?.hasNull ?? false,
+            loading: true,
+            error: null,
+          },
+        };
+      });
+
+      try {
+        const response = await nodesApi.uniqueValues(currentWorkspaceId, selectedNodeId, column);
+        const rawValues: unknown[] = Array.isArray(response?.unique_values) ? response.unique_values : [];
+        const hasNullFromResponse = Boolean(response?.has_null);
+        const uniqueEntries = new Map<string, CategoricalOptionEntry>();
+
+        rawValues.forEach((value) => {
+          const primitive = toCategoricalPrimitive(value);
+          if (primitive === null) {
+            return;
+          }
+          const optionKey = getCategoricalOptionKey(primitive);
+          if (!uniqueEntries.has(optionKey)) {
+            uniqueEntries.set(optionKey, {
+              key: optionKey,
+              value: primitive,
+              label: formatPreviewValue(primitive),
+              isNull: false,
+            });
+          }
+        });
+
+        const optionList: CategoricalOptionEntry[] = [];
+        if (hasNullFromResponse) {
+          optionList.push({
+            key: NULL_OPTION_KEY,
+            value: null,
+            label: 'Null (no value)',
+            isNull: true,
+          });
+        }
+        optionList.push(...uniqueEntries.values());
+
+        setCategoricalOptions((prev) => ({
+          ...prev,
+          [key]: {
+            options: optionList,
+            hasNull: hasNullFromResponse,
+            loading: false,
+            error: null,
+          },
+        }));
+      } catch (error) {
+        setCategoricalOptions((prev) => ({
+          ...prev,
+          [key]: {
+            options: [],
+            hasNull: false,
+            loading: false,
+            error: error instanceof Error ? error.message : 'Failed to load categories',
+          },
+        }));
+      }
+    },
+    [currentWorkspaceId, selectedNodeId, getCategoricalKey]
+  );
+
   const filterDefaultPalette = useMemo(
     () => ['#2563eb', '#dc2626', '#16a34a', '#f97316', '#d946ef', '#0ea5e9'],
     [],
@@ -213,6 +344,25 @@ export const FilterSubTab: React.FC<FilterSubTabProps> = ({
 
   const handleFilterColorChange = useCallback(() => undefined, []);
   const handleFilterColumnChange = useCallback(() => undefined, []);
+
+  useEffect(() => {
+    setCategoricalOptions({});
+  }, [currentWorkspaceId, selectedNodeId]);
+
+  useEffect(() => {
+    if (!currentWorkspaceId || !selectedNodeId) {
+      return;
+    }
+
+    conditions.forEach((condition) => {
+      if (condition.dataType === 'categorical' && condition.column) {
+        const key = getCategoricalKey(condition.column);
+        if (!categoricalOptions[key]) {
+          void ensureCategoricalOptions(condition.column);
+        }
+      }
+    });
+  }, [conditions, currentWorkspaceId, selectedNodeId, categoricalOptions, getCategoricalKey, ensureCategoricalOptions]);
 
   // Auto-generate node name based on selected node
   useEffect(() => {
@@ -330,14 +480,16 @@ export const FilterSubTab: React.FC<FilterSubTabProps> = ({
 
   const handleAddCondition = () => {
     const firstColumn = availableColumns[0];
+    const defaultOperator = firstColumn ? getDefaultOperatorForType(firstColumn.dataType) : 'eq';
+    const defaultValue: ConditionValue = defaultOperator === 'in' ? [] : '';
     const newCondition: FilterConditionWithId = {
       id: Date.now().toString(),
       column: firstColumn ? firstColumn.name : '',
-      operator: 'eq',
-      value: '',
+      operator: defaultOperator,
+      value: defaultValue,
       dataType: firstColumn ? firstColumn.dataType : 'string',
       negate: false,
-      regex: true,
+      regex: defaultOperator === 'contains',
     };
     setConditions([...conditions, newCondition]);
   };
@@ -353,6 +505,8 @@ export const FilterSubTab: React.FC<FilterSubTabProps> = ({
     field: Key,
     value: FilterConditionWithId[Key]
   ) => {
+    let nextCategoricalColumnToLoad: string | null = null;
+
     setConditions(conditions.map((c) => {
       if (c.id !== id) return c;
       
@@ -363,28 +517,64 @@ export const FilterSubTab: React.FC<FilterSubTabProps> = ({
         const columnInfo = availableColumns.find(col => col.name === value);
         if (columnInfo) {
           updated.dataType = columnInfo.dataType;
-          updated.operator = 'eq';
-          updated.value = '';
+          const nextOperator = getDefaultOperatorForType(columnInfo.dataType);
+          updated.operator = nextOperator;
+          updated.value = nextOperator === 'in' ? [] : '';
+          updated.regex = nextOperator === 'contains';
+
+          if (columnInfo.dataType === 'categorical') {
+            nextCategoricalColumnToLoad = columnInfo.name;
+          }
           
           // Pre-fill datetime values if datetime column
-          if (columnInfo.dataType === 'datetime' && selectedNodeId && currentWorkspaceId) {
-            prefillDatetimeValue(id, columnInfo.name, 'eq');
+          if (
+            columnInfo.dataType === 'datetime' &&
+            selectedNodeId &&
+            currentWorkspaceId &&
+            nextOperator !== 'is_null'
+          ) {
+            prefillDatetimeValue(id, columnInfo.name, nextOperator);
           }
         }
       }
       
-      // If operator changed for datetime column, pre-fill value
-      if (field === 'operator' && c.dataType === 'datetime' && c.column && selectedNodeId && currentWorkspaceId) {
-        updated.value = '';
-        prefillDatetimeValue(id, c.column, value as FilterCondition['operator']);
+      if (field === 'operator') {
+        if (value === 'in') {
+          updated.value = Array.isArray(updated.value) ? updated.value : [];
+          if (updated.dataType === 'categorical' && updated.column) {
+            nextCategoricalColumnToLoad = updated.column;
+          }
+        } else if (updated.dataType === 'categorical' && Array.isArray(updated.value)) {
+          updated.value = updated.value[0] ?? '';
+        }
+
+        if (
+          updated.dataType === 'datetime' &&
+          updated.column &&
+          selectedNodeId &&
+          currentWorkspaceId
+        ) {
+          updated.value = '';
+          if (value !== 'is_null') {
+            prefillDatetimeValue(id, updated.column, value as FilterCondition['operator']);
+          }
+        }
       }
       
       return updated;
     }));
+
+    if (nextCategoricalColumnToLoad) {
+      void ensureCategoricalOptions(nextCategoricalColumnToLoad);
+    }
   };
 
   // Pre-fill datetime values based on operator and column statistics
-  const prefillDatetimeValue = async (conditionId: string, column: string, operator: string) => {
+  const prefillDatetimeValue = async (
+    conditionId: string,
+    column: string,
+    operator: FilterCondition['operator']
+  ) => {
     if (!selectedNodeId || !currentWorkspaceId) return;
     
     try {
@@ -437,6 +627,125 @@ export const FilterSubTab: React.FC<FilterSubTabProps> = ({
     }
 
     const dataType = condition.dataType || 'string';
+
+    if (dataType === 'categorical') {
+      const column = condition.column;
+      const key = column ? getCategoricalKey(column) : null;
+      const optionState = key ? categoricalOptions[key] : undefined;
+      const optionEntries = optionState?.options ?? [];
+      const selectedValues = Array.isArray(condition.value)
+        ? (condition.value as Array<unknown>).map(toCategoricalPrimitive)
+        : [];
+      const selectedKeys = new Set(selectedValues.map((entry) => getCategoricalOptionKey(entry)));
+      const isLoadingOptions = optionState?.loading ?? false;
+      const optionError = optionState?.error;
+
+      const updateSelections = (nextSelections: CategoricalPrimitive[]) => {
+        handleConditionChange(condition.id, 'value', nextSelections);
+      };
+
+      const toggleValue = (entry: CategoricalOptionEntry, nextChecked: boolean) => {
+        if (disabled) return;
+        if (nextChecked) {
+          if (selectedKeys.has(entry.key)) return;
+          updateSelections([...selectedValues, entry.value]);
+        } else {
+          updateSelections(
+            selectedValues.filter(
+              (current) => getCategoricalOptionKey(current) !== entry.key,
+            ),
+          );
+        }
+      };
+
+      const handleSelectAll = () => {
+        if (disabled) return;
+        updateSelections(optionEntries.map((entry) => entry.value));
+      };
+
+      const handleClearAll = () => {
+        if (disabled) return;
+        updateSelections([]);
+      };
+
+      return (
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              disabled={disabled || isLoadingOptions || optionEntries.length === 0}
+              onClick={handleSelectAll}
+            >
+              Select all
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={disabled || (selectedKeys.size === 0 && !isLoadingOptions)}
+              onClick={handleClearAll}
+            >
+              Clear
+            </Button>
+            {optionError && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => column && ensureCategoricalOptions(column)}
+                disabled={disabled}
+              >
+                Retry
+              </Button>
+            )}
+          </div>
+
+          {isLoadingOptions ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>Loading categories…</span>
+            </div>
+          ) : optionError ? (
+            <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              Failed to load categories: {optionError}
+            </div>
+          ) : (
+            <div className="max-h-48 overflow-y-auto rounded-md border border-border/60 bg-background px-3 py-2">
+              {optionEntries.length === 0 ? (
+                <div className="text-xs text-muted-foreground">No categories available.</div>
+              ) : (
+                optionEntries.map((option) => {
+                  const checked = selectedKeys.has(option.key);
+                  return (
+                    <label
+                      key={`${condition.id}-${option.key}`}
+                      className={`flex items-center gap-2 py-1 text-sm ${
+                        option.isNull ? 'text-amber-700' : 'text-foreground'
+                      }`}
+                    >
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={(next) => toggleValue(option, next === true)}
+                        disabled={disabled}
+                        id={`${condition.id}-${option.key}`}
+                      />
+                      <span
+                        className={`flex-1 truncate ${option.isNull ? 'font-medium' : ''}`}
+                        title={option.isNull ? 'Null (no value)' : option.label}
+                      >
+                        {option.isNull ? 'Null (no value)' : option.label}
+                      </span>
+                    </label>
+                  );
+                })
+              )}
+            </div>
+          )}
+        </div>
+      );
+    }
 
     if (dataType === 'boolean') {
       return (
@@ -711,29 +1020,31 @@ export const FilterSubTab: React.FC<FilterSubTabProps> = ({
                         </SelectContent>
                       </Select>
 
-                      <Select
-                        value={condition.operator}
-                        onValueChange={(value) =>
-                          handleConditionChange(
-                            condition.id,
-                            'operator',
-                            value as FilterCondition['operator']
-                          )
-                        }
-                        disabled={rowDisabled}
-                      >
-                        <SelectTrigger className="w-36 flex-none">
-                          <SelectValue placeholder={!condition.column ? 'Select a column first' : 'Select operator'} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {condition.column &&
-                            getOperatorsForType(condition.dataType || 'string').map((op) => (
-                              <SelectItem key={op.value} value={op.value}>
-                                {op.label}
-                              </SelectItem>
-                            ))}
-                        </SelectContent>
-                      </Select>
+                      {condition.dataType !== 'categorical' && (
+                        <Select
+                          value={condition.operator}
+                          onValueChange={(value) =>
+                            handleConditionChange(
+                              condition.id,
+                              'operator',
+                              value as FilterCondition['operator']
+                            )
+                          }
+                          disabled={rowDisabled}
+                        >
+                          <SelectTrigger className="w-36 flex-none">
+                            <SelectValue placeholder={!condition.column ? 'Select a column first' : 'Select operator'} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {condition.column &&
+                              getOperatorsForType(condition.dataType || 'string').map((op) => (
+                                <SelectItem key={op.value} value={op.value}>
+                                  {op.label}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                      )}
 
                       {condition.operator !== 'is_null' && (
                         <div className="flex-1 md:flex-auto md:min-w-[28ch] md:max-w-full">

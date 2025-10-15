@@ -22,6 +22,9 @@ export const normalizeTypeName = (type?: string | null): string => {
   if (lowercaseType.includes('time') && !lowercaseType.includes('interval')) {
     return 'datetime';
   }
+  if (lowercaseType.includes('categorical') || lowercaseType.includes('category')) {
+    return 'categorical';
+  }
   if (lowercaseType.includes('bool')) {
     return 'boolean';
   }

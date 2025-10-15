@@ -4,6 +4,7 @@
 export const normalizeTypeName = (type: string): string => {
   const lowercaseType = type.toLowerCase();
   if (lowercaseType.includes('utf8') || lowercaseType.includes('string')) return 'string';
+  if (lowercaseType.includes('categorical') || lowercaseType.includes('category')) return 'categorical';
   if (lowercaseType.includes('int') && !lowercaseType.includes('interval')) return 'integer';
   if (lowercaseType.includes('float') || lowercaseType.includes('double')) return 'float';
   if (lowercaseType.includes('bool')) return 'boolean';
@@ -25,6 +26,10 @@ export const getOperatorsForType = (dataType: string) => {
         { value: 'endswith', label: 'ends with' },
         { value: 'is_null', label: 'is null' },
       ];
+    case 'categorical':
+      return [
+        { value: 'in', label: 'is one of' },
+      ];
     case 'integer':
     case 'float':
       return [
@@ -40,7 +45,6 @@ export const getOperatorsForType = (dataType: string) => {
       ];
     case 'datetime':
       return [
-        { value: 'eq', label: 'equals' },
         { value: 'gte', label: 'after or equal' },
         { value: 'lte', label: 'before or equal' },
         { value: 'between', label: 'between' },

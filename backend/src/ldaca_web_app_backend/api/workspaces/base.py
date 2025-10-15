@@ -604,7 +604,7 @@ async def cast_node(
         node_id: The node identifier to cast
         cast_data: Dictionary with casting specifications:
             - column: str - name of the column to cast
-            - target_type: str - target data type (e.g., "integer", "float", "string", "datetime", "boolean")
+            - target_type: str - target data type (e.g., "integer", "float", "string", "datetime", "boolean", "categorical")
             - format: str (optional) - datetime format string for string to datetime conversion
             Example: {"column": "date_col", "target_type": "datetime", "format": "%Y-%m-%d"}
 
@@ -691,6 +691,7 @@ async def cast_node(
 
         # Determine operation based on target type
         target_lower = target_type.lower()
+        orig_lower = (original_type or "").lower()
 
         # Perform the casting using .with_columns() and expressions
         try:
@@ -762,7 +763,6 @@ async def cast_node(
                 # 2. If source is string: parse via float first (lenient), then truncate -> int.
                 # 3. Otherwise: direct int cast (lenient) to avoid whole-column failure.
                 col_expr = pl.col(column_name)
-                orig_lower = (original_type or "").lower()
                 if "float" in orig_lower:
                     # Truncate decimals by casting directly (Polars truncates toward zero)
                     cast_expr = (
@@ -782,10 +782,25 @@ async def cast_node(
             elif target_lower == "float":
                 # String -> number (float) conversion
                 cast_expr = pl.col(column_name).cast(pl.Float64).alias(column_name)
+            elif target_lower == "categorical":
+                col_expr = pl.col(column_name)
+                if any(
+                    tok in orig_lower
+                    for tok in ["utf8", "string", "str", "categorical"]
+                ):
+                    cast_expr = col_expr.cast(pl.Categorical, strict=False).alias(
+                        column_name
+                    )
+                else:
+                    cast_expr = (
+                        col_expr.cast(pl.Utf8, strict=False)
+                        .cast(pl.Categorical, strict=False)
+                        .alias(column_name)
+                    )
             else:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Casting to '{target_type}' is not yet supported. Supported: string, integer, float, datetime.",
+                    detail=f"Casting to '{target_type}' is not yet supported. Supported: string, integer, float, datetime, categorical.",
                 )
 
             # Perform a small head() sample validation to surface conversion errors early

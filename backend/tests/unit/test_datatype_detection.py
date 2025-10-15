@@ -166,3 +166,38 @@ class TestDataTypeDetection:
         assert "columns" in result
         assert "preview" in result  # preview replaces data field
         # Should handle special characters without breaking JSON serialization
+
+    def test_categorical_dtype_serialization(self):
+        """Ensure categorical dtypes remain categorical after serialization"""
+        if serialize_dataframe_for_json is None:
+            pytest.skip("serialize_dataframe_for_json not available")
+
+        df_categorical = pl.DataFrame({
+            "cat_col": pl.Series(["apple", "banana", "apple"]).cast(pl.Categorical)
+        })
+
+        result = serialize_dataframe_for_json(df_categorical)
+
+        assert isinstance(result, dict)
+        assert result["dtypes"].get("cat_col", "").lower().startswith("categorical")
+
+
+class TestDocWorkspaceTypeMapping:
+    """Tests for API schema type conversion helpers"""
+
+    def test_polars_type_to_js_type_categorical(self):
+        """Categorical dtypes map to categorical JS type"""
+        from ldaca_web_app_backend.core.docworkspace_api import DocWorkspaceAPIUtils
+
+        assert (
+            DocWorkspaceAPIUtils.polars_type_to_js_type(pl.Categorical) == "categorical"
+        )
+        assert (
+            DocWorkspaceAPIUtils.polars_type_to_js_type("Categorical") == "categorical"
+        )
+        assert (
+            DocWorkspaceAPIUtils.polars_type_to_js_type(
+                "Categorical(ordering='physical')"
+            )
+            == "categorical"
+        )

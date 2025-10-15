@@ -87,7 +87,7 @@ const UniqueValueCount: React.FC<UniqueValueCountProps> = ({ workspaceId, nodeId
 
   return (
     <span className="text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded">
-      {data.unique_count} unique {data.has_more ? '(+)' : ''}
+      {data.unique_count} unique{data.has_null ? ' + null' : ''}
     </span>
   );
 };

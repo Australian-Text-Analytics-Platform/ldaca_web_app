@@ -102,6 +102,20 @@ def _build_filter_expression(request: FilterRequest) -> pl.Expr:
                 expr = column_expr < lit_val
             elif op == "lte":
                 expr = column_expr <= lit_val
+        elif op == "in":
+            if isinstance(raw_value, (list, tuple, set)):
+                values = [
+                    _coerce_scalar(_parse_temporal(item))
+                    for item in raw_value
+                    if item is not None
+                ]
+            elif raw_value is None:
+                values = []
+            else:
+                values = [_coerce_scalar(_parse_temporal(raw_value))]
+
+            if values:
+                expr = column_expr.is_in(values)
         elif op == "contains":
             pattern = str(raw_value)
             if getattr(condition, "regex", False):
@@ -512,16 +526,16 @@ async def get_column_unique_values(
         else:
             df = data_obj
         try:
-            unique_values = df.select(column_name).unique().to_series().to_list()
-            unique_count = len(unique_values)
-            max_values_to_return = 100
-            sample_values = unique_values[:max_values_to_return]
+            column_series = df.select(pl.col(column_name)).to_series()
+            unique_series = column_series.unique()
+            raw_values = unique_series.to_list()
+            has_null = any(value is None for value in raw_values)
+            non_null_values = [value for value in raw_values if value is not None]
             return {
                 "column_name": column_name,
-                "unique_count": unique_count,
-                "sample_values": sample_values,
-                "total_values_returned": len(sample_values),
-                "has_more": len(unique_values) > max_values_to_return,
+                "unique_count": len(raw_values),
+                "unique_values": non_null_values,
+                "has_null": has_null,
             }
         except Exception as e:
             raise HTTPException(

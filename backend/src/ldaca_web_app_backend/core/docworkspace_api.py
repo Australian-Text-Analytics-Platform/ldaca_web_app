@@ -55,7 +55,9 @@ class DocWorkspaceAPIUtils:
             return "float"
         if polars_type == pl.Boolean:
             return "boolean"
-        if polars_type in (pl.Utf8, getattr(pl, "String", pl.Utf8)):
+        if polars_type == pl.Categorical:
+            return "categorical"
+        if polars_type in (pl.Utf8, pl.String):
             return "string"
         if polars_type in (pl.Date, pl.Datetime, pl.Time):
             return "datetime"
@@ -72,7 +74,7 @@ class DocWorkspaceAPIUtils:
             return "array"
         if cls_name == "Struct" or lowered_type == "struct":
             return "object"
-        return "string"
+        return "string"  # To be changed to 'unknown' in future versions
 
     @staticmethod
     def convert_schema_to_js_types(schema) -> Dict[str, str]:

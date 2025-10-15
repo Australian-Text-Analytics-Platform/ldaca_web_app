@@ -55,6 +55,16 @@ class TestBasicCasting:
         dates = casted_df["date_str"].to_list()
         assert len(dates) == 3
 
+    def test_string_to_categorical_cast(self, sample_dataframe):
+        """Test casting string column to categorical"""
+        casted_df = sample_dataframe.with_columns(
+            pl.col("id").cast(pl.Categorical).alias("id")
+        )
+
+        assert casted_df.schema["id"] == pl.Categorical
+        categories = casted_df["id"].to_list()
+        assert categories == ["1", "2", "3"]
+
 
 class TestDocDataFrameCasting:
     """Test casting functionality with DocDataFrame"""

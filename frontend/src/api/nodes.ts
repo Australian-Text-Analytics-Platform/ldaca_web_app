@@ -3,7 +3,12 @@ import { get, post, del, httpRequest } from './http';
 
 export type ConversionTarget = 'docdataframe' | 'dataframe' | 'doclazyframe' | 'lazyframe';
 
-export interface ColumnUniqueValuesResponse { unique_count: number; sample_values: any[]; has_more: boolean; }
+export interface ColumnUniqueValuesResponse {
+  column_name: string;
+  unique_count: number;
+  unique_values: Array<string | number | boolean | null>;
+  has_null: boolean;
+}
 
 export interface ColumnDescribeResponse {
   column_name: string;
@@ -20,7 +25,7 @@ export interface ColumnDescribeResponse {
 
 export interface FilterCondition {
   column: string;
-  operator: 'eq' | 'gte' | 'lte' | 'contains' | 'startswith' | 'endswith' | 'is_null' | 'between';
+  operator: 'eq' | 'gte' | 'lte' | 'contains' | 'startswith' | 'endswith' | 'is_null' | 'between' | 'in';
   value: any;
   negate?: boolean;
   regex?: boolean;

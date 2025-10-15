@@ -73,6 +73,7 @@ const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
 const DATA_TYPES = [
   { value: 'string', label: 'string' },
+  { value: 'categorical', label: 'categorical' },
   { value: 'integer', label: 'integer' },
   { value: 'float', label: 'float' },
   { value: 'boolean', label: 'boolean' },
@@ -239,6 +240,7 @@ const WorkspaceTable: React.FC<WorkspaceTableProps> = ({
   const normalizeTypeName = useCallback((type: string): string => {
     const lowercaseType = type.toLowerCase();
     if (lowercaseType.includes('utf8') || lowercaseType.includes('string')) return 'string';
+    if (lowercaseType.includes('categorical') || lowercaseType.includes('category')) return 'categorical';
     if (lowercaseType.includes('int')) return 'integer';
     if (lowercaseType.includes('float') || lowercaseType.includes('double')) return 'float';
     if (lowercaseType.includes('bool')) return 'boolean';

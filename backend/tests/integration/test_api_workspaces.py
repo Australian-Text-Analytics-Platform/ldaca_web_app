@@ -521,6 +521,61 @@ class TestWorkspaceAPI:
             assert data["cast_info"]["target_type"] == "float"
             mock_save.assert_called_once()
 
+    async def test_cast_node_categorical_type(self, authenticated_client):
+        """Test casting to categorical type"""
+        import polars as pl
+
+        mock_node = Mock()
+        mock_node.data = pl.DataFrame({"label": ["A", "B", "A"]})
+
+        with (
+            patch(
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_node_from_workspace"
+            ) as mock_get_node,
+            patch(
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.persist"
+            ) as mock_save,
+        ):
+            mock_get_node.return_value = mock_node
+
+            cast_data = {"column": "label", "target_type": "categorical"}
+            response = await authenticated_client.post(
+                "/api/workspaces/test-workspace/nodes/test-node/cast", json=cast_data
+            )
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data.get("state") == "successful"
+            assert data["cast_info"]["target_type"] == "categorical"
+            assert "Categorical" in data["cast_info"].get("new_type", "")
+            mock_save.assert_called_once()
+
+    async def test_unique_values_endpoint_returns_full_set(self, authenticated_client):
+        """Unique values endpoint returns all values and null metadata"""
+        import polars as pl
+
+        source_df = pl.DataFrame({"category": ["alpha", "beta", "alpha", None]})
+
+        class DummyNode:
+            def __init__(self):
+                self.data = source_df
+
+        with patch(
+            "ldaca_web_app_backend.api.workspaces.workspace_manager.get_node_from_workspace"
+        ) as mock_get_node:
+            mock_get_node.return_value = DummyNode()
+
+            response = await authenticated_client.get(
+                "/api/workspaces/test-workspace/nodes/test-node/columns/category/unique"
+            )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["column_name"] == "category"
+        assert payload["unique_count"] == 3
+        assert sorted(payload["unique_values"]) == ["alpha", "beta"]
+        assert payload["has_null"] is True
+
     async def test_cast_node_unsupported_type(self, authenticated_client):
         """Test that unsupported casting types raise errors"""
         import polars as pl

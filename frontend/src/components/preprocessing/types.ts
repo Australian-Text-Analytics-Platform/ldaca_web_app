@@ -3,11 +3,18 @@
  */
 
 export type ConditionRange = { start: string | Date | null; end: string | Date | null };
-export type ConditionValue = string | number | boolean | Date | ConditionRange | null;
+export type ConditionValue =
+  | string
+  | number
+  | boolean
+  | Date
+  | ConditionRange
+  | null
+  | Array<string | number | boolean | Date | null>;
 
 export interface FilterCondition {
   column: string;
-  operator: 'eq' | 'gte' | 'lte' | 'contains' | 'startswith' | 'endswith' | 'is_null' | 'between';
+  operator: 'eq' | 'gte' | 'lte' | 'contains' | 'startswith' | 'endswith' | 'is_null' | 'between' | 'in';
   value: ConditionValue;
   negate?: boolean;
   regex?: boolean;
