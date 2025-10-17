@@ -1,6 +1,13 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ColumnDef, flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table';
-import { ChevronDown, Loader2, Settings2, X } from 'lucide-react';
+import {
+  ColumnDef,
+  ColumnPinningState,
+  flexRender,
+  getCoreRowModel,
+  useReactTable,
+} from '@tanstack/react-table';
+import type { Column as TableColumn } from '@tanstack/react-table';
+import { ChevronDown, Loader2, Pin, Settings2, X } from 'lucide-react';
 
 import { useWorkspaceActions } from '../../hooks/useWorkspaceActions';
 import { useWorkspaceData } from '../../hooks/useWorkspaceData';
@@ -170,6 +177,7 @@ const WorkspaceTable: React.FC<WorkspaceTableProps> = ({
   const [columnActionLoading, setColumnActionLoading] = useState<Record<string, boolean>>({});
   const [renameState, setRenameState] = useState<{ column: string; value: string } | null>(null);
   const renameInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const [columnPinning, setColumnPinning] = useState<ColumnPinningState>({ left: [] });
 
   const debugEnabled = useMemo(() => {
     if (typeof window === 'undefined') {
@@ -492,40 +500,57 @@ const WorkspaceTable: React.FC<WorkspaceTableProps> = ({
       return {
         id: column,
         accessorFn: (row) => row?.[column],
-        header: () => (
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex min-w-0 items-center gap-2">
-              {isRenaming ? (
-                <Input
-                  ref={(element) => {
-                    if (element) {
-                      renameInputRefs.current[column] = element;
-                    } else {
-                      delete renameInputRefs.current[column];
-                    }
-                  }}
-                  value={renameDraftValue}
-                  disabled={isColumnBusy}
-                  onChange={(event) => updateRenameDraft(column, event.target.value)}
-                  onBlur={() => {
-                    if (!isColumnBusy) {
-                      void submitRename(column, renameDraftValue);
-                    }
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                      event.preventDefault();
+        header: ({ column: columnInstance }) => {
+          const isPinnedLeft = columnInstance.getIsPinned() === 'left';
+          return (
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => columnInstance.pin(isPinnedLeft ? false : 'left')}
+                  className={cn(
+                    'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-transparent text-muted-foreground transition-colors hover:bg-muted-foreground/10 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                    isPinnedLeft && 'text-primary'
+                  )}
+                  aria-pressed={isPinnedLeft}
+                  aria-label={isPinnedLeft ? `Unpin column ${column}` : `Pin column ${column} to the left`}
+                >
+                  <Pin
+                    className="h-3.5 w-3.5"
+                    fill={isPinnedLeft ? 'currentColor' : 'none'}
+                  />
+                </button>
+                {isRenaming ? (
+                  <Input
+                    ref={(element) => {
+                      if (element) {
+                        renameInputRefs.current[column] = element;
+                      } else {
+                        delete renameInputRefs.current[column];
+                      }
+                    }}
+                    value={renameDraftValue}
+                    disabled={isColumnBusy}
+                    onChange={(event) => updateRenameDraft(column, event.target.value)}
+                    onBlur={() => {
                       if (!isColumnBusy) {
                         void submitRename(column, renameDraftValue);
                       }
-                    } else if (event.key === 'Escape') {
-                      setRenameState(null);
-                    }
-                  }}
-                  className="h-7 w-40 truncate text-xs"
-                  aria-label={`Rename column ${column}`}
-                />
-              ) : canRename ? (
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault();
+                        if (!isColumnBusy) {
+                          void submitRename(column, renameDraftValue);
+                        }
+                      } else if (event.key === 'Escape') {
+                        setRenameState(null);
+                      }
+                    }}
+                    className="h-7 w-40 truncate text-xs"
+                    aria-label={`Rename column ${column}`}
+                  />
+                ) : canRename ? (
                 <button
                   type="button"
                   className="max-w-[160px] truncate text-left text-xs font-medium text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
@@ -635,7 +660,8 @@ const WorkspaceTable: React.FC<WorkspaceTableProps> = ({
               )}
             </div>
           </div>
-        ),
+          );
+        },
         cell: ({ getValue }) => {
           const cellValue = getValue();
           const displayValue = cellValue === null || cellValue === undefined ? '' : String(cellValue);
@@ -667,11 +693,48 @@ const WorkspaceTable: React.FC<WorkspaceTableProps> = ({
     requestDeleteColumn,
   ]);
 
+  const getPinnedStyles = useCallback(
+    (column: TableColumn<DataRow, unknown>, variant: 'header' | 'cell'): React.CSSProperties | undefined => {
+      const pinState = column.getIsPinned();
+      if (!pinState) {
+        return undefined;
+      }
+
+      const style: React.CSSProperties = {
+        position: 'sticky',
+        zIndex: variant === 'header' ? 30 : 5,
+      };
+
+      if (variant === 'header') {
+        style.top = 0;
+      }
+
+      if (pinState === 'left') {
+        style.left = `${column.getStart('left')}px`;
+        style.boxShadow = variant === 'header'
+          ? '2px 0 0 -1px rgba(15, 23, 42, 0.12)'
+          : '2px 0 0 -1px rgba(15, 23, 42, 0.08)';
+      } else if (pinState === 'right') {
+        style.right = `${column.getStart('right')}px`;
+        style.boxShadow = variant === 'header'
+          ? '-2px 0 0 -1px rgba(15, 23, 42, 0.12)'
+          : '-2px 0 0 -1px rgba(15, 23, 42, 0.08)';
+      }
+
+      return style;
+    },
+    []
+  );
+
   const tableInstance = useReactTable({
     data: sanitizedData,
     columns: columnDefs,
     getCoreRowModel: getCoreRowModel(),
     debugTable: debugEnabled,
+    state: {
+      columnPinning,
+    },
+    onColumnPinningChange: setColumnPinning,
   });
 
   const tableRows = tableInstance.getRowModel().rows;
@@ -785,7 +848,7 @@ const WorkspaceTable: React.FC<WorkspaceTableProps> = ({
           style={{ scrollbarGutter: 'stable both-edges' }}
         >
           <Table disableContainer>
-            <TableHeader className="sticky top-0 z-10 bg-muted">
+            <TableHeader className="sticky top-0 z-20 bg-muted">
               {tableInstance.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id}>
                   {headerGroup.headers.map((header) => {
@@ -793,8 +856,17 @@ const WorkspaceTable: React.FC<WorkspaceTableProps> = ({
                     return (
                       <TableHead
                         key={header.id}
-                        className={cn(meta?.headerClassName, 'last:border-r-0')}
-                        style={meta?.headerMinWidth ? { minWidth: `${meta.headerMinWidth}px` } : undefined}
+                        className={cn(
+                          meta?.headerClassName,
+                          'last:border-r-0',
+                          header.column.getIsPinned()
+                            ? 'bg-muted shadow-sm ring-1 ring-primary/20'
+                            : 'bg-muted'
+                        )}
+                        style={{
+                          ...(meta?.headerMinWidth ? { minWidth: `${meta.headerMinWidth}px` } : {}),
+                          ...getPinnedStyles(header.column, 'header'),
+                        }}
                       >
                         {header.isPlaceholder
                           ? null
@@ -813,8 +885,17 @@ const WorkspaceTable: React.FC<WorkspaceTableProps> = ({
                     return (
                       <TableCell
                         key={cell.id}
-                        className={cn(meta?.cellClassName, 'last:border-r-0')}
-                        style={meta?.cellMinWidth ? { minWidth: `${meta.cellMinWidth}px` } : undefined}
+                        className={cn(
+                          meta?.cellClassName,
+                          'last:border-r-0',
+                          cell.column.getIsPinned()
+                            ? 'bg-white ring-1 ring-inset ring-primary/10'
+                            : undefined
+                        )}
+                        style={{
+                          ...(meta?.cellMinWidth ? { minWidth: `${meta.cellMinWidth}px` } : {}),
+                          ...getPinnedStyles(cell.column, 'cell'),
+                        }}
                       >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </TableCell>
