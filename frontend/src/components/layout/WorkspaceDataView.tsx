@@ -785,7 +785,7 @@ const WorkspaceTable: React.FC<WorkspaceTableProps> = ({
           style={{ scrollbarGutter: 'stable both-edges' }}
         >
           <Table disableContainer>
-            <TableHeader className="sticky top-0 z-10 bg-muted/40">
+            <TableHeader className="sticky top-0 z-10 bg-muted">
               {tableInstance.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id}>
                   {headerGroup.headers.map((header) => {
