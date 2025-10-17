@@ -1,4 +1,3 @@
-import React from 'react';
 import { GoogleLogin as OAuthGoogleLogin } from '@react-oauth/google';
 
 interface GoogleLoginProps {
@@ -8,7 +7,7 @@ interface GoogleLoginProps {
   error?: string | null;
 }
 
-const GoogleLogin: React.FC<GoogleLoginProps> = ({ onLogin, onLogout, isLoading, error }) => {
+function GoogleLogin({ onLogin, onLogout, isLoading, error }: GoogleLoginProps) {
   const handleGoogleSuccess = async (credentialResponse: any) => {
     try {
       if (credentialResponse.credential) {

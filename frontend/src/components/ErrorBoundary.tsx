@@ -1,4 +1,4 @@
-import React from 'react';
+import { Component, type ReactNode, type ComponentType } from 'react';
 
 interface ErrorBoundaryState {
   hasError: boolean;
@@ -6,14 +6,14 @@ interface ErrorBoundaryState {
 }
 
 interface ErrorBoundaryProps {
-  children: React.ReactNode;
-  fallback?: React.ComponentType<{ error?: Error; resetError: () => void }>;
+  children: ReactNode;
+  fallback?: ComponentType<{ error?: Error; resetError: () => void }>;
 }
 
 /**
  * Error boundary component to catch and handle React errors gracefully
  */
-export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = { hasError: false };
@@ -44,10 +44,11 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 /**
  * Default error fallback component
  */
-const DefaultErrorFallback: React.FC<{ error?: Error; resetError: () => void }> = ({ 
+function DefaultErrorFallback({ 
   error, 
   resetError 
-}) => (
+}: { error?: Error; resetError: () => void }) {
+  return (
   <div className="flex flex-col items-center justify-center min-h-[400px] p-8 bg-red-50 border border-red-200 rounded-lg">
     <div className="text-red-600 text-xl font-semibold mb-4">
       Something went wrong
@@ -84,15 +85,17 @@ const DefaultErrorFallback: React.FC<{ error?: Error; resetError: () => void }> 
       </details>
     )}
   </div>
-);
+  );
+}
 
 /**
  * Workspace-specific error fallback
  */
-export const WorkspaceErrorFallback: React.FC<{ error?: Error; resetError: () => void }> = ({ 
+export function WorkspaceErrorFallback({ 
   error, 
   resetError 
-}) => (
+}: { error?: Error; resetError: () => void }) {
+  return (
   <div className="flex flex-col items-center justify-center h-full p-8 bg-yellow-50 border border-yellow-200 rounded-lg">
     <div className="text-yellow-800 text-lg font-semibold mb-4">
       Workspace Error
@@ -111,4 +114,5 @@ export const WorkspaceErrorFallback: React.FC<{ error?: Error; resetError: () =>
       </button>
     </div>
   </div>
-);
+  );
+}

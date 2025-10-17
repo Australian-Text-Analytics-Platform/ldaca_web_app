@@ -1,4 +1,4 @@
-import React, { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   ColumnDef,
   ColumnPinningState,
@@ -87,7 +87,7 @@ interface PaginationJumpProps {
   onPageChange: (page: number) => void;
 }
 
-const PaginationJump: React.FC<PaginationJumpProps> = ({ totalPages, onPageChange }) => {
+function PaginationJump({ totalPages, onPageChange }: PaginationJumpProps) {
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -283,7 +283,7 @@ const extractColumnTypes = (schema: NodeSchemaResponse | null | undefined): Reco
   return {};
 };
 
-const WorkspaceTable: React.FC<WorkspaceTableProps> = ({
+function WorkspaceTable({
   data,
   loading = false,
   workspaceId,
@@ -295,7 +295,7 @@ const WorkspaceTable: React.FC<WorkspaceTableProps> = ({
   pagination,
   onPageChange,
   onPageSizeChange,
-}) => {
+}: WorkspaceTableProps) {
   const [columnTypes, setColumnTypes] = useState<Record<string, string>>({});
   const [loadingCast, setLoadingCast] = useState<Record<string, boolean>>({});
   const [datetimeModal, setDatetimeModal] = useState<{ isOpen: boolean; column: string; targetType: string }>({
@@ -1066,10 +1066,10 @@ const WorkspaceTable: React.FC<WorkspaceTableProps> = ({
 };
 
 /**
- * Separated data view component focused only on data table rendering
+ * Separated data view component focused only on table rendering and pagination
  * This replaces the data table logic from the monolithic WorkspaceView
  */
-export const WorkspaceDataView: React.FC = memo(() => {
+export const WorkspaceDataView = memo(() => {
   const { currentWorkspaceId, nodeData, getNodeShape } = useWorkspaceData();
   const { selectedNode, selectedNodes, selectedNodeIds, handlePageChange, handlePageSizeChange } = useWorkspaceSelection();
   const { castColumn, renameColumn, deleteColumn, refreshNodeSchema, selectNodes, toggleNodeSelection } = useWorkspaceActions();

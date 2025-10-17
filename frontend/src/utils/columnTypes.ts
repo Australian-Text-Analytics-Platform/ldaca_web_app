@@ -1,8 +1,26 @@
+/**
+ * Represents column metadata including name and data type
+ */
 export interface ColumnInfo {
   name: string;
   dataType: string;
 }
 
+/**
+ * Normalizes various data type representations into standardized type names.
+ * Handles Polars, Pandas, and generic type strings.
+ * 
+ * @param type - Raw type string from backend (e.g., 'Utf8', 'Int64', 'Datetime')
+ * @returns Normalized type name ('string', 'integer', 'float', 'datetime', 'boolean', 'categorical', 'array', 'struct')
+ * 
+ * @example
+ * ```ts
+ * normalizeTypeName('Utf8') // 'string'
+ * normalizeTypeName('Int64') // 'integer'
+ * normalizeTypeName('Float64') // 'float'
+ * normalizeTypeName('Datetime') // 'datetime'
+ * ```
+ */
 export const normalizeTypeName = (type?: string | null): string => {
   if (!type || typeof type !== 'string') {
     return 'string';
@@ -47,6 +65,12 @@ export const normalizeTypeName = (type?: string | null): string => {
   return 'string';
 };
 
+/**
+ * Extracts type information from a schema entry object
+ * @param entry - Schema entry from backend (string, object with js_type/type/dtype fields)
+ * @returns Type string if found, undefined otherwise
+ * @internal
+ */
 const extractTypeFromSchemaEntry = (entry: any): string | undefined => {
   if (!entry) return undefined;
   if (typeof entry === 'string') return entry;
@@ -56,6 +80,19 @@ const extractTypeFromSchemaEntry = (entry: any): string | undefined => {
   return undefined;
 };
 
+/**
+ * Extracts column names and data types from a workspace node object.
+ * Handles multiple schema formats from backend (schema array, dtypes object, columns array).
+ * 
+ * @param node - Workspace node object containing schema/dtypes/columns metadata
+ * @returns Array of ColumnInfo objects with name and normalized dataType
+ * 
+ * @example
+ * ```ts
+ * const columns = getColumnsWithTypesFromNode(nodeData);
+ * // [{ name: 'id', dataType: 'integer' }, { name: 'text', dataType: 'string' }]
+ * ```
+ */
 export const getColumnsWithTypesFromNode = (node: any): ColumnInfo[] => {
   if (!node) return [];
 

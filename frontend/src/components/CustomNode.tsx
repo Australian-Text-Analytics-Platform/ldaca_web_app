@@ -1,4 +1,4 @@
-import React, { memo, useState, useEffect, useRef, useCallback } from 'react';
+import { memo, useState, useEffect, useRef, useCallback } from 'react';
 import { NodeProps, Handle, Position } from '@xyflow/react';
 import { Settings2, Trash2 } from 'lucide-react';
 import { WorkspaceNode } from '../types';
@@ -23,7 +23,7 @@ interface CustomNodeData {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const CustomNode: React.FC<NodeProps<any>> = ({ data, selected }) => {
+function CustomNode({ data, selected }: NodeProps<any>) {
   const { node: initialNode, isMultiSelected = false, onDelete, onRename, onConvertToDocDataFrame, onConvertToDataFrame, onConvertToDocLazyFrame, onConvertToLazyFrame, onResetDocument } = data as CustomNodeData;
   // Keep a local state but always sync with props to prevent staleness after in-place updates
   const [node, setNode] = useState(initialNode);
@@ -42,7 +42,7 @@ const CustomNode: React.FC<NodeProps<any>> = ({ data, selected }) => {
 
   const debugWindow: DebugWindow | null = typeof window !== 'undefined' ? (window as DebugWindow) : null;
   const DEBUG_GRAPH = Boolean(debugWindow?.__LDACA_DEBUG_GRAPH) || (typeof window !== 'undefined' && localStorage.getItem('debugGraph') === '1');
-  const dlog = React.useCallback((...args: unknown[]) => {
+  const dlog = useCallback((...args: unknown[]) => {
     if (DEBUG_GRAPH) console.debug(...args);
   }, [DEBUG_GRAPH]);
 

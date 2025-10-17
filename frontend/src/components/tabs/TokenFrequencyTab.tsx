@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, react/no-unescaped-entities */
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import NodeSelectionPanel from '../NodeSelectionPanel';
 import { useWorkspaceData } from '../../hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '../../hooks/useWorkspaceSelection';
@@ -22,6 +22,11 @@ import useNodeColumnInfos from '../../hooks/useNodeColumnInfos';
 import { useUIStore } from '../../stores';
 import { useAnalysisStore } from '../../stores/analysisStore';
 
+/**
+ * Safely converts unknown values to finite numbers
+ * @param value - Value to convert (number or string)
+ * @returns Finite number or null if conversion fails
+ */
 const toFiniteNumber = (value: unknown): number | null => {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
   if (typeof value === 'string' && value.trim() !== '') {
@@ -37,6 +42,19 @@ type FormatNumberOptions = {
   fallback?: string;
 };
 
+/**
+ * Formats numeric values with fixed decimals and optional suffix
+ * @param value - Numeric value to format
+ * @param decimals - Number of decimal places
+ * @param options - Formatting options (suffix, multiplier, fallback)
+ * @returns Formatted string or fallback if invalid
+ * 
+ * @example
+ * ```ts
+ * formatNumber(0.12345, 2, { suffix: '%', multiplier: 100 }) // '12.35%'
+ * formatNumber(null, 2) // '—'
+ * ```
+ */
 const formatNumber = (value: unknown, decimals: number, options: FormatNumberOptions = {}): string => {
   const { suffix = '', multiplier = 1, fallback = '—' } = options;
   const numeric = toFiniteNumber(value);
@@ -52,19 +70,43 @@ const DEFAULT_TOKEN_LIMIT = 10;
 const SERVER_LIMIT_MULTIPLIER = 5;
 const MAX_SERVER_TOKEN_LIMIT = 5000;
 
+/**
+ * Computes server-side token limit with bounds checking
+ * @param limit - User-requested limit
+ * @returns Server limit (5x user limit, clamped between 10 and 5000)
+ */
 const computeServerLimit = (limit: number) =>
   Math.min(Math.max(limit * SERVER_LIMIT_MULTIPLIER, DEFAULT_TOKEN_LIMIT), MAX_SERVER_TOKEN_LIMIT);
 
+/**
+ * Type guard: checks if value is a non-empty trimmed string
+ * @param value - Value to check
+ * @returns True if value is a non-empty string
+ */
 const isNonEmptyString = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0;
 
+/**
+ * Normalized node result structure for token frequency analysis
+ * Separates node ID (unique identifier) from display name (presentation)
+ */
 type NormalizedNodeResult = {
+  /** Unique node identifier (used for keying) */
   nodeId: string;
+  /** Human-readable display name */
   displayName: string;
+  /** Token frequency data rows */
   rows: any[];
+  /** Additional metadata from backend */
   metadata: Record<string, unknown>;
+  /** Original raw entry for debugging */
   rawEntry: unknown;
 };
 
+/**
+ * Extracts data rows from various backend response formats
+ * @param entry - Backend response entry (array or object with data property)
+ * @returns Array of rows or empty array
+ */
 const extractRows = (entry: unknown): any[] => {
   if (Array.isArray(entry)) {
     return entry as any[];
@@ -80,6 +122,11 @@ const extractRows = (entry: unknown): any[] => {
   return [];
 };
 
+/**
+ * Extracts metadata object from backend response entry
+ * @param entry - Backend response entry
+ * @returns Metadata object or empty object
+ */
 const extractMetadata = (entry: unknown): Record<string, unknown> => {
   if (
     entry &&
@@ -93,7 +140,7 @@ const extractMetadata = (entry: unknown): Record<string, unknown> => {
   return {};
 };
 
-const TokenFrequencyTab: React.FC = () => {
+function TokenFrequencyTab() {
   const { selectedNodes } = useWorkspaceSelection();
   const { currentWorkspaceId, getNodeShape } = useWorkspaceData();
   const { isLoading } = useWorkspaceStatus();

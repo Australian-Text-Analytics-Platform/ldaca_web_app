@@ -1,4 +1,4 @@
-import React, { memo, useCallback, useMemo, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useMemo, useEffect, useRef, useState } from 'react';
 import dagre from 'dagre';
 import {
   ReactFlow,
@@ -72,7 +72,7 @@ const computeDagreLayout = (
  * Separated graph view component focused only on ReactFlow rendering
  * This replaces the graph-related logic from the monolithic WorkspaceView
  */
-export const WorkspaceGraphView: React.FC = memo(() => {
+export const WorkspaceGraphView = memo(() => {
   // Lightweight runtime toggle for verbose graph logging
   const DEBUG_GRAPH = (typeof window !== 'undefined' && (window as any).__LDACA_DEBUG_GRAPH) ||
     (typeof window !== 'undefined' && localStorage.getItem('debugGraph') === '1');
