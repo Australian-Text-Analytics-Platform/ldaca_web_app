@@ -1,4 +1,4 @@
-import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   ColumnDef,
   ColumnPinningState,
@@ -7,7 +7,7 @@ import {
   useReactTable,
 } from '@tanstack/react-table';
 import type { Column as TableColumn } from '@tanstack/react-table';
-import { ChevronDown, Loader2, Pin, Settings2, X } from 'lucide-react';
+import { ChevronDown, Loader2, MoreHorizontal, Pin, Settings2, X } from 'lucide-react';
 
 import { useWorkspaceActions } from '../../hooks/useWorkspaceActions';
 import { useWorkspaceData } from '../../hooks/useWorkspaceData';
@@ -29,7 +29,6 @@ import {
 import {
   Pagination,
   PaginationContent,
-  PaginationEllipsis,
   PaginationItem,
   PaginationLink,
   PaginationNext,
@@ -82,6 +81,136 @@ interface WorkspaceTableProps {
 }
 
 type PaginationRangeItem = number | 'dots';
+
+interface PaginationJumpProps {
+  totalPages: number;
+  onPageChange: (page: number) => void;
+}
+
+const PaginationJump: React.FC<PaginationJumpProps> = ({ totalPages, onPageChange }) => {
+  const [open, setOpen] = useState(false);
+  const [value, setValue] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const inputId = useId();
+  const errorId = `${inputId}-error`;
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!containerRef.current || containerRef.current.contains(event.target as Node)) {
+        return;
+      }
+      setOpen(false);
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleEscape);
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    setValue('');
+    setError(null);
+    requestAnimationFrame(() => {
+      inputRef.current?.focus();
+    });
+  }, [open]);
+
+  const handleSubmit = useCallback(
+    (event: React.FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      const trimmed = value.trim();
+      const numericPattern = /^\d+$/;
+
+      if (!numericPattern.test(trimmed)) {
+        setError(`Enter a whole number between 1 and ${totalPages}`);
+        return;
+      }
+
+      const targetPage = Number.parseInt(trimmed, 10);
+      if (Number.isNaN(targetPage) || targetPage < 1 || targetPage > totalPages) {
+        setError(`Enter a value between 1 and ${totalPages}`);
+        return;
+      }
+
+      onPageChange(targetPage);
+      setOpen(false);
+    },
+    [onPageChange, totalPages, value]
+  );
+
+  return (
+    <div ref={containerRef} className="relative">
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        onClick={() => setOpen((previous) => !previous)}
+        className="size-9 text-muted-foreground hover:text-foreground"
+      >
+        <MoreHorizontal className="h-4 w-4" />
+        <span className="sr-only">Jump to page</span>
+      </Button>
+      {open ? (
+        <div className="absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2 rounded-md border border-border bg-popover px-3 py-2 text-popover-foreground shadow-lg">
+          <form className="flex items-center gap-2" onSubmit={handleSubmit} noValidate>
+            <label className="text-xs font-medium text-muted-foreground" htmlFor={inputId}>
+              Page:
+            </label>
+            <Input
+              id={inputId}
+              ref={inputRef}
+              value={value}
+              onChange={(event) => {
+                setValue(event.target.value);
+                if (error) {
+                  setError(null);
+                }
+              }}
+              type="text"
+              inputMode="numeric"
+              placeholder={`${totalPages}`}
+              aria-invalid={error ? 'true' : undefined}
+              aria-describedby={error ? errorId : undefined}
+              className={cn(
+                'h-8 w-16 text-sm',
+                error && 'border-destructive focus-visible:ring-destructive'
+              )}
+            />
+            <Button type="submit" size="sm">
+              Go
+            </Button>
+            {error ? (
+              <span id={errorId} className="sr-only">
+                {error}
+              </span>
+            ) : null}
+          </form>
+        </div>
+      ) : null}
+    </div>
+  );
+};
 
 interface LegacySchemaEntry {
   name: string;
@@ -800,7 +929,7 @@ const WorkspaceTable: React.FC<WorkspaceTableProps> = ({
             {paginationRange.map((item, index) => (
               <PaginationItem key={`${item}-${index}`}>
                 {item === 'dots' ? (
-                  <PaginationEllipsis />
+                  <PaginationJump totalPages={safeTotalPages} onPageChange={onPageChange} />
                 ) : (
                   <PaginationLink
                     href="#"

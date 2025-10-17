@@ -74,10 +74,17 @@ async def test_token_frequencies_truncation_and_metadata(
         assert meta["token_limit"] == DEFAULT_TOKEN_LIMIT
         assert meta["total_tokens_before_limit"] >= expected_server_limit
         assert meta["truncated"] is True
+        assert meta["node_id"] == node_id
+        assert meta.get("display_name")
         assert len(node_result.get("data", [])) <= expected_server_limit
 
     stats = data.get("statistics")
     assert stats is not None and len(stats) > 0
+
+    node_display_names = data.get("metadata", {}).get("node_display_names")
+    assert isinstance(node_display_names, dict)
+    for original_id in node_ids:
+        assert original_id in node_display_names
 
     first_node_result = next(iter(data["data"].values()))
     sample_token = first_node_result["data"][0]["token"]

@@ -375,7 +375,8 @@ async def calculate_token_frequencies(
                 status_code=500, detail=f"Required libraries not available: {str(e)}"
             )
 
-        frames_dict = {}
+        frames_dict: dict[str, object] = {}
+        node_display_names: dict[str, str] = {}
 
         for node_id in request.node_ids:
             node = workspace_manager.get_node_from_workspace(
@@ -386,6 +387,7 @@ async def calculate_token_frequencies(
 
             node_data = node.data if hasattr(node, "data") else node
             node_name = node.name if hasattr(node, "name") and node.name else node_id
+            node_display_names[node_id] = node_name
 
             try:
                 is_doc_frame = isinstance(node_data, (DocDataFrame, DocLazyFrame))
@@ -495,7 +497,7 @@ async def calculate_token_frequencies(
                             selected_data = selected_data.collect()
                         processed_frame = DocDataFrame(selected_data)
 
-                frames_dict[node_name] = processed_frame
+                frames_dict[node_id] = processed_frame
 
             except HTTPException:
                 raise
@@ -528,13 +530,14 @@ async def calculate_token_frequencies(
             max(effective_limit * SERVER_LIMIT_MULTIPLIER, DEFAULT_TOKEN_LIMIT),
             MAX_SERVER_TOKEN_LIMIT,
         )
-        for frame_name, freq_dict in frequency_results.items():
+        for frame_key, freq_dict in frequency_results.items():
             sorted_tokens = sorted(freq_dict.items(), key=lambda x: x[1], reverse=True)
             total_tokens = sum(1 for token, freq in sorted_tokens if freq > 0)
             limited_tokens = [
                 (token, freq) for token, freq in sorted_tokens if freq > 0
             ][:server_limit]
-            response_data[frame_name] = {
+            display_name = node_display_names.get(frame_key, frame_key)
+            response_data[frame_key] = {
                 "data": [
                     TokenFrequencyData(token=token, frequency=freq)
                     for token, freq in limited_tokens
@@ -545,6 +548,9 @@ async def calculate_token_frequencies(
                     "total_tokens_before_limit": total_tokens,
                     "truncated": total_tokens > len(limited_tokens),
                     "token_limit": effective_limit,
+                    "node_id": frame_key,
+                    "display_name": display_name,
+                    "node_name": display_name,
                 },
             }
 
@@ -609,6 +615,7 @@ async def calculate_token_frequencies(
                 "token_limit": effective_limit,
                 "server_limit": server_limit,
                 "stop_words": requested_stop_words,
+                "node_display_names": {**node_display_names},
             },
             "stop_words": requested_stop_words,
         }

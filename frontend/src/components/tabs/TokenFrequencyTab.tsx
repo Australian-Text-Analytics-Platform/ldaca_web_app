@@ -55,6 +55,44 @@ const MAX_SERVER_TOKEN_LIMIT = 5000;
 const computeServerLimit = (limit: number) =>
   Math.min(Math.max(limit * SERVER_LIMIT_MULTIPLIER, DEFAULT_TOKEN_LIMIT), MAX_SERVER_TOKEN_LIMIT);
 
+const isNonEmptyString = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0;
+
+type NormalizedNodeResult = {
+  nodeId: string;
+  displayName: string;
+  rows: any[];
+  metadata: Record<string, unknown>;
+  rawEntry: unknown;
+};
+
+const extractRows = (entry: unknown): any[] => {
+  if (Array.isArray(entry)) {
+    return entry as any[];
+  }
+  if (
+    entry &&
+    typeof entry === 'object' &&
+    !Array.isArray(entry) &&
+    Array.isArray((entry as any).data)
+  ) {
+    return (entry as any).data as any[];
+  }
+  return [];
+};
+
+const extractMetadata = (entry: unknown): Record<string, unknown> => {
+  if (
+    entry &&
+    typeof entry === 'object' &&
+    !Array.isArray(entry) &&
+    (entry as any).metadata &&
+    typeof (entry as any).metadata === 'object'
+  ) {
+    return (entry as any).metadata as Record<string, unknown>;
+  }
+  return {};
+};
+
 const TokenFrequencyTab: React.FC = () => {
   const { selectedNodes } = useWorkspaceSelection();
   const { currentWorkspaceId, getNodeShape } = useWorkspaceData();
@@ -116,6 +154,195 @@ const TokenFrequencyTab: React.FC = () => {
   const previousBackendLimitRef = useRef<number | null>(null);
   const tokenLimitInputChangedRef = useRef(false);
   const tokenLimitApplyTimeoutRef = useRef<number | null>(null);
+
+  const selectionNameById = useMemo(() => {
+    const mapping: Record<string, string> = {};
+    selectedNodes.forEach((node) => {
+      if (isNonEmptyString(node?.id) && isNonEmptyString((node as any)?.name)) {
+        mapping[node.id] = (node as any).name as string;
+      }
+    });
+    if (Array.isArray(panelSelectedNodes)) {
+      panelSelectedNodes.forEach((node) => {
+        if (isNonEmptyString(node?.id) && isNonEmptyString((node as any)?.name)) {
+          mapping[node.id] = (node as any).name as string;
+        }
+      });
+    }
+    return mapping;
+  }, [selectedNodes, panelSelectedNodes]);
+
+  const responseDisplayNameHints = useMemo(() => {
+    const mapping: Record<string, string> = {};
+    const metadataNodeNames = ((results?.metadata as Record<string, unknown> | null | undefined)?.node_display_names ?? {}) as Record<string, unknown>;
+    if (metadataNodeNames && typeof metadataNodeNames === 'object') {
+      Object.entries(metadataNodeNames).forEach(([id, name]) => {
+        if (isNonEmptyString(name)) {
+          mapping[id] = name;
+        }
+      });
+    }
+    if (results?.data && typeof results.data === 'object') {
+      Object.entries(results.data as Record<string, unknown>).forEach(([key, value]) => {
+        const entryMetadata = extractMetadata(value);
+        const metaNodeId = entryMetadata['node_id'];
+        const metaDisplayName = entryMetadata['display_name'];
+        if (isNonEmptyString(metaNodeId) && isNonEmptyString(metaDisplayName)) {
+          mapping[metaNodeId] = metaDisplayName;
+        } else if (isNonEmptyString(metaNodeId) && !mapping[metaNodeId] && isNonEmptyString(key)) {
+          mapping[metaNodeId] = key;
+        }
+      });
+    }
+    return mapping;
+  }, [results]);
+
+  const computeDisplayName = useCallback(
+    (nodeId: string, fallbackKey?: string) => {
+      if (isNonEmptyString(responseDisplayNameHints[nodeId])) {
+        return responseDisplayNameHints[nodeId];
+      }
+      if (isNonEmptyString(lockedNodeNameMap[nodeId])) {
+        return lockedNodeNameMap[nodeId];
+      }
+      if (isNonEmptyString(nodeIdToName[nodeId])) {
+        return nodeIdToName[nodeId];
+      }
+      if (isNonEmptyString(selectionNameById[nodeId])) {
+        return selectionNameById[nodeId];
+      }
+      if (isNonEmptyString(fallbackKey)) {
+        return fallbackKey;
+      }
+      return nodeId;
+    },
+    [responseDisplayNameHints, lockedNodeNameMap, nodeIdToName, selectionNameById]
+  );
+
+  const analysisNodeIds = useMemo(() => {
+    const combined: Array<string | null | undefined> = [];
+    const paramsNodeIds = (results?.analysis_params as Record<string, unknown> | null | undefined)?.node_ids;
+    if (Array.isArray(paramsNodeIds)) {
+      combined.push(...paramsNodeIds);
+    }
+    combined.push(...lastCompareNodeIds);
+    combined.push(...effectiveNodeColumnSelections.map((sel) => sel.nodeId));
+    combined.push(...selectedNodes.map((node) => node.id));
+    if (Array.isArray(panelSelectedNodes)) {
+      combined.push(...panelSelectedNodes.map((node) => node?.id));
+    }
+    const seen = new Set<string>();
+    const deduped: string[] = [];
+    combined.forEach((id) => {
+      if (isNonEmptyString(id) && !seen.has(id)) {
+        seen.add(id);
+        deduped.push(id);
+      }
+    });
+    return deduped;
+  }, [results, lastCompareNodeIds, effectiveNodeColumnSelections, selectedNodes, panelSelectedNodes]);
+
+  const normalizedNodeResults = useMemo<NormalizedNodeResult[]>(() => {
+    if (!results?.data || typeof results.data !== 'object') {
+      return [];
+    }
+
+    const dataRecord = results.data as Record<string, unknown>;
+    const entries = Object.entries(dataRecord);
+    const usedKeys = new Set<string>();
+    const nodeIds = analysisNodeIds.length > 0 ? analysisNodeIds : entries.map(([key]) => key);
+
+    const normalized: NormalizedNodeResult[] = nodeIds.map((nodeId, index) => {
+      const fallbackKey = entries[index]?.[0];
+      const displayName = computeDisplayName(nodeId, fallbackKey);
+      let entry: unknown;
+      let entryKey: string | null = null;
+
+      if (Object.prototype.hasOwnProperty.call(dataRecord, nodeId)) {
+        entry = dataRecord[nodeId];
+        entryKey = nodeId;
+      } else if (Object.prototype.hasOwnProperty.call(dataRecord, displayName)) {
+        entry = dataRecord[displayName];
+        entryKey = displayName;
+      } else {
+        const match = entries.find(([key, value]) => {
+          if (usedKeys.has(key)) {
+            return false;
+          }
+          const meta = extractMetadata(value);
+          const metaNodeId = meta['node_id'];
+          const metaDisplayName = meta['display_name'];
+          if (isNonEmptyString(metaNodeId) && metaNodeId === nodeId) {
+            return true;
+          }
+          if (isNonEmptyString(metaDisplayName) && metaDisplayName.toLowerCase() === displayName.toLowerCase()) {
+            return true;
+          }
+          return false;
+        });
+        if (match) {
+          entryKey = match[0];
+          entry = match[1];
+        }
+      }
+
+      if (!entry) {
+        const fallbackEntry = entries.find(([key]) => !usedKeys.has(key));
+        if (fallbackEntry) {
+          entryKey = fallbackEntry[0];
+          entry = fallbackEntry[1];
+        }
+      }
+
+      if (entryKey) {
+        usedKeys.add(entryKey);
+      }
+
+      const metadata = extractMetadata(entry);
+      const rows = extractRows(entry);
+
+      return {
+        nodeId,
+        displayName,
+        rows,
+        metadata,
+        rawEntry: entry ?? null,
+      };
+    });
+
+    entries.forEach(([key, value]) => {
+      if (usedKeys.has(key)) {
+        return;
+      }
+      const metadata = extractMetadata(value);
+      const metaNodeId = metadata['node_id'];
+      const metaDisplayName = metadata['display_name'];
+      const nodeId = isNonEmptyString(metaNodeId) ? metaNodeId : key;
+      if (normalized.some((item) => item.nodeId === nodeId)) {
+        return;
+      }
+      usedKeys.add(key);
+      normalized.push({
+        nodeId,
+        displayName: computeDisplayName(nodeId, isNonEmptyString(metaDisplayName) ? (metaDisplayName as string) : key),
+        rows: extractRows(value),
+        metadata,
+        rawEntry: value,
+      });
+    });
+
+    return normalized;
+  }, [results, analysisNodeIds, computeDisplayName]);
+
+  const filteredNodeResults = useMemo<NormalizedNodeResult[]>(() => {
+    if (!appliedStopSet || appliedStopSet.size === 0) {
+      return normalizedNodeResults;
+    }
+    return normalizedNodeResults.map((result) => ({
+      ...result,
+      rows: result.rows.filter((item: any) => !appliedStopSet.has(String(item?.token ?? '').toLowerCase())),
+    }));
+  }, [normalizedNodeResults, appliedStopSet]);
 
   const backendTokenLimit = useMemo(() => {
     if (!results) return null;
@@ -848,25 +1075,14 @@ const TokenFrequencyTab: React.FC = () => {
   };
 
   // Derive filtered results data according to the applied stop-word set
-  const filteredResultsData = useMemo(() => {
-    if (!results?.data) return null;
-    if (!appliedStopSet || appliedStopSet.size === 0) return results.data as any;
-    const out: Record<string, any[]> = {};
-    for (const [nodeName, freqValue] of Object.entries(results.data as any)) {
-      const rows = Array.isArray(freqValue) ? (freqValue as any[]) : ((freqValue as any)?.data ?? []);
-      out[nodeName] = rows.filter((item: any) => !appliedStopSet.has(String(item.token || '').toLowerCase()));
-    }
-    return out;
-  }, [results, appliedStopSet]);
-
-  const renderChart = (nodeName: string, data: any[], color: string) => {
+  const renderChart = (nodeId: string, displayName: string, data: any[], color: string) => {
     // Find max frequency for bar width calculation (guard against empty arrays)
     const maxFreq = Math.max(...data.map(item => item.frequency), 1);
 
     return (
-      <div key={nodeName} className="mb-6">
+      <div className="mb-6" data-node-id={nodeId || displayName}>
         <div className="h-16 mb-4 flex items-center">
-          <h3 className="text-lg font-semibold text-gray-800 break-words leading-tight w-full">{nodeName}</h3>
+          <h3 className="text-lg font-semibold text-gray-800 break-words leading-tight w-full">{displayName}</h3>
         </div>
         
   {/* Word Cloud */}
@@ -1065,29 +1281,33 @@ const TokenFrequencyTab: React.FC = () => {
                   </div>
                 </div>
 
-              {results.data ? (
+              {normalizedNodeResults.length > 0 ? (
                 <div className="space-y-8">
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                    {Object.entries((filteredResultsData ?? (results.data as any))).map(([nodeName, freqValue], idx) => {
-                      const nodeId = lastCompareNodeIds[idx];
-                      const color = getColorForNodeId(nodeId, idx);
-                      const rows = Array.isArray(freqValue) ? (freqValue as any[]) : ((freqValue as any)?.data ?? []);
-                      // Cap to backend-provided limit after filtering to maintain a stable count
-                      const limitForSlice = typeof effectiveTokenLimit === 'number' ? effectiveTokenLimit : rows.length;
-                      const display = rows.slice(0, Math.max(0, limitForSlice));
-                      return renderChart(nodeName, display, color);
+                    {filteredNodeResults.map((result, idx) => {
+                      const referenceId = isNonEmptyString(result.nodeId) ? result.nodeId : undefined;
+                      const colorKey = referenceId ?? lastCompareNodeIds[idx] ?? `${result.displayName}-${idx}`;
+                      const color = getColorForNodeId(colorKey, idx);
+                      const limitForSlice = typeof effectiveTokenLimit === 'number' ? effectiveTokenLimit : result.rows.length;
+                      const display = result.rows.slice(0, Math.max(0, limitForSlice));
+                      return (
+                        <div key={`${result.nodeId || result.displayName}-${idx}`}>
+                          {renderChart(result.nodeId, result.displayName, display, color)}
+                        </div>
+                      );
                     })}
                   </div>
 
                   {/* Unified Comparative Word Cloud */}
-                  {Object.keys(results.data).length === 2 && lastCompareNodeIds.length === 2 && (() => {
-                    const entries = Object.entries(results.data);
-                    const [nodeAName] = entries[0];
-                    const [nodeBName] = entries[1];
-                    const nodeAId = lastCompareNodeIds[0];
-                    const nodeBId = lastCompareNodeIds[1];
-                    const nodeAColor = getColorForNodeId(nodeAId, 0);
-                    const nodeBColor = getColorForNodeId(nodeBId, 1);
+                  {normalizedNodeResults.length === 2 && lastCompareNodeIds.length === 2 && (() => {
+                    const nodeAResult = (filteredNodeResults[0] ?? normalizedNodeResults[0]) ?? null;
+                    const nodeBResult = (filteredNodeResults[1] ?? normalizedNodeResults[1]) ?? null;
+                    const nodeAId = nodeAResult?.nodeId ?? lastCompareNodeIds[0] ?? '';
+                    const nodeBId = nodeBResult?.nodeId ?? lastCompareNodeIds[1] ?? '';
+                    const nodeAName = nodeAResult?.displayName ?? computeDisplayName(nodeAId, nodeAId);
+                    const nodeBName = nodeBResult?.displayName ?? computeDisplayName(nodeBId, nodeBId);
+                    const nodeAColor = getColorForNodeId(nodeAId || nodeAName, 0);
+                    const nodeBColor = getColorForNodeId(nodeBId || nodeBName, 1);
                     // Build from statistics table with requested juxRank selection
                     const stats = (results.statistics || [])
                     .filter((s: any) => !appliedStopSet.has(String(s.token || '').toLowerCase()))
