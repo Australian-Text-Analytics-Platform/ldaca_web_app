@@ -9,6 +9,7 @@ import { NodeSchemaResponse } from '../../types';
 import { cn } from '../../lib/utils';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
+import { ScrollArea } from '../ui/scroll-area';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -561,8 +562,13 @@ const WorkspaceTable: React.FC<WorkspaceTableProps> = ({
 
   return (
     <>
-      <div className="flex h-full w-full flex-col">
-        <div className="flex-1 overflow-auto rounded-t-lg border border-border shadow-sm">
+      <div className="flex h-full w-full flex-col min-h-0">
+        <ScrollArea
+          type="always"
+          scrollbars="both"
+          className="flex-1 rounded-t-lg border border-border shadow-sm bg-white"
+          style={{ scrollbarGutter: 'stable both-edges' }}
+        >
           <Table>
             <TableHeader className="sticky top-0 z-10 bg-muted/40">
               <TableRow>
@@ -772,7 +778,7 @@ const WorkspaceTable: React.FC<WorkspaceTableProps> = ({
               )}
             </TableBody>
           </Table>
-        </div>
+        </ScrollArea>
         {renderPaginationControls()}
       </div>
 
@@ -1055,7 +1061,7 @@ export const WorkspaceDataView: React.FC = memo(() => {
         </div>
 
         {/* Data table with column type casting */}
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 min-h-0">
           <WorkspaceTable
             data={nodeData.data}
             loading={isLoading.nodeData}
