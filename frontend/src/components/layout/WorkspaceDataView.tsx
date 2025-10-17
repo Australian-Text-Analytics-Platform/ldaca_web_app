@@ -1,4 +1,5 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ColumnDef, flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table';
 import { ChevronDown, Loader2, Settings2, X } from 'lucide-react';
 
 import { useWorkspaceActions } from '../../hooks/useWorkspaceActions';
@@ -37,6 +38,16 @@ import {
   TableRow,
 } from '../ui/table';
 import { DatetimeFormatPanel } from '../panels/DatetimeFormatPanel';
+
+declare module '@tanstack/react-table' {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  interface ColumnMeta<TData, TValue> {
+    headerClassName?: string;
+    headerMinWidth?: number;
+    cellClassName?: string;
+    cellMinWidth?: number;
+  }
+}
 
 type DataRow = Record<string, unknown>;
 
@@ -462,6 +473,210 @@ const WorkspaceTable: React.FC<WorkspaceTableProps> = ({
     [onDeleteColumn, onRefreshSchema, applySchema, renameState, setColumnBusy]
   );
 
+  const columnDefs = useMemo<ColumnDef<DataRow, unknown>[]>(() => {
+    return columns.map((column) => {
+      const currentType = normalizeTypeName(columnTypes[column] ?? 'string');
+      const isColumnLoading = Boolean(loadingCast[column]);
+      const isColumnMutating = Boolean(columnActionLoading[column]);
+      const isColumnBusy = isColumnLoading || isColumnMutating;
+      const displayLabel = getTypeDisplayName(currentType);
+      const availableTypes = [
+        { value: currentType, label: displayLabel },
+        ...DATA_TYPES.filter((type) => type.value !== currentType),
+      ];
+      const isRenaming = renameState?.column === column;
+      const renameDraftValue = isRenaming ? renameState.value : column;
+      const canRename = Boolean(onRenameColumn);
+      const canDelete = Boolean(onDeleteColumn);
+
+      return {
+        id: column,
+        accessorFn: (row) => row?.[column],
+        header: () => (
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-2">
+              {isRenaming ? (
+                <Input
+                  ref={(element) => {
+                    if (element) {
+                      renameInputRefs.current[column] = element;
+                    } else {
+                      delete renameInputRefs.current[column];
+                    }
+                  }}
+                  value={renameDraftValue}
+                  disabled={isColumnBusy}
+                  onChange={(event) => updateRenameDraft(column, event.target.value)}
+                  onBlur={() => {
+                    if (!isColumnBusy) {
+                      void submitRename(column, renameDraftValue);
+                    }
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      if (!isColumnBusy) {
+                        void submitRename(column, renameDraftValue);
+                      }
+                    } else if (event.key === 'Escape') {
+                      setRenameState(null);
+                    }
+                  }}
+                  className="h-7 w-40 truncate text-xs"
+                  aria-label={`Rename column ${column}`}
+                />
+              ) : canRename ? (
+                <button
+                  type="button"
+                  className="max-w-[160px] truncate text-left text-xs font-medium text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  onClick={() => {
+                    if (!isColumnBusy) {
+                      beginRename(column);
+                    }
+                  }}
+                  disabled={isColumnBusy}
+                  title={column}
+                >
+                  {column}
+                </button>
+              ) : (
+                <span className="block max-w-[160px] truncate text-xs font-medium text-foreground" title={column}>
+                  {column}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-1">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={isColumnBusy || !onCast}
+                    className={cn(
+                      'h-7 min-w-[104px] justify-between gap-2 px-2 text-xs font-medium',
+                      isColumnBusy && 'cursor-progress opacity-80'
+                    )}
+                    aria-label={`Change data type for column ${column}`}
+                  >
+                    <span className="truncate">{displayLabel}</span>
+                    {isColumnBusy ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                    ) : (
+                      <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-40 p-1">
+                  <DropdownMenuRadioGroup
+                    value={currentType}
+                    onValueChange={(value) => {
+                      if (!isColumnBusy) {
+                        handleTypeChange(column, value);
+                      }
+                    }}
+                  >
+                    {availableTypes.map((type) => (
+                      <DropdownMenuRadioItem key={type.value} value={type.value} className="text-xs">
+                        {type.label}
+                      </DropdownMenuRadioItem>
+                    ))}
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              {(canRename || canDelete) && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      disabled={isColumnBusy}
+                      className={cn(
+                        'h-7 w-7 text-muted-foreground hover:text-primary',
+                        isColumnBusy && 'cursor-progress opacity-80'
+                      )}
+                      aria-label={`Column settings for ${column}`}
+                    >
+                      {isColumnBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Settings2 className="h-3.5 w-3.5" />}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-40 p-1">
+                    {canRename && (
+                      <DropdownMenuItem
+                        disabled={isColumnBusy}
+                        onSelect={() => {
+                          if (isColumnBusy) {
+                            return;
+                          }
+                          beginRename(column);
+                        }}
+                        className="text-xs"
+                      >
+                        Rename
+                      </DropdownMenuItem>
+                    )}
+                    {canDelete && (
+                      <DropdownMenuItem
+                        disabled={isColumnBusy}
+                        onSelect={() => {
+                          if (isColumnBusy) {
+                            return;
+                          }
+                          void requestDeleteColumn(column);
+                        }}
+                        className="text-xs text-destructive focus:text-destructive"
+                      >
+                        Delete
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
+          </div>
+        ),
+        cell: ({ getValue }) => {
+          const cellValue = getValue();
+          const displayValue = cellValue === null || cellValue === undefined ? '' : String(cellValue);
+          return <span className="block truncate">{displayValue}</span>;
+        },
+        meta: {
+          headerClassName: 'whitespace-nowrap border-r border-border/70 px-4 py-3 text-left',
+          headerMinWidth: 250,
+          cellClassName: 'whitespace-nowrap border-r border-border/60 px-4 py-3 text-sm text-foreground',
+          cellMinWidth: 200,
+        },
+      };
+    });
+  }, [
+    columns,
+    columnTypes,
+    loadingCast,
+    columnActionLoading,
+    getTypeDisplayName,
+    renameState,
+    onRenameColumn,
+    onDeleteColumn,
+    onCast,
+    normalizeTypeName,
+    handleTypeChange,
+    beginRename,
+    updateRenameDraft,
+    submitRename,
+    requestDeleteColumn,
+  ]);
+
+  const tableInstance = useReactTable({
+    data: sanitizedData,
+    columns: columnDefs,
+    getCoreRowModel: getCoreRowModel(),
+    debugTable: debugEnabled,
+  });
+
+  const tableRows = tableInstance.getRowModel().rows;
+  const visibleColumnCount = Math.max(tableInstance.getVisibleLeafColumns().length, 1);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -569,207 +784,48 @@ const WorkspaceTable: React.FC<WorkspaceTableProps> = ({
           className="flex-1 rounded-t-lg border border-border shadow-sm bg-white"
           style={{ scrollbarGutter: 'stable both-edges' }}
         >
-          <Table>
+          <Table disableContainer>
             <TableHeader className="sticky top-0 z-10 bg-muted/40">
-              <TableRow>
-                {columns.map((column) => {
-                  const currentType = normalizeTypeName(columnTypes[column] ?? 'string');
-                  const isColumnLoading = Boolean(loadingCast[column]);
-                  const isColumnMutating = Boolean(columnActionLoading[column]);
-                  const isColumnBusy = isColumnLoading || isColumnMutating;
-                  const displayLabel = getTypeDisplayName(currentType);
-                  const availableTypes = [
-                    { value: currentType, label: displayLabel },
-                    ...DATA_TYPES.filter((type) => type.value !== currentType),
-                  ];
-                  const isRenaming = renameState?.column === column;
-                  const renameDraftValue = isRenaming ? renameState.value : column;
-                  const canRename = Boolean(onRenameColumn);
-                  const canDelete = Boolean(onDeleteColumn);
-
-                  return (
-                    <TableHead
-                      key={column}
-                      className="whitespace-nowrap border-r border-border/70 px-4 py-3 text-left last:border-r-0"
-                      style={{ minWidth: '250px' }}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex min-w-0 items-center gap-2">
-                          {isRenaming ? (
-                            <Input
-                              ref={(element) => {
-                                if (element) {
-                                  renameInputRefs.current[column] = element;
-                                } else {
-                                  delete renameInputRefs.current[column];
-                                }
-                              }}
-                              value={renameDraftValue}
-                              disabled={isColumnBusy}
-                              onChange={(event) => updateRenameDraft(column, event.target.value)}
-                              onBlur={() => {
-                                if (!isColumnBusy) {
-                                  void submitRename(column, renameDraftValue);
-                                }
-                              }}
-                              onKeyDown={(event) => {
-                                if (event.key === 'Enter') {
-                                  event.preventDefault();
-                                  if (!isColumnBusy) {
-                                    void submitRename(column, renameDraftValue);
-                                  }
-                                } else if (event.key === 'Escape') {
-                                  setRenameState(null);
-                                }
-                              }}
-                              className="h-7 w-40 truncate text-xs"
-                              aria-label={`Rename column ${column}`}
-                            />
-                          ) : canRename ? (
-                            <button
-                              type="button"
-                              className="max-w-[160px] truncate text-left text-xs font-medium text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                              onClick={() => {
-                                if (!isColumnBusy) {
-                                  beginRename(column);
-                                }
-                              }}
-                              disabled={isColumnBusy}
-                              title={column}
-                            >
-                              {column}
-                            </button>
-                          ) : (
-                            <span className="block max-w-[160px] truncate text-xs font-medium text-foreground" title={column}>
-                              {column}
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                disabled={isColumnBusy || !onCast}
-                                className={cn(
-                                  'h-7 min-w-[104px] justify-between gap-2 px-2 text-xs font-medium',
-                                  isColumnBusy && 'cursor-progress opacity-80'
-                                )}
-                                aria-label={`Change data type for column ${column}`}
-                              >
-                                <span className="truncate">{displayLabel}</span>
-                                {isColumnBusy ? (
-                                  <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
-                                ) : (
-                                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-                                )}
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="start" className="w-40 p-1">
-                              <DropdownMenuRadioGroup
-                                value={currentType}
-                                onValueChange={(value) => {
-                                  if (!isColumnBusy) {
-                                    handleTypeChange(column, value);
-                                  }
-                                }}
-                              >
-                                {availableTypes.map((type) => (
-                                  <DropdownMenuRadioItem
-                                    key={type.value}
-                                    value={type.value}
-                                    className="text-xs"
-                                  >
-                                    {type.label}
-                                  </DropdownMenuRadioItem>
-                                ))}
-                              </DropdownMenuRadioGroup>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                          {(canRename || canDelete) && (
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  disabled={isColumnBusy}
-                                  className={cn(
-                                    'h-7 w-7 text-muted-foreground hover:text-primary',
-                                    isColumnBusy && 'cursor-progress opacity-80'
-                                  )}
-                                  aria-label={`Column settings for ${column}`}
-                                >
-                                  {isColumnBusy ? (
-                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                  ) : (
-                                    <Settings2 className="h-3.5 w-3.5" />
-                                  )}
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-40 p-1">
-                                {canRename && (
-                                  <DropdownMenuItem
-                                    disabled={isColumnBusy}
-                                    onSelect={() => {
-                                      if (isColumnBusy) {
-                                        return;
-                                      }
-                                      beginRename(column);
-                                    }}
-                                    className="text-xs"
-                                  >
-                                    Rename
-                                  </DropdownMenuItem>
-                                )}
-                                {canDelete && (
-                                  <DropdownMenuItem
-                                    disabled={isColumnBusy}
-                                    onSelect={() => {
-                                      if (isColumnBusy) {
-                                        return;
-                                      }
-                                      void requestDeleteColumn(column);
-                                    }}
-                                    className="text-xs text-destructive focus:text-destructive"
-                                  >
-                                    Delete
-                                  </DropdownMenuItem>
-                                )}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          )}
-                        </div>
-                      </div>
-                    </TableHead>
-                  );
-                })}
-              </TableRow>
+              {tableInstance.getHeaderGroups().map((headerGroup) => (
+                <TableRow key={headerGroup.id}>
+                  {headerGroup.headers.map((header) => {
+                    const meta = header.column.columnDef.meta;
+                    return (
+                      <TableHead
+                        key={header.id}
+                        className={cn(meta?.headerClassName, 'last:border-r-0')}
+                        style={meta?.headerMinWidth ? { minWidth: `${meta.headerMinWidth}px` } : undefined}
+                      >
+                        {header.isPlaceholder
+                          ? null
+                          : flexRender(header.column.columnDef.header, header.getContext())}
+                      </TableHead>
+                    );
+                  })}
+                </TableRow>
+              ))}
             </TableHeader>
             <TableBody className="divide-y divide-border/60 bg-white">
-              {sanitizedData.map((row, rowIndex) => (
-                <TableRow key={rowIndex} className="transition-colors duration-150 hover:bg-muted/40">
-                  {columns.map((column, columnIndex) => {
-                    const cellValue = row[column];
-                    const displayValue = cellValue === null || cellValue === undefined ? '' : String(cellValue);
+              {tableRows.map((row) => (
+                <TableRow key={row.id} className="transition-colors duration-150 hover:bg-muted/40">
+                  {row.getVisibleCells().map((cell) => {
+                    const meta = cell.column.columnDef.meta;
                     return (
                       <TableCell
-                        key={`${column}-${columnIndex}`}
-                        className="whitespace-nowrap border-r border-border/60 px-4 py-3 text-sm text-foreground last:border-r-0"
-                        style={{ minWidth: '200px' }}
+                        key={cell.id}
+                        className={cn(meta?.cellClassName, 'last:border-r-0')}
+                        style={meta?.cellMinWidth ? { minWidth: `${meta.cellMinWidth}px` } : undefined}
                       >
-                        {displayValue}
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </TableCell>
                     );
                   })}
                 </TableRow>
               ))}
-              {sanitizedData.length === 0 && (
+              {tableRows.length === 0 && (
                 <TableRow>
                   <TableCell
-                    colSpan={columns.length || 1}
+                    colSpan={visibleColumnCount}
                     className="px-4 py-6 text-center text-sm text-muted-foreground"
                   >
                     No rows to display
