@@ -23,6 +23,7 @@ export interface UserMeResponse {
   user: User;
   authenticated: boolean;
   expires_at: string;
+  data_folder?: string; // Only present in single-user mode
 }
 
 export const authApi = {

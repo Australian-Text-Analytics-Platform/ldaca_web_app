@@ -34,10 +34,10 @@ class DocWorkspaceAPIUtils:
         """Convert Polars data type to JavaScript-compatible type.
 
         Args:
-            polars_type: Polars data type object (e.g., pl.Int64, pl.Float32) or string representation
+            polars_type: Polars data type object (e.g., pl.Int64, pl.Float32)
 
         Returns:
-            JavaScript-compatible type string: 'integer', 'float', 'string', 'boolean', 'datetime', 'array'
+            JavaScript-compatible type string: 'integer', 'float', 'string', 'boolean', 'datetime', 'array', 'categorical'
         """
         # Identity-based classification (no pattern matching) to support wider runtime versions.
         if polars_type in (

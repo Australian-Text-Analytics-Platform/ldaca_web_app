@@ -118,7 +118,7 @@ const Sidebar: React.FC = () => {
   const { workspaceGraph, currentWorkspaceId, getNodeShape } = useWorkspaceData();
   const { selectedNodeIds } = useWorkspaceSelection();
   const { toggleNodeSelection } = useWorkspaceActions();
-  const { getAuthHeaders, user, logout } = useAuth();
+  const { getAuthHeaders, user, logout, dataFolder } = useAuth();
   const { tasks, setTasks } = useAnalysisStore(
     useShallow((state) => ({
       tasks: state.tasks,
@@ -287,16 +287,23 @@ const Sidebar: React.FC = () => {
           <img src={logo} alt="LDaCA Logo" className="h-9 w-auto" />
           <p className="text-sm font-semibold">LDaCA Corpus Analysis</p>
         </div>
-        <div className="mt-3 flex items-center justify-between gap-2 text-xs text-muted-foreground">
-          <p className="truncate">Welcome, {user?.name ?? 'Guest'}</p>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-xs text-red-600 hover:text-red-700"
-            onClick={logout}
-          >
-            Logout
-          </Button>
+        <div className="mt-3 space-y-2">
+          <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+            <p className="truncate">Welcome, {user?.name ?? 'Guest'}</p>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs text-red-600 hover:text-red-700 shrink-0"
+              onClick={logout}
+            >
+              Logout
+            </Button>
+          </div>
+          {dataFolder && (
+            <p className="text-[10px] text-muted-foreground/70 break-all leading-tight">
+              Data: {dataFolder}
+            </p>
+          )}
         </div>
       </SidebarHeader>
       <SidebarContent>

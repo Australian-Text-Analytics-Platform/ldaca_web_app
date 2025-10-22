@@ -96,7 +96,7 @@ class TestDatabaseOperations:
         mock_session.commit.assert_called_once()
 
     @patch("ldaca_web_app_backend.db.async_session_maker")
-    @patch("ldaca_web_app_backend.config.settings")
+    @patch("ldaca_web_app_backend.settings.settings")
     async def test_create_user_session(self, mock_settings, mock_session_maker):
         """Test creating a user session"""
         from ldaca_web_app_backend.db import create_user_session

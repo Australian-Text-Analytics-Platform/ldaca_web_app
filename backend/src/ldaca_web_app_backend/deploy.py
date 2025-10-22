@@ -7,8 +7,8 @@ from pathlib import Path
 import uvicorn
 from IPython.display import Javascript, Markdown, display
 
-from .config import PACKAGE_ROOT, settings
 from .main import app
+from .settings import PACKAGE_ROOT, settings
 
 # Add Colab detection
 try:

@@ -7,8 +7,8 @@ from typing import Optional
 
 from fastapi import Depends, Header, HTTPException
 
-from ..config import settings
 from ..db import validate_access_token
+from ..settings import settings
 
 logger = logging.getLogger(__name__)
 

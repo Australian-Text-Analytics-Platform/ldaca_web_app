@@ -16,8 +16,8 @@ from .api.files import router as files_router
 from .api.text import router as text_router
 from .api.users import router as users_router
 from .api.workspaces import router as workspaces_router
-from .config import settings
 from .db import cleanup_expired_sessions, init_db
+from .settings import settings
 
 # Ensure DocWorkspace classes are extended with API methods (e.g., to_api_graph)
 # Importing this module applies monkey patches when DOCWORKSPACE is available.

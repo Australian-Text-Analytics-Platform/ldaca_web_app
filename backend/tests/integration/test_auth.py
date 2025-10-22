@@ -235,8 +235,8 @@ class TestAuthenticationConfiguration:
         """Document and test current configuration values"""
         from unittest.mock import MagicMock, patch
 
-        from ldaca_web_app_backend.config import settings
         from ldaca_web_app_backend.core.auth import get_available_auth_methods
+        from ldaca_web_app_backend.settings import settings
 
         # Create a mock settings object with test values
         mock_settings = MagicMock()
@@ -248,7 +248,7 @@ class TestAuthenticationConfiguration:
         mock_settings.database_url = "sqlite+aiosqlite:///:memory:"
 
         # Patch the settings in the config module
-        with patch("ldaca_web_app_backend.config.settings", mock_settings):
+        with patch("ldaca_web_app_backend.settings.settings", mock_settings):
             # Test current configuration
             assert settings.multi_user is False  # Should be single-user mode
             assert settings.single_user_id == "test"

@@ -11,7 +11,7 @@ from typing import Any, Dict, Union
 import pandas as pd
 import polars as pl
 
-from ..config import settings
+from ..settings import settings
 
 # Direct imports - assuming proper package installation
 # (Optional) Import heavy libs lazily where needed to reduce import cost.

@@ -5,38 +5,43 @@ Tests for unified file preview endpoint
 from unittest.mock import patch
 
 import polars as pl
-
-# Skip these tests for now due to environment differences and optional Excel deps
 import pytest
-import pytest as _pytest
 from fastapi.testclient import TestClient
-
-pytestmark = _pytest.mark.skip(
-    reason="Unified preview endpoint tests are environment-dependent; skipping in unit suite"
-)
 
 
 @pytest.fixture()
-def client(tmp_path, monkeypatch):
-    # Configure data root to tmp_path
+def client(tmp_path):
+    """Create test client with mocked settings and user authentication"""
     # Patch settings and DB init to keep app lightweight
     with (
         patch("ldaca_web_app_backend.main.settings") as mock_settings,
         patch("ldaca_web_app_backend.main.init_db"),
         patch("ldaca_web_app_backend.main.cleanup_expired_sessions"),
-        patch("ldaca_web_app_backend.core.utils.config") as mock_config,
+        patch("ldaca_web_app_backend.core.utils.settings") as mock_utils_settings,
     ):
-        mock_settings.data_folder = tmp_path
-        mock_settings.allowed_origins = ["http://localhost:3000"]
-        mock_settings.get.return_value = True
+        # Configure main settings
         mock_settings.debug = False
-        # Configure utils.config for user data layout
-        mock_config.get_data_root.return_value = tmp_path
-        mock_config.user_data_folder = "users"
-        mock_config.multi_user = True
-        # Ensure the folder exists (do not monkeypatch Path methods)
-        tmp_path.mkdir(parents=True, exist_ok=True)
+        mock_settings.cors_allow_origin_regex = r"http://localhost(:\d+)?"
+        mock_settings.cors_allow_credentials = True
+        mock_settings.multi_user = True
+        mock_settings.get_data_root.return_value = tmp_path
+        mock_settings.get_user_data_folder.return_value = tmp_path / "users"
+        mock_settings.get_sample_data_folder.return_value = tmp_path / "sample_data"
+        mock_settings.get_database_backup_folder.return_value = tmp_path / "backups"
+        mock_settings.user_data_folder = "users"
 
+        # Configure utils settings (same instance)
+        mock_utils_settings.get_data_root.return_value = tmp_path
+        mock_utils_settings.user_data_folder = "users"
+        mock_utils_settings.multi_user = True
+
+        # Ensure required folders exist
+        tmp_path.mkdir(parents=True, exist_ok=True)
+        (tmp_path / "users").mkdir(parents=True, exist_ok=True)
+        (tmp_path / "sample_data").mkdir(parents=True, exist_ok=True)
+        (tmp_path / "backups").mkdir(parents=True, exist_ok=True)
+
+        # Import app after settings are patched
         app = __import__("ldaca_web_app_backend.main", fromlist=["app"]).app
 
         # Mock auth dependency to return a fixed user
@@ -51,10 +56,14 @@ def client(tmp_path, monkeypatch):
         user_root = tmp_path / "users" / "user_test_user" / "user_data"
         user_root.mkdir(parents=True, exist_ok=True)
 
-        return TestClient(app)
+        yield TestClient(app)
+
+        # Cleanup
+        app.dependency_overrides.clear()
 
 
 def test_csv_preview_supported_types_and_preview(client, tmp_path):
+    """Test CSV file preview with pagination"""
     # Arrange: create CSV in user data
     user_root = tmp_path / "users" / "user_test_user" / "user_data"
     csv_path = user_root / "sample.csv"
@@ -65,6 +74,8 @@ def test_csv_preview_supported_types_and_preview(client, tmp_path):
         "/api/files/preview",
         json={"filename": "sample.csv", "page": 0, "page_size": 2},
     )
+
+    # Assert
     assert resp.status_code == 200
     data = resp.json()
     assert data["file_type"] == "csv"
@@ -75,24 +86,29 @@ def test_csv_preview_supported_types_and_preview(client, tmp_path):
 
 
 def test_excel_preview_sheet_names_and_selection(client, tmp_path):
-    # Skip if polars lacks write_excel; construct via pandas
-    import importlib
-
-    if importlib.util.find_spec("openpyxl") is None:
-        pytest.skip("openpyxl not installed; skipping excel preview test")
-    import pandas as pd
+    """Test Excel file preview with sheet selection"""
+    # Skip if xlsxwriter is not available (required by Polars for Excel writing)
+    try:
+        import xlsxwriter  # noqa: F401
+    except ImportError:
+        pytest.skip("xlsxwriter not installed; required for Polars Excel writing")
 
     user_root = tmp_path / "users" / "user_test_user" / "user_data"
     xlsx_path = user_root / "book.xlsx"
-    with pd.ExcelWriter(xlsx_path) as writer:
-        pd.DataFrame({"t": ["a", "b"]}).to_excel(
-            writer, sheet_name="SheetA", index=False
-        )
-        pd.DataFrame({"t": ["c", "d"]}).to_excel(
-            writer, sheet_name="SheetB", index=False
-        )
 
-    # No payload -> should pick first sheet and return sheet_names
+    # Create Excel file with multiple sheets using Polars
+    # Write first sheet and get the workbook object
+    df_a = pl.DataFrame({"t": ["a", "b"]})
+    workbook = df_a.write_excel(xlsx_path, worksheet="SheetA")
+
+    # Add second sheet to the same workbook
+    df_b = pl.DataFrame({"t": ["c", "d"]})
+    df_b.write_excel(workbook=workbook, worksheet="SheetB")
+
+    # Close the workbook to ensure data is written
+    workbook.close()
+
+    # Test 1: No payload -> should pick first sheet and return sheet_names
     resp1 = client.post("/api/files/preview", json={"filename": "book.xlsx"})
     assert resp1.status_code == 200
     j1 = resp1.json()
@@ -102,7 +118,7 @@ def test_excel_preview_sheet_names_and_selection(client, tmp_path):
     assert j1.get("selected_sheet")
     assert len(j1["preview"]) >= 1
 
-    # Select SheetB explicitly
+    # Test 2: Select SheetB explicitly
     resp2 = client.post(
         "/api/files/preview",
         json={"filename": "book.xlsx", "payload": {"sheet_name": "SheetB"}},

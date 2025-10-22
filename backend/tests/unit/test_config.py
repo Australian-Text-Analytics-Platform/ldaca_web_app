@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 from unittest.mock import patch
 
-from ldaca_web_app_backend.config import Settings, settings
+from ldaca_web_app_backend.settings import Settings, settings
 
 
 class TestSettings:

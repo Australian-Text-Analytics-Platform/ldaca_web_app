@@ -9,7 +9,6 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 from google.auth.transport import requests as grequests
 from google.oauth2 import id_token
 
-from ..config import settings
 from ..core.auth import (
     get_available_auth_methods,
     get_current_user,
@@ -18,6 +17,7 @@ from ..core.auth import (
 from ..core.utils import setup_user_folders
 from ..db import cleanup_expired_sessions, create_user_session, get_or_create_user
 from ..models import AuthInfoResponse, GoogleIn, GoogleOut, User, UserResponse
+from ..settings import settings
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 logger = logging.getLogger(__name__)
@@ -206,7 +206,7 @@ async def logout(current_user: dict = Depends(get_current_user)):
 @router.get("/status")
 async def auth_status(current_user: dict = Depends(get_current_user)):
     """Check if user is authenticated"""
-    return {
+    response = {
         "authenticated": True,
         "user": {
             "id": current_user["id"],
@@ -214,6 +214,12 @@ async def auth_status(current_user: dict = Depends(get_current_user)):
             "name": current_user["name"],
         },
     }
+    
+    # Add data folder path in single-user mode only
+    if not settings.multi_user:
+        response["data_folder"] = str(settings.get_data_root())
+    
+    return response
 
 
 @router.get("/debug/token")

@@ -11,9 +11,9 @@ from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from ..config import settings
 from ..core.auth import get_current_user
 from ..models import FeedbackRequest, FeedbackResponse
+from ..settings import settings
 
 # Avoid importing pyairtable at module import time; detect availability cheaply
 try:

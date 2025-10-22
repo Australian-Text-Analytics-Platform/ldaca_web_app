@@ -1,7 +1,7 @@
 import secrets
 import uuid
 from collections.abc import AsyncGenerator
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
 from typing import Any, Dict, Optional
 
 from fastapi import Depends
@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.sql import func
 
-from .config import settings
+from .settings import settings
 
 
 # SQLAlchemy setup
@@ -136,7 +136,9 @@ async def create_user_session(user_id: str, google_token: str) -> Dict[str, Any]
         refresh_token = secrets.token_urlsafe(32)
 
         # Calculate expiry time
-        expires_at = datetime.now(UTC).replace(tzinfo=None) + timedelta(hours=settings.token_expire_hours)
+        expires_at = datetime.now(UTC).replace(tzinfo=None) + timedelta(
+            hours=settings.token_expire_hours
+        )
 
         # Clean up old sessions for this user (optional - keep only latest)
         result = await session.execute(
@@ -222,7 +224,9 @@ async def cleanup_expired_sessions():
     """Clean up expired sessions"""
     async with async_session_maker() as session:
         result = await session.execute(
-            select(UserSession).where(UserSession.expires_at <= datetime.now(UTC).replace(tzinfo=None))
+            select(UserSession).where(
+                UserSession.expires_at <= datetime.now(UTC).replace(tzinfo=None)
+            )
         )
         expired_sessions = result.scalars().all()
         for expired_session in expired_sessions:

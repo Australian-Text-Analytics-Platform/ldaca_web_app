@@ -23,6 +23,7 @@ dependencies = [
     "jupyter-server-proxy>=4.4.0",
     "ipython>=9.5.0",
     "nltk>=3.9.1",
+    "xlsxwriter>=3.2.9",
 ]
 
 [tool.pytest.ini_options]

@@ -168,6 +168,7 @@ export interface AuthInfoResponse {
   multi_user_mode: boolean;
   available_auth_methods: AuthMethod[];
   requires_authentication: boolean;
+  data_folder?: string; // Only present in single-user mode
 }
 
 export interface GoogleAuthRequest {

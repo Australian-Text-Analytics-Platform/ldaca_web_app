@@ -41,6 +41,7 @@ const fetchAuthInfoOnce = async () => {
           { name: 'google', display_name: 'Google', enabled: true }
         ],
         requires_authentication: true,
+        data_folder: info.data_folder, // Only present in single-user mode
       };
     } catch (err) {
       console.error('Auth info fetch failed:', err);
@@ -145,6 +146,7 @@ export const useAuth = () => {
   const isMultiUserMode = globalAuthInfo?.multi_user_mode ?? false;
   const requiresAuthentication = globalAuthInfo?.requires_authentication ?? false;
   const availableAuthMethods = globalAuthInfo?.available_auth_methods ?? [];
+  const dataFolder = globalAuthInfo?.data_folder ?? null;
 
   return {
     // Auth state
@@ -153,6 +155,7 @@ export const useAuth = () => {
     isMultiUserMode,
     requiresAuthentication,
     availableAuthMethods,
+    dataFolder,
     
     // Loading and error states
     isLoading,

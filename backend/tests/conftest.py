@@ -127,7 +127,7 @@ async def authenticated_client(settings_override):
         return mock_user
 
     patches = [
-        patch("ldaca_web_app_backend.config.settings", settings_override),
+        patch("ldaca_web_app_backend.settings.settings", settings_override),
         patch("ldaca_web_app_backend.main.settings", settings_override),
         patch("ldaca_web_app_backend.api.auth.settings", settings_override),
         patch("ldaca_web_app_backend.core.auth.settings", settings_override),
@@ -160,7 +160,7 @@ async def test_client(settings_override):
     from ldaca_web_app_backend.main import app
 
     patches = [
-        patch("ldaca_web_app_backend.config.settings", settings_override),
+        patch("ldaca_web_app_backend.settings.settings", settings_override),
         patch("ldaca_web_app_backend.main.settings", settings_override),
         patch("ldaca_web_app_backend.api.auth.settings", settings_override),
         patch("ldaca_web_app_backend.core.auth.settings", settings_override),
@@ -194,7 +194,7 @@ def temp_dir():
 @pytest.fixture
 def mock_settings():
     """Mock the config module with test configuration"""
-    with patch("ldaca_web_app_backend.config.config") as mock_config:
+    with patch("ldaca_web_app_backend.settings.settings") as mock_config:
         # Core settings
         mock_config.database_url = "sqlite+aiosqlite:///:memory:"
         mock_config.user_data_folder = "./test_data"

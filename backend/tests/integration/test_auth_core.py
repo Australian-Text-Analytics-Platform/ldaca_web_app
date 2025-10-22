@@ -92,12 +92,12 @@ class TestAuthenticationConfiguration:
         mock_settings.database_url = "sqlite+aiosqlite:///:memory:"
 
         # Patch the settings in the config module
-        with patch("ldaca_web_app_backend.config.settings", mock_settings):
+        with patch("ldaca_web_app_backend.settings.settings", mock_settings):
             yield mock_settings
 
     def test_single_user_mode_configuration(self):
         """Test single-user mode configuration values"""
-        from ldaca_web_app_backend.config import settings
+        from ldaca_web_app_backend.settings import settings
 
         # Test current configuration
         assert settings.multi_user is False
