@@ -38,11 +38,11 @@ export default defineConfig({
     }
   },
   server: {
-    port: 3000,
+    port: Number(process.env.FRONTEND_PORT ?? 3000),
     host: '0.0.0.0',
   },
   preview: {
-    port: 3000,
+    port: Number(process.env.FRONTEND_PORT ?? 3000),
   },
   envPrefix: 'VITE_', // Vite standard environment variable prefix
 });

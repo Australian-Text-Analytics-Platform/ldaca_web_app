@@ -214,11 +214,11 @@ async def auth_status(current_user: dict = Depends(get_current_user)):
             "name": current_user["name"],
         },
     }
-    
+
     # Add data folder path in single-user mode only
     if not settings.multi_user:
         response["data_folder"] = str(settings.get_data_root())
-    
+
     return response
 
 

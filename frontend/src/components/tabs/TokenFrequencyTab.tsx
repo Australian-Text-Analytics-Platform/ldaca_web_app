@@ -274,10 +274,6 @@ function TokenFrequencyTab() {
     }
     combined.push(...lastCompareNodeIds);
     combined.push(...effectiveNodeColumnSelections.map((sel) => sel.nodeId));
-    combined.push(...selectedNodes.map((node) => node.id));
-    if (Array.isArray(panelSelectedNodes)) {
-      combined.push(...panelSelectedNodes.map((node) => node?.id));
-    }
     const seen = new Set<string>();
     const deduped: string[] = [];
     combined.forEach((id) => {
@@ -287,7 +283,7 @@ function TokenFrequencyTab() {
       }
     });
     return deduped;
-  }, [results, lastCompareNodeIds, effectiveNodeColumnSelections, selectedNodes, panelSelectedNodes]);
+  }, [results, lastCompareNodeIds, effectiveNodeColumnSelections]);
 
   const normalizedNodeResults = useMemo<NormalizedNodeResult[]>(() => {
     if (!results?.data || typeof results.data !== 'object') {
@@ -357,27 +353,8 @@ function TokenFrequencyTab() {
       };
     });
 
-    entries.forEach(([key, value]) => {
-      if (usedKeys.has(key)) {
-        return;
-      }
-      const metadata = extractMetadata(value);
-      const metaNodeId = metadata['node_id'];
-      const metaDisplayName = metadata['display_name'];
-      const nodeId = isNonEmptyString(metaNodeId) ? metaNodeId : key;
-      if (normalized.some((item) => item.nodeId === nodeId)) {
-        return;
-      }
-      usedKeys.add(key);
-      normalized.push({
-        nodeId,
-        displayName: computeDisplayName(nodeId, isNonEmptyString(metaDisplayName) ? (metaDisplayName as string) : key),
-        rows: extractRows(value),
-        metadata,
-        rawEntry: value,
-      });
-    });
-
+    // Only include entries from analysisNodeIds - do NOT add extra unmatched entries
+    // This ensures the results panel only shows nodes that were actually locked/analyzed
     return normalized;
   }, [results, analysisNodeIds, computeDisplayName]);
 

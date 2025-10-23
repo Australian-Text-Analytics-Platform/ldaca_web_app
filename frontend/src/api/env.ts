@@ -1,8 +1,9 @@
 // Centralized environment & API base URL detection
 // Handles:
 //  - Explicit override via function argument (tests)
-//  - Vite env var override: VITE_BACKEND_API_BASE
-//  - Any localhost/127.0.0.1 frontend port -> backend assumed at :8001 (unless already on 8001)
+//  - Vite env var override: VITE_BACKEND_API_BASE (full URL)
+//  - Vite env var: VITE_BACKEND_PORT (port only, defaults to 8001)
+//  - Any localhost/127.0.0.1 frontend port -> backend assumed at configured port
 //  - JupyterHub/Binder proxied paths (/user/<name>/proxy/<port>/)
 //  - Default same-origin /api
 //
@@ -17,6 +18,17 @@ export interface ApiEnvOptions {
 }
 
 const PROXY_REGEX = /^(.*\/proxy\/)(\d+)(\/|$)/;
+
+// Get backend port from env var, default to 8001
+function getBackendPort(): string {
+  if (typeof import.meta !== 'undefined' && (import.meta as any).env) {
+    const port = (import.meta as any).env.VITE_BACKEND_PORT as string | undefined;
+    if (port && port.trim()) {
+      return port.trim();
+    }
+  }
+  return '8001';
+}
 
 export function getApiBase(options: ApiEnvOptions = {}): string {
   // 1. Explicit override (tests / callers)
@@ -36,21 +48,22 @@ export function getApiBase(options: ApiEnvOptions = {}): string {
 
   const loc = options.windowLocation || window.location;
   const { origin, hostname, port, pathname } = loc;
+  const backendPort = getBackendPort();
 
-  // 3. Local dev heuristic: ANY localhost/127.0.0.1 frontend port (other than backend) => backend assumed 8001
+  // 3. Local dev heuristic: ANY localhost/127.0.0.1 frontend port (other than backend) => backend assumed at configured port
   //    This solves the previous limitation (only 3000/5173). Keep a small allowlist for future doc but allow any.
   const isLoopback = hostname === 'localhost' || hostname === '127.0.0.1';
   if (isLoopback) {
     // If the current port is already the backend port, we can same-origin /api
-    if (port === '8001') return `${origin}/api`;
-    return `http://${hostname}:8001/api`;
+    if (port === backendPort) return `${origin}/api`;
+    return `http://${hostname}:${backendPort}/api`;
   }
 
   // 4. JupyterHub/Binder style proxied path /user/<name>/proxy/<frontendPort>/
   const match = pathname.match(PROXY_REGEX);
   if (match) {
     const prefix = match[1];
-    return `${origin}${prefix}8001/api`;
+    return `${origin}${prefix}${backendPort}/api`;
   }
 
   // 5. Default: same origin /api
