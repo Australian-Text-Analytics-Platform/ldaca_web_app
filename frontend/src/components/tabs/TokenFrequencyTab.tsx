@@ -201,6 +201,8 @@ function TokenFrequencyTab() {
   const previousBackendLimitRef = useRef<number | null>(null);
   const tokenLimitInputChangedRef = useRef(false);
   const tokenLimitApplyTimeoutRef = useRef<number | null>(null);
+  const wordCloudRefs = useRef<Record<string, SVGSVGElement | null>>({});
+  const wordCloudExportScale = 3;
 
   const selectionNameById = useMemo(() => {
     const mapping: Record<string, string> = {};
@@ -1050,19 +1052,132 @@ function TokenFrequencyTab() {
 
   const getColorForNodeId = (nodeId: string, idx: number) => nodeColors[nodeId] || defaultPalette[idx % defaultPalette.length];
 
-  const renderWordCloud = (data: any[], width: number = 400, height: number = 200, color: string) => {
+  const toSafeExportFilename = (label: string, suffix: string, extension: string) => {
+    const base = (label || 'token-frequency')
+      .toString()
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 80) || 'token-frequency';
+    return `${base}-${suffix}.${extension}`;
+  };
+
+  const triggerFileDownload = (href: string, filename: string) => {
+    if (typeof document === 'undefined') return;
+    const link = document.createElement('a');
+    link.href = href;
+    link.download = filename;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleDownloadWordCloud = (nodeKey: string, displayName: string) => {
+    if (typeof window === 'undefined') return;
+    const svg = wordCloudRefs.current[nodeKey];
+    if (!svg) return;
+
+    let width = Number(svg.getAttribute('width')) || svg.clientWidth || 400;
+    let height = Number(svg.getAttribute('height')) || svg.clientHeight || 200;
+    const viewBox = svg.getAttribute('viewBox');
+    if ((!width || !height) && viewBox) {
+      const parts = viewBox.split(' ').map((part) => Number(part));
+      if (parts.length === 4) {
+        width = parts[2] || width;
+        height = parts[3] || height;
+      }
+    }
+
+    const clone = svg.cloneNode(true) as SVGSVGElement;
+    clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    if (width) clone.setAttribute('width', String(width));
+    if (height) clone.setAttribute('height', String(height));
+
+    const serializer = new XMLSerializer();
+    const svgString = serializer.serializeToString(clone);
+    const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+
+    const image = new Image();
+    image.onload = () => {
+      const canvas = document.createElement('canvas');
+      const scale = Number.isFinite(wordCloudExportScale) && wordCloudExportScale > 1 ? wordCloudExportScale : 1;
+      const scaledWidth = Math.max(1, Math.round(width * scale));
+      const scaledHeight = Math.max(1, Math.round(height * scale));
+      canvas.width = scaledWidth;
+      canvas.height = scaledHeight;
+      const context = canvas.getContext('2d');
+      if (!context) {
+        URL.revokeObjectURL(url);
+        return;
+      }
+      context.fillStyle = '#ffffff';
+      context.fillRect(0, 0, scaledWidth, scaledHeight);
+      if (scale > 1) {
+        context.imageSmoothingEnabled = true;
+        context.imageSmoothingQuality = 'high';
+      }
+      context.drawImage(image, 0, 0, scaledWidth, scaledHeight);
+      URL.revokeObjectURL(url);
+      const dataUrl = canvas.toDataURL('image/png');
+      triggerFileDownload(dataUrl, toSafeExportFilename(displayName || nodeKey, 'wordcloud', 'png'));
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+    };
+    image.src = url;
+  };
+
+  const handleDownloadFrequencyCsv = (label: string, rows: any[]) => {
+    if (typeof window === 'undefined') return;
+    const csvLines = [
+      ['word', 'count'],
+      ...rows.map((item) => [
+        String(item?.token ?? ''),
+        String(item?.frequency ?? ''),
+      ]),
+    ].map((line) =>
+      line
+        .map((value) => {
+          const str = String(value).replace(/"/g, '""');
+          return `"${str}"`;
+        })
+        .join(',')
+    );
+    const csvContent = csvLines.join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    triggerFileDownload(url, toSafeExportFilename(label, 'frequencies', 'csv'));
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  };
+
+  const renderWordCloud = (nodeKey: string, data: any[], width: number = 400, height: number = 200, color: string) => {
     // Transform data for word cloud format
     const words = data.map(item => ({
       text: item.token,
       value: item.frequency
     }));
 
-    const fontScale = (datum: any) => Math.max(12, Math.min(48, datum.value / Math.max(...data.map(d => d.frequency)) * 36 + 12));
+    const maxFrequency = data.length > 0 ? Math.max(...data.map(d => d.frequency)) : 1;
+    const fontScale = (datum: any) => Math.max(12, Math.min(48, (datum.value / maxFrequency) * 36 + 12));
     const fontSizeSetter = (datum: any) => fontScale(datum);
 
     return (
       <div className="flex justify-center mb-4">
-        <svg width={width} height={height}>
+        <svg
+          ref={(el) => {
+            if (!el) {
+              delete wordCloudRefs.current[nodeKey];
+            } else {
+              wordCloudRefs.current[nodeKey] = el;
+            }
+          }}
+          width={width}
+          height={height}
+          xmlns="http://www.w3.org/2000/svg"
+        >
           <Wordcloud
             words={words}
             width={width}
@@ -1099,20 +1214,42 @@ function TokenFrequencyTab() {
   };
 
   // Derive filtered results data according to the applied stop-word set
-  const renderChart = (nodeId: string, displayName: string, data: any[], color: string) => {
+  const renderChart = (nodeId: string, displayName: string, data: any[], color: string, fullRows: any[]) => {
     // Find max frequency for bar width calculation (guard against empty arrays)
-    const maxFreq = Math.max(...data.map(item => item.frequency), 1);
+    const maxFreqRaw = data.length > 0 ? Math.max(...data.map(item => item.frequency)) : 0;
+    const maxFreq = maxFreqRaw > 0 ? maxFreqRaw : 1;
+    const exportKey = nodeId || displayName;
 
     return (
       <div className="mb-6" data-node-id={nodeId || displayName}>
         <div className="h-16 mb-4 flex items-center">
           <h3 className="text-lg font-semibold text-gray-800 break-words leading-tight w-full">{displayName}</h3>
         </div>
-        
-  {/* Word Cloud */}
-  {renderWordCloud(data, 400, 200, color)}
-        
+
+        <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleDownloadWordCloud(exportKey, displayName)}
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Save Word Cloud (PNG)
+          </Button>
+        </div>
+    {/* Word Cloud */}
+    {renderWordCloud(exportKey, data, 400, 200, color)}
+
         <div className="bg-white p-4 rounded-lg border">
+          <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleDownloadFrequencyCsv(displayName || nodeId, fullRows)}
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Save Frequencies (CSV)
+            </Button>
+          </div>
           <div className="space-y-1.5 max-h-36 overflow-y-auto pr-2">
             {data.map((item, index) => (
               <div key={index} className="flex items-center gap-2 py-1">
@@ -1316,7 +1453,7 @@ function TokenFrequencyTab() {
                       const display = result.rows.slice(0, Math.max(0, limitForSlice));
                       return (
                         <div key={`${result.nodeId || result.displayName}-${idx}`}>
-                          {renderChart(result.nodeId, result.displayName, display, color)}
+                          {renderChart(result.nodeId, result.displayName, display, color, result.rows)}
                         </div>
                       );
                     })}
@@ -1427,6 +1564,8 @@ function TokenFrequencyTab() {
 
                     const fontScale = (datum: any) => Math.max(12, Math.min(54, datum.value / maxTotal * 42 + 12));
                     const fontSizeSetter = (datum: any) => fontScale(datum);
+                    const unifiedKey = `${nodeAId || 'node-a'}-${nodeBId || 'node-b'}-unified`;
+                    const unifiedLabel = `${nodeAName} vs ${nodeBName}`;
 
                     return (
                       <div className="mb-10">
@@ -1442,8 +1581,29 @@ function TokenFrequencyTab() {
                             </div>
                           </div>
                         </div>
+                        <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDownloadWordCloud(unifiedKey, unifiedLabel)}
+                          >
+                            <Download className="mr-2 h-4 w-4" />
+                            Save Word Cloud (PNG)
+                          </Button>
+                        </div>
                         <div className="flex justify-center">
-                          <svg width={860} height={260}>
+                          <svg
+                            ref={(el) => {
+                              if (!el) {
+                                delete wordCloudRefs.current[unifiedKey];
+                              } else {
+                                wordCloudRefs.current[unifiedKey] = el;
+                              }
+                            }}
+                            width={860}
+                            height={260}
+                            xmlns="http://www.w3.org/2000/svg"
+                          >
                             <Wordcloud
                               words={words}
                               width={860}

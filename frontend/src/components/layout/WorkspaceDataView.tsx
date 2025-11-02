@@ -7,7 +7,7 @@ import {
   useReactTable,
 } from '@tanstack/react-table';
 import type { Column as TableColumn } from '@tanstack/react-table';
-import { ChevronDown, Loader2, MoreHorizontal, Pin, Settings2, X } from 'lucide-react';
+import { ChevronDown, Expand, Loader2, Minimize, MoreHorizontal, Pin, Settings2, X } from 'lucide-react';
 
 import { useWorkspaceActions } from '../../hooks/useWorkspaceActions';
 import { useWorkspaceData } from '../../hooks/useWorkspaceData';
@@ -50,8 +50,10 @@ declare module '@tanstack/react-table' {
   interface ColumnMeta<TData, TValue> {
     headerClassName?: string;
     headerMinWidth?: number;
+    headerMaxWidth?: number;
     cellClassName?: string;
     cellMinWidth?: number;
+    cellMaxWidth?: number;
   }
 }
 
@@ -229,6 +231,11 @@ const DATA_TYPES = [
   { value: 'array', label: 'array' },
 ] as const;
 
+const WIDE_COLUMN_THRESHOLD = 120;
+const COLLAPSED_COLUMN_MAX_WIDTH = 320;
+const EXPANDED_COLUMN_MAX_WIDTH = 960;
+const WIDE_COLUMN_SAMPLE_LIMIT = 25;
+
 const buildPaginationRange = (current: number, total: number): PaginationRangeItem[] => {
   const normalizedTotal = Math.max(total, 1);
   const output: PaginationRangeItem[] = [];
@@ -307,6 +314,7 @@ function WorkspaceTable({
   const [renameState, setRenameState] = useState<{ column: string; value: string } | null>(null);
   const renameInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const [columnPinning, setColumnPinning] = useState<ColumnPinningState>({ left: [] });
+  const [expandedColumns, setExpandedColumns] = useState<Record<string, boolean>>({});
 
   const debugEnabled = useMemo(() => {
     if (typeof window === 'undefined') {
@@ -385,6 +393,42 @@ function WorkspaceTable({
     }
     return Object.keys(columnTypes);
   }, [sanitizedData, columnTypes]);
+
+  const wideColumns = useMemo(() => {
+    const sampleRows = sanitizedData.slice(0, WIDE_COLUMN_SAMPLE_LIMIT);
+    const result = new Set<string>();
+
+    columns.forEach((column) => {
+      let maxContentLength = column.length;
+      for (const row of sampleRows) {
+        if (!row || typeof row !== 'object') {
+          continue;
+        }
+        const rawValue = row[column];
+        if (rawValue === null || rawValue === undefined) {
+          continue;
+        }
+        const displayValue = typeof rawValue === 'string' ? rawValue : String(rawValue);
+        maxContentLength = Math.max(maxContentLength, displayValue.length);
+        if (maxContentLength > WIDE_COLUMN_THRESHOLD) {
+          result.add(column);
+          break;
+        }
+      }
+    });
+
+    return result;
+  }, [columns, sanitizedData]);
+
+  const toggleColumnWidth = useCallback((columnId: string) => {
+    setExpandedColumns((prev) => {
+      if (prev[columnId]) {
+        const { [columnId]: _removed, ...rest } = prev;
+        return rest;
+      }
+      return { ...prev, [columnId]: true };
+    });
+  }, []);
 
   const normalizeTypeName = useCallback((type: string): string => {
     const lowercaseType = type.toLowerCase();
@@ -625,6 +669,9 @@ function WorkspaceTable({
       const renameDraftValue = isRenaming ? renameState.value : column;
       const canRename = Boolean(onRenameColumn);
       const canDelete = Boolean(onDeleteColumn);
+      const isWideColumn = wideColumns.has(column);
+      const isExpandedColumn = expandedColumns[column] === true;
+      const isCollapsedColumn = isWideColumn && !isExpandedColumn;
 
       return {
         id: column,
@@ -632,74 +679,75 @@ function WorkspaceTable({
         header: ({ column: columnInstance }) => {
           const isPinnedLeft = columnInstance.getIsPinned() === 'left';
           return (
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex min-w-0 items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => columnInstance.pin(isPinnedLeft ? false : 'left')}
-                  className={cn(
-                    'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-transparent text-muted-foreground transition-colors hover:bg-muted-foreground/10 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                    isPinnedLeft && 'text-primary'
-                  )}
-                  aria-pressed={isPinnedLeft}
-                  aria-label={isPinnedLeft ? `Unpin column ${column}` : `Pin column ${column} to the left`}
-                >
-                  <Pin
-                    className="h-3.5 w-3.5"
-                    fill={isPinnedLeft ? 'currentColor' : 'none'}
-                  />
-                </button>
-                {isRenaming ? (
-                  <Input
-                    ref={(element) => {
-                      if (element) {
-                        renameInputRefs.current[column] = element;
-                      } else {
-                        delete renameInputRefs.current[column];
-                      }
-                    }}
-                    value={renameDraftValue}
-                    disabled={isColumnBusy}
-                    onChange={(event) => updateRenameDraft(column, event.target.value)}
-                    onBlur={() => {
+            <div className="flex min-w-0 items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => columnInstance.pin(isPinnedLeft ? false : 'left')}
+                className={cn(
+                  'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-transparent text-muted-foreground transition-colors hover:bg-muted-foreground/10 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  isPinnedLeft && 'text-primary'
+                )}
+                aria-pressed={isPinnedLeft}
+                aria-label={isPinnedLeft ? `Unpin column ${column}` : `Pin column ${column} to the left`}
+              >
+                <Pin
+                  className="h-3.5 w-3.5"
+                  fill={isPinnedLeft ? 'currentColor' : 'none'}
+                />
+              </button>
+              {isRenaming ? (
+                <Input
+                  ref={(element) => {
+                    if (element) {
+                      renameInputRefs.current[column] = element;
+                    } else {
+                      delete renameInputRefs.current[column];
+                    }
+                  }}
+                  value={renameDraftValue}
+                  disabled={isColumnBusy}
+                  onChange={(event) => updateRenameDraft(column, event.target.value)}
+                  onBlur={() => {
+                    if (!isColumnBusy) {
+                      void submitRename(column, renameDraftValue);
+                    }
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
                       if (!isColumnBusy) {
                         void submitRename(column, renameDraftValue);
                       }
-                    }}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') {
-                        event.preventDefault();
-                        if (!isColumnBusy) {
-                          void submitRename(column, renameDraftValue);
-                        }
-                      } else if (event.key === 'Escape') {
-                        setRenameState(null);
-                      }
-                    }}
-                    className="h-7 w-40 truncate text-xs"
-                    aria-label={`Rename column ${column}`}
-                  />
-                ) : canRename ? (
-                <button
-                  type="button"
-                  className="max-w-[160px] truncate text-left text-xs font-medium text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  onClick={() => {
-                    if (!isColumnBusy) {
-                      beginRename(column);
+                    } else if (event.key === 'Escape') {
+                      setRenameState(null);
                     }
                   }}
-                  disabled={isColumnBusy}
-                  title={column}
-                >
-                  {column}
-                </button>
+                  className="h-7 w-40 truncate text-xs"
+                  aria-label={`Rename column ${column}`}
+                />
               ) : (
-                <span className="block max-w-[160px] truncate text-xs font-medium text-foreground" title={column}>
-                  {column}
-                </span>
+                <div className="min-w-0">
+                  {canRename ? (
+                    <button
+                      type="button"
+                      className="block max-w-[160px] truncate text-left text-xs font-medium text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      onClick={() => {
+                        if (!isColumnBusy) {
+                          beginRename(column);
+                        }
+                      }}
+                      disabled={isColumnBusy}
+                      title={column}
+                    >
+                      {column}
+                    </button>
+                  ) : (
+                    <span className="block max-w-[160px] truncate text-xs font-medium text-foreground" title={column}>
+                      {column}
+                    </span>
+                  )}
+                </div>
               )}
-            </div>
-            <div className="flex items-center gap-1">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -738,6 +786,22 @@ function WorkspaceTable({
                   </DropdownMenuRadioGroup>
                 </DropdownMenuContent>
               </DropdownMenu>
+              {isWideColumn ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => toggleColumnWidth(column)}
+                  className="h-7 w-7 shrink-0 text-muted-foreground hover:text-primary"
+                  aria-label={isCollapsedColumn ? `Expand column ${column}` : `Collapse column ${column}`}
+                >
+                  {isCollapsedColumn ? (
+                    <Expand className="h-3.5 w-3.5" />
+                  ) : (
+                    <Minimize className="h-3.5 w-3.5" />
+                  )}
+                </Button>
+              ) : null}
               {(canRename || canDelete) && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -747,7 +811,7 @@ function WorkspaceTable({
                       size="icon"
                       disabled={isColumnBusy}
                       className={cn(
-                        'h-7 w-7 text-muted-foreground hover:text-primary',
+                        'h-7 w-7 shrink-0 text-muted-foreground hover:text-primary',
                         isColumnBusy && 'cursor-progress opacity-80'
                       )}
                       aria-label={`Column settings for ${column}`}
@@ -788,19 +852,24 @@ function WorkspaceTable({
                 </DropdownMenu>
               )}
             </div>
-          </div>
           );
         },
         cell: ({ getValue }) => {
           const cellValue = getValue();
           const displayValue = cellValue === null || cellValue === undefined ? '' : String(cellValue);
-          return <span className="block truncate">{displayValue}</span>;
+          return (
+            <span className="block truncate" title={displayValue}>
+              {displayValue}
+            </span>
+          );
         },
         meta: {
           headerClassName: 'whitespace-nowrap border-r border-border/70 px-4 py-3 text-left',
           headerMinWidth: 250,
+          headerMaxWidth: isWideColumn ? (isCollapsedColumn ? COLLAPSED_COLUMN_MAX_WIDTH : EXPANDED_COLUMN_MAX_WIDTH) : undefined,
           cellClassName: 'whitespace-nowrap border-r border-border/60 px-4 py-3 text-sm text-foreground',
           cellMinWidth: 200,
+          cellMaxWidth: isWideColumn ? (isCollapsedColumn ? COLLAPSED_COLUMN_MAX_WIDTH : EXPANDED_COLUMN_MAX_WIDTH) : undefined,
         },
       };
     });
@@ -820,6 +889,9 @@ function WorkspaceTable({
     updateRenameDraft,
     submitRename,
     requestDeleteColumn,
+    wideColumns,
+    expandedColumns,
+    toggleColumnWidth,
   ]);
 
   const getPinnedStyles = useCallback(
@@ -994,6 +1066,18 @@ function WorkspaceTable({
                         )}
                         style={{
                           ...(meta?.headerMinWidth ? { minWidth: `${meta.headerMinWidth}px` } : {}),
+                          ...(meta?.headerMaxWidth !== undefined
+                            ? {
+                                maxWidth: `${meta.headerMaxWidth}px`,
+                                width: `${meta.headerMaxWidth}px`,
+                                overflow: 'hidden',
+                              }
+                            : {}),
+                          ...(meta?.headerMinWidth || meta?.headerMaxWidth !== undefined
+                            ? {
+                                transition: 'max-width 200ms ease, width 200ms ease, min-width 200ms ease',
+                              }
+                            : {}),
                           ...getPinnedStyles(header.column, 'header'),
                         }}
                       >
@@ -1023,6 +1107,18 @@ function WorkspaceTable({
                         )}
                         style={{
                           ...(meta?.cellMinWidth ? { minWidth: `${meta.cellMinWidth}px` } : {}),
+                          ...(meta?.cellMaxWidth !== undefined
+                            ? {
+                                maxWidth: `${meta.cellMaxWidth}px`,
+                                width: `${meta.cellMaxWidth}px`,
+                                overflow: 'hidden',
+                              }
+                            : {}),
+                          ...(meta?.cellMinWidth || meta?.cellMaxWidth !== undefined
+                            ? {
+                                transition: 'max-width 200ms ease, width 200ms ease, min-width 200ms ease',
+                              }
+                            : {}),
                           ...getPinnedStyles(cell.column, 'cell'),
                         }}
                       >

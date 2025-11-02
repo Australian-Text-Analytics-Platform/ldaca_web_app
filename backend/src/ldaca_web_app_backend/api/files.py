@@ -79,6 +79,7 @@ def _get_supported_types_by_extension(file_type: str) -> List[str]:
         "parquet": ["DocLazyFrame", "LazyFrame", "DocDataFrame", "DataFrame"],
         "excel": ["DocDataFrame", "DataFrame"],  # Excel lacks native scan; eager only
         "text": ["DocDataFrame", "DataFrame"],
+        "zip": ["DocDataFrame", "DataFrame"],
         "unknown": [],
     }
     return mapping.get(ft, [])
@@ -331,6 +332,16 @@ async def unified_file_preview(
             except Exception:
                 total_rows = 0
 
+        elif file_type == "zip":
+            import docframe
+
+            doc_df = docframe.read_zip(file_path)
+            df = doc_df.dataframe
+            total_rows = int(df.height)
+            if offset or page_size:
+                df = df.slice(offset, page_size)
+            columns = list(df.columns)
+            preview = df.fill_null("None").to_dicts()
         else:
             # Non-Excel: prefer lazy scan where available
             lf = _lazy_scan(file_path, file_type).slice(offset, page_size)

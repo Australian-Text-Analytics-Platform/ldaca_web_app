@@ -195,9 +195,10 @@ const DataLoaderTab: React.FC = () => {
                     multiple
                     onChange={(e) => e.target.files && handleFileInputUpload(e.target.files)}
                     className="hidden"
-                    accept=".csv,.json,.txt,.tsv,.parquet"
+                    accept=".csv,.json,.txt,.tsv,.parquet,.zip"
                   />
                 </label>
+                . Supported formats: CSV, JSON, TXT, TSV, Parquet, ZIP bundles.
               </div>
               {uploading && (
                 <span className="text-blue-600">Uploading…</span>

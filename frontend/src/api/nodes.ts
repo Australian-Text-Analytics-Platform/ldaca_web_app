@@ -52,6 +52,27 @@ export interface FilterPreviewResponse {
 }
 export type JoinPreviewResponse = FilterPreviewResponse;
 
+export interface ExpressionTransformRequest {
+  expression: string;
+  new_column_name?: string | null;
+  preview_limit?: number;
+}
+
+export interface ExpressionPreviewResponse {
+  columns: string[];
+  dtypes: Record<string, string>;
+  data: any[];
+}
+
+export interface ExpressionApplyResponse {
+  state: 'successful';
+  node_id: string;
+  column_name: string;
+  expression: string;
+  dtype?: string | null;
+  message: string;
+}
+
 export const nodesApi = {
   info: (ws: string, node: string, headers: Record<string,string> = {}) => get(`/workspaces/${ws}/nodes/${node}`, headers),
   data: (ws: string, node: string, page = 0, pageSize = 20, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/nodes/${node}/data`, { method: 'GET', headers, params: { page, page_size: pageSize } }),
@@ -118,4 +139,22 @@ export const nodesApi = {
     { method: 'POST', headers, params: { page, page_size: pageSize }, body: req }
   ),
   slice: (ws: string, node: string, req: SliceRequest, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/nodes/${node}/slice`, req, headers),
+  computeColumnPreview: (
+    ws: string,
+    node: string,
+    req: ExpressionTransformRequest,
+    headers: Record<string, string> = {}
+  ) => httpRequest<ExpressionPreviewResponse>(
+    `/workspaces/${ws}/nodes/${node}/compute-column/preview`,
+    { method: 'POST', headers, body: req }
+  ),
+  computeColumn: (
+    ws: string,
+    node: string,
+    req: ExpressionTransformRequest,
+    headers: Record<string, string> = {}
+  ) => httpRequest<ExpressionApplyResponse>(
+    `/workspaces/${ws}/nodes/${node}/compute-column`,
+    { method: 'POST', headers, body: req }
+  ),
 };

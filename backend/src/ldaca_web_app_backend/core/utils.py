@@ -140,6 +140,7 @@ def detect_file_type(filename: str) -> str:
         ".xlsx": "excel",
         ".txt": "text",
         ".tsv": "tsv",
+        ".zip": "zip",
     }
     return type_map.get(ext, "unknown")
 
@@ -175,6 +176,10 @@ def load_data_file(
                     raise RuntimeError(
                         f"Failed to read Excel via polars: {ex2}"
                     ) from ex
+        elif file_type == "zip":
+            import docframe
+
+            return docframe.read_zip(file_path)
     except Exception as e:
         print(f"Warning: polars lazy loading failed: {e}, falling back to pandas")
 

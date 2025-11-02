@@ -2,6 +2,7 @@
 Tests for unified file preview endpoint
 """
 
+from pathlib import Path
 from unittest.mock import patch
 
 import polars as pl
@@ -127,3 +128,29 @@ def test_excel_preview_sheet_names_and_selection(client, tmp_path):
     j2 = resp2.json()
     assert j2["selected_sheet"] == "SheetB"
     assert len(j2["preview"]) >= 1
+
+
+def test_zip_preview_uses_docframe(client, tmp_path):
+    """Ensure ZIP archives are parsed with docframe.read_zip."""
+
+    user_root = tmp_path / "users" / "user_test_user" / "user_data"
+    repo_root = next(
+        parent
+        for parent in Path(__file__).resolve().parents
+        if (parent / "docframe" / "examples" / "data" / "zip_example").exists()
+    )
+    source = repo_root / "docframe" / "examples" / "data" / "zip_example" / "data.zip"
+    target = user_root / "archive.zip"
+    target.write_bytes(source.read_bytes())
+
+    resp = client.post(
+        "/api/files/preview",
+        json={"filename": "archive.zip", "page": 0, "page_size": 10},
+    )
+
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload["file_type"] == "zip"
+    assert payload["columns"] == ["file_path", "file_name", "text"]
+    assert "DocDataFrame" in payload["supported_types"]
+    assert any(row["file_name"] == "1.txt" for row in payload["preview"])

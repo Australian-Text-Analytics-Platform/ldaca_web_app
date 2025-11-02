@@ -78,7 +78,16 @@ const FileList: React.FC<FileListProps> = ({
   };
 
   const getFileIcon = (type: string) => {
-    switch (type.toLowerCase()) {
+    const normalized = type.toLowerCase();
+    if (normalized.includes('zip')) {
+      return (
+        <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 2h8l4 4v12a2 2 0 01-2 2H7a2 2 0 01-2-2V4a2 2 0 012-2z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 6h2m-2 4h2m-2 4h2" />
+        </svg>
+      );
+    }
+    switch (normalized) {
       case 'csv':
         return (
           <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">

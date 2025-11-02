@@ -333,7 +333,10 @@ const Sidebar: React.FC = () => {
             <span>Nodes</span>
             <span className="text-xs text-muted-foreground">{nodeCount}</span>
           </SidebarGroupLabel>
-          <SidebarGroupContent className="flex-1 space-y-2 overflow-y-auto pr-1">
+          <SidebarGroupContent
+            className="flex-1 space-y-2 overflow-y-auto pr-1"
+            onMouseLeave={() => setHoveredNodeId(null)}
+          >
             {nodes.length ? (
               nodes.map((node) => {
                 const name = node?.data?.nodeName || node?.data?.label || node?.label || '';
@@ -383,7 +386,12 @@ const Sidebar: React.FC = () => {
                         title={displayName}
                       >
                         <span className="flex-1 min-w-0 truncate">{displayName}</span>
-                        <span className="flex items-center shrink-0 text-xs text-muted-foreground transition-opacity duration-200 ease-out opacity-0 group-hover:opacity-100 group-focus-within:opacity-100">
+                        <span
+                          className={cn(
+                            'flex items-center shrink-0 text-xs text-muted-foreground transition-opacity duration-200 ease-out',
+                            hoveredNodeId === node.id ? 'opacity-100' : 'opacity-0'
+                          )}
+                        >
                           {isNameCopied ? (
                             <Check className="h-3.5 w-3.5 text-emerald-500" aria-hidden="true" />
                           ) : (

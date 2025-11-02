@@ -197,7 +197,7 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
   return (
     <div className={cn('space-y-3', className)}>
       {showHeaderLabel && (
-        <div className="flex items-center justify-between px-1">
+        <div className="flex items-center justify-between px-4 pt-2">
           <label className="block text-sm font-medium text-muted-foreground">
             Selected Nodes ({(originalCount ?? selectedNodes.length)}/{maxCompare})
           </label>
@@ -217,7 +217,7 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
       ) : (
         <div
           className={cn(
-            'flex gap-2 px-1.5 pb-2 pt-0',
+            'flex gap-3 px-4 pb-3 pt-0',
             selectedNodes.length > maxCompare ? 'overflow-x-auto' : 'overflow-x-hidden'
           )}
         >

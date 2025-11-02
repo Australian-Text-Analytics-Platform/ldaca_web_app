@@ -3,7 +3,7 @@
 Maintains identical route and behavior for backward compatibility.
 """
 
-from typing import Optional, cast
+from typing import Optional
 
 import polars as pl
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
@@ -33,28 +33,46 @@ async def upload_file_to_workspace(
         with open(file_path, "wb") as f:
             content = await file.read()
             f.write(content)
-        data = load_data_file(file_path)
-        if (
-            hasattr(data, "iloc")
-            and hasattr(data, "dtypes")
-            and not isinstance(data, (pl.DataFrame, pl.LazyFrame))
-        ):
-            data = pl.DataFrame(data)
-        try:
-            if isinstance(data, pl.DataFrame):
-                data = data.lazy()
-        except Exception:
+
+        data_obj = load_data_file(file_path)
+
+        try:  # Lazy import to avoid hard dependency during tests
+            from docframe import DocDataFrame, DocLazyFrame  # type: ignore
+        except ImportError:  # pragma: no cover - docframe is expected to be installed
+            DocDataFrame = DocLazyFrame = None  # type: ignore
+
+        node_data = data_obj
+
+        if DocDataFrame is not None and isinstance(node_data, DocDataFrame):  # type: ignore[arg-type]
             pass
+        elif DocLazyFrame is not None and isinstance(node_data, DocLazyFrame):  # type: ignore[arg-type]
+            pass
+        else:
+            if (
+                hasattr(node_data, "iloc")
+                and hasattr(node_data, "dtypes")
+                and not isinstance(node_data, (pl.DataFrame, pl.LazyFrame))
+            ):
+                node_data = pl.DataFrame(node_data)
+
+            try:
+                if isinstance(node_data, pl.DataFrame):
+                    node_data = node_data.lazy()
+            except Exception:
+                pass
+
+            if not isinstance(node_data, (pl.DataFrame, pl.LazyFrame)):
+                raise HTTPException(
+                    status_code=400, detail="Unsupported uploaded data type"
+                )
+
         node_name = node_name or file.filename or "uploaded_file"
-        if not isinstance(data, (pl.DataFrame, pl.LazyFrame)):
-            raise HTTPException(
-                status_code=400, detail="Unsupported uploaded data type"
-            )
+
         node = workspace_manager.add_node_to_workspace(
             user_id=user_id,
             workspace_id=workspace_id,
             node_name=node_name,
-            data=cast(pl.DataFrame | pl.LazyFrame, data),
+            data=node_data,
             operation=f"upload_file({file.filename})",
         )
         if not node:

@@ -8,7 +8,7 @@ import { useAuth } from './useAuth';
 import { NodeSchemaResponse } from '../types';
 // New modular API imports
 import { workspacesApi } from '../api/workspaces';
-import { nodesApi, FilterRequest, SliceRequest } from '../api/nodes';
+import { nodesApi, FilterRequest, SliceRequest, ExpressionTransformRequest } from '../api/nodes';
 import { textApi, ConcordanceRequest, ConcordanceDetachRequest, QuotationRequest, QuotationDetachRequest, ConcordanceAnalysisRequest } from '../api/text';
 import { queryKeys } from '../lib/queryKeys';
 import { getNodeInfo } from '../lib/nodeInfoCache';
@@ -282,21 +282,49 @@ export const useWorkspaceInternal = () => {
   ]);
 
   // Mutations with proper error handling and loading states
-  const setCurrentWorkspaceMutation = useMutation({
+  const setCurrentWorkspaceMutation = useMutation<any, unknown, string | null, { previousId: string | null }>({
     mutationFn: (workspaceId: string | null) => workspacesApi.current.set(workspaceId, authHeaders),
-    onMutate: () => {
+    onMutate: async (workspaceId: string | null) => {
       startOperation('setCurrentWorkspace');
+      const previousId = currentWorkspaceId;
+      if (!workspaceId && previousId) {
+        await queryClient.cancelQueries({
+          predicate: ({ queryKey }) =>
+            Array.isArray(queryKey) &&
+            queryKey[0] === 'workspaces' &&
+            queryKey[1] === previousId &&
+            queryKey.length > 1,
+        });
+      }
+      return { previousId };
     },
-    onSuccess: (_data, workspaceId) => {
-      setCurrentWorkspaceId(workspaceId ?? null);
+    onSuccess: (_data, workspaceId, context) => {
+      const previousId = context?.previousId ?? null;
+      const nextId = workspaceId ?? null;
+      queryClient.setQueryData(queryKeys.currentWorkspace, nextId);
+      setCurrentWorkspaceId(nextId);
       clearSelection();
+
+      if (nextId) {
+        queryClient.invalidateQueries({
+          predicate: ({ queryKey }) =>
+            Array.isArray(queryKey) &&
+            queryKey[0] === 'workspaces' &&
+            queryKey[1] === nextId &&
+            queryKey.length > 1,
+        });
+      } else if (previousId) {
+        // Drop cached queries for the unloaded workspace so the backend isn't pinged again.
+        queryClient.removeQueries({
+          predicate: ({ queryKey }) =>
+            Array.isArray(queryKey) &&
+            queryKey[0] === 'workspaces' &&
+            queryKey[1] === previousId &&
+            queryKey.length > 1,
+        });
+      }
+
       queryClient.invalidateQueries({ queryKey: queryKeys.currentWorkspace });
-      queryClient.invalidateQueries({
-        predicate: ({ queryKey }) =>
-          Array.isArray(queryKey) &&
-          queryKey[0] === 'workspaces' &&
-          queryKey.some((part) => part === 'graph'),
-      });
       endOperation('setCurrentWorkspace');
     },
     onError: (error: any) => {
@@ -579,6 +607,31 @@ export const useWorkspaceInternal = () => {
     onError: (error: any) => {
       setOperationError('filterNode', error.message);
       endOperation('filterNode');
+    },
+  });
+
+  const computeColumnMutation = useMutation({
+    mutationFn: ({ workspaceId, nodeId, request }: {
+      workspaceId: string;
+      nodeId: string;
+      request: ExpressionTransformRequest;
+    }) => nodesApi.computeColumn(workspaceId, nodeId, request, authHeaders),
+    onMutate: () => {
+      startOperation('computeColumn');
+    },
+    onSuccess: (_response, variables) => {
+      if (currentWorkspaceId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
+        if (variables?.nodeId) {
+          queryClient.invalidateQueries({ queryKey: queryKeys.nodeData(currentWorkspaceId, variables.nodeId) });
+          queryClient.invalidateQueries({ queryKey: queryKeys.nodeSchema(currentWorkspaceId, variables.nodeId) });
+        }
+      }
+      endOperation('computeColumn');
+    },
+    onError: (error: any) => {
+      setOperationError('computeColumn', error.message);
+      endOperation('computeColumn');
     },
   });
 
@@ -1023,6 +1076,16 @@ export const useWorkspaceInternal = () => {
       if (!currentWorkspaceId) return Promise.reject(new Error('No workspace selected'));
       return nodesApi.slicePreview(currentWorkspaceId, nodeId, request, page, pageSize, authHeaders);
     },
+
+    computeColumnPreview: (nodeId: string, request: ExpressionTransformRequest) => {
+      if (!currentWorkspaceId) return Promise.reject(new Error('No workspace selected'));
+      return nodesApi.computeColumnPreview(currentWorkspaceId, nodeId, request, authHeaders);
+    },
+
+    computeColumn: (nodeId: string, request: ExpressionTransformRequest) => {
+      if (!currentWorkspaceId) return Promise.reject(new Error('No workspace selected'));
+      return computeColumnMutation.mutateAsync({ workspaceId: currentWorkspaceId, nodeId, request });
+    },
     
     concordanceSearch: (nodeId: string, request: ConcordanceRequest) => {
       if (!currentWorkspaceId) return Promise.reject(new Error('No workspace selected'));
@@ -1105,6 +1168,7 @@ export const useWorkspaceInternal = () => {
   updateWorkspaceNameMutation,
     concatNodesMutation,
     sliceNodeMutation,
+    computeColumnMutation,
     getNodeShapeStable,
     currentWorkspaceId,
     authHeaders,

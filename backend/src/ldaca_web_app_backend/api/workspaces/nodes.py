@@ -15,10 +15,14 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ...core.auth import get_current_user
 from ...core.docworkspace_api import DocWorkspaceAPIUtils
+from ...core.expression_parser import ExpressionParseError, build_polars_expression
 from ...core.workspace import workspace_manager
 from ...models import (
     ConcatPreviewRequest,
     ConcatRequest,
+    ExpressionApplyResponse,
+    ExpressionPreviewResponse,
+    ExpressionTransformRequest,
     FilterPreviewResponse,
     FilterRequest,
     SliceRequest,
@@ -65,6 +69,18 @@ def _coerce_scalar(value: Any) -> Any:
         except Exception:
             return value
     return value
+
+
+def _sanitize_column_alias(label: str) -> str:
+    sanitized = re.sub(r"\s+", " ", label or "").strip()
+    if not sanitized:
+        return "computed_column"
+    return sanitized[:120]
+
+
+def _resolve_expression_column_name(request: ExpressionTransformRequest) -> str:
+    candidate = (request.new_column_name or request.expression or "").strip()
+    return _sanitize_column_alias(candidate)
 
 
 def _build_filter_expression(request: FilterRequest) -> pl.Expr:
@@ -363,6 +379,142 @@ def _derive_concat_node_name(nodes: List[Any], desired_name: Optional[str]) -> s
     else:
         label_str = ", ".join(labels[:3]) + ", ..."
     return f"Concat({label_str})"
+
+
+@router.post(
+    "/{workspace_id}/nodes/{node_id}/compute-column/preview",
+    response_model=ExpressionPreviewResponse,
+)
+async def compute_column_preview(
+    workspace_id: str,
+    node_id: str,
+    request: ExpressionTransformRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    user_id = current_user["id"]
+    node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
+    if not node:
+        raise HTTPException(status_code=404, detail="Node not found")
+
+    try:
+        lazy_data = _ensure_lazyframe(node.data)
+    except HTTPException:
+        raise
+    except Exception as exc:  # pragma: no cover - defensive
+        raise HTTPException(
+            status_code=500, detail=f"Failed to inspect node data: {exc}"
+        ) from exc
+
+    columns, _ = _extract_lazy_schema(lazy_data)
+
+    try:
+        expr = build_polars_expression(request.expression, columns=columns)
+    except ExpressionParseError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    column_name = _resolve_expression_column_name(request)
+    expr = expr.alias(column_name)
+
+    preview_limit = request.preview_limit or 50
+    preview_limit = max(1, min(preview_limit, 500))
+
+    try:
+        preview_df = lazy_data.with_columns(expr).limit(preview_limit).collect()
+    except Exception as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Failed to evaluate expression: {exc}",
+        ) from exc
+
+    columns_out = list(preview_df.columns)
+    dtypes_out = {col: str(dtype) for col, dtype in preview_df.schema.items()}
+    data_rows = preview_df.to_dicts()
+
+    return ExpressionPreviewResponse(
+        columns=columns_out, dtypes=dtypes_out, data=data_rows
+    )
+
+
+@router.post(
+    "/{workspace_id}/nodes/{node_id}/compute-column",
+    response_model=ExpressionApplyResponse,
+)
+async def compute_column_apply(
+    workspace_id: str,
+    node_id: str,
+    request: ExpressionTransformRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    user_id = current_user["id"]
+    node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
+    if not node:
+        raise HTTPException(status_code=404, detail="Node not found")
+
+    data_obj = node.data
+    try:
+        lazy_data = _ensure_lazyframe(data_obj)
+        columns, _ = _extract_lazy_schema(lazy_data)
+    except HTTPException:
+        raise
+    except Exception as exc:  # pragma: no cover - defensive
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to inspect node schema: {exc}",
+        ) from exc
+
+    column_name = _resolve_expression_column_name(request)
+
+    try:
+        expr = build_polars_expression(request.expression, columns=columns).alias(
+            column_name
+        )
+    except ExpressionParseError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    try:
+        if hasattr(data_obj, "with_columns"):
+            updated_data = data_obj.with_columns(expr)
+        else:
+            updated_data = lazy_data.with_columns(expr)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Failed to evaluate expression: {exc}",
+        ) from exc
+
+    dtype_str: Optional[str] = None
+    try:
+        if hasattr(updated_data, "collect_schema"):
+            schema = updated_data.collect_schema()
+        elif hasattr(updated_data, "schema"):
+            schema = updated_data.schema
+        else:
+            schema = None
+        if schema is not None:
+            schema_dict = schema if isinstance(schema, dict) else dict(schema)  # type: ignore[arg-type]
+            dtype = schema_dict.get(column_name)
+            if dtype is not None:
+                dtype_str = str(dtype)
+    except Exception:  # pragma: no cover - best effort only
+        dtype_str = None
+
+    try:
+        node.data = updated_data
+        workspace_manager.persist(user_id, workspace_id)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to persist computed column: {exc}",
+        ) from exc
+
+    return ExpressionApplyResponse(
+        state="successful",
+        node_id=node_id,
+        column_name=column_name,
+        expression=request.expression.strip(),
+        dtype=dtype_str,
+        message=f"Added column '{column_name}' to node",
+    )
 
 
 @router.get("/{workspace_id}/nodes/{node_id}")

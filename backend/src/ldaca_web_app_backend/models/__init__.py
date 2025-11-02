@@ -2,7 +2,7 @@
 Pydantic models for the ATAP Web App API
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -224,6 +224,27 @@ class TransformOperation(BaseModel):
 class AggregateOperation(BaseModel):
     group_by: Optional[List[str]] = None
     aggregations: Dict[str, str]  # column -> function
+
+
+class ExpressionTransformRequest(BaseModel):
+    expression: str = Field(..., min_length=1)
+    new_column_name: Optional[str] = Field(default=None, max_length=200)
+    preview_limit: Optional[int] = Field(default=50, ge=1, le=500)
+
+
+class ExpressionPreviewResponse(BaseModel):
+    columns: List[str]
+    dtypes: Dict[str, str]
+    data: List[Dict[str, Any]]
+
+
+class ExpressionApplyResponse(BaseModel):
+    state: Literal["successful"]
+    node_id: str
+    column_name: str
+    expression: str
+    dtype: Optional[str] = None
+    message: str
 
 
 class JoinRequest(BaseModel):

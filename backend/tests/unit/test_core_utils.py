@@ -2,6 +2,7 @@
 Tests for core utilities
 """
 
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
@@ -19,6 +20,8 @@ from ldaca_web_app_backend.core.utils import (
     setup_user_folders,
     validate_file_path,
 )
+
+import docframe
 
 
 class TestUserFolders:
@@ -121,6 +124,7 @@ class TestFileOperations:
             ("spreadsheet.xlsx", "excel"),
             ("notes.txt", "text"),
             ("data.tsv", "tsv"),
+            ("archive.zip", "zip"),
             ("unknown.xyz", "unknown"),
             ("file_without_extension", "unknown"),
         ]
@@ -158,6 +162,31 @@ class TestFileOperations:
         assert "name" in columns
         assert "age" in columns
         assert "city" in columns
+
+    @pytest.fixture()
+    def sample_zip_file(self, temp_dir):
+        """Provide a copy of the example ZIP archive for tests."""
+
+        repo_root = next(
+            parent
+            for parent in Path(__file__).resolve().parents
+            if (parent / "docframe" / "examples" / "data" / "zip_example").exists()
+        )
+        source = (
+            repo_root / "docframe" / "examples" / "data" / "zip_example" / "data.zip"
+        )
+        target = temp_dir / "sample.zip"
+        target.write_bytes(source.read_bytes())
+        return target
+
+    def test_load_data_file_zip(self, sample_zip_file):
+        """ZIP archives should read via docframe.read_zip."""
+
+        result = load_data_file(sample_zip_file)
+
+        assert isinstance(result, docframe.DocDataFrame)
+        assert result.active_document_name == "text"
+        assert result.dataframe.shape == (3, 3)
 
     def test_load_data_file_json(self, sample_json_file):
         """Test loading JSON file"""
