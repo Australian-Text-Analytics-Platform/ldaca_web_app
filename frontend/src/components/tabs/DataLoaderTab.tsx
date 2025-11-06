@@ -24,6 +24,7 @@ import { queryKeys } from '../../lib/queryKeys';
 import { useFiles } from '../../hooks/useFiles';
 import FilePreviewPanel from '../panels/FilePreviewPanel';
 import AddFilePanel from '../panels/AddFilePanel';
+import { ConfirmDialog } from '../ui/confirm-dialog';
 
 const DataLoaderTab: React.FC = () => {
   const { getAuthHeaders } = useAuth();
@@ -47,8 +48,15 @@ const DataLoaderTab: React.FC = () => {
   const [addingToWorkspace, setAddingToWorkspace] = useState<string | null>(null);
   const [fileToAdd, setFileToAdd] = useState<string | null>(null);
   const [importingSamples, setImportingSamples] = useState(false);
-  const handleImportSamples = useCallback(async () => {
-    if (!window.confirm('Import sample data? This will replace any existing sample_data folder.')) return;
+  const [importSampleDialogOpen, setImportSampleDialogOpen] = useState(false);
+  const [deleteFileDialogOpen, setDeleteFileDialogOpen] = useState(false);
+  const [fileToDelete, setFileToDelete] = useState<string | null>(null);
+  const handleImportSamples = useCallback(() => {
+    setImportSampleDialogOpen(true);
+  }, []);
+
+  const confirmImportSamples = useCallback(async () => {
+    setImportSampleDialogOpen(false);
     setImportingSamples(true);
     try {
       await filesApi.importSampleData(authHeaders);
@@ -62,6 +70,28 @@ const DataLoaderTab: React.FC = () => {
       setImportingSamples(false);
     }
   }, [authHeaders, queryClient, refetchFiles]);
+
+  const requestDeleteFile = useCallback((filename: string) => {
+    setFileToDelete(filename);
+    setDeleteFileDialogOpen(true);
+  }, []);
+
+  const confirmDeleteFile = useCallback(async () => {
+    if (!fileToDelete) return;
+    
+    const filename = fileToDelete;
+    setDeleteFileDialogOpen(false);
+    setFileToDelete(null);
+
+    const ok = await handleDeleteFile(filename);
+    if (!ok) {
+      console.error('Failed to delete file');
+    } else {
+      // Refresh list to reflect deletion
+      refetchFiles();
+    }
+  }, [fileToDelete, handleDeleteFile, refetchFiles]);
+
   const downloadFile = useCallback(async (filename: string) => {
     try {
       const blob = await filesApi.download(filename, authHeaders);
@@ -311,17 +341,9 @@ const DataLoaderTab: React.FC = () => {
                         </Button>
                         {!file.is_sample && (
                           <Button
-                            onClick={async (e) => {
+                            onClick={(e) => {
                               e.stopPropagation();
-                              const confirm = window.confirm(`Delete file "${file.filename}"? This cannot be undone.`);
-                              if (!confirm) return;
-                              const ok = await handleDeleteFile(file.filename);
-                              if (!ok) {
-                                console.error('Failed to delete file');
-                              } else {
-                                // Refresh list to reflect deletion
-                                refetchFiles();
-                              }
+                              requestDeleteFile(file.filename);
                             }}
                             size="sm"
                             variant="ghost"
@@ -535,6 +557,30 @@ const DataLoaderTab: React.FC = () => {
             <p className="text-sm text-red-700">Error: {errors.operations}</p>
           </div>
         )}
+
+        {/* Import Sample Data Confirmation Dialog */}
+        <ConfirmDialog
+          open={importSampleDialogOpen}
+          onOpenChange={setImportSampleDialogOpen}
+          title="Import Sample Data"
+          description="This will replace any existing sample_data folder. Are you sure you want to continue?"
+          confirmText="Import"
+          cancelText="Cancel"
+          variant="default"
+          onConfirm={confirmImportSamples}
+        />
+
+        {/* Delete File Confirmation Dialog */}
+        <ConfirmDialog
+          open={deleteFileDialogOpen}
+          onOpenChange={setDeleteFileDialogOpen}
+          title="Delete File"
+          description={`Are you sure you want to delete file "${fileToDelete}"? This operation cannot be undone.`}
+          confirmText="Delete"
+          cancelText="Cancel"
+          variant="destructive"
+          onConfirm={confirmDeleteFile}
+        />
       </div>
     </div>
   );

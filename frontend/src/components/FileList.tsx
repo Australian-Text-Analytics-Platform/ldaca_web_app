@@ -3,6 +3,7 @@ import { useFilePreview } from '../hooks/useFilePreview';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 import { Loader2 } from 'lucide-react';
 import { FileInfo } from '../types';
+import { ConfirmDialog } from './ui/confirm-dialog';
 
 interface FileListProps {
   files: FileInfo[];
@@ -24,6 +25,8 @@ const FileList: React.FC<FileListProps> = ({
   const [actionLoading, setActionLoading] = useState<{ [key: string]: 'delete' | 'download' | null }>({});
   const { previewData, loading: previewLoading, error, fetchPreview, clearPreview } = useFilePreview();
   const [hoveredFile, setHoveredFile] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [fileToDelete, setFileToDelete] = useState<string | null>(null);
 
   const handleMouseEnter = (filename: string) => {
     setHoveredFile(filename);
@@ -35,17 +38,26 @@ const FileList: React.FC<FileListProps> = ({
     clearPreview();
   };
 
-  const handleDelete = async (filename: string, event: React.MouseEvent) => {
+  const handleDelete = (filename: string, event: React.MouseEvent) => {
     event.stopPropagation();
     if (!onDelete) return;
 
-    if (window.confirm(`Are you sure you want to delete "${filename}"?`)) {
-      setActionLoading(prev => ({ ...prev, [filename]: 'delete' }));
-      try {
-        await onDelete(filename);
-      } finally {
-        setActionLoading(prev => ({ ...prev, [filename]: null }));
-      }
+    setFileToDelete(filename);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!fileToDelete || !onDelete) return;
+
+    const filename = fileToDelete;
+    setDeleteDialogOpen(false);
+    setFileToDelete(null);
+
+    setActionLoading(prev => ({ ...prev, [filename]: 'delete' }));
+    try {
+      await onDelete(filename);
+    } finally {
+      setActionLoading(prev => ({ ...prev, [filename]: null }));
     }
   };
 
@@ -313,6 +325,18 @@ const FileList: React.FC<FileListProps> = ({
       </Tooltip>
         ))}
       </ul>
+
+      {/* Delete File Confirmation Dialog */}
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title="Delete File"
+        description={`Are you sure you want to delete "${fileToDelete}"? This operation cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="destructive"
+        onConfirm={confirmDelete}
+      />
     </TooltipProvider>
   );
 };

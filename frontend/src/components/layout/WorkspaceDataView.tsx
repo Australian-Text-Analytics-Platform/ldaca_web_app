@@ -44,6 +44,7 @@ import {
   TableRow,
 } from '../ui/table';
 import { DatetimeFormatPanel } from '../panels/DatetimeFormatPanel';
+import { ConfirmDialog } from '../ui/confirm-dialog';
 
 declare module '@tanstack/react-table' {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -315,6 +316,8 @@ function WorkspaceTable({
   const renameInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const [columnPinning, setColumnPinning] = useState<ColumnPinningState>({ left: [] });
   const [expandedColumns, setExpandedColumns] = useState<Record<string, boolean>>({});
+  const [deleteColumnDialogOpen, setDeleteColumnDialogOpen] = useState(false);
+  const [columnToDelete, setColumnToDelete] = useState<string | null>(null);
 
   const debugEnabled = useMemo(() => {
     if (typeof window === 'undefined') {
@@ -612,13 +615,22 @@ function WorkspaceTable({
         return;
       }
 
-      const confirmation =
-        typeof window === 'undefined'
-          ? true
-          : window.confirm(`Delete column "${column}"? This operation cannot be undone.`);
-      if (!confirmation) {
+      // Open confirmation dialog
+      setColumnToDelete(column);
+      setDeleteColumnDialogOpen(true);
+    },
+    [onDeleteColumn]
+  );
+
+  const confirmDeleteColumn = useCallback(
+    async () => {
+      if (!columnToDelete || !onDeleteColumn) {
         return;
       }
+
+      const column = columnToDelete;
+      setDeleteColumnDialogOpen(false);
+      setColumnToDelete(null);
 
       setColumnBusy(column, true);
       try {
@@ -651,7 +663,7 @@ function WorkspaceTable({
         setColumnBusy(column, false);
       }
     },
-    [onDeleteColumn, onRefreshSchema, applySchema, renameState, setColumnBusy]
+    [columnToDelete, onDeleteColumn, onRefreshSchema, applySchema, renameState, setColumnBusy]
   );
 
   const columnDefs = useMemo<ColumnDef<DataRow, unknown>[]>(() => {
@@ -1156,6 +1168,18 @@ function WorkspaceTable({
             return value === null || value === undefined ? '' : String(value);
           })
           .filter(Boolean)}
+      />
+
+      {/* Delete Column Confirmation Dialog */}
+      <ConfirmDialog
+        open={deleteColumnDialogOpen}
+        onOpenChange={setDeleteColumnDialogOpen}
+        title="Delete Column"
+        description={`Are you sure you want to delete column "${columnToDelete}"? This operation cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="destructive"
+        onConfirm={confirmDeleteColumn}
       />
     </>
   );
