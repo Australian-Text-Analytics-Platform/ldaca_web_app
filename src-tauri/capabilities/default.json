@@ -1,0 +1,23 @@
+{
+  "identifier": "default",
+  "description": "Default permissions for the LDaCA Text Analytics app",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-create",
+    "core:window:allow-center",
+    "core:window:allow-close",
+    "core:window:allow-hide",
+    "core:window:allow-maximize",
+    "core:window:allow-minimize",
+    "core:window:allow-show",
+    "core:window:allow-unmaximize",
+    "core:window:allow-unminimize",
+    "core:webview:allow-set-webview-size",
+    "core:webview:allow-print",
+    "shell:allow-open",
+    "shell:allow-execute",
+    "shell:allow-spawn",
+    "opener:default"
+  ]
+}

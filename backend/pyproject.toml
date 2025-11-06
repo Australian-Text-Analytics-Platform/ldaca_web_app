@@ -68,6 +68,7 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
+    "pyinstaller>=6.16.0",
     "twine>=6.2.0",
 ]
 

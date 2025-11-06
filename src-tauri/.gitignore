@@ -1,0 +1,35 @@
+# Rust/Cargo build artifacts
+target/
+
+# Tauri generated files
+gen/
+WixTools/
+
+# macOS bundle artifacts
+*.app
+*.dmg
+
+# Windows bundle artifacts
+*.exe
+*.msi
+
+# Linux bundle artifacts
+*.deb
+*.rpm
+*.AppImage
+*.appimage
+
+# Keep all source icons (they're small and needed for builds)
+# Icons are managed by generate-icons.sh script
+
+# Platform-specific
+.cargo/
+.idea/
+.vscode/
+
+# Logs
+*.log
+
+# Temp files
+*~
+.DS_Store

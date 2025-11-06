@@ -48,8 +48,10 @@
     "@tanstack/react-query": "^5.83.0",
     "@tanstack/react-query-devtools": "^5.83.0",
     "@tanstack/react-table": "^8.21.3",
+    "@tauri-apps/api": "^2.9.0",
     "@visx/text": "3.13.2-alpha.0",
     "@visx/wordcloud": "3.13.0-alpha.0",
+    "@vitejs/plugin-react": "^5.0.4",
     "@xyflow/react": "^12.8.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -65,9 +67,8 @@
     "recharts": "^3.1.2",
     "rehype-raw": "^7.0.0",
     "tailwind-merge": "^3.3.1",
-    "zustand": "^5.0.6",
     "vite": "^7.1.10",
-    "@vitejs/plugin-react": "^5.0.4"
+    "zustand": "^5.0.6"
   },
   "scripts": {
     "dev": "vite",

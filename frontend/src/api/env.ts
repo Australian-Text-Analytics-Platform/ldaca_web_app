@@ -11,6 +11,12 @@
 // to incorrectly target the frontend origin when running dev server on a different port
 // (e.g. 4000). This revision broadens the heuristic and adds an explicit override.
 
+declare global {
+  interface Window {
+    __BACKEND_URL__?: string;
+  }
+}
+
 export interface ApiEnvOptions {
   explicitBase?: string; // override (useful for tests)
   windowLocation?: Location; // injection for testability
@@ -21,8 +27,8 @@ const PROXY_REGEX = /^(.*\/proxy\/)(\d+)(\/|$)/;
 
 // Get backend port from env var, default to 8001
 function getBackendPort(): string {
-  if (typeof import.meta !== 'undefined' && (import.meta as any).env) {
-    const port = (import.meta as any).env.VITE_BACKEND_PORT as string | undefined;
+  if (typeof import.meta !== 'undefined' && import.meta.env) {
+    const port = import.meta.env.VITE_BACKEND_PORT;
     if (port && port.trim()) {
       return port.trim();
     }
@@ -34,11 +40,23 @@ export function getApiBase(options: ApiEnvOptions = {}): string {
   // 1. Explicit override (tests / callers)
   if (options.explicitBase) return options.explicitBase.replace(/\/$/, '');
 
-  // 2. Build-time / runtime environment override via Vite (e.g. VITE_BACKEND_API_BASE)
+  // 2. Tauri desktop app: check for injected backend URL or call Tauri command
+  if (typeof window !== 'undefined') {
+    // First check for injected URL (might be set by Rust)
+    if (window.__BACKEND_URL__) {
+      const tauriUrl = window.__BACKEND_URL__;
+      return `${tauriUrl}/api`.replace(/\/$/, '');
+    }
+    
+    // If in Tauri but no URL yet, we'll fall through to other methods
+    // The Tauri command will be called asynchronously elsewhere if needed
+  }
+
+  // 3. Build-time / runtime environment override via Vite (e.g. VITE_BACKEND_API_BASE)
   //    This lets a dev specify: VITE_BACKEND_API_BASE=http://localhost:8001/api
   //    or full URL to remote backend. We don't attempt to validate here beyond trimming.
-  if (typeof import.meta !== 'undefined' && (import.meta as any).env) {
-    const explicit = (import.meta as any).env.VITE_BACKEND_API_BASE as string | undefined;
+  if (typeof import.meta !== 'undefined' && import.meta.env) {
+    const explicit = import.meta.env.VITE_BACKEND_API_BASE;
     if (explicit && explicit.trim()) {
       return explicit.replace(/\/$/, '');
     }

@@ -180,6 +180,31 @@ frontend/frontend.log
 frontend/build/
 frontend/dist/
 
+# Desktop (Tauri) - Build artifacts
+src-tauri/target/
+src-tauri/gen/
+src-tauri/WixTools/
+
+# Desktop (Tauri) - Bundled outputs
+src-tauri/*.app
+src-tauri/*.dmg
+src-tauri/*.exe
+src-tauri/*.msi
+src-tauri/*.deb
+src-tauri/*.rpm
+src-tauri/*.AppImage
+
+# Desktop (Tauri) - Platform-specific
+src-tauri/.cargo/
+
+# npm Workspaces - Root level
+node_modules/
+package-lock.json
+
+# npm Workspaces - Workspace members have their own node_modules
+frontend/node_modules/
+frontend/package-lock.json
+
 # Development artifacts from docframe/docworkspace integration
 *.pkl
 *.joblib

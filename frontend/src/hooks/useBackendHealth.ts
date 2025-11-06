@@ -13,53 +13,112 @@ import { getApiBase } from '../api/env';
 export const useBackendHealth = () => {
   const [ready, setReady] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [healthUrl, setHealthUrl] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+
+    const resolveHealthUrl = async () => {
+      try {
+        if (typeof window !== 'undefined') {
+          if (window.__BACKEND_URL__) {
+            const normalizedBackend = window.__BACKEND_URL__.replace(/\/$/, '');
+            if (!cancelled) {
+              setHealthUrl(`${normalizedBackend}/health`);
+            }
+            return;
+          }
+
+          if ('__TAURI_INTERNALS__' in window) {
+            try {
+              const { invoke } = await import('@tauri-apps/api/core');
+              const backendUrl = await invoke<string>('get_backend_url');
+              if (backendUrl && !cancelled) {
+                const normalizedBackend = backendUrl.replace(/\/$/, '');
+                window.__BACKEND_URL__ = normalizedBackend;
+                setHealthUrl(`${normalizedBackend}/health`);
+                return;
+              }
+            } catch (tauriErr) {
+              console.error('Failed to resolve backend URL via Tauri invoke', tauriErr);
+            }
+          }
+        }
+
+        const base = getApiBase();
+        const normalizedBase = base.replace(/\/$/, '');
+        const resolved = normalizedBase.endsWith('/api')
+          ? normalizedBase.replace(/\/api$/, '/health')
+          : `${normalizedBase}/health`;
+        if (!cancelled) {
+          setHealthUrl(resolved);
+        }
+      } catch (err) {
+        console.error('Failed to resolve backend health URL', err);
+        if (!cancelled) {
+          setHealthUrl('/health');
+        }
+      }
+    };
+
+    resolveHealthUrl();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!healthUrl) return;
+
     let cancelled = false;
     let attempt = 0;
     let timeoutId: number | null = null;
 
-  // Derive health endpoint: if API base ends with /api strip it to reach root for /health
-  const apiBase = getApiBase();
-  const healthUrl = apiBase.endsWith('/api') ? apiBase.replace(/\/api$/, '/health') : `${apiBase}/health`;
-  const poll = async () => {
+    const poll = async () => {
       attempt += 1;
       try {
-  const resp = await fetch(healthUrl, { cache: 'no-store' });
+        const resp = await fetch(healthUrl, { cache: 'no-store' });
         if (resp.ok) {
-          // Optionally verify JSON shape / status
-            // swallow JSON parse errors (treat as not ready)
+          let healthy = true;
           try {
             const data = await resp.json();
-            if (data && (data.status === 'healthy' || data.status === 'operational')) {
-              if (!cancelled) {
-                setReady(true);
-                setError(null);
-              }
-              return; // stop polling
+            healthy = Boolean(
+              data && (data.status === 'healthy' || data.status === 'operational')
+            );
+          } catch {
+            healthy = true; // Treat a 2xx with no JSON as success
+          }
+
+          if (healthy) {
+            if (!cancelled) {
+              setReady(true);
+              setError(null);
             }
-          } catch { /* ignore */ }
+            return;
+          }
         }
         throw new Error(`HTTP ${resp.status}`);
-      } catch (e: any) {
+      } catch (err: unknown) {
         if (!cancelled) {
-          setError(e?.message || 'Backend not reachable');
+          const message = err instanceof Error ? err.message : 'Backend not reachable';
+          setError(message);
         }
       }
       if (cancelled) return;
-      // Schedule next attempt with backoff
       const nextDelay = attempt <= 6
-        ? 500 // 6 quick attempts (~3s)
-        : Math.min(5000, 1000 * 2 ** Math.min(5, attempt - 6)); // capped exponential
+        ? 500
+        : Math.min(5000, 1000 * 2 ** Math.min(5, attempt - 6));
       timeoutId = window.setTimeout(poll, nextDelay);
     };
 
     poll();
+
     return () => {
       cancelled = true;
       if (timeoutId) window.clearTimeout(timeoutId);
     };
-  }, []);
+  }, [healthUrl]);
 
   return { ready, error };
 };

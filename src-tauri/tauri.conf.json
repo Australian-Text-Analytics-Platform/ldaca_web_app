@@ -1,0 +1,51 @@
+{
+  "productName": "LDaCA Text Analytics",
+  "version": "0.1.0",
+  "identifier": "au.edu.ldaca.text-analytics",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:3000",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../frontend/build"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "LDaCA Text Analytics",
+        "width": 1400,
+        "height": 900,
+        "minWidth": 1000,
+        "minHeight": 700,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; connect-src 'self' http://localhost:* ws://localhost:* http://127.0.0.1:* ws://127.0.0.1:*; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:;"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "externalBin": [
+      "../backend/dist/ldaca_web_app_backend"
+    ],
+    "copyright": "Copyright © 2025 Australian Text Analytics Platform",
+    "category": "Education",
+    "shortDescription": "Text analytics and visualization platform",
+    "longDescription": "LDaCA Text Analytics provides comprehensive tools for text analysis, including concordance, frequency analysis, topic modeling, and timeline visualization."
+  },
+  "plugins": {
+    "shell": {
+      "open": true
+    }
+  }
+}
