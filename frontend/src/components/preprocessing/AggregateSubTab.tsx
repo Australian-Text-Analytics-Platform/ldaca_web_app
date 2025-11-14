@@ -46,6 +46,19 @@ const getErrorMessage = (error: unknown): string => {
 
 const BASIC_TOKEN_MIME = 'application/x-ldaca-builder-token';
 
+const SMART_CHAR_MAP: Record<string, string> = {
+  '“': '"',
+  '”': '"',
+  '„': '"',
+  '‟': '"',
+  '‘': '\'',
+  '’': '\'',
+  '‚': '\'',
+  '‛': '\'',
+};
+
+const normalizeSmartCharacters = (input: string): string => input.replace(/[“”„‟‘’‚‛]/g, (char) => SMART_CHAR_MAP[char] ?? char);
+
 type BasicToken =
   | { id: string; kind: 'column'; column: string }
   | { id: string; kind: 'custom'; value: string };
@@ -56,6 +69,25 @@ type DragPayload =
   | { source: 'palette'; kind: 'column'; column: string }
   | { source: 'palette'; kind: 'custom' }
   | { source: 'existing'; id: string };
+
+const setDragPayload = (dataTransfer: DataTransfer, payload: DragPayload, plainText: string): void => {
+  const encoded = JSON.stringify(payload);
+  try {
+    dataTransfer.setData(BASIC_TOKEN_MIME, encoded);
+  } catch {
+    /* WebViews may reject custom MIME types */
+  }
+  try {
+    dataTransfer.setData('application/json', encoded);
+  } catch {
+    /* Some environments disallow registering JSON mime types */
+  }
+  try {
+    dataTransfer.setData('text/plain', plainText);
+  } catch {
+    /* Ignore environments that disallow overriding text/plain */
+  }
+};
 
 const createTokenId = (): string => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -129,6 +161,7 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = ({
   const previewTimeoutRef = useRef<number | null>(null);
   const latestExpressionRef = useRef('');
   const latestColumnNameRef = useRef('');
+  const lastDragPayloadRef = useRef<DragPayload | null>(null);
 
   useEffect(() => {
     setPreviewData(null);
@@ -205,9 +238,10 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = ({
   }, [effectiveSelectedNodes]);
 
   const setExpressionAndMarkDirty = useCallback((nextExpression: string) => {
-    latestExpressionRef.current = nextExpression;
-    setExpression(nextExpression);
-    const nextTrimmed = nextExpression.trim();
+    const normalizedExpression = normalizeSmartCharacters(nextExpression);
+    latestExpressionRef.current = normalizedExpression;
+    setExpression(normalizedExpression);
+    const nextTrimmed = normalizedExpression.trim();
     if (nextTrimmed.length === 0) {
       setPreviewData(null);
       setPreviewError(null);
@@ -401,9 +435,10 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = ({
     if (basicDisabled) return;
     const target = basicTokens.find((token): token is Extract<BasicToken, { kind: 'custom' }> => token.id === tokenId && token.kind === 'custom');
     if (!target) return;
-    setEditingTokenId(tokenId);
-    setCustomDraft(target.value);
-    customOriginalRef.current = target.value;
+  const normalizedValue = normalizeSmartCharacters(target.value);
+  setEditingTokenId(tokenId);
+  setCustomDraft(normalizedValue);
+  customOriginalRef.current = normalizedValue;
   }, [basicTokens, basicDisabled]);
 
   const finishCustomEdit = useCallback((commit: boolean) => {
@@ -431,7 +466,7 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = ({
   }, [editingTokenId, customDraft, applyBasicTokenUpdate, schedulePreview]);
 
   const handleCustomDraftChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    setCustomDraft(event.target.value);
+    setCustomDraft(normalizeSmartCharacters(event.target.value));
   }, []);
 
   const handleCustomInputKeyDown = useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -455,28 +490,43 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = ({
     schedulePreview();
   }, [basicDisabled, basicTokens.length, applyBasicTokenUpdate, schedulePreview, setExpressionAndMarkDirty]);
 
-  const parseDragPayload = (event: React.DragEvent): DragPayload | null => {
-    try {
-      const raw = event.dataTransfer?.getData(BASIC_TOKEN_MIME);
+  const parseDragPayload = useCallback((event: React.DragEvent): DragPayload | null => {
+    const decode = (raw: string | null | undefined): DragPayload | null => {
       if (!raw) return null;
-      const payload = JSON.parse(raw) as DragPayload;
-      if (!payload || typeof payload !== 'object') return null;
-      return payload;
-    } catch {
-      return null;
+      try {
+        const candidate = JSON.parse(raw) as DragPayload;
+        return candidate && typeof candidate === 'object' ? candidate : null;
+      } catch {
+        return null;
+      }
+    };
+
+    const dt = event.dataTransfer;
+    if (dt) {
+      const direct = decode(dt.getData(BASIC_TOKEN_MIME));
+      if (direct) return direct;
+
+      const jsonDecoded = decode(dt.getData('application/json'));
+      if (jsonDecoded) return jsonDecoded;
+
+      const plainDecoded = decode(dt.getData('text/plain'));
+      if (plainDecoded) return plainDecoded;
     }
-  };
+
+    return lastDragPayloadRef.current;
+  }, [lastDragPayloadRef]);
 
   const handleColumnDragStart = useCallback((event: React.DragEvent<HTMLButtonElement>, column: string) => {
     if (basicDisabled) {
       event.preventDefault();
       return;
     }
-  const dt = event.dataTransfer;
-  if (!dt) return;
-  dt.setData(BASIC_TOKEN_MIME, JSON.stringify({ source: 'palette', kind: 'column', column } satisfies DragPayload));
-  dt.setData('text/plain', column);
-  dt.effectAllowed = 'copy';
+    const dt = event.dataTransfer;
+    if (!dt) return;
+    const payload: DragPayload = { source: 'palette', kind: 'column', column };
+    lastDragPayloadRef.current = payload;
+    setDragPayload(dt, payload, column);
+    dt.effectAllowed = 'copy';
     setBasicDragActive(true);
   }, [basicDisabled]);
 
@@ -485,11 +535,12 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = ({
       event.preventDefault();
       return;
     }
-  const dt = event.dataTransfer;
-  if (!dt) return;
-  dt.setData(BASIC_TOKEN_MIME, JSON.stringify({ source: 'palette', kind: 'custom' } satisfies DragPayload));
-  dt.setData('text/plain', 'Custom token');
-  dt.effectAllowed = 'copy';
+    const dt = event.dataTransfer;
+    if (!dt) return;
+    const payload: DragPayload = { source: 'palette', kind: 'custom' };
+    lastDragPayloadRef.current = payload;
+    setDragPayload(dt, payload, 'Custom token');
+    dt.effectAllowed = 'copy';
     setBasicDragActive(true);
   }, [basicDisabled]);
 
@@ -501,15 +552,21 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = ({
     if (editingTokenId) {
       finishCustomEdit(true);
     }
-  const dt = event.dataTransfer;
-  if (!dt) return;
-  dt.setData(BASIC_TOKEN_MIME, JSON.stringify({ source: 'existing', id: tokenId } satisfies DragPayload));
-  dt.setData('text/plain', 'Column token');
-  dt.effectAllowed = 'move';
+    const dt = event.dataTransfer;
+    if (!dt) return;
+    const payload: DragPayload = { source: 'existing', id: tokenId };
+    lastDragPayloadRef.current = payload;
+    setDragPayload(dt, payload, 'Column token');
+    dt.effectAllowed = 'move';
     setBasicDragActive(true);
   }, [basicDisabled, editingTokenId, finishCustomEdit]);
 
   const handleExistingTokenDragEnd = useCallback(() => {
+    setBasicDragActive(false);
+    setDropIndicator(null);
+  }, []);
+
+  const handlePaletteDragEnd = useCallback(() => {
     setBasicDragActive(false);
     setDropIndicator(null);
   }, []);
@@ -525,6 +582,10 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = ({
   const handleBuilderDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
     if (basicDisabled) return;
     event.preventDefault();
+    const dt = event.dataTransfer;
+    if (dt) {
+      dt.dropEffect = dt.effectAllowed === 'move' ? 'move' : 'copy';
+    }
     setBasicDragActive(true);
   }, [basicDisabled]);
 
@@ -543,7 +604,10 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = ({
     const payload = parseDragPayload(event);
     const indicator = dropIndicator;
     setDropIndicator(null);
-    if (!payload) return;
+    if (!payload) {
+      lastDragPayloadRef.current = null;
+      return;
+    }
     let insertIndex = basicTokens.length;
     if (indicator) {
       const targetIdx = basicTokens.findIndex((token) => token.id === indicator.tokenId);
@@ -558,13 +622,15 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = ({
       } else if (payload.kind === 'custom') {
         addCustomToken(insertIndex);
       }
+      lastDragPayloadRef.current = null;
       return;
     }
 
     if (payload.source === 'existing') {
       moveBasicToken(payload.id, insertIndex);
     }
-  }, [basicDisabled, dropIndicator, basicTokens, addColumnToken, addCustomToken, moveBasicToken]);
+    lastDragPayloadRef.current = null;
+  }, [basicDisabled, dropIndicator, basicTokens, addColumnToken, addCustomToken, moveBasicToken, parseDragPayload]);
 
   const handleApply = useCallback(async () => {
     const currentExpression = latestExpressionRef.current.trim();
@@ -665,7 +731,7 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = ({
   }, [setExpressionAndMarkDirty]);
 
   const handleColumnNameChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const next = event.target.value;
+    const next = normalizeSmartCharacters(event.target.value);
     latestColumnNameRef.current = next;
     setColumnName(next);
     if (trimmedExpression.length === 0) {
@@ -761,7 +827,7 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = ({
                         type="button"
                         draggable={!basicDisabled}
                         onDragStart={(event) => handleColumnDragStart(event, column)}
-                        onDragEnd={() => setBasicDragActive(false)}
+                        onDragEnd={handlePaletteDragEnd}
                         onClick={() => addColumnToken(column)}
                         className={cn(
                           'select-none rounded-full border border-border bg-foreground px-3 py-1 text-sm text-background shadow-sm transition',
@@ -775,7 +841,7 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = ({
                       type="button"
                       draggable={!basicDisabled}
                       onDragStart={handleCustomDragStart}
-                      onDragEnd={() => setBasicDragActive(false)}
+                      onDragEnd={handlePaletteDragEnd}
                       onClick={() => addCustomToken()}
                       className={cn(
                         'select-none rounded-full border border-border bg-background px-3 py-1 text-sm text-foreground shadow-sm transition',
@@ -850,6 +916,10 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = ({
                                       onChange={handleCustomDraftChange}
                                       onBlur={() => finishCustomEdit(true)}
                                       onKeyDown={handleCustomInputKeyDown}
+                                      spellCheck={false}
+                                      autoCorrect="off"
+                                      autoCapitalize="none"
+                                      autoComplete="off"
                                       autoFocus
                                       className="h-7 w-32 rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground shadow-none focus-visible:ring-0"
                                     />
@@ -928,6 +998,10 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = ({
                   onChange={handleExpressionChange}
                   onBlur={handleExpressionBlur}
                   onFocus={handleExpressionFocus}
+                  spellCheck={false}
+                  autoCorrect="off"
+                  autoCapitalize="none"
+                  autoComplete="off"
                   rows={3}
                   placeholder='Examples: A + B, when(A > 0, A, 0), A / lit(100)'
                   className={cn(
@@ -948,6 +1022,10 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = ({
                 onChange={handleColumnNameChange}
                 onBlur={handleColumnBlur}
                 onFocus={handleColumnFocus}
+                spellCheck={false}
+                autoCorrect="off"
+                autoCapitalize="none"
+                autoComplete="off"
                 placeholder="Defaults to the expression string"
                 disabled={!hasSelection || isLoading.operations}
               />

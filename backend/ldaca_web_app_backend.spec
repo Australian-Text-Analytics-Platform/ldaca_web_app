@@ -7,6 +7,8 @@ Creates a standalone executable that bundles the FastAPI server
 import sys
 from pathlib import Path
 
+from PyInstaller.utils.hooks import collect_submodules
+
 # Get the backend root directory
 backend_root = Path.cwd()
 src_path = backend_root / 'src'
@@ -22,84 +24,46 @@ datas = [
 
 # Hidden imports that PyInstaller might miss
 # These are dynamically imported or loaded at runtime
-hiddenimports = [
-    # FastAPI and dependencies
-    'uvicorn',
+api_modules = collect_submodules('ldaca_web_app_backend.api')
+core_modules = collect_submodules('ldaca_web_app_backend.core')
+
+base_hiddenimports = [
+    # Uvicorn internals loaded lazily by FastAPI
     'uvicorn.logging',
-    'uvicorn.loops',
-    'uvicorn.loops.auto',
-    'uvicorn.protocols',
+    'uvicorn.lifespan',
+    'uvicorn.lifespan.on',
     'uvicorn.protocols.http',
     'uvicorn.protocols.http.auto',
     'uvicorn.protocols.websockets',
     'uvicorn.protocols.websockets.auto',
-    'uvicorn.lifespan',
-    'uvicorn.lifespan.on',
-    
-    # FastAPI routers - explicitly include all API modules
-    'ldaca_web_app_backend.api.admin',
-    'ldaca_web_app_backend.api.auth',
-    'ldaca_web_app_backend.api.feedback',
-    'ldaca_web_app_backend.api.files',
-    'ldaca_web_app_backend.api.text',
-    'ldaca_web_app_backend.api.users',
-    'ldaca_web_app_backend.api.workspaces',
-    'ldaca_web_app_backend.api.workspaces.workspace',
-    'ldaca_web_app_backend.api.workspaces.node_ops',
-    
-    # Core modules
-    'ldaca_web_app_backend.core',
-    'ldaca_web_app_backend.core.docworkspace_api',
-    'ldaca_web_app_backend.core.background_tasks',
-    'ldaca_web_app_backend.db',
-    'ldaca_web_app_backend.models',
-    'ldaca_web_app_backend.settings',
-    
-    # SQLAlchemy and database
-    'sqlalchemy',
-    'sqlalchemy.ext.asyncio',
-    'aiosqlite',
-    
-    # Pydantic
-    'pydantic',
-    'pydantic_settings',
-    
-    # Authentication
-    'fastapi_users',
+
+    # Authentication dependencies
+    'fastapi_users.authentication',
     'fastapi_users.db',
-    'google.auth',
-    'google_auth_oauthlib',
-    
-    # Data processing - docframe and docworkspace
+    'google.auth.transport.requests',
+    'google.oauth2.id_token',
+
+    # DocFrame/docworkspace integration
     'docframe',
     'docframe.core',
-    'docframe.text',
     'docworkspace',
     'docworkspace.workspace',
     'docworkspace.node',
     
-    # Polars and data libraries
-    'polars',
-    'polars.io',
-    'pyarrow',
-    'pyarrow.parquet',
-    
-    # NLP libraries
-    'nltk',
-    'nltk.corpus',
-    'nltk.tokenize',
-    
-    # Other dependencies
-    'xlsxwriter',
-    'pyairtable',
-    'trio',
-    'multipart',
-    
-    # Standard library modules that might be missed
+    # Database driver for SQLAlchemy async sqlite (loaded via URL string)
+    'aiosqlite',
+    'sqlalchemy.dialects.sqlite.aiosqlite',
+
+    # Process utilities used for cleanup in CLI
+    'psutil',
+
+    # Standard library helpers referenced dynamically
     'email.mime.multipart',
     'email.mime.text',
     'email.mime.base',
 ]
+
+hiddenimports = sorted(set(base_hiddenimports + api_modules + core_modules))
 
 # Analysis: scan the source code for dependencies
 a = Analysis(
@@ -108,7 +72,7 @@ a = Analysis(
     binaries=[],
     datas=datas,
     hiddenimports=hiddenimports,
-    hookspath=[],
+    hookspath=[str(backend_root / 'hooks')],
     hooksconfig={},
     runtime_hooks=[],
     excludes=[
@@ -137,13 +101,13 @@ pyz = PYZ(
     cipher=block_cipher,
 )
 
-# EXE: Create the executable
+# EXE: Create the executable (one-directory mode)
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
+    [],
+    [],
+    [],
     [],
     name='ldaca_web_app_backend',
     debug=False,
@@ -158,4 +122,17 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    exclude_binaries=True,
+)
+
+# COLLECT: bundle the Python runtime, libraries, and resources alongside the executable
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    name='ldaca_web_app_backend_bundle',
 )

@@ -12,7 +12,7 @@
     "build": "npm run -w frontend build",
     "tauri": "tauri",
     "tauri:dev": "npm run prepare:frontend && tauri dev",
-    "tauri:build": "tauri build",
+  "tauri:build": "npm run prepare:backend && tauri build",
     "desktop:dev": "npm run prepare:frontend && tauri dev",
     "desktop:build": "npm run prepare:all && tauri build",
     "prepare:backend": "cd backend && bash build_executable.sh --clean",

@@ -86,21 +86,14 @@ def _get_supported_types_by_extension(file_type: str) -> List[str]:
 
 
 def _excel_sheet_names(file_path) -> List[str]:
+    # Prefer Polars to avoid pandas dependency
     try:
-        # Prefer Polars to avoid pandas dependency
         sheets = pl.read_excel(file_path, sheet_id=None)  # may return dict-like
         if isinstance(sheets, dict):
             return list(sheets.keys())
     except Exception:
         pass
-    # Fallback to pandas for sheet listing
-    try:
-        import pandas as pd
 
-        xl = pd.ExcelFile(file_path)
-        return list(xl.sheet_names)
-    except Exception:
-        pass
     # Final fallback: parse workbook.xml from xlsx zip
     try:
         import xml.etree.ElementTree as ET
@@ -305,12 +298,11 @@ async def unified_file_preview(
                     )
                 except Exception:
                     df = pl.read_excel(file_path, sheet_name=selected_sheet)
-            except Exception:
-                # Fallback to pandas
-                import pandas as pd
-
-                pdf = pd.read_excel(file_path, sheet_name=selected_sheet)
-                df = pl.from_pandas(pdf)
+            except Exception as e:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to read Excel file with polars: {str(e)}. Ensure polars[xlsx2csv] is installed.",
+                )
 
             # Slice page window if requested
             if offset or page_size:
@@ -322,15 +314,16 @@ async def unified_file_preview(
 
             # Compute total rows cheaply if possible (may require reading entire sheet)
             try:
-                # Use pandas to get total rows without re-reading if possible
-                if "pdf" in locals():
-                    total_rows = int(pdf.shape[0])
-                else:
+                # Get total rows from the DataFrame
+                total_rows = int(df.height)
+            except Exception:
+                # Fallback: re-read to get height
+                try:
                     total_rows = int(
                         pl.read_excel(file_path, sheet_name=selected_sheet).height
                     )
-            except Exception:
-                total_rows = 0
+                except Exception:
+                    total_rows = 0
 
         elif file_type == "zip":
             import docframe

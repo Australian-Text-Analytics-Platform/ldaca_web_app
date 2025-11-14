@@ -2,9 +2,10 @@
 Pydantic models for the ATAP Web App API
 """
 
+from enum import Enum
 from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field, model_validator
 
 # =============================================================================
 # AUTHENTICATION MODELS
@@ -322,6 +323,27 @@ class ConcordanceDetachRequest(BaseModel):
 
 
 # Quotation requests (mirror concordance shape but without search parameters)
+class QuotationEngineType(str, Enum):
+    LOCAL = "local"
+    REMOTE = "remote"
+
+
+class QuotationEngineConfig(BaseModel):
+    type: QuotationEngineType = QuotationEngineType.LOCAL
+    url: Optional[AnyHttpUrl] = None
+
+    @model_validator(mode="after")
+    def _validate_remote(self) -> "QuotationEngineConfig":
+        if self.type is QuotationEngineType.LOCAL:
+            # Normalise to ensure we never persist stale URLs for local mode
+            self.url = None
+        elif self.url is None:
+            raise ValueError("Remote quotation engines require a URL")
+        return self
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class QuotationRequest(BaseModel):
     column: str
     # Pagination parameters
@@ -330,12 +352,18 @@ class QuotationRequest(BaseModel):
     # Sorting parameters
     sort_by: Optional[str] = None  # column name to sort by
     sort_order: str = "asc"  # "asc" or "desc"
+    engine: Optional[QuotationEngineConfig] = None
+
+    model_config = ConfigDict(extra="forbid")
 
 
 class QuotationDetachRequest(BaseModel):
     node_id: str
     column: str
     new_node_name: Optional[str] = None  # If not provided, will be auto-generated
+    engine: Optional[QuotationEngineConfig] = None
+
+    model_config = ConfigDict(extra="forbid")
 
 
 class FrequencyAnalysisRequest(BaseModel):

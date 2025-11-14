@@ -13,10 +13,10 @@ DIST_DIR="$BACKEND_DIR/dist"
 echo "🔧 Preparing backend for Tauri sidecar..."
 echo ""
 
-# Check if backend executable exists
-if [ ! -f "$DIST_DIR/ldaca_web_app_backend" ] && [ ! -f "$DIST_DIR/ldaca_web_app_backend.exe" ]; then
-    echo "❌ Backend executable not found!"
-    echo "   Expected: $DIST_DIR/ldaca_web_app_backend"
+# Check if backend bundle exists (one-directory layout)
+if [ ! -d "$DIST_DIR/ldaca_web_app_backend_bundle" ]; then
+    echo "❌ Backend bundle not found!"
+    echo "   Expected directory: $DIST_DIR/ldaca_web_app_backend_bundle"
     echo ""
     echo "   Build it first with:"
     echo "   cd backend && bash build_executable.sh --clean"
@@ -49,18 +49,23 @@ else
 fi
 
 echo "Detected target: $TARGET"
-echo "Source: $DIST_DIR/$EXE_NAME"
-echo "Destination: $DIST_DIR/ldaca_web_app_backend-$TARGET"
+DEST_DIR="$DIST_DIR/ldaca_web_app_backend_bundle-$TARGET"
+
+echo "Detected target: $TARGET"
+echo "Source bundle: $DIST_DIR/ldaca_web_app_backend_bundle"
+echo "Destination bundle: $DEST_DIR"
 echo ""
 
 # Copy and rename for sidecar
-cp "$DIST_DIR/$EXE_NAME" "$DIST_DIR/ldaca_web_app_backend-$TARGET"
+# Copy bundle for sidecar consumption
+rm -rf "$DEST_DIR"
+cp -R "$DIST_DIR/ldaca_web_app_backend_bundle" "$DEST_DIR"
 
 # Make executable (Linux/macOS)
 if [ "$EXE_NAME" != "ldaca_web_app_backend.exe" ]; then
-    chmod +x "$DIST_DIR/ldaca_web_app_backend-$TARGET"
+    chmod +x "$DEST_DIR/$EXE_NAME"
 fi
 
 echo "✅ Backend prepared for Tauri sidecar"
 echo ""
-echo "Sidecar binary: $DIST_DIR/ldaca_web_app_backend-$TARGET"
+echo "Sidecar bundle: $DEST_DIR"

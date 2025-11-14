@@ -4,7 +4,7 @@
   "identifier": "au.edu.ldaca.text-analytics",
   "build": {
     "beforeDevCommand": "npm run dev",
-    "devUrl": "http://localhost:3000",
+    "devUrl": "http://localhost:3001",
     "beforeBuildCommand": "npm run build",
     "frontendDist": "../frontend/build"
   },
@@ -35,8 +35,14 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "macOS": {
+      "signingIdentity": "-"
+    },
     "externalBin": [
-      "../backend/dist/ldaca_web_app_backend"
+      "../backend/dist/ldaca_web_app_backend_bundle/ldaca_web_app_backend"
+    ],
+    "resources": [
+      "../backend/dist/ldaca_web_app_backend_bundle"
     ],
     "copyright": "Copyright © 2025 Australian Text Analytics Platform",
     "category": "Education",

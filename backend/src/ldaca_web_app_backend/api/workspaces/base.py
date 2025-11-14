@@ -325,7 +325,7 @@ def _configure_numba_threading():
                 # TBB will manage its own threads
                 pass
             print(
-                "📊 Numba: Using TBB threading layer (thread-safe, TBB-managed threads)"
+                "INFO: Numba: Using TBB threading layer (thread-safe, TBB-managed threads)"
             )
         else:
             # Fall back to workqueue with single thread for safety
@@ -335,7 +335,7 @@ def _configure_numba_threading():
             if "NUMBA_NUM_THREADS" not in os.environ:
                 os.environ["NUMBA_NUM_THREADS"] = "1"
             print(
-                "📊 Numba: Using workqueue threading layer (single-threaded for safety)"
+                "INFO: Numba: Using workqueue threading layer (single-threaded for safety)"
             )
 
     except Exception as e:
@@ -343,7 +343,7 @@ def _configure_numba_threading():
         os.environ.setdefault("NUMBA_THREADING_LAYER", "workqueue")
         os.environ.setdefault("NUMBA_THREADING_LAYER_PRIORITY", "workqueue omp tbb")
         os.environ.setdefault("NUMBA_NUM_THREADS", "1")
-        print(f"⚠️ Numba: Threading configuration warning: {e}")
+        print(f"WARNING: Numba: Threading configuration warning: {e}")
 
 
 # Apply the configuration
@@ -428,12 +428,8 @@ async def add_node_to_workspace(
         if mode in {"DocLazyFrame", "DocDataFrame"}:
             try:
                 import docframe  # noqa: F401
-                from docframe.core.docframe import (
-                    DocDataFrame as _DocDF,  # type: ignore
-                )
-                from docframe.core.docframe import (
-                    DocLazyFrame as _DocLF,  # type: ignore
-                )
+                from docframe.core.docframe import DocDataFrame as _DocDF  # type: ignore
+                from docframe.core.docframe import DocLazyFrame as _DocLF  # type: ignore
             except Exception:  # pragma: no cover
                 raise HTTPException(
                     status_code=500,
@@ -553,7 +549,7 @@ async def add_node_to_workspace(
         # Log and convert unexpected errors to 500
         import traceback
 
-        print(f"❌ Add node error: {str(e)}")
+        print(f"ERROR: Add node error: {str(e)}")
         print(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=500, detail=f"Internal server error adding node: {str(e)}"

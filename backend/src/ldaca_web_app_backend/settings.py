@@ -4,7 +4,6 @@ Settings are loaded from environment variables with sensible defaults.
 Users are responsible for setting environment variables themselves.
 """
 
-import os
 from pathlib import Path
 
 from pydantic import Field
@@ -47,6 +46,13 @@ class Settings(BaseSettings):
     server_host: str = Field(default="0.0.0.0", description="Server host")
     backend_port: int = Field(default=8001, description="Backend server port")
     debug: bool = Field(default=False, description="Debug mode")
+    quotation_service_timeout: float = Field(
+        default=30.0, description="Timeout (seconds) for remote quotation services"
+    )
+    quotation_service_max_batch_size: int = Field(
+        default=128,
+        description="Maximum documents sent per request to the remote quotation service",
+    )
 
     # CORS Configuration
     cors_allow_origin_regex: str = Field(

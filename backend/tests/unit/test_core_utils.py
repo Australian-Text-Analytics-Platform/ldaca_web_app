@@ -5,7 +5,7 @@ Tests for core utilities
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pandas as pd
+import polars as pl
 import pytest
 from ldaca_web_app_backend.core.utils import (
     detect_file_type,
@@ -193,7 +193,7 @@ class TestFileOperations:
         df = load_data_file(sample_json_file)
 
         # Should return polars DataFrame by default
-        assert hasattr(df, "shape")  # Both polars and pandas have shape
+        assert hasattr(df, "shape")  # Polars DataFrames expose shape
         assert df.shape[0] == 3  # 3 rows
         assert df.shape[1] == 3  # 3 columns
 
@@ -317,7 +317,7 @@ class TestDataFrameUtils:
 
     def test_serialize_dataframe_for_json(self):
         """Test DataFrame serialization for JSON"""
-        df = pd.DataFrame({
+        df = pl.DataFrame({
             "name": ["Alice", "Bob", "Charlie"],
             "age": [25, 30, 35],
             "score": [95.5, 87.2, 92.1],
@@ -334,14 +334,14 @@ class TestDataFrameUtils:
 
     def test_serialize_dataframe_with_nulls(self):
         """Test DataFrame serialization with null values"""
-        df = pd.DataFrame({"name": ["Alice", None, "Charlie"], "age": [25, 30, None]})
+        df = pl.DataFrame({"name": ["Alice", None, "Charlie"], "age": [25, 30, None]})
 
         result = serialize_dataframe_for_json(df)
 
         assert result["shape"] == (3, 2)
         assert len(result["preview"]) == 3
-        # Check that nulls are handled
-        assert any("None" in str(row) for row in result["preview"])
+        # Check that nulls are preserved as None values
+        assert any(row["name"] is None for row in result["preview"])
 
     def test_serialize_invalid_dataframe(self):
         """Test serialization of invalid DataFrame-like object"""
@@ -360,7 +360,7 @@ class TestDataFrameUtils:
         mock_df.shape = (10, 5)
         mock_df.columns = ["doc_id", "text", "metadata"]
         mock_df.dtypes = {"doc_id": "int64", "text": "object"}
-        mock_df.head.return_value.fillna.return_value.to_dict.return_value = []
+        mock_df.head.return_value.to_dicts.return_value = []
         mock_df.__class__.__name__ = "DocDataFrame"
 
         # Mock the underlying dataframe attribute (what DocDataFrame uses)
@@ -372,7 +372,7 @@ class TestDataFrameUtils:
             "text": "str",
             "metadata": "str",
         }
-        mock_underlying_df.head.return_value.to_pandas.return_value.fillna.return_value.to_dict.return_value = []
+        mock_underlying_df.head.return_value.to_dicts.return_value = []
         mock_df.dataframe = mock_underlying_df
 
         result = serialize_dataframe_for_json(mock_df)

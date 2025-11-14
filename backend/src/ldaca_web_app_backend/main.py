@@ -46,35 +46,30 @@ async def lifespan(app: FastAPI):
     await init_db()
     await cleanup_expired_sessions()
 
-    # Initialize worker pool for background tasks
-    try:
-        from .core.worker import get_worker_pool
-
-        worker_pool = get_worker_pool()
-        worker_pool.start()
-        print("Worker pool started for background processing")
-    except Exception as e:
-        print(f"Warning: Failed to start worker pool: {e}")
+    # Worker pool will start lazily on first task submission
+    print("Worker pool configured for lazy initialization")
 
     print(
-        f"📖 API Documentation: http://{settings.server_host}:{settings.backend_port}/api/docs"
+        f"API Documentation: http://{settings.server_host}:{settings.backend_port}/api/docs"
     )
-    print(
-        f"🔍 Health Check: http://{settings.server_host}:{settings.backend_port}/health"
-    )
+    print(f"Health Check: http://{settings.server_host}:{settings.backend_port}/health")
 
     yield  # Application runs here
 
     # Shutdown
     print("Shutting down Enhanced LDaCA Web App API...")
 
-    # Shutdown worker pool
+    # Shutdown worker pool with timeout to prevent hanging
     try:
         from .core.worker import get_worker_pool
 
         worker_pool = get_worker_pool()
-        worker_pool.shutdown(wait=True)
-        print("Worker pool shutdown complete")
+        if worker_pool.is_running:
+            print(
+                f"Shutting down worker pool ({worker_pool.active_task_count} active tasks)..."
+            )
+            worker_pool.shutdown(wait=True, timeout=5.0)
+            print("Worker pool shutdown complete")
     except Exception as e:
         print(f"Warning: Error during worker pool shutdown: {e}")
 
@@ -93,9 +88,12 @@ app = FastAPI(
 )
 
 # Setup CORS (regex + credentials from settings)
+# Allow:
+# - http://localhost:* and http://127.0.0.1:* for web dev/production
+# - tauri://localhost for Tauri desktop app
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"http://(localhost|127\.0\.0\.1)(:\d+)?",
+    allow_origin_regex=r"(http://(localhost|127\.0\.0\.1)(:\d+)?|tauri://localhost)",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -202,27 +200,27 @@ async def status():
         "status": "operational",
         "components": {
             "authentication": {
-                "status": "✅ Google OAuth 2.0",
+                "status": "[OK] Google OAuth 2.0",
                 "description": "Secure user authentication with session management",
             },
             "file_management": {
-                "status": "✅ Multi-format support",
+                "status": "[OK] Multi-format support",
                 "description": "Upload, download, preview CSV, JSON, Parquet, Excel files",
             },
             "workspace_management": {
-                "status": "✅ Multi-user isolation",
+                "status": "[OK] Multi-user isolation",
                 "description": "Per-user workspaces with DataFrame node operations",
             },
             "data_operations": {
-                "status": "✅ DataFrame manipulation",
+                "status": "[OK] DataFrame manipulation",
                 "description": "Filter, slice, transform, aggregate, join operations",
             },
             "text_analysis": {
-                "status": "✅ DocFrame ready",
+                "status": "[OK] DocFrame ready",
                 "description": "Advanced text analysis with DocFrame integration",
             },
             "database": {
-                "status": "✅ SQLAlchemy async",
+                "status": "[OK] SQLAlchemy async",
                 "description": "Async SQLAlchemy with session management",
             },
         },
@@ -239,7 +237,7 @@ async def status():
 if __name__ == "__main__":
     import uvicorn
 
-    print("🚀 Starting Enhanced LDaCA Web App API server...")
+    print("Starting Enhanced LDaCA Web App API server...")
 
     uvicorn.run(
         app,

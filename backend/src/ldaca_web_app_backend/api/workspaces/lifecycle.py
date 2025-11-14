@@ -70,7 +70,7 @@ async def create_workspace(
     except Exception as e:
         import traceback
 
-        print(f"❌ Workspace creation error: {e}")
+        print(f"ERROR: Workspace creation error: {e}")
         print(traceback.format_exc())
         raise HTTPException(
             status_code=500,

@@ -29,8 +29,10 @@ export interface ConcordanceAnalysisResponse {
   combinable?: boolean;
   preferences?: { page_size?: number; show_metadata?: boolean; [key: string]: unknown };
 }
-export interface QuotationRequest { column: string; page?: number; page_size?: number; sort_by?: string | null; sort_order?: 'asc' | 'desc'; }
-export interface QuotationDetachRequest { node_id: string; column: string; new_node_name?: string; }
+export type QuotationEngineType = 'local' | 'remote';
+export interface QuotationEngineConfig { type: QuotationEngineType; url?: string | null; }
+export interface QuotationRequest { column: string; page?: number; page_size?: number; sort_by?: string | null; sort_order?: 'asc' | 'desc'; engine?: QuotationEngineConfig; }
+export interface QuotationDetachRequest { node_id: string; column: string; new_node_name?: string; engine?: QuotationEngineConfig; }
 export interface FrequencyAnalysisRequest { time_column: string; group_by_columns?: string[] | null; frequency: 'daily' | 'weekly' | 'monthly' | 'yearly'; sort_by_time: boolean; }
 
 export interface TokenFrequencyRequest { node_ids: string[]; node_columns: Record<string,string>; stop_words?: string[] | null; }

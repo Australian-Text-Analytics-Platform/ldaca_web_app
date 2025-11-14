@@ -5,7 +5,6 @@ import subprocess
 from pathlib import Path
 
 import uvicorn
-from IPython.display import Javascript, Markdown, display
 
 from .main import app
 from .settings import PACKAGE_ROOT, settings
@@ -17,6 +16,22 @@ try:
     ON_COLAB = True
 except ImportError:
     ON_COLAB = False
+
+# Optional IPython dependencies for Jupyter/Colab deployment
+try:
+    from IPython.display import Javascript, Markdown, display
+
+    IPYTHON_AVAILABLE = True
+except ImportError:
+    IPYTHON_AVAILABLE = False
+    # Define no-op placeholders if IPython is not available
+    Javascript = None
+    Markdown = None
+
+    def display(x):
+        """No-op placeholder when IPython is not available."""
+        pass
+
 
 import tarfile
 import tempfile
@@ -50,6 +65,18 @@ def start_backend(port=8001):
 def start_frontend(
     port=3000, platform=None, download_release=False, frontend_dir=None, build_dir=None
 ):
+    """Start the frontend server with nginx.
+
+    Note: This function is designed for Jupyter/Colab environments.
+    To use IPython display features, install optional dependencies:
+        pip install ldaca-web-app-backend[deploy]
+    """
+    if not IPYTHON_AVAILABLE and not ON_COLAB:
+        print("Warning: IPython not available. Display features will be limited.")
+        print(
+            "To enable full Jupyter integration, install: pip install ldaca-web-app-backend[deploy]"
+        )
+
     url = f"http://localhost:{port}"
     NGINX_DIR = Path("~/nginx").expanduser()
     NGINX_DIR.mkdir(parents=True, exist_ok=True)

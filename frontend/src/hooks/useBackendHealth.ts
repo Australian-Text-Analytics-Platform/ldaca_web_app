@@ -15,6 +15,9 @@ export const useBackendHealth = () => {
   const [error, setError] = useState<string | null>(null);
   const [healthUrl, setHealthUrl] = useState<string | null>(null);
 
+  console.warn('[Health Check] Hook initialized, window.__BACKEND_URL__:', 
+    typeof window !== 'undefined' ? window.__BACKEND_URL__ : 'N/A');
+
   useEffect(() => {
     let cancelled = false;
 
@@ -23,8 +26,10 @@ export const useBackendHealth = () => {
         if (typeof window !== 'undefined') {
           if (window.__BACKEND_URL__) {
             const normalizedBackend = window.__BACKEND_URL__.replace(/\/$/, '');
+            const healthEndpoint = `${normalizedBackend}/health`;
+            console.warn('[Health Check] Using Tauri injected URL:', healthEndpoint);
             if (!cancelled) {
-              setHealthUrl(`${normalizedBackend}/health`);
+              setHealthUrl(healthEndpoint);
             }
             return;
           }
@@ -35,8 +40,10 @@ export const useBackendHealth = () => {
               const backendUrl = await invoke<string>('get_backend_url');
               if (backendUrl && !cancelled) {
                 const normalizedBackend = backendUrl.replace(/\/$/, '');
+                const healthEndpoint = `${normalizedBackend}/health`;
+                console.warn('[Health Check] Using Tauri invoke URL:', healthEndpoint);
                 window.__BACKEND_URL__ = normalizedBackend;
-                setHealthUrl(`${normalizedBackend}/health`);
+                setHealthUrl(healthEndpoint);
                 return;
               }
             } catch (tauriErr) {
@@ -50,6 +57,7 @@ export const useBackendHealth = () => {
         const resolved = normalizedBase.endsWith('/api')
           ? normalizedBase.replace(/\/api$/, '/health')
           : `${normalizedBase}/health`;
+        console.warn('[Health Check] Using fallback URL:', resolved);
         if (!cancelled) {
           setHealthUrl(resolved);
         }
@@ -81,16 +89,18 @@ export const useBackendHealth = () => {
         const resp = await fetch(healthUrl, { cache: 'no-store' });
         if (resp.ok) {
           let healthy = true;
+          let responseData = null;
           try {
-            const data = await resp.json();
+            responseData = await resp.json();
             healthy = Boolean(
-              data && (data.status === 'healthy' || data.status === 'operational')
+              responseData && (responseData.status === 'healthy' || responseData.status === 'operational')
             );
           } catch {
             healthy = true; // Treat a 2xx with no JSON as success
           }
 
           if (healthy) {
+            console.warn('[Health Check] ✓ Backend is healthy!', { healthUrl, response: responseData });
             if (!cancelled) {
               setReady(true);
               setError(null);

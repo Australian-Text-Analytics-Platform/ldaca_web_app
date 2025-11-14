@@ -2,40 +2,33 @@
 Text analysis utility endpoints
 """
 
-import nltk
-from fastapi import APIRouter, HTTPException
-from nltk.corpus import stopwords
+from typing import List
 
-router = APIRouter(prefix="/text", tags=["text_analysis"])
+from fastapi import APIRouter
+from pydantic import BaseModel
+
+router = APIRouter(prefix="/api/text", tags=["text"])
 
 
-@router.get(
-    "/default-stop-words",
-    summary="Get default English stop words",
-    description="Returns a list of default English stop words from NLTK",
-)
-async def get_default_stop_words():
-    """
-    Get default English stop words from NLTK.
+class StopWordConfig(BaseModel):
+    """Configuration for stop word options"""
 
-    Returns a list of common English stop words that can be used for token frequency analysis.
-    """
+    language: str = "english"
+    custom_words: List[str] = []  # Additional stop words to add
+
+
+@router.get("/default-stop-words")
+async def get_default_stop_words(
+    language: str = "english",
+):
+    """Get default stop words for a language."""
     try:
-        # Try to get stop words
-        try:
-            nltk.data.find("corpora/stopwords")
-        except LookupError:
-            nltk.download("stopwords")
+        # Lazy import: only load NLTK when endpoint is actually called
+        import nltk
 
-        # Get English stop words
-        stop_words = list(stopwords.words("english"))
+        nltk.download("stopwords", quiet=True)
+        from nltk.corpus import stopwords
 
-        return {
-            "state": "successful",
-            "message": f"Retrieved {len(stop_words)} default stop words",
-            "data": stop_words,
-        }
+        return {"stopwords": stopwords.words(language)}
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error retrieving stop words: {str(e)}"
-        )
+        return {"error": f"Failed to load stopwords: {str(e)}", "stopwords": []}

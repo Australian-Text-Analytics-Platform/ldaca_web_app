@@ -34,7 +34,9 @@ def _configure_worker_environment():
     os.environ["MKL_NUM_THREADS"] = "1"
     os.environ["OPENBLAS_NUM_THREADS"] = "1"
 
-    print(f"[Worker {os.getpid()}] 📊 Using safe workqueue threading (single-threaded)")
+    print(
+        f"[Worker {os.getpid()}] INFO: Using safe workqueue threading (single-threaded)"
+    )
 
     # Try to upgrade to TBB if it's actually available and functional
     tbb_functional = False
@@ -42,7 +44,7 @@ def _configure_worker_environment():
         # Test 1: Check if TBB package is importable
         import tbb  # noqa: F401
 
-        print(f"[Worker {os.getpid()}] 🔍 TBB package found")
+        print(f"[Worker {os.getpid()}] INFO: TBB package found")
 
         # Test 2: Check if Numba can actually use TBB
         try:
@@ -65,20 +67,20 @@ def _configure_worker_environment():
                 result = _test_tbb()
                 if result == 42:
                     tbb_functional = True
-                    print(f"[Worker {os.getpid()}] ✅ TBB threading functional")
+                    print(f"[Worker {os.getpid()}] SUCCESS: TBB threading functional")
 
             except Exception as e:
-                print(f"[Worker {os.getpid()}] ⚠️ TBB test failed: {e}")
+                print(f"[Worker {os.getpid()}] WARNING: TBB test failed: {e}")
                 # Restore safe settings
                 os.environ["NUMBA_THREADING_LAYER"] = "workqueue"
                 os.environ["NUMBA_THREADING_LAYER_PRIORITY"] = "workqueue"
                 os.environ["NUMBA_NUM_THREADS"] = "1"
 
         except Exception as e:
-            print(f"[Worker {os.getpid()}] ⚠️ Numba TBB check failed: {e}")
+            print(f"[Worker {os.getpid()}] WARNING: Numba TBB check failed: {e}")
 
     except ImportError:
-        print(f"[Worker {os.getpid()}] ℹ️ TBB package not available")
+        print(f"[Worker {os.getpid()}] INFO: TBB package not available")
 
     # If TBB is functional, configure it properly
     if tbb_functional:
@@ -87,10 +89,10 @@ def _configure_worker_environment():
         # Don't set NUMBA_NUM_THREADS when using TBB
         if "NUMBA_NUM_THREADS" in os.environ:
             del os.environ["NUMBA_NUM_THREADS"]
-        print(f"[Worker {os.getpid()}] 📊 Upgraded to TBB threading layer")
+        print(f"[Worker {os.getpid()}] INFO: Upgraded to TBB threading layer")
     else:
         print(
-            f"[Worker {os.getpid()}] 📊 Using workqueue threading layer (single-threaded)"
+            f"[Worker {os.getpid()}] INFO: Using workqueue threading layer (single-threaded)"
         )
 
 
@@ -251,9 +253,9 @@ def topic_modeling_task(
                     "threads have been launched",
                 ]
             ):
-                print(f"[Worker {os.getpid()}] ⚠️ Threading error detected: {e}")
+                print(f"[Worker {os.getpid()}] WARNING: Threading error detected: {e}")
                 print(
-                    f"[Worker {os.getpid()}] 🔧 Reconfiguring with safe threading and retrying..."
+                    f"[Worker {os.getpid()}] INFO: Reconfiguring with safe threading and retrying..."
                 )
 
                 # Force safe threading configuration
@@ -273,7 +275,7 @@ def topic_modeling_task(
 
                 # Retry the computation with safe settings
                 print(
-                    f"[Worker {os.getpid()}] 🔄 Retrying topic modeling with workqueue threading..."
+                    f"[Worker {os.getpid()}] INFO: Retrying topic modeling with workqueue threading..."
                 )
                 tv = topic_visualization(
                     corpora=corpora,
@@ -281,7 +283,7 @@ def topic_modeling_task(
                     use_ctfidf=use_ctfidf,
                 )
                 print(
-                    f"[Worker {os.getpid()}] ✅ Topic modeling succeeded with fallback threading"
+                    f"[Worker {os.getpid()}] SUCCESS: Topic modeling succeeded with fallback threading"
                 )
             else:
                 # Re-raise non-threading errors
@@ -322,40 +324,111 @@ class WorkerPool:
         self.max_workers = max_workers
         self._pool: Optional[ProcessPoolExecutor] = None
         self._shutdown = False
+        self._active_tasks: list[Future] = []  # Track submitted tasks
 
     def start(self):
-        """Start the worker pool."""
+        """Start the worker pool lazily when first needed."""
         if self._pool is not None:
             return
 
-        print(f"🚀 Starting worker pool with {self.max_workers} processes")
+        print(f"Starting worker pool with {self.max_workers} processes")
         self._pool = ProcessPoolExecutor(
             max_workers=self.max_workers,
             mp_context=mp.get_context("spawn"),  # Use spawn for better isolation
         )
         self._shutdown = False
 
-    def shutdown(self, wait: bool = True):
-        """Shutdown the worker pool."""
+    def shutdown(self, wait: bool = True, timeout: float = 5.0):
+        """
+        Shutdown the worker pool and clean up child processes.
+
+        Args:
+            wait: Whether to wait for tasks to complete
+            timeout: Maximum time to wait for graceful shutdown (seconds)
+        """
         if self._pool is not None:
-            print("🛑 Shutting down worker pool...")
+            print("Shutting down worker pool...")
+
+            # Cancel any pending tasks
+            cancelled_count = 0
+            for task in self._active_tasks:
+                if not task.done():
+                    task.cancel()
+                    cancelled_count += 1
+
+            if cancelled_count > 0:
+                print(f"Cancelled {cancelled_count} pending tasks")
+
             self._shutdown = True
-            self._pool.shutdown(wait=wait)
+
+            # Try graceful shutdown first
+            try:
+                self._pool.shutdown(wait=wait, cancel_futures=True)
+                print("Worker pool shutdown complete")
+            except Exception as e:
+                print(f"Warning: Error during worker pool shutdown: {e}")
+
+                # Force terminate worker processes if graceful shutdown fails
+                try:
+                    import os as _os
+
+                    import psutil
+
+                    # Get worker processes
+                    parent = psutil.Process(_os.getpid())
+                    for child in parent.children(recursive=True):
+                        if child.is_running():
+                            try:
+                                print(f"Force terminating worker process {child.pid}")
+                                child.terminate()
+                            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                                pass
+
+                    # Wait briefly then force kill
+                    import time
+
+                    time.sleep(0.5)
+                    for child in parent.children(recursive=True):
+                        if child.is_running():
+                            try:
+                                child.kill()
+                            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                                pass
+                except ImportError:
+                    print("Warning: psutil not available for force termination")
+
             self._pool = None
+            self._active_tasks.clear()
 
     def submit_task(self, task_func: callable, *args, **kwargs) -> Future:
-        """Submit a task to the worker pool."""
+        """Submit a task to the worker pool. Starts pool lazily if not running."""
+        # Lazy initialization: start pool on first task submission
+        if self._pool is None and not self._shutdown:
+            self.start()
+
         if self._pool is None:
             raise RuntimeError("Worker pool not started")
         if self._shutdown:
             raise RuntimeError("Worker pool is shutting down")
 
-        return self._pool.submit(task_func, *args, **kwargs)
+        future = self._pool.submit(task_func, *args, **kwargs)
+        self._active_tasks.append(future)
+
+        # Clean up completed tasks from tracking list
+        self._active_tasks = [f for f in self._active_tasks if not f.done()]
+
+        return future
 
     @property
     def is_running(self) -> bool:
         """Check if the worker pool is running."""
         return self._pool is not None and not self._shutdown
+
+    @property
+    def active_task_count(self) -> int:
+        """Get the number of active (non-completed) tasks."""
+        self._active_tasks = [f for f in self._active_tasks if not f.done()]
+        return len(self._active_tasks)
 
 
 # Global worker pool instance
@@ -364,4 +437,5 @@ worker_pool = WorkerPool()
 
 def get_worker_pool() -> WorkerPool:
     """Get the global worker pool instance."""
+    return worker_pool
     return worker_pool

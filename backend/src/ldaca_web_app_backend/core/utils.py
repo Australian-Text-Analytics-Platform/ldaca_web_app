@@ -8,7 +8,6 @@ import uuid
 from pathlib import Path
 from typing import Any, Dict, Union
 
-import pandas as pd
 import polars as pl
 
 from ..settings import settings
@@ -147,63 +146,41 @@ def detect_file_type(filename: str) -> str:
 
 def load_data_file(
     file_path: Path,
-) -> Union[pl.DataFrame, pl.LazyFrame, pd.DataFrame, Any]:
+) -> Union[pl.DataFrame, pl.LazyFrame, Any]:
     """Load data file into appropriate DataFrame type - defaults to polars LazyFrame for efficiency"""
     file_type = detect_file_type(file_path.name)
 
     # Load as polars LazyFrame by default for better performance and memory efficiency
-    try:
-        import polars as pl
-
-        if file_type == "csv":
-            return pl.scan_csv(file_path)
-        elif file_type == "parquet":
-            return pl.scan_parquet(file_path)
-        elif file_type == "json":
-            # JSON doesn't have scan_json, fall back to read_json
-            return pl.read_json(file_path)
-        elif file_type == "tsv":
-            return pl.scan_csv(file_path, separator="\t")
-        elif file_type == "excel":
-            # Use Polars to read Excel directly; returns an eager DataFrame
-            try:
-                return pl.read_excel(file_path)
-            except Exception as ex:
-                # Some versions require specifying sheet id/name
-                try:
-                    return pl.read_excel(file_path, sheet_id=0)
-                except Exception as ex2:
-                    raise RuntimeError(
-                        f"Failed to read Excel via polars: {ex2}"
-                    ) from ex
-        elif file_type == "zip":
-            import docframe
-
-            return docframe.read_zip(file_path)
-    except Exception as e:
-        print(f"Warning: polars lazy loading failed: {e}, falling back to pandas")
-
-    # Fallback to pandas
     if file_type == "csv":
-        return pd.read_csv(file_path)
-    elif file_type == "json":
-        return pd.read_json(file_path)
+        return pl.scan_csv(file_path)
     elif file_type == "parquet":
-        return pd.read_parquet(file_path)
-    elif file_type == "excel":
-        # Avoid pandas dependency for Excel; require polars support instead
-        raise ValueError(
-            "Excel loading requires polars.read_excel; pandas-based Excel loading is disabled. Convert to CSV or ensure polars supports your Excel file."
-        )
+        return pl.scan_parquet(file_path)
+    elif file_type == "json":
+        # JSON doesn't have scan_json, fall back to read_json
+        return pl.read_json(file_path)
     elif file_type == "tsv":
-        return pd.read_csv(file_path, sep="\t")
+        return pl.scan_csv(file_path, separator="\t")
+    elif file_type == "excel":
+        # Use Polars to read Excel directly; returns an eager DataFrame
+        try:
+            return pl.read_excel(file_path)
+        except Exception as ex:
+            # Some versions require specifying sheet id/name
+            try:
+                return pl.read_excel(file_path, sheet_id=0)
+            except Exception as ex2:
+                raise RuntimeError(f"Failed to read Excel via polars: {ex2}") from ex
+    elif file_type == "zip":
+        import docframe
+
+        return docframe.read_zip(file_path)
     else:
         raise ValueError(f"Unsupported file type: {file_type}")
 
 
 def serialize_dataframe_for_json(df) -> Dict[str, Any]:
     """
-    Convert a DataFrame (pandas, polars, or DocDataFrame) to JSON-serializable format
+    Convert a DataFrame (polars or DocDataFrame) to JSON-serializable format
     with complete type representation using module.ClassName format.
     """
     try:
@@ -317,7 +294,7 @@ def serialize_dataframe_for_json(df) -> Dict[str, Any]:
             # Regular polars DataFrame
             dtypes = {col: str(dtype) for col, dtype in underlying_data.schema.items()}
         elif hasattr(underlying_data, "dtypes"):
-            # Pandas
+            # Polars legacy (if schema is not available)
             dtypes = {col: str(dtype) for col, dtype in underlying_data.dtypes.items()}
 
         # Get preview data - collect LazyFrame for preview
@@ -334,25 +311,16 @@ def serialize_dataframe_for_json(df) -> Dict[str, Any]:
                     # Regular DataFrame
                     preview_df = underlying_data.head(5)
 
-                # Convert to pandas for consistent JSON serialization
-                if hasattr(preview_df, "to_pandas"):
-                    preview_pandas = preview_df.to_pandas()
-                else:
-                    preview_pandas = preview_df
-
-                # Handle NaN values safely - check if it's a pandas DataFrame
+                # Convert to dict - polars DataFrames have to_dicts() or write_json()
                 try:
-                    if hasattr(preview_pandas, "fillna"):
-                        preview = preview_pandas.fillna("None").to_dict(
-                            orient="records"
-                        )
+                    if hasattr(preview_df, "to_dicts"):
+                        # Polars DataFrame
+                        preview = preview_df.to_dicts()
+                    elif hasattr(preview_df, "to_dict"):
+                        # Fallback to to_dict
+                        preview = preview_df.to_dict(as_series=False)
                     else:
-                        # For non-pandas DataFrames, just convert directly
-                        preview = (
-                            preview_pandas.to_dict()
-                            if hasattr(preview_pandas, "to_dict")
-                            else []
-                        )
+                        preview = []
                 except Exception as e:
                     print(f"Warning: Could not convert preview to dict: {e}")
                     preview = []

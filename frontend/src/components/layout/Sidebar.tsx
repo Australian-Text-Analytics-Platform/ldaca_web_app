@@ -11,6 +11,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuAction,
   SidebarRail,
   SidebarSeparator,
   SidebarTrigger,
@@ -27,12 +28,15 @@ import { useAuth } from '@/hooks/useAuth';
 import { workspacesApi } from '@/api/workspaces';
 import { useAnalysisStore } from '@/stores/analysisStore';
 import { useUIStore } from '@/stores';
+import { useQuotationEngineDialogStore } from '@/stores/quotationEngineStore';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   AlertCircle,
   BarChart3,
   BookOpen,
   CheckCircle,
   Circle,
+  Cog,
   Clock,
   FileText,
   Filter,
@@ -125,6 +129,7 @@ const Sidebar: React.FC = () => {
       setTasks: state.setTasks,
     }))
   );
+  const openEngineDialog = useQuotationEngineDialogStore((state) => state.open);
   const {
     status: taskStreamStatus,
     error: taskStreamError,
@@ -135,6 +140,11 @@ const Sidebar: React.FC = () => {
     const rawNodes = (workspaceGraph as { nodes?: unknown } | undefined)?.nodes;
     return Array.isArray(rawNodes) ? (rawNodes as WorkspaceNode[]) : [];
   }, [workspaceGraph]);
+
+  const openQuotationEngineDialog = React.useCallback(() => {
+    setCurrentView('quotation');
+    openEngineDialog();
+  }, [setCurrentView, openEngineDialog]);
 
   const nodeCount = nodes.length;
   const sortedTasks = React.useMemo<TaskRecord[]>(() => {
@@ -311,17 +321,38 @@ const Sidebar: React.FC = () => {
           <SidebarGroupLabel>Views</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
-                <SidebarMenuItem key={id}>
-                  <SidebarMenuButton
-                    isActive={currentView === id}
-                    onClick={() => setCurrentView(id)}
-                  >
-                    <Icon />
-                    <span>{label}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {NAV_ITEMS.map(({ id, label, icon: Icon }) => {
+                const isQuotation = id === 'quotation';
+                return (
+                  <SidebarMenuItem key={id}>
+                    <SidebarMenuButton
+                      isActive={currentView === id}
+                      onClick={() => setCurrentView(id)}
+                    >
+                      <Icon />
+                      <span>{label}</span>
+                    </SidebarMenuButton>
+                    {isQuotation ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <SidebarMenuAction
+                            aria-label="Configure quotation engine"
+                            showOnHover
+                            onClick={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              openQuotationEngineDialog();
+                            }}
+                          >
+                            <Cog className="h-4 w-4" />
+                          </SidebarMenuAction>
+                        </TooltipTrigger>
+                        <TooltipContent side="right">Settings</TooltipContent>
+                      </Tooltip>
+                    ) : null}
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

@@ -32,7 +32,7 @@ bash build_executable.sh --clean
 ### 3. Run the executable
 
 ```bash
-./dist/ldaca_web_app_backend
+./dist/ldaca_web_app_backend_bundle/ldaca_web_app_backend
 ```
 
 The executable will:
@@ -56,7 +56,7 @@ Example:
 ```bash
 export LDACA_BACKEND_PORT=8080
 export LDACA_DATA_ROOT=/path/to/data
-./dist/ldaca_web_app_backend
+./dist/ldaca_web_app_backend_bundle/ldaca_web_app_backend
 ```
 
 ## Files
@@ -82,8 +82,12 @@ After a successful build:
 backend/
 ├── build/              # Temporary build files
 │   └── ldaca_web_app_backend/
-├── dist/               # Final executable
-│   └── ldaca_web_app_backend   # ← The standalone executable
+├── dist/               # Final bundles
+│   ├── ldaca_web_app_backend_bundle/            # ← PyInstaller one-dir bundle (recommended)
+│   │   ├── ldaca_web_app_backend                #     Executable entry point
+│   │   ├── ldaca_web_app_backend-<target triple> #     Copy used by Tauri sidecar (e.g. -aarch64-apple-darwin)
+│   │   └── ...                                   #     Python runtime + dependencies
+│   └── ldaca_web_app_backend_bundle-<target>/   # Optional per-target copy for debugging
 ├── ldaca_web_app_backend.spec  # PyInstaller config
 └── build_executable.sh # Build script
 ```
@@ -142,7 +146,7 @@ To reduce size:
 
 ```bash
 # Start the server
-./dist/ldaca_web_app_backend &
+./dist/ldaca_web_app_backend_bundle/ldaca_web_app_backend &
 
 # Wait for startup
 sleep 5
@@ -167,13 +171,13 @@ The executable is self-contained and can be distributed as-is. Users do not need
 On macOS, if distributing to other users, they may see a security warning. To fix:
 
 ```bash
-xattr -cr ./dist/ldaca_web_app_backend
+xattr -cr ./dist/ldaca_web_app_backend_bundle
 ```
 
 Or have users run:
 
 ```bash
-xattr -d com.apple.quarantine ./dist/ldaca_web_app_backend
+xattr -d com.apple.quarantine ./dist/ldaca_web_app_backend_bundle
 ```
 
 ### Linux Distribution

@@ -164,7 +164,7 @@ async def get_frequency_analysis(
     except Exception as e:  # pragma: no cover
         import traceback
 
-        print(f"❌ Unexpected frequency analysis error: {e}")
+        print(f"ERROR: Unexpected frequency analysis error: {e}")
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
 

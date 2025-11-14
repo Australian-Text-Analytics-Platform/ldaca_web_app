@@ -20,16 +20,16 @@ echo ""
 echo "Checking prerequisites..."
 echo ""
 
-# Check backend executable
-if [ ! -f "backend/dist/ldaca_web_app_backend" ] && [ ! -f "backend/dist/ldaca_web_app_backend.exe" ]; then
-    echo "ERROR: Backend executable not found!"
-    echo "   Expected: backend/dist/ldaca_web_app_backend"
+# Check backend bundle (PyInstaller one-dir)
+if [ ! -d "backend/dist/ldaca_web_app_backend_bundle" ]; then
+    echo "ERROR: Backend bundle not found!"
+    echo "   Expected directory: backend/dist/ldaca_web_app_backend_bundle"
     echo ""
     echo "   Build it with:"
     echo "   cd backend && bash build_executable.sh --clean"
     exit 1
 fi
-echo "Backend executable found"
+echo "Backend bundle found"
 
 # Check frontend build
 if [ ! -d "frontend/build" ] || [ ! -f "frontend/build/index.html" ]; then

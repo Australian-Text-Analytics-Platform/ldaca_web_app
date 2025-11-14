@@ -7,14 +7,18 @@ import { useWorkspaceSelection } from '../../hooks/useWorkspaceSelection';
 import { useWorkspaceActions } from '../../hooks/useWorkspaceActions';
 import { useAuth } from '../../hooks/useAuth';
 import { textApi } from '../../api/text';
+import type { QuotationEngineConfig, QuotationEngineType, QuotationRequest } from '../../api/text';
 import { getNodeInfo } from '../../lib/nodeInfoCache';
 import { applySelectedColumnsToSnapshots } from '../../hooks/useSchemaManagement';
 import useNodeColumnInfos from '../../hooks/useNodeColumnInfos';
 import { useAnalysisLockState, useParameterChangeDetection } from '../../hooks/useAnalysisLockState';
+import { useQuotationEngineDialogStore, useQuotationEngineConfigStore } from '../../stores/quotationEngineStore';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Input } from '../ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog';
+import { Badge } from '../ui/badge';
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2, Search, Trash2, Unlink } from 'lucide-react';
 
 interface QuotationResultState {
@@ -36,6 +40,55 @@ interface QuotationResultState {
 }
 
 const DEFAULT_PAGE_SIZE = 20;
+type EngineRequestPayload = { type: 'local' } | { type: 'remote'; url: string };
+
+type NormalizationFailureReason = 'empty' | 'scheme' | 'format' | 'protocol';
+
+interface NormalizedRemoteUrl {
+  normalized: string;
+  valid: boolean;
+  reason: NormalizationFailureReason | null;
+}
+
+const NORMALIZED_SCHEME_REGEX = /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//;
+
+const normalizeRemoteUrl = (value: string): NormalizedRemoteUrl => {
+  const trimmed = value.trim();
+  if (!trimmed.length) {
+    return { normalized: '', valid: false, reason: 'empty' };
+  }
+
+  const hasScheme = NORMALIZED_SCHEME_REGEX.test(trimmed);
+
+  const isHttpScheme = /^https?:\/\//i.test(trimmed);
+
+  const canParse = (candidate: string) => {
+    try {
+      const parsed = new URL(candidate);
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  };
+
+  if (canParse(trimmed)) {
+    return { normalized: trimmed, valid: true, reason: null };
+  }
+
+  if (!hasScheme) {
+    const prefixed = `http://${trimmed}`;
+    if (canParse(prefixed)) {
+      return { normalized: prefixed, valid: true, reason: null };
+    }
+    return { normalized: trimmed, valid: false, reason: 'format' };
+  }
+
+  if (!isHttpScheme) {
+    return { normalized: trimmed, valid: false, reason: 'protocol' };
+  }
+
+  return { normalized: trimmed, valid: false, reason: 'format' };
+};
 
 const resolveNodeId = (node: any, fallbackIndex = 0): string => {
   if (!node) return `node-${fallbackIndex}`;
@@ -79,6 +132,15 @@ const QuotationTab: React.FC = () => {
   });
 
   // Show metadata by default so the table mirrors original columns
+  const engineConfig = useQuotationEngineConfigStore((state) => state.config);
+  const lastRemoteUrl = useQuotationEngineConfigStore((state) => state.lastRemoteUrl);
+  const setEngineConfigStore = useQuotationEngineConfigStore((state) => state.setConfig);
+  const updateRemoteUrl = useQuotationEngineConfigStore((state) => state.updateRemoteUrl);
+  const [engineError, setEngineError] = useState<string | null>(null);
+  const engineDialogOpen = useQuotationEngineDialogStore((state) => state.isOpen);
+  const setEngineDialogOpen = useQuotationEngineDialogStore((state) => state.setOpen);
+  const openEngineDialog = useQuotationEngineDialogStore((state) => state.open);
+  const closeEngineDialog = useQuotationEngineDialogStore((state) => state.close);
   const [showMetadata, setShowMetadata] = useState(true);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [isLoadingQuotations, setIsLoadingQuotations] = useState(false);
@@ -100,6 +162,96 @@ const QuotationTab: React.FC = () => {
     panelSelectedNodes.slice(0, 1)
   ), [panelSelectedNodes]);
 
+  const resolvedEnginePayload = useMemo(() => {
+    if (engineConfig.type === 'remote') {
+      const rawUrl = (engineConfig.url ?? '').trim();
+      const { normalized, valid, reason } = normalizeRemoteUrl(rawUrl);
+      return {
+        type: 'remote' as const,
+        rawUrl,
+        normalizedUrl: normalized,
+        isValid: valid,
+        failureReason: reason,
+      };
+    }
+    return { type: 'local' as const };
+  }, [engineConfig]);
+
+  const engineReady = resolvedEnginePayload.type === 'local'
+    ? true
+    : resolvedEnginePayload.isValid;
+
+  const engineBadgeLabel = useMemo(() => {
+    if (resolvedEnginePayload.type === 'remote') {
+      return resolvedEnginePayload.isValid
+        ? 'Remote Engine'
+        : 'Remote Engine • Not configured';
+    }
+    return 'Local Engine';
+  }, [resolvedEnginePayload]);
+
+  const engineBadgeTitle = useMemo(() => {
+    if (resolvedEnginePayload.type === 'remote') {
+      if (resolvedEnginePayload.isValid && resolvedEnginePayload.normalizedUrl.length) {
+        return `Remote Engine • ${resolvedEnginePayload.normalizedUrl}`;
+      }
+      return 'Remote Engine • Not configured';
+    }
+    return 'Local Engine';
+  }, [resolvedEnginePayload]);
+
+  const engineDisplayUrl = useMemo(() => {
+    if (resolvedEnginePayload.type === 'remote') {
+      if (resolvedEnginePayload.isValid && resolvedEnginePayload.normalizedUrl.length) {
+        return resolvedEnginePayload.normalizedUrl;
+      }
+      return resolvedEnginePayload.rawUrl;
+    }
+    return '';
+  }, [resolvedEnginePayload]);
+
+  const buildEngineRequest = useCallback((): EngineRequestPayload | null => {
+    if (resolvedEnginePayload.type === 'remote') {
+      const rawUrl = resolvedEnginePayload.rawUrl;
+      if (!rawUrl.length) {
+        setEngineError('Provide a quotation service URL.');
+        return null;
+      }
+
+      if (!resolvedEnginePayload.isValid) {
+        if (resolvedEnginePayload.failureReason === 'empty') {
+          setEngineError('Provide a quotation service URL.');
+        } else if (resolvedEnginePayload.failureReason === 'protocol') {
+          setEngineError('Remote engines must use http:// or https:// URLs.');
+        } else {
+          setEngineError('Enter a valid URL including http:// or https://');
+        }
+        return null;
+      }
+
+      const normalizedUrl = resolvedEnginePayload.normalizedUrl;
+      if ((engineConfig.url ?? '').trim() !== normalizedUrl) {
+        updateRemoteUrl(normalizedUrl);
+      }
+      setEngineError(null);
+      return { type: 'remote', url: normalizedUrl };
+    }
+    setEngineError(null);
+    return { type: 'local' };
+  }, [resolvedEnginePayload, engineConfig.url, updateRemoteUrl]);
+
+  const handleEngineDialogSave = useCallback(() => {
+    const payload = buildEngineRequest();
+    if (!payload) {
+      return;
+    }
+    closeEngineDialog();
+  }, [buildEngineRequest, closeEngineDialog]);
+
+  useEffect(() => {
+    setEngineError(null);
+  }, [engineConfig.type, engineConfig.url]);
+
   const getStringColumns = useCallback((node: any) => getColumnInfos(node).map(info => info.name), [getColumnInfos]);
 
   const hasIncompleteSelections = useMemo(() => (
@@ -111,8 +263,8 @@ const QuotationTab: React.FC = () => {
   ), [activeSelections, displayedNodes]);
 
   const canRunQuotation = useMemo(() => (
-    Boolean(currentWorkspaceId) && displayedNodes.length > 0 && !hasIncompleteSelections
-  ), [currentWorkspaceId, displayedNodes, hasIncompleteSelections]);
+    Boolean(currentWorkspaceId) && displayedNodes.length > 0 && !hasIncompleteSelections && engineReady
+  ), [currentWorkspaceId, displayedNodes, hasIncompleteSelections, engineReady]);
 
   // Per-node pagination and sorting state
   const [nodeState, setNodeState] = useState<Record<string, {
@@ -141,14 +293,20 @@ const QuotationTab: React.FC = () => {
       sortBy: undefined,
       sortOrder: 'asc' as const,
     };
+    const engineSnapshot = resolvedEnginePayload;
+    const engineUrl = engineSnapshot.type === 'remote' && engineSnapshot.isValid
+      ? engineSnapshot.normalizedUrl
+      : null;
     return {
       column: selection.column,
       page: state.currentPage,
       page_size: state.pageSize,
       sort_by: state.sortBy ?? null,
       sort_order: state.sortOrder,
+      engine_type: engineSnapshot.type,
+      engine_url: engineUrl,
     } as Record<string, unknown>;
-  }, [activeSelections, displayedNodes, isLocked, lockedNodesSnapshot, nodeState]);
+  }, [activeSelections, displayedNodes, isLocked, lockedNodesSnapshot, nodeState, resolvedEnginePayload]);
 
   const hasParamsChanged = useParameterChangeDetection<Record<string, unknown>>(
     isLocked,
@@ -410,15 +568,26 @@ const QuotationTab: React.FC = () => {
     const sortBy = overrides?.sortBy ?? state.sortBy;
     const sortOrder: 'asc' | 'desc' = overrides?.sortOrder ?? state.sortOrder ?? 'asc';
 
-    const requestPayload = {
+    const enginePayload = buildEngineRequest();
+    if (!enginePayload) {
+      openEngineDialog();
+      return null;
+    }
+
+    const engineConfigForRequest: QuotationEngineConfig = enginePayload.type === 'remote'
+      ? { type: 'remote', url: enginePayload.url }
+      : { type: 'local' };
+
+    const requestPayload: QuotationRequest = {
       column,
       page,
       page_size: pageSize,
       sort_by: sortBy ?? undefined,
       sort_order: sortOrder,
-    } as const;
+      engine: engineConfigForRequest,
+    };
 
-    const result = await quotationSearch(nodeId, requestPayload as any);
+    const result = await quotationSearch(nodeId, requestPayload);
     const normalized = updateResultState(nodeId, column, result);
     return {
       normalized,
@@ -428,6 +597,8 @@ const QuotationTab: React.FC = () => {
         page_size: requestPayload.page_size,
         sort_by: requestPayload.sort_by ?? null,
         sort_order: requestPayload.sort_order,
+        engine_type: engineConfigForRequest.type,
+        engine_url: engineConfigForRequest.type === 'remote' ? (engineConfigForRequest.url ?? '') : null,
       },
     };
   };
@@ -530,7 +701,18 @@ const QuotationTab: React.FC = () => {
     if (!selection?.column) return;
     setNodeDetaching(prev => ({ ...prev, [nodeId]: true }));
     try {
-      await detachQuotation(nodeId, { node_id: nodeId, column: selection.column });
+      const enginePayload = buildEngineRequest();
+      if (!enginePayload) {
+        openEngineDialog();
+        return;
+      }
+      await detachQuotation(nodeId, {
+        node_id: nodeId,
+        column: selection.column,
+        engine: enginePayload.type === 'remote'
+          ? { type: 'remote', url: enginePayload.url }
+          : { type: 'local' },
+      });
     } catch (e: any) {
       alert(`Error detaching quotation: ${e?.message || 'Unknown error'}`);
     } finally {
@@ -551,11 +733,33 @@ const QuotationTab: React.FC = () => {
           return;
         }
 
-        const req = (reqResp as any)?.data;
-        const nodeId = req?.node_id || req?.nodeId;
-        const column = req?.column || '';
+        const requestData = (reqResp as any)?.data;
+        const nodeId = requestData?.node_id || requestData?.nodeId;
+        const column = requestData?.column || '';
+        const reqEngine = (requestData?.engine ?? null) as QuotationEngineConfig | null;
+        let hydratedEngine: EngineRequestPayload = (() => {
+          if (resolvedEnginePayload.type === 'remote' && resolvedEnginePayload.isValid) {
+            return { type: 'remote', url: resolvedEnginePayload.normalizedUrl } as EngineRequestPayload;
+          }
+          return { type: 'local' } as EngineRequestPayload;
+        })();
+
         if (!nodeId) {
           return;
+        }
+
+        if (reqEngine?.type === 'remote') {
+          const trimmed = (reqEngine.url ?? '').trim();
+          if (trimmed.length) {
+            const { normalized, valid } = normalizeRemoteUrl(trimmed);
+            const appliedUrl = valid ? normalized : trimmed;
+            hydratedEngine = { type: 'remote', url: appliedUrl };
+            updateRemoteUrl(appliedUrl);
+            setEngineConfigStore({ type: 'remote', url: appliedUrl });
+          }
+        } else if (reqEngine?.type === 'local') {
+          hydratedEngine = { type: 'local' };
+          setEngineConfigStore({ type: 'local' });
         }
 
         setNodeColumnSelections([{ nodeId, column }], { replace: true });
@@ -593,6 +797,8 @@ const QuotationTab: React.FC = () => {
           page_size: normalized.pagination.page_size,
           sort_by: normalized.sorting.sort_by ?? null,
           sort_order: normalized.sorting.sort_order,
+          engine_type: hydratedEngine.type,
+          engine_url: hydratedEngine.type === 'remote' ? hydratedEngine.url : null,
         });
         setHasLoaded(true);
       } catch { /* ignore */ }
@@ -601,17 +807,102 @@ const QuotationTab: React.FC = () => {
   }, [currentWorkspaceId, getAuthHeaders]);
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader className="space-y-0 pb-4">
-          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-            <div>
-              <CardTitle>Quotation Extraction</CardTitle>
-              <CardDescription>Load quotations for a single node and highlight speaker, quote, and verb spans.</CardDescription>
+    <>
+      <Dialog open={engineDialogOpen} onOpenChange={setEngineDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Quotation Engine</DialogTitle>
+            <DialogDescription>Select which engine to use when extracting quotations.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label htmlFor="quotation-engine-type" className="text-sm font-medium">Engine Source</label>
+              <Select
+                value={engineConfig.type}
+                onValueChange={(value) => {
+                  const next = value as QuotationEngineType;
+                  if (next === 'remote') {
+                    const url = lastRemoteUrl || engineConfig.url || '';
+                    setEngineConfigStore({ type: 'remote', url });
+                  } else {
+                    setEngineConfigStore({ type: 'local' });
+                  }
+                }}
+              >
+                <SelectTrigger id="quotation-engine-type">
+                  <SelectValue placeholder="Choose engine" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="local">Local (built-in)</SelectItem>
+                  <SelectItem value="remote">Remote service</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
+            {engineConfig.type === 'remote' ? (
+              <div className="space-y-2">
+                <label htmlFor="quotation-engine-url" className="text-sm font-medium">Service URL</label>
+                <Input
+                  id="quotation-engine-url"
+                  value={engineConfig.url ?? ''}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    updateRemoteUrl(value);
+                    if (engineConfig.type !== 'remote') {
+                      setEngineConfigStore({ type: 'remote', url: value });
+                    }
+                  }}
+                  placeholder="https://example.com/api/v1/quotation"
+                  autoComplete="off"
+                />
+                {engineError ? (
+                  <p className="text-sm text-destructive">{engineError}</p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Include protocol and point to the remote quotation extractor base URL.</p>
+                )}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">The local extractor runs inside this workspace; no extra configuration required.</p>
+            )}
           </div>
-        </CardHeader>
-        <CardContent className="space-y-6 pt-0">
+          <DialogFooter className="sm:justify-end">
+            <Button variant="outline" onClick={closeEngineDialog}>Cancel</Button>
+            <Button
+              onClick={handleEngineDialogSave}
+              disabled={engineConfig.type === 'remote' && !(engineConfig.url ?? '').trim().length}
+            >
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <div className="space-y-6">
+        <Card>
+          <CardHeader className="space-y-0 pb-4">
+            <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+              <div>
+                <CardTitle>Quotation Extraction</CardTitle>
+                <CardDescription>Load quotations for a single node and highlight speaker, quote, and verb spans.</CardDescription>
+              </div>
+              <div className="flex flex-col items-start gap-1 md:items-end md:text-right">
+                <Badge
+                  variant="outline"
+                  className="max-w-full break-all text-xs"
+                  title={engineBadgeTitle}
+                >
+                  {engineBadgeLabel}
+                </Badge>
+                {engineDisplayUrl.length ? (
+                  <span
+                    className="text-xs text-muted-foreground break-all max-w-xs md:max-w-sm"
+                    title={engineDisplayUrl}
+                  >
+                    {engineDisplayUrl}
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6 pt-0">
             <NodeSelectionPanel
               selectedNodes={panelSelectedNodes}
               nodeColumnSelections={activeSelections}
@@ -941,6 +1232,7 @@ const QuotationTab: React.FC = () => {
           );
         })}
       </div>
+    </>
   );
 };
 

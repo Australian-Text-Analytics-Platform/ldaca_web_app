@@ -12,6 +12,7 @@ import { useWorkspaceStore } from './workspaceStore';
 export { useUIStore } from './uiStore';
 export { useSelectionStore } from './selectionStore';  
 export { useWorkspaceStore } from './workspaceStore';
+export { useQuotationEngineDialogStore, useQuotationEngineConfigStore } from './quotationEngineStore';
 
 // Export types
 export type { ViewType } from './uiStore';

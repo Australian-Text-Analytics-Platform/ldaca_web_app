@@ -864,7 +864,7 @@ async def run_concordance(
     except Exception as e:
         import traceback
 
-        print(f"❌ Unexpected concordance error: {str(e)}")
+        print(f"ERROR: Unexpected concordance error: {str(e)}")
         print(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
@@ -1483,7 +1483,7 @@ async def detach_concordance(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"❌ Error in detach concordance: {str(e)}")
+        print(f"ERROR: Error in detach concordance: {str(e)}")
         raise HTTPException(
             status_code=500, detail=f"Error detaching concordance results: {str(e)}"
         )

@@ -1147,8 +1147,9 @@ result = lazy_frame.with_columns(expr.alias('A + Total Count'))
 ##### `quotation.py` - Quotation Extraction
 
 **Endpoints**:
+
 - `POST /{workspace_id}/quotation`: Extract quotations
-  - **Implementation**: Calls `pl.col(column).text.extract_quotes()`, saves to analysis_store
+  - **Implementation**: Materialises the target node into a Polars `DataFrame`, feeds it into `_compute_quote_dataframe()`, joins the exploded quotation rows back to the original metadata, and persists the response envelope to `analysis_store`. The local engine path delegates to DocFrame's `text.quotation()` and mirrors the legacy explode/unnest behaviour, while the remote engine path streams batches through `_extract_remote_paginated()` so that the external service limit defined by `settings.quotation_service_max_batch_size` is honoured before pagination.
 - `GET /{workspace_id}/quotation/current-request`: Get last request
 - `GET /{workspace_id}/quotation/current-result`: Get last result
 - `DELETE /{workspace_id}/quotation`: Clear results
@@ -1156,21 +1157,25 @@ result = lazy_frame.with_columns(expr.alias('A + Total Count'))
 #### Other Backend Files
 
 **`db.py` - Database Management**:
+
 - `get_async_session()`: Async dependency providing SQLAlchemy session
 - `init_db()`: Initialize database tables
 - `get_engine()`: Returns async SQLAlchemy engine
 
 **`settings.py` - Application Settings**:
+
 - `Settings`: Pydantic settings class loading from env vars
-- Key settings: `MULTI_USER`, `GOOGLE_CLIENT_ID`, `DATABASE_URL`, `USER_DATA_FOLDER`, `CORS_ALLOWED_ORIGINS_STR`
+- Key settings: `MULTI_USER`, `GOOGLE_CLIENT_ID`, `DATABASE_URL`, `USER_DATA_FOLDER`, `CORS_ALLOWED_ORIGINS_STR`, `quotation_service_timeout`, `quotation_service_max_batch_size`
 
 **`main.py` - FastAPI Application**:
+
 - Creates FastAPI app
 - Registers all routers with appropriate prefixes
 - Configures CORS middleware
 - Startup/shutdown events for database initialization
 
 **`cli.py` - CLI Commands**:
+
 - `ldaca-backend serve`: Start server
 - `ldaca-backend init-db`: Initialize database
 - `ldaca-backend create-user`: Create user (CLI)
