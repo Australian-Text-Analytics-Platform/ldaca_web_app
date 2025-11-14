@@ -39,6 +39,7 @@ from ....settings import settings
 
 logger = logging.getLogger(__name__)
 
+
 def _to_polars_dataframe(data: Any) -> pl.DataFrame:
     """Best-effort conversion of docframe/Polars-like objects into a Polars DataFrame."""
 
@@ -108,7 +109,9 @@ def _ensure_quote_dataframe(df: pl.DataFrame) -> pl.DataFrame:
         result = result.with_row_index("document_idx")
     if "quote_row_idx" not in result.columns:
         result = result.with_columns(
-            pl.arange(0, result.height, eager=True).cast(pl.Int64).alias("quote_row_idx")
+            pl.arange(0, result.height, eager=True)
+            .cast(pl.Int64)
+            .alias("quote_row_idx")
         )
     # Enforce stable dtypes for numeric columns used downstream
     cast_map = {
@@ -122,7 +125,11 @@ def _ensure_quote_dataframe(df: pl.DataFrame) -> pl.DataFrame:
         "quote_token_count": pl.Int64,
         "quote_row_idx": pl.Int64,
     }
-    numeric_exprs = [pl.col(col).cast(dtype, strict=False) for col, dtype in cast_map.items() if col in result.columns]
+    numeric_exprs = [
+        pl.col(col).cast(dtype, strict=False)
+        for col, dtype in cast_map.items()
+        if col in result.columns
+    ]
     boolean_exprs = []
     if "is_floating_quote" in result.columns:
         boolean_exprs.append(pl.col("is_floating_quote").cast(pl.Boolean, strict=False))
@@ -131,10 +138,14 @@ def _ensure_quote_dataframe(df: pl.DataFrame) -> pl.DataFrame:
     return result
 
 
-def _prepare_documents_payload(base_df: pl.DataFrame, column: str) -> Dict[str, Dict[str, Any]]:
+def _prepare_documents_payload(
+    base_df: pl.DataFrame, column: str
+) -> Dict[str, Dict[str, Any]]:
     try:
         series = base_df.get_column(column)
-    except pl.ColumnNotFoundError as exc:  # pragma: no cover - safety net (should be caught earlier)
+    except (
+        pl.ColumnNotFoundError
+    ) as exc:  # pragma: no cover - safety net (should be caught earlier)
         raise ValueError(str(exc)) from exc
 
     docs: Dict[str, Dict[str, Any]] = {}
@@ -159,7 +170,9 @@ def _remote_payload_to_dataframe(payload: Dict[str, Any]) -> pl.DataFrame:
         try:
             document_idx = int(identifier)
         except (TypeError, ValueError):
-            logger.debug("Skipping quotation entry with non-integer identifier: %s", identifier)
+            logger.debug(
+                "Skipping quotation entry with non-integer identifier: %s", identifier
+            )
             continue
         quotes = entry.get("quotes") if isinstance(entry, dict) else None
         if not quotes:
@@ -167,24 +180,22 @@ def _remote_payload_to_dataframe(payload: Dict[str, Any]) -> pl.DataFrame:
         for quote_idx, quote in enumerate(quotes):
             if not isinstance(quote, dict):
                 continue
-            rows.append(
-                {
-                    "document_idx": document_idx,
-                    "quote_row_idx": quote_idx,
-                    "speaker": quote.get("speaker"),
-                    "speaker_start_idx": quote.get("speaker_start_idx"),
-                    "speaker_end_idx": quote.get("speaker_end_idx"),
-                    "quote": quote.get("quote"),
-                    "quote_start_idx": quote.get("quote_start_idx"),
-                    "quote_end_idx": quote.get("quote_end_idx"),
-                    "verb": quote.get("verb"),
-                    "verb_start_idx": quote.get("verb_start_idx"),
-                    "verb_end_idx": quote.get("verb_end_idx"),
-                    "quote_type": quote.get("quote_type"),
-                    "quote_token_count": quote.get("quote_token_count"),
-                    "is_floating_quote": quote.get("is_floating_quote"),
-                }
-            )
+            rows.append({
+                "document_idx": document_idx,
+                "quote_row_idx": quote_idx,
+                "speaker": quote.get("speaker"),
+                "speaker_start_idx": quote.get("speaker_start_idx"),
+                "speaker_end_idx": quote.get("speaker_end_idx"),
+                "quote": quote.get("quote"),
+                "quote_start_idx": quote.get("quote_start_idx"),
+                "quote_end_idx": quote.get("quote_end_idx"),
+                "verb": quote.get("verb"),
+                "verb_start_idx": quote.get("verb_start_idx"),
+                "verb_end_idx": quote.get("verb_end_idx"),
+                "quote_type": quote.get("quote_type"),
+                "quote_token_count": quote.get("quote_token_count"),
+                "is_floating_quote": quote.get("is_floating_quote"),
+            })
 
     if not rows:
         return _empty_quote_dataframe()
@@ -192,7 +203,9 @@ def _remote_payload_to_dataframe(payload: Dict[str, Any]) -> pl.DataFrame:
     return _ensure_quote_dataframe(pl.DataFrame(rows))
 
 
-def _stable_document_items(documents: Dict[str, Dict[str, Any]]) -> List[Tuple[str, Dict[str, Any]]]:
+def _stable_document_items(
+    documents: Dict[str, Dict[str, Any]],
+) -> List[Tuple[str, Dict[str, Any]]]:
     items: List[Tuple[str, Dict[str, Any]]] = list(documents.items())
 
     def _key(pair: Tuple[str, Dict[str, Any]]) -> Tuple[int, Any]:
@@ -286,7 +299,9 @@ async def _compute_quote_dataframe(
         base_with_idx = None
 
     if base_with_idx is not None and hasattr(base_with_idx, "text"):
-        quote_raw = base_with_idx.text.quotation(column=column, explode=True, unnest=True)
+        quote_raw = base_with_idx.text.quotation(
+            column=column, explode=True, unnest=True
+        )
     else:
         quote_raw = node.data.text.quotation(column=column, explode=True, unnest=True)
 
@@ -328,6 +343,7 @@ async def _build_joined_quotation_frames(
         joined = joined.select(base_columns + additional_columns)
 
     return joined, base_df
+
 
 router = APIRouter(prefix="/workspaces", tags=["quotation"])  # maintain path parity
 
@@ -401,14 +417,14 @@ async def get_quotation(
                 detail="This node does not support text analysis (DocFrame text namespace not available)",
             )
 
-        joined_df, _ = await _build_joined_quotation_frames(node, request.column, engine)
+        joined_df, _ = await _build_joined_quotation_frames(
+            node, request.column, engine
+        )
 
         sort_by = request.sort_by or None
         sort_order = (request.sort_order or "asc").lower()
         if sort_by and sort_by in joined_df.columns:
-            joined_df = joined_df.sort(
-                pl.col(sort_by), descending=sort_order == "desc"
-            )
+            joined_df = joined_df.sort(pl.col(sort_by), descending=sort_order == "desc")
 
         page_size = max(1, int(request.page_size or 1))
         page = max(1, int(request.page or 1))
@@ -479,7 +495,9 @@ async def detach_quotation(
                 detail="This node does not support text analysis (DocFrame text namespace not available)",
             )
 
-        joined_df, _ = await _build_joined_quotation_frames(node, request.column, engine)
+        joined_df, _ = await _build_joined_quotation_frames(
+            node, request.column, engine
+        )
 
         if "document_idx" in joined_df.columns:
             final_data = joined_df.drop("document_idx")

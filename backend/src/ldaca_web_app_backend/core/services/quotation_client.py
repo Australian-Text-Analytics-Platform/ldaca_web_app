@@ -9,7 +9,11 @@ import httpx
 from ...models import QuotationEngineConfig, QuotationEngineType
 from ...settings import settings
 
-__all__ = ["QuotationServiceError", "normalise_engine_base_url", "extract_remote_quotations"]
+__all__ = [
+    "QuotationServiceError",
+    "normalise_engine_base_url",
+    "extract_remote_quotations",
+]
 
 
 class QuotationServiceError(RuntimeError):
@@ -51,7 +55,9 @@ async def extract_remote_quotations(
     """Invoke the remote quotation engine and return the decoded JSON payload."""
 
     if engine.type is not QuotationEngineType.REMOTE:
-        raise QuotationServiceError("Remote extraction requested with non-remote engine config")
+        raise QuotationServiceError(
+            "Remote extraction requested with non-remote engine config"
+        )
     if not engine.url:
         raise QuotationServiceError("Remote quotation engine URL is required")
 
@@ -62,10 +68,14 @@ async def extract_remote_quotations(
     if options:
         payload["options"] = options
 
-    request_timeout = timeout if timeout is not None else settings.quotation_service_timeout
+    request_timeout = (
+        timeout if timeout is not None else settings.quotation_service_timeout
+    )
 
     try:
-        async with httpx.AsyncClient(timeout=request_timeout, follow_redirects=True) as client:
+        async with httpx.AsyncClient(
+            timeout=request_timeout, follow_redirects=True
+        ) as client:
             response = await client.post(extract_url, json=payload)
     except httpx.RequestError as exc:
         raise QuotationServiceError(
@@ -90,4 +100,6 @@ async def extract_remote_quotations(
     try:
         return response.json()
     except ValueError as exc:  # pragma: no cover - unexpected payload
-        raise QuotationServiceError("Quotation service returned non-JSON response") from exc
+        raise QuotationServiceError(
+            "Quotation service returned non-JSON response"
+        ) from exc
