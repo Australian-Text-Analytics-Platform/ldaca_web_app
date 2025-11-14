@@ -9,8 +9,8 @@ cargo --version
 # Check if npm is installed  
 npm --version
 
-# Check if backend is built
-ls backend/dist/ldaca_web_app_backend*
+# Check if backend runtime is packaged (expect run_backend.sh and run_backend.sh-<target>)
+ls backend/dist-tauri/backend-runtime/run_backend.sh*
 
 # Check if frontend is built
 ls frontend/build/index.html
@@ -92,7 +92,7 @@ npm run -w frontend dev        # Alternative way to start frontend
 npm run -w frontend lint       # Lint frontend code
 
 # Build preparation
-npm run prepare:backend        # Build Python backend
+npm run prepare:backend        # Package Python backend runtime
 npm run prepare:frontend       # Build React frontend
 npm run prepare:all            # Build both
 
@@ -103,17 +103,22 @@ npm ls --workspaces           # List workspace dependencies
 
 ## Troubleshooting
 
-### "Backend executable not found"
+### "Backend runtime not found"
 
-Build the backend first:
+When launching the bare binary (without the `.app` bundle) the runtime is
+resolved from the bundled sidecar, `backend/dist-tauri/backend-runtime`, or the
+path in `LDACA_BACKEND_LAUNCHER`. If all of those are missing you will see this
+error. Package the backend first:
+
 ```bash
 cd backend
-bash build_executable.sh --clean
+bash scripts/package_backend_runtime.sh --clean
 ```
 
 ### "Frontend build not found"
 
 Build the frontend first:
+
 ```bash
 cd frontend
 npm install
@@ -123,6 +128,7 @@ npm run build
 ### "Cannot find module '@tauri-apps/cli'"
 
 Install npm dependencies:
+
 ```bash
 npm install
 ```
@@ -133,16 +139,17 @@ The app will automatically try ports 8001-8010. If all are in use, close some ap
 
 ## Full Build Script
 
+
 ```bash
 #!/usr/bin/env bash
 # Build everything from scratch
 
 cd "$(dirname "$0")"
 
-# Build backend
-echo "Building backend..."
+# Build backend runtime
+echo "Packaging backend runtime..."
 cd backend
-bash build_executable.sh --clean
+bash scripts/package_backend_runtime.sh --clean
 cd ..
 
 # Build frontend
@@ -169,6 +176,7 @@ fi
 ```
 
 Save this as `build-all.sh` and run:
+
 ```bash
 chmod +x build-all.sh
 ./build-all.sh

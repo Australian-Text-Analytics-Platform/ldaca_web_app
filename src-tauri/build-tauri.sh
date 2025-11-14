@@ -20,16 +20,16 @@ echo ""
 echo "Checking prerequisites..."
 echo ""
 
-# Check backend bundle (PyInstaller one-dir)
-if [ ! -d "backend/dist/ldaca_web_app_backend_bundle" ]; then
-    echo "ERROR: Backend bundle not found!"
-    echo "   Expected directory: backend/dist/ldaca_web_app_backend_bundle"
+# Check backend runtime folder
+if [ ! -x "backend/dist-tauri/backend-runtime/run_backend.sh" ]; then
+    echo "ERROR: Backend runtime not found!"
+    echo "   Expected: backend/dist-tauri/backend-runtime/run_backend.sh"
     echo ""
-    echo "   Build it with:"
-    echo "   cd backend && bash build_executable.sh --clean"
+    echo "   Create it with:"
+    echo "   cd backend && bash scripts/package_backend_runtime.sh --clean"
     exit 1
 fi
-echo "Backend bundle found"
+echo "Backend runtime found"
 
 # Check frontend build
 if [ ! -d "frontend/build" ] || [ ! -f "frontend/build/index.html" ]; then

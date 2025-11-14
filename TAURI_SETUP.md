@@ -52,7 +52,7 @@ ldaca_web_app/
 ### 1. Build the Backend (if not done)
 ```bash
 cd backend
-bash build_executable.sh --clean
+bash scripts/package_backend_runtime.sh --clean
 ```
 
 ### 2. Build the Frontend (if not done)
@@ -95,14 +95,14 @@ npm run tauri:build
 Scripts for building:
 - `tauri:dev` - Development mode with hot reload
 - `tauri:build` - Production build
-- `prepare:backend` - Build backend executable
+- `prepare:backend` - Package backend runtime for Tauri
 - `prepare:frontend` - Build frontend
 - `prepare:all` - Build both
 
 ### `src-tauri/tauri.conf.json`
 Key settings:
 - `build.frontendDist`: Points to `../frontend/build`
-- `bundle.resources`: Includes backend executable
+- `bundle.resources`: Includes backend runtime folder + launcher script
 - `app.security.csp`: Allows localhost connections
 - `app.windows`: Window size and properties
 

@@ -14,16 +14,16 @@ echo "LDaCA Desktop App - Complete Build"
 echo "=========================================="
 echo ""
 
-# Step 1: Build Backend
-echo "📦 Step 1/3: Building backend executable..."
+# Step 1: Package Backend Runtime
+echo "📦 Step 1/3: Packaging backend runtime..."
 cd backend
-if [ ! -f "build_executable.sh" ]; then
-    echo "❌ Backend build script not found!"
+if [ ! -f "scripts/package_backend_runtime.sh" ]; then
+    echo "❌ Backend packaging script not found!"
     exit 1
 fi
-bash build_executable.sh --clean
+bash scripts/package_backend_runtime.sh --clean
 cd ..
-echo "✅ Backend built successfully"
+echo "✅ Backend runtime packaged successfully"
 echo ""
 
 # Step 2: Build Frontend

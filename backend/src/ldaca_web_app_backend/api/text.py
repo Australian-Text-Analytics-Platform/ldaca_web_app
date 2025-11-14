@@ -7,7 +7,7 @@ from typing import List
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-router = APIRouter(prefix="/api/text", tags=["text"])
+router = APIRouter(prefix="/text", tags=["text_analysis"])
 
 
 class StopWordConfig(BaseModel):

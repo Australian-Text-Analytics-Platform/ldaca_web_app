@@ -1,22 +1,225 @@
 // Prevents additional console window on Windows in release
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use std::io::{self, BufRead, BufReader};
+use std::net::{TcpListener, TcpStream};
+use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
-use tauri::{Manager, State};
-use tauri_plugin_shell::process::CommandChild;
+use tauri::{AppHandle, Manager, State};
 use tauri_plugin_shell::ShellExt;
 
 /// Holds the backend URL, process, and PID
 struct BackendState {
     url: String,
-    process: Arc<Mutex<Option<CommandChild>>>,
     pid: Arc<Mutex<Option<u32>>>,
     closing: Arc<Mutex<bool>>, // track if graceful closing is in progress
 }
 
+const DEV_BACKEND_LAUNCHER: &str =
+    concat!(env!("CARGO_MANIFEST_DIR"), "/../backend/dist-tauri/backend-runtime/run_backend.sh");
+
+const BACKEND_HOST: &str = "127.0.0.1";
+
+fn locate_backend_launcher() -> Option<PathBuf> {
+    if let Ok(custom) = std::env::var("LDACA_BACKEND_LAUNCHER") {
+        let candidate = PathBuf::from(custom);
+        if candidate.exists() {
+            return Some(candidate);
+        }
+    }
+
+    let dev_path = PathBuf::from(DEV_BACKEND_LAUNCHER);
+    if dev_path.exists() {
+        return Some(dev_path);
+    }
+
+    const RELATIVE_SEARCH_PATHS: &[&str] = &[
+        "backend/dist-tauri/backend-runtime/run_backend.sh",
+        "_up_/backend/dist-tauri/backend-runtime/run_backend.sh",
+        "dist-tauri/backend-runtime/run_backend.sh",
+        "Resources/backend/dist-tauri/backend-runtime/run_backend.sh",
+        "run_backend.sh",
+    ];
+
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(mut dir) = exe_path.parent().map(Path::to_path_buf) {
+            loop {
+                for relative in RELATIVE_SEARCH_PATHS {
+                    let candidate = dir.join(relative);
+                    if candidate.exists() {
+                        return Some(candidate);
+                    }
+                }
+
+                if !dir.pop() {
+                    break;
+                }
+            }
+        }
+    }
+
+    None
+}
+
+fn pipe_child_output<R>(reader: R, is_stderr: bool)
+where
+    R: std::io::Read + Send + 'static,
+{
+    std::thread::spawn(move || {
+        let reader = BufReader::new(reader);
+        for line in reader.lines() {
+            match line {
+                Ok(text) => {
+                    if is_stderr {
+                        eprintln!("[Backend] {}", text);
+                    } else {
+                        println!("[Backend] {}", text);
+                    }
+                }
+                Err(err) => {
+                    eprintln!("[Backend] Failed to read backend output: {}", err);
+                    break;
+                }
+            }
+        }
+    });
+}
+
+fn spawn_manual_backend(launcher: &Path, backend_port: u16) -> io::Result<u32> {
+    let mut command = Command::new(launcher);
+    command
+        .env("BACKEND_PORT", backend_port.to_string())
+        .env("LDACA_BACKEND_PORT", backend_port.to_string())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    let mut child = command.spawn()?;
+    let pid = child.id();
+
+    if let Some(stdout) = child.stdout.take() {
+        pipe_child_output(stdout, false);
+    }
+    if let Some(stderr) = child.stderr.take() {
+        pipe_child_output(stderr, true);
+    }
+
+    println!(
+        "Backend launcher {:?} started on port {} with PID {}",
+        launcher, backend_port, pid
+    );
+
+    Ok(pid)
+}
+
+fn fallback_to_manual_launcher(
+    backend_port: u16,
+    reason: impl std::fmt::Display,
+) -> Result<u32, Box<dyn std::error::Error>> {
+    let reason_msg = reason.to_string();
+    if let Some(local_launcher) = locate_backend_launcher() {
+        println!(
+            "Sidecar launcher unavailable ({}). Falling back to {:?}",
+            reason_msg, local_launcher
+        );
+        spawn_manual_backend(&local_launcher, backend_port)
+            .map_err(|err| Box::new(err) as Box<dyn std::error::Error>)
+    } else {
+        let message = format!(
+            "Backend runtime is missing from the bundle and no local runtime was found.\n\
+             Please run the packaged .app bundle or rebuild the runtime with `npm run prepare:backend`.\n\
+             Original error: {}",
+            reason_msg
+        );
+        Err(Box::new(io::Error::new(io::ErrorKind::NotFound, message)))
+    }
+}
+
+fn spawn_backend_process(
+    app: &AppHandle,
+    backend_port: u16,
+) -> Result<u32, Box<dyn std::error::Error>> {
+    match app
+        .shell()
+        .sidecar("backend-runtime/run_backend.sh")
+    {
+        Ok(sidecar_command) => {
+            let spawn_result = sidecar_command
+                .env("BACKEND_PORT", backend_port.to_string())
+                .env("LDACA_BACKEND_PORT", backend_port.to_string())
+                .spawn();
+
+            match spawn_result {
+                Ok((mut rx, child)) => {
+                    let child_pid = child.pid();
+                    println!(
+                        "Backend sidecar started on port {} with PID {}",
+                        backend_port, child_pid
+                    );
+
+                    std::thread::spawn(move || {
+                        use tauri_plugin_shell::process::CommandEvent;
+                        while let Some(event) = futures::executor::block_on(async { rx.recv().await }) {
+                            match event {
+                                CommandEvent::Stdout(line) => {
+                                    println!("[Backend] {}", String::from_utf8_lossy(&line))
+                                }
+                                CommandEvent::Stderr(line) => {
+                                    eprintln!("[Backend] {}", String::from_utf8_lossy(&line))
+                                }
+                                CommandEvent::Error(err) => eprintln!("[Backend Error] {}", err),
+                                CommandEvent::Terminated(payload) => {
+                                    println!(
+                                        "[Backend] Process terminated with code: {:?}",
+                                        payload.code
+                                    );
+                                    break;
+                                }
+                                _ => {}
+                            }
+                        }
+                    });
+
+                    Ok(child_pid)
+                }
+                Err(spawn_err) => fallback_to_manual_launcher(backend_port, spawn_err),
+            }
+        }
+        Err(shell_err) => fallback_to_manual_launcher(backend_port, shell_err),
+    }
+}
+
 /// Find an available port in the given range
+fn port_has_listener(port: u16) -> bool {
+    TcpStream::connect((BACKEND_HOST, port)).is_ok()
+}
+
+fn can_bind_port(port: u16) -> bool {
+    match TcpListener::bind((BACKEND_HOST, port)) {
+        Ok(listener) => {
+            drop(listener);
+            true
+        }
+        Err(err) => {
+            println!("Unable to bind to {}:{} ({})", BACKEND_HOST, port, err);
+            false
+        }
+    }
+}
+
 fn find_available_port(start: u16, end: u16) -> Option<u16> {
-    (start..=end).find(|port| portpicker::is_free(*port))
+    for port in start..=end {
+        if port_has_listener(port) {
+            println!("Port {} already in use, checking next...", port);
+            continue;
+        }
+
+        if can_bind_port(port) {
+            println!("Selected backend port {}", port);
+            return Some(port);
+        }
+    }
+    None
 }
 
 /// Tauri command to get the backend URL
@@ -140,7 +343,6 @@ fn main() {
 
     let backend_state = BackendState {
         url: backend_url.clone(),
-        process: Arc::new(Mutex::new(None)),
         pid: Arc::new(Mutex::new(None)),
         closing: Arc::new(Mutex::new(false)),
     };
@@ -158,52 +360,18 @@ fn main() {
             window.eval(&format!(
                 r#"
                 window.__BACKEND_URL__ = "{}";
+                window.__BACKEND_PORT__ = {};
                 console.log('[Tauri] Backend URL injected:', window.__BACKEND_URL__);
+                console.log('[Tauri] Backend port injected:', window.__BACKEND_PORT__);
                 "#,
-                backend_url
+                backend_url,
+                backend_port
             ))?;
 
-            // Start the backend sidecar
-            let sidecar_command = app
-                .shell()
-                .sidecar("ldaca_web_app_backend_bundle/ldaca_web_app_backend")?;
-
-            let (mut rx, child) = sidecar_command
-                .env("BACKEND_PORT", backend_port.to_string())
-                .env("LDACA_BACKEND_PORT", backend_port.to_string())
-                .spawn()?;
-
-            // Store the PID and child process so we can kill it later
-            let child_pid = child.pid();
+            let app_handle = app.handle();
+            let pid = spawn_backend_process(&app_handle, backend_port)?;
             let state: State<BackendState> = app.state();
-            *state.process.lock().unwrap() = Some(child);
-            *state.pid.lock().unwrap() = Some(child_pid);
-
-            println!(
-                "Backend sidecar started on port {} with PID {}",
-                backend_port, child_pid
-            );
-
-            // Spawn a thread to read and print backend output
-            std::thread::spawn(move || {
-                use tauri_plugin_shell::process::CommandEvent;
-                while let Some(event) = futures::executor::block_on(async { rx.recv().await }) {
-                    match event {
-                        CommandEvent::Stdout(line) => {
-                            println!("[Backend] {}", String::from_utf8_lossy(&line))
-                        }
-                        CommandEvent::Stderr(line) => {
-                            eprintln!("[Backend] {}", String::from_utf8_lossy(&line))
-                        }
-                        CommandEvent::Error(err) => eprintln!("[Backend Error] {}", err),
-                        CommandEvent::Terminated(payload) => {
-                            println!("[Backend] Process terminated with code: {:?}", payload.code);
-                            break;
-                        }
-                        _ => {}
-                    }
-                }
-            });
+            *state.pid.lock().unwrap() = Some(pid);
 
             // Wait a bit for the backend to start
             std::thread::sleep(std::time::Duration::from_secs(3));

@@ -4,7 +4,7 @@ This project uses **npm workspaces** to manage multiple packages in a monorepo s
 
 ## Project Structure
 
-```
+```text
 ldaca_web_app/
 ├── package.json              # Root workspace configuration
 ├── frontend/                 # React frontend (workspace member)
@@ -13,7 +13,7 @@ ldaca_web_app/
 │   └── build/               # Vite build output
 ├── backend/                  # Python FastAPI backend
 │   ├── pyproject.toml
-│   └── dist/                # PyInstaller output
+│   └── dist-tauri/          # Packaged backend runtime for Tauri
 └── src-tauri/               # Rust desktop wrapper
     ├── Cargo.toml
     ├── tauri.conf.json
@@ -35,7 +35,7 @@ ldaca_web_app/
 # Install all dependencies (root + frontend)
 npm install
 
-# Build backend executable
+# Package backend runtime
 npm run prepare:backend
 
 # Build frontend
@@ -93,7 +93,7 @@ npm run tauri:build
 | `npm run tauri:build` | Build Tauri desktop app (production) |
 | `npm run desktop:dev` | Build frontend + start desktop dev |
 | `npm run desktop:build` | Build everything + create installer |
-| `npm run prepare:backend` | Build Python backend executable |
+| `npm run prepare:backend` | Package Python backend runtime for Tauri |
 | `npm run prepare:frontend` | Build React frontend |
 | `npm run prepare:all` | Build backend + frontend |
 | `npm run clean` | Clean all build artifacts |
@@ -152,6 +152,7 @@ npm update --workspaces
 ### VS Code
 
 The workspace is automatically detected. You can:
+
 - Run npm scripts from the NPM Scripts explorer
 - Use integrated terminal with correct working directory
 - Install the "NPM" extension for better workspace support

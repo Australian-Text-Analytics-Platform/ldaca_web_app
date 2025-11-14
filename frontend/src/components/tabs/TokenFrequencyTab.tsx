@@ -855,13 +855,14 @@ function TokenFrequencyTab() {
     setIsLoadingStopWords(true);
     try {
     const response = await textApi.defaultStopWords(getAuthHeaders());
-    if (response.state === 'successful' && response.data) {
-        const joined = response.data.join(', ');
+    const defaultWords = response?.stopwords ?? (response as any)?.data;
+    if (Array.isArray(defaultWords) && defaultWords.length) {
+        const joined = defaultWords.join(', ');
         setStopWords(joined);
         // Auto-apply on fill default and persist
         applyStopSetFromText(joined);
       } else {
-        console.error('Failed to get default stop words:', response.message);
+        console.error('Failed to get default stop words:', response);
       }
     } catch (error) {
       console.error('Error getting default stop words:', error);

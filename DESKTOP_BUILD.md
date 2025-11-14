@@ -7,7 +7,7 @@ This directory contains the Tauri desktop application that bundles the LDaCA bac
 The desktop app consists of:
 
 1. **Frontend**: React app (from `frontend/build`)
-2. **Backend**: FastAPI server executable (from `backend/dist/ldaca_web_app_backend`)
+2. **Backend**: FastAPI server runtime folder (from `backend/dist-tauri/backend-runtime`)
 3. **Tauri Shell**: Rust-based native wrapper that:
    - Finds an available port (8001-8010)
    - Starts the backend server
@@ -17,6 +17,7 @@ The desktop app consists of:
 ## Prerequisites
 
 ### macOS
+
 ```bash
 # Install Xcode Command Line Tools
 xcode-select --install
@@ -29,6 +30,7 @@ brew install imagemagick  # For icon generation
 ```
 
 ### Linux (Ubuntu/Debian)
+
 ```bash
 # Install system dependencies
 sudo apt update
@@ -48,6 +50,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
 ### Windows
+
 ```powershell
 # Install Rust from https://rustup.rs/
 
@@ -61,14 +64,20 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ## Building the Desktop App
 
 ### Step 1: Prepare the Backend
+
 ```bash
 cd backend
-bash build_executable.sh --clean
+bash scripts/package_backend_runtime.sh --clean
 ```
 
-This creates: `backend/dist/ldaca_web_app_backend` (or `.exe` on Windows)
+This creates: `backend/dist-tauri/backend-runtime`
+
+You should see `run_backend.sh` plus platform-suffixed aliases such as
+`run_backend.sh-aarch64-apple-darwin`. Tauri looks for the target triple when
+bundling sidecars, so these duplicate launchers are expected on macOS.
 
 ### Step 2: Prepare the Frontend
+
 ```bash
 cd frontend
 npm install
@@ -78,6 +87,7 @@ npm run build
 This creates: `frontend/build/`
 
 ### Step 3: Generate Icons (Optional)
+
 ```bash
 cd src-tauri
 bash generate-icons.sh
@@ -86,6 +96,7 @@ bash generate-icons.sh
 This creates all required icon formats from the frontend logo.
 
 ### Step 4: Install Tauri CLI
+
 ```bash
 # From the ldaca_web_app root directory
 npm install
@@ -94,49 +105,70 @@ npm install
 ### Step 5: Build the Desktop App
 
 #### Development Mode (with hot reload)
+
 ```bash
 npm run tauri:dev
 ```
 
 This:
+
 - Starts the frontend dev server on port 3000
 - Opens the Tauri window
 - Automatically reloads on code changes
 
 #### Production Build
+
 ```bash
 npm run tauri:build
 ```
 
 This creates platform-specific installers:
+
 - **macOS**: `src-tauri/target/release/bundle/dmg/LDaCA Text Analytics_*.dmg`
 - **Windows**: `src-tauri/target/release/bundle/msi/LDaCA Text Analytics_*.msi`
 - **Linux**: `src-tauri/target/release/bundle/deb/ldaca-text-analytics_*.deb` or `.AppImage`
 
 ### One-Command Build (All Steps)
+
 ```bash
 # From the ldaca_web_app root directory
 npm run prepare:all  # Builds backend + frontend
 npm run tauri:build  # Builds desktop app
 ```
 
+### Running the Raw Binary Directly
+
+The preferred way to launch the app is via the generated `.app` bundle (or the
+platform-specific installer). Running the bare binary at
+`src-tauri/target/release/ldaca-web-app` also works, but it requires access to a
+backend runtime folder. The launcher now falls back to these locations:
+
+1. Bundled sidecar inside the `.app` resources (default for shipped builds)
+2. `backend/dist-tauri/backend-runtime` inside the repo
+3. A custom path provided via the `LDACA_BACKEND_LAUNCHER` environment variable
+
+If none of those locations exist you will see a friendly error explaining how to
+rebuild the runtime. Running `npm run prepare:backend` regenerates the fallback
+folder, while `npm run desktop:build` refreshes the bundled copy.
+
 ## Port Management
 
 The desktop app automatically finds an available port in the range 8001-8010 for the backend server. This prevents conflicts if multiple instances are running or if those ports are already in use.
 
 The backend URL is dynamically injected into the frontend at runtime via:
+
 ```javascript
 window.__BACKEND_URL__
 ```
 
 ## Application Structure
 
-```
+```text
 ldaca_web_app/
 ├── package.json              # Root package.json with Tauri scripts
 ├── backend/
-│   └── dist/
-│       └── ldaca_web_app_backend  # Bundled backend executable
+│   └── dist-tauri/
+│       └── backend-runtime       # Bundled Python runtime + launcher
 ├── frontend/
 │   └── build/                # Production frontend build
 └── src-tauri/
@@ -162,22 +194,27 @@ ldaca_web_app/
 ### Backend Environment Variables
 
 The Tauri app sets these automatically:
+
 - `BACKEND_PORT`: Dynamically assigned port (8001-8010)
 - `LDACA_BACKEND_PORT`: Same as above (for compatibility)
 
 You can also set:
+
 - `LDACA_DATA_ROOT`: Custom data directory (defaults to `~/Documents/ldaca`)
 - `LDACA_DEBUG`: Enable debug mode (not recommended for production)
 
 ## Troubleshooting
 
 ### Backend doesn't start
+
 Check logs in the console. Common issues:
-- Backend executable not found in bundle
+
+- Backend runtime folder missing from bundle
 - Port range exhausted (all ports 8001-8010 in use)
 - Missing system dependencies
 
 ### Frontend can't connect to backend
+
 - Check that `window.__BACKEND_URL__` is set correctly
 - Verify CSP settings allow localhost connections
 - Ensure backend started successfully (check console logs)
@@ -185,6 +222,7 @@ Check logs in the console. Common issues:
 ### Build errors
 
 **macOS**:
+
 ```bash
 # Clear Rust cache
 cargo clean
@@ -194,12 +232,14 @@ rm -rf src-tauri/target
 ```
 
 **Linux**:
+
 ```bash
 # Install missing dependencies
 sudo apt-get install -y libwebkit2gtk-4.1-dev
 ```
 
 **Windows**:
+
 ```powershell
 # Reinstall WebView2
 # Download from: https://developer.microsoft.com/en-us/microsoft-edge/webview2/
@@ -207,15 +247,18 @@ sudo apt-get install -y libwebkit2gtk-4.1-dev
 
 ## Distribution
 
-### macOS
+### macOS Distribution
+
 - DMG installer: Drag and drop to Applications
 - Notarization required for distribution (see Apple Developer docs)
 
-### Windows
+### Windows Distribution
+
 - MSI installer: Standard Windows installer
 - Code signing recommended for distribution
 
-### Linux
+### Linux Distribution
+
 - DEB package: `sudo dpkg -i ldaca-text-analytics_*.deb`
 - AppImage: Portable, no installation required
 
@@ -230,6 +273,7 @@ The app runs with the following security measures:
 ## Development Tips
 
 ### Testing without building
+
 ```bash
 # Backend only
 cd backend
@@ -248,6 +292,7 @@ cd frontend && REACT_APP_BACKEND_URL=http://localhost:8001 npm start
 ```
 
 ### Debugging the Tauri app
+
 ```bash
 # Dev mode with console
 npm run tauri:dev
@@ -257,9 +302,10 @@ npm run tauri:dev
 ```
 
 ### Updating the backend
+
 ```bash
 cd backend
-bash build_executable.sh --clean
+bash scripts/package_backend_runtime.sh --clean
 # Then rebuild the Tauri app
 cd ..
 npm run tauri:build

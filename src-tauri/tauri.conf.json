@@ -39,10 +39,10 @@
       "signingIdentity": "-"
     },
     "externalBin": [
-      "../backend/dist/ldaca_web_app_backend_bundle/ldaca_web_app_backend"
+      "../backend/dist-tauri/backend-runtime/run_backend.sh"
     ],
     "resources": [
-      "../backend/dist/ldaca_web_app_backend_bundle"
+      "../backend/dist-tauri/backend-runtime"
     ],
     "copyright": "Copyright © 2025 Australian Text Analytics Platform",
     "category": "Education",
