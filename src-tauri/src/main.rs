@@ -6,14 +6,100 @@ use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 use tauri::{AppHandle, Manager, State};
 use tauri_plugin_shell::ShellExt;
 
 /// Holds the backend URL, process, and PID
 struct BackendState {
     url: String,
-    pid: Arc<Mutex<Option<u32>>>,
+    process: Arc<Mutex<Option<BackendProcessHandle>>>,
     closing: Arc<Mutex<bool>>, // track if graceful closing is in progress
+}
+
+enum BackendProcessInner {
+    Sidecar(tauri_plugin_shell::process::CommandChild),
+    Manual(std::process::Child),
+}
+
+struct BackendProcessHandle {
+    pid: u32,
+    inner: BackendProcessInner,
+}
+
+impl BackendProcessHandle {
+    fn new_sidecar(child: tauri_plugin_shell::process::CommandChild) -> Self {
+        let pid = child.pid();
+        Self {
+            pid,
+            inner: BackendProcessInner::Sidecar(child),
+        }
+    }
+
+    fn new_manual(child: std::process::Child) -> Self {
+        let pid = child.id();
+        Self {
+            pid,
+            inner: BackendProcessInner::Manual(child),
+        }
+    }
+
+    fn pid(&self) -> u32 {
+        self.pid
+    }
+
+    fn shutdown(mut self) {
+        #[cfg(unix)]
+        {
+            match send_sigterm(self.pid) {
+                Ok(_) => {
+                    if self.inner.wait_for_exit(self.pid, Duration::from_millis(7000)) {
+                        println!("Backend {} exited gracefully", self.pid);
+                        return;
+                    }
+                    println!(
+                        "Backend {} did not exit after SIGTERM; requesting immediate termination",
+                        self.pid
+                    );
+                }
+                Err(err) => {
+                    eprintln!(
+                        "Failed to send SIGTERM to backend {}: {}",
+                        self.pid, err
+                    );
+                }
+            }
+        }
+
+        if let Err(err) = self.inner.terminate_now() {
+            eprintln!("Failed to stop backend {} cleanly: {}", self.pid, err);
+        }
+    }
+}
+
+impl BackendProcessInner {
+    #[cfg(unix)]
+    fn wait_for_exit(&mut self, pid: u32, timeout: Duration) -> bool {
+        match self {
+            BackendProcessInner::Sidecar(_) => wait_for_exit(pid, timeout),
+            BackendProcessInner::Manual(child) => wait_for_child_exit(child, timeout),
+        }
+    }
+
+    fn terminate_now(self) -> io::Result<()> {
+        match self {
+            BackendProcessInner::Sidecar(child) => {
+                child
+                    .kill()
+                    .map_err(|err| io::Error::new(io::ErrorKind::Other, err.to_string()))
+            }
+            BackendProcessInner::Manual(mut child) => {
+                child.kill()?;
+                let _ = child.wait();
+                Ok(())
+            }
+        }
+    }
 }
 
 const DEV_BACKEND_LAUNCHER: &str =
@@ -86,7 +172,7 @@ where
     });
 }
 
-fn spawn_manual_backend(launcher: &Path, backend_port: u16) -> io::Result<u32> {
+fn spawn_manual_backend(launcher: &Path, backend_port: u16) -> io::Result<BackendProcessHandle> {
     let mut command = Command::new(launcher);
     command
         .env("BACKEND_PORT", backend_port.to_string())
@@ -109,13 +195,13 @@ fn spawn_manual_backend(launcher: &Path, backend_port: u16) -> io::Result<u32> {
         launcher, backend_port, pid
     );
 
-    Ok(pid)
+    Ok(BackendProcessHandle::new_manual(child))
 }
 
 fn fallback_to_manual_launcher(
     backend_port: u16,
     reason: impl std::fmt::Display,
-) -> Result<u32, Box<dyn std::error::Error>> {
+) -> Result<BackendProcessHandle, Box<dyn std::error::Error>> {
     let reason_msg = reason.to_string();
     if let Some(local_launcher) = locate_backend_launcher() {
         println!(
@@ -138,7 +224,7 @@ fn fallback_to_manual_launcher(
 fn spawn_backend_process(
     app: &AppHandle,
     backend_port: u16,
-) -> Result<u32, Box<dyn std::error::Error>> {
+) -> Result<BackendProcessHandle, Box<dyn std::error::Error>> {
     match app
         .shell()
         .sidecar("backend-runtime/run_backend.sh")
@@ -180,7 +266,7 @@ fn spawn_backend_process(
                         }
                     });
 
-                    Ok(child_pid)
+                    Ok(BackendProcessHandle::new_sidecar(child))
                 }
                 Err(spawn_err) => fallback_to_manual_launcher(backend_port, spawn_err),
             }
@@ -228,109 +314,57 @@ fn get_backend_url(state: State<BackendState>) -> String {
     state.url.clone()
 }
 
-/// Check if a process is running (Unix)
+/// Send SIGTERM to a process (Unix)
 #[cfg(unix)]
-fn is_process_running(pid: u32) -> bool {
-    use std::process::Command;
-    if let Ok(output) = Command::new("kill").arg("-0").arg(pid.to_string()).output() {
-        output.status.success()
+fn send_sigterm(pid: u32) -> io::Result<()> {
+    if pid == 0 {
+        return Ok(());
+    }
+    let result = unsafe { libc::kill(pid as libc::pid_t, libc::SIGTERM) };
+    if result == 0 {
+        Ok(())
     } else {
-        false
+        Err(io::Error::last_os_error())
     }
 }
 
-/// Send SIGTERM to a process (Unix)
+/// Wait for a process to exit, with timeout
 #[cfg(unix)]
-fn send_sigterm(pid: u32) {
-    use std::process::Command;
-    let _ = Command::new("kill")
-        .arg("-TERM")
-        .arg(pid.to_string())
-        .output();
-}
-
-/// Wait for a process to exit, with timeout in milliseconds (Unix)
-#[cfg(unix)]
-fn wait_for_exit(pid: u32, timeout_ms: u64) -> bool {
-    let start = std::time::Instant::now();
-    while start.elapsed() < std::time::Duration::from_millis(timeout_ms) {
+fn wait_for_exit(pid: u32, timeout: Duration) -> bool {
+    let start = Instant::now();
+    while start.elapsed() < timeout {
         if !is_process_running(pid) {
             return true;
         }
-        std::thread::sleep(std::time::Duration::from_millis(100));
+        std::thread::sleep(Duration::from_millis(100));
     }
     !is_process_running(pid)
 }
 
-/// Force kill a process by PID on Unix systems
 #[cfg(unix)]
-fn force_kill_process(pid: u32) -> Result<(), String> {
-    use std::process::Command;
-
-    println!("Force killing process tree with root PID {}...", pid);
-
-    // Get all child processes using pgrep
-    let children_result = Command::new("pgrep")
-        .arg("-P")
-        .arg(pid.to_string())
-        .output();
-
-    let mut all_pids = vec![pid];
-    if let Ok(output) = children_result {
-        if output.status.success() {
-            let children_str = String::from_utf8_lossy(&output.stdout);
-            for line in children_str.lines() {
-                if let Ok(child_pid) = line.trim().parse::<u32>() {
-                    all_pids.push(child_pid);
+fn wait_for_child_exit(child: &mut std::process::Child, timeout: Duration) -> bool {
+    let start = Instant::now();
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => return true,
+            Ok(None) => {
+                if start.elapsed() >= timeout {
+                    return false;
                 }
+                std::thread::sleep(Duration::from_millis(100));
             }
+            Err(_) => return false,
         }
     }
-
-    println!("Found process tree: {:?}", all_pids);
-
-    // Force kill all processes with SIGKILL
-    for &proc_pid in &all_pids {
-        let kill_result = Command::new("kill")
-            .arg("-9")
-            .arg(proc_pid.to_string())
-            .output();
-
-        if let Ok(output) = kill_result {
-            if output.status.success() {
-                println!("SIGKILL sent to PID {}", proc_pid);
-            }
-        }
-    }
-
-    Ok(())
 }
 
-/// Force kill a process by PID on Windows
-#[cfg(windows)]
-fn force_kill_process(pid: u32) -> Result<(), String> {
-    use std::process::Command;
-
-    println!("Force killing process with PID {}...", pid);
-
-    let kill_result = Command::new("taskkill")
-        .arg("/F")
-        .arg("/PID")
-        .arg(pid.to_string())
-        .output();
-
-    match kill_result {
-        Ok(output) => {
-            if output.status.success() {
-                println!("Successfully killed process PID {}", pid);
-                Ok(())
-            } else {
-                let err = String::from_utf8_lossy(&output.stderr);
-                Err(format!("Failed to kill PID {}: {}", pid, err))
-            }
-        }
-        Err(e) => Err(format!("Failed to execute taskkill command: {}", e)),
+#[cfg(unix)]
+fn is_process_running(pid: u32) -> bool {
+    if pid == 0 {
+        return false;
     }
+    let result = unsafe { libc::kill(pid as libc::pid_t, 0) };
+    result == 0
 }
 
 fn main() {
@@ -343,7 +377,7 @@ fn main() {
 
     let backend_state = BackendState {
         url: backend_url.clone(),
-        pid: Arc::new(Mutex::new(None)),
+        process: Arc::new(Mutex::new(None)),
         closing: Arc::new(Mutex::new(false)),
     };
 
@@ -369,14 +403,18 @@ fn main() {
             ))?;
 
             let app_handle = app.handle();
-            let pid = spawn_backend_process(&app_handle, backend_port)?;
+            let process = spawn_backend_process(&app_handle, backend_port)?;
+            let backend_pid = process.pid();
             let state: State<BackendState> = app.state();
-            *state.pid.lock().unwrap() = Some(pid);
+            *state.process.lock().unwrap() = Some(process);
 
             // Wait a bit for the backend to start
             std::thread::sleep(std::time::Duration::from_secs(3));
 
-            println!("Backend ready at: {}", backend_url);
+            println!(
+                "Backend ready at: {} (pid {})",
+                backend_url, backend_pid
+            );
 
             Ok(())
         })
@@ -402,28 +440,12 @@ fn main() {
                 // First time: prevent close and start graceful shutdown
                 api.prevent_close();
 
-                let pid_opt = state.pid.lock().unwrap().take();
+                let process_handle = state.process.lock().unwrap().take();
                 let window_clone = window.clone();
                 std::thread::spawn(move || {
-                    if let Some(pid) = pid_opt {
-                        #[cfg(unix)]
-                        {
-                            println!(
-                                "Sending SIGTERM to backend PID {} and waiting to exit...",
-                                pid
-                            );
-                            send_sigterm(pid);
-                            if wait_for_exit(pid, 7000) {
-                                println!("Backend exited gracefully");
-                            } else {
-                                println!("Backend did not exit in time; forcing termination...");
-                                let _ = force_kill_process(pid);
-                            }
-                        }
-                        #[cfg(windows)]
-                        {
-                            let _ = force_kill_process(pid);
-                        }
+                    if let Some(process) = process_handle {
+                        println!("Shutting down backend PID {}", process.pid());
+                        process.shutdown();
                     }
                     let _ = window_clone.close();
                 });
@@ -436,19 +458,13 @@ fn main() {
             if let tauri::RunEvent::ExitRequested { .. } = event {
                 if let Some(state) = app_handle.try_state::<BackendState>() {
                     println!("App exiting - waiting for backend to terminate gracefully...");
-                    let pid_opt = state.pid.lock().ok().and_then(|mut guard| guard.take());
-                    if let Some(pid) = pid_opt {
-                        #[cfg(unix)]
-                        {
-                            send_sigterm(pid);
-                            if !wait_for_exit(pid, 7000) {
-                                let _ = force_kill_process(pid);
-                            }
-                        }
-                        #[cfg(windows)]
-                        {
-                            let _ = force_kill_process(pid);
-                        }
+                    if let Some(process) = state
+                        .process
+                        .lock()
+                        .ok()
+                        .and_then(|mut guard| guard.take())
+                    {
+                        process.shutdown();
                     }
                 }
             }

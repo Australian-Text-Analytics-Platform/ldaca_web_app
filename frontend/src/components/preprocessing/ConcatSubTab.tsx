@@ -264,6 +264,15 @@ export const ConcatSubTab: React.FC<ConcatSubTabProps> = ({
 
   const concatPreviewCurrentPage = concatPreviewPagination?.page ?? concatPreviewPage;
   const concatStatusMessage = concatAnalysis.issues;
+  const concatSelectionStatus = useMemo(() => {
+    if (concatAnalysis.ready || !concatStatusMessage) {
+      return null;
+    }
+    return {
+      message: concatStatusMessage,
+      variant: concatAnalysis.mismatches.length > 0 ? 'error' : 'warning',
+    } as const;
+  }, [concatAnalysis.ready, concatAnalysis.mismatches.length, concatStatusMessage]);
 
   const autoConcatName = useMemo(() => {
     if (!concatAnalysis.summaries.length) return '';
@@ -432,6 +441,8 @@ export const ConcatSubTab: React.FC<ConcatSubTabProps> = ({
             getNodeShapeFn={getNodeShape}
             disabled={concatSelectedNodes.length < 2}
             originalCount={concatOriginalCount}
+            statusMessage={concatSelectionStatus?.message}
+            statusVariant={concatSelectionStatus?.variant}
           />
 
           {concatOriginalCount > MAX_CONCAT_NODES && (

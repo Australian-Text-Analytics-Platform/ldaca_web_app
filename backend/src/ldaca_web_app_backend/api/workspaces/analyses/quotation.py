@@ -36,6 +36,7 @@ from ....models import (
     QuotationRequest,
 )
 from ....settings import settings
+from ..utils import get_node_with_data_or_400
 
 logger = logging.getLogger(__name__)
 
@@ -406,12 +407,10 @@ async def get_quotation(
     """
     user_id = current_user["id"]
     try:
-        node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
-        if not node:
-            raise HTTPException(status_code=404, detail="Node not found")
+        node, node_data = get_node_with_data_or_400(user_id, workspace_id, node_id)
         engine = request.engine or QuotationEngineConfig()
 
-        if engine.type is QuotationEngineType.LOCAL and not hasattr(node.data, "text"):
+        if engine.type is QuotationEngineType.LOCAL and not hasattr(node_data, "text"):
             raise HTTPException(
                 status_code=400,
                 detail="This node does not support text analysis (DocFrame text namespace not available)",
@@ -485,11 +484,9 @@ async def detach_quotation(
     """Detach quotation results (full-table) by joining exploded quotations with original table into a new node."""
     user_id = current_user["id"]
     try:
-        node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
-        if not node:
-            raise HTTPException(status_code=404, detail="Node not found")
+        node, node_data = get_node_with_data_or_400(user_id, workspace_id, node_id)
         engine = request.engine or QuotationEngineConfig()
-        if engine.type is QuotationEngineType.LOCAL and not hasattr(node.data, "text"):
+        if engine.type is QuotationEngineType.LOCAL and not hasattr(node_data, "text"):
             raise HTTPException(
                 status_code=400,
                 detail="This node does not support text analysis (DocFrame text namespace not available)",

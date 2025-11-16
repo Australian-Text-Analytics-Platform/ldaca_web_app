@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import NodeSelectionPanel from '../NodeSelectionPanel';
 import AnalysisLockedNotice from './AnalysisLockedNotice';
@@ -803,7 +802,6 @@ const QuotationTab: React.FC = () => {
         setHasLoaded(true);
       } catch { /* ignore */ }
     })();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentWorkspaceId, getAuthHeaders]);
 
   return (

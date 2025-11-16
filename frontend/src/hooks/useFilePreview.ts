@@ -42,7 +42,7 @@ export const useFilePreview = () => {
       setSelectedSheet(response.selected_sheet || null);
       if (typeof nextPage === 'number') setPage(nextPage);
       return data;
-    } catch (err) {
+    } catch (_err) {
       setError('Failed to load preview');
       setPreviewData([]);
       setColumns([]);

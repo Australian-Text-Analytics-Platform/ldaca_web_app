@@ -10,8 +10,8 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from ....core.analysis_store import clear_analyses, get_latest_analysis, save_analysis
 from ....core.auth import get_current_user
-from ....core.workspace import workspace_manager
 from ....models import FrequencyAnalysisRequest
+from ..utils import get_node_with_data_or_400
 
 router = APIRouter(prefix="/workspaces")
 
@@ -61,15 +61,13 @@ async def get_frequency_analysis(
     """Run frequency analysis on a node with DocFrame integration."""
     user_id = current_user["id"]
     try:
-        node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
-        if not node:
-            raise HTTPException(status_code=404, detail="Node not found")
+        node, node_data = get_node_with_data_or_400(user_id, workspace_id, node_id)
 
         # Determine available columns
-        if hasattr(node.data, "columns"):
-            available_columns = node.data.columns
-        elif hasattr(node.data, "schema"):
-            available_columns = list(node.data.schema.keys())
+        if hasattr(node_data, "columns"):
+            available_columns = node_data.columns
+        elif hasattr(node_data, "schema"):
+            available_columns = list(node_data.schema.keys())
         else:
             available_columns = []
 
@@ -98,13 +96,13 @@ async def get_frequency_analysis(
                 detail=f"Invalid frequency '{request.frequency}'. Valid options: {valid_frequencies}",
             )
 
-        if not hasattr(node.data, "text"):
+        if not hasattr(node_data, "text"):
             raise HTTPException(
                 status_code=400,
                 detail="Node data does not support text analysis. Ensure it contains text data.",
             )
 
-        frequency_result = node.data.text.frequency_analysis(  # type: ignore[attr-defined]
+        frequency_result = node_data.text.frequency_analysis(  # type: ignore[attr-defined]
             time_column=request.time_column,
             group_by_columns=request.group_by_columns,
             frequency=request.frequency,

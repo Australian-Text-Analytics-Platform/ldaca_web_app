@@ -7,7 +7,7 @@ interface GoogleLoginProps {
   error?: string | null;
 }
 
-function GoogleLogin({ onLogin, onLogout, isLoading, error }: GoogleLoginProps) {
+function GoogleLogin({ onLogin, onLogout: _onLogout, isLoading, error }: GoogleLoginProps) {
   const handleGoogleSuccess = async (credentialResponse: any) => {
     try {
       if (credentialResponse.credential) {

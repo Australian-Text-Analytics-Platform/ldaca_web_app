@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import NodeSelectionPanel, { WorkspaceNodeLike } from '../NodeSelectionPanel';
 import { useWorkspaceData } from '../../hooks/useWorkspaceData';

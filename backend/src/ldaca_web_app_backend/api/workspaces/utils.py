@@ -5,6 +5,7 @@ from typing import Any, Optional, Tuple
 from fastapi import HTTPException
 
 from ...core.json_utils import json_sanitize  # type: ignore
+from ...core.workspace import workspace_manager
 
 
 def success(data=None, message: str = "ok", state: str = "successful", **extra):
@@ -23,6 +24,28 @@ def failed(message: str, error: Any = None, status_code: int = 400):
     if error is not None:
         detail["error"] = str(error)
     raise HTTPException(status_code=status_code, detail=detail)
+
+
+def get_node_or_404(
+    user_id: str, workspace_id: str, node_id: str, detail: Optional[str] = None
+):
+    node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
+    if not node:
+        raise HTTPException(status_code=404, detail=detail or "Node not found")
+    return node
+
+
+def get_node_with_data_or_400(
+    user_id: str,
+    workspace_id: str,
+    node_id: str,
+    not_found_detail: Optional[str] = None,
+):
+    node = get_node_or_404(user_id, workspace_id, node_id, detail=not_found_detail)
+    data = getattr(node, "data", None)
+    if data is None:
+        raise HTTPException(status_code=400, detail="Node has no data")
+    return node, data
 
 
 def _handle_operation_result(result: Any) -> Tuple[bool, str, Any]:  # exported
@@ -73,4 +96,6 @@ __all__ = [
     "failed",
     "_handle_operation_result",
     "configure_numba_threading",
+    "get_node_or_404",
+    "get_node_with_data_or_400",
 ]

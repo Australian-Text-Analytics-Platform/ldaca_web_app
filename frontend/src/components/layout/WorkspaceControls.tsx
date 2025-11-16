@@ -1,19 +1,14 @@
 import React, { memo, useEffect, useState } from 'react';
 import { useWorkspaceData } from '../../hooks/useWorkspaceData';
 import { useWorkspaceActions } from '../../hooks/useWorkspaceActions';
-import { useWorkspaceSelection } from '../../hooks/useWorkspaceSelection';
 
 /**
  * Separated controls component focused only on workspace controls
  * Removed view mode toggle since both views are now shown vertically
  */
 export const WorkspaceControls: React.FC = memo(() => {
-  const { currentWorkspace, workspaceGraph } = useWorkspaceData();
-  const { selectedNodeIds } = useWorkspaceSelection();
+  const { currentWorkspace } = useWorkspaceData();
   const { saveWorkspace, saveWorkspaceAs, renameWorkspace, setCurrentWorkspace } = useWorkspaceActions();
-
-  // Use workspaceGraph.nodes as the single source of truth for node count
-  const nodeCount = workspaceGraph?.nodes?.length || 0;
 
   const [isEditing, setIsEditing] = useState(false);
   const [nameInput, setNameInput] = useState(currentWorkspace?.name || '');

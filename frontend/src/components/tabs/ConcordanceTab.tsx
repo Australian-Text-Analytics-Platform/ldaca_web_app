@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 // NodeSelectionPanel now handles color selection UI inline
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import NodeSelectionPanel from '../NodeSelectionPanel';
@@ -696,7 +695,6 @@ const ConcordanceTab: React.FC = () => {
         if (resp?.data) mergeConcordanceResults(resp as ConcordanceAnalysisResponse);
       })();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [combinedPage]);
 
   const handleSort = (columnName: string, nodeKey: string, requestNodeId?: string) => {

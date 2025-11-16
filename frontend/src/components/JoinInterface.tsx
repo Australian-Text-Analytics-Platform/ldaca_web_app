@@ -16,7 +16,7 @@ const JoinInterface: React.FC<JoinInterfaceProps> = ({
   leftNode,
   rightNode,
   onJoin,
-  onCancel,
+  onCancel: _onCancel,
   loading = false
 }) => {
   const { getNodeShape } = useWorkspaceData();

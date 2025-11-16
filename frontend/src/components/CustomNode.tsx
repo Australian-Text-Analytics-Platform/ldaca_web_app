@@ -22,7 +22,6 @@ interface CustomNodeData {
   onResetDocument?: (nodeId: string, documentColumn?: string) => void;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function CustomNode({ data, selected }: NodeProps<any>) {
   const { node: initialNode, isMultiSelected = false, onDelete, onRename, onConvertToDocDataFrame, onConvertToDataFrame, onConvertToDocLazyFrame, onConvertToLazyFrame, onResetDocument } = data as CustomNodeData;
   // Keep a local state but always sync with props to prevent staleness after in-place updates

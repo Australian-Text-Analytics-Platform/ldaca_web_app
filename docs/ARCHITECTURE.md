@@ -1,5 +1,7 @@
 # LDaCA Web App Architecture
 
+<!-- markdownlint-disable MD024 MD031 MD032 MD040 -->
+
 ## Overview
 
 The LDaCA (Language Data Commons of Australia) Web Application is a full-stack text analytics platform consisting of three main components: **DocWorkspace** (graph-based data management), **Backend** (FastAPI REST API), and **Frontend** (React + TypeScript). The system enables interactive text analysis with workspace management, lazy evaluation, and visual data lineage tracking.
@@ -349,7 +351,7 @@ Frontend stores token, includes in Authorization header
   - **Type conversion**: `pl.Int64` → `"Int64"`, `pl.Utf8` → `"String"`, etc.
   
 - `workspace_to_react_flow(workspace, layout_algorithm='grid')`: Converts workspace to React Flow format
-  - **Implementation**: 
+  - **Implementation**:
     1. Iterate nodes, calculate positions using `_calculate_layout()`
     2. Create `ReactFlowNode` for each with position, data (label, type, shape, columns)
     3. Iterate parent relationships, create `ReactFlowEdge` for each (source=parent.id, target=node.id)
@@ -361,7 +363,7 @@ Frontend stores token, includes in Authorization header
   - **Handles lazy**: For lazy frames, uses `collect_schema()` to avoid materialization
   
 - `get_paginated_data(node, page=1, page_size=100)`: Paginates node data
-  - **Implementation**: 
+  - **Implementation**:
     1. Materialize if lazy: `node.collect()` if needed
     2. Calculate slice: `start = (page-1) * page_size`, `end = start + page_size`
     3. Slice data: `data[start:end]`
@@ -775,12 +777,14 @@ Frontend: POST /concordance/current-result {page: 2} → Returns page 2 from cac
 
 **Purpose**: User management, authentication sessions.
 
-**Implementation**:
+##### Implementation
+
 - **Database**: async SQLite (`sqlite+aiosqlite://`) with SQLAlchemy
 - **Models**: `User` (id, email, name, created_at), `Session` (token, user_id, expires_at)
 - **Migrations**: Manual migration scripts in `migrate_db.py`
 
-**Example**:
+##### Example
+
 ```python
 # db.py
 async def get_async_session():
@@ -804,7 +808,7 @@ This section provides comprehensive documentation of every backend file and its 
 
 **Purpose**: Single-workspace-per-user in-memory orchestration.
 
-**Class: WorkspaceManager**
+###### Class: WorkspaceManager
 
 **Key Data Structures**:
 - `_current: Dict[str, Dict[str, Any]]`: Currently loaded workspace per user `{user_id: {id, ws}}`

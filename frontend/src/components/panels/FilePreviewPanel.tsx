@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo } from 'react';
 import { useFilePreview } from '../../hooks/useFilePreview';
-import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '../ui/sheet';
+import { Dialog, DialogContent } from '../ui/dialog';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 
@@ -37,7 +38,7 @@ export const FilePreviewPanel: React.FC<FilePreviewPanelProps> = ({ filename, op
   }, [filename, canNext, fetchPreview, page]);
 
   return (
-    <Sheet
+    <Dialog
       open={open && Boolean(filename)}
       onOpenChange={(nextOpen) => {
         if (!nextOpen) {
@@ -45,77 +46,81 @@ export const FilePreviewPanel: React.FC<FilePreviewPanelProps> = ({ filename, op
         }
       }}
     >
-      <SheetContent side="right" className="sm:max-w-4xl w-full overflow-hidden">
-        <SheetHeader className="px-1">
-          <SheetTitle className="truncate">Preview{filename ? `: ${filename}` : ''}</SheetTitle>
-          <SheetDescription>Inspect the first rows of the uploaded file before adding it to a workspace.</SheetDescription>
-        </SheetHeader>
+      <DialogContent className="w-full max-w-[95vw] border-none bg-transparent p-0 shadow-none sm:max-w-[1100px] lg:max-w-[1400px]">
+        <Card className="flex h-[85vh] max-h-[90vh] flex-col">
+          <CardHeader className="border-b px-6 py-4">
+            <CardTitle className="truncate text-lg font-semibold">Preview{filename ? `: ${filename}` : ''}</CardTitle>
+            <CardDescription>Inspect the first rows of the uploaded file before adding it to a workspace.</CardDescription>
+          </CardHeader>
 
-        <div className="flex-1 overflow-auto px-1">
-          {loading ? (
-            <div className="py-12 text-center text-muted-foreground">Loading…</div>
-          ) : error ? (
-            <div className="py-12 text-center text-destructive">{error}</div>
-          ) : rows.length === 0 ? (
-            <div className="py-12 text-center text-muted-foreground">No preview data</div>
-          ) : (
-            <div className="w-full overflow-auto">
-              <table className="min-w-full text-sm">
-                <thead>
-                  <tr className="bg-muted">
-                    {columns.map((column) => (
-                      <th key={column} className="whitespace-nowrap px-3 py-2 text-left font-medium">
-                        {column}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row, rowIndex) => (
-                    <tr key={rowIndex} className={rowIndex % 2 ? 'bg-muted/40' : 'bg-background'}>
-                      {columns.map((column) => (
-                        <td key={`${column}-${rowIndex}`} className="whitespace-nowrap px-3 py-2">
-                          {String(row[column] ?? '')}
-                        </td>
+          <CardContent className="flex-1 overflow-hidden px-0 py-0">
+            <div className="h-full w-full overflow-auto px-6 py-4">
+              {loading ? (
+                <div className="py-12 text-center text-muted-foreground">Loading…</div>
+              ) : error ? (
+                <div className="py-12 text-center text-destructive">{error}</div>
+              ) : rows.length === 0 ? (
+                <div className="py-12 text-center text-muted-foreground">No preview data</div>
+              ) : (
+                <div className="w-full overflow-x-auto overflow-y-auto rounded-md border border-border/50">
+                  <table className="min-w-max text-sm">
+                    <thead>
+                      <tr className="bg-muted">
+                        {columns.map((column) => (
+                          <th key={column} className="whitespace-nowrap px-3 py-2 text-left font-medium">
+                            {column}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((row, rowIndex) => (
+                        <tr key={rowIndex} className={rowIndex % 2 ? 'bg-muted/40' : 'bg-background'}>
+                          {columns.map((column) => (
+                            <td key={`${column}-${rowIndex}`} className="whitespace-nowrap px-3 py-2">
+                              {String(row[column] ?? '')}
+                            </td>
+                          ))}
+                        </tr>
                       ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          </CardContent>
 
-        <SheetFooter className="border-t border-border/70 px-1 py-3">
-          <div className="flex w-full flex-wrap items-center justify-between gap-3">
-            <div className="text-xs text-muted-foreground">
-              Page {page + 1}
-              {totalRows ? ` of ~${Math.ceil(totalRows / pageSize)}` : ''}
+          <CardFooter className="border-t px-6 py-4">
+            <div className="flex w-full flex-wrap items-center justify-between gap-3">
+              <div className="text-xs text-muted-foreground">
+                Page {page + 1}
+                {totalRows ? ` of ~${Math.ceil(totalRows / pageSize)}` : ''}
+              </div>
+              <div className="flex items-center gap-2">
+                <Button onClick={handlePrev} disabled={!canPrev || loading} variant="outline" size="sm">
+                  Prev
+                </Button>
+                <Button onClick={handleNext} disabled={!canNext || loading} variant="outline" size="sm">
+                  Next
+                </Button>
+                <Select value={String(pageSize)} onValueChange={(value) => setPageSize(Number(value))}>
+                  <SelectTrigger className="w-20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[10, 25, 50, 100].map((size) => (
+                      <SelectItem key={size} value={String(size)}>
+                        {size}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Button onClick={handlePrev} disabled={!canPrev || loading} variant="outline" size="sm">
-                Prev
-              </Button>
-              <Button onClick={handleNext} disabled={!canNext || loading} variant="outline" size="sm">
-                Next
-              </Button>
-              <Select value={String(pageSize)} onValueChange={(value) => setPageSize(Number(value))}>
-                <SelectTrigger className="w-20">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {[10, 25, 50, 100].map((size) => (
-                    <SelectItem key={size} value={String(size)}>
-                      {size}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+          </CardFooter>
+        </Card>
+      </DialogContent>
+    </Dialog>
   );
 };
 

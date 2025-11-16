@@ -314,7 +314,6 @@ export const WorkspaceGraphView = memo(() => {
     return () => {
       if (updateRafRef.current) cancelAnimationFrame(updateRafRef.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [newNodeIds, newEdgeIds, newNodesSignature, currentNodesSignature]);
 
   // Removed edge-clearing safeguards so backend edges can render

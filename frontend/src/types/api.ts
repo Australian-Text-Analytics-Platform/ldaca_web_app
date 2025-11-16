@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Enhanced TypeScript types for the ATAP Web App
  * Provides type safety and better development experience

@@ -20,6 +20,12 @@ type NodeColumnSource = string[] | ColumnInfo[];
 
 const CLEAR_SELECTION_VALUE = '__ldaca__clear__';
 
+const STATUS_VARIANT_STYLES: Record<'info' | 'warning' | 'error', string> = {
+  info: 'border-sky-500/50 bg-sky-100/60 text-sky-900',
+  warning: 'border-amber-500/60 bg-amber-100/60 text-amber-900',
+  error: 'border-destructive/50 bg-destructive/10 text-destructive',
+};
+
 export type WorkspaceNodeLike = Record<string, unknown> & {
   id?: string;
   node_id?: string;
@@ -81,6 +87,8 @@ interface NodeSelectionPanelProps {
   allowedDataTypes?: string[];
   fallbackToAllColumns?: boolean; // if true, when filtering removes all columns we fall back to the unfiltered list
   lockedMessage?: ReactNode; // optional message shown when locked
+  statusMessage?: ReactNode; // optional inline status/warning rendered within the panel
+  statusVariant?: 'info' | 'warning' | 'error';
 }
 
 /** Shared node + text-column + color selection panel reused across analysis tabs */
@@ -107,6 +115,8 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
   allowedDataTypes,
   fallbackToAllColumns = false,
   lockedMessage,
+  statusMessage,
+  statusVariant = 'warning',
 }) => {
   const getColorForNodeId = (nodeId: string, idx: number) => {
     if (nodeColors[nodeId]) return nodeColors[nodeId];
@@ -206,6 +216,18 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
               <Lock className="h-3.5 w-3.5" aria-hidden="true" />
             </span>
           )}
+        </div>
+      )}
+      {statusMessage && (
+        <div className="px-4">
+          <div
+            className={cn(
+              'rounded-md border px-3 py-2 text-xs leading-snug',
+              STATUS_VARIANT_STYLES[statusVariant] ?? STATUS_VARIANT_STYLES.warning,
+            )}
+          >
+            {statusMessage}
+          </div>
         </div>
       )}
       {selectedNodes.length === 0 ? (

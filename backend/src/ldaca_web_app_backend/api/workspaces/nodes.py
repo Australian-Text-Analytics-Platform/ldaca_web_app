@@ -27,7 +27,7 @@ from ...models import (
     FilterRequest,
     SliceRequest,
 )
-from .utils import _handle_operation_result
+from .utils import _handle_operation_result, get_node_or_404, get_node_with_data_or_400
 
 router = APIRouter(prefix="/workspaces", tags=["nodes"])
 
@@ -263,12 +263,12 @@ def _get_concat_nodes(
                 status_code=400,
                 detail=f"Duplicate node id '{node_id}' provided",
             )
-        node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
-        if not node:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Node '{node_id}' not found in workspace",
-            )
+        node = get_node_or_404(
+            user_id,
+            workspace_id,
+            node_id,
+            detail=f"Node '{node_id}' not found in workspace",
+        )
         nodes.append(node)
         seen.add(node_id)
     if len(nodes) < 2:
@@ -392,12 +392,10 @@ async def compute_column_preview(
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
-    if not node:
-        raise HTTPException(status_code=404, detail="Node not found")
+    _, data_obj = get_node_with_data_or_400(user_id, workspace_id, node_id)
 
     try:
-        lazy_data = _ensure_lazyframe(node.data)
+        lazy_data = _ensure_lazyframe(data_obj)
     except HTTPException:
         raise
     except Exception as exc:  # pragma: no cover - defensive
@@ -446,11 +444,7 @@ async def compute_column_apply(
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
-    if not node:
-        raise HTTPException(status_code=404, detail="Node not found")
-
-    data_obj = node.data
+    node, data_obj = get_node_with_data_or_400(user_id, workspace_id, node_id)
     try:
         lazy_data = _ensure_lazyframe(data_obj)
         columns, _ = _extract_lazy_schema(lazy_data)
@@ -522,9 +516,7 @@ async def get_node_info(
     workspace_id: str, node_id: str, current_user: dict = Depends(get_current_user)
 ):
     user_id = current_user["id"]
-    node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
-    if not node:
-        raise HTTPException(status_code=404, detail="Node not found")
+    node = get_node_or_404(user_id, workspace_id, node_id)
     try:
         return DocWorkspaceAPIUtils.convert_node_info_for_api(node)
     except Exception as e:  # pragma: no cover
@@ -540,11 +532,8 @@ async def get_node_data(
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
-    if not node:
-        raise HTTPException(status_code=404, detail="Node not found")
+    node, data_obj = get_node_with_data_or_400(user_id, workspace_id, node_id)
     try:
-        data_obj = node.data
         if hasattr(data_obj, "collect"):
             df = data_obj.collect()
         else:
@@ -574,11 +563,8 @@ async def get_node_shape(
     workspace_id: str, node_id: str, current_user: dict = Depends(get_current_user)
 ):
     user_id = current_user["id"]
-    node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
-    if not node:
-        raise HTTPException(status_code=404, detail="Node not found")
+    node, data_obj = get_node_with_data_or_400(user_id, workspace_id, node_id)
     try:
-        data_obj = node.data
         try:  # pragma: no cover
             from docframe import DocDataFrame, DocLazyFrame  # type: ignore
 
@@ -658,11 +644,8 @@ async def get_column_unique_values(
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
-    if not node:
-        raise HTTPException(status_code=404, detail="Node not found")
+    _, data_obj = get_node_with_data_or_400(user_id, workspace_id, node_id)
     try:
-        data_obj = node.data
         if hasattr(data_obj, "columns"):
             columns = list(data_obj.columns)
         elif hasattr(data_obj, "schema"):
@@ -713,13 +696,9 @@ async def describe_column(
     from ...models import ColumnDescribeResponse
 
     user_id = current_user["id"]
-    node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
-    if not node:
-        raise HTTPException(status_code=404, detail="Node not found")
+    _, data_obj = get_node_with_data_or_400(user_id, workspace_id, node_id)
 
     try:
-        data_obj = node.data
-
         # Get columns
         if hasattr(data_obj, "columns"):
             columns = list(data_obj.columns)
@@ -860,12 +839,7 @@ async def convert_node(
         raise HTTPException(
             status_code=500, detail="docframe library not available on backend"
         )
-    src_node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
-    if not src_node:
-        raise HTTPException(status_code=404, detail="Node not found")
-    data = getattr(src_node, "data", None)
-    if data is None:
-        raise HTTPException(status_code=400, detail="Node has no data")
+    src_node, data = get_node_with_data_or_400(user_id, workspace_id, node_id)
     try:
         new_data = None
         operation_name = f"convert_to_{target}"
@@ -1017,12 +991,7 @@ async def reset_node_document_column(
         raise HTTPException(
             status_code=500, detail="docframe library not available on backend"
         )
-    src_node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
-    if not src_node:
-        raise HTTPException(status_code=404, detail="Node not found")
-    data = getattr(src_node, "data", None)
-    if data is None:
-        raise HTTPException(status_code=400, detail="Node has no data")
+    src_node, data = get_node_with_data_or_400(user_id, workspace_id, node_id)
     try:
         new_data = None
         if isinstance(data, DocDataFrame):  # type: ignore[arg-type]
@@ -1090,9 +1059,7 @@ async def update_node_name(
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
-    if not node:
-        raise HTTPException(status_code=404, detail="Node not found")
+    node = get_node_or_404(user_id, workspace_id, node_id)
     try:
         node.name = new_name
         workspace = workspace_manager.get_workspace(user_id, workspace_id)
@@ -1121,9 +1088,11 @@ async def filter_node(
     user_id = current_user["id"]
 
     def filter_operation():
-        node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
-        if not node:
-            raise ValueError("Node not found")
+        try:
+            node, _ = get_node_with_data_or_400(user_id, workspace_id, node_id)
+        except HTTPException as exc:
+            detail = exc.detail if isinstance(exc.detail, str) else "Node not found"
+            raise ValueError(detail) from exc
         filter_expr = _build_filter_expression(request)
         if hasattr(node.data, "filter"):
             filtered_data = node.data.filter(filter_expr)
@@ -1159,9 +1128,7 @@ async def filter_preview(
     current_user: dict = Depends(get_current_user),
 ) -> FilterPreviewResponse:
     user_id = current_user["id"]
-    node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
-    if not node:
-        raise HTTPException(status_code=404, detail="Node not found")
+    _, data_obj = get_node_with_data_or_400(user_id, workspace_id, node_id)
 
     try:
         filter_expr = _build_filter_expression(request)
@@ -1169,7 +1136,7 @@ async def filter_preview(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     try:
-        lazy_data = _ensure_lazyframe(node.data)
+        lazy_data = _ensure_lazyframe(data_obj)
         filtered_lazy = lazy_data.filter(filter_expr)
 
         total_rows_series = (
@@ -1224,9 +1191,11 @@ async def slice_node(
     user_id = current_user["id"]
 
     def slice_operation():
-        node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
-        if not node:
-            raise ValueError("Node not found")
+        try:
+            node, _ = get_node_with_data_or_400(user_id, workspace_id, node_id)
+        except HTTPException as exc:
+            detail = exc.detail if isinstance(exc.detail, str) else "Node not found"
+            raise ValueError(detail) from exc
         offset = int(request.offset or 0)
         length = request.length
         sliced_data = node.data
@@ -1273,15 +1242,13 @@ async def slice_preview(
     current_user: dict = Depends(get_current_user),
 ) -> FilterPreviewResponse:
     user_id = current_user["id"]
-    node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
-    if not node:
-        raise HTTPException(status_code=404, detail="Node not found")
+    _, data_obj = get_node_with_data_or_400(user_id, workspace_id, node_id)
 
     offset = int(request.offset or 0)
     length = request.length if request.length is None else int(request.length)
 
     try:
-        lazy_data = _ensure_lazyframe(node.data)
+        lazy_data = _ensure_lazyframe(data_obj)
         sliced_lazy = lazy_data.slice(offset, length)
 
         total_rows_series = (
@@ -1436,14 +1403,18 @@ async def join_nodes_preview(
 ):
     user_id = current_user["id"]
     try:
-        left_node = workspace_manager.get_node_from_workspace(
-            user_id, workspace_id, left_node_id
+        left_node = get_node_or_404(
+            user_id,
+            workspace_id,
+            left_node_id,
+            detail=f"Left node '{left_node_id}' not found",
         )
-        right_node = workspace_manager.get_node_from_workspace(
-            user_id, workspace_id, right_node_id
+        right_node = get_node_or_404(
+            user_id,
+            workspace_id,
+            right_node_id,
+            detail=f"Right node '{right_node_id}' not found",
         )
-        if not left_node or not right_node:
-            raise HTTPException(status_code=404, detail="One or both nodes not found")
 
         allowed_hows = {"inner", "left", "right", "full", "semi", "anti", "cross"}
         how_val = (how or "inner").lower()
@@ -1528,14 +1499,18 @@ async def join_nodes(
 ):
     user_id = current_user["id"]
     try:
-        left_node = workspace_manager.get_node_from_workspace(
-            user_id, workspace_id, left_node_id
+        left_node = get_node_or_404(
+            user_id,
+            workspace_id,
+            left_node_id,
+            detail=f"Left node '{left_node_id}' not found",
         )
-        right_node = workspace_manager.get_node_from_workspace(
-            user_id, workspace_id, right_node_id
+        right_node = get_node_or_404(
+            user_id,
+            workspace_id,
+            right_node_id,
+            detail=f"Right node '{right_node_id}' not found",
         )
-        if not left_node or not right_node:
-            raise HTTPException(status_code=404, detail="One or both nodes not found")
         left_data = left_node.data
         right_data = right_node.data
         allowed_hows = {"inner", "left", "right", "full", "semi", "anti", "cross"}

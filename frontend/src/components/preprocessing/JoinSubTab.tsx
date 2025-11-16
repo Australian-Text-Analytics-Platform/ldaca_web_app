@@ -400,12 +400,6 @@ export const JoinSubTab: React.FC<JoinSubTabProps> = ({
             Select up to two nodes in the workspace (Shift/⌘-click) to configure a join. Column pickers will appear below for the current selection.
           </p>
 
-          {joinConfigIssues && !joinConfigReady && (
-            <div className="rounded-md border border-amber-500/50 bg-amber-100/60 p-3 text-sm text-amber-900">
-              {joinConfigIssues}
-            </div>
-          )}
-
           <NodeSelectionPanel
             selectedNodes={joinSelectedNodesForPanel}
             nodeColumnSelections={joinNodeSelections}
@@ -431,6 +425,7 @@ export const JoinSubTab: React.FC<JoinSubTabProps> = ({
               if (nodeId === joinRightNodeId) return 'Right column:';
               return 'Join column:';
             }}
+            statusMessage={!joinConfigReady && joinConfigIssues ? joinConfigIssues : undefined}
           />
 
           {joinNeedsColumns && joinLeftNodeId && joinRightNodeId && joinLeftNodeId !== joinRightNodeId && (

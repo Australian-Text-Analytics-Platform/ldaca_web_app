@@ -108,7 +108,6 @@ export const useNodeColumnInfos = (
       idsToFetch.forEach((id) => pendingSet.delete(id));
       forceTick((tick) => tick + 1);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, workspaceId, getAuthHeaders, nodeIds.join('|'), cache]);
 
   const getColumnInfos = useCallback((node: NodeLike | null | undefined, idx = 0): ColumnInfo[] => {

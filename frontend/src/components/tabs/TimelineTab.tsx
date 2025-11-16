@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useWorkspaceData } from '../../hooks/useWorkspaceData';
@@ -207,7 +206,6 @@ const TimelineTab: React.FC = () => {
     if (!currentSelection || currentSelection.column !== desired) {
       setNodeColumnSelections([{ nodeId: selectedNodeId, column: desired }]);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLocked, hydratingSelection, selectedNodeId, timeColumn, timeColumnOptions, setNodeColumnSelections]);
   // Note: nodeColumnSelections intentionally excluded from deps to prevent infinite loop
   // We read it directly inside the effect to check current state

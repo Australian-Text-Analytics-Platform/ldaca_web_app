@@ -3,9 +3,24 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import path from 'path';
 
+const reactWithCompiler = react({
+  babel: {
+    plugins: [
+      [
+        'babel-plugin-react-compiler',
+        {
+          target: '19',
+          runtimeModule: 'react-compiler-runtime',
+          throwIfUnsupported: false,
+        },
+      ],
+    ],
+  },
+});
+
 export default defineConfig({
   base: './',
-  plugins: [react(), tailwindcss()],
+  plugins: [reactWithCompiler, tailwindcss()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

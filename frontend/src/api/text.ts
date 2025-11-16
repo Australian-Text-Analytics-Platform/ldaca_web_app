@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { post, get, httpRequest } from './http';
 
 // Concordance / Quotation / Token Frequency / Topic Modeling grouped

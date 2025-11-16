@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { AuthInfoResponse, GoogleAuthResponse as LegacyGoogleAuthResponse } from '../types';
+import { AuthInfoResponse } from '../types';
 // Migrated to modular API layer
 import { authApi } from '../api/auth';
 
@@ -78,7 +78,7 @@ export const useAuth = () => {
     ensureRefreshInterval();
     return () => {
       // Remove this component's listener on unmount
-      listeners.forEach(l => {
+      listeners.forEach((_listener) => {
         // We can't easily compare functions created inline above; harmless to leave
         // (memory is trivial). For completeness, we could store the specific fn.
       });
