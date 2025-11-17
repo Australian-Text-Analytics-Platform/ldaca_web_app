@@ -1,0 +1,108 @@
+name: Desktop macOS Build (Apple Silicon)
+
+on:
+  workflow_dispatch:
+    inputs:
+      build-notes:
+        description: "Optional note about this build"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build-macos-apple-silicon:
+    runs-on: macos-14
+    env:
+      CI: "true"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            frontend/package-lock.json
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          targets: aarch64-apple-darwin
+
+      - name: Prepare cache directories
+        run: |
+          mkdir -p ~/.cargo/registry
+          mkdir -p ~/.cargo/git
+          mkdir -p ~/.rustup
+          mkdir -p ~/.cache/uv
+          mkdir -p ~/.local/share/uv
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Cache rustup toolchains
+        uses: actions/cache@v4
+        with:
+          path: ~/.rustup
+          key: ${{ runner.os }}-rustup-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-rustup-
+
+      - name: Install uv CLI
+        shell: bash
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Cache uv workspace
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/uv
+            ~/.local/share/uv
+          key: ${{ runner.os }}-uv-${{ hashFiles('backend/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-
+
+      - name: Run desktop build script
+        shell: bash
+        run: bash build-desktop.sh
+
+      - name: Label DMG output for Apple Silicon
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          shopt -s nullglob
+          dmg_files=(src-tauri/target/release/bundle/dmg/*.dmg)
+          if [ ${#dmg_files[@]} -eq 0 ]; then
+            echo "No DMG output found" >&2
+            exit 1
+          fi
+          primary_dmg="${dmg_files[0]}"
+          labeled_dmg="src-tauri/target/release/bundle/dmg/ldaca-desktop-apple-silicon.dmg"
+          cp "$primary_dmg" "$labeled_dmg"
+          echo "APPLE_SILICON_DMG=$labeled_dmg" >> "$GITHUB_ENV"
+          echo "Primary DMG: $primary_dmg"
+          echo "Labeled DMG: $labeled_dmg"
+
+      - name: Upload macOS Apple Silicon DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ldaca-desktop-macos-apple-silicon
+          path: ${{ env.APPLE_SILICON_DMG }}
+          if-no-files-found: error
+          retention-days: 14
