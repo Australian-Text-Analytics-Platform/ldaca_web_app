@@ -78,9 +78,152 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-uv-
 
-      - name: Run desktop build script
+      - name: Package backend runtime
         shell: bash
-        run: bash build-desktop.sh
+        working-directory: backend
+        run: |
+          set -Eeuo pipefail
+          PYTHON_VERSION="3.12"
+          DIST_ROOT="$PWD/dist-tauri"
+          OUTPUT_DIR="$DIST_ROOT/backend-runtime"
+          LOCKFILE="$DIST_ROOT/backend-runtime-requirements.txt"
+
+          echo "🧹 Cleaning backend dist directory"
+          rm -rf "$DIST_ROOT"
+          mkdir -p "$OUTPUT_DIR"
+
+          echo "🧰 Installing Python ${PYTHON_VERSION} via uv"
+          uv python install "$PYTHON_VERSION"
+
+          echo "🔒 Resolving backend dependencies"
+          uv pip compile pyproject.toml \
+            --python-version "$PYTHON_VERSION" \
+            --output-file "$LOCKFILE"
+
+          echo "🐍 Creating backend virtual environment"
+          uv venv --python "$PYTHON_VERSION" "$OUTPUT_DIR/.venv"
+
+          VENV_BIN_DIR="$OUTPUT_DIR/.venv/bin"
+          if [[ ! -d "$VENV_BIN_DIR" ]]; then
+            VENV_BIN_DIR="$OUTPUT_DIR/.venv/Scripts"
+          fi
+          PYTHON_BIN="$VENV_BIN_DIR/python"
+          if [[ ! -x "$PYTHON_BIN" ]]; then
+            PYTHON_BIN="$VENV_BIN_DIR/python.exe"
+          fi
+          if [[ ! -x "$PYTHON_BIN" ]]; then
+            echo "Python executable not found in runtime venv" >&2
+            exit 1
+          fi
+
+          echo "📥 Installing backend requirements into runtime venv"
+          uv pip install --python "$PYTHON_BIN" -r "$LOCKFILE"
+
+          echo "📦 Installing backend package into runtime venv"
+          uv pip install --python "$PYTHON_BIN" "$PWD"
+
+          RUNNER_PATH="$OUTPUT_DIR/run_backend.sh"
+          cat > "$RUNNER_PATH" <<'RUNNER'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+VENV_DIR="$SCRIPT_DIR/.venv"
+if [[ -d "$VENV_DIR/bin" ]]; then
+    PYTHON_BIN="$VENV_DIR/bin/python"
+elif [[ -d "$VENV_DIR/Scripts" ]]; then
+    PYTHON_BIN="$VENV_DIR/Scripts/python.exe"
+else
+    echo "Virtual environment missing at $VENV_DIR" >&2
+    exit 1
+fi
+
+if [[ -f "$SCRIPT_DIR/.env" ]]; then
+    set -a
+    source "$SCRIPT_DIR/.env"
+    set +a
+fi
+
+if [[ -f "$SCRIPT_DIR/.env.desktop" ]]; then
+    set -a
+    source "$SCRIPT_DIR/.env.desktop"
+    set +a
+fi
+
+PORT_VALUE="${BACKEND_PORT:-${LDACA_BACKEND_PORT:-8001}}"
+HOST_VALUE="${SERVER_HOST:-${LDACA_SERVER_HOST:-127.0.0.1}}"
+
+export BACKEND_PORT="$PORT_VALUE"
+export LDACA_BACKEND_PORT="$PORT_VALUE"
+export SERVER_HOST="$HOST_VALUE"
+export LDACA_SERVER_HOST="$HOST_VALUE"
+export PYTHONUNBUFFERED=1
+export LDACA_CONFIG_PROFILE="${LDACA_CONFIG_PROFILE:-desktop}"
+
+exec "$PYTHON_BIN" -m ldaca_web_app_backend.cli
+RUNNER
+          chmod +x "$RUNNER_PATH"
+
+          if [[ "$(uname -s)" == "Darwin" ]]; then
+            echo "🔧 Creating macOS sidecar aliases"
+            for target in aarch64-apple-darwin x86_64-apple-darwin; do
+              alias_path="${RUNNER_PATH}-${target}"
+              cp "$RUNNER_PATH" "$alias_path"
+              chmod +x "$alias_path"
+            done
+          fi
+
+          cat > "$OUTPUT_DIR/.env.desktop.example" <<'ENV'
+# Desktop-specific overrides for the bundled backend
+# Copy this file to .env.desktop and adjust values if needed.
+#
+#BACKEND_PORT=8001
+#SERVER_HOST=127.0.0.1
+#LDACA_DATA_ROOT=$HOME/Documents/ldaca
+ENV
+
+          cat > "$OUTPUT_DIR/README_RUNTIME.md" <<'DOCS'
+# LDaCA Backend Runtime
+
+This folder is generated during the desktop build and contains:
+
+- `.venv/` – self-contained Python interpreter with all backend dependencies
+- `run_backend.sh` – launcher script used by the Tauri shell
+- `run_backend.sh-*` – architecture-specific copies for Tauri sidecar lookup
+- `.env.desktop.example` – optional overrides for runtime configuration
+
+The launcher expects the following environment variables (all optional):
+
+| Variable | Purpose |
+|----------|---------|
+| `BACKEND_PORT` / `LDACA_BACKEND_PORT` | Port to bind the FastAPI server (defaults to 8001) |
+| `SERVER_HOST` / `LDACA_SERVER_HOST` | Network interface to bind (defaults to 127.0.0.1) |
+| `LDACA_DATA_ROOT` | Location for workspace + user data (default `~/Documents/ldaca`) |
+| `LDACA_CONFIG_PROFILE` | Arbitrary label for downstream logging (defaults to `desktop`) |
+
+At runtime the Tauri shell executes `run_backend.sh`, which in turn boots
+`ldaca_web_app_backend.cli` inside the bundled virtual environment.
+DOCS
+
+          echo "✅ Backend runtime packaged at $OUTPUT_DIR"
+
+      - name: Install frontend dependencies
+        shell: bash
+        working-directory: frontend
+        run: npm install
+
+      - name: Build frontend
+        shell: bash
+        working-directory: frontend
+        run: npm run build
+
+      - name: Install root dependencies
+        shell: bash
+        run: npm install
+
+      - name: Build Tauri desktop application
+        shell: bash
+        run: npm run tauri:build
 
       - name: Label DMG output for Apple Silicon
         shell: bash
