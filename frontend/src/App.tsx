@@ -6,7 +6,7 @@ import { WorkspaceProvider } from './providers/WorkspaceProvider';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import GoogleLogin from './components/GoogleLogin';
 import { WorkspaceView, Sidebar } from './components/layout';
-import logo from './logo.png';
+import BlockingScreen from './components/startup/BlockingScreen';
 import FeedbackPanel from './components/panels/FeedbackPanel';
 import { useUIStore } from './stores';
 import { useShallow } from 'zustand/react/shallow';
@@ -24,9 +24,10 @@ const ExportTab = lazy(() => import('./components/tabs/ExportTab'));
 const TokenFrequencyTab = lazy(() => import('./components/tabs/TokenFrequencyTab'));
 
 /**
- * Improved App component with proper error boundaries and loading states
+ * Shell that renders the main workspace experience once the backend is healthy
+ * and the user has completed authentication (if required).
  */
-const App: React.FC = () => {
+const WorkspaceShell: React.FC = () => {
   const {
     currentView,
     closeFeedbackModal,
@@ -36,9 +37,24 @@ const App: React.FC = () => {
     closeFeedbackModal: state.closeFeedbackModal,
     feedbackOpen: state.modals.feedbackModal,
   })));
-  const [isTutorial, setIsTutorial] = useState<boolean>(false);
-  const { loginWithGoogle, logout, isAuthenticated, isMultiUserMode, isLoading, error } = useAuth();
-  const { ready: backendReady } = useBackendHealth();
+  const {
+    loginWithGoogle,
+    logout,
+    isAuthenticated,
+    isMultiUserMode,
+    isLoading: authLoading,
+    error: authError,
+    refreshAuth,
+  } = useAuth({ autoStart: false, debugLabel: 'WorkspaceShell' });
+  if (import.meta.env.DEV) {
+    console.debug('[WorkspaceShell] auth state', JSON.stringify({
+      authLoading,
+      authError,
+      isAuthenticated,
+      isMultiUserMode,
+    }));
+  }
+  const [authLagging, setAuthLagging] = useState(false);
 
   // Right panel width and resize handlers must be declared before any early returns (React Hooks rule)
   const [rightWidth, setRightWidth] = useState<number>(40); // percentage of total width
@@ -49,6 +65,20 @@ const App: React.FC = () => {
   const mainRef = useRef<HTMLElement>(null);
   const asideRef = useRef<HTMLElement>(null);
   const rightWidthLiveRef = useRef<number>(rightWidth);
+
+  useEffect(() => {
+    refreshAuth();
+  }, [refreshAuth]);
+
+  useEffect(() => {
+    if (!authLoading) {
+      setAuthLagging(false);
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => setAuthLagging(true), 8000);
+    return () => window.clearTimeout(timeoutId);
+  }, [authLoading]);
   const onStartResize = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     if (isRightCollapsed) return; // don't resize when collapsed
@@ -107,55 +137,24 @@ const App: React.FC = () => {
     });
   }, [rightWidth, lastRightWidth]);
 
-  // Hash-based lightweight routing for tutorial page
-  useEffect(() => {
-    const check = () => setIsTutorial(window.location.hash.replace(/^#/, '') === '/tutorial');
-    check();
-    window.addEventListener('hashchange', check);
-    return () => window.removeEventListener('hashchange', check);
-  }, []);
-
-  if (isTutorial) {
+  if (authLoading) {
     return (
-      <Suspense fallback={
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading Tutorial...</p>
-          </div>
-        </div>
-      }>
-        <TutorialView />
-      </Suspense>
-    );
-  }
-
-  // Show loading state while checking auth
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Wait for backend readiness before showing anything else (prevents empty file list due to race)
-  if (!backendReady) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
-        <div className="text-center flex flex-col items-center space-y-5 bg-white/80 backdrop-blur px-10 py-8 rounded-xl shadow-lg border border-gray-100">
-          <img src={logo} alt="LDaCA Logo" className="h-16 w-auto object-contain" />
-          <h1 className="text-2xl font-bold text-gray-800">LDaCA Corpus Analysis</h1>
-          <div className="flex flex-col items-center space-y-3">
-            <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-200 border-t-blue-600" />
-            <p className="text-gray-700 font-medium">Backend not ready yet</p>
-            <p className="text-xs text-gray-500">Waiting for API /health...</p>
-          </div>
-        </div>
-      </div>
+      <BlockingScreen
+        title="Signing you in"
+        description="The backend is healthy; finishing the authentication handshake."
+        status={authLagging ? 'Still waiting for auth…' : 'Checking your session…'}
+        hint={authLagging ? 'This can happen if backend migrations are still running. You can retry below.' : 'This usually takes just a moment.'}
+        error={authError}
+        actions={(
+          <button
+            type="button"
+            onClick={refreshAuth}
+            className="rounded-lg bg-blue-600 px-4 py-2 text-white font-medium shadow hover:bg-blue-700 focus-visible:outline-offset-2 focus-visible:outline-blue-500 focus-visible:outline-2"
+          >
+            Retry connection
+          </button>
+        )}
+      />
     );
   }
 
@@ -171,8 +170,8 @@ const App: React.FC = () => {
             <GoogleLogin 
               onLogin={loginWithGoogle} 
               onLogout={logout}
-              isLoading={isLoading}
-              error={error}
+              isLoading={authLoading}
+              error={authError}
             />
           </div>
         </ErrorBoundary>
@@ -284,6 +283,50 @@ const App: React.FC = () => {
       </WorkspaceProvider>
     </QueryProvider>
   );
+};
+
+/**
+ * Top-level app entry that handles tutorial routing and backend health gating
+ * before rendering the main workspace shell.
+ */
+const App: React.FC = () => {
+  const [isTutorial, setIsTutorial] = useState(false);
+  const { ready: backendReady, error: backendError } = useBackendHealth();
+
+  useEffect(() => {
+    const check = () => setIsTutorial(window.location.hash.replace(/^#/, '') === '/tutorial');
+    check();
+    window.addEventListener('hashchange', check);
+    return () => window.removeEventListener('hashchange', check);
+  }, []);
+
+  if (isTutorial) {
+    return (
+      <Suspense fallback={
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading Tutorial...</p>
+          </div>
+        </div>
+      }>
+        <TutorialView />
+      </Suspense>
+    );
+  }
+
+  if (!backendReady) {
+    return (
+      <BlockingScreen
+        title="Starting backend services"
+        description="Hang tight while we verify the backend is up and happy."
+        status="Checking /health…"
+        hint={backendError ? `Last error: ${backendError}` : 'If this takes more than ~30s, check the backend logs.'}
+      />
+    );
+  }
+
+  return <WorkspaceShell />;
 };
 
 export default App;

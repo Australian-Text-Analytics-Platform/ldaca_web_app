@@ -1770,6 +1770,43 @@ for node in workspace.nodes.values():
   const store = useWorkspaceStore();
   ```
 
+### Tutorial: Startup Readiness Flow (Desktop + Web)
+
+**Goal**: walk through what the React shell now does before showing any workspace UI. Assume we are teaching a brand-new team member how the desktop build waits for the FastAPI backend and the authentication handshake.
+
+1. **Step 1 – Ask “Is the backend awake?”**  
+   *Question*: *What happens the moment the shell boots but `/health` is not ready yet?*  
+   *Answer*: `useBackendHealth()` polls the resolved `/health` URL (Tauri injects `window.__BACKEND_URL__` for desktop). Until `ready === true`, the app renders `BlockingScreen` (`frontend/src/components/startup/BlockingScreen.tsx`). The screen shows the spinner, logo, and the last error string so that non-technical users still see feedback.
+
+   ```tsx
+   const { ready, error } = useBackendHealth();
+   if (!ready) {
+     return (
+       <BlockingScreen
+         title="LDaCA Corpus Analysis"
+         description="Waiting for the backend API to finish booting."
+         status="Starting backend services"
+         hint={error ?? 'Most boots finish within 30 seconds.'}
+       />
+     );
+   }
+   ```
+
+2. **Step 2 – Ask “Can we trust the auth session?”**  
+  *Question*: *Why do we still see a blocking screen even after `/health` is green?*  
+  *Answer*: The shell calls `useAuth({ autoStart: false })`, so *no* `/api/auth/` request fires until `useBackendHealth()` reports success. The moment `ready` flips to `true`, `App.tsx` invokes `refreshAuth()`, which (a) attaches any stored bearer token, (b) times out in 7 s, (c) retries automatically if the handshake fails, and (d) surfaces both the `refreshAuth()` action and an `authLagging` hint if things drag on. This ordering guarantees `/health` is always the first network request (critical for desktop builds where the backend may still be binding to its port) and avoids the previous stuck state where an in-flight `/auth` call blocked retries for the full timeout window. The UI again uses `BlockingScreen`, this time with a CTA so users can retry instead of staring at a blank spinner.
+
+3. **Step 3 – When both gates pass**  
+   *Question*: *What finally unlocks the workspace layout?*  
+   *Answer*: Once `backendReady && !authLoading`, the normal providers render. If the backend says multi-user mode is enabled and the user is not authenticated, the Google login card is shown as before.
+
+**Safety Net Tests**  
+`frontend/src/App.startup.test.tsx` runs through the three scenarios with Vitest + Testing Library (`vite.config.ts` now sets `test.environment = 'jsdom'`). The tests mock `useAuth`/`useBackendHealth` and assert that:
+
+- The backend gate shows “Starting backend services” alongside the last health error.
+- The auth gate shows “Signing you in”, automatically kicks `refreshAuth()` once the backend flips to healthy, and clicking *Retry connection* calls it again.
+- When both gates pass, the main layout mounts (`Sidebar`, `WorkspaceView`, etc.).
+
 ### Database Queries
 
 **Async SQLite**:

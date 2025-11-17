@@ -1,4 +1,5 @@
-import { post, get } from './http';
+import { AuthInfoResponse } from '../types';
+import { post, httpRequest } from './http';
 
 export interface GoogleAuthResponse {
   access_token: string;
@@ -28,7 +29,14 @@ export interface UserMeResponse {
 
 export const authApi = {
   googleAuth: (idToken: string) => post<GoogleAuthResponse>('/auth/google', { id_token: idToken }),
-  status: (authHeaders: Record<string,string> = {}) => get<UserMeResponse>('/auth/status', authHeaders),
+  info: (
+    authHeaders: Record<string, string> = {},
+    options?: { timeoutMs?: number },
+  ) => httpRequest<AuthInfoResponse>('/auth/', {
+    method: 'GET',
+    headers: authHeaders,
+    timeoutMs: options?.timeoutMs,
+  }),
   logout: (authHeaders: Record<string,string> = {}) => post('/auth/logout', {}, authHeaders),
 };
 
