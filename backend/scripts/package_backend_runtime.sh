@@ -107,8 +107,11 @@ uv pip compile pyproject.toml \
 echo "📁 Lockfile created at $LOCKFILE"
 
 # Step 2: Create a dedicated virtual environment under the runtime folder
+echo "🧰 Ensuring Python $PYTHON_VERSION via uv"
+uv python install "$PYTHON_VERSION"
+
 echo "🐍 Creating virtual environment"
-uv venv "$OUTPUT_DIR/.venv"
+uv venv --python "$PYTHON_VERSION" "$OUTPUT_DIR/.venv"
 
 VENV_BIN_DIR="$OUTPUT_DIR/.venv/bin"
 if [[ ! -d "$VENV_BIN_DIR" ]]; then
