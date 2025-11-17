@@ -123,45 +123,46 @@ jobs:
           uv pip install --python "$PYTHON_BIN" "$PWD"
 
           RUNNER_PATH="$OUTPUT_DIR/run_backend.sh"
-          cat > "$RUNNER_PATH" <<'RUNNER'
-#!/usr/bin/env bash
-set -Eeuo pipefail
+          printf '%s\n' \
+            '#!/usr/bin/env bash' \
+            'set -Eeuo pipefail' \
+            '' \
+            'SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"' \
+            'VENV_DIR="$SCRIPT_DIR/.venv"' \
+            'if [[ -d "$VENV_DIR/bin" ]]; then' \
+            '    PYTHON_BIN="$VENV_DIR/bin/python"' \
+            'elif [[ -d "$VENV_DIR/Scripts" ]]; then' \
+            '    PYTHON_BIN="$VENV_DIR/Scripts/python.exe"' \
+            'else' \
+            '    echo "Virtual environment missing at $VENV_DIR" >&2' \
+            '    exit 1' \
+            'fi' \
+            '' \
+            'if [[ -f "$SCRIPT_DIR/.env" ]]; then' \
+            '    set -a' \
+            '    source "$SCRIPT_DIR/.env"' \
+            '    set +a' \
+            'fi' \
+            '' \
+            'if [[ -f "$SCRIPT_DIR/.env.desktop" ]]; then' \
+            '    set -a' \
+            '    source "$SCRIPT_DIR/.env.desktop"' \
+            '    set +a' \
+            'fi' \
+            '' \
+            'PORT_VALUE="${BACKEND_PORT:-${LDACA_BACKEND_PORT:-8001}}"' \
+            'HOST_VALUE="${SERVER_HOST:-${LDACA_SERVER_HOST:-127.0.0.1}}"' \
+            '' \
+            'export BACKEND_PORT="$PORT_VALUE"' \
+            'export LDACA_BACKEND_PORT="$PORT_VALUE"' \
+            'export SERVER_HOST="$HOST_VALUE"' \
+            'export LDACA_SERVER_HOST="$HOST_VALUE"' \
+            'export PYTHONUNBUFFERED=1' \
+            'export LDACA_CONFIG_PROFILE="${LDACA_CONFIG_PROFILE:-desktop}"' \
+            '' \
+            'exec "$PYTHON_BIN" -m ldaca_web_app_backend.cli' \
+            > "$RUNNER_PATH"
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VENV_DIR="$SCRIPT_DIR/.venv"
-if [[ -d "$VENV_DIR/bin" ]]; then
-    PYTHON_BIN="$VENV_DIR/bin/python"
-elif [[ -d "$VENV_DIR/Scripts" ]]; then
-    PYTHON_BIN="$VENV_DIR/Scripts/python.exe"
-else
-    echo "Virtual environment missing at $VENV_DIR" >&2
-    exit 1
-fi
-
-if [[ -f "$SCRIPT_DIR/.env" ]]; then
-    set -a
-    source "$SCRIPT_DIR/.env"
-    set +a
-fi
-
-if [[ -f "$SCRIPT_DIR/.env.desktop" ]]; then
-    set -a
-    source "$SCRIPT_DIR/.env.desktop"
-    set +a
-fi
-
-PORT_VALUE="${BACKEND_PORT:-${LDACA_BACKEND_PORT:-8001}}"
-HOST_VALUE="${SERVER_HOST:-${LDACA_SERVER_HOST:-127.0.0.1}}"
-
-export BACKEND_PORT="$PORT_VALUE"
-export LDACA_BACKEND_PORT="$PORT_VALUE"
-export SERVER_HOST="$HOST_VALUE"
-export LDACA_SERVER_HOST="$HOST_VALUE"
-export PYTHONUNBUFFERED=1
-export LDACA_CONFIG_PROFILE="${LDACA_CONFIG_PROFILE:-desktop}"
-
-exec "$PYTHON_BIN" -m ldaca_web_app_backend.cli
-RUNNER
           chmod +x "$RUNNER_PATH"
 
           if [[ "$(uname -s)" == "Darwin" ]]; then
@@ -173,37 +174,37 @@ RUNNER
             done
           fi
 
-          cat > "$OUTPUT_DIR/.env.desktop.example" <<'ENV'
-# Desktop-specific overrides for the bundled backend
-# Copy this file to .env.desktop and adjust values if needed.
-#
-#BACKEND_PORT=8001
-#SERVER_HOST=127.0.0.1
-#LDACA_DATA_ROOT=$HOME/Documents/ldaca
-ENV
+          printf '%s\n' \
+            '# Desktop-specific overrides for the bundled backend' \
+            '# Copy this file to .env.desktop and adjust values if needed.' \
+            '#' \
+            '#BACKEND_PORT=8001' \
+            '#SERVER_HOST=127.0.0.1' \
+            '#LDACA_DATA_ROOT=$HOME/Documents/ldaca' \
+            > "$OUTPUT_DIR/.env.desktop.example"
 
-          cat > "$OUTPUT_DIR/README_RUNTIME.md" <<'DOCS'
-# LDaCA Backend Runtime
-
-This folder is generated during the desktop build and contains:
-
-- `.venv/` – self-contained Python interpreter with all backend dependencies
-- `run_backend.sh` – launcher script used by the Tauri shell
-- `run_backend.sh-*` – architecture-specific copies for Tauri sidecar lookup
-- `.env.desktop.example` – optional overrides for runtime configuration
-
-The launcher expects the following environment variables (all optional):
-
-| Variable | Purpose |
-|----------|---------|
-| `BACKEND_PORT` / `LDACA_BACKEND_PORT` | Port to bind the FastAPI server (defaults to 8001) |
-| `SERVER_HOST` / `LDACA_SERVER_HOST` | Network interface to bind (defaults to 127.0.0.1) |
-| `LDACA_DATA_ROOT` | Location for workspace + user data (default `~/Documents/ldaca`) |
-| `LDACA_CONFIG_PROFILE` | Arbitrary label for downstream logging (defaults to `desktop`) |
-
-At runtime the Tauri shell executes `run_backend.sh`, which in turn boots
-`ldaca_web_app_backend.cli` inside the bundled virtual environment.
-DOCS
+          printf '%s\n' \
+            '# LDaCA Backend Runtime' \
+            '' \
+            'This folder is generated during the desktop build and contains:' \
+            '' \
+            '- `.venv/` – self-contained Python interpreter with all backend dependencies' \
+            '- `run_backend.sh` – launcher script used by the Tauri shell' \
+            '- `run_backend.sh-*` – architecture-specific copies for Tauri sidecar lookup' \
+            '- `.env.desktop.example` – optional overrides for runtime configuration' \
+            '' \
+            'The launcher expects the following environment variables (all optional):' \
+            '' \
+            '| Variable | Purpose |' \
+            '|----------|---------|' \
+            '| `BACKEND_PORT` / `LDACA_BACKEND_PORT` | Port to bind the FastAPI server (defaults to 8001) |' \
+            '| `SERVER_HOST` / `LDACA_SERVER_HOST` | Network interface to bind (defaults to 127.0.0.1) |' \
+            '| `LDACA_DATA_ROOT` | Location for workspace + user data (default `~/Documents/ldaca`) |' \
+            '| `LDACA_CONFIG_PROFILE` | Arbitrary label for downstream logging (defaults to `desktop`) |' \
+            '' \
+            'At runtime the Tauri shell executes `run_backend.sh`, which in turn boots' \
+            '`ldaca_web_app_backend.cli` inside the bundled virtual environment.' \
+            > "$OUTPUT_DIR/README_RUNTIME.md"
 
           echo "✅ Backend runtime packaged at $OUTPUT_DIR"
 
