@@ -119,19 +119,26 @@ def _build_filter_expression(request: FilterRequest) -> pl.Expr:
             elif op == "lte":
                 expr = column_expr <= lit_val
         elif op == "in":
+            include_null = False
+            values: list[Any] = []
+
             if isinstance(raw_value, (list, tuple, set)):
-                values = [
-                    _coerce_scalar(_parse_temporal(item))
-                    for item in raw_value
-                    if item is not None
-                ]
+                for item in raw_value:
+                    if item is None:
+                        include_null = True
+                        continue
+                    values.append(_coerce_scalar(_parse_temporal(item)))
             elif raw_value is None:
-                values = []
+                include_null = True
             else:
                 values = [_coerce_scalar(_parse_temporal(raw_value))]
 
             if values:
                 expr = column_expr.is_in(values)
+                if include_null:
+                    expr = expr | column_expr.is_null()
+            elif include_null:
+                expr = column_expr.is_null()
         elif op == "contains":
             pattern = str(raw_value)
             if getattr(condition, "regex", False):

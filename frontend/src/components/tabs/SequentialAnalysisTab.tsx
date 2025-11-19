@@ -6,7 +6,7 @@ import { useWorkspaceStatus } from '../../hooks/useWorkspaceStatus';
 import { useAuth } from '../../hooks/useAuth';
 import { useAnalysisLockState, useParameterChangeDetection } from '../../hooks/useAnalysisLockState';
 import { useSchemaManagement, useLatestRef, createNodeSnapshot, applySelectedColumnsToSnapshots } from '../../hooks/useSchemaManagement';
-import { SequentialAnalysisRequest, textApi } from '../../api/text';
+import { SequentialAnalysisRequest, SequentialFrequency, textApi } from '../../api/text';
 import { nodesApi } from '../../api/index';
 import NodeSelectionPanel from '../NodeSelectionPanel';
 import { getNodeInfo } from '../../lib/nodeInfoCache';
@@ -14,6 +14,7 @@ import AnalysisLockedNotice from './AnalysisLockedNotice';
 import { normalizeSchemaFromInfo } from '../../hooks/useSchemaManagement';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
+import { Input } from '../ui/input';
 import {
   Select,
   SelectContent,
@@ -36,6 +37,7 @@ import {
   AreaChart,
   Area,
 } from 'recharts';
+import { normalizeTypeName } from '../../utils/columnTypes';
 
 // Component to display unique value count for a column
 interface UniqueValueCountProps {
@@ -44,7 +46,7 @@ interface UniqueValueCountProps {
   columnName: string;
 }
 
-type TimelineDatum = Record<string, unknown>;
+type SequentialAnalysisDatum = Record<string, unknown>;
 
 type ChartTypeOption = 'line' | 'bar' | 'area';
 
@@ -52,7 +54,27 @@ const CHART_TYPE_OPTIONS: ChartTypeOption[] = ['line', 'bar', 'area'];
 const isChartTypeOption = (value: unknown): value is ChartTypeOption =>
   typeof value === 'string' && CHART_TYPE_OPTIONS.includes(value as ChartTypeOption);
 
-const TIMELINE_PALETTE = [
+const FREQUENCY_OPTIONS: Array<{ value: SequentialFrequency; label: string }> = [
+  { value: 'hourly', label: 'Hourly' },
+  { value: 'daily', label: 'Daily' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'monthly', label: 'Monthly' },
+  { value: 'quarterly', label: 'Quarterly' },
+  { value: 'yearly', label: 'Yearly' },
+];
+
+const TIME_COMPATIBLE_TYPES = ['datetime', 'integer', 'float'] as const;
+const NUMERIC_TYPE_SET = new Set(['integer', 'float']);
+
+const parseNumericInput = (value: string): number | null => {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed.length) return null;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const SEQUENTIAL_ANALYSIS_PALETTE = [
   '#2563eb', // blue
   '#16a34a', // green
   '#f59e0b', // amber
@@ -65,7 +87,7 @@ const TIMELINE_PALETTE = [
   '#22c55e', // emerald
 ] as const;
 
-const getPaletteColor = (index: number) => TIMELINE_PALETTE[index % TIMELINE_PALETTE.length];
+const getPaletteColor = (index: number) => SEQUENTIAL_ANALYSIS_PALETTE[index % SEQUENTIAL_ANALYSIS_PALETTE.length];
 
 const UniqueValueCount: React.FC<UniqueValueCountProps> = ({ workspaceId, nodeId, columnName }) => {
   const { getAuthHeaders } = useAuth();
@@ -91,7 +113,7 @@ const UniqueValueCount: React.FC<UniqueValueCountProps> = ({ workspaceId, nodeId
   );
 };
 
-const TimelineTab: React.FC = () => {
+const SequentialAnalysisTab: React.FC = () => {
   const { selectedNodeId, selectedNode } = useWorkspaceSelection();
   const { nodeData, currentWorkspaceId } = useWorkspaceData();
   const { isLoading } = useWorkspaceStatus();
@@ -113,13 +135,15 @@ const TimelineTab: React.FC = () => {
     maxNodes: 1,
     docTypeOnly: false,
     enableHeuristicGuess: false,
-    storageScope: 'timeline', // Separate from other tabs
+    storageScope: 'sequential-analysis', // Separate from other tabs
   });
 
   const [timeColumn, setTimeColumn] = useState('');
   const [groupByColumns, setGroupByColumns] = useState<string[]>([]);
-  const [frequency, setFrequency] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('daily');
+  const [frequency, setFrequency] = useState<SequentialFrequency>('daily');
   const [chartType, setChartType] = useState<ChartTypeOption>('line');
+  const [numericOriginInput, setNumericOriginInput] = useState<string>('');
+  const [numericIntervalInput, setNumericIntervalInput] = useState<string>('1');
   
   // Use schema management hook
   const {
@@ -142,19 +166,36 @@ const TimelineTab: React.FC = () => {
   
   // Track locked parameters and detect changes
   const [lockedParams, setLockedParams] = useState<{
-    frequency: 'daily' | 'weekly' | 'monthly' | 'yearly';
+    frequency: SequentialFrequency;
     groupByColumns: string[];
+    columnType: 'datetime' | 'numeric';
+    numericOrigin: number | null;
+    numericInterval: number | null;
+    sortByTime: boolean;
   } | null>(null);
 
   // Ref for hydration logic (needed to access latest values in async effect)
   const frequencyRef = useLatestRef(frequency);
   const chartTypeRef = useLatestRef(chartType);
 
-  // Use parameter change detection hook
-  const hasParamsChanged = useParameterChangeDetection(
-    isLocked,
-    { frequency, groupByColumns },
-    lockedParams
+  const timeCompatibleColumns = useMemo(
+    () =>
+      availableColumns
+        .map((column) => ({
+          ...column,
+          dataType: normalizeTypeName(column.dataType),
+        }))
+        .filter((column) => TIME_COMPATIBLE_TYPES.includes(column.dataType as (typeof TIME_COMPATIBLE_TYPES)[number]))
+        .sort((a, b) => {
+          const priority = (type: string) => (type === 'datetime' ? 0 : 1);
+          return priority(a.dataType) - priority(b.dataType);
+        }),
+    [availableColumns]
+  );
+
+  const timeColumnOptions = useMemo(
+    () => timeCompatibleColumns.map((column) => column.name),
+    [timeCompatibleColumns]
   );
 
   const activeTimeColumn = useMemo(() => {
@@ -164,16 +205,37 @@ const TimelineTab: React.FC = () => {
     if (timeColumn) return timeColumn;
     const hydratedTime = (results?.analysis_params?.time_column as string | undefined) ?? '';
     return hydratedTime;
-  }, [activeNodeId, nodeColumnSelections, timeColumn, results]);
+  }, [activeNodeId, nodeColumnSelections, timeColumn, results, timeColumnOptions]);
 
-  const datetimeColumns = useMemo(
-    () => availableColumns.filter((column) => column.dataType === 'datetime'),
-    [availableColumns]
+  const activeColumnInfo = useMemo(
+    () => timeCompatibleColumns.find((column) => column.name === activeTimeColumn),
+    [timeCompatibleColumns, activeTimeColumn]
   );
 
-  const timeColumnOptions = useMemo(
-    () => datetimeColumns.map((column) => column.name),
-    [datetimeColumns]
+  const activeColumnType = normalizeTypeName(activeColumnInfo?.dataType || (timeCompatibleColumns[0]?.dataType ?? 'datetime'));
+  const isNumericColumn = useMemo(() => NUMERIC_TYPE_SET.has(activeColumnType), [activeColumnType]);
+  const derivedColumnType: 'datetime' | 'numeric' = isNumericColumn ? 'numeric' : 'datetime';
+  const numericOriginValue = useMemo(
+    () => (derivedColumnType === 'numeric' ? parseNumericInput(numericOriginInput) : null),
+    [derivedColumnType, numericOriginInput]
+  );
+  const numericIntervalValue = useMemo(
+    () => (derivedColumnType === 'numeric' ? parseNumericInput(numericIntervalInput) : null),
+    [derivedColumnType, numericIntervalInput]
+  );
+
+  // Use parameter change detection hook
+  const hasParamsChanged = useParameterChangeDetection(
+    isLocked,
+    {
+      frequency,
+      groupByColumns,
+      columnType: derivedColumnType,
+      numericOrigin: derivedColumnType === 'numeric' ? numericOriginValue : null,
+      numericInterval: derivedColumnType === 'numeric' ? numericIntervalValue : null,
+      sortByTime: true,
+    },
+    lockedParams
   );
 
   useEffect(() => {
@@ -249,11 +311,25 @@ const handleAnalyze = async () => {
 
     const validGroupByColumns = groupByColumns.filter(col => col.trim() !== '');
 
+    if (derivedColumnType === 'numeric') {
+      if (numericIntervalValue === null || numericIntervalValue <= 0) {
+        alert('Please enter a numeric interval greater than 0.');
+        return;
+      }
+      if (numericOriginInput.trim().length > 0 && numericOriginValue === null) {
+        alert('Numeric origin must be a valid number.');
+        return;
+      }
+    }
+
     const request: SequentialAnalysisRequest = {
       time_column: picked,
       group_by_columns: validGroupByColumns.length > 0 ? validGroupByColumns : null,
       frequency,
-      sort_by_time: true
+      sort_by_time: true,
+      column_type: derivedColumnType,
+      numeric_origin: derivedColumnType === 'numeric' ? numericOriginValue : undefined,
+      numeric_interval: derivedColumnType === 'numeric' ? numericIntervalValue : undefined,
     };
 
     try {
@@ -268,6 +344,9 @@ const handleAnalyze = async () => {
           group_by_columns: validGroupByColumns,
           time_column: picked,
           frequency,
+          column_type: derivedColumnType,
+          numeric_origin: numericOriginValue,
+          numeric_interval: numericIntervalValue,
         },
       };
       const resolvedChartType = isChartTypeOption((enrichedResult as any)?.chart_type)
@@ -295,6 +374,10 @@ const handleAnalyze = async () => {
         setLockedParams({
           frequency,
           groupByColumns: [...validGroupByColumns],
+          columnType: derivedColumnType,
+          numericOrigin: numericOriginValue,
+          numericInterval: numericIntervalValue,
+          sortByTime: true,
         });
 
         setIsLocked(true);
@@ -327,6 +410,8 @@ const handleUpdateResults = async () => {
     setLockedParams(null);
     setIsLocked(false);
     setChartType('line');
+    setNumericOriginInput('');
+    setNumericIntervalInput('1');
   };
 
   const handleChartTypeChange = useCallback(
@@ -351,7 +436,7 @@ const handleUpdateResults = async () => {
   );
 
   // Prepare data for chart visualization
-  const chartData = useMemo<TimelineDatum[]>(() => {
+  const chartData = useMemo<SequentialAnalysisDatum[]>(() => {
     if (!results?.data || !Array.isArray(results.data)) {
       return [];
     }
@@ -365,13 +450,15 @@ const handleUpdateResults = async () => {
       // No grouping - simple time series
       return results.data.map((item: Record<string, unknown>) => ({
         ...item,
-        time_period: (item.time_period_formatted as string | undefined) || (item.time_period as string | undefined),
-        frequency_count: item.frequency_count,
+        time_period:
+          (item.time_period_formatted as string | undefined) ||
+          (item.time_period as string | undefined),
+        sequential_count: item.sequential_count,
       }));
     }
 
     // With grouping - need to reshape data for recharts
-    const timeMap = new Map<string, TimelineDatum>();
+    const timeMap = new Map<string, SequentialAnalysisDatum>();
     
     results.data.forEach((item: Record<string, unknown>) => {
       const timePeriod = (item.time_period_formatted as string | undefined) || (item.time_period as string | undefined) || '';
@@ -383,7 +470,7 @@ const handleUpdateResults = async () => {
       
       const timeEntry = timeMap.get(timePeriod);
       if (timeEntry) {
-        timeEntry[groupKey] = item.frequency_count;
+        timeEntry[groupKey] = item.sequential_count;
       }
     });
     
@@ -402,7 +489,7 @@ const handleUpdateResults = async () => {
       : (groupByColumns.length ? groupByColumns : []);
 
     if (!effectiveGroupColumns.length || !chartData.length) {
-      return ['frequency_count'];
+      return ['sequential_count'];
     }
     
     // Extract all group keys from the transformed data
@@ -419,10 +506,10 @@ const handleUpdateResults = async () => {
   }, [results, chartData, groupByColumns]);
 
   const chartConfig = useMemo<ChartConfig>(() => {
-    if (!groupKeys.length || (groupKeys.length === 1 && groupKeys[0] === 'frequency_count')) {
+    if (!groupKeys.length || (groupKeys.length === 1 && groupKeys[0] === 'sequential_count')) {
       return {
-        frequency_count: {
-          label: 'Frequency Count',
+        sequential_count: {
+          label: 'Sequential Count',
           color: getPaletteColor(0),
         },
       };
@@ -474,7 +561,7 @@ const handleUpdateResults = async () => {
     if (!chartData.length) {
       return (
         <div className="flex h-40 items-center justify-center rounded-md border border-dashed border-muted-foreground/30 text-sm text-muted-foreground">
-          No timeline data available. Adjust your configuration and try again.
+          No sequential analysis data available. Adjust your configuration and try again.
         </div>
       );
     }
@@ -572,7 +659,16 @@ const handleUpdateResults = async () => {
 
   const summaryTimeColumn = (results?.analysis_params?.time_column as string | undefined) ?? timeColumn;
   const summaryGroupBy = (results?.analysis_params?.group_by_columns as string[] | undefined) ?? groupByColumns;
-  const summaryFrequency = (results?.analysis_params?.frequency as string | undefined) ?? frequency;
+  const summaryColumnType = (results?.analysis_params?.column_type as 'datetime' | 'numeric' | undefined) ?? derivedColumnType;
+  const summaryNumericOrigin = summaryColumnType === 'numeric'
+    ? (results?.analysis_params?.numeric_origin as number | null | undefined) ?? numericOriginValue ?? null
+    : null;
+  const summaryNumericInterval = summaryColumnType === 'numeric'
+    ? (results?.analysis_params?.numeric_interval as number | null | undefined) ?? numericIntervalValue ?? null
+    : null;
+  const summaryFrequency = summaryColumnType === 'numeric'
+    ? 'Numeric bins'
+    : ((results?.analysis_params?.frequency as SequentialFrequency | undefined) ?? frequency);
 
   // Hydration from backend once per mount
   const hydratedOnceRef = useRef<boolean>(false);
@@ -597,13 +693,31 @@ const handleUpdateResults = async () => {
 
           const req = (reqResp as any)?.data;
           let lockedGroups: string[] = [];
-          let lockedFrequency: 'daily' | 'weekly' | 'monthly' | 'yearly' = frequencyRef.current;
+          let lockedFrequency: SequentialFrequency = frequencyRef.current;
+          let lockedColumnType: 'datetime' | 'numeric' = 'datetime';
+          let lockedNumericOrigin: number | null = null;
+          let lockedNumericInterval: number | null = null;
           let reqTimeColumn = '';
           let nodeIdStr = '';
 
           if (req) {
             nodeIdStr = String(req.node_id || req.nodeId || '');
             reqTimeColumn = typeof req.time_column === 'string' ? req.time_column : '';
+            const reqColumnType = req.column_type === 'numeric' ? 'numeric' : 'datetime';
+            lockedColumnType = reqColumnType;
+            if (reqColumnType === 'numeric') {
+              lockedNumericOrigin = typeof req.numeric_origin === 'number' ? req.numeric_origin : null;
+              lockedNumericInterval = typeof req.numeric_interval === 'number' ? req.numeric_interval : null;
+              setNumericOriginInput(
+                typeof req.numeric_origin === 'number' ? String(req.numeric_origin) : ''
+              );
+              setNumericIntervalInput(
+                typeof req.numeric_interval === 'number' ? String(req.numeric_interval) : '1'
+              );
+            } else {
+              setNumericOriginInput('');
+              setNumericIntervalInput('1');
+            }
             if (nodeIdStr && reqTimeColumn) {
               setNodeColumnSelections([{ nodeId: nodeIdStr, column: reqTimeColumn }]);
               setTimeColumn(reqTimeColumn);
@@ -615,7 +729,7 @@ const handleUpdateResults = async () => {
             setGroupByColumns(normalizedGroups.length ? [...normalizedGroups] : []);
             lockedGroups = normalizedGroups.length ? [...normalizedGroups] : [];
 
-            const validFrequencies: Array<'daily' | 'weekly' | 'monthly' | 'yearly'> = ['daily', 'weekly', 'monthly', 'yearly'];
+            const validFrequencies: SequentialFrequency[] = ['hourly', 'daily', 'weekly', 'monthly', 'quarterly', 'yearly'];
             const reqFrequency = typeof req.frequency === 'string' ? (req.frequency as any) : undefined;
             if (reqFrequency && validFrequencies.includes(reqFrequency)) {
               lockedFrequency = reqFrequency;
@@ -626,7 +740,14 @@ const handleUpdateResults = async () => {
               lockedFrequency = frequencyRef.current;
             }
 
-            setLockedParams({ frequency: lockedFrequency, groupByColumns: [...lockedGroups] });
+            setLockedParams({
+              frequency: lockedFrequency,
+              groupByColumns: [...lockedGroups],
+              columnType: lockedColumnType,
+              numericOrigin: lockedNumericOrigin,
+              numericInterval: lockedNumericInterval,
+              sortByTime: typeof req.sort_by_time === 'boolean' ? req.sort_by_time : true,
+            });
 
             if (nodeIdStr) {
               setIsLocked(true);
@@ -663,6 +784,8 @@ const handleUpdateResults = async () => {
             setTimeColumn('');
             setGroupByColumns([]);
             setLockedParams(null);
+            setNumericOriginInput('');
+            setNumericIntervalInput('1');
             setIsLocked(false);
             setLockedNodesSnapshot([]);
             setLockedSchema(null);
@@ -679,6 +802,9 @@ const handleUpdateResults = async () => {
                 group_by_columns: lockedGroups,
                 time_column: reqTimeColumn,
                 frequency: lockedFrequency,
+                column_type: lockedColumnType,
+                numeric_origin: lockedNumericOrigin,
+                numeric_interval: lockedNumericInterval,
               },
             };
             const resolvedChartType = isChartTypeOption((resResp as any)?.chart_type)
@@ -711,7 +837,7 @@ const handleUpdateResults = async () => {
         <CardHeader className="space-y-0 pb-4">
           <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
             <div>
-              <CardTitle>Timeline Analysis</CardTitle>
+              <CardTitle>Sequential Analysis</CardTitle>
               <CardDescription>Configure a time-series frequency view for the selected node.</CardDescription>
             </div>
           </div>
@@ -734,7 +860,7 @@ const handleUpdateResults = async () => {
             }}
             nodeColors={{}}
             onColorChange={() => {}}
-            getNodeColumns={() => datetimeColumns}
+            getNodeColumns={() => timeCompatibleColumns}
             defaultPalette={[]}
             maxCompare={1}
             className="border border-dashed border-muted-foreground/40 rounded-lg bg-muted/30 p-4"
@@ -746,35 +872,72 @@ const handleUpdateResults = async () => {
             disabled={!!isLocked}
             locked={!!isLocked}
             originalCount={displayNodeCount}
-            columnLabelFn={() => 'Time Column *'}
-            allowedDataTypes={['datetime']}
+            columnLabelFn={() => 'Time/Numeric Column *'}
+            allowedDataTypes={Array.from(TIME_COMPATIBLE_TYPES)}
             lockedMessage={<AnalysisLockedNotice />}
           />
 
           {/* Analysis Configuration */}
           <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Frequency Selection */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Frequency
-              </label>
-              <Select
-                value={frequency}
-                onValueChange={(value) => setFrequency(value as 'daily' | 'weekly' | 'monthly' | 'yearly')}
-                disabled={!isLocked && (isAnalyzing || isLoading.operations || !activeNodeId)}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select frequency" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="daily">Daily</SelectItem>
-                  <SelectItem value="weekly">Weekly</SelectItem>
-                  <SelectItem value="monthly">Monthly</SelectItem>
-                  <SelectItem value="yearly">Yearly</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            {derivedColumnType === 'datetime' ? (
+              <div className="md:col-span-1">
+                <label className="mb-1 block text-sm font-medium text-gray-700">
+                  Frequency
+                </label>
+                <Select
+                  value={frequency}
+                  onValueChange={(value) => setFrequency(value as SequentialFrequency)}
+                  disabled={!isLocked && (isAnalyzing || isLoading.operations || !activeNodeId)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select frequency" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FREQUENCY_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">
+                    Numeric Origin
+                  </label>
+                  <Input
+                    type="number"
+                    value={numericOriginInput}
+                    onChange={(event) => setNumericOriginInput(event.target.value)}
+                    placeholder="Auto-detect"
+                    disabled={!!isLocked}
+                  />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Optional. Leave blank to auto-detect from the minimum value.
+                  </p>
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">
+                    Numeric Interval *
+                  </label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={numericIntervalInput}
+                    onChange={(event) => setNumericIntervalInput(event.target.value)}
+                    placeholder="e.g. 10"
+                    disabled={!!isLocked}
+                  />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Required. Values are bucketed using this interval width.
+                  </p>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Group By Columns */}
@@ -865,7 +1028,7 @@ const handleUpdateResults = async () => {
               ) : (
                 <>
                   <Play className="mr-2 h-4 w-4" />
-                  Analyze Timeline
+                  Run Sequential Analysis
                 </>
               )}
             </Button>
@@ -889,10 +1052,12 @@ const handleUpdateResults = async () => {
         <Card className="mt-6">
           <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
-              <CardTitle>Timeline Results</CardTitle>
+              <CardTitle>Sequential Analysis Results</CardTitle>
               <CardDescription>
                 {summaryTimeColumn
-                  ? `Frequency of records grouped by ${summaryTimeColumn}`
+                  ? (summaryColumnType === 'numeric'
+                      ? `Numeric bin counts for ${summaryTimeColumn}`
+                      : `Frequency of records grouped by ${summaryTimeColumn}`)
                   : 'Aggregated frequency over time'}
               </CardDescription>
             </div>
@@ -925,10 +1090,14 @@ const handleUpdateResults = async () => {
               </div>
               <div className="rounded-md border border-border/60 p-3">
                 <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Frequency
+                  {summaryColumnType === 'numeric' ? 'Numeric Interval' : 'Frequency'}
                 </span>
                 <div className="mt-1 text-base font-semibold capitalize text-foreground">
-                  {summaryFrequency}
+                  {summaryColumnType === 'numeric'
+                    ? summaryNumericInterval != null
+                      ? `${summaryNumericInterval}${summaryNumericOrigin != null ? ` (origin ${summaryNumericOrigin})` : ''}`
+                      : '—'
+                    : summaryFrequency}
                 </div>
               </div>
               <div className="rounded-md border border-border/60 p-3">
@@ -957,4 +1126,4 @@ const handleUpdateResults = async () => {
   );
 };
 
-export default TimelineTab;
+export default SequentialAnalysisTab;

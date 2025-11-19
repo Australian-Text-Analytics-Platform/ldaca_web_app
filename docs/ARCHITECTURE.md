@@ -712,17 +712,17 @@ WorkspaceManager._analysis_state = {
     4. Return filtered subset
   - **Purpose**: Frontend can paginate/filter without backend re-computation
 
-**Frequency Analysis** (`api/workspaces/analyses/frequency_analysis.py`):
+**Sequential Analysis** (`api/workspaces/analyses/sequential_analysis.py`):
 
-- `GET /frequency-analysis/current-request`:
-  - Returns last frequency analysis parameters (node IDs, columns, filters)
+- `GET /sequential-analysis/current-request`:
+  - Returns the last sequential analysis parameters including node IDs, selected column, `column_type`, `frequency`, optional `numeric_origin`/`numeric_interval`, and grouping columns. The frontend hydrates the tab with this payload so numeric forms stay in sync with locked jobs.
   
-- `GET /frequency-analysis/current-result`:
-  - Returns last frequency analysis results (token counts, statistics)
+- `GET /sequential-analysis/current-result`:
+  - Returns the cached sequential analysis DataFrame (counts, formatted periods, min/max timestamps or numeric ranges) along with persisted chart metadata.
   
-- `POST /frequency-analysis/current-result`:
-  - **Body**: Filters for top-N tokens, minimum count, etc.
-  - Applies filters to stored results, returns subset
+- `POST /sequential-analysis/current-result`:
+  - **Body**: Chart metadata overrides (currently `chart_type`), plus optional summary snippets consumed by the UI.
+  - Reads the stored result from `analysis_store`, applies metadata update, and re-saves so subsequent GET calls reflect the new chart selection.
 
 **Topic Modeling** (`api/workspaces/analyses/topic_modeling.py`):
 
@@ -1114,15 +1114,27 @@ result = lazy_frame.with_columns(expr.alias('A + Total Count'))
 - `_normalize_saved_result(result, request)`: Normalizes stored result
 - `_apply_result_filters(matches, query)`: Filters concordance matches
 
-##### `frequency_analysis.py` - Frequency Analysis
+##### `sequential_analysis.py` - Sequential Analysis
 
 **Endpoints**:
-- `POST /{workspace_id}/frequency-analysis`: Run token frequency analysis
-  - **Implementation**: Calls `docframe.compute_token_frequencies()`, saves to analysis_store
-- `GET /{workspace_id}/frequency-analysis/current-request`: Get last request
-- `GET /{workspace_id}/frequency-analysis/current-result`: Get last result
-- `POST /{workspace_id}/frequency-analysis/current-result`: Get filtered result
-- `DELETE /{workspace_id}/frequency-analysis`: Clear results
+- `POST /{workspace_id}/nodes/{node_id}/sequential-analysis`: Run sequential (time-series) analysis
+  - **Implementation**:
+    1. Load the node schema and infer the selected column type (`datetime`, `date`, `time`, `integer`, `float`). This powers the default `column_type` when the frontend does not explicitly set it.
+    2. Validate the request body (`SequentialAnalysisRequest`):
+       - `frequency`: literal union `'hourly' | 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly'`
+       - `column_type`: `'datetime'` or `'numeric'`
+       - Numeric mode requires `numeric_interval > 0` (enforced by a Pydantic validator) and optional `numeric_origin` fallback to column minimum.
+    3. Reject incompatible combinations early (e.g., numeric column with `column_type="datetime"`) so the UI receives a descriptive 400 before docframe is called.
+    4. Call `selected_lazy_frame.text.sequential_analysis(...)` passing along newly supported hourly/quarterly frequencies or numeric bin parameters.
+    5. Store `{request, result}` plus `chart_type` inside `analysis_store` under the per-user workspace key.
+- `GET /{workspace_id}/sequential-analysis/current-request`: Get last request
+- `GET /{workspace_id}/sequential-analysis/current-result`: Get last result
+- `POST /{workspace_id}/sequential-analysis/current-result`: Persist chart metadata updates (e.g., chart_type)
+- `DELETE /{workspace_id}/sequential-analysis`: Clear results
+
+**Q:** How does the API respond if `column_type="numeric"` is sent without `numeric_interval`?
+
+**A:** The request fails validation with `422 Unprocessable Entity` because the Pydantic model enforces `numeric_interval` to be a positive number. The frontend surfaces that message next to the interval input, preventing ambiguous `[start, end)` ranges.
 
 ##### `token_frequencies.py` - Token Frequency Comparisons
 

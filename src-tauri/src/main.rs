@@ -53,7 +53,10 @@ impl BackendProcessHandle {
         {
             match send_sigterm(self.pid) {
                 Ok(_) => {
-                    if self.inner.wait_for_exit(self.pid, Duration::from_millis(7000)) {
+                    if self
+                        .inner
+                        .wait_for_exit(self.pid, Duration::from_millis(7000))
+                    {
                         println!("Backend {} exited gracefully", self.pid);
                         return;
                     }
@@ -63,10 +66,7 @@ impl BackendProcessHandle {
                     );
                 }
                 Err(err) => {
-                    eprintln!(
-                        "Failed to send SIGTERM to backend {}: {}",
-                        self.pid, err
-                    );
+                    eprintln!("Failed to send SIGTERM to backend {}: {}", self.pid, err);
                 }
             }
         }
@@ -88,11 +88,9 @@ impl BackendProcessInner {
 
     fn terminate_now(self) -> io::Result<()> {
         match self {
-            BackendProcessInner::Sidecar(child) => {
-                child
-                    .kill()
-                    .map_err(|err| io::Error::new(io::ErrorKind::Other, err.to_string()))
-            }
+            BackendProcessInner::Sidecar(child) => child
+                .kill()
+                .map_err(|err| io::Error::new(io::ErrorKind::Other, err.to_string())),
             BackendProcessInner::Manual(mut child) => {
                 child.kill()?;
                 let _ = child.wait();
@@ -102,8 +100,10 @@ impl BackendProcessInner {
     }
 }
 
-const DEV_BACKEND_LAUNCHER: &str =
-    concat!(env!("CARGO_MANIFEST_DIR"), "/../backend/dist-tauri/backend-runtime/run_backend.sh");
+const DEV_BACKEND_LAUNCHER: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../backend/dist-tauri/backend-runtime/run_backend.sh"
+);
 
 const BACKEND_HOST: &str = "127.0.0.1";
 
@@ -225,10 +225,7 @@ fn spawn_backend_process(
     app: &AppHandle,
     backend_port: u16,
 ) -> Result<BackendProcessHandle, Box<dyn std::error::Error>> {
-    match app
-        .shell()
-        .sidecar("backend-runtime/run_backend.sh")
-    {
+    match app.shell().sidecar("backend-runtime/run_backend.sh") {
         Ok(sidecar_command) => {
             let spawn_result = sidecar_command
                 .env("BACKEND_PORT", backend_port.to_string())
@@ -245,7 +242,9 @@ fn spawn_backend_process(
 
                     std::thread::spawn(move || {
                         use tauri_plugin_shell::process::CommandEvent;
-                        while let Some(event) = futures::executor::block_on(async { rx.recv().await }) {
+                        while let Some(event) =
+                            futures::executor::block_on(async { rx.recv().await })
+                        {
                             match event {
                                 CommandEvent::Stdout(line) => {
                                     println!("[Backend] {}", String::from_utf8_lossy(&line))
@@ -393,13 +392,80 @@ fn main() {
             // This ensures window.__BACKEND_URL__ is available when React boots
             window.eval(&format!(
                 r#"
-                window.__BACKEND_URL__ = "{}";
-                window.__BACKEND_PORT__ = {};
+                window.__BACKEND_URL__ = "{backend_url}";
+                window.__BACKEND_PORT__ = {backend_port};
                 console.log('[Tauri] Backend URL injected:', window.__BACKEND_URL__);
                 console.log('[Tauri] Backend port injected:', window.__BACKEND_PORT__);
+
+                (function() {{
+                    if (window.__LDACA_DESKTOP_ZOOM_INITIALIZED) {{
+                        return;
+                    }}
+                    window.__LDACA_DESKTOP_ZOOM_INITIALIZED = true;
+                    const STORAGE_KEY = '__ldaca_desktop_zoom';
+                    const MIN_ZOOM = 0.85;
+                    const MAX_ZOOM = 1.25;
+                    const STEP = 0.05;
+
+                    const clamp = (value) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value));
+                    let zoomValue = Number(localStorage.getItem(STORAGE_KEY));
+                    if (!Number.isFinite(zoomValue)) {{
+                        zoomValue = 0.95;
+                    }}
+                    zoomValue = clamp(zoomValue);
+
+                    const applyZoom = () => {{
+                        const target = document.body;
+                        if (!target) {{
+                            requestAnimationFrame(applyZoom);
+                            return;
+                        }}
+                        target.style.zoom = zoomValue.toString();
+                    }};
+
+                    const persistZoom = () => {{
+                        try {{
+                            localStorage.setItem(STORAGE_KEY, zoomValue.toString());
+                        }} catch (err) {{
+                            console.warn('[Tauri] Unable to persist zoom preference', err);
+                        }}
+                    }};
+
+                    const setZoom = (value) => {{
+                        zoomValue = clamp(value);
+                        applyZoom();
+                        persistZoom();
+                    }};
+
+                    const adjustZoom = (delta) => {{
+                        setZoom(zoomValue + delta);
+                    }};
+
+                    window.addEventListener('keydown', (event) => {{
+                        if (!(event.metaKey || event.ctrlKey) || event.altKey) {{
+                            return;
+                        }}
+                        if (event.key === '=' || event.key === '+') {{
+                            event.preventDefault();
+                            adjustZoom(STEP);
+                        }} else if (event.key === '-' || event.key === '_') {{
+                            event.preventDefault();
+                            adjustZoom(-STEP);
+                        }} else if (event.key === '0') {{
+                            event.preventDefault();
+                            setZoom(1.0);
+                        }}
+                    }});
+
+                    if (document.readyState === 'complete' || document.readyState === 'interactive') {{
+                        applyZoom();
+                    }} else {{
+                        document.addEventListener('DOMContentLoaded', applyZoom, {{ once: true }});
+                    }}
+                }})();
                 "#,
-                backend_url,
-                backend_port
+                backend_url = backend_url,
+                backend_port = backend_port
             ))?;
 
             let app_handle = app.handle();

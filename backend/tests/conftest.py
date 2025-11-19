@@ -438,12 +438,12 @@ def timeline_csv_file(test_user):
     timeline_file = user_data_dir / "timeline.csv"
     with open(timeline_file, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-    writer.writerow(["document", "published_at", "category"])
-    writer.writerow(["Entry one", "2024-01-01T08:15:00Z", "alpha"])
-    writer.writerow(["Entry two", "2024-01-02T09:00:00Z", "beta"])
-    writer.writerow(["Entry three", "2024-01-02T11:30:00Z", "alpha"])
-    writer.writerow(["Entry four", "2024-01-03T14:45:00Z", "beta"])
-    writer.writerow(["Entry five", "2024-01-03T16:00:00Z", "gamma"])
+        writer.writerow(["document", "published_at", "category"])
+        writer.writerow(["Entry one", "2024-01-01T08:15:00Z", "alpha"])
+        writer.writerow(["Entry two", "2024-01-02T09:00:00Z", "beta"])
+        writer.writerow(["Entry three", "2024-01-02T11:30:00Z", "alpha"])
+        writer.writerow(["Entry four", "2024-01-03T14:45:00Z", "beta"])
+        writer.writerow(["Entry five", "2024-01-03T16:00:00Z", "gamma"])
 
     return timeline_file
 

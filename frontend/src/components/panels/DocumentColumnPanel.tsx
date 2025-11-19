@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import columnPersistence from '../../utils/columnPersistence';
-import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '../ui/sheet';
+import { Dialog, DialogContent } from '../ui/dialog';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 
@@ -64,7 +65,7 @@ export const DocumentColumnPanel: React.FC<DocumentColumnPanelProps> = ({
   };
 
   return (
-    <Sheet
+    <Dialog
       open={open}
       onOpenChange={(nextOpen) => {
         if (!nextOpen) {
@@ -72,44 +73,47 @@ export const DocumentColumnPanel: React.FC<DocumentColumnPanelProps> = ({
         }
       }}
     >
-      <SheetContent side="right" className="sm:max-w-md w-full">
-        <SheetHeader>
-          <SheetTitle>Choose a document column</SheetTitle>
-          <SheetDescription>
-            Select which column from <span className="font-semibold text-foreground">{nodeName}</span> should be treated as the document text.
-          </SheetDescription>
-        </SheetHeader>
+      <DialogContent className="w-full max-w-lg border-none bg-transparent p-0 shadow-none">
+        <Card>
+          <CardHeader>
+            <CardTitle>Choose a document column</CardTitle>
+            <CardDescription>
+              Select which column from <span className="font-semibold text-foreground">{nodeName}</span> should be treated as the
+              document text.
+            </CardDescription>
+          </CardHeader>
 
-        <div className="py-4">
-          <label htmlFor="document-column" className="mb-2 block text-sm font-medium text-foreground">
-            Document Column
-          </label>
-          <Select value={selectedColumn} onValueChange={setSelectedColumn}>
-            <SelectTrigger id="document-column">
-              <SelectValue placeholder="Select a column" />
-            </SelectTrigger>
-            <SelectContent>
-              {columns.map((column) => (
-                <SelectItem key={column} value={column}>
-                  {column}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+          <CardContent className="py-4">
+            <label htmlFor="document-column" className="mb-2 block text-sm font-medium text-foreground">
+              Document Column
+            </label>
+            <Select value={selectedColumn} onValueChange={setSelectedColumn}>
+              <SelectTrigger id="document-column">
+                <SelectValue placeholder="Select a column" />
+              </SelectTrigger>
+              <SelectContent>
+                {columns.map((column) => (
+                  <SelectItem key={column} value={column}>
+                    {column}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </CardContent>
 
-        <SheetFooter className="border-t border-border/70 pt-4">
-          <div className="flex w-full items-center justify-end gap-2">
-            <Button variant="outline" onClick={handleCancel} type="button">
-              Cancel
-            </Button>
-            <Button onClick={handleConfirm} disabled={!selectedColumn || submitting}>
-              Convert
-            </Button>
-          </div>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+          <CardFooter className="border-t border-border/70 pt-4">
+            <div className="flex w-full items-center justify-end gap-2">
+              <Button variant="outline" onClick={handleCancel} type="button">
+                Cancel
+              </Button>
+              <Button onClick={handleConfirm} disabled={!selectedColumn || submitting}>
+                Convert
+              </Button>
+            </div>
+          </CardFooter>
+        </Card>
+      </DialogContent>
+    </Dialog>
   );
 };
 

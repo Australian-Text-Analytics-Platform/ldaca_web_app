@@ -4,7 +4,7 @@
 
 # LDaCA Web App Tutorial
 
-Welcome! This guide walks you through the LDaCA web application—from first launch to analysis and export—without assuming any programming background. You’ll learn what Workspaces and Nodes are, how to bring your own files, explore text, filter data, model topics, view timelines, and export results.
+Welcome! This guide walks you through the LDaCA web application—from first launch to analysis and export—without assuming any programming background. You’ll learn what Workspaces and Nodes are, how to bring your own files, explore text, filter data, model topics, run sequential analyses, and export results.
 
 ---
 
@@ -35,7 +35,7 @@ Welcome! This guide walks you through the LDaCA web application—from first lau
 ## 2) The app layout at a glance
 
 - Header: shows your name (if logged in) and a Logout button. ![header](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/mfFRUu.png) The log out button is designed for multi user environments.
-- Left Sidebar: tab buttons (Data Loader, Filter/Slicing, Token Frequency, Topic Modeling, Concordance, Timeline, Export) and a live list of nodes with checkboxes to select them. ![left side bar](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/Po2Uve.png)
+- Left Sidebar: tab buttons (Data Loader, Filter/Slicing, Token Frequency, Topic Modeling, Concordance, Sequential Analysis, Export) and a live list of nodes with checkboxes to select them. ![left side bar](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/Po2Uve.png)
 - Middle Panel: the main controls for the active tab. ![middle panel](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/8Reyp6.png)
 - Right Panel: the Workspace View with two stacked sections:
 	- Graph View (top): boxes and lines showing your workflow. ![graph view](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/sBUDUy.png)
@@ -179,14 +179,14 @@ Note:
 
 ---
 
-## 10) Timeline: counts over time for one node
+## 10) Sequential Analysis: counts over time for one node
 
-Open the “Timeline” tab.
+Open the “Sequential Analysis” tab.
 
 - Select a node (single).
 - Choose a time column (the app suggests a likely one) and optional “Group By” columns.
 - Pick a frequency (daily/weekly/monthly/yearly) and a chart type (line/bar/area).
-- Run analysis to view counts over time. The legend shows each group if you grouped by columns.
+- Run the analysis to view counts over time. The legend shows each group if you grouped by columns.
 
 ![timeline](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/pZGnUz.png)
 
@@ -237,4 +237,4 @@ Feedback:
 
 ---
 
-That’s it—you’re ready to explore text datasets, compare corpora, search in context, model topics, plot timelines, and export results in the LDaCA web app.
+That’s it—you’re ready to explore text datasets, compare corpora, search in context, model topics, run sequential analyses, and export results in the LDaCA web app.

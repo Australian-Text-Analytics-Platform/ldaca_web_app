@@ -79,7 +79,7 @@ vi.mock('./components/tabs/DataPreprocessingTab', lazyComponentMock);
 vi.mock('./components/tabs/ConcordanceTab', lazyComponentMock);
 vi.mock('./components/tabs/QuotationTab', lazyComponentMock);
 vi.mock('./components/tabs/TopicModelingTab', lazyComponentMock);
-vi.mock('./components/tabs/TimelineTab', lazyComponentMock);
+vi.mock('./components/tabs/SequentialAnalysisTab', lazyComponentMock);
 vi.mock('./components/tabs/ExportTab', lazyComponentMock);
 vi.mock('./components/tabs/TokenFrequencyTab', lazyComponentMock);
 

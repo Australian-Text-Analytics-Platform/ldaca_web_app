@@ -32,7 +32,16 @@ export type QuotationEngineType = 'local' | 'remote';
 export interface QuotationEngineConfig { type: QuotationEngineType; url?: string | null; }
 export interface QuotationRequest { column: string; page?: number; page_size?: number; sort_by?: string | null; sort_order?: 'asc' | 'desc'; engine?: QuotationEngineConfig; }
 export interface QuotationDetachRequest { node_id: string; column: string; new_node_name?: string; engine?: QuotationEngineConfig; }
-export interface FrequencyAnalysisRequest { time_column: string; group_by_columns?: string[] | null; frequency: 'daily' | 'weekly' | 'monthly' | 'yearly'; sort_by_time: boolean; }
+export type SequentialFrequency = 'hourly' | 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+export interface SequentialAnalysisRequest {
+  time_column: string;
+  group_by_columns?: string[] | null;
+  frequency: SequentialFrequency;
+  sort_by_time: boolean;
+  column_type?: 'datetime' | 'numeric';
+  numeric_origin?: number | null;
+  numeric_interval?: number | null;
+}
 
 export interface TokenFrequencyRequest { node_ids: string[]; node_columns: Record<string,string>; stop_words?: string[] | null; }
 export interface TokenFrequencyNodeResult {
@@ -84,12 +93,12 @@ export const textApi = {
   getQuotationCurrentResult: (ws: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/quotation/current-result`, { method: 'GET', headers }),
   clearQuotation: (ws: string, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/quotation/clear`, {}, headers),
 
-  // Timeline / Frequency analysis
-  frequency: (ws: string, node: string, req: FrequencyAnalysisRequest, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/nodes/${node}/frequency-analysis`, req, headers),
-  getFrequencyCurrentRequest: (ws: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/frequency-analysis/current-request`, { method: 'GET', headers }),
-  getFrequencyCurrentResult: (ws: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/frequency-analysis/current-result`, { method: 'GET', headers }),
-  postFrequencyCurrentResult: (ws: string, body: Record<string,unknown>, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/frequency-analysis/current-result`, body, headers),
-  clearFrequencyAnalysis: (ws: string, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/frequency-analysis/clear`, {}, headers),
+  // Sequential analysis
+  sequentialAnalysis: (ws: string, node: string, req: SequentialAnalysisRequest, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/nodes/${node}/sequential-analysis`, req, headers),
+  getSequentialAnalysisCurrentRequest: (ws: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/sequential-analysis/current-request`, { method: 'GET', headers }),
+  getSequentialAnalysisCurrentResult: (ws: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/sequential-analysis/current-result`, { method: 'GET', headers }),
+  postSequentialAnalysisCurrentResult: (ws: string, body: Record<string,unknown>, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/sequential-analysis/current-result`, body, headers),
+  clearSequentialAnalysis: (ws: string, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/sequential-analysis/clear`, {}, headers),
 
   // Token Frequency
   tokenFrequencies: (ws: string, req: TokenFrequencyRequest, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/token-frequencies`, req, headers),

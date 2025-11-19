@@ -337,10 +337,10 @@ class TestTokenFrequencyPersistence:
 
 
 @pytest.mark.anyio
-class TestFrequencyAnalysisPersistence:
-    """Test frequency analysis persistence and presentation preferences."""
+class TestSequentialAnalysisPersistence:
+    """Test sequential analysis persistence and presentation preferences."""
 
-    async def _run_frequency_analysis(
+    async def _run_sequential_analysis(
         self,
         client: AsyncClient,
         workspace_id: str,
@@ -350,7 +350,7 @@ class TestFrequencyAnalysisPersistence:
         from types import SimpleNamespace
 
         from ldaca_web_app_backend.api.workspaces.analyses import (
-            frequency_analysis as frequency_module,
+            sequential_analysis as sequential_module,
         )
 
         request_payload = {
@@ -366,13 +366,13 @@ class TestFrequencyAnalysisPersistence:
                     {
                         "time_period": "2024-01-01",
                         "time_period_formatted": "2024-01-01",
-                        "frequency_count": 2,
+                        "sequential_count": 2,
                         "category": "alpha",
                     },
                     {
                         "time_period": "2024-01-02",
                         "time_period_formatted": "2024-01-02",
-                        "frequency_count": 1,
+                        "sequential_count": 1,
                         "category": "beta",
                     },
                 ]
@@ -386,7 +386,7 @@ class TestFrequencyAnalysisPersistence:
 
         class DummyTextOps:
             @staticmethod
-            def frequency_analysis(*_args, **_kwargs) -> DummyResult:
+            def sequential_analysis(*_args, **_kwargs) -> DummyResult:
                 return DummyResult()
 
         dummy_node = SimpleNamespace(
@@ -401,14 +401,14 @@ class TestFrequencyAnalysisPersistence:
         )
 
         monkeypatch.setattr(
-            frequency_module.workspace_manager,
-            "get_node_from_workspace",
-            lambda *_args, **_kwargs: dummy_node,
+            sequential_module,
+            "get_node_with_data_or_400",
+            lambda *_args, **_kwargs: (dummy_node, dummy_node.data),
         )
 
         response = await post_json(
             client,
-            f"/api/workspaces/{workspace_id}/nodes/{node_id}/frequency-analysis",
+            f"/api/workspaces/{workspace_id}/nodes/{node_id}/sequential-analysis",
             request_payload,
         )
 
@@ -417,7 +417,7 @@ class TestFrequencyAnalysisPersistence:
         assert_successful_result(result_data)
         return result_data
 
-    async def test_frequency_analysis_includes_chart_type(
+    async def test_sequential_analysis_includes_chart_type(
         self,
         authenticated_client,
         workspace_id,
@@ -425,9 +425,9 @@ class TestFrequencyAnalysisPersistence:
         test_user,
         monkeypatch,
     ):
-        """Frequency analysis responses should include a default chart type."""
+        """Sequential analysis responses should include a default chart type."""
 
-        result_data = await self._run_frequency_analysis(
+        result_data = await self._run_sequential_analysis(
             authenticated_client, workspace_id, timeline_node_id, monkeypatch
         )
 
@@ -436,18 +436,18 @@ class TestFrequencyAnalysisPersistence:
         analyses = list_analyses(test_user["id"], workspace_id)
         assert len(analyses) == 1
         record = analyses[0]
-        assert record.task == "frequency_analysis"
+        assert record.task == "sequential_analysis"
         assert record.result.get("chart_type") == "line"
 
         current_result_response = await get_json(
             authenticated_client,
-            f"/api/workspaces/{workspace_id}/frequency-analysis/current-result",
+            f"/api/workspaces/{workspace_id}/sequential-analysis/current-result",
         )
         assert current_result_response.status_code == 200
         current_payload = current_result_response.json()
         assert current_payload["data"]["chart_type"] == "line"
 
-    async def test_frequency_analysis_chart_type_update_persists(
+    async def test_sequential_analysis_chart_type_update_persists(
         self,
         authenticated_client,
         workspace_id,
@@ -457,13 +457,13 @@ class TestFrequencyAnalysisPersistence:
     ):
         """Updating the chart type should persist via current-result endpoint."""
 
-        await self._run_frequency_analysis(
+        await self._run_sequential_analysis(
             authenticated_client, workspace_id, timeline_node_id, monkeypatch
         )
 
         update_response = await post_json(
             authenticated_client,
-            f"/api/workspaces/{workspace_id}/frequency-analysis/current-result",
+            f"/api/workspaces/{workspace_id}/sequential-analysis/current-result",
             {"chart_type": "bar"},
         )
         assert update_response.status_code == 200
@@ -476,7 +476,7 @@ class TestFrequencyAnalysisPersistence:
 
         current_result_response = await get_json(
             authenticated_client,
-            f"/api/workspaces/{workspace_id}/frequency-analysis/current-result",
+            f"/api/workspaces/{workspace_id}/sequential-analysis/current-result",
         )
         assert current_result_response.status_code == 200
         current_payload = current_result_response.json()
@@ -487,7 +487,7 @@ class TestFrequencyAnalysisPersistence:
         record = analyses[0]
         assert record.result.get("chart_type") == "bar"
 
-    async def test_frequency_analysis_rejects_invalid_chart_type(
+    async def test_sequential_analysis_rejects_invalid_chart_type(
         self,
         authenticated_client,
         workspace_id,
@@ -496,18 +496,149 @@ class TestFrequencyAnalysisPersistence:
     ):
         """Invalid chart types should be rejected with clear feedback."""
 
-        await self._run_frequency_analysis(
+        await self._run_sequential_analysis(
             authenticated_client, workspace_id, timeline_node_id, monkeypatch
         )
 
         invalid_response = await post_json(
             authenticated_client,
-            f"/api/workspaces/{workspace_id}/frequency-analysis/current-result",
+            f"/api/workspaces/{workspace_id}/sequential-analysis/current-result",
             {"chart_type": "scatter"},
         )
         assert invalid_response.status_code == 400
         error_payload = invalid_response.json()
         assert "Invalid chart type" in error_payload["detail"]
+
+    async def test_sequential_analysis_numeric_params(
+        self,
+        authenticated_client,
+        workspace_id,
+        timeline_node_id,
+        monkeypatch,
+    ):
+        """Numeric sequential analysis should persist origin/interval inputs."""
+
+        from types import SimpleNamespace
+
+        captured_kwargs: dict[str, object] = {}
+
+        class DummyResult:
+            def __init__(self) -> None:
+                self._rows = []
+                self.columns = []
+
+            def to_dicts(self) -> list[dict[str, object]]:
+                return []
+
+            def __len__(self) -> int:
+                return 0
+
+        class DummyTextOps:
+            @staticmethod
+            def sequential_analysis(*_args, **kwargs) -> DummyResult:
+                captured_kwargs.update(kwargs)
+                return DummyResult()
+
+        dummy_node = SimpleNamespace(
+            data=SimpleNamespace(
+                columns=["score"],
+                schema=[{"name": "score", "js_type": "integer"}],
+                text=DummyTextOps(),
+            )
+        )
+
+        from ldaca_web_app_backend.api.workspaces.analyses import (
+            sequential_analysis as sequential_module,
+        )
+
+        monkeypatch.setattr(
+            sequential_module,
+            "get_node_with_data_or_400",
+            lambda *_args, **_kwargs: (dummy_node, dummy_node.data),
+        )
+
+        payload = {
+            "time_column": "score",
+            "column_type": "numeric",
+            "numeric_origin": 0,
+            "numeric_interval": 5,
+            "sort_by_time": True,
+        }
+
+        response = await post_json(
+            authenticated_client,
+            f"/api/workspaces/{workspace_id}/nodes/{timeline_node_id}/sequential-analysis",
+            payload,
+        )
+
+        assert response.status_code == 200
+        assert captured_kwargs.get("column_type") == "numeric"
+        assert captured_kwargs.get("numeric_interval") == 5
+
+    async def test_sequential_analysis_numeric_requires_interval(
+        self,
+        authenticated_client,
+        workspace_id,
+        timeline_node_id,
+        monkeypatch,
+    ):
+        """Missing numeric interval inputs should raise a validation error."""
+
+        from types import SimpleNamespace
+
+        class DummyResult:
+            def __init__(self) -> None:
+                self._rows = []
+                self.columns = []
+
+            def to_dicts(self) -> list[dict[str, object]]:
+                return []
+
+            def __len__(self) -> int:
+                return 0
+
+        class DummyTextOps:
+            @staticmethod
+            def sequential_analysis(*_args, **_kwargs) -> DummyResult:
+                return DummyResult()
+
+        dummy_node = SimpleNamespace(
+            data=SimpleNamespace(
+                columns=["score"],
+                schema=[{"name": "score", "js_type": "integer"}],
+                text=DummyTextOps(),
+            )
+        )
+
+        from ldaca_web_app_backend.api.workspaces.analyses import (
+            sequential_analysis as sequential_module,
+        )
+
+        monkeypatch.setattr(
+            sequential_module,
+            "get_node_with_data_or_400",
+            lambda *_args, **_kwargs: (dummy_node, dummy_node.data),
+        )
+
+        payload = {
+            "time_column": "score",
+            "column_type": "numeric",
+            "sort_by_time": True,
+        }
+
+        response = await post_json(
+            authenticated_client,
+            f"/api/workspaces/{workspace_id}/nodes/{timeline_node_id}/sequential-analysis",
+            payload,
+        )
+
+        assert response.status_code == 422
+        detail = response.json().get("detail", "")
+        if isinstance(detail, list):
+            detail_text = " ".join(str(item) for item in detail)
+        else:
+            detail_text = str(detail)
+        assert "interval" in detail_text.lower()
 
 
 @pytest.mark.anyio

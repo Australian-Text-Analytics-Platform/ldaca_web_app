@@ -366,11 +366,25 @@ class QuotationDetachRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-class FrequencyAnalysisRequest(BaseModel):
+class SequentialAnalysisRequest(BaseModel):
     time_column: str
     group_by_columns: Optional[List[str]] = None
-    frequency: str = "monthly"  # daily, weekly, monthly, yearly
+    frequency: Literal[
+        "hourly", "daily", "weekly", "monthly", "quarterly", "yearly"
+    ] = "monthly"
     sort_by_time: bool = True
+    column_type: Literal["datetime", "numeric"] = "datetime"
+    numeric_origin: Optional[float] = None
+    numeric_interval: Optional[float] = None
+
+    @model_validator(mode="after")
+    def validate_numeric_params(self) -> "SequentialAnalysisRequest":
+        if self.column_type == "numeric":
+            if self.numeric_interval is None or self.numeric_interval <= 0:
+                raise ValueError(
+                    "numeric_interval must be a positive number when column_type='numeric'"
+                )
+        return self
 
     # Pydantic v2 model config
     model_config = ConfigDict(
@@ -380,6 +394,9 @@ class FrequencyAnalysisRequest(BaseModel):
                 "group_by_columns": ["party", "electorate"],
                 "frequency": "monthly",
                 "sort_by_time": True,
+                "column_type": "datetime",
+                "numeric_origin": None,
+                "numeric_interval": None,
             }
         }
     )

@@ -95,7 +95,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'filter', label: 'Data Preprocessing', icon: Filter },
   { id: 'token-frequency', label: 'Token Frequency', icon: TrendingUp },
   { id: 'concordance', label: 'Concordance', icon: FileText },
-  { id: 'analysis', label: 'Timeline', icon: BarChart3 },
+  { id: 'analysis', label: 'Sequential Analysis', icon: BarChart3 },
   { id: 'topic-modeling', label: 'Topic Modeling', icon: Puzzle },
   { id: 'quotation', label: 'Quotation', icon: Quote },
   { id: 'export', label: 'Export', icon: Upload },

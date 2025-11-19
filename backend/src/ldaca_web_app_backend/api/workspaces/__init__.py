@@ -7,13 +7,13 @@ Exports a single FastAPI `router` that combines core workspace endpoints
 from fastapi import APIRouter
 
 from ...core.workspace import (
-    workspace_manager,  # re-export for test patches expecting api.workspaces.workspace_manager
-)
+    workspace_manager,
+)  # re-export for test patches expecting api.workspaces.workspace_manager
 from . import base, files, lifecycle, nodes, tasks
 from .analyses import (
     concordance,
-    frequency_analysis,
     quotation,
+    sequential_analysis,
     token_frequencies,
     topic_modeling,
 )
@@ -26,7 +26,7 @@ router.include_router(files.router)
 router.include_router(tasks.router)
 router.include_router(base.router)
 router.include_router(token_frequencies.router)
-router.include_router(frequency_analysis.router)
+router.include_router(sequential_analysis.router)
 router.include_router(quotation.router)
 router.include_router(concordance.router)
 router.include_router(topic_modeling.router)

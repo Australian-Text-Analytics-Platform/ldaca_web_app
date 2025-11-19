@@ -3,7 +3,7 @@ import { devtools } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
 
 import type { ConcordanceAnalysisResponse } from '../api/text'
-import type { TokenFrequencyResponse } from '../api/text'
+import type { SequentialFrequency, TokenFrequencyResponse } from '../api/text'
 
 interface LockedNodeSnapshot {
   nodeId: string;
@@ -60,7 +60,7 @@ interface QuotationLockState {
   }
 }
 
-interface TimelineLockState {
+interface SequentialAnalysisLockState {
   workspaceId: string | null
   locked: boolean
   lockedNodeIds: string[]
@@ -69,8 +69,11 @@ interface TimelineLockState {
   lockedNodesSnapshot: LockedNodeSnapshot[]
   lockedParams: {
     groupByColumns: string[]
-    frequency: 'daily' | 'weekly' | 'monthly' | 'yearly'
+    frequency: SequentialFrequency
     sortByTime: boolean
+    columnType?: 'datetime' | 'numeric'
+    numericOrigin?: number | null
+    numericInterval?: number | null
   }
 }
 
@@ -116,7 +119,7 @@ interface AnalysisStoreState {
   concordance: ConcordanceLockState | null
   tokenFreq: TokenFreqLockState | null
   quotation: QuotationLockState | null
-  timeline: TimelineLockState | null
+  sequentialAnalysis: SequentialAnalysisLockState | null
   topicModeling: TopicModelingLockState | null
   topicModelingReadyTaskId: string | null
   topicModelingReadyTimestamp: number | null
@@ -132,8 +135,8 @@ interface AnalysisStoreActions {
   clearTokenFreq: () => void
   setQuotationLock: (s: QuotationLockState) => void
   clearQuotation: () => void
-  setTimelineLock: (s: TimelineLockState) => void
-  clearTimeline: () => void
+  setSequentialAnalysisLock: (s: SequentialAnalysisLockState) => void
+  clearSequentialAnalysis: () => void
   setTopicModelingLock: (s: TopicModelingLockState) => void
   clearTopicModeling: () => void
   markTopicModelingReady: (taskId: string, timestamp?: number | null) => void
@@ -149,7 +152,7 @@ export const useAnalysisStore = create<AnalysisStoreState & AnalysisStoreActions
       concordance: null,
       tokenFreq: null,
       quotation: null,
-      timeline: null,
+      sequentialAnalysis: null,
       topicModeling: null,
       topicModelingReadyTaskId: null,
       topicModelingReadyTimestamp: null,
@@ -173,8 +176,8 @@ export const useAnalysisStore = create<AnalysisStoreState & AnalysisStoreActions
       setQuotationLock: (s) => set((state) => { state.quotation = s }),
       clearQuotation: () => set((state) => { state.quotation = null }),
 
-      setTimelineLock: (s) => set((state) => { state.timeline = s }),
-      clearTimeline: () => set((state) => { state.timeline = null }),
+      setSequentialAnalysisLock: (s) => set((state) => { state.sequentialAnalysis = s }),
+      clearSequentialAnalysis: () => set((state) => { state.sequentialAnalysis = null }),
 
       setTopicModelingLock: (s) => set((state) => { state.topicModeling = s }),
       clearTopicModeling: () => set((state) => { state.topicModeling = null }),

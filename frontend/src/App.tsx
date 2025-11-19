@@ -19,7 +19,7 @@ const DataPreprocessingTab = lazy(() => import('./components/tabs/DataPreprocess
 const ConcordanceTab = lazy(() => import('./components/tabs/ConcordanceTab'));
 const QuotationTab = lazy(() => import('./components/tabs/QuotationTab'));
 const TopicModelingTab = lazy(() => import('./components/tabs/TopicModelingTab'));
-const TimelineTab = lazy(() => import('./components/tabs/TimelineTab'));
+const SequentialAnalysisTab = lazy(() => import('./components/tabs/SequentialAnalysisTab'));
 const ExportTab = lazy(() => import('./components/tabs/ExportTab'));
 const TokenFrequencyTab = lazy(() => import('./components/tabs/TokenFrequencyTab'));
 
@@ -221,7 +221,7 @@ const WorkspaceShell: React.FC = () => {
                             {currentView === 'filter' && <DataPreprocessingTab />}
                             {currentView === 'token-frequency' && <TokenFrequencyTab />}
                             {currentView === 'concordance' && <ConcordanceTab />}
-                            {currentView === 'analysis' && <TimelineTab />}
+                            {currentView === 'analysis' && <SequentialAnalysisTab />}
                             {currentView === 'topic-modeling' && <TopicModelingTab />}
                             {currentView === 'quotation' && <QuotationTab />}
                             {currentView === 'export' && <ExportTab />}
