@@ -1819,6 +1819,12 @@ for node in workspace.nodes.values():
 - The auth gate shows “Signing you in”, automatically kicks `refreshAuth()` once the backend flips to healthy, and clicking *Retry connection* calls it again.
 - When both gates pass, the main layout mounts (`Sidebar`, `WorkspaceView`, etc.).
 
+### Desktop Runtime + Sidecar Notes
+
+- `backend/scripts/package_backend_runtime.sh` now bundles a standalone Python interpreter (copied from the `uv` cache) into `python/` instead of creating a symlinked `venv/`. The script also builds wheels for `docframe`, `docworkspace`, and the backend itself before installation, so the packaged runtime contains real site-packages instead of `.pth` files pointing back to the developer machine.
+- `run_backend.sh` (the sidecar launcher) now includes logic to locate the runtime directory. It checks the local directory first, then falls back to standard macOS bundle resource paths (`../Resources/backend/dist-tauri/backend-runtime`, `../Resources/_up_/backend/dist-tauri/backend-runtime`, etc.) if running from `Contents/MacOS`. This ensures the launcher can find the `python` interpreter and `.env` files even if Tauri separates the executable from the resources or nests them under `_up_`.
+- `src-tauri/src/main.rs` prints “Backend launched … – waiting for /health” as soon as the sidecar spawns, then calls `wait_for_backend_health()` (infinite loop, 500 ms interval) before logging “Backend ready …”. The helper issues blocking HTTP GETs against `${BACKEND_URL}/health` via `ureq`; if the health check never succeeds the setup handler waits indefinitely, preventing the React shell from claiming the API is live when the FastAPI process actually crashed.
+
 ### Database Queries
 
 **Async SQLite**:
