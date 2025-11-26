@@ -123,6 +123,10 @@ class TestFileOperations:
             ("table.parquet", "parquet"),
             ("spreadsheet.xlsx", "excel"),
             ("notes.txt", "text"),
+            ("readme.md", "text"),
+            ("doc.rst", "text"),
+            ("server.log", "text"),
+            ("snippet.text", "text"),
             ("data.tsv", "tsv"),
             ("archive.zip", "zip"),
             ("unknown.xyz", "unknown"),
@@ -186,7 +190,22 @@ class TestFileOperations:
 
         assert isinstance(result, docframe.DocDataFrame)
         assert result.active_document_name == "text"
-        assert result.dataframe.shape == (3, 3)
+        assert result.dataframe.shape == (3, 4)
+        assert set(result.dataframe.columns) == {
+            "file_path",
+            "base_name",
+            "extension",
+            "text",
+        }
+
+    def test_load_data_file_text(self, sample_plain_text_file):
+        """Plain text files should be wrapped as DocDataFrames."""
+
+        result = load_data_file(sample_plain_text_file)
+
+        assert isinstance(result, docframe.DocDataFrame)
+        assert result.active_document_name == "text"
+        assert result.dataframe["text"].item(0) == "Plain text upload support"
 
     def test_load_data_file_json(self, sample_json_file):
         """Test loading JSON file"""

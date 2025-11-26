@@ -299,6 +299,15 @@ def sample_json_file(temp_dir):
 
 
 @pytest.fixture
+def sample_plain_text_file(temp_dir):
+    """Create a sample plain-text file for testing"""
+
+    text_file = temp_dir / "sample.txt"
+    text_file.write_text("Plain text upload support", encoding="utf-8")
+    return text_file
+
+
+@pytest.fixture
 def mock_user():
     """Mock user data for testing"""
     return {

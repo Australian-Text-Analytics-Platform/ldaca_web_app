@@ -335,6 +335,16 @@ async def unified_file_preview(
                 df = df.slice(offset, page_size)
             columns = list(df.columns)
             preview = df.fill_null("None").to_dicts()
+        elif file_type == "text":
+            import docframe
+
+            doc_df = docframe.read_text(file_path)
+            df = doc_df.dataframe
+            total_rows = int(df.height)
+            if offset or page_size:
+                df = df.slice(offset, page_size)
+            columns = list(df.columns)
+            preview = df.fill_null("None").to_dicts()
         else:
             # Non-Excel: prefer lazy scan where available
             lf = _lazy_scan(file_path, file_type).slice(offset, page_size)

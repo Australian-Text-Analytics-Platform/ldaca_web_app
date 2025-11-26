@@ -151,6 +151,26 @@ def test_zip_preview_uses_docframe(client, tmp_path):
     assert resp.status_code == 200
     payload = resp.json()
     assert payload["file_type"] == "zip"
-    assert payload["columns"] == ["file_path", "file_name", "text"]
+    assert payload["columns"] == ["file_path", "base_name", "extension", "text"]
     assert "DocDataFrame" in payload["supported_types"]
-    assert any(row["file_name"] == "1.txt" for row in payload["preview"])
+    assert any(row["base_name"] == "1" for row in payload["preview"])
+
+
+def test_text_preview_returns_single_cell(client, tmp_path):
+    """Plain text files should produce a 1x1 preview table."""
+
+    user_root = tmp_path / "users" / "user_test_user" / "user_data"
+    text_path = user_root / "example.txt"
+    text_path.write_text("Plain text document.", encoding="utf-8")
+
+    resp = client.post(
+        "/api/files/preview",
+        json={"filename": "example.txt", "page": 0, "page_size": 5},
+    )
+
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload["file_type"] == "text"
+    assert payload["columns"] == ["text"]
+    assert payload["preview"] == [{"text": "Plain text document."}]
+    assert payload["total_rows"] == 1

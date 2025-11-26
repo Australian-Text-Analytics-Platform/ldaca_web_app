@@ -128,12 +128,19 @@ export const AddFilePanel: React.FC<AddFilePanelProps> = ({ filename, open, onCl
 
   useEffect(() => {
     if (!open) return;
-    if (isDocumentMode(mode)) {
-      setDocumentColumn((prev) => prev || persistedDocumentColumn || guessedColumn || null);
-    } else {
+
+    if (!isDocumentMode(mode)) {
       setDocumentColumn(null);
+      return;
     }
-  }, [mode, guessedColumn, persistedDocumentColumn, open]);
+
+    if (fileType === 'text') {
+      setDocumentColumn(columns[0] || 'text');
+      return;
+    }
+
+    setDocumentColumn((prev) => prev || persistedDocumentColumn || guessedColumn || null);
+  }, [mode, guessedColumn, persistedDocumentColumn, open, fileType, columns]);
 
   const handleClose = useCallback(() => {
     onClose();
@@ -147,16 +154,17 @@ export const AddFilePanel: React.FC<AddFilePanelProps> = ({ filename, open, onCl
         mode,
         documentColumn: isDocumentMode(mode) ? documentColumn || undefined : undefined
       });
-      if (isDocumentMode(mode) && filename && documentColumn) {
+      if (isDocumentMode(mode) && filename && documentColumn && fileType !== 'text') {
         columnPersistence.set(filePersistenceCtx, filename, documentColumn);
       }
       handleClose();
     } finally {
       setSubmitting(false);
     }
-  }, [filename, mode, documentColumn, onConfirm, filePersistenceCtx, handleClose]);
+  }, [filename, mode, documentColumn, onConfirm, filePersistenceCtx, handleClose, fileType]);
 
-  const allowDocumentColumn = isDocumentMode(mode);
+  const autoDocumentColumn = isDocumentMode(mode) && fileType === 'text';
+  const allowDocumentColumn = isDocumentMode(mode) && !autoDocumentColumn;
 
   return (
     <Dialog
@@ -252,6 +260,12 @@ export const AddFilePanel: React.FC<AddFilePanelProps> = ({ filename, open, onCl
                   </Select>
                 )}
                 <p className="mt-1 text-xs text-muted-foreground">A preferred column is pre-selected automatically; change it if needed.</p>
+              </div>
+            )}
+
+            {autoDocumentColumn && (
+              <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+                Plain text files expose a single column (“{documentColumn ?? 'text'}”). It will be used automatically as the document column.
               </div>
             )}
 

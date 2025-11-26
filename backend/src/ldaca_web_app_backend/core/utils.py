@@ -138,6 +138,10 @@ def detect_file_type(filename: str) -> str:
         ".parquet": "parquet",
         ".xlsx": "excel",
         ".txt": "text",
+        ".text": "text",
+        ".md": "text",
+        ".rst": "text",
+        ".log": "text",
         ".tsv": "tsv",
         ".zip": "zip",
     }
@@ -174,6 +178,10 @@ def load_data_file(
         import docframe
 
         return docframe.read_zip(file_path)
+    elif file_type == "text":
+        import docframe
+
+        return docframe.read_text(file_path)
     else:
         raise ValueError(f"Unsupported file type: {file_type}")
 

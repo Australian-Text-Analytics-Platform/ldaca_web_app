@@ -945,6 +945,13 @@ This section provides comprehensive documentation of every backend file and its 
 - `get_user_uploads_folder(user_id)`: Returns Path to user's uploads folder
 - `sanitize_filename(filename)`: Removes unsafe characters
 - `get_file_info(filepath)`: Returns file metadata (size, modified_at, mime_type)
+- `detect_file_type(filename)`: Maps extensions (.csv, .json, .parquet, .tsv, .zip,
+  `.txt`, `.text`, `.md`, `.rst`, `.log`) to loader hints used during ingestion
+- `load_data_file(path)`: Centralized loader that picks the appropriate Polars
+  scan/read call or DocFrame helper. CSV/TSV/Parquet return LazyFrames by default,
+  JSON stays eager, ZIP files route to `docframe.read_zip`, and plain-text uploads
+  (`.txt`, `.text`, `.md`, `.rst`, `.log`) are wrapped via `docframe.read_text`
+  so they enter the workspace as single-document DocDataFrames.
 
 ##### `json_utils.py` - JSON Sanitization
 
@@ -1465,7 +1472,13 @@ Frontend: POST /api/workspaces/{workspace_id}/nodes/load {filepath, name}
 Backend: api/workspaces/nodes.py load_file_as_node()
   1. Get workspace via WorkspaceManager.load(user_id, workspace_id)
   2. Resolve full file path from USER_DATA_FOLDER
-  3. Load file: docframe.read_csv(filepath) → DocDataFrame/DataFrame
+  3. Load file: `core.utils.load_data_file(filepath)` → Polars LazyFrame/DataFrame or
+     DocDataFrame depending on detected type
+     - CSV/TSV/Parquet: `pl.scan_csv` / `pl.scan_parquet` for lazy loading
+     - JSON: `pl.read_json`
+     - ZIP: `docframe.read_zip`
+     - Plain text (`.txt/.text/.md/.rst/.log`): `docframe.read_text` (single row with
+       document + metadata)
   4. Create node: Node(data, name, workspace)
   5. Node auto-adds to workspace (workspace.add_node() called internally)
   6. Persist workspace: WorkspaceManager.persist(user_id, workspace_id, workspace)
