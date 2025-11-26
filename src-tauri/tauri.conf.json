@@ -38,9 +38,6 @@
     "macOS": {
       "signingIdentity": "-"
     },
-    "externalBin": [
-      "../backend/dist-tauri/backend-runtime/run_backend.sh"
-    ],
     "resources": [
       "../backend/dist-tauri/backend-runtime"
     ],
@@ -48,10 +45,5 @@
     "category": "Education",
     "shortDescription": "Text analytics and visualization platform",
     "longDescription": "LDaCA Text Analytics provides comprehensive tools for text analysis, including concordance, frequency analysis, topic modeling, and timeline visualization."
-  },
-  "plugins": {
-    "shell": {
-      "open": true
-    }
   }
 }

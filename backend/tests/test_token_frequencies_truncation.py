@@ -20,7 +20,7 @@ def _write_token_csv(folder, filename, start, end):
 
 
 @pytest.mark.anyio
-async def test_token_frequencies_truncation_and_metadata(
+async def test_token_frequencies_full_table_and_metadata(
     authenticated_client,
     workspace_id,
     test_user,
@@ -70,13 +70,14 @@ async def test_token_frequencies_truncation_and_metadata(
     for node_id, node_result in data["data"].items():
         meta = node_result.get("metadata")
         assert meta is not None, f"metadata missing for node result {node_id}"
-        assert meta["applied_server_limit"] == expected_server_limit
+        assert meta["applied_server_limit"] is None
         assert meta["token_limit"] == DEFAULT_TOKEN_LIMIT
         assert meta["total_tokens_before_limit"] >= expected_server_limit
-        assert meta["truncated"] is True
+        assert meta.get("total_tokens_returned") == meta["total_tokens_before_limit"]
+        assert meta["truncated"] is False
         assert meta["node_id"] == node_id
         assert meta.get("display_name")
-        assert len(node_result.get("data", [])) <= expected_server_limit
+        assert len(node_result.get("data", [])) == meta["total_tokens_before_limit"]
 
     stats = data.get("statistics")
     assert stats is not None and len(stats) > 0

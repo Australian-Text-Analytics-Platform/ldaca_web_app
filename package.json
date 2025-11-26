@@ -15,7 +15,7 @@
     "tauri:build": "npm run prepare:backend && tauri build",
     "desktop:dev": "npm run prepare:frontend && tauri dev",
     "desktop:build": "npm run prepare:all && tauri build",
-    "prepare:backend": "cd backend && bash scripts/package_backend_runtime.sh --clean",
+    "prepare:backend": "cd backend && uv run python scripts/package_backend_runtime.py --clean",
     "prepare:frontend": "npm run -w frontend build",
     "prepare:all": "npm run prepare:backend && npm run prepare:frontend",
     "clean": "npm run -w frontend clean && cd src-tauri && cargo clean",

@@ -21,12 +21,15 @@ echo "Checking prerequisites..."
 echo ""
 
 # Check backend runtime folder
-if [ ! -x "backend/dist-tauri/backend-runtime/run_backend.sh" ]; then
+PYTHON_UNIX="backend/dist-tauri/backend-runtime/python/bin/python3"
+PYTHON_WIN="backend/dist-tauri/backend-runtime/python/python.exe"
+
+if [ ! -x "$PYTHON_UNIX" ] && [ ! -x "$PYTHON_WIN" ]; then
     echo "ERROR: Backend runtime not found!"
-    echo "   Expected: backend/dist-tauri/backend-runtime/run_backend.sh"
+    echo "   Expected a Python interpreter under backend/dist-tauri/backend-runtime/python/"
     echo ""
     echo "   Create it with:"
-    echo "   cd backend && bash scripts/package_backend_runtime.sh --clean"
+    echo "   cd backend && uv run python scripts/package_backend_runtime.py --clean"
     exit 1
 fi
 echo "Backend runtime found"

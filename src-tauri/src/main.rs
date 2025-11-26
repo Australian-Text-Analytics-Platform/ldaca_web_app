@@ -1,14 +1,14 @@
 // Prevents additional console window on Windows in release
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use std::collections::HashMap;
 use std::io::{self, BufRead, BufReader};
 use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
-use tauri::{AppHandle, Manager, State};
-use tauri_plugin_shell::ShellExt;
+use tauri::{path::BaseDirectory, AppHandle, Manager, State};
 
 /// Holds the backend URL, process, and PID
 struct BackendState {
@@ -17,30 +17,22 @@ struct BackendState {
     closing: Arc<Mutex<bool>>, // track if graceful closing is in progress
 }
 
-enum BackendProcessInner {
-    Sidecar(tauri_plugin_shell::process::CommandChild),
-    Manual(std::process::Child),
+struct BackendRuntime {
+    root: PathBuf,
+    python: PathBuf,
 }
 
 struct BackendProcessHandle {
     pid: u32,
-    inner: BackendProcessInner,
+    child: Option<std::process::Child>,
 }
 
 impl BackendProcessHandle {
-    fn new_sidecar(child: tauri_plugin_shell::process::CommandChild) -> Self {
-        let pid = child.pid();
-        Self {
-            pid,
-            inner: BackendProcessInner::Sidecar(child),
-        }
-    }
-
-    fn new_manual(child: std::process::Child) -> Self {
+    fn new(child: std::process::Child) -> Self {
         let pid = child.id();
         Self {
             pid,
-            inner: BackendProcessInner::Manual(child),
+            child: Some(child),
         }
     }
 
@@ -49,83 +41,101 @@ impl BackendProcessHandle {
     }
 
     fn shutdown(mut self) {
-        #[cfg(unix)]
-        {
-            match send_sigterm(self.pid) {
-                Ok(_) => {
-                    if self
-                        .inner
-                        .wait_for_exit(self.pid, Duration::from_millis(7000))
-                    {
-                        println!("Backend {} exited gracefully", self.pid);
-                        return;
+        if let Some(mut child) = self.child.take() {
+            #[cfg(unix)]
+            {
+                match send_sigterm(self.pid) {
+                    Ok(_) => {
+                        if wait_for_child_exit(&mut child, Duration::from_millis(7000)) {
+                            println!("Backend {} exited gracefully", self.pid);
+                            return;
+                        }
+                        println!(
+                            "Backend {} did not exit after SIGTERM; requesting immediate termination",
+                            self.pid
+                        );
                     }
-                    println!(
-                        "Backend {} did not exit after SIGTERM; requesting immediate termination",
-                        self.pid
-                    );
-                }
-                Err(err) => {
-                    eprintln!("Failed to send SIGTERM to backend {}: {}", self.pid, err);
+                    Err(err) => {
+                        eprintln!("Failed to send SIGTERM to backend {}: {}", self.pid, err);
+                    }
                 }
             }
-        }
 
-        if let Err(err) = self.inner.terminate_now() {
-            eprintln!("Failed to stop backend {} cleanly: {}", self.pid, err);
-        }
-    }
-}
-
-impl BackendProcessInner {
-    #[cfg(unix)]
-    fn wait_for_exit(&mut self, pid: u32, timeout: Duration) -> bool {
-        match self {
-            BackendProcessInner::Sidecar(_) => wait_for_exit(pid, timeout),
-            BackendProcessInner::Manual(child) => wait_for_child_exit(child, timeout),
-        }
-    }
-
-    fn terminate_now(self) -> io::Result<()> {
-        match self {
-            BackendProcessInner::Sidecar(child) => child
-                .kill()
-                .map_err(|err| io::Error::new(io::ErrorKind::Other, err.to_string())),
-            BackendProcessInner::Manual(mut child) => {
-                child.kill()?;
+            if let Err(err) = child.kill() {
+                eprintln!("Failed to stop backend {} cleanly: {}", self.pid, err);
+            } else {
                 let _ = child.wait();
-                Ok(())
             }
         }
     }
 }
 
-const DEV_BACKEND_LAUNCHER: &str = concat!(
+const DEV_BACKEND_RUNTIME: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../backend/dist-tauri/backend-runtime/run_backend.sh"
+    "/../backend/dist-tauri/backend-runtime"
 );
 
 const BACKEND_HOST: &str = "127.0.0.1";
 
-fn locate_backend_launcher() -> Option<PathBuf> {
-    if let Ok(custom) = std::env::var("LDACA_BACKEND_LAUNCHER") {
-        let candidate = PathBuf::from(custom);
-        if candidate.exists() {
-            return Some(candidate);
+fn make_error(message: impl Into<String>) -> Box<dyn std::error::Error> {
+    Box::new(io::Error::new(io::ErrorKind::Other, message.into()))
+}
+
+fn locate_backend_runtime(app: &AppHandle) -> Result<BackendRuntime, Box<dyn std::error::Error>> {
+    if let Some(python_override) = path_from_env("LDACA_BACKEND_PYTHON") {
+        let runtime_dir = path_from_env("LDACA_BACKEND_RUNTIME")
+            .or_else(|| infer_runtime_dir_from_python(&python_override))
+            .ok_or_else(|| {
+                make_error(
+                    "LDACA_BACKEND_PYTHON is set but LDACA_BACKEND_RUNTIME could not be resolved.",
+                )
+            })?;
+
+        return Ok(BackendRuntime {
+            root: runtime_dir,
+            python: python_override,
+        });
+    }
+
+    let runtime_dir = path_from_env("LDACA_BACKEND_RUNTIME")
+        .or_else(runtime_from_launcher_env)
+        .or_else(|| detect_runtime_dir(app))
+        .ok_or_else(|| {
+            make_error(
+                "Backend runtime not found. Run `npm run prepare:backend` and ensure the bundle includes backend/dist-tauri/backend-runtime.",
+            )
+        })?;
+
+    let python_path = locate_python_binary(&runtime_dir)
+        .ok_or_else(|| make_error(format!("No python interpreter found in {}", runtime_dir.display())))?;
+
+    Ok(BackendRuntime {
+        root: runtime_dir,
+        python: python_path,
+    })
+}
+
+fn detect_runtime_dir(app: &AppHandle) -> Option<PathBuf> {
+    let resolver = app.path();
+    for resource in ["backend/dist-tauri/backend-runtime", "backend-runtime"] {
+        if let Ok(candidate) = resolver.resolve(resource, BaseDirectory::Resource) {
+            if candidate.exists() {
+                return Some(candidate);
+            }
         }
     }
 
-    let dev_path = PathBuf::from(DEV_BACKEND_LAUNCHER);
+    let dev_path = PathBuf::from(DEV_BACKEND_RUNTIME);
     if dev_path.exists() {
         return Some(dev_path);
     }
 
     const RELATIVE_SEARCH_PATHS: &[&str] = &[
-        "backend/dist-tauri/backend-runtime/run_backend.sh",
-        "_up_/backend/dist-tauri/backend-runtime/run_backend.sh",
-        "dist-tauri/backend-runtime/run_backend.sh",
-        "Resources/backend/dist-tauri/backend-runtime/run_backend.sh",
-        "run_backend.sh",
+        "backend/dist-tauri/backend-runtime",
+        "_up_/backend/dist-tauri/backend-runtime",
+        "dist-tauri/backend-runtime",
+        "Resources/backend/dist-tauri/backend-runtime",
+        "backend-runtime",
     ];
 
     if let Ok(exe_path) = std::env::current_exe() {
@@ -143,6 +153,72 @@ fn locate_backend_launcher() -> Option<PathBuf> {
                 }
             }
         }
+    }
+
+    None
+}
+
+fn path_from_env(var: &str) -> Option<PathBuf> {
+    std::env::var_os(var).map(PathBuf::from).and_then(|path| {
+        if path.exists() {
+            Some(path)
+        } else {
+            eprintln!(
+                "Environment variable {} points to {:?}, but it does not exist",
+                var, path
+            );
+            None
+        }
+    })
+}
+
+fn runtime_from_launcher_env() -> Option<PathBuf> {
+    std::env::var_os("LDACA_BACKEND_LAUNCHER").map(PathBuf::from).and_then(|launcher| {
+        if launcher.exists() {
+            launcher.parent().map(Path::to_path_buf)
+        } else {
+            None
+        }
+    })
+}
+
+fn locate_python_binary(runtime_dir: &Path) -> Option<PathBuf> {
+    let candidates = [
+        runtime_dir.join("python").join("bin").join("python3"),
+        runtime_dir.join("python").join("bin").join("python"),
+        runtime_dir.join("python").join("python.exe"),
+        runtime_dir.join("python").join("python3.exe"),
+        runtime_dir.join("venv").join("bin").join("python"),
+        runtime_dir.join("venv").join("Scripts").join("python.exe"),
+    ];
+
+    for candidate in candidates {
+        if candidate.exists() {
+            return Some(candidate);
+        }
+    }
+
+    None
+}
+
+fn infer_runtime_dir_from_python(python_path: &Path) -> Option<PathBuf> {
+    let mut current = python_path.parent()?;
+
+    for _ in 0..6 {
+        if let Some(name) = current.file_name().and_then(|n| n.to_str()) {
+            match name {
+                "bin" | "Scripts" => {
+                    current = current.parent()?;
+                    continue;
+                }
+                "python" | "venv" => {
+                    return current.parent().map(Path::to_path_buf);
+                }
+                _ => {}
+            }
+        }
+
+        current = current.parent()?;
     }
 
     None
@@ -172,17 +248,79 @@ where
     });
 }
 
-fn spawn_manual_backend(launcher: &Path, backend_port: u16) -> io::Result<BackendProcessHandle> {
-    let mut command = Command::new(launcher);
+fn load_runtime_env(
+    runtime_dir: &Path,
+) -> Result<HashMap<String, String>, Box<dyn std::error::Error>> {
+    let mut values = HashMap::new();
+    for filename in [".env", ".env.desktop"] {
+        let env_path = runtime_dir.join(filename);
+        if env_path.exists() {
+            parse_env_file(&env_path, &mut values)?;
+        }
+    }
+    Ok(values)
+}
+
+fn parse_env_file(
+    path: &Path,
+    dest: &mut HashMap<String, String>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let iter = dotenvy::from_path_iter(path)?;
+    for entry in iter {
+        let (key, value) = entry?;
+        dest.insert(key, value);
+    }
+    Ok(())
+}
+
+fn determine_server_host(env_overrides: &HashMap<String, String>) -> String {
+    env_overrides
+        .get("SERVER_HOST")
+        .cloned()
+        .or_else(|| env_overrides.get("LDACA_SERVER_HOST").cloned())
+        .or_else(|| std::env::var("SERVER_HOST").ok())
+        .or_else(|| std::env::var("LDACA_SERVER_HOST").ok())
+        .unwrap_or_else(|| BACKEND_HOST.to_string())
+}
+
+fn spawn_backend_process(
+    runtime: &BackendRuntime,
+    backend_port: u16,
+    env_overrides: &HashMap<String, String>,
+) -> io::Result<BackendProcessHandle> {
+    let mut command = Command::new(&runtime.python);
     command
-        .env("BACKEND_PORT", backend_port.to_string())
-        .env("LDACA_BACKEND_PORT", backend_port.to_string())
+        .arg("-m")
+        .arg("ldaca_web_app_backend.cli")
+        .current_dir(&runtime.root)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
-    let mut child = command.spawn()?;
-    let pid = child.id();
+    command.envs(env_overrides.iter());
+    command.env("PYTHONUNBUFFERED", "1");
+    command.env("BACKEND_PORT", backend_port.to_string());
+    command.env("LDACA_BACKEND_PORT", backend_port.to_string());
+    command.env("LDACA_BACKEND_RUNTIME", runtime.root.as_os_str());
+    command.env("LDACA_BACKEND_PYTHON", runtime.python.as_os_str());
 
+    let host_value = determine_server_host(env_overrides);
+    command.env("SERVER_HOST", host_value.clone());
+    command.env("LDACA_SERVER_HOST", host_value);
+
+    if std::env::var("LDACA_CONFIG_PROFILE").is_err()
+        && !env_overrides.contains_key("LDACA_CONFIG_PROFILE")
+    {
+        command.env("LDACA_CONFIG_PROFILE", "desktop");
+    }
+
+    println!(
+        "Launching backend via {} (runtime: {}) on port {}",
+        runtime.python.display(),
+        runtime.root.display(),
+        backend_port
+    );
+
+    let mut child = command.spawn()?;
     if let Some(stdout) = child.stdout.take() {
         pipe_child_output(stdout, false);
     }
@@ -190,88 +328,7 @@ fn spawn_manual_backend(launcher: &Path, backend_port: u16) -> io::Result<Backen
         pipe_child_output(stderr, true);
     }
 
-    println!(
-        "Backend launcher {:?} started on port {} with PID {}",
-        launcher, backend_port, pid
-    );
-
-    Ok(BackendProcessHandle::new_manual(child))
-}
-
-fn fallback_to_manual_launcher(
-    backend_port: u16,
-    reason: impl std::fmt::Display,
-) -> Result<BackendProcessHandle, Box<dyn std::error::Error>> {
-    let reason_msg = reason.to_string();
-    if let Some(local_launcher) = locate_backend_launcher() {
-        println!(
-            "Sidecar launcher unavailable ({}). Falling back to {:?}",
-            reason_msg, local_launcher
-        );
-        spawn_manual_backend(&local_launcher, backend_port)
-            .map_err(|err| Box::new(err) as Box<dyn std::error::Error>)
-    } else {
-        let message = format!(
-            "Backend runtime is missing from the bundle and no local runtime was found.\n\
-             Please run the packaged .app bundle or rebuild the runtime with `npm run prepare:backend`.\n\
-             Original error: {}",
-            reason_msg
-        );
-        Err(Box::new(io::Error::new(io::ErrorKind::NotFound, message)))
-    }
-}
-
-fn spawn_backend_process(
-    app: &AppHandle,
-    backend_port: u16,
-) -> Result<BackendProcessHandle, Box<dyn std::error::Error>> {
-    match app.shell().sidecar("backend-runtime/run_backend.sh") {
-        Ok(sidecar_command) => {
-            let spawn_result = sidecar_command
-                .env("BACKEND_PORT", backend_port.to_string())
-                .env("LDACA_BACKEND_PORT", backend_port.to_string())
-                .spawn();
-
-            match spawn_result {
-                Ok((mut rx, child)) => {
-                    let child_pid = child.pid();
-                    println!(
-                        "Backend sidecar started on port {} with PID {}",
-                        backend_port, child_pid
-                    );
-
-                    std::thread::spawn(move || {
-                        use tauri_plugin_shell::process::CommandEvent;
-                        while let Some(event) =
-                            futures::executor::block_on(async { rx.recv().await })
-                        {
-                            match event {
-                                CommandEvent::Stdout(line) => {
-                                    println!("[Backend] {}", String::from_utf8_lossy(&line))
-                                }
-                                CommandEvent::Stderr(line) => {
-                                    eprintln!("[Backend] {}", String::from_utf8_lossy(&line))
-                                }
-                                CommandEvent::Error(err) => eprintln!("[Backend Error] {}", err),
-                                CommandEvent::Terminated(payload) => {
-                                    println!(
-                                        "[Backend] Process terminated with code: {:?}",
-                                        payload.code
-                                    );
-                                    break;
-                                }
-                                _ => {}
-                            }
-                        }
-                    });
-
-                    Ok(BackendProcessHandle::new_sidecar(child))
-                }
-                Err(spawn_err) => fallback_to_manual_launcher(backend_port, spawn_err),
-            }
-        }
-        Err(shell_err) => fallback_to_manual_launcher(backend_port, shell_err),
-    }
+    Ok(BackendProcessHandle::new(child))
 }
 
 /// Find an available port in the given range
@@ -327,19 +384,6 @@ fn send_sigterm(pid: u32) -> io::Result<()> {
     }
 }
 
-/// Wait for a process to exit, with timeout
-#[cfg(unix)]
-fn wait_for_exit(pid: u32, timeout: Duration) -> bool {
-    let start = Instant::now();
-    while start.elapsed() < timeout {
-        if !is_process_running(pid) {
-            return true;
-        }
-        std::thread::sleep(Duration::from_millis(100));
-    }
-    !is_process_running(pid)
-}
-
 #[cfg(unix)]
 fn wait_for_child_exit(child: &mut std::process::Child, timeout: Duration) -> bool {
     let start = Instant::now();
@@ -355,15 +399,6 @@ fn wait_for_child_exit(child: &mut std::process::Child, timeout: Duration) -> bo
             Err(_) => return false,
         }
     }
-}
-
-#[cfg(unix)]
-fn is_process_running(pid: u32) -> bool {
-    if pid == 0 {
-        return false;
-    }
-    let result = unsafe { libc::kill(pid as libc::pid_t, 0) };
-    result == 0
 }
 
 fn wait_for_backend_health(backend_url: &str) -> io::Result<()> {
@@ -418,7 +453,6 @@ fn main() {
     };
 
     tauri::Builder::default()
-        .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
         .manage(backend_state)
         .invoke_handler(tauri::generate_handler![get_backend_url])
@@ -506,7 +540,9 @@ fn main() {
             ))?;
 
             let app_handle = app.handle();
-            let process = spawn_backend_process(&app_handle, backend_port)?;
+            let runtime = locate_backend_runtime(&app_handle)?;
+            let runtime_env = load_runtime_env(&runtime.root)?;
+            let process = spawn_backend_process(&runtime, backend_port, &runtime_env)?;
             let backend_pid = process.pid();
             let state: State<BackendState> = app.state();
             *state.process.lock().unwrap() = Some(process);

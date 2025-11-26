@@ -524,7 +524,7 @@ async def calculate_token_frequencies(
             frames=frames_dict, stop_words=None
         )
 
-        # Return full vocabulary (no backend truncation); UI limit is purely presentation.
+        # Return full vocabulary; UI limit is purely presentation/persistence only.
         response_data: dict[str, dict] = {}
         server_limit = min(
             max(effective_limit * SERVER_LIMIT_MULTIPLIER, DEFAULT_TOKEN_LIMIT),
@@ -532,21 +532,23 @@ async def calculate_token_frequencies(
         )
         for frame_key, freq_dict in frequency_results.items():
             sorted_tokens = sorted(freq_dict.items(), key=lambda x: x[1], reverse=True)
-            total_tokens = sum(1 for token, freq in sorted_tokens if freq > 0)
-            limited_tokens = [
+            filtered_tokens = [
                 (token, freq) for token, freq in sorted_tokens if freq > 0
-            ][:server_limit]
+            ]
+            total_tokens = len(filtered_tokens)
             display_name = node_display_names.get(frame_key, frame_key)
             response_data[frame_key] = {
                 "data": [
                     TokenFrequencyData(token=token, frequency=freq)
-                    for token, freq in limited_tokens
+                    for token, freq in filtered_tokens
                 ],
                 "columns": ["token", "frequency"],
                 "metadata": {
-                    "applied_server_limit": server_limit,
+                    # Preserve legacy key but signal that backend did not truncate.
+                    "applied_server_limit": None,
                     "total_tokens_before_limit": total_tokens,
-                    "truncated": total_tokens > len(limited_tokens),
+                    "total_tokens_returned": total_tokens,
+                    "truncated": False,
                     "token_limit": effective_limit,
                     "node_id": frame_key,
                     "display_name": display_name,

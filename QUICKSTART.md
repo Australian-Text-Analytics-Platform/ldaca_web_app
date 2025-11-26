@@ -9,8 +9,9 @@ cargo --version
 # Check if npm is installed  
 npm --version
 
-# Check if backend runtime is packaged (expect run_backend.sh and run_backend.sh-<target>)
-ls backend/dist-tauri/backend-runtime/run_backend.sh*
+# Check if backend runtime is packaged (expect bundled python interpreter)
+ls backend/dist-tauri/backend-runtime/python/bin/python3  # macOS/Linux
+ls backend/dist-tauri/backend-runtime/python/python.exe   # Windows
 
 # Check if frontend is built
 ls frontend/build/index.html
@@ -26,6 +27,7 @@ npm install
 ```
 
 This single command installs:
+
 - Root dependencies (Tauri CLI)
 - Frontend workspace dependencies (React, Vite, etc.)
 
@@ -46,6 +48,7 @@ npm run desktop:dev
 ```
 
 This will:
+
 1. Build the frontend
 2. Launch the Tauri window
 3. Auto-start the backend
@@ -68,6 +71,7 @@ npm run tauri:build
 ```
 
 The installer will be in:
+
 - macOS: `src-tauri/target/release/bundle/dmg/`
 - Windows: `src-tauri/target/release/bundle/msi/`
 - Linux: `src-tauri/target/release/bundle/deb/` or `appimage/`
@@ -106,13 +110,14 @@ npm ls --workspaces           # List workspace dependencies
 ### "Backend runtime not found"
 
 When launching the bare binary (without the `.app` bundle) the runtime is
-resolved from the bundled sidecar, `backend/dist-tauri/backend-runtime`, or the
-path in `LDACA_BACKEND_LAUNCHER`. If all of those are missing you will see this
+resolved, in order, from `LDACA_BACKEND_RUNTIME`, the bundled resources,
+`backend/dist-tauri/backend-runtime`, and finally the parent folder of any
+legacy `LDACA_BACKEND_LAUNCHER`. If all of those are missing you will see this
 error. Package the backend first:
 
 ```bash
 cd backend
-bash scripts/package_backend_runtime.sh --clean
+uv run python scripts/package_backend_runtime.py --clean
 ```
 
 ### "Frontend build not found"
@@ -149,7 +154,7 @@ cd "$(dirname "$0")"
 # Build backend runtime
 echo "Packaging backend runtime..."
 cd backend
-bash scripts/package_backend_runtime.sh --clean
+uv run python scripts/package_backend_runtime.py --clean
 cd ..
 
 # Build frontend

@@ -67,14 +67,21 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
 ```bash
 cd backend
-bash scripts/package_backend_runtime.sh --clean
+uv run python scripts/package_backend_runtime.py --clean
 ```
 
 This creates: `backend/dist-tauri/backend-runtime`
 
-You should see `run_backend.sh` plus platform-suffixed aliases such as
-`run_backend.sh-aarch64-apple-darwin`. Tauri looks for the target triple when
-bundling sidecars, so these duplicate launchers are expected on macOS.
+Verify that a Python interpreter now lives under that folder:
+
+```bash
+ls backend/dist-tauri/backend-runtime/python/bin/python3  # macOS/Linux
+ls backend/dist-tauri/backend-runtime/python/python.exe   # Windows
+```
+
+You might also see `run_backend.sh` and architecture-suffixed variants; these
+are still generated for manual debugging but the desktop wrapper no longer
+depends on them.
 
 ### Step 2: Prepare the Frontend
 
@@ -143,9 +150,10 @@ platform-specific installer). Running the bare binary at
 `src-tauri/target/release/ldaca-web-app` also works, but it requires access to a
 backend runtime folder. The launcher now falls back to these locations:
 
-1. Bundled sidecar inside the `.app` resources (default for shipped builds)
-2. `backend/dist-tauri/backend-runtime` inside the repo
-3. A custom path provided via the `LDACA_BACKEND_LAUNCHER` environment variable
+1. `LDACA_BACKEND_RUNTIME` (if set) or the directory that contains `python/`
+2. The bundled resource path returned by `app.path_resolver().resolve_resource()`
+3. `backend/dist-tauri/backend-runtime` inside the repo when running from source
+4. The parent directory of `LDACA_BACKEND_LAUNCHER` (kept for legacy scripts)
 
 If none of those locations exist you will see a friendly error explaining how to
 rebuild the runtime. Running `npm run prepare:backend` regenerates the fallback
@@ -197,6 +205,10 @@ The Tauri app sets these automatically:
 
 - `BACKEND_PORT`: Dynamically assigned port (8001-8010)
 - `LDACA_BACKEND_PORT`: Same as above (for compatibility)
+- `SERVER_HOST` / `LDACA_SERVER_HOST`: Interface to bind (defaults to 127.0.0.1)
+- `LDACA_BACKEND_RUNTIME`: Absolute path to the resolved runtime directory
+- `LDACA_BACKEND_PYTHON`: Absolute path to the interpreter inside that runtime
+- `LDACA_CONFIG_PROFILE`: Defaults to `desktop` when unset
 
 You can also set:
 
@@ -305,7 +317,7 @@ npm run tauri:dev
 
 ```bash
 cd backend
-bash scripts/package_backend_runtime.sh --clean
+uv run python scripts/package_backend_runtime.py --clean
 # Then rebuild the Tauri app
 cd ..
 npm run tauri:build

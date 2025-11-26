@@ -3,7 +3,8 @@
 ## ✅ What's Been Created
 
 ### Directory Structure
-```
+
+```text
 ldaca_web_app/
 ├── package.json                    # Tauri scripts and dependencies
 ├── DESKTOP_BUILD.md               # Comprehensive build guide
@@ -50,12 +51,14 @@ ldaca_web_app/
 ## 🚀 Next Steps
 
 ### 1. Build the Backend (if not done)
+
 ```bash
 cd backend
-bash scripts/package_backend_runtime.sh --clean
+uv run python scripts/package_backend_runtime.py --clean
 ```
 
 ### 2. Build the Frontend (if not done)
+
 ```bash
 cd frontend
 npm install
@@ -63,6 +66,7 @@ npm run build
 ```
 
 ### 3. Generate Platform Icons (optional, for production)
+
 ```bash
 # Install imagemagick first
 brew install imagemagick
@@ -73,6 +77,7 @@ bash generate-icons.sh
 ```
 
 Or use Tauri's icon generator:
+
 ```bash
 npm install -g @tauri-apps/cli
 cd ldaca_web_app
@@ -80,11 +85,13 @@ tauri icon frontend/public/logo512.png
 ```
 
 ### 4. Try Development Mode
+
 ```bash
 npm run tauri:dev
 ```
 
 ### 5. Build Production App
+
 ```bash
 npm run tauri:build
 ```
@@ -92,7 +99,9 @@ npm run tauri:build
 ## 📝 Configuration Files
 
 ### `package.json`
+
 Scripts for building:
+
 - `tauri:dev` - Development mode with hot reload
 - `tauri:build` - Production build
 - `prepare:backend` - Package backend runtime for Tauri
@@ -100,14 +109,18 @@ Scripts for building:
 - `prepare:all` - Build both
 
 ### `src-tauri/tauri.conf.json`
+
 Key settings:
+
 - `build.frontendDist`: Points to `../frontend/build`
 - `bundle.resources`: Includes backend runtime folder + launcher script
 - `app.security.csp`: Allows localhost connections
 - `app.windows`: Window size and properties
 
 ### `src-tauri/src/main.rs`
+
 Main features:
+
 - `find_available_port()`: Scans ports 8001-8010
 - `start_backend_server()`: Launches backend with env vars
 - `get_backend_url()`: Tauri command for frontend
@@ -116,13 +129,17 @@ Main features:
 ## 🔧 Customization
 
 ### Change Port Range
+
 Edit `src-tauri/src/main.rs`:
+
 ```rust
 let backend_port = find_available_port(8001, 8010)
 ```
 
 ### Change Window Size
+
 Edit `src-tauri/tauri.conf.json`:
+
 ```json
 "windows": [{
   "width": 1400,
@@ -131,7 +148,9 @@ Edit `src-tauri/tauri.conf.json`:
 ```
 
 ### Add Backend Environment Variables
+
 Edit `src-tauri/src/main.rs` in `start_backend_server()`:
+
 ```rust
 Command::new(backend_path)
     .env("BACKEND_PORT", port.to_string())
@@ -142,16 +161,19 @@ Command::new(backend_path)
 ## 📦 Distribution
 
 ### macOS
+
 - Output: `src-tauri/target/release/bundle/dmg/*.dmg`
 - Users drag-and-drop to Applications folder
 - For public distribution: needs notarization (Apple Developer account)
 
 ### Windows
+
 - Output: `src-tauri/target/release/bundle/msi/*.msi`
 - Standard Windows installer
 - For public distribution: recommend code signing
 
 ### Linux
+
 - DEB: `src-tauri/target/release/bundle/deb/*.deb`
 - AppImage: `src-tauri/target/release/bundle/appimage/*.AppImage`
 - DEB requires `sudo dpkg -i`, AppImage is portable

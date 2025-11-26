@@ -17,11 +17,11 @@ echo ""
 # Step 1: Package Backend Runtime
 echo "📦 Step 1/3: Packaging backend runtime..."
 cd backend
-if [ ! -f "scripts/package_backend_runtime.sh" ]; then
+if [ ! -f "scripts/package_backend_runtime.py" ]; then
     echo "❌ Backend packaging script not found!"
     exit 1
 fi
-bash scripts/package_backend_runtime.sh --clean
+uv run python scripts/package_backend_runtime.py --clean
 cd ..
 echo "✅ Backend runtime packaged successfully"
 echo ""

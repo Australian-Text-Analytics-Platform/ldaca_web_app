@@ -1290,9 +1290,18 @@ const onNodeClick = (event, node) => {
 
 **Implementation**:
 - Fetches token frequencies: `useMutation({mutationFn: (params) => api.computeTokenFrequencies(workspaceId, params)})`
+- Backend now returns the full vocabulary; the tab enforces the user’s preferred `token_limit` locally before rendering the table or clouds.
 - Generates word clouds using `react-wordcloud` library
 - Displays statistics tables with sorting/filtering
 - Locks analysis results (prevents re-computation on node selection changes)
+
+**Walkthrough Q**: *How does the UI keep results manageable if the backend never truncates?*
+
+**Answer**: Treat this tab like a teaching demo for lazy data handling:
+1. Read `result.metadata.token_limit` (default 10) plus `metadata.server_limit` to learn the saved UI preference.
+2. Slice the unbounded `data` array with `data.slice(0, token_limit)` when rendering each table/word cloud.
+3. Surface `total_tokens_before_limit` and `total_tokens_returned` so students can see that `applied_server_limit` is always `null` unless a legacy record is loaded.
+4. Persist the learner’s stop words via `/token-frequencies/current-request`, ensuring the UI filter stays in sync with the saved metadata without ever discarding raw frequencies.
 
 **Locking Mechanism** (Bug Fixed):
 ```tsx
@@ -1517,7 +1526,7 @@ Frontend stores selectedNodes = [node1.id, node2.id] in Zustand
 User clicks "Compare Token Frequencies"
     ↓
 Frontend: POST /api/workspaces/{workspace_id}/analysis/token-frequencies
-  {node_ids: [node1.id, node2.id], column: 'document', top_n: 100}
+  {node_ids: [node1.id, node2.id], column: 'document', token_limit: 100}
     ↓
 Backend: api/workspaces/analysis.py compute_token_frequencies_endpoint()
   1. Load workspace
@@ -1534,6 +1543,7 @@ Backend: api/workspaces/analysis.py compute_token_frequencies_endpoint()
            - Bayes Factor (BIC): G² - (dof * log(grand_total))
            - Effect Size (ELL): G² / (grand_total * log(min_expected))
          * Return (freq_dicts, stats_df)
+        * Backend intentionally ignores `token_limit` when generating `freq_dicts`; truncation is now 100% a presentation concern handled in the UI.
   4. Generate analysis ID: str(uuid.uuid4())
   5. Store results in workspace metadata: workspace.set_metadata(f"analysis_{analysis_id}", result)
   6. Persist workspace
@@ -1542,10 +1552,15 @@ Backend: api/workspaces/analysis.py compute_token_frequencies_endpoint()
 Frontend: Receives analysis result
   1. Stores in TanStack Query cache: queryKey ['analysis', workspace_id, analysis_id]
   2. Locks analysis: setLastCompareNodeIds([node1.id, node2.id])
-  3. Renders TokenFrequencyTab:
+  3. Reads metadata (`total_tokens_before_limit`, `applied_server_limit`, `token_limit`) so it can explain to the learner that the server returned every token and the UI will now slice locally.
+  4. Renders TokenFrequencyTab:
      - Unified word cloud (combined frequencies)
      - Per-node word clouds
      - Statistics table (sorted by log-likelihood)
+
+> **Walkthrough Q**: *If the backend returns every token, why keep `token_limit` in the payload?*
+>
+> **Answer**: Treat `token_limit` as a persisted preference, not a hard cap. The backend copies it into `analysis_params.token_limit` and `metadata.token_limit` so the UI can (a) remember the student’s preferred table length, (b) label results with `applied_server_limit = null` when nothing was truncated, and (c) apply the limit client-side without recomputing the analysis. This separation keeps the data layer lossless while the presentation layer stays friendly for beginners.
 ```
 
 **Key Insight**: Analysis results stored in workspace metadata; frontend locks analysis to prevent UI changes on new node selection.
@@ -1821,9 +1836,9 @@ for node in workspace.nodes.values():
 
 ### Desktop Runtime + Sidecar Notes
 
-- `backend/scripts/package_backend_runtime.sh` now bundles a standalone Python interpreter (copied from the `uv` cache) into `python/` instead of creating a symlinked `venv/`. The script also builds wheels for `docframe`, `docworkspace`, and the backend itself before installation, so the packaged runtime contains real site-packages instead of `.pth` files pointing back to the developer machine.
-- `run_backend.sh` (the sidecar launcher) now includes logic to locate the runtime directory. It checks the local directory first, then falls back to standard macOS bundle resource paths (`../Resources/backend/dist-tauri/backend-runtime`, `../Resources/_up_/backend/dist-tauri/backend-runtime`, etc.) if running from `Contents/MacOS`. This ensures the launcher can find the `python` interpreter and `.env` files even if Tauri separates the executable from the resources or nests them under `_up_`.
-- `src-tauri/src/main.rs` prints “Backend launched … – waiting for /health” as soon as the sidecar spawns, then calls `wait_for_backend_health()` (infinite loop, 500 ms interval) before logging “Backend ready …”. The helper issues blocking HTTP GETs against `${BACKEND_URL}/health` via `ureq`; if the health check never succeeds the setup handler waits indefinitely, preventing the React shell from claiming the API is live when the FastAPI process actually crashed.
+- `backend/scripts/package_backend_runtime.py` still vendors a full Python install into `backend/dist-tauri/backend-runtime/python/`, but it now treats the bundled interpreter as the primary entrypoint. The script copies the managed `uv` toolchain, builds local wheels for `docframe`, `docworkspace`, and the backend, and installs every dependency into the copied site-packages. The legacy `run_backend.sh` launcher (plus `run_backend.sh-<target>`) is still emitted for engineers who want a one-liner to boot the backend outside the desktop app, yet the Rust host no longer depends on it.
+- `locate_backend_runtime()` in `src-tauri/src/main.rs` replaces the shell sidecar lookup. It first honors `LDACA_BACKEND_RUNTIME` (preferred) and `LDACA_BACKEND_PYTHON`, falls back to the macOS bundle resource path via `app.path_resolver().resolve_resource()`, then walks upward from `current_exe()` checking the same directories as the old launcher (including `_up_` and `Resources/backend/dist-tauri/backend-runtime`). `LDACA_BACKEND_LAUNCHER` is still accepted for backwards compatibility by taking the parent folder of the provided script path.
+- After the runtime root is discovered, `load_runtime_env()` uses `dotenvy` to parse `.env` and `.env.desktop`, merging those values with the ambient environment before `spawn_backend_process()` runs `python -m ldaca_web_app_backend.cli`. The helper injects `BACKEND_PORT`, `LDACA_BACKEND_PORT`, `SERVER_HOST`, `LDACA_SERVER_HOST`, `PYTHONUNBUFFERED`, `LDACA_CONFIG_PROFILE` (defaulting to `desktop`), plus the resolved `LDACA_BACKEND_RUNTIME`/`LDACA_BACKEND_PYTHON` paths. `wait_for_backend_health()` still polls `${BACKEND_URL}/health` every 500 ms, so React only mounts once FastAPI is reachable, but the intermediate logging now reflects the direct interpreter spawn instead of a shell sidecar.
 
 ### Database Queries
 
@@ -1975,6 +1990,10 @@ frames = {
 # Compute frequencies and statistics
 freq_dicts, stats_df = compute_token_frequencies(frames, stop_words=None)
 
+# IMPORTANT: The backend now returns the entire vocabulary and only records the
+# student's preferred `token_limit` in metadata. Stop words are stored so the UI
+# can filter them locally without re-running the analysis.
+
 # Store in workspace metadata
 workspace.set_metadata("token_freq_analysis", {
     "frequencies": freq_dicts,
@@ -1992,11 +2011,11 @@ const tokenFreqMutation = useMutation({
   },
 });
 
-// Trigger analysis
+// Trigger analysis (token_limit is purely a UI preference)
 tokenFreqMutation.mutate({
   node_ids: selectedNodes,
   column: 'document',
-  top_n: 100,
+  token_limit: 100,
 });
 ```
 
