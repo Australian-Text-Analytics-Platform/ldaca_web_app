@@ -167,8 +167,8 @@ export const AddFilePanel: React.FC<AddFilePanelProps> = ({ filename, open, onCl
         }
       }}
     >
-      <DialogContent className="w-full max-w-[95vw] border-none bg-transparent p-0 shadow-none sm:max-w-[1000px] lg:max-w-[1200px]">
-        <Card className="flex max-h-[90vh] flex-col">
+      <DialogContent className="w-full max-w-[min(80vw,_960px)] border-none bg-transparent p-0 shadow-none">
+        <Card className="flex w-full max-h-[90vh] min-w-0 flex-col">
           <CardHeader className="border-b px-6 py-4">
             <CardTitle className="truncate text-lg font-semibold">Add File{filename ? `: ${filename}` : ''}</CardTitle>
             <CardDescription>
@@ -176,7 +176,7 @@ export const AddFilePanel: React.FC<AddFilePanelProps> = ({ filename, open, onCl
             </CardDescription>
           </CardHeader>
 
-          <CardContent className="flex-1 space-y-6 overflow-auto px-6 py-6">
+          <CardContent className="flex-1 min-w-0 space-y-6 overflow-auto px-6 py-6">
             {fileType === 'excel' && sheetNames && sheetNames.length > 0 && (
               <div>
                 <label className="mb-2 block text-sm font-medium text-foreground">Sheet</label>
@@ -257,7 +257,7 @@ export const AddFilePanel: React.FC<AddFilePanelProps> = ({ filename, open, onCl
 
             <div>
               <label className="mb-2 block text-sm font-medium text-foreground">Preview (first rows)</label>
-              <div className="max-h-60 overflow-x-auto overflow-y-auto rounded border border-border">
+              <div className="max-h-60 w-full min-w-0 max-w-full overflow-x-auto overflow-y-auto rounded border border-border">
                 {loading ? (
                   <div className="p-4 text-sm text-muted-foreground">Loading…</div>
                 ) : error ? (

@@ -46,15 +46,15 @@ export const FilePreviewPanel: React.FC<FilePreviewPanelProps> = ({ filename, op
         }
       }}
     >
-      <DialogContent className="w-full max-w-[95vw] border-none bg-transparent p-0 shadow-none sm:max-w-[1100px] lg:max-w-[1400px]">
-        <Card className="flex h-[85vh] max-h-[90vh] flex-col">
+      <DialogContent className="w-full max-w-[min(80vw,_1000px)] border-none bg-transparent p-0 shadow-none">
+        <Card className="flex h-[85vh] w-full max-h-[90vh] min-w-0 flex-col">
           <CardHeader className="border-b px-6 py-4">
             <CardTitle className="truncate text-lg font-semibold">Preview{filename ? `: ${filename}` : ''}</CardTitle>
             <CardDescription>Inspect the first rows of the uploaded file before adding it to a workspace.</CardDescription>
           </CardHeader>
 
-          <CardContent className="flex-1 overflow-hidden px-0 py-0">
-            <div className="h-full w-full overflow-auto px-6 py-4">
+          <CardContent className="flex-1 min-w-0 overflow-hidden px-0 py-0">
+            <div className="h-full w-full min-w-0 overflow-y-auto px-6 py-4">
               {loading ? (
                 <div className="py-12 text-center text-muted-foreground">Loading…</div>
               ) : error ? (
@@ -62,8 +62,8 @@ export const FilePreviewPanel: React.FC<FilePreviewPanelProps> = ({ filename, op
               ) : rows.length === 0 ? (
                 <div className="py-12 text-center text-muted-foreground">No preview data</div>
               ) : (
-                <div className="w-full overflow-x-auto overflow-y-auto rounded-md border border-border/50">
-                  <table className="min-w-max text-sm">
+                <div className="w-full min-w-0 max-w-full overflow-x-auto rounded-md border border-border/50">
+                  <table className="min-w-max max-w-full text-sm">
                     <thead>
                       <tr className="bg-muted">
                         {columns.map((column) => (
