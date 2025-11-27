@@ -1507,27 +1507,29 @@ const ConcordanceTab: React.FC = () => {
                       </CardDescription>
                     )}
                   </div>
-                  <Tabs
-                    value={viewMode}
-                    onValueChange={(mode) => handleViewModeChange(mode as 'separated' | 'combined')}
-                    className="w-full md:w-auto"
-                  >
-                    <TabsList aria-label="Concordance view mode">
-                      <TabsTrigger value="separated">Separated</TabsTrigger>
-                      {results?.combinable && (
-                        <TabsTrigger value="combined">
-                          {combinedLoading ? (
-                            <span className="flex items-center gap-1">
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                              Combined
-                            </span>
-                          ) : (
-                            'Combined'
-                          )}
-                        </TabsTrigger>
-                      )}
-                    </TabsList>
-                  </Tabs>
+                  {panelSelectedNodes.length > 1 && (
+                    <Tabs
+                      value={viewMode}
+                      onValueChange={(mode) => handleViewModeChange(mode as 'separated' | 'combined')}
+                      className="w-full md:w-auto"
+                    >
+                      <TabsList aria-label="Concordance view mode">
+                        <TabsTrigger value="separated">Separated</TabsTrigger>
+                        {results?.combinable && (
+                          <TabsTrigger value="combined">
+                            {combinedLoading ? (
+                              <span className="flex items-center gap-1">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Combined
+                              </span>
+                            ) : (
+                              'Combined'
+                            )}
+                          </TabsTrigger>
+                        )}
+                      </TabsList>
+                    </Tabs>
+                  )}
                 </div>
                 <div className="flex flex-wrap items-center gap-4">
                   <div className="flex items-center gap-2">
