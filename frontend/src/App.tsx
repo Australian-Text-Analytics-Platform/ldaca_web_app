@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, Suspense, lazy } from 'react';
-import { useAuth } from './hooks/useAuth';
+import { useAuth, AuthPhase, REFRESH_FAILURE_THRESHOLD } from './hooks/useAuth';
 import { useBackendHealth } from './hooks/useBackendHealth';
 import { QueryProvider } from './providers/QueryProvider';
 import { WorkspaceProvider } from './providers/WorkspaceProvider';
@@ -23,6 +23,9 @@ const SequentialAnalysisTab = lazy(() => import('./components/tabs/SequentialAna
 const ExportTab = lazy(() => import('./components/tabs/ExportTab'));
 const TokenFrequencyTab = lazy(() => import('./components/tabs/TokenFrequencyTab'));
 
+const REFRESH_CHIP_DELAY_MS = 3000;
+const LAG_HINT_DELAY_MS = 8000;
+
 /**
  * Shell that renders the main workspace experience once the backend is healthy
  * and the user has completed authentication (if required).
@@ -38,6 +41,7 @@ const WorkspaceShell: React.FC = () => {
     feedbackOpen: state.modals.feedbackModal,
   })));
   const {
+    phase,
     loginWithGoogle,
     logout,
     isAuthenticated,
@@ -45,16 +49,15 @@ const WorkspaceShell: React.FC = () => {
     isLoading: authLoading,
     error: authError,
     refreshAuth,
-  } = useAuth({ autoStart: false, debugLabel: 'WorkspaceShell' });
+  } = useAuth({ autoStart: true, debugLabel: 'WorkspaceShell' });
   if (import.meta.env.DEV) {
-    console.debug('[WorkspaceShell] auth state', JSON.stringify({
-      authLoading,
-      authError,
+    console.debug('[WorkspaceShell] auth phase', phase.status, {
       isAuthenticated,
       isMultiUserMode,
-    }));
+    });
   }
-  const [authLagging, setAuthLagging] = useState(false);
+  const [showLaggingHint, setShowLaggingHint] = useState(false);
+  const [refreshChipVisible, setRefreshChipVisible] = useState(false);
 
   // Right panel width and resize handlers must be declared before any early returns (React Hooks rule)
   const [rightWidth, setRightWidth] = useState<number>(40); // percentage of total width
@@ -67,18 +70,32 @@ const WorkspaceShell: React.FC = () => {
   const rightWidthLiveRef = useRef<number>(rightWidth);
 
   useEffect(() => {
-    refreshAuth();
-  }, [refreshAuth]);
-
-  useEffect(() => {
-    if (!authLoading) {
-      setAuthLagging(false);
+    if (phase.status !== 'bootstrapping') {
+      setShowLaggingHint(false);
       return;
     }
-
-    const timeoutId = window.setTimeout(() => setAuthLagging(true), 8000);
+    const timeoutId = window.setTimeout(() => setShowLaggingHint(true), LAG_HINT_DELAY_MS);
     return () => window.clearTimeout(timeoutId);
-  }, [authLoading]);
+  }, [phase.status]);
+
+  useEffect(() => {
+    if (phase.status !== 'refreshing') {
+      setRefreshChipVisible(false);
+      return;
+    }
+    setRefreshChipVisible(false);
+    const timeoutId = window.setTimeout(() => setRefreshChipVisible(true), REFRESH_CHIP_DELAY_MS);
+    return () => window.clearTimeout(timeoutId);
+  }, [phase.status]);
+
+  const blockingCopy = getBlockingCopy(phase, showLaggingHint);
+  const shouldShowLoginCard = isMultiUserMode && !isAuthenticated && phase.status !== 'bootstrapping';
+  const degradedPhase = phase.status === 'degraded' ? phase : null;
+  const showRefreshBanner = Boolean(degradedPhase);
+  const bannerAttemptsLabel = degradedPhase ? formatAttemptLabel(degradedPhase.attempts) : null;
+  const bannerMessage = degradedPhase?.error ?? 'Having trouble refreshing your session.';
+  const bannerTime = degradedPhase ? formatTimestamp(degradedPhase.lastFailureAt) : null;
+  const showRefreshChip = phase.status === 'refreshing' && refreshChipVisible;
   const onStartResize = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     if (isRightCollapsed) return; // don't resize when collapsed
@@ -137,14 +154,14 @@ const WorkspaceShell: React.FC = () => {
     });
   }, [rightWidth, lastRightWidth]);
 
-  if (authLoading) {
+  if (blockingCopy) {
     return (
       <BlockingScreen
-        title="Signing you in"
-        description="The backend is healthy; finishing the authentication handshake."
-        status={authLagging ? 'Still waiting for auth…' : 'Checking your session…'}
-        hint={authLagging ? 'This can happen if backend migrations are still running. You can retry below.' : 'This usually takes just a moment.'}
-        error={authError}
+        title={blockingCopy.title}
+        description={blockingCopy.description}
+        status={blockingCopy.status}
+        hint={blockingCopy.hint}
+        error={blockingCopy.error}
         actions={(
           <button
             type="button"
@@ -159,7 +176,7 @@ const WorkspaceShell: React.FC = () => {
   }
 
   // Show login screen if not authenticated and in multi-user mode
-  if (!isAuthenticated && isMultiUserMode) {
+  if (shouldShowLoginCard) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
         <ErrorBoundary>
@@ -179,13 +196,38 @@ const WorkspaceShell: React.FC = () => {
     );
   }
 
-  // (removed duplicate resize hook block)
-
   return (
     <QueryProvider>
       <WorkspaceProvider>
         <ErrorBoundary>
           <SidebarProvider className="bg-gradient-to-br from-slate-50 to-blue-50">
+            {(showRefreshBanner || showRefreshChip) && (
+              <div className="pointer-events-none fixed left-1/2 top-4 z-50 flex -translate-x-1/2 flex-col gap-2">
+                {showRefreshBanner && bannerAttemptsLabel && (
+                  <div className="pointer-events-auto flex max-w-xl flex-wrap items-center gap-2 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-900 shadow-lg">
+                    <span className="font-medium text-amber-900">Connection hiccup</span>
+                    <span className="text-xs text-amber-900/80">{bannerMessage}</span>
+                    <span className="text-xs text-amber-900/70">Attempts {bannerAttemptsLabel}</span>
+                    {bannerTime && (
+                      <span className="text-xs text-amber-900/60">Last failure {bannerTime}</span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={refreshAuth}
+                      className="rounded-full border border-amber-400 px-3 py-1 text-xs font-medium text-amber-900 hover:bg-amber-100"
+                    >
+                      Retry now
+                    </button>
+                  </div>
+                )}
+                {showRefreshChip && (
+                  <div className="flex items-center gap-2 self-center rounded-full bg-slate-900/90 px-3 py-1 text-xs font-medium text-white shadow-lg">
+                    <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-300" aria-hidden />
+                    Reconnecting…
+                  </div>
+                )}
+              </div>
+            )}
             <div className="flex h-screen w-full overflow-hidden">
               <ErrorBoundary>
                 <Sidebar />
@@ -327,6 +369,49 @@ const App: React.FC = () => {
   }
 
   return <WorkspaceShell />;
+};
+
+type BlockingCopy = {
+  title: string;
+  description: string;
+  status: string;
+  hint?: string;
+  error?: string;
+};
+
+const formatTimestamp = (value?: number | null) => {
+  if (!value) return null;
+  return new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+};
+
+const formatAttemptLabel = (attempts: number) => `${Math.min(attempts, REFRESH_FAILURE_THRESHOLD)}/${REFRESH_FAILURE_THRESHOLD}`;
+
+const getBlockingCopy = (phase: AuthPhase, showLaggingHint: boolean): BlockingCopy | null => {
+  if (phase.status === 'bootstrapping') {
+    return {
+      title: 'Signing you in',
+      description: 'The backend is healthy; finishing the authentication handshake.',
+      status: showLaggingHint ? 'Still waiting for auth…' : 'Checking your session…',
+      hint: showLaggingHint
+        ? 'This can happen if backend migrations are still running. You can retry below.'
+        : 'This usually takes just a moment.',
+      error: phase.error,
+    };
+  }
+
+  if (phase.status === 'fatal') {
+    return {
+      title: 'Reconnecting your session',
+      description: 'Multiple background refresh attempts failed, so we paused the workspace until the backend responds again.',
+      status: `Retrying (${formatAttemptLabel(phase.attempts)})…`,
+      hint: formatTimestamp(phase.lastFailureAt)
+        ? `Last failure at ${formatTimestamp(phase.lastFailureAt)}. Check your connection or restart the backend, then retry below.`
+        : 'Check your connection or restart the backend, then retry below.',
+      error: phase.error,
+    };
+  }
+
+  return null;
 };
 
 export default App;

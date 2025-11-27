@@ -33,7 +33,7 @@ const ConcordanceTab: React.FC = () => {
   const { selectedNodes } = useWorkspaceSelection();
   const { isLoading } = useWorkspaceStatus();
   const { currentWorkspaceId, getNodeShape } = useWorkspaceData();
-  const { detachConcordance } = useWorkspaceActions();
+  const { detachConcordance, selectNodes } = useWorkspaceActions();
 
   const { getColumnInfos } = useNodeColumnInfos({
     workspaceId: currentWorkspaceId,
@@ -268,22 +268,47 @@ const ConcordanceTab: React.FC = () => {
       setSearchWord(pendingConcordance.searchWord);
     }
 
-    if (pendingConcordance.nodeColumnSelections?.length) {
-      const matchingSelections = pendingConcordance.nodeColumnSelections.filter((sel) =>
-        selectedNodes.some((node: any) => node.id === sel.nodeId)
-      );
-      if (matchingSelections.length > 0) {
-        setNodeColumnSelections(matchingSelections, { replace: true });
+    if (Array.isArray(pendingConcordance.selectedNodes) && pendingConcordance.selectedNodes.length > 0) {
+      const targetIds = pendingConcordance.selectedNodes
+        .map((node) => (typeof node?.id === 'string' ? node.id : ''))
+        .filter((id): id is string => id.trim().length > 0)
+        .slice(0, 2);
+      if (targetIds.length > 0) {
+        const currentIds = selectedNodes.map((node) => node.id);
+        const needsSync =
+          targetIds.length !== currentIds.length ||
+          targetIds.some((id, index) => id !== currentIds[index]);
+        if (needsSync) {
+          try {
+            selectNodes(targetIds);
+          } catch (error) {
+            if (localStorage.getItem('debugConc') === '1') {
+              console.warn('Failed to sync workspace selection from pending concordance:', error);
+            }
+          }
+        }
       }
+    }
+
+    if (pendingConcordance.nodeColumnSelections?.length) {
+      setNodeColumnSelections(
+        pendingConcordance.nodeColumnSelections.map((sel) => ({ ...sel })),
+        { replace: true }
+      );
     }
 
     if (pendingConcordance.nodeColors) {
       setNodeColors((prev) => ({ ...pendingConcordance.nodeColors, ...prev }));
     }
 
-    const delay = pendingConcordance.autoRun ? 50 : 500;
+    const shouldAutoRun = pendingConcordance.autoRun === true;
     let timeoutId: number | null = null;
-    if (pendingConcordance.searchWord && selectedNodes.length > 0) {
+    const hasNodeTargets =
+      selectedNodes.length > 0 ||
+      (pendingConcordance.selectedNodes?.length ?? 0) > 0 ||
+      (pendingConcordance.nodeColumnSelections?.length ?? 0) > 0;
+    if (shouldAutoRun && pendingConcordance.searchWord && hasNodeTargets) {
+      const delay = 50;
       timeoutId = window.setTimeout(() => {
         if (localStorage.getItem('debugConc') === '1') {
           console.debug(
@@ -300,7 +325,7 @@ const ConcordanceTab: React.FC = () => {
         window.clearTimeout(timeoutId);
       }
     };
-  }, [pendingConcordance, selectedNodes, setNodeColumnSelections, clearPendingConcordance]);
+  }, [pendingConcordance, selectedNodes, setNodeColumnSelections, clearPendingConcordance, selectNodes]);
 
   // Recompute auto columns if unlocked and selections empty but nodes exist
   useEffect(() => {

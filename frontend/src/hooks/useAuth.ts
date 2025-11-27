@@ -1,69 +1,74 @@
 import { useEffect, useCallback, useSyncExternalStore } from 'react';
 import { AuthInfoResponse } from '../types';
-// Migrated to modular API layer
 import { authApi } from '../api/auth';
 
 if (import.meta.env.DEV) {
   console.debug('[useAuth] module loaded', import.meta.url);
 }
 
-/**
- * Unified authentication hook that works with both single-user and multi-user modes.
- * Backend controls all auth logic via MULTI_USER environment variable.
- */
+const AUTH_INFO_TIMEOUT_MS = 7000;
+const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+export const REFRESH_FAILURE_THRESHOLD = 3;
+
+type FetchReason = 'bootstrap' | 'refresh' | 'manual';
+
+export type AuthPhase =
+  | { status: 'bootstrapping'; attempts: number; error?: string }
+  | { status: 'ready'; info: AuthInfoResponse }
+  | { status: 'refreshing'; info: AuthInfoResponse; startedAt: number }
+  | { status: 'degraded'; info: AuthInfoResponse | null; attempts: number; lastFailureAt: number; error?: string }
+  | { status: 'fatal'; attempts: number; lastFailureAt: number; error: string };
+
+type AuthSnapshot = {
+  phase: AuthPhase;
+  authInfo: AuthInfoResponse | null;
+};
+
 // ------------------------------------------------------------
-// Global (module-level) singleton auth state to prevent the flood
-// of /api/auth/ requests caused by multiple components invoking
-// useAuth independently (and React 18 StrictMode double-mount).
+// Global singleton state so every component shares the same
+// authentication lifecycle (and StrictMode double-mounts are safe).
 // ------------------------------------------------------------
 let globalAuthInfo: AuthInfoResponse | null = null;
-let globalIsLoading = true;
-let globalError: string | null = null;
+let globalPhase: AuthPhase = { status: 'bootstrapping', attempts: 0 };
+let globalBootstrapAttempts = 0;
+let globalRefreshFailures = 0;
 let inFlight: Promise<void> | null = null;
 let refreshIntervalId: number | null = null;
 const listeners = new Set<() => void>();
-const AUTH_INFO_TIMEOUT_MS = 7000;
-
-type AuthSnapshot = {
-  authInfo: AuthInfoResponse | null;
-  isLoading: boolean;
-  error: string | null;
-};
-
-let currentSnapshot: AuthSnapshot = {
-  authInfo: globalAuthInfo,
-  isLoading: globalIsLoading,
-  error: globalError,
-};
 
 const computeSnapshot = (): AuthSnapshot => ({
+  phase: globalPhase,
   authInfo: globalAuthInfo,
-  isLoading: globalIsLoading,
-  error: globalError,
 });
 
-const updateSnapshot = () => {
+let currentSnapshot: AuthSnapshot = computeSnapshot();
+
+const notify = () => {
   const nextSnapshot = computeSnapshot();
-  if (
-    nextSnapshot.authInfo === currentSnapshot.authInfo &&
-    nextSnapshot.isLoading === currentSnapshot.isLoading &&
-    nextSnapshot.error === currentSnapshot.error
-  ) {
-    return false;
+  if (nextSnapshot.phase === currentSnapshot.phase && nextSnapshot.authInfo === currentSnapshot.authInfo) {
+    return;
   }
   currentSnapshot = nextSnapshot;
-  return true;
+  listeners.forEach((listener) => {
+    try {
+      listener();
+    } catch {
+      // no-op
+    }
+  });
 };
 
-export interface UseAuthOptions {
-  /**
-   * When false, the hook will wait for an explicit `refreshAuth` call
-   * before making the initial /api/auth/ request.
-   */
-  autoStart?: boolean;
-  /** Optional label for development logging */
-  debugLabel?: string;
-}
+const setPhase = (phase: AuthPhase) => {
+  globalPhase = phase;
+  notify();
+};
+
+const subscribe = (listener: () => void) => {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+};
+
+const getSnapshot = () => currentSnapshot;
 
 const readStoredToken = () => {
   if (typeof window === 'undefined') return null;
@@ -92,126 +97,148 @@ const buildAuthHeaders = (): Record<string, string> => {
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
-const notify = () => {
-  const changed = updateSnapshot();
-  if (!changed) {
-    return;
-  }
-  listeners.forEach(l => {
-    try { l(); } catch { /* ignore */ }
-  });
-};
-
-const subscribe = (listener: () => void) => {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
-};
-
-const getSnapshot = () => currentSnapshot;
-
-const fetchAuthInfoOnce = async () => {
+const runAuthFetch = (reason: FetchReason): Promise<void> => {
   if (inFlight) return inFlight;
-  globalIsLoading = true;
-  globalError = null;
-  notify();
+
+  const hasSession = Boolean(globalAuthInfo);
+  const treatAsBootstrap = reason === 'bootstrap' || !hasSession || globalPhase.status === 'fatal';
+
+  if (treatAsBootstrap) {
+    globalBootstrapAttempts += 1;
+    setPhase({ status: 'bootstrapping', attempts: globalBootstrapAttempts });
+  } else if (globalAuthInfo) {
+    setPhase({ status: 'refreshing', info: globalAuthInfo, startedAt: Date.now() });
+  }
+
   inFlight = (async () => {
     try {
-      if (import.meta.env.DEV) {
-        console.debug('[useAuth] fetching /api/auth/');
-      }
       const info = await authApi.info(buildAuthHeaders(), { timeoutMs: AUTH_INFO_TIMEOUT_MS });
       globalAuthInfo = info;
-      if (import.meta.env.DEV) {
-        console.debug('[useAuth] auth success', JSON.stringify(info));
+      globalBootstrapAttempts = 0;
+      globalRefreshFailures = 0;
+      setPhase({ status: 'ready', info });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Authentication failed';
+      const status = typeof (error as any)?.status === 'number' ? (error as any).status : null;
+      const unauthorized = status === 401 || status === 403;
+      const failureTime = Date.now();
+
+      if (!globalAuthInfo || treatAsBootstrap) {
+        globalBootstrapAttempts += 1;
+        setPhase({ status: 'bootstrapping', attempts: globalBootstrapAttempts, error: message });
+        return;
       }
-    } catch (err) {
-      console.error('Auth info fetch failed:', err);
-      globalError = err instanceof Error ? err.message : 'Authentication failed';
-      globalAuthInfo = null;
+
+      if (unauthorized) {
+        persistToken(null);
+        globalAuthInfo = null;
+        globalRefreshFailures = REFRESH_FAILURE_THRESHOLD;
+        setPhase({
+          status: 'fatal',
+          attempts: REFRESH_FAILURE_THRESHOLD,
+          lastFailureAt: failureTime,
+          error: 'Session expired. Please sign in again.',
+        });
+        return;
+      }
+
+      globalRefreshFailures = Math.min(REFRESH_FAILURE_THRESHOLD, globalRefreshFailures + 1);
+      if (globalRefreshFailures >= REFRESH_FAILURE_THRESHOLD) {
+        setPhase({ status: 'fatal', attempts: globalRefreshFailures, lastFailureAt: failureTime, error: message });
+      } else {
+        setPhase({
+          status: 'degraded',
+          info: globalAuthInfo,
+          attempts: globalRefreshFailures,
+          lastFailureAt: failureTime,
+          error: message,
+        });
+      }
     } finally {
-      globalIsLoading = false;
       inFlight = null;
-      if (import.meta.env.DEV) {
-        console.debug('[useAuth] notify listeners', JSON.stringify({ globalIsLoading, listeners: listeners.size }));
-      }
-      notify();
     }
   })();
+
   return inFlight;
 };
 
 const ensureRefreshInterval = () => {
   if (refreshIntervalId != null || typeof window === 'undefined') return;
-  // Refresh every 5 minutes only once globally
-  refreshIntervalId = window.setInterval(fetchAuthInfoOnce, 5 * 60 * 1000);
+  refreshIntervalId = window.setInterval(() => {
+    if (!globalAuthInfo || inFlight || globalPhase.status === 'fatal') return;
+    runAuthFetch('refresh');
+  }, REFRESH_INTERVAL_MS);
 };
 
+export interface UseAuthOptions {
+  /**
+   * When false, the hook will wait for an explicit `refreshAuth` call
+   * before making the initial /api/auth/ request.
+   */
+  autoStart?: boolean;
+  /** Optional label for development logging */
+  debugLabel?: string;
+}
+
 export const useAuth = (options: UseAuthOptions = {}) => {
-  const autoStart = options.autoStart ?? true;
+  const autoStart = options.autoStart ?? false;
   const debugLabel = options.debugLabel ?? 'useAuth';
-  const { authInfo, isLoading, error } = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+  const { phase, authInfo } = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 
   if (import.meta.env.DEV) {
-    console.debug(`[useAuth] render snapshot (${debugLabel})`, JSON.stringify({
-      isLoading,
+    console.debug(`[useAuth] snapshot (${debugLabel})`, {
+      phase: phase.status,
       hasAuthInfo: Boolean(authInfo),
       inFlight: Boolean(inFlight),
-    }));
+    });
   }
 
   useEffect(() => {
-    // Kick off initial load if needed
-    if (autoStart && globalAuthInfo === null && !inFlight) {
-      fetchAuthInfoOnce();
+    if (autoStart && !globalAuthInfo) {
+      runAuthFetch('bootstrap');
     }
     ensureRefreshInterval();
   }, [autoStart]);
 
   const refreshAuth = useCallback(async () => {
-    await fetchAuthInfoOnce();
+    const reason: FetchReason = !globalAuthInfo || globalPhase.status === 'fatal' ? 'bootstrap' : 'manual';
+    await runAuthFetch(reason);
   }, []);
 
-  // Google login handler
-  const loginWithGoogle = useCallback(async (idToken: string): Promise<void> => {
+  const loginWithGoogle = useCallback(async (idToken: string) => {
     if (!globalAuthInfo?.multi_user_mode) {
       throw new Error('Google login not available in single-user mode');
     }
-    globalError = null;
-    notify();
+
     try {
       const response = await authApi.googleAuth(idToken);
       persistToken(response.access_token);
-      // Re-fetch to populate user info
-      await fetchAuthInfoOnce();
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Google login failed';
-      globalError = errorMessage;
-      notify();
-      throw new Error(errorMessage);
+      await runAuthFetch('bootstrap');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Google login failed';
+      throw new Error(message);
     }
   }, []);
 
-  // Logout handler
-  const logout = useCallback(async (): Promise<void> => {
+  const logout = useCallback(async () => {
     if (!globalAuthInfo?.multi_user_mode) {
-      // No logout needed in single-user mode
       return;
     }
-    globalError = null;
-    notify();
+
     try {
       await authApi.logout(buildAuthHeaders());
-      persistToken(null);
-      await fetchAuthInfoOnce();
     } catch (err) {
       console.error('Logout error:', err);
+    } finally {
       persistToken(null);
       globalAuthInfo = null;
-      notify();
+      globalBootstrapAttempts = 0;
+      globalRefreshFailures = 0;
+      setPhase({ status: 'bootstrapping', attempts: 0 });
+      await runAuthFetch('bootstrap');
     }
   }, []);
 
-  // Get auth headers for API calls
   const getAuthHeaders = useCallback((): Record<string, string> => {
     const token = readStoredToken();
     if (!token) return {};
@@ -221,34 +248,29 @@ export const useAuth = (options: UseAuthOptions = {}) => {
     return { Authorization: `Bearer ${token}` };
   }, []);
 
-  // Computed values
   const isAuthenticated = authInfo?.authenticated ?? false;
   const user = authInfo?.user ?? null;
   const isMultiUserMode = authInfo?.multi_user_mode ?? false;
   const requiresAuthentication = authInfo?.requires_authentication ?? false;
   const availableAuthMethods = authInfo?.available_auth_methods ?? [];
   const dataFolder = authInfo?.data_folder ?? null;
+  const error = 'error' in phase ? phase.error ?? null : null;
+  const isLoading = phase.status === 'bootstrapping';
 
   return {
-    // Auth state
+    phase,
+    authInfo,
     isAuthenticated,
     user,
     isMultiUserMode,
     requiresAuthentication,
     availableAuthMethods,
     dataFolder,
-    
-    // Loading and error states
-    isLoading,
     error,
-    
-    // Actions
+    isLoading,
     loginWithGoogle,
     logout,
     refreshAuth,
     getAuthHeaders,
-    
-    // Raw auth info for debugging
-    authInfo: globalAuthInfo,
   };
 };

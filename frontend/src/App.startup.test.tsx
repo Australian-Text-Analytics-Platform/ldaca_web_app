@@ -1,8 +1,10 @@
 import { describe, expect, it, beforeEach, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
 import App from './App';
+import type { AuthPhase } from './hooks/useAuth';
+import type { AuthInfoResponse } from './types';
 
 const mockUseAuth = vi.fn();
 vi.mock('./hooks/useAuth', () => ({
@@ -83,14 +85,29 @@ vi.mock('./components/tabs/SequentialAnalysisTab', lazyComponentMock);
 vi.mock('./components/tabs/ExportTab', lazyComponentMock);
 vi.mock('./components/tabs/TokenFrequencyTab', lazyComponentMock);
 
+const baseAuthInfo: AuthInfoResponse = {
+  authenticated: true,
+  user: null,
+  multi_user_mode: false,
+  available_auth_methods: [],
+  requires_authentication: false,
+};
+
 const createAuthState = (overrides: Record<string, any> = {}) => ({
+  phase: { status: 'ready', info: baseAuthInfo } as AuthPhase,
+  authInfo: baseAuthInfo,
   loginWithGoogle: vi.fn(),
   logout: vi.fn(),
-  isAuthenticated: false,
+  isAuthenticated: true,
   isMultiUserMode: false,
-  isLoading: true,
+  isLoading: false,
   error: null,
   refreshAuth: vi.fn(),
+  getAuthHeaders: vi.fn(() => ({})),
+  requiresAuthentication: false,
+  availableAuthMethods: [],
+  dataFolder: null,
+  user: null,
   ...overrides,
 });
 
@@ -106,10 +123,10 @@ describe('App startup gating', () => {
 
   it('defers auth bootstrap until the backend passes health checks', () => {
     mockUseBackendHealth.mockReturnValue({ ready: true, error: null });
-    mockUseAuth.mockReturnValue(createAuthState({ isLoading: false, isAuthenticated: true }));
+    mockUseAuth.mockReturnValue(createAuthState());
     const { unmount } = render(<App />);
 
-    expect(mockUseAuth).toHaveBeenCalledWith(expect.objectContaining({ autoStart: false }));
+    expect(mockUseAuth).toHaveBeenCalledWith(expect.objectContaining({ autoStart: true, debugLabel: 'WorkspaceShell' }));
     unmount();
   });
 
@@ -129,34 +146,30 @@ describe('App startup gating', () => {
     mockUseBackendHealth.mockReturnValue({ ready: true, error: null });
     const refreshAuth = vi.fn();
     mockUseAuth.mockReturnValue(createAuthState({
+      phase: { status: 'bootstrapping', attempts: 1, error: 'Auth timed out' },
       isLoading: true,
       error: 'Auth timed out',
+      isAuthenticated: false,
       refreshAuth,
     }));
 
     const user = userEvent.setup();
     render(<App />);
 
-    await waitFor(() => expect(refreshAuth).toHaveBeenCalledTimes(1));
     expect(screen.getByText('Signing you in')).toBeInTheDocument();
     expect(screen.getByText('Auth timed out')).toBeInTheDocument();
+    expect(refreshAuth).not.toHaveBeenCalled();
     const retryButton = screen.getByRole('button', { name: /retry connection/i });
     await user.click(retryButton);
-    expect(refreshAuth).toHaveBeenCalledTimes(2);
+    expect(refreshAuth).toHaveBeenCalledTimes(1);
   });
 
   it('renders main layout once backend and auth are ready', async () => {
     mockUseBackendHealth.mockReturnValue({ ready: true, error: null });
-    const refreshAuth = vi.fn();
-    mockUseAuth.mockReturnValue(createAuthState({
-      isLoading: false,
-      isAuthenticated: true,
-      refreshAuth,
-    }));
+    mockUseAuth.mockReturnValue(createAuthState());
 
     render(<App />);
 
-    await waitFor(() => expect(refreshAuth).toHaveBeenCalledTimes(1));
     expect(screen.getByText('Sidebar')).toBeInTheDocument();
     expect(screen.getByText('WorkspaceView')).toBeInTheDocument();
   });

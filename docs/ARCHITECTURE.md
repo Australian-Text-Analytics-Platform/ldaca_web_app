@@ -1294,6 +1294,8 @@ const onNodeClick = (event, node) => {
 - Unified word cloud (combined frequencies across selected nodes)
 - Per-node word clouds and tables
 - Statistical measures (log-likelihood, Bayes factor, effect size)
+- Stop-word filtering is applied entirely in the browser. The tab keeps the full backend payload intact, derives `nodeDisplayResults` via `useMemo`, and walks the unbounded token list to “backfill” slots so that each word cloud/table still renders up to the learner’s configured `token_limit` even after common words are filtered out.
+- For UX/performance parity, the input is clamped to **100 tokens max**. Requests above that ceiling are automatically reset to 100 and the learner sees an alert explaining that word clouds can’t render larger payloads.
 
 **Implementation**:
 - Fetches token frequencies: `useMutation({mutationFn: (params) => api.computeTokenFrequencies(workspaceId, params)})`
@@ -1834,7 +1836,7 @@ for node in workspace.nodes.values():
 
 2. **Step 2 – Ask “Can we trust the auth session?”**  
   *Question*: *Why do we still see a blocking screen even after `/health` is green?*  
-  *Answer*: The shell calls `useAuth({ autoStart: false })`, so *no* `/api/auth/` request fires until `useBackendHealth()` reports success. The moment `ready` flips to `true`, `App.tsx` invokes `refreshAuth()`, which (a) attaches any stored bearer token, (b) times out in 7 s, (c) retries automatically if the handshake fails, and (d) surfaces both the `refreshAuth()` action and an `authLagging` hint if things drag on. This ordering guarantees `/health` is always the first network request (critical for desktop builds where the backend may still be binding to its port) and avoids the previous stuck state where an in-flight `/auth` call blocked retries for the full timeout window. The UI again uses `BlockingScreen`, this time with a CTA so users can retry instead of staring at a blank spinner.
+  *Answer*: `WorkspaceShell` is the **only** component that opts into `useAuth({ autoStart: true })`. Every other hook call uses the new default `autoStart: false`, meaning they simply subscribe to the shared auth snapshot without firing `/api/auth/` on mount. Once the backend gate flips to ready, `WorkspaceShell` mounts, detects that no auth info has been loaded yet, and kicks off the bootstrap fetch itself. The UI stays on `BlockingScreen` until `phase.status === 'ready'`. The Retry button still calls `refreshAuth()` (which internally forces another bootstrap), but we avoid the old behavior where sidebar/tab mounts re-triggered `/api/auth/`, tore down the workspace tree, and spammed the backend with SSE cancellations.
 
 3. **Step 3 – When both gates pass**  
    *Question*: *What finally unlocks the workspace layout?*  
@@ -1844,8 +1846,21 @@ for node in workspace.nodes.values():
 `frontend/src/App.startup.test.tsx` runs through the three scenarios with Vitest + Testing Library (`vite.config.ts` now sets `test.environment = 'jsdom'`). The tests mock `useAuth`/`useBackendHealth` and assert that:
 
 - The backend gate shows “Starting backend services” alongside the last health error.
-- The auth gate shows “Signing you in”, automatically kicks `refreshAuth()` once the backend flips to healthy, and clicking *Retry connection* calls it again.
+- The auth gate shows “Signing you in” whenever `useAuth().phase.status === 'bootstrapping'`; the Retry button simply calls `refreshAuth()` while the hook manages the actual bootstrap fetch.
 - When both gates pass, the main layout mounts (`Sidebar`, `WorkspaceView`, etc.).
+
+#### Auth refresh resiliency (frontend)
+
+- `useAuth()` now boils the lifecycle down to a single `phase: AuthPhase` union plus `isLoading`/`error` shorthands. The phases are:  
+  - `'bootstrapping'`: first contact (or post-fatal retry) with `/api/auth/`.  
+  - `'ready'`: cached auth info is fresh; the UI renders normally.  
+  - `'refreshing'`: background poll is in-flight; no UI appears unless it runs longer than 3 s.  
+  - `'degraded'`: at least one refresh failed but fewer than three consecutively—LDaCA keeps using the previous token and shows a slim banner.  
+  - `'fatal'`: three consecutive failures or an explicit 401/403; the blocking screen reappears until the user retries.
+- The hook defaults to `autoStart: false`; `WorkspaceShell` opts in so there is exactly one bootstrap fetch per page load. This prevents child components (e.g., `Sidebar`, tabs, task streams) from re-triggering `/api/auth/`, which previously caused their React subtrees to unmount and forced the SSE connections to restart.
+- Background refreshes (still every 5 minutes) run silently; if a refresh exceeds 3 s the top-center “Reconnecting…” chip fades in. The banner includes the attempt counter `X/3`, the last failure timestamp, and a “Retry now” CTA without tearing down the workspace.
+- When `phase.status === 'fatal'` the blocking screen copy changes to “Reconnecting your session” with the same retry counter. Clicking *Retry* routes through `refreshAuth()`, which forces a bootstrap fetch and keeps the UI stable until `/api/auth/` succeeds again.
+- `WorkspaceShell` is the only component that interprets these phases, so every route/tab inherits the same overlays with zero duplicated logic.
 
 ### Desktop Runtime + Sidecar Notes
 
