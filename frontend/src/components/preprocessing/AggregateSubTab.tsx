@@ -269,9 +269,7 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = ({
       return '""';
     }
     const trimmed = rawValue.trim();
-    if (!trimmed.length) {
-      return '""';
-    }
+    // Allow whitespace-only strings to be treated as literals (fall through to default quoting)
     if (
       (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
       (trimmed.startsWith("'") && trimmed.endsWith("'"))
@@ -447,7 +445,8 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = ({
       return;
     }
     if (commit) {
-      const nextValue = customDraft.trim().length ? customDraft : '';
+      // Allow spaces or empty strings if user desires (e.g. for separators)
+      const nextValue = customDraft;
       applyBasicTokenUpdate((prev) => prev.map((token) => {
         if (token.id === editingTokenId && token.kind === 'custom') {
           if (token.value === nextValue) {
