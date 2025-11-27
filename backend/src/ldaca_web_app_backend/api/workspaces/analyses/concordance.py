@@ -1390,16 +1390,32 @@ async def detach_concordance(
                 detail=f"Column '{request.column}' not found. Available columns: {available_columns}",
             )
         if hasattr(node.data, "text"):
-            concordance_result = node.data.text.concordance(
-                column=request.column,
-                search_word=request.search_word,
-                num_left_tokens=request.num_left_tokens,
-                num_right_tokens=request.num_right_tokens,
-                regex=request.regex,
-                case_sensitive=request.case_sensitive,
-                explode=True,
-                unnest=True,
+            cache_key = _concordance_cache_key(
+                user_id,
+                workspace_id,
+                node_id,
+                request.column,
+                request.search_word,
+                request.num_left_tokens,
+                request.num_right_tokens,
+                request.regex,
+                request.case_sensitive,
             )
+            concordance_result = _get_cached_concordance_df(cache_key)
+
+            if concordance_result is None:
+                concordance_result = node.data.text.concordance(
+                    column=request.column,
+                    search_word=request.search_word,
+                    num_left_tokens=request.num_left_tokens,
+                    num_right_tokens=request.num_right_tokens,
+                    regex=request.regex,
+                    case_sensitive=request.case_sensitive,
+                    explode=True,
+                    unnest=True,
+                )
+                _store_concordance_df(cache_key, concordance_result)
+
             if "document_idx" not in concordance_result.columns:
                 concordance_with_idx = concordance_result.with_row_index("document_idx")
             else:
