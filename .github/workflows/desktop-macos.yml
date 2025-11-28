@@ -20,6 +20,14 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        
+      - name: Fetch docframe dependency
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          if [ ! -d ../docframe ]; then
+            git clone --depth 1 https://github.com/Australian-Text-Analytics-Platform/docframe.git ../docframe
+          fi
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
