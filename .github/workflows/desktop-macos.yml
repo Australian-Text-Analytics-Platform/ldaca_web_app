@@ -83,7 +83,7 @@ jobs:
         working-directory: backend
         run: |
           set -Eeuo pipefail
-          uv run python scripts/package_backend_runtime.py --clean
+          uv run  --python 3.12 python scripts/package_backend_runtime.py --clean
 
       - name: Install frontend dependencies
         shell: bash
