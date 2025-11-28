@@ -312,6 +312,140 @@ def topic_modeling_task(
         raise
 
 
+def _materialize_to_polars_df(obj):
+    import polars as pl
+
+    if isinstance(obj, pl.LazyFrame):
+        obj = obj.collect()
+
+    # DocFrame objects expose to_lazyframe()/to_polars() helpers
+    if hasattr(obj, "to_lazyframe"):
+        obj = obj.to_lazyframe().collect()
+    elif hasattr(obj, "to_polars"):
+        obj = obj.to_polars()
+
+    if hasattr(obj, "_df"):
+        obj = obj._df
+
+    if not isinstance(obj, pl.DataFrame):
+        try:
+            obj = pl.DataFrame(obj)
+        except Exception as exc:
+            raise ValueError(
+                f"Unable to coerce concordance result into Polars DataFrame: {exc}"
+            )
+    return obj
+
+
+def concordance_task(
+    user_id: str,
+    workspace_id: str,
+    node_ids: list[str],
+    node_columns: Dict[str, str],
+    search_word: str,
+    num_left_tokens: int = 5,
+    num_right_tokens: int = 5,
+    regex: bool = False,
+    case_sensitive: bool = False,
+    progress_callback: Optional[callable] = None,
+) -> Dict[str, Any]:
+    """
+    Execute concordance analysis in a worker process.
+
+    Args:
+        user_id: User ID
+        workspace_id: Workspace ID
+        node_ids: List of node IDs to analyze
+        node_columns: Mapping of node_id -> column_name
+        search_word: The word or pattern to search for
+        num_left_tokens: Number of tokens to the left
+        num_right_tokens: Number of tokens to the right
+        regex: Whether search_word is a regex
+        case_sensitive: Whether search is case sensitive
+        progress_callback: Optional callback for progress updates
+
+    Returns:
+        Dictionary containing concordance results (DataFrames)
+    """
+    _configure_worker_environment()
+
+    try:
+        from ldaca_web_app_backend.core.workspace import workspace_manager
+
+        print(
+            f"[Worker {os.getpid()}] Starting concordance task for workspace {workspace_id}"
+        )
+
+        if progress_callback:
+            progress_callback(0.1, "Initializing workspace...")
+
+        workspace = workspace_manager.get_workspace(user_id, workspace_id)
+        if not workspace:
+            success = workspace_manager.set_current_workspace(user_id, workspace_id)
+            if success:
+                workspace = workspace_manager.get_workspace(user_id, workspace_id)
+
+        if not workspace:
+            raise ValueError(
+                f"Workspace {workspace_id} not found (worker process cannot access workspace)"
+            )
+
+        if progress_callback:
+            progress_callback(0.2, "Loading node data...")
+
+        results = {}
+
+        for i, node_id in enumerate(node_ids):
+            node = workspace_manager.get_node_from_workspace(
+                user_id, workspace_id, node_id
+            )
+            if not node:
+                raise ValueError(f"Node {node_id} not found")
+
+            node_data = getattr(node, "data", node)
+            column_name = node_columns.get(node_id)
+
+            if not column_name:
+                raise ValueError(f"No column specified for node {node_id}")
+
+            if not hasattr(node_data, "text"):
+                raise ValueError(f"Node {node_id} does not support text operations")
+
+            if progress_callback:
+                progress_callback(
+                    0.2 + 0.3 * (i + 1) / len(node_ids), f"Processing {node_id}..."
+                )
+
+            concordance_df = node_data.text.concordance(
+                column=column_name,
+                search_word=search_word,
+                num_left_tokens=num_left_tokens,
+                num_right_tokens=num_right_tokens,
+                regex=regex,
+                case_sensitive=case_sensitive,
+                explode=True,
+                unnest=True,
+            )
+            concordance_df = _materialize_to_polars_df(concordance_df)
+
+            results[node_id] = {
+                "rows": concordance_df.to_dicts(),
+                "columns": list(concordance_df.columns),
+            }
+
+        if progress_callback:
+            progress_callback(1.0, "Completed successfully")
+
+        print(f"[Worker {os.getpid()}] Concordance completed successfully")
+        return {"node_results": results}
+
+    except Exception as e:
+        print(f"[Worker {os.getpid()}] Concordance failed: {str(e)}")
+        if progress_callback:
+            progress_callback(-1, f"Failed: {str(e)}")
+        raise
+
+
 class WorkerPool:
     """Manages the ProcessPoolExecutor for background tasks."""
 
@@ -438,4 +572,10 @@ worker_pool = WorkerPool()
 def get_worker_pool() -> WorkerPool:
     """Get the global worker pool instance."""
     return worker_pool
-    return worker_pool
+
+
+# Task Registry for generic task submission
+TASK_REGISTRY = {
+    "topic_modeling": topic_modeling_task,
+    "concordance": concordance_task,
+}

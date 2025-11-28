@@ -15,6 +15,7 @@ from typing import Dict
 
 from fastapi import APIRouter, Depends, HTTPException
 
+from ....core.analysis_admin import clear_analyses_and_cache
 from ....core.auth import get_current_user
 from ....core.json_utils import json_sanitize
 from ....core.workspace import workspace_manager
@@ -98,15 +99,11 @@ async def clear_topic_modeling_results(
 ):
     """Clear persisted topic modeling analyses for the workspace."""
     user_id = current_user["id"]
-    try:
-        from ldaca_web_app_backend.core.analysis_store import clear_analyses
-    except Exception as e:  # pragma: no cover
-        raise HTTPException(status_code=500, detail=f"analysis_store unavailable: {e}")
 
-    removed = await asyncio.to_thread(
-        clear_analyses, user_id, workspace_id, "topic_modeling"
+    summary = await clear_analyses_and_cache(
+        user_id, workspace_id, task="topic_modeling"
     )
-    return {"state": "successful", "cleared": {"analyses_removed": removed}}
+    return {"state": "successful", "cleared": summary}
 
 
 @router.post(
@@ -209,13 +206,16 @@ async def run_topic_modeling(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Validation error: {e}")
     try:
-        task_info = await tm.submit_topic_modeling(
+        task_info = await tm.submit_task(
             user_id=user_id,
             workspace_id=workspace_id,
-            node_ids=request.node_ids,
-            node_columns=validated_columns,
-            min_topic_size=request.min_topic_size or 5,
-            use_ctfidf=bool(request.use_ctfidf),
+            task_type="topic_modeling",
+            task_args={
+                "node_ids": request.node_ids,
+                "node_columns": validated_columns,
+                "min_topic_size": request.min_topic_size or 5,
+                "use_ctfidf": bool(request.use_ctfidf),
+            },
         )
         try:  # persist request
             from ldaca_web_app_backend.core.analysis_store import save_analysis

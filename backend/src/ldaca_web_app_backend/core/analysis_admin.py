@@ -14,12 +14,18 @@ concordance router imports these helpers.
 
 from __future__ import annotations
 
+import asyncio
+import logging
 from typing import Optional
 
 from . import analysis_store
+from .workspace import workspace_manager
 
 # Type alias for clarity
 ClearedSummary = dict
+
+
+logger = logging.getLogger(__name__)
 
 
 def clear_concordance_cache_for(user_id: str, workspace_id: str) -> int:
@@ -40,26 +46,35 @@ def clear_concordance_cache_for(user_id: str, workspace_id: str) -> int:
     return len(to_remove)
 
 
-def clear_analyses_and_cache(
+async def clear_analyses_and_cache(
     user_id: str, workspace_id: str, task: Optional[str]
 ) -> ClearedSummary:
     """Clear persisted analyses (optionally filtered by task), concordance cache,
-    and task manager records (topic modeling) mirroring previous endpoint semantics.
+    and task manager records. Task clearing is routed through ProcessTaskManager
+    so callers can keep SSE task lists in sync with backend state.
     """
-    removed = analysis_store.clear_analyses(user_id, workspace_id, task)
+
+    removed = await asyncio.to_thread(
+        analysis_store.clear_analyses, user_id, workspace_id, task
+    )
 
     cache_removed = 0
     if task is None or task in {"concordance", "multi_concordance"}:
         cache_removed = clear_concordance_cache_for(user_id, workspace_id)
 
     tasks_removed = 0
-    if task is None or task in {"topic_modeling"}:
-        from .workspace import workspace_manager
-
+    try:
         tm = workspace_manager.get_task_manager(user_id, workspace_id)
-        # task argument here intentionally passed through (will clear all if None)
-        tasks_removed = tm.clear_tasks(
+        tasks_removed = await tm.clear_tasks(
             task_type=task, user_id=user_id, workspace_id=workspace_id
+        )
+    except Exception as exc:  # pragma: no cover - defensive logging only
+        logger.warning(
+            "Failed to clear tasks for user=%s workspace=%s task=%s: %s",
+            user_id,
+            workspace_id,
+            task,
+            exc,
         )
 
     return {

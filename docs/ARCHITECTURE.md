@@ -886,6 +886,8 @@ This section provides comprehensive documentation of every backend file and its 
 - `_configure_worker_environment()`: Sets up threading env vars
 - `topic_modeling_task(...)`: Runs BERTopic analysis
   - **Steps**: Load workspace → Concatenate docs → BERTopic fit_transform → Extract topics → Return results
+- `concordance_task(...)`: Runs concordance analysis
+  - **Steps**: Load workspace → Run concordance on each node → Return results (DataFrames)
 - `_load_workspace_and_nodes(user_id, workspace_id, node_ids)`: Helper to load data in worker process
 - `_prepare_documents(nodes, node_columns)`: Concatenates documents from multiple nodes
 
@@ -1110,16 +1112,31 @@ result = lazy_frame.with_columns(expr.alias('A + Total Count'))
 
 **Endpoints**:
 - `POST /{workspace_id}/concordance`: Run concordance search
-  - **Implementation**: Calls `pl.col(column).text.concordance(search_term, ...)`, saves to analysis_store
+  - **Implementation**: Submits async task to `ProcessTaskManager`, returns task ID
 - `GET /{workspace_id}/concordance/current-request`: Get last concordance request
-- `GET /{workspace_id}/concordance/current-result`: Get last concordance result
-- `POST /{workspace_id}/concordance/current-result`: Get filtered concordance result
-- `DELETE /{workspace_id}/concordance`: Clear concordance results
+- `GET /{workspace_id}/concordance/current-result`: Get last concordance result (paginated)
+- `POST /{workspace_id}/concordance/current-result`: Get filtered/paginated concordance result
+- `POST /{workspace_id}/concordance/clear`: Clear concordance results, cached frames, and associated task manager entries
+
+The clear endpoint delegates to `clear_analyses_and_cache()` which removes the stored analysis payloads, prunes the shared concordance cache, **and calls `ProcessTaskManager.clear_tasks(task_type="concordance")`** for the current user/workspace. The JSON response includes
+
+```json
+{
+  "state": "successful",
+  "cleared": {
+    "analyses_removed": <int>,
+    "concordance_cache_removed": <int>,
+    "tasks_removed": <int>
+  }
+}
+```
+
+allowing the frontend task sidebar to immediately drop any lingering concordance rows when the user clicks “Clear Results”.
 
 **Helper Functions**:
 - `_normalize_saved_request(request, result)`: Normalizes stored request for frontend
 - `_normalize_saved_result(result, request)`: Normalizes stored result
-- `_apply_result_filters(matches, query)`: Filters concordance matches
+- `_process_dataframe_result(result, request)`: Paginates task result DataFrames
 
 ##### `sequential_analysis.py` - Sequential Analysis
 
@@ -1161,7 +1178,9 @@ result = lazy_frame.with_columns(expr.alias('A + Total Count'))
     4. Client polls task status or subscribes to SSE stream
 - `GET /{workspace_id}/topic-modeling/current-request`: Get last request
 - `GET /{workspace_id}/topic-modeling/current-result`: Get last result
-- `DELETE /{workspace_id}/topic-modeling`: Clear results
+- `POST /{workspace_id}/topic-modeling/clear`: Clear results and purge `topic_modeling` tasks from ProcessTaskManager
+
+Like concordance, the clear endpoint returns a `cleared` summary with `analyses_removed` and `tasks_removed` counts so the frontend can synchronise its task list immediately after the user clears results.
 
 **Helper Functions**:
 - `_prepare_topic_modeling_params(request)`: Validates and prepares parameters

@@ -18,6 +18,8 @@ import { Checkbox } from '../ui/checkbox';
 import { AlertTriangle, Loader2, Play, Trash2 } from 'lucide-react';
 import { applySelectedColumnsToSnapshots } from '../../hooks/useSchemaManagement';
 import AnalysisLockedNotice from './AnalysisLockedNotice';
+import AnalysisTaskBanner from './AnalysisTaskBanner';
+import { useAnalysisTaskStatus } from '../../hooks/useAnalysisTaskStatus';
 // Define local lightweight response/topic interfaces if not exported (legacy code referenced these)
 interface TopicModelingTopic { id: number; label: string; size: number[]; total_size: number; x: number; y: number; }
 interface TopicModelingResponse { state?: 'running' | 'successful' | 'failed' | 'cancelled'; message?: string; data?: { topics: TopicModelingTopic[]; corpus_sizes?: number[] }; metadata?: { task_id?: string; [k: string]: any } }
@@ -52,11 +54,20 @@ const TopicModelingTab: React.FC = () => {
   const { selectedNodes } = useWorkspaceSelection();
   const { currentWorkspaceId, getNodeShape } = useWorkspaceData();
   const { getAuthHeaders } = useAuth();
-  const tasks = useAnalysisStore((state: any) => state.tasks);
   const topicModelingReadyTaskId = useAnalysisStore((state: any) => state.topicModelingReadyTaskId);
   const topicModelingReadyTimestamp = useAnalysisStore((state: any) => state.topicModelingReadyTimestamp);
   const resetTopicModelingReady = useAnalysisStore((state: any) => state.resetTopicModelingReady);
+  const setTasks = useAnalysisStore((state: any) => state.setTasks);
   const [isRunning, setIsRunning] = useState(false);
+  const {
+    tasks: topicModelingTasks,
+    bannerStatus: topicBannerStatus,
+    bannerTaskId: topicBannerTaskId,
+    bannerMessage: topicBannerMessage,
+    runningTask: topicRunningTask,
+    successfulTask: topicSuccessfulTask,
+    failedTask: topicFailedTask,
+  } = useAnalysisTaskStatus('topic_modeling');
   const {
     isLocked,
     setIsLocked,
@@ -103,6 +114,23 @@ const TopicModelingTab: React.FC = () => {
   const chartRef = useRef<HTMLDivElement | null>(null); // chart area
   const [chartWidth, setChartWidth] = useState<number>(800);
   const lastFetchedRef = useRef<{ taskId: string | null; state: 'successful' | 'failed' | null }>({ taskId: null, state: null });
+  const topicWaitingBanner = useMemo(() => {
+    if (topicBannerStatus) {
+      return {
+        status: topicBannerStatus,
+        taskId: topicBannerTaskId,
+        message: topicBannerMessage?.trim() || undefined,
+      } as const;
+    }
+    if (result?.state === 'running') {
+      return {
+        status: 'running' as const,
+        taskId: (result as any)?.metadata?.task_id ?? topicRunningTask?.task_id ?? null,
+        message: undefined,
+      } as const;
+    }
+    return null;
+  }, [topicBannerStatus, topicBannerTaskId, topicBannerMessage, result, topicRunningTask]);
 
   useEffect(() => {
     lastFetchedRef.current = { taskId: null, state: null };
@@ -487,7 +515,7 @@ const TopicModelingTab: React.FC = () => {
 
   // React to task state changes for running state management
   useEffect(() => {
-    if (!tasks || !tasks.length) {
+    if (!topicModelingTasks.length) {
       if (runningRef.current) {
         setIsRunning(false);
         runningRef.current = false;
@@ -495,42 +523,36 @@ const TopicModelingTab: React.FC = () => {
       return;
     }
 
-    const tmTasks = tasks.filter((t: any) => t.task_type === 'topic_modeling');
-    if (!tmTasks.length) {
-      if (runningRef.current) {
-        setIsRunning(false);
-        runningRef.current = false;
-      }
-      return;
-    }
-
-    const hasRunningTM = tmTasks.some((t: any) => t.state === 'running');
-    const failedTask = tmTasks.find((t: any) => t.state === 'failed');
-    const successfulTask = tmTasks.find((t: any) => t.state === 'successful' && t.result_persisted);
-
-    if (hasRunningTM) {
+    if (topicRunningTask) {
       setIsLocked(true);
       setIsRunning(true);
       runningRef.current = true;
-    } else if (!failedTask) {
+    } else if (!topicFailedTask) {
       if (runningRef.current) {
         setIsRunning(false);
         runningRef.current = false;
       }
     }
 
-    if (successfulTask?.task_id) {
+    if (topicSuccessfulTask?.task_id) {
       setIsLocked(true);
       setIsRunning(false);
       runningRef.current = false;
-      void fetchTopicModelingResult(successfulTask.task_id, 'successful');
-    } else if (failedTask?.task_id) {
+      void fetchTopicModelingResult(topicSuccessfulTask.task_id, 'successful');
+    } else if (topicFailedTask?.task_id) {
       setIsLocked(true);
       setIsRunning(false);
       runningRef.current = false;
-      void fetchTopicModelingResult(failedTask.task_id, 'failed');
+      void fetchTopicModelingResult(topicFailedTask.task_id, 'failed');
     }
-  }, [tasks, fetchTopicModelingResult, setIsLocked]);
+  }, [
+    topicModelingTasks,
+    topicRunningTask,
+    topicSuccessfulTask,
+    topicFailedTask,
+    fetchTopicModelingResult,
+    setIsLocked,
+  ]);
 
   // React to explicit ready markers from task stream (covers persisted results without state change yet)
   useEffect(() => {
@@ -646,6 +668,11 @@ const TopicModelingTab: React.FC = () => {
                         /* ignore cancellation errors */
                       }
                       try {
+                        await workspacesApi.clearTasks(currentWorkspaceId, { task_type: 'topic_modeling' }, getAuthHeaders());
+                      } catch {
+                        /* ignore task clearing errors */
+                      }
+                      try {
                         await textApi.clearTopicModeling(currentWorkspaceId, getAuthHeaders());
                       } catch {
                         /* ignore clear errors */
@@ -661,6 +688,11 @@ const TopicModelingTab: React.FC = () => {
                       lastFetchedRef.current = { taskId: null, state: null };
                       setNodeColumnSelections([], { replace: true, persist: false });
                       recomputeAutoColumns();
+                      setTasks((prev: any[]) =>
+                        Array.isArray(prev)
+                          ? prev.filter((task) => task?.task_type !== 'topic_modeling')
+                          : prev
+                      );
                     }
                   }}
                   disabled={isClearing || !currentWorkspaceId}
@@ -692,19 +724,15 @@ const TopicModelingTab: React.FC = () => {
           </CardContent>
         </Card>
 
-        {result && result.state === 'running' && (
-          <Card className="border border-amber-200 bg-amber-50/80 shadow-sm">
-            <CardContent className="flex items-center gap-3 py-4 text-sm text-amber-900">
-              <div className="flex h-6 w-6 items-center justify-center rounded-full border border-amber-300 bg-white/70">
-                <Loader2 className="h-4 w-4 animate-spin" />
-              </div>
-              <p className="leading-tight">
-                Topic modeling task started and is running in the background
-                {result?.metadata?.task_id ? ` (task ${result.metadata.task_id})` : ''}. See Tasks list for progress.
-              </p>
-            </CardContent>
-          </Card>
-        )}
+          {topicWaitingBanner && (
+            <AnalysisTaskBanner
+              analysisName="Topic Modeling"
+              status={topicWaitingBanner.status}
+              taskId={topicWaitingBanner.taskId}
+              message={topicWaitingBanner.message}
+              className="mt-4"
+            />
+          )}
 
         {result && result.state === 'successful' && (
           <Card ref={containerRef}>

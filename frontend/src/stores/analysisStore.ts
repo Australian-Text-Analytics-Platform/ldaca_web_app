@@ -90,7 +90,7 @@ interface TopicModelingLockState {
   }
 }
 
-interface TaskItem { 
+export interface TaskItem { 
   task_id: string; 
   task_type: string; 
   state?: 'running' | 'successful' | 'failed' | 'cancelled';

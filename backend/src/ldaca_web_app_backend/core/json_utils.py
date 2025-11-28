@@ -9,16 +9,16 @@ serialization failures.
 
 def json_sanitize(obj):
     """Recursively sanitize an object for JSON serialization.
-    
+
     This function handles:
     - Numpy scalar types -> Python scalars
     - Non-string dict keys -> string dict keys
     - Nested collections (lists, tuples, sets, dicts)
     - Pydantic-like models with model_dump() or dict() methods
-    
+
     Args:
         obj: The object to sanitize
-        
+
     Returns:
         A JSON-serializable version of the object
     """

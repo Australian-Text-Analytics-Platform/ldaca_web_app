@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from .worker import get_worker_pool, topic_modeling_task
+from .worker import TASK_REGISTRY, get_worker_pool
 
 logger = logging.getLogger(__name__)
 
@@ -232,12 +232,13 @@ class ProcessTaskManager:
 
             if (
                 task_info.status == TaskStatus.SUCCESSFUL
-                and task_info.metadata.get("task_type") == "topic_modeling"
+                and task_info.metadata.get("task_type") in TASK_REGISTRY
             ):
+                task_type = task_info.metadata.get("task_type")
                 try:
                     # Save the analysis result
-                    await self._save_topic_modeling_result(
-                        user_id, workspace_id, task_info, result
+                    await self._save_analysis_result(
+                        user_id, workspace_id, task_type, task_info, result
                     )
                     result_persisted = True
 
@@ -247,14 +248,14 @@ class ProcessTaskManager:
                         workspace_id,
                         {
                             "type": "analysis_saved",
-                            "task_type": "topic_modeling",
+                            "task_type": task_type,
                             "task_id": task_info.id,
                             "timestamp": time.time(),
                         },
                     )
                 except Exception as save_error:
                     logger.error(
-                        f"Failed to save topic modeling result for task {task_info.id}: {save_error}"
+                        f"Failed to save {task_type} result for task {task_info.id}: {save_error}"
                     )
 
                     # Emit analysis save failure event
@@ -263,7 +264,7 @@ class ProcessTaskManager:
                         workspace_id,
                         {
                             "type": "analysis_save_failed",
-                            "task_type": "topic_modeling",
+                            "task_type": task_type,
                             "task_id": task_info.id,
                             "message": f"Failed to save result: {str(save_error)}",
                             "timestamp": time.time(),
@@ -298,10 +299,15 @@ class ProcessTaskManager:
                 },
             )
 
-    async def _save_topic_modeling_result(
-        self, user_id: str, workspace_id: str, task_info: TaskInfo, result: Any
+    async def _save_analysis_result(
+        self,
+        user_id: str,
+        workspace_id: str,
+        task_type: str,
+        task_info: TaskInfo,
+        result: Any,
     ):
-        """Save topic modeling result to analysis store."""
+        """Save analysis result to analysis store."""
         try:
             from ldaca_web_app_backend.core.analysis_store import (
                 get_latest_analysis,
@@ -310,13 +316,13 @@ class ProcessTaskManager:
 
             # Get the original request to preserve it
             existing = await asyncio.to_thread(
-                get_latest_analysis, user_id, workspace_id, "topic_modeling"
+                get_latest_analysis, user_id, workspace_id, task_type
             )
             req_dict = existing.request if existing else {}
 
             result_payload = {
                 "status": "successful",
-                "message": "Topic modeling completed successfully",
+                "message": f"{task_type} completed successfully",
                 "data": result,
             }
 
@@ -325,31 +331,34 @@ class ProcessTaskManager:
                 save_analysis,
                 user_id,
                 workspace_id,
-                "topic_modeling",
+                task_type,
                 req_dict,
                 result_payload,
             )
 
-            logger.info(f"Topic modeling result saved for task {task_info.id}")
+            logger.info(f"{task_type} result saved for task {task_info.id}")
 
         except Exception as e:
             logger.error(
-                f"Failed to save topic modeling result for task {task_info.id}: {e}"
+                f"Failed to save {task_type} result for task {task_info.id}: {e}"
             )
             raise  # Re-raise to mark task as failed
 
-    async def submit_topic_modeling(
+    async def submit_task(
         self,
         user_id: str,
         workspace_id: str,
-        node_ids: List[str],
-        node_columns: Dict[str, str],
-        min_topic_size: int = 5,
-        use_ctfidf: bool = False,
-        task_name: str = "Topic Modeling",
+        task_type: str,
+        task_args: Dict[str, Any],
+        task_name: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> TaskInfo:
-        """Submit a topic modeling task to the process pool."""
+        """Submit a task to the process pool."""
+
+        if task_type not in TASK_REGISTRY:
+            raise ValueError(f"Unknown task type: {task_type}")
+
+        task_func = TASK_REGISTRY[task_type]
 
         # Create task ID for progress tracking
         task_id = str(uuid.uuid4())
@@ -361,13 +370,10 @@ class ProcessTaskManager:
             worker_pool.start()
 
         future = worker_pool.submit_task(
-            topic_modeling_task,
+            task_func,
             user_id=user_id,
             workspace_id=workspace_id,
-            node_ids=node_ids,
-            node_columns=node_columns,
-            min_topic_size=min_topic_size,
-            use_ctfidf=use_ctfidf,
+            **task_args,
             progress_callback=None,  # Remove progress callback for now
         )
 
@@ -377,8 +383,8 @@ class ProcessTaskManager:
             status=TaskStatus.RUNNING,
             started_at=time.time(),
             metadata={
-                "task_type": "topic_modeling",
-                "name": task_name,
+                "task_type": task_type,
+                "name": task_name or task_type,
                 "user_id": user_id,
                 "workspace_id": workspace_id,
                 **(metadata or {}),

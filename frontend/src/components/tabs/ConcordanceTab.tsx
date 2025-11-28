@@ -9,6 +9,7 @@ import { useWorkspaceActions } from '../../hooks/useWorkspaceActions';
 import { useAuth } from '../../hooks/useAuth';
 import { ConcordanceAnalysisRequest, ConcordanceAnalysisResponse, textApi } from '../../api/text';
 import { httpRequest } from '../../api/http';
+import { workspacesApi } from '../../api/workspaces';
 import { getNodeInfo } from '../../lib/nodeInfoCache';
 import { useAnalysisStore } from '../../stores/analysisStore';
 import { useAnalysisLockState } from '../../hooks/useAnalysisLockState';
@@ -26,6 +27,8 @@ import {
 } from '../ui/table';
 import { applySelectedColumnsToSnapshots } from '../../hooks/useSchemaManagement';
 import AnalysisLockedNotice from './AnalysisLockedNotice';
+import AnalysisTaskBanner from './AnalysisTaskBanner';
+import { useAnalysisTaskStatus } from '../../hooks/useAnalysisTaskStatus';
 
 const ConcordanceTab: React.FC = () => {
   // Anchor ref for results container to stabilize scroll on view mode toggle
@@ -43,6 +46,7 @@ const ConcordanceTab: React.FC = () => {
   const { getAuthHeaders } = useAuth();
   const pendingConcordance = useAnalysisStore((state) => state.pendingConcordance);
   const clearPendingConcordance = useAnalysisStore((state) => state.clearPendingConcordance);
+  const setTasks = useAnalysisStore((state) => state.setTasks);
 
   const {
     isLocked,
@@ -184,10 +188,72 @@ const ConcordanceTab: React.FC = () => {
   
   // State for auto-triggering search from TokenFrequencyTab
   const [shouldAutoSearch, setShouldAutoSearch] = useState(false);
+  const [activeConcordanceTaskId, setActiveConcordanceTaskId] = useState<string | null>(null);
+  const pollTimerRef = useRef<number | null>(null);
+  const lastFetchedTaskRef = useRef<{ taskId: string | null; state: 'successful' | 'failed' | null }>({ taskId: null, state: null });
+  const {
+    tasks: concordanceTasks,
+    bannerStatus: concordanceBannerStatus,
+    bannerTaskId: concordanceBannerTaskId,
+    bannerMessage: concordanceBannerMessage,
+    terminalTask: concordanceTerminalTask,
+    activeTaskId: storeActiveConcordanceTaskId,
+  } = useAnalysisTaskStatus('concordance');
+  const effectiveActiveConcordanceTaskId = activeConcordanceTaskId ?? storeActiveConcordanceTaskId ?? null;
 
   const effectiveNodeColumnSelections = useMemo(() => (
     isLocked ? activeNodeColumnSelections : nodeColumnSelections
   ), [isLocked, activeNodeColumnSelections, nodeColumnSelections]);
+
+  const refreshCurrentConcordanceResult = useCallback(async () => {
+    if (!currentWorkspaceId) {
+      return null;
+    }
+
+    try {
+      const headers = getAuthHeaders();
+      const response = await httpRequest<ConcordanceAnalysisResponse>(
+        `/workspaces/${currentWorkspaceId}/concordance/current-result`,
+        { method: 'GET', headers }
+      );
+      const typedResponse = response as ConcordanceAnalysisResponse | null;
+      if (typedResponse) {
+        setResults(typedResponse);
+      }
+      return typedResponse;
+    } catch (error) {
+      console.error('Failed to refresh concordance results automatically', error);
+      return null;
+    }
+  }, [currentWorkspaceId, getAuthHeaders, setResults]);
+
+  const concordanceWaitingBanner = useMemo(() => {
+    const trimmedMessage = concordanceBannerMessage?.trim() || undefined;
+    if (concordanceBannerStatus) {
+      return {
+        status: concordanceBannerStatus,
+        taskId: concordanceBannerTaskId,
+        message: trimmedMessage,
+      } as const;
+    }
+    if (results?.state === 'running') {
+      return {
+        status: 'running' as const,
+        taskId:
+          concordanceBannerTaskId ??
+          (results as any)?.metadata?.task_id ??
+          effectiveActiveConcordanceTaskId,
+        message: trimmedMessage,
+      } as const;
+    }
+    return null;
+  }, [
+    concordanceBannerStatus,
+    concordanceBannerTaskId,
+    concordanceBannerMessage,
+    results,
+    effectiveActiveConcordanceTaskId,
+  ]);
 
   // Debug results changes
   useEffect(() => {
@@ -251,6 +317,48 @@ const ConcordanceTab: React.FC = () => {
     }
     prevSelectedNodeIdsRef.current = curr;
   }, [selectedNodeIds, isLocked]);
+
+  useEffect(() => {
+    if (!currentWorkspaceId) {
+      setActiveConcordanceTaskId(null);
+      lastFetchedTaskRef.current = { taskId: null, state: null };
+      return;
+    }
+
+    if (!concordanceTasks.length) {
+      setActiveConcordanceTaskId(null);
+    }
+
+    const terminalTask = concordanceTerminalTask;
+    if (terminalTask?.task_id) {
+      const terminalState: 'successful' | 'failed' =
+        terminalTask.state === 'successful' ? 'successful' : 'failed';
+      const prev = lastFetchedTaskRef.current;
+      if (prev.taskId !== terminalTask.task_id || prev.state !== terminalState) {
+        lastFetchedTaskRef.current = { taskId: terminalTask.task_id, state: terminalState };
+        void (async () => {
+          const refreshed = await refreshCurrentConcordanceResult();
+          if (!refreshed && terminalState === 'failed') {
+            setResults({
+              state: 'failed',
+              message: terminalTask.message || 'Concordance analysis failed',
+              data: {},
+            } as ConcordanceAnalysisResponse);
+          }
+        })();
+      }
+
+      setActiveConcordanceTaskId((prev) =>
+        prev && terminalTask.task_id && prev === terminalTask.task_id ? null : prev
+      );
+    }
+  }, [
+    concordanceTasks,
+    concordanceTerminalTask,
+    currentWorkspaceId,
+    refreshCurrentConcordanceResult,
+    setResults,
+  ]);
 
   // React to pending concordance handoff from TokenFrequencyTab
   useEffect(() => {
@@ -326,6 +434,36 @@ const ConcordanceTab: React.FC = () => {
       }
     };
   }, [pendingConcordance, selectedNodes, setNodeColumnSelections, clearPendingConcordance, selectNodes]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const clearTimer = () => {
+      if (pollTimerRef.current !== null) {
+        window.clearInterval(pollTimerRef.current);
+        pollTimerRef.current = null;
+      }
+    };
+
+    if (!effectiveActiveConcordanceTaskId || !currentWorkspaceId) {
+      clearTimer();
+      return;
+    }
+
+    if (pollTimerRef.current !== null) {
+      return;
+    }
+
+    pollTimerRef.current = window.setInterval(() => {
+      void refreshCurrentConcordanceResult();
+    }, 5000);
+
+    return () => {
+      clearTimer();
+    };
+  }, [effectiveActiveConcordanceTaskId, currentWorkspaceId, refreshCurrentConcordanceResult]);
 
   // Recompute auto columns if unlocked and selections empty but nodes exist
   useEffect(() => {
@@ -484,11 +622,16 @@ const ConcordanceTab: React.FC = () => {
           request.sort_by = requestedSortBy;
         }
 
+        lastFetchedTaskRef.current = { taskId: null, state: null };
         response = await textApi.concordance(currentWorkspaceId, request, authHeaders);
         if (localStorage.getItem('debugConc') === '1') {
           console.debug('Multi-Node Concordance Response:', response);
         }
         setResults(response);
+        const responseTaskId = (response as any)?.metadata?.task_id;
+        if (typeof responseTaskId === 'string' && responseTaskId.trim().length > 0) {
+          setActiveConcordanceTaskId(responseTaskId);
+        }
 
         try {
           const snaps: Array<{ id: string; name: string; columns: string[] }> = [];
@@ -627,13 +770,35 @@ const ConcordanceTab: React.FC = () => {
   }, [currentWorkspaceId, getAuthHeaders, setNodeColumnSelections, lockWithSnapshots, setViewMode]);
 
   const handleClearResults = async () => {
-    try {
-      if (currentWorkspaceId) {
-  await textApi.clearConcordance(currentWorkspaceId, getAuthHeaders());
+    if (currentWorkspaceId) {
+      const headers = getAuthHeaders();
+      try {
+        await workspacesApi.cancelTasks(
+          currentWorkspaceId,
+          { task_type: 'concordance' },
+          headers,
+        );
+      } catch (error) {
+        console.warn('Failed to cancel concordance tasks before clearing', error);
       }
-    } catch (e) {
-      console.error('Failed to clear backend analyses/cache:', e);
+      try {
+        await workspacesApi.clearTasks(
+          currentWorkspaceId,
+          { task_type: 'concordance' },
+          headers,
+        );
+      } catch (error) {
+        console.warn('Failed to clear concordance tasks from task manager', error);
+      }
+      try {
+        await textApi.clearConcordance(currentWorkspaceId, headers);
+      } catch (error) {
+        console.error('Failed to clear backend analyses/cache:', error);
+      }
     }
+    setTasks((prev) =>
+      Array.isArray(prev) ? prev.filter((task) => task?.task_type !== 'concordance') : prev
+    );
     setResults(null);
     setNodePagination({});
     setCombinedPage(1);
@@ -1492,11 +1657,20 @@ const ConcordanceTab: React.FC = () => {
         </CardFooter>
       </Card>
 
+      {concordanceWaitingBanner && (
+        <AnalysisTaskBanner
+          analysisName="Concordance"
+          status={concordanceWaitingBanner.status}
+          taskId={concordanceWaitingBanner.taskId}
+          message={concordanceWaitingBanner.message}
+          className="mt-4"
+        />
+      )}
+
       {/* Results */}
-      {results && (
+      {results?.state === 'successful' && (
         <Card ref={resultsRef}>
-          {((results as any)?.state === 'successful') ? (
-            <>
+          <>
               <CardHeader className="space-y-4">
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                   <div className="space-y-1">
@@ -1652,14 +1826,17 @@ const ConcordanceTab: React.FC = () => {
                   <div className="rounded-md border border-muted bg-muted/50 px-4 py-3 text-sm text-muted-foreground">No data available</div>
                 )}
               </CardContent>
-            </>
-          ) : (
-            <CardContent>
-              <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-                {results?.message ?? 'The search failed. Please try again.'}
-              </div>
-            </CardContent>
-          )}
+          </>
+        </Card>
+      )}
+
+      {results?.state === 'failed' && (
+        <Card>
+          <CardContent>
+            <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              {results?.message ?? 'The search failed. Please try again.'}
+            </div>
+          </CardContent>
         </Card>
       )}
 
