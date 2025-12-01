@@ -117,7 +117,12 @@ fn locate_backend_runtime(app: &AppHandle) -> Result<BackendRuntime, Box<dyn std
 
 fn detect_runtime_dir(app: &AppHandle) -> Option<PathBuf> {
     let resolver = app.path();
-    for resource in ["backend/dist-tauri/backend-runtime", "backend-runtime"] {
+    for resource in [
+        "backend/dist-tauri/backend-runtime",
+        "backend-runtime",
+        "_up_/backend/dist-tauri/backend-runtime",
+        "Resources/_up_/backend/dist-tauri/backend-runtime",
+    ] {
         if let Ok(candidate) = resolver.resolve(resource, BaseDirectory::Resource) {
             if candidate.exists() {
                 return Some(candidate);
@@ -135,6 +140,7 @@ fn detect_runtime_dir(app: &AppHandle) -> Option<PathBuf> {
         "_up_/backend/dist-tauri/backend-runtime",
         "dist-tauri/backend-runtime",
         "Resources/backend/dist-tauri/backend-runtime",
+        "Resources/_up_/backend/dist-tauri/backend-runtime",
         "backend-runtime",
     ];
 
