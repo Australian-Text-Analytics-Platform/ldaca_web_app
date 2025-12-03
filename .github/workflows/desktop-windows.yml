@@ -100,10 +100,7 @@ jobs:
           $env:UV_PYTHON_INSTALL_DIR = $installDir
           $env:UV_PYTHON = "3.12"
           $env:UV_PYTHON_PREFER_MANAGED = "1"
-          $env:UV_PYTHON_EXECUTABLE = Join-Path $installDir "python3.12.exe"
-          if (-not (Test-Path $env:UV_PYTHON_EXECUTABLE)) {
-            uv python install 3.12
-          }
+          $env:UV_LINK_MODE = "copy"
           uv run --python 3.12 python scripts/package_backend_runtime.py --clean
 
       - name: Install frontend dependencies
