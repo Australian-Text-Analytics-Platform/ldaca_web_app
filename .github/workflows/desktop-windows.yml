@@ -1,0 +1,151 @@
+name: Desktop Windows Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      build-notes:
+        description: "Optional note about this build"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    env:
+      CI: "true"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Fetch docframe dependency
+        shell: pwsh
+        run: |
+          Set-StrictMode -Version Latest
+          if (-not (Test-Path ..\docframe)) {
+            git clone --depth 1 https://github.com/Australian-Text-Analytics-Platform/docframe.git ..\docframe
+          }
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            frontend/package-lock.json
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          targets: x86_64-pc-windows-msvc
+
+      - name: Prepare cache directories
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.cargo\registry" | Out-Null
+          New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.cargo\git" | Out-Null
+          New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.rustup" | Out-Null
+          New-Item -ItemType Directory -Force -Path "$env:LOCALAPPDATA\uv" | Out-Null
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Cache rustup toolchains
+        uses: actions/cache@v4
+        with:
+          path: ~/.rustup
+          key: ${{ runner.os }}-rustup-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-rustup-
+
+      - name: Install uv CLI
+        shell: pwsh
+        run: |
+          Set-StrictMode -Version Latest
+          irm https://astral.sh/uv/install.ps1 | iex
+          "$env:USERPROFILE\.local\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Cache uv workspace
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/uv
+            ~/.local/share/uv
+          key: ${{ runner.os }}-uv-${{ hashFiles('backend/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-
+
+      - name: Package backend runtime
+        shell: pwsh
+        working-directory: backend
+        run: |
+          Set-StrictMode -Version Latest
+          uv run --python 3.12 python scripts/package_backend_runtime.py --clean
+
+      - name: Install frontend dependencies
+        shell: pwsh
+        working-directory: frontend
+        run: |
+          Set-StrictMode -Version Latest
+          npm install
+
+      - name: Build frontend
+        shell: pwsh
+        working-directory: frontend
+        run: |
+          Set-StrictMode -Version Latest
+          npm run build
+
+      - name: Install root dependencies
+        shell: pwsh
+        run: |
+          Set-StrictMode -Version Latest
+          npm install
+
+      - name: Build Tauri desktop application
+        shell: pwsh
+        run: |
+          Set-StrictMode -Version Latest
+          npm run tauri:build
+
+      - name: Gather Windows bundles
+        id: gather-bundles
+        shell: pwsh
+        run: |
+          Set-StrictMode -Version Latest
+          $bundleRoot = "src-tauri/target/release/bundle"
+          if (-not (Test-Path $bundleRoot)) {
+            Write-Error "Bundle output not found at $bundleRoot"
+          }
+          $archives = Get-ChildItem -Path $bundleRoot -Recurse -Include *.msi,*.exe,*.zip,*.msix,*.appx
+          if ($archives.Count -eq 0) {
+            Write-Error "No Windows bundle artifacts found"
+          }
+          $archiveList = $archives | ForEach-Object { $_.FullName }
+          $archiveList -join "`n" | Out-String | Write-Host
+          $archiveList -join "`n" | Out-File -FilePath bundle_paths.txt -Encoding utf8
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ldaca-desktop-windows
+          path: |
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/msi/*.msi
+            src-tauri/target/release/bundle/app/*.zip
+            src-tauri/target/release/bundle/msix/*.msix
+            src-tauri/target/release/bundle/appx/*.appx
+          if-no-files-found: warn
+          retention-days: 14
