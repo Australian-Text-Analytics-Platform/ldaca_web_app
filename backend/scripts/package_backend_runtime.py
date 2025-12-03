@@ -127,6 +127,77 @@ def copy_python_installation(source_root: Path, destination_root: Path) -> None:
     )
 
 
+def fix_macos_python_linking(python_root: Path) -> None:
+    """Fix Python dynamic library linking on macOS to be relocatable."""
+    if platform.system() != "Darwin":
+        return
+    
+    print("🔧 Fixing macOS Python dynamic library linking for relocatability")
+    
+    # Find the Python binary
+    python_bin = python_root / "bin" / "python3"
+    if not python_bin.exists():
+        print("   ⚠️  Python binary not found, skipping relinking")
+        return
+    
+    # Find the Python dynamic library
+    lib_dir = python_root / "lib"
+    dylib_candidates = list(lib_dir.glob("libpython3*.dylib"))
+    
+    if not dylib_candidates:
+        print("   ⚠️  Python dylib not found, skipping relinking")
+        return
+    
+    dylib = dylib_candidates[0]
+    print(f"   Found Python dylib: {dylib.name}")
+    
+    # Get the current install name
+    result = subprocess.run(
+        ["otool", "-L", str(python_bin)],
+        capture_output=True,
+        text=True,
+        check=True
+    )
+    
+    # Check if it references an absolute Framework path
+    framework_ref = None
+    for line in result.stdout.splitlines():
+        if "/Library/Frameworks/Python.framework" in line or "/Python.framework" in line:
+            framework_ref = line.strip().split()[0]
+            break
+    
+    if framework_ref:
+        print(f"   Changing {framework_ref}")
+        print(f"   To @executable_path/../lib/{dylib.name}")
+        
+        # Change the Python binary to use @executable_path relative reference
+        subprocess.run(
+            [
+                "install_name_tool",
+                "-change",
+                framework_ref,
+                f"@executable_path/../lib/{dylib.name}",
+                str(python_bin),
+            ],
+            check=True,
+        )
+        
+        # Also update the dylib's own install name to be relative
+        subprocess.run(
+            [
+                "install_name_tool",
+                "-id",
+                f"@rpath/{dylib.name}",
+                str(dylib),
+            ],
+            check=True,
+        )
+        
+        print("   ✅ Python linking fixed for bundle relocatability")
+    else:
+        print("   ℹ️  No absolute Framework references found, already relocatable")
+
+
 def remove_externally_managed_markers(root: Path) -> None:
     for marker in root.rglob("EXTERNALLY-MANAGED"):
         marker.unlink()
@@ -388,6 +459,7 @@ def main() -> None:
     
     runtime_python_dir = output_dir / "python"
     copy_python_installation(python_install_root, runtime_python_dir)
+    fix_macos_python_linking(runtime_python_dir)
     remove_externally_managed_markers(runtime_python_dir)
 
     python_bin = runtime_python_dir / "bin" / "python3"
