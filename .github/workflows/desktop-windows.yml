@@ -16,6 +16,8 @@ jobs:
     runs-on: windows-latest
     env:
       CI: "true"
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: "utf-8"
 
     steps:
       - name: Checkout repository
@@ -127,6 +129,7 @@ jobs:
         shell: pwsh
         run: |
           Set-StrictMode -Version Latest
+          [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
           npm run tauri:build
 
       - name: Gather Windows bundles
