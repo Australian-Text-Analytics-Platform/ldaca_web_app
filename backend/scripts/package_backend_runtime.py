@@ -347,12 +347,17 @@ def main() -> None:
     print(f"📁 Third-party lock written to {sanitized_lockfile}")
 
     print("🧰 Ensuring requested Python version via uv")
-    run(["uv", "python", "install", args.python_version])
     
     # Prefer UV_PYTHON_INSTALL_DIR if set (CI/managed environments)
     uv_install_dir = os.environ.get("UV_PYTHON_INSTALL_DIR")
     if uv_install_dir:
         uv_install_path = Path(uv_install_dir)
+        # Ensure the install directory exists
+        uv_install_path.mkdir(parents=True, exist_ok=True)
+        
+        # Install Python to the custom directory
+        run(["uv", "python", "install", args.python_version])
+        
         # Find the installed managed Python in the custom directory
         managed_candidates = sorted(uv_install_path.glob(f"cpython-{args.python_version}*"))
         if managed_candidates:
@@ -362,10 +367,12 @@ def main() -> None:
         else:
             raise RuntimeError(
                 f"UV_PYTHON_INSTALL_DIR is set to {uv_install_dir}, "
-                f"but no Python {args.python_version} installation was found there"
+                f"but no Python {args.python_version} installation was found there. "
+                f"Found directories: {list(uv_install_path.iterdir())}"
             )
     else:
         # Fallback to standard uv python find
+        run(["uv", "python", "install", args.python_version])
         find_result = run(
             ["uv", "python", "find", "--managed-python", args.python_version],
             capture_output=True,
