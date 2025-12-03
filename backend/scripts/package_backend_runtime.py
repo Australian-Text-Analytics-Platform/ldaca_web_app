@@ -348,18 +348,37 @@ def main() -> None:
 
     print("🧰 Ensuring requested Python version via uv")
     run(["uv", "python", "install", args.python_version])
-    find_result = run(
-        ["uv", "python", "find", "--managed-python", args.python_version],
-        capture_output=True,
-    )
-    base_python_bin = Path(find_result.stdout.strip().splitlines()[-1])
-    resolved_python_bin = resolve_python_bin(base_python_bin)
+    
+    # Prefer UV_PYTHON_INSTALL_DIR if set (CI/managed environments)
+    uv_install_dir = os.environ.get("UV_PYTHON_INSTALL_DIR")
+    if uv_install_dir:
+        uv_install_path = Path(uv_install_dir)
+        # Find the installed managed Python in the custom directory
+        managed_candidates = sorted(uv_install_path.glob(f"cpython-{args.python_version}*"))
+        if managed_candidates:
+            managed_root = managed_candidates[-1]
+            print(f"   Using managed Python from UV_PYTHON_INSTALL_DIR: {managed_root}")
+            python_install_root = managed_root
+        else:
+            raise RuntimeError(
+                f"UV_PYTHON_INSTALL_DIR is set to {uv_install_dir}, "
+                f"but no Python {args.python_version} installation was found there"
+            )
+    else:
+        # Fallback to standard uv python find
+        find_result = run(
+            ["uv", "python", "find", "--managed-python", args.python_version],
+            capture_output=True,
+        )
+        base_python_bin = Path(find_result.stdout.strip().splitlines()[-1])
+        resolved_python_bin = resolve_python_bin(base_python_bin)
 
-    print(f"   Base Python found at: {base_python_bin}")
-    if resolved_python_bin != base_python_bin:
-        print(f"   Resolved interpreter: {resolved_python_bin}")
+        print(f"   Base Python found at: {base_python_bin}")
+        if resolved_python_bin != base_python_bin:
+            print(f"   Resolved interpreter: {resolved_python_bin}")
 
-    python_install_root = resolved_python_bin.parent.parent
+        python_install_root = resolved_python_bin.parent.parent
+    
     runtime_python_dir = output_dir / "python"
     copy_python_installation(python_install_root, runtime_python_dir)
     remove_externally_managed_markers(runtime_python_dir)
