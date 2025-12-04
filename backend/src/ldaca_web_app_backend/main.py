@@ -90,10 +90,10 @@ app = FastAPI(
 # Setup CORS (regex + credentials from settings)
 # Allow:
 # - http://localhost:* and http://127.0.0.1:* for web dev/production
-# - tauri://localhost for Tauri desktop app
+# - tauri://localhost and https://tauri.localhost for Tauri desktop app (v1 and v2)
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"(http://(localhost|127\.0\.0\.1)(:\d+)?|tauri://localhost)",
+    allow_origin_regex=r"(https?://(localhost|127\.0\.0\.1)(:\d+)?|tauri://localhost|https://tauri\.localhost)",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
