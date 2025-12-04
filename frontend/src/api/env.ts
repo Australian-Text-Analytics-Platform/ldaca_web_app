@@ -70,10 +70,17 @@ export function getApiBase(options: ApiEnvOptions = {}): string {
 
   // 3. Local dev heuristic: ANY localhost/127.0.0.1 frontend port (other than backend) => backend assumed at configured port
   //    This solves the previous limitation (only 3000/5173). Keep a small allowlist for future doc but allow any.
-  const isLoopback = hostname === 'localhost' || hostname === '127.0.0.1';
+  //    Also handle Tauri v2 Windows hostname (tauri.localhost)
+  const isLoopback = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === 'tauri.localhost';
   if (isLoopback) {
     // If the current port is already the backend port, we can same-origin /api
     if (port === backendPort) return `${origin}/api`;
+    
+    // For tauri.localhost, we must target 127.0.0.1 to reach the backend process
+    if (hostname === 'tauri.localhost') {
+      return `http://127.0.0.1:${backendPort}/api`;
+    }
+    
     return `http://${hostname}:${backendPort}/api`;
   }
 
