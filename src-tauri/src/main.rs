@@ -449,7 +449,9 @@ fn main() {
     let backend_port =
         find_available_port(8001, 8010).expect("No available ports found in range 8001-8010");
 
-    let backend_url = format!("http://localhost:{}", backend_port);
+    // Use 127.0.0.1 instead of localhost to avoid mixed content issues on Windows
+    // where Tauri serves from https://tauri.localhost
+    let backend_url = format!("http://127.0.0.1:{}", backend_port);
     println!("Backend will run on: {}", backend_url);
 
     let backend_state = BackendState {
