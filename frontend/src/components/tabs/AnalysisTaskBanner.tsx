@@ -37,13 +37,16 @@ const AnalysisTaskBanner: React.FC<AnalysisTaskBannerProps> = ({
   const trimmedMessage = message?.trim();
 
   return (
-    <Card className={cn('shadow-sm', styles.card, className)}>
+    <Card className={cn('shadow-sm', styles.card, className)} data-testid="analysis-task-card">
       <CardContent
         className={cn('flex items-start gap-3 py-4 text-sm', styles.text)}
         aria-label={`${analysisName} task ${status}${taskId ? ` (task ${taskId})` : ''}`}
       >
-        <div className={cn('flex h-6 w-6 items-center justify-center rounded-full border', styles.badge)}>
-          <Loader2 className="h-4 w-4 animate-spin" />
+        <div
+          className={cn('flex h-6 w-6 items-center justify-center rounded-full border', styles.badge)}
+          data-testid="analysis-task-spinner"
+        >
+          <Loader2 className="h-4 w-4 animate-spin" data-testid="analysis-task-spinner-icon" aria-hidden="true" />
         </div>
         <div className="space-y-1">
           {trimmedMessage && (

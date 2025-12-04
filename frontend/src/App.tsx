@@ -14,14 +14,14 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from './components/ui/s
 
 // Lazy load components for code splitting
 const TutorialView = lazy(() => import('./components/TutorialView'));
-const DataLoaderTab = lazy(() => import('./components/tabs/DataLoaderTab'));
-const DataPreprocessingTab = lazy(() => import('./components/tabs/DataPreprocessingTab'));
-const ConcordanceTab = lazy(() => import('./components/tabs/ConcordanceTab'));
-const QuotationTab = lazy(() => import('./components/tabs/QuotationTab'));
-const TopicModelingTab = lazy(() => import('./components/tabs/TopicModelingTab'));
-const SequentialAnalysisTab = lazy(() => import('./components/tabs/SequentialAnalysisTab'));
-const ExportTab = lazy(() => import('./components/tabs/ExportTab'));
-const TokenFrequencyTab = lazy(() => import('./components/tabs/TokenFrequencyTab'));
+const DataLoaderFeature = lazy(() => import('./features/analysis/data-loader/DataLoaderFeature'));
+const DataPreprocessingFeature = lazy(() => import('./features/analysis/data-preprocessing/DataPreprocessingFeature'));
+const ConcordanceFeature = lazy(() => import('./features/analysis/concordance/ConcordanceFeature'));
+const QuotationFeature = lazy(() => import('./features/analysis/quotation/QuotationFeature'));
+const TopicModelingFeature = lazy(() => import('./features/analysis/topic-modeling/TopicModelingFeature'));
+const SequentialAnalysisFeature = lazy(() => import('./features/analysis/sequential-analysis/SequentialAnalysisFeature'));
+const ExportFeature = lazy(() => import('./features/analysis/export/ExportFeature'));
+const TokenFrequencyFeature = lazy(() => import('./features/analysis/token-frequency/TokenFrequencyFeature'));
 
 const REFRESH_CHIP_DELAY_MS = 3000;
 const LAG_HINT_DELAY_MS = 8000;
@@ -259,14 +259,14 @@ const WorkspaceShell: React.FC = () => {
                               </div>
                             </div>
                           }>
-                            {currentView === 'data-loader' && <DataLoaderTab />}
-                            {currentView === 'filter' && <DataPreprocessingTab />}
-                            {currentView === 'token-frequency' && <TokenFrequencyTab />}
-                            {currentView === 'concordance' && <ConcordanceTab />}
-                            {currentView === 'analysis' && <SequentialAnalysisTab />}
-                            {currentView === 'topic-modeling' && <TopicModelingTab />}
-                            {currentView === 'quotation' && <QuotationTab />}
-                            {currentView === 'export' && <ExportTab />}
+                            {currentView === 'data-loader' && <DataLoaderFeature />}
+                            {currentView === 'filter' && <DataPreprocessingFeature />}
+                            {currentView === 'token-frequency' && <TokenFrequencyFeature />}
+                            {currentView === 'concordance' && <ConcordanceFeature />}
+                            {currentView === 'analysis' && <SequentialAnalysisFeature />}
+                            {currentView === 'topic-modeling' && <TopicModelingFeature />}
+                            {currentView === 'quotation' && <QuotationFeature />}
+                            {currentView === 'export' && <ExportFeature />}
                           </Suspense>
                         </ErrorBoundary>
                       </div>

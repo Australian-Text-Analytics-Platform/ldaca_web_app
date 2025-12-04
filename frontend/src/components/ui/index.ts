@@ -13,3 +13,4 @@ export * from './separator';
 export * from './checkbox';
 export * from './alert-dialog';
 export * from './table';
+export * from './tag';

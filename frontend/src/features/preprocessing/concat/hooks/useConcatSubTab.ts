@@ -1,0 +1,437 @@
+import { useCallback, useMemo, useState } from 'react';
+
+import type { NodeColumnSelection, WorkspaceNodeLike } from '../../../../components/NodeSelectionPanel';
+import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
+import type {
+  ConcatNodeSummary,
+  ConcatPreviewRequestPayload,
+  ConcatSchemaAnalysis,
+  PreviewPagination,
+  PreviewRow,
+} from '../../types';
+import { MAX_CONCAT_NODES } from '../../types';
+import { buildWorkspaceNodeMap, deriveNodeLabel, getNodeKey } from '../../utils/nodeMetadata';
+
+const DEFAULT_CONCAT_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#f97316', '#d946ef', '#0ea5e9', '#f59e0b', '#14b8a6'];
+
+export interface ConcatSubTabProps {
+  selectedNodeIds: string[];
+  currentWorkspaceId: string | null;
+  workspaceNodes: WorkspaceNodeLike[];
+  getNodeShape: (
+    nodeId: string,
+  ) => Promise<{ shape: [number, number]; is_lazy: boolean; calculated: boolean } | null>;
+  concatNodes: (nodeIds: string[], newNodeName?: string) => Promise<void>;
+  concatPreview: (
+    nodeIds: string[],
+    page: number,
+    pageSize: number,
+  ) => Promise<{
+    data: PreviewRow[];
+    columns: string[];
+    pagination: PreviewPagination | null;
+  }>;
+  isLoading: {
+    operations: boolean;
+  };
+  onAlert: (message: string) => void;
+}
+
+interface ConcatSelectionPanelConfig {
+  selectedNodes: WorkspaceNodeLike[];
+  nodeColumnSelections: NodeColumnSelection[];
+  nodeColors: Record<string, string>;
+  defaultPalette: string[];
+  disabled: boolean;
+  originalCount: number;
+  statusMessage: string | null;
+  statusVariant: 'warning' | 'error' | null;
+  maxCompare: number;
+  onColumnChange: () => void;
+  onColorChange: () => void;
+}
+
+interface ConcatFormControllers {
+  value: string;
+  setValue: (value: string) => void;
+  placeholder: string;
+}
+
+interface ConcatPreviewConfig {
+  columns: string[];
+  data: PreviewRow[];
+  pagination: PreviewPagination | null;
+  loading: boolean;
+  error: string | null;
+  ready: boolean;
+  readyMessage: string;
+  page: number;
+  pageSize: number;
+  onPreviousPage: () => void;
+  onNextPage: () => void;
+  onPageSizeChange: (size: number) => void;
+}
+
+interface ConcatApplyState {
+  run: () => Promise<void>;
+  disabled: boolean;
+  isBusy: boolean;
+}
+
+export interface UseConcatSubTabResult {
+  selectionPanel: ConcatSelectionPanelConfig;
+  form: ConcatFormControllers;
+  statusMessage: string;
+  statusVariant: 'warning' | 'error' | null;
+  extraSelectionMessage: string | null;
+  analysis: ConcatSchemaAnalysis;
+  preview: ConcatPreviewConfig;
+  apply: ConcatApplyState;
+  mismatches: ConcatSchemaAnalysis['mismatches'];
+  showActivityTag: boolean;
+}
+
+const noop = () => undefined;
+
+const buildConcatNodeSummaries = (nodes: WorkspaceNodeLike[]): ConcatNodeSummary[] => {
+  return nodes.map((node) => {
+    const nodeId = getNodeKey(node);
+    const displayName = deriveNodeLabel(node) || nodeId;
+    const data = (node.data ?? {}) as Record<string, unknown>;
+
+    let columns: string[] = [];
+    if (Array.isArray(data.columns)) {
+      columns = (data.columns as unknown[]).map((entry) => String(entry));
+    }
+
+    let rawDtypes: Record<string, string> = {};
+    if (data.dtypes && typeof data.dtypes === 'object') {
+      rawDtypes = Object.entries(data.dtypes as Record<string, unknown>).reduce<Record<string, string>>((acc, [col, dtype]) => {
+        acc[col] = String(dtype);
+        return acc;
+      }, {});
+    } else if (data.schema && typeof data.schema === 'object') {
+      rawDtypes = Object.entries(data.schema as Record<string, unknown>).reduce<Record<string, string>>((acc, [col, dtype]) => {
+        acc[col] = String(dtype);
+        return acc;
+      }, {});
+    }
+
+    if (!columns.length) {
+      columns = Object.keys(rawDtypes);
+    }
+
+    const uniqueColumns = Array.from(new Set(columns.map((name) => String(name))));
+    const normalizedColumns = [...uniqueColumns].sort((a, b) => a.localeCompare(b));
+    const normalizedDtypes = normalizedColumns.reduce<Record<string, string>>((acc, column) => {
+      const dtype = rawDtypes[column];
+      acc[column] = dtype ? dtype.toString().toLowerCase() : '';
+      return acc;
+    }, {});
+
+    return {
+      nodeId,
+      displayName,
+      columns: uniqueColumns,
+      normalizedColumns,
+      dtypes: normalizedDtypes,
+      rawDtypes,
+      columnCount: uniqueColumns.length,
+    };
+  });
+};
+
+const analyzeSchema = (summaries: ConcatNodeSummary[]): ConcatSchemaAnalysis => {
+  const result: ConcatSchemaAnalysis = {
+    summaries,
+    ready: false,
+    issues: '',
+    mismatches: [],
+    baseColumns: [],
+    baseColumnCount: 0,
+  };
+
+  if (summaries.length === 0) {
+    result.issues = 'Select nodes in the workspace to enable concatenation.';
+    return result;
+  }
+
+  if (summaries.length < 2) {
+    result.issues = 'Pick at least two nodes to concatenate.';
+    return result;
+  }
+
+  const base = summaries[0];
+  if (!base.normalizedColumns.length) {
+    result.issues = `${base.displayName || base.nodeId} has no columns to align.`;
+    return result;
+  }
+
+  result.baseColumns = base.normalizedColumns;
+  result.baseColumnCount = base.normalizedColumns.length;
+
+  const baseColumnSet = new Set(base.normalizedColumns);
+  const baseDtypes = base.normalizedColumns.reduce<Record<string, string>>((acc, column) => {
+    acc[column] = base.dtypes[column] ?? '';
+    return acc;
+  }, {});
+
+  summaries.slice(1).forEach((summary) => {
+    const summaryColumnSet = new Set(summary.normalizedColumns);
+    const missing = Array.from(baseColumnSet).filter((column) => !summaryColumnSet.has(column));
+    const extra = Array.from(summaryColumnSet).filter((column) => !baseColumnSet.has(column));
+    const typeMismatches = Array.from(baseColumnSet).filter((column) => {
+      if (!summaryColumnSet.has(column)) return false;
+      const baseType = baseDtypes[column] ?? '';
+      const summaryType = summary.dtypes[column] ?? '';
+      return baseType && summaryType && baseType !== summaryType;
+    });
+
+    const details: string[] = [];
+    if (missing.length) {
+      details.push(`Missing columns: ${missing.sort().join(', ')}`);
+    }
+    if (extra.length) {
+      details.push(`Extra columns: ${extra.sort().join(', ')}`);
+    }
+    if (typeMismatches.length) {
+      const mismatchText = typeMismatches
+        .sort()
+        .map((column) => `${column} (${baseDtypes[column] || 'unknown'} vs ${summary.dtypes[column] || 'unknown'})`)
+        .join(', ');
+      details.push(`Type mismatches: ${mismatchText}`);
+    }
+
+    if (details.length) {
+      result.mismatches.push({
+        nodeId: summary.nodeId,
+        nodeName: summary.displayName || summary.nodeId,
+        details,
+      });
+    }
+  });
+
+  if (result.mismatches.length === 0) {
+    result.ready = true;
+    result.issues = `Ready to concatenate ${summaries.length} nodes (${result.baseColumnCount} columns).`;
+  } else {
+    result.issues = 'Resolve schema mismatches before concatenating.';
+  }
+
+  return result;
+};
+
+const dedupeNodeIds = (nodeIds: string[]): string[] => {
+  const seen = new Set<string>();
+  return nodeIds.filter((nodeId) => {
+    if (!nodeId || seen.has(nodeId)) return false;
+    seen.add(nodeId);
+    return true;
+  });
+};
+
+export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult => {
+  const {
+    selectedNodeIds,
+    currentWorkspaceId,
+    workspaceNodes,
+    concatPreview,
+    concatNodes,
+    isLoading,
+    onAlert,
+  } = props;
+
+  const [newNodeName, setNewNodeName] = useState('');
+  const [isConcatenating, setIsConcatenating] = useState(false);
+
+  const workspaceNodeMap = useMemo(() => buildWorkspaceNodeMap(workspaceNodes), [workspaceNodes]);
+
+  const uniqueNodeIds = useMemo(() => dedupeNodeIds(selectedNodeIds), [selectedNodeIds]);
+  const concatNodeIds = useMemo(() => uniqueNodeIds.slice(0, MAX_CONCAT_NODES), [uniqueNodeIds]);
+  const concatOriginalCount = uniqueNodeIds.length;
+
+  const concatSelectedNodes = useMemo<WorkspaceNodeLike[]>(() => {
+    return concatNodeIds
+      .map((nodeId) => workspaceNodeMap.get(nodeId))
+      .filter((node): node is WorkspaceNodeLike => Boolean(node));
+  }, [concatNodeIds, workspaceNodeMap]);
+
+  const concatNodeSummaries = useMemo(() => buildConcatNodeSummaries(concatSelectedNodes), [concatSelectedNodes]);
+
+  const concatAnalysis = useMemo(() => analyzeSchema(concatNodeSummaries), [concatNodeSummaries]);
+
+  const statusVariant: 'warning' | 'error' | null = useMemo(() => {
+    if (concatAnalysis.ready || !concatAnalysis.issues) return null;
+    return concatAnalysis.mismatches.length > 0 ? 'error' : 'warning';
+  }, [concatAnalysis.ready, concatAnalysis.issues, concatAnalysis.mismatches.length]);
+
+  const autoConcatName = useMemo(() => {
+    if (!concatAnalysis.summaries.length) return '';
+    const labels = concatAnalysis.summaries
+      .map((summary) => summary.displayName || summary.nodeId)
+      .filter(Boolean);
+    if (!labels.length) return '';
+    if (labels.length <= 3) {
+      return `Concat(${labels.join(', ')})`;
+    }
+    const shortened = `${labels.slice(0, 3).join(', ')}, …`;
+    return `Concat(${shortened})`;
+  }, [concatAnalysis.summaries]);
+
+  const concatUsedNodeIds = useMemo(() => concatAnalysis.summaries.map((summary) => summary.nodeId), [concatAnalysis.summaries]);
+
+  const concatPreviewRequest = useMemo(() => {
+    if (!concatAnalysis.ready) return null;
+    return { nodeIds: concatUsedNodeIds } satisfies ConcatPreviewRequestPayload;
+  }, [concatAnalysis.ready, concatUsedNodeIds]);
+
+  const concatPreviewSignature = useMemo(() => {
+    if (!concatPreviewRequest) return 'concat-preview-disabled';
+    return concatPreviewRequest.nodeIds.join('|');
+  }, [concatPreviewRequest]);
+
+  const concatPreviewFetcher = useCallback(async ({
+    request,
+    page,
+    pageSize,
+  }: {
+    request: ConcatPreviewRequestPayload;
+    page: number;
+    pageSize: number;
+  }) => {
+    const response = await concatPreview(request.nodeIds, page, pageSize);
+    return {
+      data: Array.isArray(response?.data) ? (response.data as PreviewRow[]) : [],
+      columns: Array.isArray(response?.columns) ? response.columns : [],
+      pagination: response?.pagination ?? null,
+    };
+  }, [concatPreview]);
+
+  const {
+    data: concatPreviewData,
+    columns: concatPreviewColumns,
+    pagination: concatPreviewPagination,
+    loading: concatPreviewLoading,
+    error: concatPreviewError,
+    ready: concatPreviewReady,
+    page: concatPreviewPage,
+    pageSize: concatPreviewPageSize,
+    setPage: setConcatPreviewPage,
+    setPageSize: setConcatPreviewPageSize,
+  } = usePreprocessingPreview<ConcatPreviewRequestPayload, PreviewRow>({
+    request: concatPreviewRequest,
+    signature: concatPreviewSignature,
+    fetcher: concatPreviewFetcher,
+  });
+
+  const concatPreviewColumnsToRender = useMemo(() => {
+    if (concatPreviewColumns.length > 0) return concatPreviewColumns;
+    if (concatPreviewData.length > 0 && typeof concatPreviewData[0] === 'object' && concatPreviewData[0] !== null) {
+      return Object.keys(concatPreviewData[0]);
+    }
+    return [];
+  }, [concatPreviewColumns, concatPreviewData]);
+
+  const handleConcatPreviewPrev = useCallback(() => {
+    if (concatPreviewPagination?.has_prev && !concatPreviewLoading) {
+      setConcatPreviewPage(Math.max(1, concatPreviewPage - 1));
+    }
+  }, [concatPreviewPagination, concatPreviewLoading, concatPreviewPage, setConcatPreviewPage]);
+
+  const handleConcatPreviewNext = useCallback(() => {
+    if (concatPreviewPagination?.has_next && !concatPreviewLoading) {
+      setConcatPreviewPage(concatPreviewPage + 1);
+    }
+  }, [concatPreviewPagination, concatPreviewLoading, concatPreviewPage, setConcatPreviewPage]);
+
+  const handleConcatPreviewPageSizeChange = useCallback((size: number) => {
+    if (!Number.isNaN(size)) {
+      setConcatPreviewPageSize(size);
+    }
+  }, [setConcatPreviewPageSize]);
+
+  const readyMessage = concatAnalysis.summaries.length < 2
+    ? 'Select at least two nodes to generate a concat preview.'
+    : concatAnalysis.issues;
+
+  const applyDisabled =
+    !concatAnalysis.ready || !currentWorkspaceId || isConcatenating || isLoading.operations;
+
+  const handleApplyConcat = useCallback(async () => {
+    if (!concatAnalysis.ready) {
+      onAlert(concatAnalysis.issues || 'Select at least two compatible nodes to concatenate.');
+      return;
+    }
+    const nodeIds = concatAnalysis.summaries.map((summary) => summary.nodeId);
+    if (nodeIds.length < 2) {
+      onAlert('Pick at least two nodes to concatenate.');
+      return;
+    }
+
+    const requestedName = newNodeName.trim() || autoConcatName || undefined;
+    try {
+      setIsConcatenating(true);
+      await concatNodes(nodeIds, requestedName);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error applying concat';
+      onAlert(`Error applying concat: ${message}`);
+    } finally {
+      setIsConcatenating(false);
+    }
+  }, [autoConcatName, concatAnalysis, concatNodes, newNodeName, onAlert]);
+
+  const selectionPanel: ConcatSelectionPanelConfig = {
+    selectedNodes: concatSelectedNodes,
+    nodeColumnSelections: concatNodeIds.map((nodeId) => ({ nodeId, column: '' })),
+    nodeColors: concatNodeIds.reduce<Record<string, string>>((acc, nodeId, index) => {
+      acc[nodeId] = DEFAULT_CONCAT_PALETTE[index % DEFAULT_CONCAT_PALETTE.length];
+      return acc;
+    }, {}),
+    defaultPalette: DEFAULT_CONCAT_PALETTE,
+    disabled: concatSelectedNodes.length < 2,
+    originalCount: concatOriginalCount,
+    statusMessage: concatAnalysis.ready ? null : concatAnalysis.issues,
+    statusVariant,
+    maxCompare: MAX_CONCAT_NODES,
+    onColumnChange: noop,
+    onColorChange: noop,
+  };
+
+  const extraSelectionMessage = concatOriginalCount > MAX_CONCAT_NODES
+    ? `Using the first ${MAX_CONCAT_NODES} of ${concatOriginalCount} selected nodes. Deselect extras to include them.`
+    : null;
+
+  return {
+    selectionPanel,
+    form: {
+      value: newNodeName,
+      setValue: setNewNodeName,
+      placeholder: autoConcatName || 'Concatenated dataset',
+    },
+    statusMessage: concatAnalysis.issues,
+    statusVariant,
+    extraSelectionMessage,
+    analysis: concatAnalysis,
+    preview: {
+      columns: concatPreviewColumnsToRender,
+      data: concatPreviewData,
+      pagination: concatPreviewPagination,
+      loading: concatPreviewLoading,
+      error: concatPreviewError,
+      ready: concatPreviewReady,
+      readyMessage,
+      page: concatPreviewPage,
+      pageSize: concatPreviewPageSize,
+      onPreviousPage: handleConcatPreviewPrev,
+      onNextPage: handleConcatPreviewNext,
+      onPageSizeChange: handleConcatPreviewPageSizeChange,
+    },
+    apply: {
+      run: handleApplyConcat,
+      disabled: applyDisabled,
+      isBusy: isConcatenating,
+    },
+    mismatches: concatAnalysis.mismatches,
+    showActivityTag: isConcatenating || isLoading.operations,
+  };
+};

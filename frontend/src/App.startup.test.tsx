@@ -76,14 +76,14 @@ function lazyComponentMock() {
   return { default: () => <div>LazyComponent</div> };
 }
 vi.mock('./components/TutorialView', lazyComponentMock);
-vi.mock('./components/tabs/DataLoaderTab', lazyComponentMock);
-vi.mock('./components/tabs/DataPreprocessingTab', lazyComponentMock);
-vi.mock('./components/tabs/ConcordanceTab', lazyComponentMock);
-vi.mock('./components/tabs/QuotationTab', lazyComponentMock);
-vi.mock('./components/tabs/TopicModelingTab', lazyComponentMock);
-vi.mock('./components/tabs/SequentialAnalysisTab', lazyComponentMock);
-vi.mock('./components/tabs/ExportTab', lazyComponentMock);
-vi.mock('./components/tabs/TokenFrequencyTab', lazyComponentMock);
+vi.mock('./features/analysis/data-loader/DataLoaderFeature', lazyComponentMock);
+vi.mock('./features/analysis/data-preprocessing/DataPreprocessingFeature', lazyComponentMock);
+vi.mock('./features/analysis/concordance/ConcordanceFeature', lazyComponentMock);
+vi.mock('./features/analysis/quotation/QuotationFeature', lazyComponentMock);
+vi.mock('./features/analysis/topic-modeling/TopicModelingFeature', lazyComponentMock);
+vi.mock('./features/analysis/sequential-analysis/SequentialAnalysisFeature', lazyComponentMock);
+vi.mock('./features/analysis/export/ExportFeature', lazyComponentMock);
+vi.mock('./features/analysis/token-frequency/TokenFrequencyFeature', lazyComponentMock);
 
 const baseAuthInfo: AuthInfoResponse = {
   authenticated: true,

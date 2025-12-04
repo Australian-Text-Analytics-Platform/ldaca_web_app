@@ -1,0 +1,180 @@
+import { useCallback, useState } from 'react';
+import { useAuth } from '@/hooks/useAuth';
+import { useAnalysisStore } from '@/stores/analysisStore';
+import type { TaskItem } from '@/stores/analysisStore';
+import {
+  type TaskEventPayload,
+  useWorkspaceTaskStreamClient,
+  type WorkspaceTaskStreamClientState,
+} from './useWorkspaceTaskStreamClient';
+
+interface TaskMergeUpdate {
+  task: Partial<TaskItem> & { task_id?: string };
+  resultPersistedOverride?: boolean;
+}
+
+const sortTasksByTime = (tasks: TaskItem[] = []) =>
+  [...tasks].sort((a, b) => {
+    const tb = b?.finished_at ?? b?.started_at ?? b?.created_at ?? 0;
+    const ta = a?.finished_at ?? a?.started_at ?? a?.created_at ?? 0;
+    return tb - ta;
+  });
+
+const buildTaskMap = (tasks: TaskItem[] = []) => {
+  const map = new Map<string, TaskItem>();
+  tasks.forEach((task) => {
+    const taskId = task?.task_id;
+    if (taskId) {
+      map.set(taskId, task);
+    }
+  });
+  return map;
+};
+
+const mergeTaskUpdates = (
+  previousTasks: TaskItem[] = [],
+  updates: TaskMergeUpdate[] = [],
+  options: { replaceAll?: boolean } = {}
+) => {
+  if (!updates.length && !options.replaceAll) {
+    return sortTasksByTime(previousTasks);
+  }
+
+  const previousMap = buildTaskMap(previousTasks);
+  const nextMap = options.replaceAll ? new Map<string, TaskItem>() : new Map(previousMap);
+
+  updates.forEach(({ task, resultPersistedOverride }) => {
+    if (!task || !task.task_id) return;
+
+    const existing = nextMap.get(task.task_id) ?? previousMap.get(task.task_id);
+    const merged: TaskItem = {
+      ...existing,
+      ...task,
+    } as TaskItem;
+
+    if (resultPersistedOverride !== undefined) {
+      merged.result_persisted = resultPersistedOverride;
+    } else if (existing?.result_persisted && !merged.result_persisted) {
+      merged.result_persisted = existing.result_persisted;
+    }
+
+    nextMap.set(task.task_id, merged);
+  });
+
+  return sortTasksByTime(Array.from(nextMap.values()));
+};
+
+export const useWorkspaceTaskInbox = (
+  workspaceId: string | null
+): WorkspaceTaskStreamClientState => {
+  const { getAuthHeaders } = useAuth();
+  const setTasks = useAnalysisStore((state) => state.setTasks);
+  const markTopicModelingReady = useAnalysisStore((state) => state.markTopicModelingReady);
+  const resetTopicModelingReady = useAnalysisStore((state) => state.resetTopicModelingReady);
+  const [transientError, setTransientError] = useState<string | null>(null);
+
+  const handlePayload = useCallback(
+    (payload: TaskEventPayload) => {
+      if (payload.type !== 'analysis_save_failed' && payload.type !== 'error') {
+        setTransientError(null);
+      }
+
+      switch (payload.type) {
+        case 'tasks_snapshot': {
+          if (Array.isArray(payload.tasks)) {
+            setTasks((prevTasks: TaskItem[]) =>
+              mergeTaskUpdates(
+                prevTasks,
+                payload.tasks.map((task) => ({ task })),
+                { replaceAll: true }
+              )
+            );
+          }
+          break;
+        }
+        case 'task_changed': {
+          if (payload.task) {
+            const resultPersisted = payload.result_persisted ?? payload.task?.result_persisted;
+            setTasks((prevTasks: TaskItem[]) =>
+              mergeTaskUpdates(prevTasks, [
+                {
+                  task: payload.task as TaskItem,
+                  resultPersistedOverride: resultPersisted,
+                },
+              ])
+            );
+
+            if (payload.task?.task_type === 'topic_modeling') {
+              if (payload.task.state === 'running') {
+                resetTopicModelingReady();
+              }
+              if (resultPersisted === true && payload.task?.task_id) {
+                markTopicModelingReady(payload.task.task_id, payload.timestamp);
+              }
+            }
+          }
+          break;
+        }
+        case 'analysis_saved': {
+          if (payload.task_type === 'topic_modeling' && payload.task_id) {
+            markTopicModelingReady(payload.task_id, payload.timestamp);
+            setTasks((prevTasks: TaskItem[]) =>
+              mergeTaskUpdates(prevTasks, [
+                {
+                  task: {
+                    task_id: payload.task_id,
+                  },
+                  resultPersistedOverride: true,
+                },
+              ])
+            );
+          }
+          break;
+        }
+        case 'analysis_save_failed': {
+          if (payload.task_type === 'topic_modeling') {
+            setTransientError(payload.message || 'Analysis save failed');
+          }
+          break;
+        }
+        case 'task_update': {
+          if (Array.isArray(payload.tasks)) {
+            setTasks((prevTasks: TaskItem[]) =>
+              mergeTaskUpdates(
+                prevTasks,
+                payload.tasks.map((task) => ({ task })),
+                { replaceAll: true }
+              )
+            );
+          }
+          break;
+        }
+        case 'error': {
+          setTransientError(payload.message || 'Task stream error');
+          break;
+        }
+        default: {
+          // noop
+          break;
+        }
+      }
+    },
+    [setTasks, markTopicModelingReady, resetTopicModelingReady, setTransientError]
+  );
+
+  const clientState = useWorkspaceTaskStreamClient(workspaceId, {
+    enabled: Boolean(workspaceId),
+    getAuthHeaders,
+    onEvent: handlePayload,
+  });
+
+  return transientError
+    ? {
+        ...clientState,
+        status: 'error',
+        error: transientError,
+      }
+    : clientState;
+};
+
+export default useWorkspaceTaskInbox;

@@ -22,29 +22,6 @@ interface SelectionState {
     pageSize: number;
     totalItems: number;
   }>;
-  
-  // Context for operations (remembers what was selected for modal operations)
-  operationContext: {
-    joinContext: {
-      leftNodeId: string | null;
-      rightNodeId: string | null;
-    };
-    filterContext: {
-      nodeId: string | null;
-    };
-    renameContext: {
-      nodeId: string | null;
-      currentName: string | null;
-    };
-    deleteContext: {
-      nodeId: string | null;
-      nodeName: string | null;
-    };
-    documentColumnContext: {
-      nodeId: string | null;
-      availableColumns: string[];
-    };
-  };
 }
 
 interface SelectionActions {
@@ -84,14 +61,6 @@ interface SelectionActions {
     totalItems: number;
   };
   
-  // Operation context management
-  setJoinContext: (leftNodeId: string | null, rightNodeId: string | null) => void;
-  setFilterContext: (nodeId: string | null) => void;
-  setRenameContext: (nodeId: string | null, currentName: string | null) => void;
-  setDeleteContext: (nodeId: string | null, nodeName: string | null) => void;
-  setDocumentColumnContext: (nodeId: string | null, availableColumns: string[]) => void;
-  clearOperationContext: () => void;
-  
   // Computed getters
   hasNodeSelection: () => boolean;
   hasMultipleSelection: () => boolean;
@@ -108,27 +77,6 @@ export const useSelectionStore = create<SelectionStore>()(
       selectedNodeIds: [],
       selectedGraphElements: [],
       nodePagination: {},
-      operationContext: {
-        joinContext: {
-          leftNodeId: null,
-          rightNodeId: null,
-        },
-        filterContext: {
-          nodeId: null,
-        },
-        renameContext: {
-          nodeId: null,
-          currentName: null,
-        },
-        deleteContext: {
-          nodeId: null,
-          nodeName: null,
-        },
-        documentColumnContext: {
-          nodeId: null,
-          availableColumns: [],
-        },
-      },
 
       // Single node selection
       selectNode: (nodeId) => set((state) => {
@@ -201,37 +149,6 @@ export const useSelectionStore = create<SelectionStore>()(
         state.selectedNodeId = null;
         state.selectedNodeIds = [];
         state.selectedGraphElements = [];
-      }),
-
-      // Operation context management
-      setJoinContext: (leftNodeId, rightNodeId) => set((state) => {
-        state.operationContext.joinContext = { leftNodeId, rightNodeId };
-      }),
-      
-      setFilterContext: (nodeId) => set((state) => {
-        state.operationContext.filterContext = { nodeId };
-      }),
-      
-      setRenameContext: (nodeId, currentName) => set((state) => {
-        state.operationContext.renameContext = { nodeId, currentName };
-      }),
-      
-      setDeleteContext: (nodeId, nodeName) => set((state) => {
-        state.operationContext.deleteContext = { nodeId, nodeName };
-      }),
-      
-      setDocumentColumnContext: (nodeId, availableColumns) => set((state) => {
-        state.operationContext.documentColumnContext = { nodeId, availableColumns };
-      }),
-      
-      clearOperationContext: () => set((state) => {
-        state.operationContext = {
-          joinContext: { leftNodeId: null, rightNodeId: null },
-          filterContext: { nodeId: null },
-          renameContext: { nodeId: null, currentName: null },
-          deleteContext: { nodeId: null, nodeName: null },
-          documentColumnContext: { nodeId: null, availableColumns: [] },
-        };
       }),
 
       // Node pagination management

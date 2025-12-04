@@ -1,22 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { ColumnInfo, filterColumnsByType, mapColumnsToInfo, normalizeTypeName } from '../utils/columnTypes';
 import { AlertTriangle, Lock } from 'lucide-react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Card, CardContent, CardHeader } from './ui/card';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from './ui/dropdown-menu';
-import { Input } from './ui/input';
 import { cn } from '../lib/utils';
-
-export interface NodeColumnSelection {
-  nodeId: string;
-  column: string;
-}
-
-type NodeColumnSource = string[] | ColumnInfo[];
+import type { NodeColumnSelection, NodeColumnSource, WorkspaceNodeLike } from '@/features/analysis/common/nodeSelectionTypes';
+import { getNodeIdentifier } from '@/features/analysis/common/nodeSelectionTypes';
+import { NodeColumnSelector, NodeSelectionList } from '@/features/analysis/common/components';
+import type { NodeSelectionRenderArgs } from '@/features/analysis/common/components';
+import { useNodeColumnOptions } from '@/features/analysis/common/useNodeColumnOptions';
 
 const CLEAR_SELECTION_VALUE = '__ldaca__clear__';
 
@@ -25,40 +14,6 @@ const STATUS_VARIANT_STYLES: Record<'info' | 'warning' | 'error', string> = {
   warning: 'border-amber-500/60 bg-amber-100/60 text-amber-900',
   error: 'border-destructive/50 bg-destructive/10 text-destructive',
 };
-
-export type WorkspaceNodeLike = Record<string, unknown> & {
-  id?: string;
-  node_id?: string;
-  data?: Record<string, unknown> & {
-    id?: string;
-    node_id?: string;
-    nodeName?: string;
-    name?: string;
-    label?: string;
-    shape?: [number, number];
-    columns?: string[];
-    schema?: unknown;
-  };
-  name?: string;
-  label?: string;
-  unique_id?: string;
-};
-
-const getNodeIdentifier = (node: WorkspaceNodeLike, fallbackIndex: number): string =>
-  node.id ||
-  node.node_id ||
-  (node.data?.id as string | undefined) ||
-  (node.data?.node_id as string | undefined) ||
-  (node.unique_id as string | undefined) ||
-  `node-${fallbackIndex}`;
-
-const getNodeDisplayName = (node: WorkspaceNodeLike, fallbackId: string): string =>
-  (node.name as string | undefined) ||
-  (node.data?.name as string | undefined) ||
-  (node.data?.nodeName as string | undefined) ||
-  (node.label as string | undefined) ||
-  (node.data?.label as string | undefined) ||
-  fallbackId;
 
 interface NodeSelectionPanelProps {
   selectedNodes: WorkspaceNodeLike[];
@@ -118,11 +73,6 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
   statusMessage,
   statusVariant = 'warning',
 }) => {
-  const getColorForNodeId = (nodeId: string, idx: number) => {
-    if (nodeColors[nodeId]) return nodeColors[nodeId];
-    if (!defaultPalette.length) return '#000000';
-    return defaultPalette[idx % defaultPalette.length];
-  };
   const getColumnLabel = (node: WorkspaceNodeLike, idx: number) => (columnLabelFn ? columnLabelFn(node, idx) : 'Text Column:');
   const [shapes, setShapes] = useState<Record<string,string>>({});
 
@@ -170,39 +120,75 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
     fetchShapes();
     return () => { cancelled = true; };
   }, [getNodeShapeFn, selectedNodeIds, shapes, showShape]);
-  const normalizeColumnInfos = useCallback((source: NodeColumnSource | undefined): ColumnInfo[] => {
-    if (!source) return [];
-    if (!Array.isArray(source) || source.length === 0) return [];
-    const first = source[0];
-    if (typeof first === 'string') {
-      return (source as string[]).map((name) => ({ name, dataType: 'string' }));
-    }
-    return (source as ColumnInfo[]).map((col) => ({
-      name: col.name,
-      dataType: normalizeTypeName(col.dataType),
-    }));
-  }, []);
-
-  const resolveColumnInfos = useCallback((node: WorkspaceNodeLike): ColumnInfo[] => {
-    let infos: ColumnInfo[] = [];
-    if (getNodeColumns) {
-      const provided = normalizeColumnInfos(getNodeColumns(node));
-      infos = provided;
-    } else {
-      infos = mapColumnsToInfo(node as unknown as Record<string, unknown>);
-    }
-
-    if (allowedDataTypes && allowedDataTypes.length) {
-      const filtered = filterColumnsByType(infos, allowedDataTypes);
-      if (filtered.length > 0) {
-        return filtered;
+  const columnSelectionsByNode = useMemo(() => {
+    const map = new Map<string, NodeColumnSelection>();
+    nodeColumnSelections.forEach((selection) => {
+      if (selection?.nodeId) {
+        map.set(selection.nodeId, selection);
       }
-      if (!fallbackToAllColumns) {
-        return filtered;
+    });
+    return map;
+  }, [nodeColumnSelections]);
+
+  const columnOptions = useNodeColumnOptions({
+    nodes: selectedNodes,
+    getNodeColumns,
+    allowedDataTypes,
+    fallbackToAllColumns,
+  });
+
+  const renderMetaContent = useCallback(
+    ({ node, nodeId }: NodeSelectionRenderArgs) => {
+      if (renderNodeMeta) {
+        return renderNodeMeta(node);
       }
-    }
-    return infos;
-  }, [allowedDataTypes, fallbackToAllColumns, getNodeColumns, normalizeColumnInfos]);
+      if (showShape) {
+        return `Shape: ${shapes[nodeId] || '…'}`;
+      }
+      return null;
+    },
+    [renderNodeMeta, showShape, shapes]
+  );
+
+  const renderColumnSelector = useCallback(
+    ({ node, nodeId, index }: NodeSelectionRenderArgs) => {
+      if (!showColumnPicker) return null;
+      const options = columnOptions[nodeId];
+      const columns = options?.columns ?? [];
+      const selection = columnSelectionsByNode.get(nodeId);
+      const selectValue = selection?.column && selection.column.length > 0 ? selection.column : CLEAR_SELECTION_VALUE;
+      return (
+        <NodeColumnSelector
+          columns={columns}
+          value={selectValue}
+          preserveValue={selection?.column}
+          clearOptionValue={CLEAR_SELECTION_VALUE}
+          label={getColumnLabel(node, index)}
+          disabled={disabled}
+          noColumnsMessage={
+            options?.filteredOutByType
+              ? 'No columns match the allowed data types for this node'
+              : 'No columns available for this node'
+          }
+          onChange={(value) => {
+            const nextValue = value === CLEAR_SELECTION_VALUE ? '' : value;
+            onColumnChange(nodeId, nextValue ?? '');
+          }}
+        />
+      );
+    },
+    [showColumnPicker, columnOptions, columnSelectionsByNode, getColumnLabel, disabled, onColumnChange]
+  );
+
+  const handleNodeColorChange = useCallback(
+    (nodeId: string, color: string) => {
+      if (disabled) return;
+      onColorChange(nodeId, color);
+    },
+    [disabled, onColorChange]
+  );
+
+  const shouldRenderMeta = renderNodeMeta != null || showShape;
 
   return (
     <div className={cn('space-y-3', className)}>
@@ -237,97 +223,17 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
             : `No nodes selected. Single click on nodes in the workspace view to select them (max ${maxCompare} for comparison).` }
         </div>
       ) : (
-        <div
-          className={cn(
-            'flex gap-3 px-4 pb-3 pt-0',
-            selectedNodes.length > maxCompare ? 'overflow-x-auto' : 'overflow-x-hidden'
-          )}
-        >
-          {selectedNodes.map((node, idx) => {
-            const nodeId = getNodeIdentifier(node, idx);
-            const columnInfos = showColumnPicker ? resolveColumnInfos(node) : [];
-            const columns = showColumnPicker ? columnInfos.map((info) => info.name) : [];
-            const selection = nodeColumnSelections.find(sel => sel.nodeId === nodeId);
-            const nodeDisplayName = getNodeDisplayName(node, nodeId);
-            const nodeColor = getColorForNodeId(nodeId, idx);
-            const selectValue = selection?.column && selection.column.length > 0 ? selection.column : CLEAR_SELECTION_VALUE;
-            return (
-              <Card
-                key={nodeId}
-                className={cn(
-                  'relative border border-border/60 bg-card shadow-sm transition-colors',
-                  selectedNodes.length > maxCompare ? 'flex-none min-w-[50%]' : 'flex-1 min-w-0'
-                )}
-              >
-                {showColorPicker && (
-                  <div className="pointer-events-auto absolute top-2 right-2">
-                    <NodeColorDropdown
-                      color={nodeColor}
-                      palette={defaultPalette}
-                      onChange={(c) => onColorChange(nodeId, c)}
-                    />
-                  </div>
-                )}
-                <CardHeader className={cn('space-y-1.5 px-4 pb-2', showColorPicker ? 'pt-4' : 'pt-3')}>
-                  <div
-                    className="max-w-full break-words pr-2 text-sm font-semibold leading-snug text-foreground"
-                    style={showColorPicker ? { color: nodeColor } : undefined}
-                    title={nodeDisplayName}
-                  >
-                    {nodeDisplayName}
-                  </div>
-                  {renderNodeMeta ? (
-                    <div className="text-xs text-muted-foreground">{renderNodeMeta(node)}</div>
-                  ) : (
-                    showShape && (
-                      <div className="text-xs text-muted-foreground">Shape: {shapes[nodeId] || '…'}</div>
-                    )
-                  )}
-                </CardHeader>
-                {showColumnPicker && (
-                  <CardContent className="space-y-2 px-4 pb-4 pt-0">
-                    {columns.length > 0 ? (
-                      <div className="space-y-1">
-                        <span className="block text-xs font-medium text-muted-foreground">
-                          {getColumnLabel(node, idx)}
-                        </span>
-                        <Select
-                          value={selectValue}
-                          onValueChange={(value) => {
-                            const nextValue = value === CLEAR_SELECTION_VALUE ? '' : value;
-                            onColumnChange(nodeId, nextValue ?? '');
-                          }}
-                          disabled={disabled}
-                        >
-                          <SelectTrigger className="w-full text-sm">
-                            <SelectValue placeholder="Select column" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value={CLEAR_SELECTION_VALUE}>Select column…</SelectItem>
-                            {columns.map((column: string) => (
-                              <SelectItem key={column} value={column}>
-                                {column}
-                              </SelectItem>
-                            ))}
-                            {selection?.column && !columns.includes(selection.column) && (
-                              <SelectItem value={selection.column}>
-                                {selection.column}
-                              </SelectItem>
-                            )}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    ) : (
-                      <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                        No columns available for this node
-                      </div>
-                    )}
-                  </CardContent>
-                )}
-              </Card>
-            );
-          })}
-        </div>
+        <NodeSelectionList
+          nodes={selectedNodes}
+          nodeIds={selectedNodeIds}
+          nodeColors={nodeColors}
+          palette={defaultPalette}
+          maxCompare={maxCompare}
+          showColorPicker={showColorPicker}
+          onColorChange={showColorPicker ? handleNodeColorChange : undefined}
+          renderNodeMeta={shouldRenderMeta ? renderMetaContent : undefined}
+          renderNodeBody={showColumnPicker ? renderColumnSelector : undefined}
+        />
       )}
       {(originalCount ?? selectedNodes.length) > maxCompare && (
         <div className="mt-1 flex items-center gap-1 text-sm text-amber-600">
@@ -350,87 +256,6 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
   );
 };
 
+export type { NodeColumnSelection, WorkspaceNodeLike } from '@/features/analysis/common/nodeSelectionTypes';
+
 export default NodeSelectionPanel;
-
-interface NodeColorDropdownProps {
-  color: string;
-  palette: string[];
-  onChange: (color: string) => void;
-}
-
-const NodeColorDropdown: React.FC<NodeColorDropdownProps> = ({ color, palette, onChange }) => {
-  const [hexInput, setHexInput] = useState(color.toUpperCase());
-
-  useEffect(() => {
-    setHexInput(color.toUpperCase());
-  }, [color]);
-
-  const handleHexChange = useCallback(
-    (value: string) => {
-      const trimmed = value.trim().toUpperCase();
-      setHexInput(trimmed.startsWith('#') ? trimmed : `#${trimmed}`);
-      const normalized = trimmed.startsWith('#') ? trimmed : `#${trimmed}`;
-      if (/^#[0-9A-F]{6}$/.test(normalized)) {
-        onChange(normalized);
-      }
-    },
-    [onChange]
-  );
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          className={cn(
-            'h-6 w-6 aspect-square rounded-full ring-2 ring-border ring-offset-1 transition-shadow hover:ring-primary focus-visible:outline-none focus-visible:ring-primary shadow-sm'
-          )}
-          style={{ backgroundColor: color }}
-          aria-label="Select color"
-        />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56 p-3 space-y-3">
-        <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
-          <span>Pick color</span>
-          <span className="font-mono text-[10px] text-muted-foreground/80">{color.toUpperCase()}</span>
-        </div>
-        <div className="grid grid-cols-6 gap-1">
-          {palette.map((swatch) => (
-            <button
-              key={swatch}
-              type="button"
-              className={cn(
-                'h-5 w-5 rounded-full border border-white shadow-sm transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1',
-                swatch.toLowerCase() === color.toLowerCase() && 'ring-2 ring-primary ring-offset-1'
-              )}
-              style={{ backgroundColor: swatch }}
-              onClick={() => onChange(swatch)}
-              aria-label={`Set color ${swatch}`}
-            />
-          ))}
-        </div>
-        <div className="flex items-center gap-2">
-          <input
-            type="color"
-            value={color}
-            onChange={(event) => {
-              const next = event.target.value.toUpperCase();
-              setHexInput(next);
-              onChange(next);
-            }}
-            className="h-9 w-9 cursor-pointer rounded border border-input bg-transparent p-0"
-            aria-label="Custom color"
-          />
-          <Input
-            value={hexInput}
-            onChange={(event) => handleHexChange(event.target.value)}
-            maxLength={7}
-            placeholder="#000000"
-            aria-label="Hex color"
-            className="flex-1 text-xs font-mono"
-          />
-        </div>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-};

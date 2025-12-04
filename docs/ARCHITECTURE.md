@@ -406,41 +406,7 @@ def polars_type_to_js_type(polars_type: pl.DataType) -> str:
 
 **Purpose**: Execute long-running operations (topic modeling, large concordance searches) asynchronously without blocking API responses.
 
-##### TaskManager (`core/task_manager.py`)
-
-**Purpose**: Legacy async-based task manager for lightweight background tasks.
-
-**Key Classes**:
-
-- `TaskStatus`: Enum (PENDING, RUNNING, SUCCESSFUL, FAILED, CANCELLED)
-- `TaskInfo`: Dataclass tracking task metadata (id, task, created_at, started_at, finished_at, status, result, error, progress, metadata)
-- `TaskManager`: Manages asyncio tasks with lifecycle tracking
-
-**Key Methods**:
-- `add_task(coro, task_type, name, metadata)`: Creates asyncio task from coroutine
-  - **Implementation**: Wraps coroutine in `asyncio.create_task()`, registers done callback
-  - **Callback**: Updates TaskInfo status (SUCCESSFUL/FAILED/CANCELLED) and stores result/error
-- `cancel_task(task_id)`: Cancels running task by ID
-  - **Implementation**: Calls `task.cancel()` on asyncio.Task
-- `cancel_all(task_type)`: Cancels all tasks of specific type
-- `list()`: Returns all tasks as dicts with state, timestamps, progress, metadata
-  - **API Contract**: Exposes `state` field (maps to internal `status`) for frontend
-- `any_running(task_type)`: Checks if any tasks of type are running
-- `latest_by_type(task_type)`: Returns most recent task of type
-- `clear_tasks(task_type)`: Removes and cancels tasks (cleanup)
-
-**Usage Pattern**:
-```python
-tm = TaskManager()
-task_info = await tm.add_task(
-    my_async_function(),
-    task_type="concordance",
-    name="Extract concordances",
-    metadata={"node_id": "abc123"}
-)
-# Return task_id to client immediately
-return {"task_id": task_info.id, "status": "running"}
-```
+> **Note**: The original thread/async-based `TaskManager` module was removed. All long-running work now goes through the process-based manager described below, so the frontend documentation, SSE stream, and Zustand stores should only reference `ProcessTaskManager` events.
 
 ##### ProcessTaskManager (`core/process_task_manager.py`)
 
@@ -487,7 +453,7 @@ return {"task_id": task_info.id, "status": "running"}
 - `cancel_task(task_id)`: Attempts to cancel process task
   - **Limitation**: ProcessPoolExecutor doesn't support reliable cancellation; task continues
   
-- `list()`, `any_running()`, `latest_by_type()`, `clear_tasks()`: Same as TaskManager
+- `list()`, `any_running()`, `latest_by_type()`, `clear_tasks()`: Present the same API surface as the deprecated TaskManager so existing routers and tests did not need to change when the process-based backend landed.
 
 **Example Usage**:
 ```python
@@ -509,6 +475,46 @@ async for event in queue:
     # Event structure: {"type": "progress", "task_id": "...", "progress": 0.5, "message": "..."}
     yield event
 ```
+
+##### Workspace Task Stream (SSE)
+
+**Endpoint**: `GET /api/workspaces/{workspace_id}/tasks/stream`
+
+1. When a user opens a workspace, the frontend mounts `useWorkspaceTaskStream(workspaceId)`. The hook now lives at `src/hooks/useWorkspaceTaskStream.ts` but simply re-exports the feature-scoped task inbox (`src/features/workspace/task-stream`).
+2. `useWorkspaceTaskStreamClient` is the low-level SSE client. It attaches auth headers, maintains the connection/retry state (`status`, `error`, `reconnectAttempt`, `lastEventTimestamp`), and parses raw frames into JSON payloads.
+3. `useWorkspaceTaskInbox` composes the client with the analysis store. It receives every parsed payload, runs the immutable `mergeTaskUpdates` helper, raises topic-model readiness flags, and surfaces any task-level error messages back through the legacy hook’s state so the Sidebar UI can continue to show the retry button.
+4. Feature code that needs the raw client (e.g., future React Query adapters) can import it directly from `src/features/workspace/task-stream`, while existing consumers keep calling `useWorkspaceTaskStream` without seeing the refactor.
+
+```tsx
+const taskStream = useWorkspaceTaskStream(currentWorkspaceId);
+
+// Under the hood: low-level SSE client plus inbox adapter
+useWorkspaceTaskStreamClient(currentWorkspaceId, {
+  getAuthHeaders,
+  onEvent: (payload) => {
+    if (payload.type === 'tasks_snapshot') {
+      setTasks((prev) => mergeTaskUpdates(prev, payload.tasks.map((task) => ({ task })), { replaceAll: true }));
+      return;
+    }
+
+    if (payload.type === 'task_changed') {
+      setTasks((prev) =>
+        mergeTaskUpdates(prev, [
+          {
+            task: payload.task,
+            resultPersistedOverride: payload.result_persisted,
+          },
+        ])
+      );
+    }
+    if (payload.type === 'analysis_saved' && payload.task_type === 'topic_modeling') {
+      markTopicModelingReady(payload.task_id!, payload.timestamp);
+    }
+  },
+});
+```
+
+Because the SSE stream is authoritative, tabs no longer poll `/tasks` blindly. Instead, `useAnalysisTaskLifecycle` only polls result endpoints (e.g., `/concordance/current-result`) when it sees that an active task exists or when the SSE terminal event fires. This keeps the sidebar, tabs, and toast banners synchronized without relying on the deprecated TaskManager worker, and the new task-stream client makes it possible to plug those events directly into React Query cache updates in later iterations.
 
 ##### Worker Pool (`core/worker.py`)
 
@@ -853,17 +859,6 @@ This section provides comprehensive documentation of every backend file and its 
 - `handle_api_error(e, operation)`: Exception → error response
 - `_calculate_layout(nodes, algorithm)`: Calculates node positions for visualization
 - `polars_type_to_js_type(polars_type)`: Type conversion for frontend
-
-##### `task_manager.py` - TaskManager (Legacy)
-
-**Purpose**: Async-based task manager for lightweight background tasks.
-
-**Classes**:
-- `TaskStatus`: Enum for task states
-- `TaskInfo`: Task metadata dataclass
-- `TaskManager`: Manages asyncio tasks
-
-**Key Methods** (documented in Background Task System section above).
 
 ##### `process_task_manager.py` - ProcessTaskManager
 
@@ -1241,8 +1236,9 @@ Like concordance, the clear endpoint returns a `cleared` summary with `analyses_
 ```
 frontend/src/
   components/              # React components
-    layout/                # AppLayout, Sidebar, Header
-    workspace/             # WorkspaceGraph (XYFlow), NodeDetails
+    layout/                # App shell: Sidebar, WorkspaceGraphView, headers
+      sidebar/             # SidebarNodesSection, SidebarTasksSection, helpers
+    panels/                # Node detail drawers, inspectors
     analysis/              # TokenFrequency, Concordance, TopicModeling
     tabs/                  # Tab panels for different views
     ui/                    # Reusable UI components (buttons, dialogs)
@@ -1252,11 +1248,17 @@ frontend/src/
     nodes.ts               # Node API calls
     analysis.ts            # Analysis API calls
   hooks/                   # Custom React hooks
-    useWorkspace.ts        # TanStack Query hooks for workspaces
-    useAuth.ts             # Authentication state/actions
+    useWorkspaceInternal.ts  # TanStack Query + Zustand orchestrator
+    useWorkspaceData.ts      # WorkspaceProvider data slice (graph, nodes)
+    useWorkspaceSelection.ts # Selection slice (selected ids + pagination helpers)
+    useWorkspaceActions.ts   # Node mutations + toggle selection
+    useWorkspaceTaskStream.ts# Thin wrapper over the feature-scoped task-stream client/inbox
+    useAuth.ts               # Authentication state/actions
   stores/                  # Zustand stores
-    useWorkspaceStore.ts   # Workspace UI state (selected nodes, panels)
-    useAuthStore.ts        # Auth state (user, token)
+    selectionStore.ts      # Node/graph selection cache (single source of truth)
+    workspaceStore.ts      # Legacy stub (WorkspaceProvider now owns workspace id + pagination)
+    analysisStore.ts       # Task inbox populated by SSE
+    uiStore.ts             # Shell/Sidebar state (active view, dialogs, loaders)
   providers/               # React context providers
     QueryProvider.tsx      # TanStack Query client setup
     AuthProvider.tsx       # Authentication context
@@ -1271,16 +1273,42 @@ frontend/src/
 
 #### Key Components
 
-##### WorkspaceGraph (`components/workspace/WorkspaceGraph.tsx`)
+##### WorkspaceGraphView (`components/layout/WorkspaceGraphView.tsx`)
 
-**Purpose**: Visual representation of workspace using React Flow (XYFlow).
+**Purpose**: Present the workspace DAG with XYFlow while delegating all data fetching and selection state to `WorkspaceProvider` + Zustand stores. The component is intentionally “dumb”: it only consumes context slices and dispatches actions exposed by the provider.
 
-**Implementation**:
-- Uses TanStack Query to fetch workspace graph: `useQuery({queryKey: ['workspace', workspaceId], queryFn: () => api.getWorkspace(workspaceId)})`
-- Renders nodes and edges using `<ReactFlow nodes={nodes} edges={edges} />`
-- Custom node renderer: `nodeTypes={{customNode: CustomNode}}`
-- Handles node selection: Updates `useWorkspaceStore` on click
-- Layout: Backend provides positions (grid/vertical/horizontal/circular)
+**Data Flow**:
+- `WorkspaceProvider` calls `useWorkspaceInternal()` once per workspace. That hook now composes three focused helpers—`useWorkspaceCore` (auth headers, workspace id, pagination, Zustand selectors), `useWorkspaceQueries` (all TanStack Query fetches), and `useWorkspaceNodeMutations` (workspace/node mutations)—plus a tiny text-task layer. The composed result still fans out through `useWorkspaceData()`, `useWorkspaceSelection()`, and `useWorkspaceActions()`, but each concern stays isolated and memoized. Workspace identity + table pagination now live inside `useWorkspaceCore`, so every consumer reads the same derived values without duplicating state.
+- `WorkspaceGraphView` reads `{ workspaceGraph, currentWorkspaceId }` via `useWorkspaceData()` and never makes HTTP calls directly.
+- Selection state lives in `selectionStore.ts`. The graph receives `selectedNodeIds` through `useWorkspaceSelection()` and dispatches `toggleNodeSelection` via `useWorkspaceActions()`, so React Flow simply reflects whatever the store decides is “selected”.
+
+**Implementation Highlights**:
+- Computes a Dagre layout client-side to keep the graph readable even though the backend already returns coordinates. This lets the UI recover gracefully if a saved layout is missing or corrupt.
+- Registers a single `customNode` type that renders `CustomNode` (see `components/CustomNode.tsx`) for every workspace node, ensuring consistent badges/menus.
+- Mirrors store selection back into React Flow by mutating local node state whenever `selectedNodeIds` changes, preventing the library from clearing the highlights when the user clicks an empty pane.
+
+**Selection Handling**:
+```tsx
+const { workspaceGraph } = useWorkspaceData();
+const { selectedNodeIds } = useWorkspaceSelection();
+const { toggleNodeSelection } = useWorkspaceActions();
+
+const onNodeClick: NodeMouseHandler = useCallback((event, node) => {
+  event.preventDefault();
+  event.stopPropagation();
+  if (node?.id) {
+    toggleNodeSelection(node.id); // writes into selectionStore
+  }
+}, [toggleNodeSelection]);
+
+useEffect(() => {
+  setNodes((nodes) => nodes.map((n) => ({
+    ...n,
+    selected: selectedNodeIds.includes(n.id),
+    data: { ...n.data, isMultiSelected: selectedNodeIds.length > 1 && selectedNodeIds.includes(n.id) },
+  })));
+}, [selectedNodeIds]);
+```
 
 **Node Rendering**:
 ```tsx
@@ -1293,18 +1321,43 @@ const CustomNode = ({ data }) => (
 );
 ```
 
-**Selection Handling**:
+Because the graph is no longer the “global selection source”, other surfaces—most notably the Sidebar—can read the same `selectionStore` slice and stay in sync without depending on React Flow internals.
+
+##### Sidebar Shell (`components/layout/Sidebar.tsx` + `components/layout/sidebar/*`)
+
+**Purpose**: Provide a tri-section sidebar (Views, Nodes, Tasks) that mirrors workspace selection, exposes navigation, and surfaces long-running analysis jobs. The component consumes WorkspaceProvider slices exactly like the graph, so the two stay synchronized without bespoke props.
+
+**Key Pieces**:
+- `SidebarNodesSection` receives `nodes`, `selectedNodeIds`, and `onToggleNodeSelection` props. Toggling a checkbox simply calls `useWorkspaceActions().toggleNodeSelection`, which writes into `selectionStore`. Hover cards fetch shapes lazily via `getNodeShape` (cached in `sessionStorage`) so the UI can show “rows × cols” without prefetching every node.
+- `SidebarTasksSection` reads `tasks` from `analysisStore` (populated by the feature-scoped task inbox) and offers Cancel/Clear buttons that call the workspace task endpoints. Connection pills reflect the status returned by `useWorkspaceTaskStream` (the compatibility hook built on `useWorkspaceTaskInbox`), so the UI still shows `connecting`, `open`, and `error` states even though the underlying SSE client now lives in `src/features/workspace/task-stream`.
+- The Views list reflects `useUIStore().currentView` so selecting “Token Frequency” or “Topic Modeling” updates the same store that the tab router consumes.
+
+**Data/Task Wiring**:
 ```tsx
-const onNodeClick = (event, node) => {
-  // Update Zustand store
-  useWorkspaceStore.getState().setSelectedNodes([node.id]);
-  
-  // Fetch node details
-  queryClient.invalidateQueries(['node', workspaceId, node.id]);
-};
+const { workspaceGraph, currentWorkspaceId, getNodeShape } = useWorkspaceData();
+const { selectedNodeIds } = useWorkspaceSelection();
+const { toggleNodeSelection } = useWorkspaceActions();
+const { tasks, setTasks } = useAnalysisStore();
+const taskStream = useWorkspaceTaskStream(currentWorkspaceId);
+
+<SidebarNodesSection
+  nodes={(workspaceGraph?.nodes ?? []) as SidebarWorkspaceNode[]}
+  selectedNodeIds={selectedNodeIds}
+  onToggleNodeSelection={toggleNodeSelection}
+  getNodeShape={getNodeShape}
+/>
+
+<SidebarTasksSection
+  tasks={tasks}
+  onCancelTask={handleCancelTask}
+  onClearTask={handleClearTask}
+  connectionStatus={taskStream.status}
+/>
 ```
 
-##### TokenFrequencyTab (`components/tabs/TokenFrequencyTab.tsx`)
+The end result is a single source of truth for selection (Zustand) and a single source of truth for analysis jobs (`analysisStore`), with both the graph and sidebar acting as thin projections of that state.
+
+##### TokenFrequencyFeature (`frontend/src/features/analysis/token-frequency/TokenFrequencyFeature.tsx`)
 
 **Purpose**: Token frequency analysis with word clouds and statistics.
 
@@ -1313,19 +1366,19 @@ const onNodeClick = (event, node) => {
 - Unified word cloud (combined frequencies across selected nodes)
 - Per-node word clouds and tables
 - Statistical measures (log-likelihood, Bayes factor, effect size)
-- Stop-word filtering is applied entirely in the browser. The tab keeps the full backend payload intact, derives `nodeDisplayResults` via `useMemo`, and walks the unbounded token list to “backfill” slots so that each word cloud/table still renders up to the learner’s configured `token_limit` even after common words are filtered out.
+- Stop-word filtering is applied entirely in the browser. The feature keeps the full backend payload intact, derives `nodeDisplayResults` via `useMemo`, and walks the unbounded token list to “backfill” slots so that each word cloud/table still renders up to the learner’s configured `token_limit` even after common words are filtered out.
 - For UX/performance parity, the input is clamped to **100 tokens max**. Requests above that ceiling are automatically reset to 100 and the learner sees an alert explaining that word clouds can’t render larger payloads.
 
 **Implementation**:
 - Fetches token frequencies: `useMutation({mutationFn: (params) => api.computeTokenFrequencies(workspaceId, params)})`
-- Backend now returns the full vocabulary; the tab enforces the user’s preferred `token_limit` locally before rendering the table or clouds.
+- Backend now returns the full vocabulary; the feature enforces the user’s preferred `token_limit` locally before rendering the table or clouds.
 - Generates word clouds using `react-wordcloud` library
 - Displays statistics tables with sorting/filtering
 - Locks analysis results (prevents re-computation on node selection changes)
 
 **Walkthrough Q**: *How does the UI keep results manageable if the backend never truncates?*
 
-**Answer**: Treat this tab like a teaching demo for lazy data handling:
+**Answer**: Treat this feature like a teaching demo for lazy data handling:
 1. Read `result.metadata.token_limit` (default 10) plus `metadata.server_limit` to learn the saved UI preference.
 2. Slice the unbounded `data` array with `data.slice(0, token_limit)` when rendering each table/word cloud.
 3. Surface `total_tokens_before_limit` and `total_tokens_returned` so students can see that `applied_server_limit` is always `null` unless a legacy record is loaded.
@@ -1351,6 +1404,155 @@ const normalizedNodeResults = useMemo(() => {
 ```
 
 **Key Insight**: Analysis results locked to prevent UI changes when selecting additional nodes in graph view.
+
+#### Analysis Shared Utilities (`frontend/src/features/analysis/common/`)
+
+The analysis tabs now share a small toolbox that keeps hydration, locking, and color assignment consistent across Token Frequency, Concordance, Sequential Analysis, and future modules. Consolidating these helpers fixes the "Failed to fetch dynamically imported module" regressions (imports such as `../common`) and keeps feature implementations slimmer.
+
+- `utils.ts`
+  - Exposes quantitative helpers used throughout Token Frequency (and planned for Sequential Analysis), including `clampDisplayTokenLimit`, `computeServerLimit`, `toFiniteNumber`, and a resilient `formatNumber` that handles suffixes, multipliers, and graceful fallbacks. All exports are pure functions so tabs can `import { formatNumber } from '../common'` without pulling in React.
+- `useAnalysisHydration.ts`
+  - Wraps the current-request/current-result persistence pattern. Tabs pass workspace-aware fetch/apply functions plus optional preference persistence callbacks. The hook handles focus/visibility rehydration, deduplicates network requests, and normalizes preference objects so each feature doesn’t have to reinvent the “hydrate on mount + rehydrate on refocus” dance.
+- `useAnalysisLockMachine.ts`
+  - Owns the lock-state machine outright (the heavy logic moved here from `useAnalysisLockState.ts`). The module exposes `useAnalysisLockCore` for legacy callers and layers snapshot helpers (`captureSnapshotsForNodes()`, `lockWithCurrentNodes()`) plus workspace-aware persistence on top. The public hook returns the full lock state plus these helpers, while `useAnalysisLockState` simply re-exports the core behavior for older tabs.
+- `useNodeColorPalette.ts`
+  - Centralizes deterministic node coloring. Given a set of node ids (and optional metadata), it guarantees each node receives a palette color, exposes setters for the color picker UI, surfaces a legend describing `{id, label, color}`, and even provides `getGradientForNodes()` for combined visualizations. Token Frequency already uses it to keep colors uniform between the selection panel, per-node charts, and the Concordance handoff payload.
+- `useNodeColumnOptions.ts`
+  - Normalizes schema metadata for every selected node and enforces any data-type filters required by the analysis surface. Consumers pass the selected nodes plus an optional `getNodeColumns` helper and the hook returns a map keyed by node id that includes filtered column lists, fallback flags, and "filtered out" indicators. The function is also exported in pure form (`buildNodeColumnOptionsMap`) so it can be unit tested without React, which keeps the new logic well covered.
+- `components/NodeColorPicker.tsx`
+  - Shared Radix-driven color dropdown that exposes the palette swatches, a native color input, and a hex text box. Any feature (or the selection list) can mount it without duplicating the dropdown plumbing, and the component keeps the inputs in sync so the palette, color input, and text box always reflect the current color.
+- `components/NodeColumnSelector.tsx`
+  - Reusable select control that handles the "Select column…" clear option, missing-column preservation, and friendly empty-state messages. Callers only provide the filtered column array and a change handler; the component renders the standard label, select trigger, and empty warning used throughout the analysis tabs.
+- `components/NodeSelectionList.tsx`
+  - Stateless renderer for the horizontal node cards used in Token Frequency, Concordance, Sequential Analysis, etc. It handles color badges, card layout, and optional render props for metadata + card body content, so legacy surfaces like `NodeSelectionPanel` can become thin wrappers that simply pass the appropriate render functions.
+
+All of the above are re-exported through `common/index.ts`, so analysis tabs only need `import { useAnalysisLockMachine, useNodeColorPalette } from '../common';` to opt in.
+
+##### FilterSubTab (`frontend/src/features/preprocessing/filter/FilterSubTab.tsx`)
+
+**Purpose**: Feature-sliced implementation of the preprocessing “Filter” sub-tab. The component now lives alongside the shared preview utilities so it can import hooks, serializers, and helpers without deep `../../components/...` paths.
+
+**Key Dependencies**:
+- `usePreprocessingPreview` — debounced preview hook shared across preprocessing subtabs (filter, slice, concat). The filter tab passes `{ nodeId, payload }` plus pagination arguments and receives `{ data, columns, pagination, setPage, setPageSize }`.
+- Shared UI primitives from `components/ui` (Button, Select, Card, Tag) and the `NodeSelectionPanel` so that filter configuration mirrors the other subtabs.
+- Serializer helpers in `frontend/src/features/preprocessing/filter/utils/serializers.ts` to build request payloads and validate condition completeness before hitting the API.
+- Type helpers (`normalizeTypeName`, `getOperatorsForType`, `formatPreviewValue`) to keep column datatype detection and categorical label formatting consistent with other preprocessing steps.
+
+**Implementation Highlights**:
+1. **Schema-aware column list** – `availableColumns` normalizes `nodeData.dtypes`, or falls back to the node schema if the API has not returned dtype metadata yet. Each condition persists the resolved `dataType` so operator dropdowns and value inputs stay in sync even as columns change.
+2. **Categorical option cache** – `ensureCategoricalOptions(column)` calls `nodesApi.uniqueValues` once per `(workspace, node, column)` and stores the result in local state keyed by `${workspaceId}::${nodeId}::${column}`. Null values are surfaced as an explicit checkbox entry (`NULL_OPTION_KEY`) so learners can include or exclude nulls with the rest of the in-list options.
+3. **Datetime prefills** – When a datetime column/operator is chosen, the component fetches `nodesApi.describeColumn` to seed the appropriate min/median/max values (or ranges for `between`). This keeps the UI from sending empty ISO strings and mirrors the legacy component behavior, but now the helper lives next to the hook/harness instead of inside the shared components directory.
+4. **Preview + pagination** – `filterPreviewRequest` memoizes `{ nodeId, payload }` and feeds it into `usePreprocessingPreview`. That hook exposes `setPage`/`setPageSize`, so the tab can drive Previous/Next buttons without duplicating fetch logic. Pagination buttons now pass explicit numbers (`setPreviewPage(Math.max(1, currentPreviewPage - 1))`) to match the hook’s `(page: number) => void` signature.
+5. **Workspace integration** – The JSX still renders `<NodeSelectionPanel>` and preview cards exactly like before, so `DataPreprocessingFeature` simply swaps its import to `../../preprocessing/filter/FilterSubTab` and keeps the same props (`selectedNodeId`, `selectedNodes`, `nodeData`, `filterNode`, `filterPreview`, etc.).
+
+6. **Condition builder primitives** – The bulky inline JSX that previously handled column/operator/value wiring now lives in `frontend/src/features/preprocessing/components/condition-builder/ConditionBuilder.tsx`. Filter passes `renderConditionMetadata` (for negate/regex toggles) and `renderValueInput`, so additional subtabs can reuse the same scaffolding by swapping in their own metadata/value editors.
+
+**Result**: The filter experience is identical in the UI, but the shared hook (`usePreprocessingPreview`), serializers, preview table, and condition builder all live under `src/features/preprocessing`. This reduces cross-package imports and provides drop-in primitives for the remaining subtabs (slice, concat, aggregate) as they migrate.
+
+##### ConditionBuilder (`frontend/src/features/preprocessing/components/condition-builder/ConditionBuilder.tsx`)
+
+**Purpose**: Shared UI skeleton for column-based condition builders. It renders the “Add condition” CTA, AND/OR logic selector, column/operator dropdowns, and defers value/input rendering to feature-specific callbacks.
+
+**Implementation Notes**:
+
+- Accepts a typed list of condition records (must expose `id`, `column`, `operator`, optional `dataType`).
+- Provides hooks for feature-specific behavior: `renderValueInput` (value editors), `renderConditionMetadata` (toggles such as negate/regex), `getOperatorOptions`, and `shouldHideOperatorSelect` for data types with fixed operators (e.g., categoricals forced to `IN`).
+- Handles empty states automatically: “Select a node…”, “Retrieving column information…”, and “No schema yet.” Callers can override the copy via props.
+- Because the component is framework-agnostic (no filter-specific imports), other subtabs can share it simply by reusing the same prop contract.
+
+##### SliceSubTab (`frontend/src/features/preprocessing/slice/SliceSubTab.tsx`)
+
+**Purpose**: Feature-sliced rewrite of the legacy slicing UI. The component now lives under `src/features/preprocessing/slice/` and shares the same preview engine, preview table, and NodeSelectionPanel wiring as the Filter tab.
+
+**Highlights**:
+
+1. **Shared preview engine** – Uses `usePreprocessingPreview` with a 400 ms debounce and a typed fetcher to call `slicePreview(nodeId, payload, page, pageSize)`. The hook manages pagination, abort controllers, and request deduplication.
+2. **Range helpers** – `rangeSummary` and `lastResultSummary` remain, but they’re now derived via `useMemo` inside the feature module so the card footer always reflects the current offset/length and last successful slice operation.
+3. **Workspace integration** – Node selection, palette management, and disabled states reuse the same helper functions defined in the module (`buildWorkspaceNodeMap`, `deriveNodeLabel`). The `NodeSelectionPanel` stays unchanged, so DataPreprocessingFeature only needed to update its import path.
+4. **Single source of truth** – The former `src/components/preprocessing/SliceSubTab.tsx` shim has been deleted, so every caller imports this module directly and there is no duplicated wrapper logic.
+
+**Result**: Slice previews, range validation, and node creation now share the same preview/pagination primitives as Filter. The module dropped ~1000 lines of bespoke preview plumbing and is ready for further decomposition (e.g., extracting the range form into a smaller component) without touching the legacy components directory.
+
+##### JoinSubTab (`frontend/src/features/preprocessing/join/JoinSubTab.tsx`)
+
+**Purpose**: Migrates the preprocessing “Join” surface into the feature-sliced preprocessing folder, wiring it to the shared preview engine and condition-builder primitives so future subtabs can drop in without touching the now-retired `src/components/preprocessing` directory.
+
+**Highlights**:
+
+1. **Typed preview payloads** – Introduces `JoinPreviewRequestPayload` in `src/features/preprocessing/types.ts`, documenting `{ leftNodeId, rightNodeId, joinType, columnPairs, limit, offset }`. Both the preview hook and the “Apply” mutation share this shape, keeping debounce + submission in sync.
+2. **`usePreprocessingPreview` integration** – The join tab passes a `joinPreviewFetcher` that calls `nodesApi.joinPreview({ workspaceId, leftNodeId, rightNodeId, payload, page, pageSize })`. The hook manages pagination, abort signals, and deduplicated debounced requests exactly like Filter/Slice, so the tab only renders pagination controls.
+3. **Column pair editor** – Local helpers derive columns for the left/right nodes from `nodeData` and gate form controls until both nodes expose schema data. Pairs are stored as `{ leftColumn, rightColumn }` records keyed by `uuidv4`, mirroring the condition-builder contract so drag-and-drop ordering or quick deletions remain trivial.
+4. **NodeSelectionPanel parity** – Joins continue to use `<NodeSelectionPanel>` for picking the primary node plus right-hand partner. The feature module reuses the shared workspace selectors and disabled states, so `DataPreprocessingFeature` simply swaps imports and props stay identical (`selectedNodeId`, `selectedNodes`, `nodeData`, etc.).
+5. **Single import path** – With the wrapper directory removed, `DataPreprocessingFeature` (and any future consumers) import this component directly from `src/features/preprocessing/join/JoinSubTab`, guaranteeing there is exactly one implementation in play.
+
+**Result**: The Join UI now benefits from the same preview/pagination infrastructure as Filter and Slice, eliminates bespoke axios calls, and keeps all preprocessing subtabs under a single folder with shared hooks/components.
+
+##### ConcatSubTab (`frontend/src/features/preprocessing/concat/ConcatSubTab.tsx`)
+
+**Purpose**: Feature-sliced rewrite of the “Concat” sub-tab that was previously 500+ lines of bespoke preview logic. The new module lives beside the other preprocessing features and consumes the shared preview hook/table so pagination, error handling, and node selection behave consistently.
+
+**Highlights**:
+
+1. **Workspace-aware schema analysis** – Reuses the legacy schema comparison routines (now colocated with the feature) to validate that each selected node exposes the same sorted column set and compatible dtypes. The analysis object drives both the status banner and the preview eligibility gate.
+2. **Shared preview engine** – Builds a `{ nodeIds }` payload and passes it to `usePreprocessingPreview`, which debounces calls to `workspaceActions.concatPreview`, manages abort signals, and surfaces pagination setters. The component now only handles Prev/Next/page-size buttons and hands the rest to `PreviewTable`.
+3. **Palette + NodeSelectionPanel reuse** – Keeps the richer node status cards by feeding `NodeSelectionPanel` directly from the feature, but the component now lives alongside the slice/join implementations, eliminating deep `../..` import chains.
+4. **Single implementation** – The old `src/components/preprocessing/ConcatSubTab.tsx` file has been removed, so the feature module is now the only implementation and no commented legacy fallback remains.
+
+**Result**: Concat now shares preview/pagination infrastructure, and the components directory no longer contains divergent business logic—only a thin shim that can be removed once downstream consumers swap to the feature import.
+
+##### AggregateSubTab (`frontend/src/features/preprocessing/aggregate/AggregateSubTab.tsx`)
+
+**Purpose**: Moves the computed-column builder into the feature-scoped preprocessing folder. The UI still exposes both the drag-and-drop “Basic” builder and the raw expression editor, but the logic now sits next to the rest of the preprocessing toolkit for easier sharing (e.g., future expression token components).
+
+**Highlights**:
+
+1. **Node selection + schema access** – Continues to rely on `NodeSelectionPanel` for highlighting the active node and retrieving column metadata via `mapColumnsToInfo`, but the new location means the component can import the shared panel directly through the features workspace (no deep `../..` chains).
+2. **Expression builder plumbing** – All drag/drop helpers, token editing flows, and smart-quote normalization live inside the feature module, making it straightforward to extract `ExpressionBuilder` or token palette components later without touching the components directory.
+3. **Preview + apply hooks** – The tab still calls `useWorkspaceActions().computeColumnPreview/computeColumn`, but the data/alert wiring now matches the other feature subtabs. With the old `src/components/preprocessing` entrypoint removed, the feature module is the canonical surface and there is no redundant wrapper to maintain.
+
+**Result**: Aggregate now resides with the rest of the preprocessing suite, eliminating another legacy component and ensuring future shared helpers (token palettes, preview harnesses) can evolve inside `src/features/preprocessing`.
+
+##### DataLoaderFeature (`frontend/src/features/analysis/data-loader/DataLoaderFeature.tsx`)
+
+**Purpose**: Provide the “Data Loader” tab that students use to (1) create/select workspaces, (2) upload local corpora or import the backend’s sample datasets, and (3) push uploaded files into the active workspace as nodes before moving on to analysis subtabs.
+
+**Workflow Recap**:
+1. *Pick an active workspace* – the component pulls `{ workspaces, currentWorkspaceId, workspaceGraph }` from `useWorkspaceData()` and mirrors the selection via `useWorkspaceActions().setCurrentWorkspace`. The summary card also surfaces node counts (`workspaceGraph?.nodes.length`) plus created/modified timestamps so learners can tell which workspace they’re editing.
+2. *Manage workspace metadata* – rename/save/save-as buttons call the memoized workspace mutations (`renameWorkspace`, `saveWorkspace`, `saveWorkspaceAs`) that live inside `useWorkspaceNodeMutations`. The “Create workspace” form simply forwards the name/description to `createWorkspace`, while delete buttons call `deleteWorkspace(workspaceId)` after a confirmation prompt.
+3. *Upload and inspect files* – `useFiles({ authHeaders })` drives the file table, leveraging the existing TanStack Query cache for `/files/`. Uploads flow through `handleUploadFile`, deletes though `handleDeleteFile`, downloads via `handleDownloadFile`, and “Import sample data” is wired straight to `filesApi.importSampleData`. The component renders `FilePreviewPanel` and `AddFilePanel` as dialogs so learners can preview/inspect a file before adding it to the workspace.
+4. *Add a file to the active workspace* – when the learner clicks **Add**, the component opens `AddFilePanel` and, on confirmation, dispatches `createNodeFromFile(filename, { mode, documentColumn })`. Success and failure states feed a single `statusMessage` banner, giving immediate feedback without exposing implementation details.
+
+**Implementation Highlights**:
+- Uses lightweight helpers (`formatBytes`, `formatTimestamp`) so the file table can display human-readable metadata without reformatting on every render.
+- Maintains a single `statusMessage` state with auto-dismissal via `useEffect`, ensuring uploads/imports/CRUD actions surface success and error feedback consistently.
+- Reuses shadcn-inspired UI primitives (`Card`, `Table`, `Badge`) and lucide icons (`Upload`, `FolderPlus`, `Trash2`) to keep the Data Loader tab visually aligned with the rest of the analysis surface.
+- Keeps the file input hidden and triggered via a primary **Upload file** button, which mirrors the legacy UX but now sits inline with the “Import sample data” CTA.
+- Guards workspace-only actions—renaming, saving, and adding files—behind `hasWorkspaceSelected` so the tab gently nudges learners to pick/create a workspace before attempting downstream transformations.
+
+**Example** – adding an uploaded CSV as a DocLazyFrame:
+
+```tsx
+const [addFileName, setAddFileName] = useState<string | null>(null);
+
+<Button onClick={() => {
+  if (!currentWorkspaceId) {
+    setStatusMessage({ type: 'error', text: 'Select a workspace first.' });
+    return;
+  }
+  setAddFileName(file.filename);
+}}>
+  Add
+</Button>
+
+<AddFilePanel
+  filename={addFileName}
+  open={Boolean(addFileName)}
+  onClose={() => setAddFileName(null)}
+  onConfirm={(options) => workspaceActions.createNodeFromFile(addFileName!, options)}
+/>
+```
+
+That snippet shows the same “question → answer” rhythm used in tutorials: once the learner clicks **Add**, the dialog gathers DocFrame mode + document column and then calls `createNodeFromFile`. The surrounding status banner reports whether the mutation succeeded so students know when it’s safe to switch into the preprocessing or analysis tabs.
 
 ##### API Client (`api/client.ts`)
 
@@ -1399,83 +1601,188 @@ client.interceptors.request.use(config => {
 
 #### State Management
 
-##### TanStack Query (`hooks/useWorkspace.ts`)
+##### Workspace hook stack (`hooks/workspace/*` + `hooks/useWorkspaceInternal.ts`)
 
-**Purpose**: Server state management with caching, refetching, optimistic updates.
+**Purpose**: Split the 1.2k-line monolith into focused hooks while keeping `WorkspaceProvider` the single wiring point. `useWorkspaceInternal()` now composes:
+
+- `useWorkspaceCore.ts` – owns auth headers, the current workspace id, selection/pagination helpers (via Zustand selectors), and UI operation bookkeeping. It exposes memoized setters (`handlePageChange`, `handlePageSizeChange`) plus normalized loading/error maps.
+- `useWorkspaceQueries.ts` – runs every TanStack Query fetch (workspaces list, current workspace, graph, node data, node shape cache) using the data provided by `useWorkspaceCore`. Returns derived arrays like `nodes`, `selectedNode`, `selectedNodes`, and aggregated loading/error objects.
+- `useWorkspaceNodeMutations.ts` – encapsulates workspace/node mutations and their invalidation/configuration logic (workspace CRUD, joins, casts, conversions, schema refresh, etc.). It expects the state setters from `useWorkspaceCore`, so selection clears and pagination resets stay centralized.
+- `useWorkspaceInternal.ts` – stitches the three hooks together, adds the text-task mutations (concordance/quotation) plus selection helpers, and exports the same `{ data, selection, actions, status }` slices that `WorkspaceProvider` already exposes.
 
 **Query Keys** (`lib/queryKeys.ts`):
 ```typescript
 export const queryKeys = {
-  workspaces: () => ['workspaces'],
-  workspace: (id: string) => ['workspace', id],
-  workspaceGraph: (id: string) => ['workspaceGraph', id],
-  node: (workspaceId: string, nodeId: string) => ['node', workspaceId, nodeId],
-  nodeData: (workspaceId: string, nodeId: string, page: number) => 
-    ['nodeData', workspaceId, nodeId, page],
-  analysisResult: (workspaceId: string, analysisId: string) => 
-    ['analysis', workspaceId, analysisId],
+  workspaces: ['workspaces'] as const,
+  currentWorkspace: ['workspaces', 'current'] as const,
+  workspace: (id: string) => ['workspaces', id] as const,
+  workspaceGraph: (id: string) => ['workspaces', id, 'graph'] as const,
+  nodeData: (workspaceId: string, nodeId: string, page?: number, pageSize?: number) =>
+    page !== undefined && pageSize !== undefined
+      ? ['workspaces', workspaceId, 'nodes', nodeId, 'data', page, pageSize] as const
+      : ['workspaces', workspaceId, 'nodes', nodeId, 'data'] as const,
+  nodeSchema: (workspaceId: string, nodeId: string) => ['workspaces', workspaceId, 'nodes', nodeId, 'schema'] as const,
 };
 ```
 
-**Example Hook**:
+**Central Hook Composition**:
 ```typescript
-export const useWorkspaceGraph = (workspaceId: string) => {
-  return useQuery({
-    queryKey: queryKeys.workspaceGraph(workspaceId),
-    queryFn: () => api.getWorkspace(workspaceId),
-    staleTime: 30000,  // Consider fresh for 30s
-    gcTime: 300000,    // Keep in cache for 5min
+export const useWorkspaceInternal = () => {
+  const core = useWorkspaceCore();
+  const queries = useWorkspaceQueries({
+    authHeaders: core.authHeaders,
+    isAuthenticated: core.isAuthenticated,
+    currentWorkspaceId: core.currentWorkspaceId,
+    selectedNodeId: core.selectedNodeId,
+    selectedNodeIds: core.selectedNodeIds,
+    getPaginationForNode: core.getPaginationForNode,
   });
+
+  const { actions: nodeActions } = useWorkspaceNodeMutations({
+    authHeaders: core.authHeaders,
+    currentWorkspaceId: core.currentWorkspaceId,
+    selectedNodeId: core.selectedNodeId,
+    setCurrentWorkspaceId: core.setCurrentWorkspaceId,
+    setSelectedNodes: core.setSelectedNodes,
+    clearSelection: core.clearSelection,
+    queryClient,
+    startOperation: core.startOperation,
+    endOperation: core.endOperation,
+    setOperationError: core.setOperationError,
+  });
+
+  const textActions = useMemo(() => ({
+    concordanceSearch: (nodeId, request) =>
+      concordanceMutation.mutateAsync({ workspaceId: ensureWorkspaceSelected(), nodeId, request }),
+    quotationSearch: (nodeId, request) =>
+      quotationMutation.mutateAsync({ workspaceId: ensureWorkspaceSelected(), nodeId, request }),
+    // ...detach helpers
+  }), [concordanceMutation, quotationMutation, ensureWorkspaceSelected]);
+
+  return {
+    workspaces: queries.workspaces,
+    workspaceGraph: queries.workspaceGraph,
+    nodeData: queries.nodeData,
+    isLoading: {
+      ...queries.queryLoadingState,
+      operations: core.loadingOperationCount > 0,
+    },
+    actions: {
+      selectNode: core.selectNode,
+      ...nodeActions,
+      ...textActions,
+    },
+    handlePageChange: core.handlePageChange,
+    handlePageSizeChange: core.handlePageSizeChange,
+  };
 };
 ```
 
-**Invalidation Pattern**:
+**Invalidation Pattern** (now lives inside `useWorkspaceNodeMutations.ts`):
 ```typescript
-// After creating node
-const createNodeMutation = useMutation({
-  mutationFn: (params) => api.createNode(workspaceId, params),
-  onSuccess: () => {
-    // Invalidate workspace graph to refetch with new node
-    queryClient.invalidateQueries(queryKeys.workspaceGraph(workspaceId));
+const setCurrentWorkspaceMutation = useMutation({
+  mutationFn: (workspaceId: string | null) => workspacesApi.current.set(workspaceId, authHeaders),
+  onSuccess: (_data, workspaceId, context) => {
+    const nextId = workspaceId ?? null;
+    queryClient.setQueryData(queryKeys.currentWorkspace, nextId);
+    setCurrentWorkspaceId(nextId);
+    clearSelection();
+
+    if (nextId) {
+      queryClient.invalidateQueries({
+        predicate: ({ queryKey }) =>
+          Array.isArray(queryKey) &&
+          queryKey[0] === 'workspaces' &&
+          queryKey[1] === nextId &&
+          queryKey.length > 1,
+      });
+    }
   },
 });
 ```
 
-##### Zustand Stores (`stores/useWorkspaceStore.ts`)
+##### Zustand Stores (`selectionStore.ts`, `workspaceStore.ts`, `analysisStore.ts`)
 
-**Purpose**: UI state that doesn't need server sync (selections, panel visibility).
-
-**Example Store**:
+**selectionStore.ts** – Owns all node/graph selection and per-node pagination. `WorkspaceGraphView`, `SidebarNodesSection`, and every tab consume the same getters so there is zero divergence.
 ```typescript
-interface WorkspaceState {
-  selectedNodes: string[];
-  setSelectedNodes: (ids: string[]) => void;
-  panelSelectedNodes: string[];
-  setPanelSelectedNodes: (ids: string[]) => void;
-  showAnalysisPanel: boolean;
-  toggleAnalysisPanel: () => void;
-}
-
-export const useWorkspaceStore = create<WorkspaceState>((set) => ({
-  selectedNodes: [],
-  setSelectedNodes: (ids) => set({selectedNodes: ids}),
-  panelSelectedNodes: [],
-  setPanelSelectedNodes: (ids) => set({panelSelectedNodes: ids}),
-  showAnalysisPanel: false,
-  toggleAnalysisPanel: () => set((state) => ({showAnalysisPanel: !state.showAnalysisPanel})),
-}));
+export const useSelectionStore = create<SelectionStore>()(
+  devtools(immer((set, get) => ({
+    selectedNodeId: null,
+    selectedNodeIds: [],
+    selectNode: (nodeId) => set((state) => {
+      state.selectedNodeId = nodeId;
+      state.selectedNodeIds = nodeId ? [nodeId] : [];
+    }),
+    setSelectedNodes: (ids) => set((state) => {
+      state.selectedNodeIds = ids;
+      state.selectedNodeId = ids[0] ?? null;
+    }),
+    toggleNodeSelection: (nodeId) => set((state) => {
+      const isSelected = state.selectedNodeIds.includes(nodeId);
+      state.selectedNodeIds = isSelected
+        ? state.selectedNodeIds.filter((id) => id !== nodeId)
+        : [...state.selectedNodeIds, nodeId];
+      state.selectedNodeId = state.selectedNodeIds[0] ?? null;
+    }),
+    // ...pagination helpers omitted for brevity
+  })))
+);
 ```
 
-**Usage**:
-```typescript
-// In component
-const {selectedNodes, setSelectedNodes} = useWorkspaceStore();
+**workspaceStore.ts** – Tracks the workspace id, graph viewport, and long-lived operation flags (pending deletes, renames, joins). Switching workspaces resets the entire slice so stale pagination/graph zoom does not leak across sessions.
 
-// Select node in graph
-const handleNodeClick = (nodeId: string) => {
-  setSelectedNodes([nodeId]);
-};
+**analysisStore.ts** – Acts as the inbox for background tasks. `useWorkspaceTaskInbox` (and the compatibility hook `useWorkspaceTaskStream`) write SSE payloads into `setTasks`, while `useAnalysisTaskStatus` / `useAnalysisTaskLifecycle` derive banners and poll/refresh behavior for Concordance and Topic Modeling tabs as well as the Sidebar’s Tasks list.
+
+##### Analysis Task Lifecycle (`hooks/useAnalysisTaskLifecycle.ts`)
+
+**Purpose**: Centralize analysis task UX (banners, polling, and result refresh) for Concordance, Topic Modeling, and future analysis tabs. The hook wraps `useAnalysisTaskStatus` and the SSE-driven task inbox (via `useWorkspaceTaskStream`) so each tab no longer re-implements the same polling/terminal-handling logic, even as the low-level SSE client moves into the feature module.
+
+**Inputs**:
+
+- `taskType`: Backend task type (`'concordance'`, `'topic_modeling'`, etc.) used to filter `analysisStore.tasks`.
+- `workspaceId`: Ensures polling/refresh only runs when a workspace is mounted; also resets internal refs when the user switches workspaces.
+- `manualActiveTaskId` *(optional)*: Allows tabs to pass the task id returned from an immediate POST response before the SSE stream echoes the task. Concordance uses this to start polling immediately after `/concordance` responds.
+- `fallbackRunningBanner`: Either a static object or a resolver function `(status) => BannerFallback | null`. Tabs provide a resolver so `AnalysisTaskBanner` can still show a spinner when the current result says `state: 'running'` even if the SSE queue hasn’t emitted a queued/running task yet.
+- `pollWhileActive`/`pollIntervalMs`: Enables lightweight polling for analyses whose results are only exposed via `/current-result` (Concordance). Topic Modeling leaves polling off because the SSE stream plus `topicModelingReady` markers are sufficient.
+- `onRefresh(context)`: Async callback invoked for two reasons:
+  - `context.reason === 'poll'`: Fired on the configured interval while a task is active.
+  - `context.reason === 'terminal'`: Fired once per terminal task transition (`successful`, `failed`, `cancelled`). The context exposes `task`, `taskId`, and `taskState` so tabs can decide how to fetch or synthesize their UI state.
+
+**Behavior**:
+
+1. **Banner Synthesis** – Computes an `AnalysisTaskBannerState` by checking `status.bannerStatus` (running/queued from SSE). If no official status exists, the fallback resolver runs so tabs can derive a “running” message from their cached `result` payload.
+2. **Polling Loop** – When `pollWhileActive` is true and either the SSE state or `manualActiveTaskId` indicates an active task, the hook schedules a `window.setInterval` and repeatedly calls `onRefresh({reason: 'poll', ...})`. React cleans up the timer automatically when dependencies change.
+3. **Terminal Deduplication** – Internally tracks `{taskId, state}` pairs so `onRefresh({reason: 'terminal'})` only fires once per completion even if Zustand re-renders multiple times.
+
+**Example (Concordance Tab)**:
+
+```tsx
+const concordanceFallback = useCallback((status: AnalysisTaskStatus) => {
+  if (results?.state !== 'running') return null;
+  return {
+    taskId: (results as any)?.metadata?.task_id ?? status.activeTaskId,
+    message: status.bannerMessage?.trim() || undefined,
+  };
+}, [results]);
+
+const handleTaskRefresh = useCallback(async (ctx: AnalysisTaskRefreshContext) => {
+  const refreshed = await refreshCurrentConcordanceResult();
+  if (!refreshed && ctx.reason === 'terminal' && ctx.taskState === 'failed') {
+    setResults({ state: 'failed', message: ctx.task?.message, data: {} });
+  }
+}, [refreshCurrentConcordanceResult]);
+
+const { banner } = useAnalysisTaskLifecycle({
+  taskType: 'concordance',
+  workspaceId: currentWorkspaceId,
+  manualActiveTaskId,
+  fallbackRunningBanner: concordanceFallback,
+  pollWhileActive: true,
+  onRefresh: handleTaskRefresh,
+});
 ```
+
+TopicModelingTab uses the same hook but disables polling and hands `onRefresh` off to `fetchTopicModelingResult`. When SSE reports a persisted `topic_modeling` task the hook makes exactly one `GET /topic-modeling/current-result` call, eliminating the bespoke `useEffect` blocks that previously watched `successfulTask`/`failedTask` manually.
 
 ## Data Flow Patterns
 
@@ -1644,6 +1951,32 @@ Frontend: Receives graph data
 
 **Key Insight**: Backend provides fully positioned graph; frontend only renders (no layout computation in browser).
 
+### Workspace Feature Modules (Frontend)
+
+The workspace screen is now implemented using feature-scoped modules under `frontend/src/features/workspace`. Each surface exposes a single feature component that layouts orchestrate (e.g., `WorkspaceDataView` and `WorkspaceGraphView` simply memo-wrap these features).
+
+#### Data View (`features/workspace/data-view`)
+
+- **Hook – `useWorkspaceDataTable`**: Centralizes every selector for the data table (selected node metadata, TanStack Table pagination handlers, mutation callbacks). The hook also tracks tab ordering for multi-selection and pulls actual shapes on-demand via `getNodeShape`.
+- **Services – `services/schemaMutations.ts`**: Pure helpers that normalize type names, manage column mutation payloads, and keep table metadata consistent when casting/renaming columns.
+- **Presentational Components**:
+  - `WorkspaceSelectionTabs` renders pills that reflect Zustand selections and exposes drag-friendly reordering callbacks supplied by the hook.
+  - `WorkspaceDataHeader` surfaces node title + shape readings with “rows loaded” status.
+  - `WorkspaceTable` wraps TanStack Table and hosts all column pinning logic, datetime format modals, column deletion dialogs, etc.
+  - `TablePaginationControls` provides the shared pagination footer with ellipsis-jump support.
+- **Feature Entry – `WorkspaceDataTableFeature`**: Orchestrates the hook + components, chooses loading/empty states, and feeds sanitized props into `WorkspaceTable`. Layout components now stay lean and simply mount this feature.
+
+#### Graph View (`features/workspace/graph-view`)
+
+- **Services – `services/graphLayout.ts`**: Houses the Dagre-based auto-layout (LR rank, sticky node widths/heights) so the behavior is shareable across hooks/tests.
+- **Hook – `useWorkspaceGraph`**: Migrates every side effect that previously lived in `WorkspaceGraphView`:
+  - Builds React Flow nodes/edges, including shape inference, data type detection, and selection flags.
+  - Exposes fully prepared handlers (`handleNodeClick`, `handleNodesChange`, `handlePaneClick`, etc.) and keeps React Flow state synchronized with Zustand selections.
+  - Provides default edge styling, connection blockers, and the “clear selection” control wiring.
+- **Feature Entry – `WorkspaceGraphFeature`**: Imports XYFlow styles, renders loading/empty states, manages local “overview” toggle state, and composes `<ReactFlow>` with the hook’s props. The node-count overlay and control buttons live here, so layouts stay declarative.
+
+These feature modules allow other surfaces (desktop shell, multi-pane layouts) to reuse the workspace data/graph experiences without pulling in unrelated UI or state management code.
+
 ## Extension Points
 
 ### 1. Adding New Workspace Operations
@@ -1715,7 +2048,7 @@ async def custom_analysis(
 
 ### 3. Adding New Frontend Components
 
-**Where**: `frontend/src/components/analysis/` or `frontend/src/components/tabs/`
+**Where**: `frontend/src/features/analysis/*` (feature-first slices)
 
 **Pattern**:
 ```tsx
