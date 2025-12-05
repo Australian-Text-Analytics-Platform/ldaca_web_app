@@ -370,6 +370,58 @@ def create_launcher_scripts(runtime_dir: Path) -> None:
     write_file(runtime_dir / "README_RUNTIME.md", docs_contents)
 
 
+def download_nltk_data(python_bin: Path, destination_dir: Path) -> None:
+    print(f"📚 Downloading NLTK data to {destination_dir}")
+    destination_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Resources to download
+    # punkt_tab is required for newer NLTK versions
+    # punkt is the classic tokenizer models
+    # averaged_perceptron_tagger_eng is standard for POS tagging
+    # stopwords is used by the text analysis API
+    resources = ["punkt_tab", "punkt", "averaged_perceptron_tagger_eng", "stopwords"]
+    
+    # Use the packaged Python to download data to ensure compatibility
+    # and because it definitely has NLTK installed (via docframe dependency)
+    # We use a robust script to ensure failures are reported
+    download_script = textwrap.dedent(f"""
+        import nltk
+        import sys
+        import os
+        
+        resources = {resources}
+        destination = r"{str(destination_dir).replace(os.sep, '/')}"
+        
+        print(f"   Target directory: {{destination}}")
+        
+        failed = []
+        for res in resources:
+            print(f"   Downloading {{res}}...")
+            try:
+                if not nltk.download(res, download_dir=destination, quiet=False):
+                    print(f"   ⚠️  nltk.download returned False for {{res}}")
+                    failed.append(res)
+            except Exception as e:
+                print(f"   ❌ Error downloading {{res}}: {{e}}")
+                failed.append(res)
+        
+        if failed:
+            print(f"   ❌ Failed to download: {{failed}}")
+            sys.exit(1)
+        
+        print("   ✅ All NLTK resources downloaded")
+    """)
+    
+    cmd = [str(python_bin), "-c", download_script]
+    
+    try:
+        run(cmd)
+        print("   ✅ NLTK data setup complete")
+    except subprocess.CalledProcessError as e:
+        print(f"   ❌ Failed to download NLTK data: {e}")
+        raise
+
+
 def main() -> None:
     args = parse_args()
     ensure_uv_is_available()
@@ -512,6 +564,8 @@ def main() -> None:
     if sanitized_lockfile.exists():
         sanitized_lockfile.unlink()
         print("🧽 Removed temporary lockfiles")
+
+    download_nltk_data(python_bin, runtime_python_dir / "nltk_data")
 
     create_launcher_scripts(output_dir)
 
