@@ -46,6 +46,22 @@ def clear_concordance_cache_for(user_id: str, workspace_id: str) -> int:
     return len(to_remove)
 
 
+def clear_quotation_cache_for(user_id: str, workspace_id: str) -> int:
+    """Remove cached quotation entries for the specified workspace."""
+
+    try:
+        from ..api.workspaces.analyses.quotation import (
+            QUOTATION_CACHE as _CACHE,  # type: ignore[attr-defined]
+        )
+    except Exception:
+        return 0
+
+    to_remove = [k for k in _CACHE if k[0] == user_id and k[1] == workspace_id]
+    for key in to_remove:
+        _CACHE.pop(key, None)
+    return len(to_remove)
+
+
 async def clear_analyses_and_cache(
     user_id: str, workspace_id: str, task: Optional[str]
 ) -> ClearedSummary:
@@ -84,4 +100,8 @@ async def clear_analyses_and_cache(
     }
 
 
-__all__ = ["clear_concordance_cache_for", "clear_analyses_and_cache"]
+__all__ = [
+    "clear_concordance_cache_for",
+    "clear_quotation_cache_for",
+    "clear_analyses_and_cache",
+]

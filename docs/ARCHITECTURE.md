@@ -1189,7 +1189,10 @@ Like concordance, the clear endpoint returns a `cleared` summary with `analyses_
   - **Implementation**: Materialises the target node into a Polars `DataFrame`, feeds it into `_compute_quote_dataframe()`, joins the exploded quotation rows back to the original metadata, and persists the response envelope to `analysis_store`. The local engine path delegates to DocFrame's `text.quotation()` and mirrors the legacy explode/unnest behaviour, while the remote engine path streams batches through `_extract_remote_paginated()` so that the external service limit defined by `settings.quotation_service_max_batch_size` is honoured before pagination.
 - `GET /{workspace_id}/quotation/current-request`: Get last request
 - `GET /{workspace_id}/quotation/current-result`: Get last result
+- `POST /{workspace_id}/quotation/current-result`: Update cached display preferences (currently only `context_length`) without recomputing quotations. The handler merges `{ "preferences": { "context_length": <int> } }` into the stored result entry after clamping values to 2,000 words.
 - `DELETE /{workspace_id}/quotation`: Clear results
+
+Every quotation result payload now includes a `preferences` object. The backend stamps a `context_length` key (default `20`, minimum `0`, maximum `2_000`) during extraction, and the POST endpoint above lets the frontend adjust that value later. Because the preference is cached server-side, the quotation results tab can hydrate the previously selected context length exactly like the Token Frequency panel hydrates its token limit.
 
 #### Other Backend Files
 

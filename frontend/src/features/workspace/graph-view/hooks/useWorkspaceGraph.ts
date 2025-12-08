@@ -18,6 +18,7 @@ import { useWorkspaceData } from '@/hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '@/hooks/useWorkspaceSelection';
 import { useWorkspaceStatus } from '@/hooks/useWorkspaceStatus';
 import { queryKeys } from '@/lib/queryKeys';
+import type { NodeShape as WorkspaceNodeShape } from '../../../../types';
 
 import { computeDagreLayout } from '../services/graphLayout';
 
@@ -186,21 +187,36 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
     );
 
     return workspaceGraph.nodes.map((node: any, index: number) => {
+      const rawNodeType = node.data?.nodeType || node.data?.dataType || node.data?.type || node.type || '';
+      const dataType = rawNodeType || 'unknown';
+      const columns = Array.isArray(node.data?.columns) ? node.data.columns : [];
+      const isLazyNode = Boolean(
+        node.data?.isLazy ||
+        node.data?.lazy ||
+        (typeof rawNodeType === 'string' && rawNodeType.toLowerCase().includes('lazyframe'))
+      );
+
       dlog('WorkspaceGraphView: Raw node data (condensed):', {
         id: node.id,
-        nodeType: node.data?.nodeType,
-        isLazy: node.data?.isLazy || node.data?.lazy,
+        nodeType: rawNodeType,
+        isLazy: isLazyNode,
         documentColumn: node.data?.documentColumn,
       });
 
       const backendShape = node.data?.shape;
-      const shape: [number, number] = [0, 0];
+      const shape: WorkspaceNodeShape = [null, null];
       if (backendShape && Array.isArray(backendShape) && backendShape.length === 2) {
-        shape[0] = backendShape[0] ?? 0;
-        shape[1] = backendShape[1] ?? 0;
+        shape[0] = typeof backendShape[0] === 'number' ? backendShape[0] : null;
+        shape[1] = typeof backendShape[1] === 'number' ? backendShape[1] : null;
       }
 
-      const dataType = node.data?.nodeType || node.data?.dataType || node.data?.type || node.type || 'unknown';
+      if (isLazyNode) {
+        shape[0] = null;
+        if (shape[1] === null && columns.length > 0) {
+          shape[1] = columns.length;
+        }
+      }
+
       const position = positions.get(node.id) || { x: index * 320, y: 50 };
 
       return {
@@ -212,7 +228,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
             node_id: node.id,
             name: node.data?.nodeName || node.data?.label || `Node ${index + 1}`,
             shape,
-            columns: node.data?.columns || [],
+            columns,
             preview: [],
             is_text_data: Boolean(node.data?.dataType?.includes('Doc')),
             data_type: dataType,

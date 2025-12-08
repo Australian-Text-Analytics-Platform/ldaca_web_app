@@ -9,7 +9,7 @@ export interface WorkspaceNodeLike extends Record<string, unknown> {
     nodeName?: string;
     name?: string;
     label?: string;
-    shape?: [number, number];
+    shape?: [number | null, number | null];
     columns?: string[];
     schema?: unknown;
     dtypes?: Record<string, unknown>;

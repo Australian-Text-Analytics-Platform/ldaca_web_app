@@ -3,6 +3,8 @@
  * Provides type safety and better development experience
  */
 
+export type ApiNodeShape = [number | null, number | null];
+
 // API Response Types
 export interface ApiResponse<T = any> {
   state: 'running' | 'successful' | 'failed' | 'cancelled';
@@ -41,7 +43,7 @@ export interface NodeInfo {
   id: string;
   name: string;
   data_type: string;
-  shape: [number, number];
+  shape: ApiNodeShape;
   columns: string[];
   schema: Record<string, string>;
   operation?: string;

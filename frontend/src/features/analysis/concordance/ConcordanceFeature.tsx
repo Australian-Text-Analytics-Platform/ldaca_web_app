@@ -7,7 +7,7 @@ import { useWorkspaceStatus } from '../../../hooks/useWorkspaceStatus';
 import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
 import { useWorkspaceActions } from '../../../hooks/useWorkspaceActions';
 import { useAuth } from '../../../hooks/useAuth';
-import { ConcordanceAnalysisRequest, ConcordanceAnalysisResponse, textApi } from '../../../api/text';
+import { ConcordanceAnalysisRequest, ConcordanceAnalysisResponse, ConcordanceResultQuery, textApi } from '../../../api/text';
 import { httpRequest } from '../../../api/http';
 import { workspacesApi } from '../../../api/workspaces';
 import { getNodeInfo } from '../../../lib/nodeInfoCache';
@@ -25,11 +25,31 @@ import {
   TableHeader,
   TableRow,
 } from '../../../components/ui/table';
+import { ScrollArea } from '../../../components/ui/scroll-area';
 import { applySelectedColumnsToSnapshots } from '../../../hooks/useSchemaManagement';
 import AnalysisLockedNotice from '../../../components/tabs/AnalysisLockedNotice';
 import AnalysisTaskBanner from '../../../components/tabs/AnalysisTaskBanner';
 import type { AnalysisTaskStatus } from '../../../hooks/useAnalysisTaskStatus';
 import useAnalysisTaskLifecycle, { type AnalysisTaskRefreshContext } from '../../../hooks/useAnalysisTaskLifecycle';
+
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const isLikelyNodeId = (value?: string | null): boolean =>
+  typeof value === 'string' && uuidPattern.test(value.trim());
+
+const sanitizeResultParams = (params?: Record<string, unknown>): Record<string, unknown> | undefined => {
+  if (!params) return undefined;
+  const cleaned = Object.entries(params).reduce<Record<string, unknown>>((acc, [key, value]) => {
+    if (value === undefined || value === null) {
+      return acc;
+    }
+    if (key === 'update_only') {
+      return acc;
+    }
+    acc[key] = value;
+    return acc;
+  }, {});
+  return Object.keys(cleaned).length ? cleaned : undefined;
+};
 
 const ConcordanceFeature: React.FC = () => {
   // Anchor ref for results container to stabilize scroll on view mode toggle
@@ -90,36 +110,6 @@ const ConcordanceFeature: React.FC = () => {
     return null;
   }, [results]);
 
-  const mergeConcordanceResults = useCallback((incoming: ConcordanceAnalysisResponse | null) => {
-    if (!incoming) return;
-    setResults(prev => {
-      if (!prev || !prev.data) {
-        return incoming;
-      }
-      if (!incoming.data) {
-        return prev;
-      }
-      const mergedData = { ...prev.data };
-      Object.entries(incoming.data).forEach(([key, value]) => {
-        mergedData[key] = value;
-      });
-      const mergedParams = incoming.analysis_params
-        ? { ...(prev.analysis_params || {}), ...incoming.analysis_params }
-        : prev.analysis_params;
-      const mergedPreferences = incoming.preferences
-        ? { ...(prev.preferences || {}), ...incoming.preferences }
-        : prev.preferences;
-      return {
-        ...prev,
-        state: incoming.state ?? prev.state,
-        message: incoming.message ?? prev.message,
-        data: mergedData,
-        analysis_params: mergedParams,
-        preferences: mergedPreferences,
-        combinable: incoming.combinable ?? prev.combinable,
-      };
-    });
-  }, []);
   // Color management & view mode
   const [nodeColors, setNodeColors] = useState<Record<string,string>>({});
   const defaultPalette = useMemo(() => [
@@ -195,7 +185,7 @@ const ConcordanceFeature: React.FC = () => {
     isLocked ? activeNodeColumnSelections : nodeColumnSelections
   ), [isLocked, activeNodeColumnSelections, nodeColumnSelections]);
 
-  const refreshCurrentConcordanceResult = useCallback(async () => {
+  const refreshCurrentConcordanceResult = useCallback(async (queryOverrides?: Record<string, unknown>) => {
     if (!currentWorkspaceId) {
       return null;
     }
@@ -204,7 +194,7 @@ const ConcordanceFeature: React.FC = () => {
       const headers = getAuthHeaders();
       const response = await httpRequest<ConcordanceAnalysisResponse>(
         `/workspaces/${currentWorkspaceId}/concordance/current-result`,
-        { method: 'GET', headers }
+        { method: 'GET', headers, params: sanitizeResultParams(queryOverrides) }
       );
       const typedResponse = response as ConcordanceAnalysisResponse | null;
       if (typedResponse) {
@@ -216,6 +206,20 @@ const ConcordanceFeature: React.FC = () => {
       return null;
     }
   }, [currentWorkspaceId, getAuthHeaders, setResults]);
+
+  const updateStoredResult = useCallback(async (
+    body: ConcordanceResultQuery,
+    fetchParamsOverride?: Record<string, unknown>
+  ): Promise<ConcordanceAnalysisResponse | null> => {
+    if (!currentWorkspaceId) {
+      return null;
+    }
+
+    const headers = getAuthHeaders();
+    await textApi.postConcordanceCurrentResult(currentWorkspaceId, body, headers);
+    const params = fetchParamsOverride ?? body;
+    return refreshCurrentConcordanceResult(params);
+  }, [currentWorkspaceId, getAuthHeaders, refreshCurrentConcordanceResult]);
 
   const concordanceFallbackBanner = useCallback(
     (status: AnalysisTaskStatus) => {
@@ -529,7 +533,7 @@ const ConcordanceFeature: React.FC = () => {
       let response: ConcordanceAnalysisResponse | null = null;
 
       if (useStoredResult) {
-        const overrides: Record<string, any> = {
+        const overrides: ConcordanceResultQuery = {
           combined: isCombinedQuery,
           sort_by: (overrideSortBy ?? firstNodePagination.sortBy) || undefined,
           sort_order: overrideSortOrder ?? firstNodePagination.sortOrder,
@@ -543,12 +547,7 @@ const ConcordanceFeature: React.FC = () => {
           overrides.page_size = firstNodePagination.pageSize;
         }
 
-        response = (await textApi.postConcordanceCurrentResult(currentWorkspaceId, overrides, authHeaders)) as ConcordanceAnalysisResponse;
-        if (response?.data) {
-          mergeConcordanceResults(response);
-        } else if (response) {
-          setResults(response);
-        }
+        response = await updateStoredResult(overrides as ConcordanceResultQuery);
 
         if (isCombinedQuery && response && response.combinable === false) {
           setViewMode('separated');
@@ -631,8 +630,8 @@ const ConcordanceFeature: React.FC = () => {
     viewMode,
     combinedPage,
     combinedPageSize,
-    mergeConcordanceResults,
     lockWithSnapshots,
+    updateStoredResult,
     setNodePagination,
     setViewMode,
     setCombinedPage,
@@ -826,14 +825,9 @@ const ConcordanceFeature: React.FC = () => {
   // Refetch combined results when combined page changes
   useEffect(() => {
     if (viewMode === 'combined' && results) {
-      // Request combined page via current-result POST
-      void (async () => {
-        if (!currentWorkspaceId) return;
-        const resp: any = await textApi.postConcordanceCurrentResult(currentWorkspaceId, { combined: true, page: combinedPage, page_size: combinedPageSize }, getAuthHeaders());
-        if (resp?.data) mergeConcordanceResults(resp as ConcordanceAnalysisResponse);
-      })();
+      void updateStoredResult({ combined: true, page: combinedPage, page_size: combinedPageSize });
     }
-  }, [combinedPage]);
+  }, [viewMode, results, combinedPage, combinedPageSize, updateStoredResult]);
 
   const handleSort = (columnName: string, nodeKey: string, requestNodeId?: string) => {
     setNodePagination(prev => {
@@ -849,21 +843,25 @@ const ConcordanceFeature: React.FC = () => {
 
       // Trigger backend resort using current-result POST
       const pageSize = currentNodePagination.pageSize;
-      const workspaceId = currentWorkspaceId;
-      if (!workspaceId) {
+      if (!currentWorkspaceId) {
         return prev;
       }
       const targetNodeId = requestNodeId ?? nodeKey;
-      void (async (wid: string) => {
+      void (async () => {
         setNodeLoading(prev => ({ ...prev, [nodeKey]: true }));
         try {
-          const overrides = { node_id: targetNodeId, sort_by: columnName, sort_order: newSortOrder, page: 1, page_size: pageSize } as any;
-          const resp: any = await textApi.postConcordanceCurrentResult(wid, overrides, getAuthHeaders());
-          if (resp?.data) mergeConcordanceResults(resp as ConcordanceAnalysisResponse);
+          const overrides: ConcordanceResultQuery = {
+            node_id: targetNodeId,
+            sort_by: columnName,
+            sort_order: newSortOrder,
+            page: 1,
+            page_size: pageSize,
+          };
+          await updateStoredResult(overrides);
         } finally {
           setNodeLoading(prev => ({ ...prev, [nodeKey]: false }));
         }
-      })(workspaceId);
+      })();
 
       return {
         ...prev,
@@ -887,27 +885,25 @@ const ConcordanceFeature: React.FC = () => {
       };
 
       // Trigger backend page update using current-result POST
-      const workspaceId = currentWorkspaceId;
-      if (!workspaceId) {
+      if (!currentWorkspaceId) {
         return prev;
       }
       const targetNodeId = requestNodeId ?? nodeKey;
-      void (async (wid: string) => {
+      void (async () => {
         setNodeLoading(prev => ({ ...prev, [nodeKey]: true }));
         try {
-          const overrides = {
+          const overrides: ConcordanceResultQuery = {
             node_id: targetNodeId,
             page: newPage,
             page_size: currentNodePagination.pageSize,
             sort_by: currentNodePagination.sortBy || undefined,
             sort_order: currentNodePagination.sortOrder,
-          } as any;
-          const resp: any = await textApi.postConcordanceCurrentResult(wid, overrides, getAuthHeaders());
-          if (resp?.data) mergeConcordanceResults(resp as ConcordanceAnalysisResponse);
+          };
+          await updateStoredResult(overrides);
         } finally {
           setNodeLoading(prev => ({ ...prev, [nodeKey]: false }));
         }
-      })(workspaceId);
+      })();
 
       return {
         ...prev,
@@ -920,8 +916,7 @@ const ConcordanceFeature: React.FC = () => {
   };
 
   const persistResultPreferences = useCallback(async (partial: { pageSize?: number; showMetadata?: boolean }) => {
-    const workspaceId = currentWorkspaceId;
-    if (!workspaceId) {
+    if (!currentWorkspaceId) {
       return;
     }
 
@@ -937,36 +932,25 @@ const ConcordanceFeature: React.FC = () => {
       return;
     }
 
-    const headers = getAuthHeaders();
-
     try {
-      await textApi.postConcordanceCurrentResult(
-        workspaceId,
-        { ...preferenceUpdates, update_only: true } as any,
-        headers,
-      );
-
-      const params: Record<string, unknown> = { combined: viewMode === 'combined' };
+      const fetchParams: Record<string, unknown> = { combined: viewMode === 'combined' };
       if (viewMode === 'combined') {
-        params.page = combinedPage;
-        params.page_size = partial.pageSize ?? combinedPageSize;
+        fetchParams.page = combinedPage;
+        fetchParams.page_size = partial.pageSize ?? combinedPageSize;
       } else {
-        params.page = 1;
-        params.page_size = partial.pageSize ?? globalPageSize;
+        fetchParams.page = 1;
+        fetchParams.page_size = partial.pageSize ?? globalPageSize;
       }
 
-      const refreshed = await httpRequest<ConcordanceAnalysisResponse>(
-        `/workspaces/${workspaceId}/concordance/current-result`,
-        { method: 'GET', headers, params },
+      return await updateStoredResult(
+        { ...preferenceUpdates, update_only: true } as ConcordanceResultQuery,
+        fetchParams,
       );
-
-      mergeConcordanceResults(refreshed);
-      return refreshed;
     } catch (error) {
       console.error('Failed to persist concordance preferences', error);
       throw error;
     }
-  }, [combinedPage, combinedPageSize, currentWorkspaceId, getAuthHeaders, globalPageSize, mergeConcordanceResults, viewMode]);
+  }, [combinedPage, combinedPageSize, currentWorkspaceId, globalPageSize, updateStoredResult, viewMode]);
 
   const handleRowClick = (row: any, nodeId: string, column: string) => {
     if (!currentWorkspaceId || row.document_idx === undefined) return;
@@ -1152,15 +1136,16 @@ const ConcordanceFeature: React.FC = () => {
   }, []);
 
   const renderConcordanceTable = (
-    nodeName: string,
+    nodeKey: string,
     nodeData: any,
-    context: { nodeId: string; paginationKey: string; requestNodeId: string; column: string }
+    context: { nodeId: string; paginationKey: string; requestNodeId: string; column: string; displayName?: string }
   ) => {
-    const { nodeId: actualNodeId, paginationKey, requestNodeId, column } = context;
+    const { nodeId: actualNodeId, paginationKey, requestNodeId, column, displayName } = context;
+    const headingLabel = displayName?.trim() || nodeKey;
     const effectiveNodeId = actualNodeId || requestNodeId;
-    const detachNodeId = actualNodeId || (labelToNodeId?.[nodeName] ?? requestNodeId);
+    const detachNodeId = actualNodeId || (labelToNodeId?.[nodeKey] ?? requestNodeId);
     const canDetach = Boolean(detachNodeId) && detachNodeId !== '__COMBINED__';
-    if (nodeName === '__COMBINED__') {
+    if (nodeKey === '__COMBINED__') {
       const rows = nodeData.data || [];
       const columns: string[] = nodeData.columns || [];
       const combinedSorting = nodeData.sorting || { sort_by: '', sort_order: 'asc' };
@@ -1169,11 +1154,7 @@ const ConcordanceFeature: React.FC = () => {
         const nextOrder: 'asc'|'desc' = isSame && combinedSorting.sort_order === 'asc' ? 'desc' : 'asc';
         setCombinedPage(1);
         // Backend combined sorting via current-result POST
-        void (async () => {
-          if (!currentWorkspaceId) return;
-          const resp: any = await textApi.postConcordanceCurrentResult(currentWorkspaceId, { combined: true, sort_by: col, sort_order: nextOrder, page: 1, page_size: combinedPageSize }, getAuthHeaders());
-          if (resp?.data) mergeConcordanceResults(resp as ConcordanceAnalysisResponse);
-        })();
+        void updateStoredResult({ combined: true, sort_by: col, sort_order: nextOrder, page: 1, page_size: combinedPageSize });
       };
       // Derive display columns: core first, then metadata (columns minus core and internal)
       const coreSet = new Set(coreCols);
@@ -1214,8 +1195,14 @@ const ConcordanceFeature: React.FC = () => {
             </div>
           </div>
           <div className="overflow-hidden rounded-lg border border-border bg-card">
-            <div className="max-h-96 overflow-y-auto">
-              <Table>
+            <ScrollArea
+              type="always"
+              scrollbars="both"
+              className="max-h-96"
+              style={{ scrollbarGutter: 'stable both-edges' }}
+            >
+              <div className="min-w-max">
+                <Table className="min-w-[720px]">
                 <TableHeader className="bg-gray-50">
                   <TableRow>
                     {displayColumns.map((c: string) => {
@@ -1279,8 +1266,9 @@ const ConcordanceFeature: React.FC = () => {
                     );
                   })}
                 </TableBody>
-              </Table>
-            </div>
+                </Table>
+              </div>
+            </ScrollArea>
             {nodeData.pagination && (
               <div className="mt-2 text-sm text-gray-600 text-center p-2">{nodeData.pagination.total_matches} total matches</div>
             )}
@@ -1320,9 +1308,9 @@ const ConcordanceFeature: React.FC = () => {
 
     if (!nodeData.data || nodeData.data.length === 0) {
       return (
-        <div key={nodeName} className="mb-6">
+        <div key={nodeKey} className="mb-6">
           <div className="h-16 mb-4 flex items-center">
-            <h3 className="text-lg font-semibold text-gray-800 break-words leading-tight w-full">{nodeName}</h3>
+            <h3 className="text-lg font-semibold text-gray-800 break-words leading-tight w-full">{headingLabel}</h3>
           </div>
           <div className="bg-white p-4 rounded-lg border">
             <div className="text-center text-gray-500">
@@ -1340,13 +1328,19 @@ const ConcordanceFeature: React.FC = () => {
     const isDetaching = detachingKey ? Boolean(nodeDetaching[detachingKey]) : false;
 
     return (
-      <div key={nodeName} className="mb-6">
+      <div key={nodeKey} className="mb-6">
         <div className="h-16 mb-4 flex items-center">
-          <h3 className="text-lg font-semibold text-gray-800 break-words leading-tight w-full">{nodeName}</h3>
+          <h3 className="text-lg font-semibold text-gray-800 break-words leading-tight w-full">{headingLabel}</h3>
         </div>
         <div className="overflow-hidden rounded-lg border border-border bg-card">
-          <div className="max-h-96 overflow-y-auto">
-            <Table>
+          <ScrollArea
+            type="always"
+            scrollbars="both"
+            className="max-h-96"
+            style={{ scrollbarGutter: 'stable both-edges' }}
+          >
+            <div className="min-w-max">
+              <Table className="min-w-[720px]">
               <TableHeader className="bg-gray-50">
                 <TableRow>
                   {displayColumns.map(key => {
@@ -1390,8 +1384,9 @@ const ConcordanceFeature: React.FC = () => {
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
-          </div>
+              </Table>
+            </div>
+          </ScrollArea>
         </div>
 
         {/* Pagination info for this node */}
@@ -1736,6 +1731,8 @@ const ConcordanceFeature: React.FC = () => {
                       }
                       
                       const nodesForDetail = panelSelectedNodes;
+                      const keyedOrder = Object.keys(results.data);
+                      const approxIndex = keyedOrder.indexOf(nodeName);
                       let node = nodesForDetail.find((n: any) => (n.data?.name || n.id) === nodeName);
                       if (!node) {
                         node = nodesForDetail.find((n: any) => n.id === nodeName);
@@ -1748,8 +1745,7 @@ const ConcordanceFeature: React.FC = () => {
                         node = nodesForDetail.find((n: any) => n.id === mappedNodeId);
                       }
                       if (!node) {
-                        const nodeIndex = Object.keys(results.data).indexOf(nodeName);
-                        node = (nodesForDetail as any)[nodeIndex];
+                        node = (nodesForDetail as any)[approxIndex];
                       }
                       
                       const resolvedNodeId = node?.id || mappedNodeId || '';
@@ -1757,6 +1753,23 @@ const ConcordanceFeature: React.FC = () => {
                       const requestNodeId = resolvedNodeId || nodeName;
                       const selection = effectiveNodeColumnSelections.find(sel => sel.nodeId === resolvedNodeId);
                       const column = selection?.column || '';
+                      const metadataNameCandidates = [
+                        (nodeData?.metadata as any)?.node_label,
+                        (nodeData?.metadata as any)?.node_name,
+                        (nodeData?.metadata as any)?.source_node_name,
+                      ];
+                      const nodeNameCandidates = [
+                        (node as any)?.data?.display_name,
+                        (node as any)?.data?.name,
+                        (node as any)?.name,
+                        (node as any)?.label,
+                        (node as any)?.data?.label,
+                      ];
+                      const candidateLabel = [...nodeNameCandidates, ...metadataNameCandidates, !isLikelyNodeId(nodeName) ? nodeName : undefined]
+                        .find((value) => typeof value === 'string' && value.trim().length > 0 && !isLikelyNodeId(value));
+                      const selectionIndex = node ? nodesForDetail.findIndex((n: any) => n.id === node.id) : -1;
+                      const fallbackOrdinal = selectionIndex >= 0 ? selectionIndex : approxIndex;
+                      const friendlyName = candidateLabel || (fallbackOrdinal >= 0 ? `Node ${fallbackOrdinal + 1}` : 'Selected node');
                       
                       if (localStorage.getItem('debugConc') === '1') {
                         console.debug('Final match - nodeId:', resolvedNodeId, 'column:', column, 'paginationKey:', paginationKey);
@@ -1767,6 +1780,7 @@ const ConcordanceFeature: React.FC = () => {
                         paginationKey,
                         requestNodeId,
                         column,
+                        displayName: friendlyName,
                       });
                     })}
                   </div>

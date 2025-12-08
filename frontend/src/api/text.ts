@@ -32,6 +32,14 @@ export type QuotationEngineType = 'local' | 'remote';
 export interface QuotationEngineConfig { type: QuotationEngineType; url?: string | null; }
 export interface QuotationRequest { column: string; page?: number; page_size?: number; sort_by?: string | null; sort_order?: 'asc' | 'desc'; engine?: QuotationEngineConfig; }
 export interface QuotationDetachRequest { node_id: string; column: string; new_node_name?: string; engine?: QuotationEngineConfig; }
+export interface QuotationResultQuery {
+  page?: number;
+  page_size?: number;
+  sort_by?: string | null;
+  sort_order?: 'asc' | 'desc';
+  context_length?: number;
+  update_only?: boolean;
+}
 export type SequentialFrequency = 'hourly' | 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
 export interface SequentialAnalysisRequest {
   time_column: string;
@@ -90,7 +98,8 @@ export const textApi = {
   quotation: (ws: string, node: string, req: QuotationRequest, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/nodes/${node}/quotation`, req, headers),
   quotationDetach: (ws: string, node: string, req: QuotationDetachRequest, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/nodes/${node}/quotation/detach`, req, headers),
   getQuotationCurrentRequest: (ws: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/quotation/current-request`, { method: 'GET', headers }),
-  getQuotationCurrentResult: (ws: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/quotation/current-result`, { method: 'GET', headers }),
+  getQuotationCurrentResult: (ws: string, headers: Record<string,string> = {}, params?: QuotationResultQuery) => httpRequest(`/workspaces/${ws}/quotation/current-result`, { method: 'GET', headers, params }),
+  postQuotationCurrentResult: (ws: string, body: QuotationResultQuery, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/quotation/current-result`, body, headers),
   clearQuotation: (ws: string, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/quotation/clear`, {}, headers),
 
   // Sequential analysis

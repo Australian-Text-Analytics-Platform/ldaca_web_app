@@ -13,6 +13,8 @@ export type SidebarTaskRecord = {
   progress_message?: string;
 };
 
+export type SidebarNodeShape = [number | null, number | null];
+
 export type SidebarWorkspaceNode = {
   id: string;
   label?: string;
@@ -22,7 +24,7 @@ export type SidebarWorkspaceNode = {
     label?: string;
     nodeType?: string;
     dataType?: string;
-    shape?: [number, number];
+    shape?: SidebarNodeShape;
     [key: string]: unknown;
   };
 };

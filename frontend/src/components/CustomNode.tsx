@@ -449,7 +449,7 @@ function CustomNode({ data, selected }: NodeProps<any>) {
                 return '?';
               }
               return nodeShape[0];
-            })()} × {nodeShape[1]})
+            })()} × {nodeShape[1] ?? '?'})
             
             {/* Tooltip removed per UX request; inline value update remains */}
           </div>

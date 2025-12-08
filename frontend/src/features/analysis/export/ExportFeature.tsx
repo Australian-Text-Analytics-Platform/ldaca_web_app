@@ -37,7 +37,9 @@ const ExportFeature: React.FC = () => {
     const id = n.id || n.node_id || n.data?.id || n.data?.node_id || n.unique_id;
     const name = n?.data?.nodeName || n?.data?.label || n?.label || n?.name || id;
     const shapeArr = Array.isArray(n?.data?.shape) ? n.data.shape : null;
-    const shape = shapeArr ? `${shapeArr[0]} × ${shapeArr[1]}` : null;
+    const formatDimension = (value: number | string | null | undefined) =>
+      typeof value === 'number' || typeof value === 'string' ? value : '?';
+    const shape = shapeArr ? `${formatDimension(shapeArr[0])} × ${formatDimension(shapeArr[1])}` : null;
     return { id, name, shape };
   }, []);
 

@@ -778,6 +778,11 @@ function TokenFrequencyFeature() {
   // Removed legacy popover logic
 
   useEffect(() => {
+    if (!currentWorkspaceId) return;
+    void hydrateFromServer();
+  }, [currentWorkspaceId, hydrateFromServer]);
+
+  useEffect(() => {
     if (typeof window === 'undefined' || typeof document === 'undefined') return;
     const maybeHydrate = () => {
       if (document.visibilityState !== 'visible' || !currentWorkspaceId) return;

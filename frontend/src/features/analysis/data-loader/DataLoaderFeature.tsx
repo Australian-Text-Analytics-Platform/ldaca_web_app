@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Loader2, FolderPlus, Upload, Trash2, Eye, Download as DownloadIcon, Plus, RefreshCcw } from 'lucide-react';
+import { Loader2, FolderPlus, Upload, Trash2, Eye, Download as DownloadIcon, Plus, RefreshCcw, LogOut } from 'lucide-react';
 import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
 import { useWorkspaceActions } from '../../../hooks/useWorkspaceActions';
 import { useWorkspaceStatus } from '../../../hooks/useWorkspaceStatus';
@@ -14,6 +14,15 @@ import { Input } from '../../../components/ui/input';
 import { Label } from '../../../components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../../components/ui/table';
 import { Badge } from '../../../components/ui/badge';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../../../components/ui/alert-dialog';
 
 const formatBytes = (bytes?: number | null): string => {
   if (!bytes || Number.isNaN(bytes)) return '—';
@@ -81,6 +90,7 @@ export const DataLoaderFeature: React.FC = () => {
   const [previewFile, setPreviewFile] = useState<string | null>(null);
   const [addFileName, setAddFileName] = useState<string | null>(null);
   const [importingSamples, setImportingSamples] = useState(false);
+  const [workspaceAlertOpen, setWorkspaceAlertOpen] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const hasWorkspaceSelected = Boolean(currentWorkspaceId);
@@ -348,6 +358,16 @@ export const DataLoaderFeature: React.FC = () => {
                       >
                         {isActive ? 'Active' : 'Activate'}
                       </Button>
+                      {isActive && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => workspaceActions.setCurrentWorkspace(null)}
+                          disabled={workspaceBusy}
+                        >
+                          <LogOut className="mr-1.5 h-4 w-4" /> Unload
+                        </Button>
+                      )}
                       <Button
                         size="sm"
                         variant="destructive"
@@ -425,7 +445,7 @@ export const DataLoaderFeature: React.FC = () => {
                           </Button>
                           <Button size="sm" onClick={() => {
                             if (!hasWorkspaceSelected) {
-                              setStatusMessage({ type: 'error', text: 'Select a workspace before adding files.' });
+                              setWorkspaceAlertOpen(true);
                               return;
                             }
                             setAddFileName(file.filename);
@@ -455,7 +475,6 @@ export const DataLoaderFeature: React.FC = () => {
         </CardContent>
         <CardFooter className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
           <div>Total files: {sortedFiles.length}</div>
-          <div>Selected: {selectedFile || '—'}</div>
         </CardFooter>
       </Card>
 
@@ -466,6 +485,19 @@ export const DataLoaderFeature: React.FC = () => {
         onClose={() => setAddFileName(null)}
         onConfirm={handleAddToWorkspace}
       />
+      <AlertDialog open={workspaceAlertOpen} onOpenChange={setWorkspaceAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>No workspace selected</AlertDialogTitle>
+            <AlertDialogDescription>
+              Choose or create a workspace in the Active workspace panel before adding files. The Add action will be available once a workspace is active.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setWorkspaceAlertOpen(false)}>Got it</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

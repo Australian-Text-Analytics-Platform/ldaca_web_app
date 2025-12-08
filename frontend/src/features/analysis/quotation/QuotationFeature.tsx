@@ -6,7 +6,7 @@ import { useWorkspaceSelection } from '../../../hooks/useWorkspaceSelection';
 import { useWorkspaceActions } from '../../../hooks/useWorkspaceActions';
 import { useAuth } from '../../../hooks/useAuth';
 import { textApi } from '../../../api/text';
-import type { QuotationEngineConfig, QuotationEngineType, QuotationRequest } from '../../../api/text';
+import type { QuotationEngineConfig, QuotationEngineType, QuotationRequest, QuotationResultQuery } from '../../../api/text';
 import { getNodeInfo } from '../../../lib/nodeInfoCache';
 import { applySelectedColumnsToSnapshots } from '../../../hooks/useSchemaManagement';
 import useNodeColumnInfos from '../../../hooks/useNodeColumnInfos';
@@ -39,6 +39,136 @@ interface QuotationResultState {
 }
 
 const DEFAULT_PAGE_SIZE = 20;
+const DEFAULT_CONTEXT_LENGTH = 20;
+const MAX_CONTEXT_LENGTH = 2000;
+
+const clampContextLength = (value: number): number => {
+  if (!Number.isFinite(value)) return DEFAULT_CONTEXT_LENGTH;
+  return Math.max(0, Math.min(MAX_CONTEXT_LENGTH, Math.floor(value)));
+};
+
+type HighlightSpan = { start: number; end: number; types: string[] };
+
+interface ContextClipResult {
+  text: string;
+  spans: HighlightSpan[];
+  prefixEllipsis: boolean;
+  suffixEllipsis: boolean;
+  sliceStart: number;
+  sliceEnd: number;
+}
+
+const clipTextAroundSpans = (text: string, spans: HighlightSpan[], surroundingWords: number): ContextClipResult => {
+  const normalizedWords = Number.isFinite(surroundingWords)
+    ? Math.max(0, Math.floor(surroundingWords))
+    : 0;
+
+  if (!text || !spans.length) {
+    return {
+      text,
+      spans: spans.map((span) => ({ ...span })),
+      prefixEllipsis: false,
+      suffixEllipsis: false,
+      sliceStart: 0,
+      sliceEnd: text.length,
+    };
+  }
+
+  const earliestStart = Math.max(0, Math.min(...spans.map((s) => s.start)));
+  const latestEnd = Math.min(text.length, Math.max(...spans.map((s) => s.end)));
+
+  if (!Number.isFinite(earliestStart) || !Number.isFinite(latestEnd) || earliestStart >= latestEnd) {
+    return {
+      text,
+      spans: spans.map((span) => ({ ...span })),
+      prefixEllipsis: false,
+      suffixEllipsis: false,
+      sliceStart: 0,
+      sliceEnd: text.length,
+    };
+  }
+
+  const regex = /\S+/g;
+  const words: Array<{ start: number; end: number }> = [];
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(text)) !== null) {
+    words.push({ start: match.index, end: match.index + match[0].length });
+  }
+
+  const projectSpans = (sliceStart: number, sliceEnd: number) =>
+    spans
+      .map((span) => {
+        const start = Math.max(span.start, sliceStart);
+        const end = Math.min(span.end, sliceEnd);
+        if (end <= start) return null;
+        return { ...span, start: start - sliceStart, end: end - sliceStart };
+      })
+      .filter((span): span is HighlightSpan => Boolean(span));
+
+  if (!words.length) {
+    const sliceStart = earliestStart;
+    const sliceEnd = latestEnd;
+    return {
+      text: text.slice(sliceStart, sliceEnd),
+      spans: projectSpans(sliceStart, sliceEnd),
+      prefixEllipsis: sliceStart > 0,
+      suffixEllipsis: sliceEnd < text.length,
+      sliceStart,
+      sliceEnd,
+    };
+  }
+
+  const findWordIndexBeforeOrAt = (pos: number) => {
+    for (let i = 0; i < words.length; i++) {
+      const word = words[i];
+      if (pos < word.start) {
+        return Math.max(0, i - 1);
+      }
+      if (pos <= word.end) {
+        return i;
+      }
+    }
+    return words.length - 1;
+  };
+
+  const findWordIndexAfterOrAt = (pos: number) => {
+    for (let i = 0; i < words.length; i++) {
+      const word = words[i];
+      if (pos <= word.end) {
+        return i;
+      }
+      if (pos < word.start) {
+        return i;
+      }
+    }
+    return words.length - 1;
+  };
+
+  const startWordIdx = findWordIndexBeforeOrAt(earliestStart);
+  const lastCharIndex = Math.max(0, latestEnd - 1);
+  const endWordIdx = findWordIndexAfterOrAt(lastCharIndex);
+
+  const clipStartIdx = Math.max(0, startWordIdx - normalizedWords);
+  const clipEndIdx = Math.min(words.length - 1, endWordIdx + normalizedWords);
+
+  let sliceStart = words[clipStartIdx]?.start ?? 0;
+  let sliceEnd = words[clipEndIdx]?.end ?? text.length;
+
+  if (!Number.isFinite(sliceStart) || !Number.isFinite(sliceEnd) || sliceEnd <= sliceStart) {
+    sliceStart = 0;
+    sliceEnd = text.length;
+  }
+
+  return {
+    text: text.slice(sliceStart, sliceEnd),
+    spans: projectSpans(sliceStart, sliceEnd),
+    prefixEllipsis: sliceStart > 0,
+    suffixEllipsis: sliceEnd < text.length,
+    sliceStart,
+    sliceEnd,
+  };
+};
+
 type EngineRequestPayload = { type: 'local' } | { type: 'remote'; url: string };
 
 type NormalizationFailureReason = 'empty' | 'scheme' | 'format' | 'protocol';
@@ -145,6 +275,10 @@ const QuotationFeature: React.FC = () => {
   const [isLoadingQuotations, setIsLoadingQuotations] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
   const [lockedRequestParams, setLockedRequestParams] = useState<Record<string, unknown> | null>(null);
+  const [contextLengthInput, setContextLengthInput] = useState(String(DEFAULT_CONTEXT_LENGTH));
+  const [contextLength, setContextLength] = useState(DEFAULT_CONTEXT_LENGTH);
+  const [contextLengthError, setContextLengthError] = useState<string | null>(null);
+  const [isSavingContextLength, setIsSavingContextLength] = useState(false);
 
   const { getColumnInfos } = useNodeColumnInfos({
     workspaceId: currentWorkspaceId,
@@ -251,7 +385,69 @@ const QuotationFeature: React.FC = () => {
     setEngineError(null);
   }, [engineConfig.type, engineConfig.url]);
 
+  const persistContextLengthPreference = useCallback(async (value: number) => {
+    if (!currentWorkspaceId) return;
+    await textApi.postQuotationCurrentResult(
+      currentWorkspaceId,
+      { context_length: value, update_only: true },
+      getAuthHeaders()
+    );
+  }, [currentWorkspaceId, getAuthHeaders]);
+
+  const applyContextLengthPreferenceFromResult = useCallback((payload: any) => {
+    const prefValue = Number(payload?.preferences?.context_length ?? payload?.preferences?.contextLength);
+    if (!Number.isFinite(prefValue)) {
+      return;
+    }
+    const normalized = clampContextLength(prefValue);
+    setContextLength(normalized);
+    setContextLengthInput(String(normalized));
+  }, []);
+
   const getStringColumns = useCallback((node: any) => getColumnInfos(node).map(info => info.name), [getColumnInfos]);
+
+  const applyContextLengthInput = useCallback(async () => {
+    const trimmed = contextLengthInput.trim();
+    if (!trimmed.length) {
+      setContextLengthError('Enter a non-negative number.');
+      return;
+    }
+    const parsed = Number(trimmed);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      setContextLengthError('Enter a non-negative number.');
+      return;
+    }
+    const normalized = clampContextLength(parsed);
+    setContextLength(normalized);
+    setContextLengthInput(String(normalized));
+    setContextLengthError(null);
+
+    const shouldPersist = Boolean(hasLoaded && currentWorkspaceId && normalized !== contextLength);
+    if (!shouldPersist) {
+      return;
+    }
+
+    try {
+      setIsSavingContextLength(true);
+      await persistContextLengthPreference(normalized);
+    } catch (error) {
+      console.error('Failed to save context length preference', error);
+      setContextLengthError('Failed to save preference. Please try again.');
+    } finally {
+      setIsSavingContextLength(false);
+    }
+  }, [contextLengthInput, hasLoaded, currentWorkspaceId, contextLength, persistContextLengthPreference]);
+
+  const handleContextLengthBlur = useCallback(() => {
+    void applyContextLengthInput();
+  }, [applyContextLengthInput]);
+
+  const handleContextLengthKeyDown = useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      void applyContextLengthInput();
+    }
+  }, [applyContextLengthInput]);
 
   const hasIncompleteSelections = useMemo(() => (
     !displayedNodes.length || displayedNodes.some((node, idx) => {
@@ -313,6 +509,27 @@ const QuotationFeature: React.FC = () => {
     lockedRequestParams
   );
 
+    const resolveLockedNodeContext = useCallback((): { nodeId: string; column: string } | null => {
+      const sourceNode = (isLocked && lockedNodesSnapshot.length ? lockedNodesSnapshot[0] : displayedNodes[0]) as any;
+      if (!sourceNode) {
+        return null;
+      }
+      const nodeId = resolveNodeId(sourceNode, 0);
+      const selection = activeSelections.find((sel) => sel.nodeId === nodeId);
+      const fallbackColumn = typeof lockedRequestParams?.column === 'string' ? lockedRequestParams.column : undefined;
+      const column = selection?.column || fallbackColumn;
+      if (!column) {
+        return null;
+      }
+      return { nodeId, column };
+    }, [
+      activeSelections,
+      displayedNodes,
+      isLocked,
+      lockedNodesSnapshot,
+      lockedRequestParams,
+    ]);
+
   useEffect(() => {
     if (isLocked) return;
     if (!selectedNodes.length) {
@@ -369,7 +586,7 @@ const QuotationFeature: React.FC = () => {
   const renderHighlightedText = (text: string, row: any, cellKey: string): React.ReactNode => {
     try {
       if (typeof text !== 'string' || !text.length) return text ?? '';
-      const spans: Array<{ start: number; end: number; types: string[] }> = [];
+      const spans: HighlightSpan[] = [];
       const addSpan = (start?: any, end?: any, type?: string) => {
         if (type && Number.isFinite(start) && Number.isFinite(end) && start < end && start >= 0 && end <= text.length) {
           spans.push({ start: Number(start), end: Number(end), types: [type] });
@@ -386,9 +603,24 @@ const QuotationFeature: React.FC = () => {
 
       if (!spans.length) return text;
 
+      const clipped = clipTextAroundSpans(text, spans, contextLength);
+      let workingText = clipped.text;
+      let workingSpans = clipped.spans;
+      if (!workingSpans.length) {
+        workingText = text.slice(clipped.sliceStart, clipped.sliceEnd);
+        workingSpans = spans
+          .map((span) => {
+            const start = Math.max(span.start, clipped.sliceStart);
+            const end = Math.min(span.end, clipped.sliceEnd);
+            if (end <= start) return null;
+            return { ...span, start: start - clipped.sliceStart, end: end - clipped.sliceStart };
+          })
+          .filter((span): span is HighlightSpan => Boolean(span));
+      }
+
       // Build segmentation boundaries
-      const bounds = new Set<number>([0, text.length]);
-      spans.forEach(s => { bounds.add(s.start); bounds.add(s.end); });
+      const bounds = new Set<number>([0, workingText.length]);
+      workingSpans.forEach(s => { bounds.add(s.start); bounds.add(s.end); });
       const points = Array.from(bounds).sort((a, b) => a - b);
 
       const segs: Array<{ start: number; end: number; types: string[] }> = [];
@@ -396,7 +628,7 @@ const QuotationFeature: React.FC = () => {
         const s = points[i];
         const e = points[i + 1];
         if (e <= s) continue;
-        const covering = spans.filter(sp => sp.start < e && sp.end > s).flatMap(sp => sp.types);
+        const covering = workingSpans.filter(sp => sp.start < e && sp.end > s).flatMap(sp => sp.types);
         segs.push({ start: s, end: e, types: Array.from(new Set(covering)) });
       }
 
@@ -423,8 +655,9 @@ const QuotationFeature: React.FC = () => {
 
       return (
         <span>
+          {clipped.prefixEllipsis && <span className="mr-1 text-muted-foreground">...</span>}
           {segs.map((seg, i) => {
-            const str = text.slice(seg.start, seg.end);
+            const str = workingText.slice(seg.start, seg.end);
             if (!seg.types.length) return <span key={i}>{str}</span>;
             const style = buildUnderlineStyle(seg.types);
             // Determine hover match for this segment: if the currently hovered type applies to this cell and segment
@@ -457,6 +690,7 @@ const QuotationFeature: React.FC = () => {
               </span>
             );
           })}
+          {clipped.suffixEllipsis && <span className="ml-1 text-muted-foreground">...</span>}
           {row?.quote_type ? (
             <span className="ml-1 align-baseline text-[10px] px-1 py-0.5 rounded bg-gray-100 text-gray-600 border border-gray-200">{String(row.quote_type)}</span>
           ) : null}
@@ -587,6 +821,7 @@ const QuotationFeature: React.FC = () => {
     };
 
     const result = await quotationSearch(nodeId, requestPayload);
+    applyContextLengthPreferenceFromResult(result);
     const normalized = updateResultState(nodeId, column, result);
     return {
       normalized,
@@ -601,6 +836,90 @@ const QuotationFeature: React.FC = () => {
       },
     };
   };
+
+  const updateStoredQuotationResult = useCallback(async (
+    overrides: Partial<QuotationResultQuery> = {},
+  ) => {
+    if (!currentWorkspaceId) {
+      return null;
+    }
+    const context = resolveLockedNodeContext();
+    if (!context) {
+      return null;
+    }
+
+    const { nodeId, column } = context;
+    const state = nodeState[nodeId] || {
+      currentPage: 1,
+      pageSize: DEFAULT_PAGE_SIZE,
+      sortBy: undefined,
+      sortOrder: 'asc' as const,
+    };
+
+    const payload: QuotationResultQuery = {
+      page: overrides.page ?? state.currentPage ?? 1,
+      page_size: overrides.page_size ?? state.pageSize ?? DEFAULT_PAGE_SIZE,
+      sort_by: overrides.sort_by ?? state.sortBy ?? null,
+      sort_order: overrides.sort_order ?? state.sortOrder ?? 'asc',
+    };
+
+    const response = await textApi.postQuotationCurrentResult(
+      currentWorkspaceId,
+      payload,
+      getAuthHeaders()
+    );
+
+    if (!response) {
+      return null;
+    }
+
+    applyContextLengthPreferenceFromResult(response);
+    const normalized = updateResultState(nodeId, column, response);
+    setHasLoaded(true);
+    setLockedRequestParams((prev) => {
+      const engineSnapshot = (() => {
+        if (prev?.engine_type) {
+          return {
+            engine_type: prev.engine_type,
+            engine_url: prev.engine_url ?? null,
+          };
+        }
+        if (resolvedEnginePayload.type === 'remote') {
+          const url = resolvedEnginePayload.isValid
+            ? resolvedEnginePayload.normalizedUrl
+            : resolvedEnginePayload.rawUrl;
+          return {
+            engine_type: 'remote' as const,
+            engine_url: url,
+          };
+        }
+        return {
+          engine_type: 'local' as const,
+          engine_url: null,
+        };
+      })();
+
+      return {
+        ...engineSnapshot,
+        column,
+        page: normalized.pagination.page,
+        page_size: normalized.pagination.page_size,
+        sort_by: normalized.sorting.sort_by ?? null,
+        sort_order: normalized.sorting.sort_order,
+      } as Record<string, unknown>;
+    });
+
+    return normalized;
+  }, [
+    applyContextLengthPreferenceFromResult,
+    currentWorkspaceId,
+    getAuthHeaders,
+    nodeState,
+    resolveLockedNodeContext,
+    resolvedEnginePayload,
+    setLockedRequestParams,
+    updateResultState,
+  ]);
 
   const handleSearchAll = async () => {
     const targetNode = displayedNodes[0];
@@ -649,13 +968,13 @@ const QuotationFeature: React.FC = () => {
       baseHandlePageChange(newPage);
       return;
     }
-    if (!isLocked) {
+    if (!isLocked || !hasLoaded) {
       baseHandlePageChange(newPage);
       return;
     }
-    const outcome = await fetchQuotations(nodeId, { page: newPage });
-    if (outcome) {
-      setLockedRequestParams(outcome.request);
+    const updated = await updateStoredQuotationResult({ page: newPage });
+    if (!updated) {
+      baseHandlePageChange(newPage);
     }
   };
 
@@ -666,13 +985,13 @@ const QuotationFeature: React.FC = () => {
       baseHandlePageSizeChange(pageSize);
       return;
     }
-    if (!isLocked) {
+    if (!isLocked || !hasLoaded) {
       baseHandlePageSizeChange(pageSize);
       return;
     }
-    const outcome = await fetchQuotations(nodeId, { page: 1, pageSize });
-    if (outcome) {
-      setLockedRequestParams(outcome.request);
+    const updated = await updateStoredQuotationResult({ page: 1, page_size: pageSize });
+    if (!updated) {
+      baseHandlePageSizeChange(pageSize);
     }
   };
 
@@ -685,14 +1004,23 @@ const QuotationFeature: React.FC = () => {
     };
     const isSame = state.sortBy === column;
     const nextOrder: 'asc' | 'desc' = isSame && state.sortOrder === 'asc' ? 'desc' : 'asc';
-    const outcome = await fetchQuotations(nodeId, {
-      page: 1,
-      sortBy: column,
-      sortOrder: nextOrder,
-    });
-    if (outcome) {
-      setLockedRequestParams(outcome.request);
+    if (!isLocked || !hasLoaded) {
+      const outcome = await fetchQuotations(nodeId, {
+        page: 1,
+        sortBy: column,
+        sortOrder: nextOrder,
+      });
+      if (outcome) {
+        setLockedRequestParams(outcome.request);
+      }
+      return;
     }
+
+    await updateStoredQuotationResult({
+      page: 1,
+      sort_by: column,
+      sort_order: nextOrder,
+    });
   };
 
   const handleDetach = async (nodeId: string) => {
@@ -779,16 +1107,12 @@ const QuotationFeature: React.FC = () => {
           /* ignore */
         }
 
-        const resResp = await textApi.getQuotationCurrentResult(currentWorkspaceId, getAuthHeaders());
-        if (!resResp) {
-          return;
-        }
-
-        const res = (resResp as any)?.data;
+        const res = await textApi.getQuotationCurrentResult(currentWorkspaceId, getAuthHeaders());
         if (!res) {
           return;
         }
 
+        applyContextLengthPreferenceFromResult(res);
         const normalized = updateResultState(nodeId, column, res);
         setLockedRequestParams({
           column: normalized.column,
@@ -920,7 +1244,6 @@ const QuotationFeature: React.FC = () => {
               allowedDataTypes={['string']}
               lockedMessage={<AnalysisLockedNotice />}
             />
-
             <div className="flex flex-wrap gap-3">
               {hasParamsChanged ? (
                 <Button
@@ -1052,6 +1375,38 @@ const QuotationFeature: React.FC = () => {
                     />
                     <span>Show metadata</span>
                   </label>
+                </div>
+                <div className="mt-4 rounded-md border border-border/60 bg-muted/20 px-4 py-2">
+                  <div className="flex flex-wrap items-center gap-3 text-sm">
+                    <span className="uppercase tracking-wide text-[10px] font-semibold text-foreground/80">Context length (words per side)</span>
+                    <Input
+                      id="quotation-context-length"
+                      aria-label="Context length in words"
+                      type="number"
+                      min={0}
+                      max={MAX_CONTEXT_LENGTH}
+                      step={1}
+                      value={contextLengthInput}
+                      onChange={(event) => {
+                        setContextLengthInput(event.target.value);
+                        if (contextLengthError) setContextLengthError(null);
+                      }}
+                      onBlur={handleContextLengthBlur}
+                      onKeyDown={handleContextLengthKeyDown}
+                      className="h-8 w-20 text-right"
+                      inputMode="numeric"
+                      disabled={isSavingContextLength}
+                    />
+                    {isSavingContextLength && (
+                      <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        <span>Saving…</span>
+                      </div>
+                    )}
+                    <span className={`text-[11px] ${contextLengthError ? 'text-destructive' : 'text-muted-foreground'}`}>
+                      {contextLengthError ?? `Enter a whole number between 0 and ${MAX_CONTEXT_LENGTH}.`}
+                    </span>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="p-0">

@@ -67,6 +67,8 @@ export interface UserStorageInfo {
   folders: string[];
 }
 
+export type NodeShape = [number | null, number | null];
+
 export interface Workspace {
   id: string;
   name: string;
@@ -92,7 +94,7 @@ export interface WorkspaceInfo {
 export interface WorkspaceNode {
   node_id: string;
   name: string;
-  shape: [number, number];
+  shape: NodeShape;
   columns: string[];
   preview: any[];
   is_text_data: boolean;
@@ -115,7 +117,7 @@ export interface NodeSchemaResponse {
 export interface CastResponse {
   node_id: string;
   name: string;
-  shape: [number, number];
+  shape: NodeShape;
   columns: string[];
   preview: any[];
   is_text_data: boolean;

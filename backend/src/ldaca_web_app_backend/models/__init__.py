@@ -366,6 +366,17 @@ class QuotationDetachRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class QuotationResultQuery(BaseModel):
+    page: Optional[int] = None
+    page_size: Optional[int] = None
+    sort_by: Optional[str] = None
+    sort_order: Optional[str] = None
+    context_length: Optional[int] = None
+    update_only: bool = False
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class SequentialAnalysisRequest(BaseModel):
     time_column: str
     group_by_columns: Optional[List[str]] = None
