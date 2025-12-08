@@ -991,6 +991,7 @@ This section provides comprehensive documentation of every backend file and its 
 - `GET /api/files/{filename}`: Download file
 - `POST /api/files/import-sample-data`: Import sample datasets
 - `GET /api/files/preview/{filename}`: Preview file (first 100 rows)
+  - **Excel preview**: Delegates sheet discovery and reading to `docframe.excel_sheet_names()` and `docframe.read_excel(..., document_column=False)`. Those helpers merely ensure the `fastexcel` dependency is present and then defer to `polars.read_excel` without forcing a specific engine, so FastAPI no longer needs to reason about `calamine` vs. legacy engine names. The endpoint just forwards the requested sheet name, slices the resulting `pl.DataFrame`, and serializes the preview response.
 
 ##### `users.py` - User Management Router
 

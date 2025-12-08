@@ -2,11 +2,15 @@
 File management endpoints
 """
 
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import polars as pl
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
+
+import docframe
+from docframe import DocDataFrame
 
 from ..core.auth import get_current_user
 from ..core.utils import (
@@ -64,20 +68,17 @@ def _lazy_scan(file_path, file_type: str) -> pl.LazyFrame:
 
 
 def _get_supported_types_by_extension(file_type: str) -> List[str]:
-    """Return supported data types for a given file type/extension.
+    """Return supported data types for a given file type/extension."""
 
-    The list is ordered by backend preference. Frontend will show all supported types.
-    """
     ft = (file_type or "").lower()
     mapping: Dict[str, List[str]] = {
-        # Most formats can support both Lazy and Eager; Doc* variants are supported if text column can be chosen later
         "csv": ["DocLazyFrame", "LazyFrame", "DocDataFrame", "DataFrame"],
         "tsv": ["DocLazyFrame", "LazyFrame", "DocDataFrame", "DataFrame"],
         "jsonl": ["DocLazyFrame", "LazyFrame", "DocDataFrame", "DataFrame"],
         "ndjson": ["DocLazyFrame", "LazyFrame", "DocDataFrame", "DataFrame"],
-        "json": ["DocDataFrame", "DataFrame"],  # no scan_json; eager is typical here
+        "json": ["DocDataFrame", "DataFrame"],
         "parquet": ["DocLazyFrame", "LazyFrame", "DocDataFrame", "DataFrame"],
-        "excel": ["DocDataFrame", "DataFrame"],  # Excel lacks native scan; eager only
+        "excel": ["DocDataFrame", "DataFrame"],
         "text": ["DocDataFrame", "DataFrame"],
         "zip": ["DocDataFrame", "DataFrame"],
         "unknown": [],
@@ -85,34 +86,25 @@ def _get_supported_types_by_extension(file_type: str) -> List[str]:
     return mapping.get(ft, [])
 
 
-def _excel_sheet_names(file_path) -> List[str]:
-    # Prefer Polars to avoid pandas dependency
-    try:
-        sheets = pl.read_excel(file_path, sheet_id=None)  # may return dict-like
-        if isinstance(sheets, dict):
-            return list(sheets.keys())
-    except Exception:
-        pass
+def _coerce_polars_dataframe(obj: Any) -> pl.DataFrame:
+    """Ensure the returned object is a Polars DataFrame."""
 
-    # Final fallback: parse workbook.xml from xlsx zip
-    try:
-        import xml.etree.ElementTree as ET
-        import zipfile
+    if isinstance(obj, pl.DataFrame):
+        return obj
+    if isinstance(obj, DocDataFrame):
+        return obj.dataframe
+    raise RuntimeError(
+        "DocFrame returned an unsupported object when loading an Excel sheet"
+    )
 
-        with zipfile.ZipFile(file_path) as z:
-            with z.open("xl/workbook.xml") as f:
-                tree = ET.parse(f)
-                root = tree.getroot()
-                # Namespaces handling
-                ns = {"ns": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
-                names = []
-                for sheet in root.findall("ns:sheets/ns:sheet", ns):
-                    name = sheet.attrib.get("name")
-                    if name:
-                        names.append(name)
-                return names
-    except Exception:
-        return []
+
+def _read_excel_sheet(file_path: Path, sheet_name: str) -> pl.DataFrame:
+    df = docframe.read_excel(
+        file_path,
+        sheet_name=sheet_name,
+        document_column=False,
+    )
+    return _coerce_polars_dataframe(df)
 
 
 @router.get("/")
@@ -269,7 +261,11 @@ async def unified_file_preview(
 
     try:
         if file_type == "excel":
-            sheet_names = _excel_sheet_names(file_path)
+            try:
+                sheet_names = docframe.excel_sheet_names(file_path)
+            except ImportError as exc:
+                raise HTTPException(status_code=500, detail=str(exc)) from exc
+
             # Choose sheet: payload.sheet_name or first sheet
             payload = req.payload or {}
             selected_sheet = payload.get("sheet_name") or (
@@ -289,45 +285,20 @@ async def unified_file_preview(
                     selected_sheet=None,
                 )
 
-            # Read selected sheet eagerly (no scan_excel available)
-            # Try polars first (engine xlsx2csv improves availability)
             try:
-                try:
-                    df = pl.read_excel(
-                        file_path, sheet_name=selected_sheet, engine="xlsx2csv"
-                    )
-                except Exception:
-                    df = pl.read_excel(file_path, sheet_name=selected_sheet)
-            except Exception as e:
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"Failed to read Excel file with polars: {str(e)}. Ensure polars[xlsx2csv] is installed.",
-                )
+                base_df = _read_excel_sheet(file_path, selected_sheet)
+            except ImportError as exc:
+                raise HTTPException(status_code=500, detail=str(exc)) from exc
+            except RuntimeError as exc:
+                raise HTTPException(status_code=500, detail=str(exc))
 
-            # Slice page window if requested
-            if offset or page_size:
-                df = df.slice(offset, page_size)
+            total_rows = int(base_df.height)
+            df = base_df.slice(offset, page_size)
 
             columns = list(df.columns)
-            # Convert preview rows
             preview = df.fill_null("None").to_dicts() if hasattr(df, "to_dicts") else []
 
-            # Compute total rows cheaply if possible (may require reading entire sheet)
-            try:
-                # Get total rows from the DataFrame
-                total_rows = int(df.height)
-            except Exception:
-                # Fallback: re-read to get height
-                try:
-                    total_rows = int(
-                        pl.read_excel(file_path, sheet_name=selected_sheet).height
-                    )
-                except Exception:
-                    total_rows = 0
-
         elif file_type == "zip":
-            import docframe
-
             doc_df = docframe.read_zip(file_path)
             df = doc_df.dataframe
             total_rows = int(df.height)
@@ -336,8 +307,6 @@ async def unified_file_preview(
             columns = list(df.columns)
             preview = df.fill_null("None").to_dicts()
         elif file_type == "text":
-            import docframe
-
             doc_df = docframe.read_text(file_path)
             df = doc_df.dataframe
             total_rows = int(df.height)

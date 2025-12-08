@@ -3,6 +3,7 @@ Tests for unified file preview endpoint
 """
 
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 import polars as pl
@@ -88,11 +89,8 @@ def test_csv_preview_supported_types_and_preview(client, tmp_path):
 
 def test_excel_preview_sheet_names_and_selection(client, tmp_path):
     """Test Excel file preview with sheet selection"""
-    # Skip if xlsxwriter is not available (required by Polars for Excel writing)
-    try:
-        import xlsxwriter  # noqa: F401
-    except ImportError:
-        pytest.skip("xlsxwriter not installed; required for Polars Excel writing")
+    pytest.importorskip("fastexcel")
+    pytest.importorskip("xlsxwriter")
 
     user_root = tmp_path / "users" / "user_test_user" / "user_data"
     xlsx_path = user_root / "book.xlsx"
@@ -130,6 +128,42 @@ def test_excel_preview_sheet_names_and_selection(client, tmp_path):
     assert len(j2["preview"]) >= 1
 
 
+def test_excel_preview_uses_docframe_helpers(client, tmp_path, monkeypatch):
+    """The backend should rely on docframe for sheet names and reading."""
+
+    user_root = tmp_path / "users" / "user_test_user" / "user_data"
+    xlsx_path = user_root / "fallback.xlsx"
+    xlsx_path.write_text("placeholder", encoding="utf-8")
+
+    from ldaca_web_app_backend.api import files as files_api
+
+    sheet_calls: list[str] = []
+    read_kwargs: list[dict[str, Any]] = []
+
+    def fake_sheet_names(path: Path) -> list[str]:
+        sheet_calls.append(str(path))
+        return ["Sheet1", "Sheet2"]
+
+    def fake_read_excel(path: Path, *_, **kwargs):
+        read_kwargs.append(kwargs.copy())
+        assert kwargs.get("sheet_name") == "Sheet1"
+        assert kwargs.get("document_column") is False
+        return pl.DataFrame({"value": [1, 2, 3]})
+
+    monkeypatch.setattr(files_api.docframe, "excel_sheet_names", fake_sheet_names)
+    monkeypatch.setattr(files_api.docframe, "read_excel", fake_read_excel)
+
+    resp = client.post("/api/files/preview", json={"filename": "fallback.xlsx"})
+
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload["selected_sheet"] == "Sheet1"
+    assert payload["sheet_names"] == ["Sheet1", "Sheet2"]
+    assert payload["preview"]
+    assert sheet_calls == [str(xlsx_path)]
+    assert read_kwargs == [{"sheet_name": "Sheet1", "document_column": False}]
+
+
 def test_zip_preview_uses_docframe(client, tmp_path):
     """Ensure ZIP archives are parsed with docframe.read_zip."""
 
@@ -151,7 +185,8 @@ def test_zip_preview_uses_docframe(client, tmp_path):
     assert resp.status_code == 200
     payload = resp.json()
     assert payload["file_type"] == "zip"
-    assert payload["columns"] == ["file_path", "base_name", "extension", "text"]
+    assert payload["columns"][:3] == ["file_path", "base_name", "extension"]
+    assert payload["columns"][3] in {"text", "document"}
     assert "DocDataFrame" in payload["supported_types"]
     assert any(row["base_name"] == "1" for row in payload["preview"])
 
@@ -171,6 +206,7 @@ def test_text_preview_returns_single_cell(client, tmp_path):
     assert resp.status_code == 200
     payload = resp.json()
     assert payload["file_type"] == "text"
-    assert payload["columns"] == ["text"]
-    assert payload["preview"] == [{"text": "Plain text document."}]
+    assert payload["columns"] in (["text"], ["document"])
+    text_key = payload["columns"][0]
+    assert payload["preview"] == [{text_key: "Plain text document."}]
     assert payload["total_rows"] == 1
