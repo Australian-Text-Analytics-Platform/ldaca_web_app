@@ -35,9 +35,7 @@ def clear_concordance_cache_for(user_id: str, workspace_id: str) -> int:
     """
     try:
         # Local import to avoid circular import at module load time
-        from ..api.workspaces.analyses.concordance import (
-            CONCORDANCE_CACHE as _CACHE,  # type: ignore
-        )
+        from ..api.workspaces.analyses.concordance import CONCORDANCE_CACHE as _CACHE  # type: ignore
     except Exception:
         return 0
     to_remove = [k for k in _CACHE if k[0] == user_id and k[1] == workspace_id]
@@ -50,9 +48,7 @@ def clear_quotation_cache_for(user_id: str, workspace_id: str) -> int:
     """Remove cached quotation entries for the specified workspace."""
 
     try:
-        from ..api.workspaces.analyses.quotation import (
-            QUOTATION_CACHE as _CACHE,  # type: ignore[attr-defined]
-        )
+        from ..api.workspaces.analyses.quotation import QUOTATION_CACHE as _CACHE  # type: ignore[attr-defined]
     except Exception:
         return 0
 

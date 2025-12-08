@@ -32,9 +32,7 @@ MAX_CONTEXT_LENGTH = 2000
 DEFAULT_PAGE_SIZE = 50
 DEFAULT_SORT_ORDER = "asc"
 
-QUOTATION_CACHE: Dict[
-    Tuple[str, str, str, str, str, str], Dict[str, Any]
-] = {}
+QUOTATION_CACHE: Dict[Tuple[str, str, str, str, str, str], Dict[str, Any]] = {}
 
 _REQUEST_STORAGE_EXCLUDE = {"page", "page_size", "sort_by", "sort_order"}
 
@@ -69,7 +67,9 @@ def _quotation_cache_key(
     )
 
 
-def _get_cached_quotation_df(key: Tuple[str, str, str, str, str, str]) -> Optional[pl.DataFrame]:
+def _get_cached_quotation_df(
+    key: Tuple[str, str, str, str, str, str],
+) -> Optional[pl.DataFrame]:
     entry = QUOTATION_CACHE.get(key)
     if not entry:
         return None
@@ -99,7 +99,9 @@ def _normalize_sort_order(sort_order: Optional[str]) -> str:
     return DEFAULT_SORT_ORDER
 
 
-def _normalize_pagination(page: Optional[int], page_size: Optional[int]) -> Tuple[int, int]:
+def _normalize_pagination(
+    page: Optional[int], page_size: Optional[int]
+) -> Tuple[int, int]:
     normalized_page = max(1, int(page)) if isinstance(page, int) else 1
     try:
         normalized_size = int(page_size) if page_size is not None else DEFAULT_PAGE_SIZE
@@ -153,7 +155,9 @@ def _paginate_dataframe(
     }
 
 
-def _rows_to_dataframe(rows: List[Dict[str, Any]], columns: Optional[List[str]] = None) -> pl.DataFrame:
+def _rows_to_dataframe(
+    rows: List[Dict[str, Any]], columns: Optional[List[str]] = None
+) -> pl.DataFrame:
     if rows:
         return pl.DataFrame(rows)
     if columns:
@@ -581,7 +585,9 @@ async def update_quotation_current_result(
     try:
         from ....core.analysis_store import get_latest_analysis, save_analysis
     except Exception as exc:  # pragma: no cover
-        raise HTTPException(status_code=500, detail=f"analysis_store unavailable: {exc}")
+        raise HTTPException(
+            status_code=500, detail=f"analysis_store unavailable: {exc}"
+        )
 
     record = get_latest_analysis(user_id, workspace_id, task="quotation")
     if not record:
@@ -596,14 +602,21 @@ async def update_quotation_current_result(
         context_length_value = _normalize_context_length(query.context_length)
 
     preferences = {
-        **(base_result.get("preferences") if isinstance(base_result.get("preferences"), dict) else {}),
+        **(
+            base_result.get("preferences")
+            if isinstance(base_result.get("preferences"), dict)
+            else {}
+        ),
         "context_length": context_length_value,
     }
 
-    needs_pagination = any(
-        value is not None
-        for value in (query.page, query.page_size, query.sort_by, query.sort_order)
-    ) and not query.update_only
+    needs_pagination = (
+        any(
+            value is not None
+            for value in (query.page, query.page_size, query.sort_by, query.sort_order)
+        )
+        and not query.update_only
+    )
 
     if not needs_pagination:
         base_result["preferences"] = preferences
@@ -628,7 +641,9 @@ async def update_quotation_current_result(
         }
 
     if not isinstance(stored_blob, dict):
-        raise HTTPException(status_code=404, detail="No paginated quotation data available")
+        raise HTTPException(
+            status_code=404, detail="No paginated quotation data available"
+        )
 
     default_page = stored_blob.get("default_page")
     default_page_size = stored_blob.get("default_page_size")

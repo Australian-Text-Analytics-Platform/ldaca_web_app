@@ -1,12 +1,8 @@
 from typing import Any, Dict, List
-
-import pytest
 from unittest.mock import MagicMock
 
-from ldaca_web_app_backend.core.analysis_store import (
-    get_latest_analysis,
-    save_analysis,
-)
+import pytest
+from ldaca_web_app_backend.core.analysis_store import get_latest_analysis, save_analysis
 from ldaca_web_app_backend.core.workspace import workspace_manager
 
 USER_ID = "test"
