@@ -85,7 +85,7 @@ export const useWorkspaceTaskInbox = (
             setTasks((prevTasks: TaskItem[]) =>
               mergeTaskUpdates(
                 prevTasks,
-                payload.tasks.map((task) => ({ task })),
+                payload.tasks.map((task: any) => ({ task })),
                 { replaceAll: true }
               )
             );
@@ -142,7 +142,7 @@ export const useWorkspaceTaskInbox = (
             setTasks((prevTasks: TaskItem[]) =>
               mergeTaskUpdates(
                 prevTasks,
-                payload.tasks.map((task) => ({ task })),
+                payload.tasks.map((task: any) => ({ task })),
                 { replaceAll: true }
               )
             );

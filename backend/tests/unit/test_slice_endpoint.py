@@ -5,6 +5,7 @@ from __future__ import annotations
 import polars as pl
 import pytest
 from ldaca_web_app_backend.api.workspaces import nodes as nodes_api
+from ldaca_web_app_backend.api.workspaces import utils as workspace_utils
 from ldaca_web_app_backend.core.docworkspace_api import create_operation_result
 from ldaca_web_app_backend.models import SliceRequest
 
@@ -80,6 +81,7 @@ def fake_workspace_manager(monkeypatch: pytest.MonkeyPatch):
     original_node = DummyNode("node_base", df.lazy(), "base_node")
     manager = FakeWorkspaceManager({"node_base": original_node})
     monkeypatch.setattr(nodes_api, "workspace_manager", manager)
+    monkeypatch.setattr(workspace_utils, "workspace_manager", manager)
     return manager
 
 

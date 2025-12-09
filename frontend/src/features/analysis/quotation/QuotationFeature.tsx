@@ -18,7 +18,16 @@ import { Input } from '../../../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../../../components/ui/dialog';
 import { Badge } from '../../../components/ui/badge';
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2, Search, Trash2, Unlink } from 'lucide-react';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '../../../components/ui/table';
+import { ScrollArea } from '../../../components/ui/scroll-area';
+import { ArrowUpDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2, Search, Trash2, Unlink } from 'lucide-react';
 
 interface QuotationResultState {
   rows: any[];
@@ -1409,36 +1418,42 @@ const QuotationFeature: React.FC = () => {
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="p-0">
-                <div className="flex h-[70vh] flex-col">
-                  <div className="flex-1 overflow-y-auto">
-                    <table className="min-w-full divide-y divide-border">
-                      <thead className="sticky top-0 bg-muted/50">
-                        <tr>
-                          {cols.map((c: string) => (
-                            <th
-                              key={c}
-                              className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground transition-colors hover:bg-muted cursor-pointer"
-                              onClick={() => handleSort(nodeId, c)}
-                            >
-                              <span className="flex items-center gap-1">
-                                <span>{c}</span>
-                                <span className="text-[10px] text-muted-foreground/70">▲▼</span>
-                              </span>
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border bg-card">
-                        {rowsForRender.length === 0 ? (
-                          <tr>
-                            <td className="px-4 py-6 text-center text-sm text-muted-foreground" colSpan={cols.length || 1}>
-                              No quotations
-                            </td>
-                          </tr>
-                        ) : (
-                          rowsForRender.map((row:any, idx:number)=> (
-                            <tr key={idx} className={idx % 2 === 0 ? 'bg-background' : 'bg-muted/30'}>
+              <CardContent className="space-y-6">
+                <div className="overflow-hidden rounded-lg border border-border bg-card">
+                  <ScrollArea
+                    type="always"
+                    scrollbars="both"
+                    className="max-h-[70vh]"
+                    style={{ scrollbarGutter: 'stable both-edges' }}
+                  >
+                    <div className="min-w-max">
+                      <Table className="min-w-full">
+                        <TableHeader className="bg-gray-50 sticky top-0 z-10">
+                          <TableRow>
+                            {cols.map((c: string) => (
+                              <TableHead
+                                key={c}
+                                className="h-10 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500 select-none cursor-pointer hover:bg-gray-100 hover:text-gray-700 transition-colors whitespace-nowrap"
+                                onClick={() => handleSort(nodeId, c)}
+                              >
+                                <div className="flex items-center gap-1.5">
+                                  <span>{c}</span>
+                                  <ArrowUpDown className="h-3 w-3 opacity-50" />
+                                </div>
+                              </TableHead>
+                            ))}
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {rowsForRender.length === 0 ? (
+                            <TableRow>
+                              <TableCell className="h-24 text-center text-muted-foreground" colSpan={cols.length || 1}>
+                                No quotations
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            rowsForRender.map((row: any, idx: number) => (
+                              <TableRow key={idx} className="hover:bg-muted/50 transition-colors">
                               {cols.map((c: string, i: number) => {
                                 const val = row?.[c];
                                 const rowWithSpans = row;
@@ -1447,21 +1462,23 @@ const QuotationFeature: React.FC = () => {
                                   ? renderHighlightedText(typeof val === 'string' ? val : (val ?? ''), rowWithSpans, cellKey)
                                   : (val !== undefined && val !== null ? String(val) : '');
                                 return (
-                                  <td
+                                  <TableCell
                                     key={i}
-                                    className="px-4 py-2 text-sm text-foreground align-top"
+                                    className="px-4 py-2.5 text-sm align-top"
                                     style={{ lineHeight: 1.6 }}
                                   >
                                     {content}
-                                  </td>
+                                  </TableCell>
                                 );
                               })}
-                            </tr>
+                            </TableRow>
                           ))
                         )}
-                      </tbody>
-                    </table>
-                  </div>
+                      </TableBody>
+                    </Table>
+                    </div>
+                  </ScrollArea>
+                </div>
                   {(() => {
                     const pag = resultState?.pagination || ((nodeData as any)?.pagination ?? {});
                     const page = Number(pag.page) || 1;
@@ -1579,7 +1596,6 @@ const QuotationFeature: React.FC = () => {
                       </div>
                     );
                   })()}
-                </div>
               </CardContent>
             </Card>
           );

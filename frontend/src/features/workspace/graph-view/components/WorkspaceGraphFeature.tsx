@@ -115,7 +115,7 @@ export function WorkspaceGraphFeature({ fallback }: WorkspaceGraphFeatureProps) 
       <ReactFlow
         nodes={graph.nodes}
         edges={graph.edges}
-        nodeTypes={graph.nodeTypes}
+        nodeTypes={graph.nodeTypes as any}
         onNodesChange={graph.handleNodesChange}
         onEdgesChange={graph.handleEdgesChange}
         onNodeClick={graph.handleNodeClick}

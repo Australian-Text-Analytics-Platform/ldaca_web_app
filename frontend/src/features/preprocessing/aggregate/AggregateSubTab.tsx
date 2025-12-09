@@ -131,7 +131,7 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
 
           <Separator />
 
-          <Tabs value={expression.mode} onValueChange={expression.setMode} className="space-y-4">
+          <Tabs value={expression.mode} onValueChange={(val) => expression.setMode(val as 'basic' | 'advanced')} className="space-y-4">
             <TabsList className="flex max-w-md gap-2">
               <TabsTrigger value="basic">Basic</TabsTrigger>
               <TabsTrigger value="advanced">Advanced</TabsTrigger>

@@ -589,7 +589,7 @@ function TokenFrequencyFeature() {
   );
 
   const applyHydratedResult = useCallback(
-    async (resultPayload: TokenFrequencyResponse | null) => {
+    async (resultPayload: TokenFrequencyResponse | null | undefined) => {
       if (!hydratedRequestAvailableRef.current) {
         setResults(null);
         return;

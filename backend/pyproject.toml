@@ -47,6 +47,18 @@ addopts = [
 ]
 pythonpath = ["src"]
 testpaths = ["tests"]
+norecursedirs = [
+    ".git",
+    ".mypy_cache",
+    ".pytest_cache",
+    "node_modules",
+    "build",
+    "dist",
+    "dist-tauri",
+    "src-tauri",
+    "src-tauri/target",
+    "*site-packages",
+]
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]

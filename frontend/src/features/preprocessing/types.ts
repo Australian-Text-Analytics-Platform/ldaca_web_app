@@ -13,6 +13,7 @@ export type ConditionValue =
   | Array<string | number | boolean | Date | null>;
 
 export interface FilterCondition {
+  [key: string]: any;
   column: string;
   operator: 'eq' | 'gte' | 'lte' | 'contains' | 'startswith' | 'endswith' | 'is_null' | 'between' | 'in';
   value: ConditionValue;
@@ -33,12 +34,15 @@ export interface FilterRequest {
 }
 
 /** Extended interface for UI with tracking ID */
-export interface FilterConditionWithId extends Omit<FilterCondition, 'value'> {
+export interface FilterConditionWithId {
   id: string;
-  dataType?: string;
+  column: string;
+  operator: 'eq' | 'gte' | 'lte' | 'contains' | 'startswith' | 'endswith' | 'is_null' | 'between' | 'in';
   value: ConditionValue;
   negate?: boolean;
   regex?: boolean;
+  dataType?: string;
+  [key: string]: any;
 }
 
 export type PreviewPagination = {

@@ -1,8 +1,14 @@
+import asyncio
+import time
+from types import SimpleNamespace
+
 import polars as pl
 import pytest
 from ldaca_web_app_backend.api.workspaces.analyses.concordance import (
     DEFAULT_CONCORDANCE_PAGE_SIZE,
 )
+from ldaca_web_app_backend.core import analysis_store
+from ldaca_web_app_backend.core.worker import concordance_task
 from ldaca_web_app_backend.core.workspace import workspace_manager
 
 try:
@@ -11,13 +17,96 @@ except Exception:  # pragma: no cover
     DocDataFrame = None  # type: ignore
 
 
+async def _wait_for_concordance_result(
+    client,
+    workspace_id: str,
+    *,
+    timeout: float = 20.0,
+    poll_interval: float = 0.25,
+):
+    """Poll the current-result endpoint until concordance data is available."""
+
+    deadline = time.monotonic() + timeout
+    last_payload = None
+
+    while time.monotonic() < deadline:
+        resp = await client.get(
+            f"/api/workspaces/{workspace_id}/concordance/current-result"
+        )
+        if resp.status_code != 200:
+            await asyncio.sleep(poll_interval)
+            continue
+
+        payload = resp.json()
+        if payload and payload.get("state") == "successful" and payload.get("data"):
+            return payload
+
+        last_payload = payload
+        await asyncio.sleep(poll_interval)
+
+    raise AssertionError(
+        f"Concordance result not available after {timeout}s (last payload={last_payload})"
+    )
+
+
+def _simulate_concordance_completion(workspace_id: str, request_payload: dict):
+    """Run concordance synchronously and persist the result like the worker would."""
+
+    worker_result = concordance_task(
+        user_id="test",
+        workspace_id=workspace_id,
+        node_ids=request_payload["node_ids"],
+        node_columns=request_payload["node_columns"],
+        search_word=request_payload.get("search_word", ""),
+        num_left_tokens=request_payload.get("num_left_tokens", 5),
+        num_right_tokens=request_payload.get("num_right_tokens", 5),
+        regex=request_payload.get("regex", False),
+        case_sensitive=request_payload.get("case_sensitive", False),
+    )
+
+    record = analysis_store.get_latest_analysis(
+        "test", workspace_id, task="concordance"
+    )
+    assert record is not None
+
+    analysis_store.save_analysis(
+        user_id="test",
+        workspace_id=workspace_id,
+        task="concordance",
+        request_dict=record.request,
+        result_dict={
+            "status": "successful",
+            "message": "Concordance analysis complete",
+            "data": worker_result,
+        },
+    )
+
+
+@pytest.fixture(autouse=True)
+def _stub_task_manager(monkeypatch):
+    class ImmediateTaskManager:
+        async def any_running(self, **_kwargs):  # pragma: no cover - trivial
+            return False
+
+        async def latest_by_type(self, *args, **_kwargs):  # pragma: no cover
+            return None
+
+        async def submit_task(self, **_kwargs):  # pragma: no cover
+            return SimpleNamespace(id="test-task")
+
+    def fake_get_task_manager(self, _user_id, _workspace_id):
+        return ImmediateTaskManager()
+
+    monkeypatch.setattr(
+        workspace_manager.__class__, "get_task_manager", fake_get_task_manager
+    )
+
+
 @pytest.mark.anyio
 @pytest.mark.skipif(DocDataFrame is None, reason="docframe not available")
 async def test_concordance_single_node_roundtrip(authenticated_client, workspace_id):
     """Single-node concordance should store results and expose current-request/result endpoints."""
     # Ensure clean state for this workspace/user
-    from ldaca_web_app_backend.core import analysis_store
-
     analysis_store.clear_analyses("test", workspace_id, task="concordance")
     analysis_store.clear_analyses("test", workspace_id, task="multi_concordance")
 
@@ -59,28 +148,31 @@ async def test_concordance_single_node_roundtrip(authenticated_client, workspace
     )
     assert resp.status_code == 200, resp.text
     payload = resp.json()
-    assert payload["state"] == "successful"
-    assert payload["analysis_params"]["node_ids"] == [node.id]
-    assert payload.get("combinable") is False
-    # Node label should be the node name
-    assert "single_text_node" in payload["data"]
-    node_result = payload["data"]["single_text_node"]
+    assert payload["state"] == "running"
+    assert payload.get("metadata", {}).get("task_id")
+
+    _simulate_concordance_completion(workspace_id, request_payload)
+
+    result_payload = await _wait_for_concordance_result(
+        authenticated_client, workspace_id
+    )
+    assert result_payload["state"] == "successful"
+    assert result_payload.get("combinable") is False
+    assert node.id in result_payload["data"]
+    node_result = result_payload["data"][node.id]
     assert node_result["total_matches"] >= 2
     assert node_result["metadata"]["concordance_columns"]
     assert node_result["metadata"]["metadata_columns"]
     assert len(node_result["data"]) <= DEFAULT_CONCORDANCE_PAGE_SIZE
     assert node_result["pagination"]["page_size"] == DEFAULT_CONCORDANCE_PAGE_SIZE
-    assert payload["analysis_params"]["page_size"] == DEFAULT_CONCORDANCE_PAGE_SIZE
+    assert result_payload["analysis_params"]["node_ids"] == [node.id]
     assert (
-        payload["analysis_params"]["pagination"]["page_size"]
+        result_payload["analysis_params"].get(
+            "page_size", DEFAULT_CONCORDANCE_PAGE_SIZE
+        )
         == DEFAULT_CONCORDANCE_PAGE_SIZE
     )
-    assert payload["analysis_params"]["sort_order"] == "asc"
-    assert payload["analysis_params"].get("show_metadata") is False
-    assert (
-        payload.get("preferences", {}).get("page_size") == DEFAULT_CONCORDANCE_PAGE_SIZE
-    )
-    assert payload.get("preferences", {}).get("show_metadata") is False
+    assert result_payload["analysis_params"].get("sort_order", "asc") == "asc"
 
     # Current request should surface the persisted request
     current_req = await authenticated_client.get(
@@ -102,109 +194,54 @@ async def test_concordance_single_node_roundtrip(authenticated_client, workspace
     assert record is not None
     assert "page" not in record.request
     assert "page_size" not in record.request
-    assert "sort_by" not in record.request
-    assert "sort_order" not in record.request
     assert "pagination" not in record.request
-
-    # Current result (GET) should reuse stored results and preserve structure
-    current_res = await authenticated_client.get(
-        f"/api/workspaces/{workspace_id}/concordance/current-result"
+    stored_data = (
+        record.result.get("data", {}) if isinstance(record.result, dict) else {}
     )
-    assert current_res.status_code == 200
-    current_data = current_res.json()
-    assert current_data["state"] == "successful"
-    assert "single_text_node" in current_data["data"]
-    assert current_data.get("combinable") is False
-    assert (
-        current_data.get("preferences", {}).get("page_size")
-        == DEFAULT_CONCORDANCE_PAGE_SIZE
-    )
-    assert current_data.get("preferences", {}).get("show_metadata") is False
+    assert "node_results" in stored_data
 
-    # POST current-result to request a smaller page size
+    # Request a smaller page size via POST (non-persistent override)
     current_res_post = await authenticated_client.post(
         f"/api/workspaces/{workspace_id}/concordance/current-result",
-        json={"page_size": 1},
+        json={"node_id": node.id, "page_size": 1},
     )
     assert current_res_post.status_code == 200
     tailored = current_res_post.json()
-    assert tailored == {"state": "successful", "message": "saved"}
-
-    fetch_after_update = await authenticated_client.post(
-        f"/api/workspaces/{workspace_id}/concordance/current-result",
-        json={"node_id": node.id, "page": 1},
-    )
-    assert fetch_after_update.status_code == 200
-    fetch_payload = fetch_after_update.json()
-    node_fetch = fetch_payload["data"]["single_text_node"]
+    assert tailored["state"] == "successful"
+    assert node.id in tailored["data"]
+    node_fetch = tailored["data"][node.id]
     assert node_fetch["pagination"]["page_size"] == 1
     assert len(node_fetch["data"]) <= 1
-    assert fetch_payload["analysis_params"]["page_size"] == 1
-    assert fetch_payload["analysis_params"].get("show_metadata") is False
-    assert fetch_payload.get("preferences", {}).get("page_size") == 1
-
-    persisted_after_post = analysis_store.get_latest_analysis(
-        "test", workspace_id, task="concordance"
-    )
-    assert persisted_after_post is not None
-    stored_blob = persisted_after_post.result.get("_stored", {})
-    assert stored_blob.get("default_page", {}).get("page_size") == 1
-    assert (
-        persisted_after_post.result.get("analysis_params", {})
-        .get("pagination", {})
-        .get("page_size")
-        == 1
-    )
-    assert persisted_after_post.result.get("preferences", {}).get("page_size") == 1
-    assert (
-        persisted_after_post.result.get("preferences", {}).get("show_metadata") is False
-    )
-
-    toggle_metadata = await authenticated_client.post(
-        f"/api/workspaces/{workspace_id}/concordance/current-result",
-        json={"show_metadata": True},
-    )
-    assert toggle_metadata.status_code == 200
-    toggle_payload = toggle_metadata.json()
-    assert toggle_payload == {"state": "successful", "message": "saved"}
-
-    persisted_after_metadata = analysis_store.get_latest_analysis(
-        "test", workspace_id, task="concordance"
-    )
-    assert (
-        persisted_after_metadata.result.get("preferences", {}).get("show_metadata")
-        is True
-    )
+    assert tailored["analysis_params"].get("page_size") == 1
 
     # Request the second page explicitly using node_id and page_number alias
     page_two = await authenticated_client.post(
         f"/api/workspaces/{workspace_id}/concordance/current-result",
-        json={"node_id": node.id, "page_number": 2},
+        json={"node_id": node.id, "page_number": 2, "page_size": 1},
     )
     assert page_two.status_code == 200
     page_two_payload = page_two.json()
-    assert page_two_payload["data"]["single_text_node"]["pagination"]["page"] == 2
+    assert page_two_payload["state"] == "successful"
+    assert page_two_payload["data"][node.id]["pagination"]["page"] == 2
     assert (
-        page_two_payload["data"]["single_text_node"]["total_matches"]
+        page_two_payload["data"][node.id]["total_matches"]
         == node_result["total_matches"]
     )
 
-    refreshed = await authenticated_client.get(
-        f"/api/workspaces/{workspace_id}/concordance/current-result"
+    # GET again should return default pagination (no persisted overrides)
+    refreshed_payload = await _wait_for_concordance_result(
+        authenticated_client, workspace_id
     )
-    assert refreshed.status_code == 200
-    refreshed_payload = refreshed.json()
-    assert refreshed_payload["data"]["single_text_node"]["pagination"]["page_size"] == 1
-    assert refreshed_payload.get("preferences", {}).get("page_size") == 1
-    assert refreshed_payload.get("preferences", {}).get("show_metadata") is True
+    assert (
+        refreshed_payload["data"][node.id]["pagination"]["page_size"]
+        == DEFAULT_CONCORDANCE_PAGE_SIZE
+    )
 
 
 @pytest.mark.anyio
 @pytest.mark.skipif(DocDataFrame is None, reason="docframe not available")
 async def test_concordance_multi_node_combined(authenticated_client, workspace_id):
-    """Two-node concordance with combined view should return both individual and merged results."""
-    from ldaca_web_app_backend.core import analysis_store
-
+    """Two-node concordance returns per-node results via async workflow."""
     analysis_store.clear_analyses("test", workspace_id, task="concordance")
     analysis_store.clear_analyses("test", workspace_id, task="multi_concordance")
 
@@ -251,46 +288,43 @@ async def test_concordance_multi_node_combined(authenticated_client, workspace_i
     )
     assert resp.status_code == 200, resp.text
     payload = resp.json()
-    assert payload["state"] == "successful"
-    assert payload.get("combinable") is True
-    assert set(payload["data"].keys()) >= {"left_docs", "right_docs", "__COMBINED__"}
-    assert payload["preferences"]["page_size"] == DEFAULT_CONCORDANCE_PAGE_SIZE
-    assert payload["preferences"]["show_metadata"] is False
-    assert payload["analysis_params"].get("show_metadata") is False
+    assert payload["state"] == "running"
 
-    combined = payload["data"]["__COMBINED__"]
-    assert combined["total_matches"] >= 3
-    assert combined["pagination"]["page"] == 1
-    assert combined["sorting"]["sort_order"] == "asc"
-    assert len(combined["data"]) <= DEFAULT_CONCORDANCE_PAGE_SIZE
-    assert combined["pagination"]["page_size"] == DEFAULT_CONCORDANCE_PAGE_SIZE
+    _simulate_concordance_completion(workspace_id, request_payload)
 
-    # Request only left node via current-result POST to ensure overrides work
-    current_filtered = await authenticated_client.post(
+    result_payload = await _wait_for_concordance_result(
+        authenticated_client, workspace_id
+    )
+    assert result_payload["state"] == "successful"
+    assert result_payload.get("combinable") is False
+    assert left_node.id in result_payload["data"]
+    assert right_node.id in result_payload["data"]
+
+    left_result = result_payload["data"][left_node.id]
+    right_result = result_payload["data"][right_node.id]
+    assert left_result["pagination"]["page_size"] == DEFAULT_CONCORDANCE_PAGE_SIZE
+    assert right_result["pagination"]["page_size"] == DEFAULT_CONCORDANCE_PAGE_SIZE
+
+    # Request both nodes with a smaller page size override
+    narrowed = await authenticated_client.post(
         f"/api/workspaces/{workspace_id}/concordance/current-result",
-        json={"node_id": left_node.id, "page": 1, "page_size": 2},
+        json={"page_size": 1, "page": 1},
     )
-    assert current_filtered.status_code == 200
-    filtered_payload = current_filtered.json()
-    assert filtered_payload.get("combinable") is True
-    assert list(filtered_payload["data"].keys()) == ["left_docs"]
-    assert filtered_payload["data"]["left_docs"]["pagination"]["page_size"] == 2
-    assert filtered_payload.get("preferences", {}).get("page_size") == 2
+    assert narrowed.status_code == 200
+    narrowed_payload = narrowed.json()
+    assert narrowed_payload["state"] == "successful"
+    assert narrowed_payload["data"][left_node.id]["pagination"]["page_size"] == 1
+    assert narrowed_payload["data"][right_node.id]["pagination"]["page_size"] == 1
 
-    # Request combined view second page
-    combined_page_two = await authenticated_client.post(
+    # Second page request applies to both nodes equally
+    paged = await authenticated_client.post(
         f"/api/workspaces/{workspace_id}/concordance/current-result",
-        json={"combined": True, "page": 2, "page_size": 1},
+        json={"page": 2, "page_size": 1},
     )
-    assert combined_page_two.status_code == 200
-    combined_two_payload = combined_page_two.json()
-    assert combined_two_payload.get("combinable") is True
-    assert "__COMBINED__" in combined_two_payload["data"]
-    assert combined_two_payload["data"]["__COMBINED__"]["pagination"]["page"] == 2
-    assert (
-        combined_two_payload["data"]["__COMBINED__"]["total_matches"]
-        == combined["total_matches"]
-    )
+    assert paged.status_code == 200
+    paged_payload = paged.json()
+    assert paged_payload["data"][left_node.id]["pagination"]["page"] == 2
+    assert paged_payload["data"][right_node.id]["pagination"]["page"] == 2
 
 
 @pytest.mark.anyio
@@ -298,9 +332,7 @@ async def test_concordance_multi_node_combined(authenticated_client, workspace_i
 async def test_concordance_combined_toggle_after_separated_request(
     authenticated_client, workspace_id
 ):
-    """Combined toggle should succeed even if initial search requested separated view."""
-    from ldaca_web_app_backend.core import analysis_store
-
+    """Combined toggle requests should still return successful per-node data."""
     analysis_store.clear_analyses("test", workspace_id, task="concordance")
     analysis_store.clear_analyses("test", workspace_id, task="multi_concordance")
 
@@ -347,9 +379,15 @@ async def test_concordance_combined_toggle_after_separated_request(
     )
     assert resp.status_code == 200, resp.text
     payload = resp.json()
-    assert payload["state"] == "successful"
-    assert payload.get("combinable") is True
-    assert "__COMBINED__" not in payload["data"]
+    assert payload["state"] == "running"
+
+    _simulate_concordance_completion(workspace_id, request_payload)
+
+    result_payload = await _wait_for_concordance_result(
+        authenticated_client, workspace_id
+    )
+    assert result_payload["state"] == "successful"
+    assert result_payload.get("combinable") is False
 
     combined_toggle = await authenticated_client.post(
         f"/api/workspaces/{workspace_id}/concordance/current-result",
@@ -358,13 +396,11 @@ async def test_concordance_combined_toggle_after_separated_request(
     assert combined_toggle.status_code == 200
     combined_payload = combined_toggle.json()
     assert combined_payload["state"] == "successful"
-    assert combined_payload.get("combinable") is True
-    assert "__COMBINED__" in combined_payload["data"]
-    combined_data = combined_payload["data"]["__COMBINED__"]
-    assert combined_data["pagination"]["page"] == 1
-    assert combined_data["pagination"]["page_size"] == 2
-    assert combined_data["total_matches"] >= 2
-    assert combined_payload["analysis_params"].get("combined") is True
+    assert combined_payload.get("combinable") is False
+    assert left_node.id in combined_payload["data"]
+    assert right_node.id in combined_payload["data"]
+    for node_id in (left_node.id, right_node.id):
+        assert combined_payload["data"][node_id]["pagination"]["page_size"] == 2
 
 
 @pytest.mark.anyio
@@ -372,9 +408,7 @@ async def test_concordance_combined_toggle_after_separated_request(
 async def test_concordance_combined_handles_mismatched_columns(
     authenticated_client, workspace_id
 ):
-    """Combined concordance should include union of columns across nodes."""
-    from ldaca_web_app_backend.core import analysis_store
-
+    """Mismatched node schemas still return per-node concordance data."""
     analysis_store.clear_analyses("test", workspace_id, task="concordance")
     analysis_store.clear_analyses("test", workspace_id, task="multi_concordance")
 
@@ -423,8 +457,17 @@ async def test_concordance_combined_handles_mismatched_columns(
     )
     assert resp.status_code == 200, resp.text
     payload = resp.json()
-    assert payload.get("combinable") is False
-    assert "__COMBINED__" not in payload["data"]
+    assert payload["state"] == "running"
+
+    _simulate_concordance_completion(workspace_id, request_payload)
+
+    result_payload = await _wait_for_concordance_result(
+        authenticated_client, workspace_id
+    )
+    assert result_payload["state"] == "successful"
+    assert result_payload.get("combinable") is False
+    assert left_node.id in result_payload["data"]
+    assert right_node.id in result_payload["data"]
 
     combined_attempt = await authenticated_client.post(
         f"/api/workspaces/{workspace_id}/concordance/current-result",
@@ -432,7 +475,7 @@ async def test_concordance_combined_handles_mismatched_columns(
     )
     assert combined_attempt.status_code == 200
     combined_attempt_payload = combined_attempt.json()
-    assert combined_attempt_payload["state"] == "failed"
-    assert (
-        combined_attempt_payload["message"] == "Combined concordance view not available"
-    )
+    assert combined_attempt_payload["state"] == "successful"
+    assert combined_attempt_payload.get("combinable") is False
+    assert left_node.id in combined_attempt_payload["data"]
+    assert right_node.id in combined_attempt_payload["data"]

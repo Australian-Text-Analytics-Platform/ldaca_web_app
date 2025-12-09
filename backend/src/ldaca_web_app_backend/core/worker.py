@@ -126,12 +126,12 @@ def topic_modeling_task(
     try:
         # Import heavy libraries after environment is configured
         import polars as pl
+        from docframe.core.text_utils import topic_visualization
 
         # Import workspace manager (this should be lightweight)
         from ldaca_web_app_backend.core.workspace import workspace_manager
 
         from docframe import DocDataFrame, DocLazyFrame
-        from docframe.core.text_utils import topic_visualization
 
         print(
             f"[Worker {os.getpid()}] Starting topic modeling task for workspace {workspace_id}"
@@ -324,7 +324,7 @@ def _materialize_to_polars_df(obj):
     elif hasattr(obj, "to_polars"):
         obj = obj.to_polars()
 
-    if hasattr(obj, "_df"):
+    if hasattr(obj, "_df") and not isinstance(obj, pl.DataFrame):
         obj = obj._df
 
     if not isinstance(obj, pl.DataFrame):

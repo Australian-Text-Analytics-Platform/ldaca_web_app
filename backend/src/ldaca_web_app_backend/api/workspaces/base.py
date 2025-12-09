@@ -258,13 +258,14 @@ async def add_node_to_workspace(
         _DocLF = None
         if mode in {"DocLazyFrame", "DocDataFrame"}:
             try:
-                import docframe  # noqa: F401
                 from docframe.core.docframe import (
                     DocDataFrame as _DocDF,  # type: ignore
                 )
                 from docframe.core.docframe import (
                     DocLazyFrame as _DocLF,  # type: ignore
                 )
+
+                import docframe  # noqa: F401
             except Exception:  # pragma: no cover
                 raise HTTPException(
                     status_code=500,
@@ -746,7 +747,7 @@ async def export_nodes(
             )
 
         # If it's a docframe wrapper unwrap _df attribute
-        if hasattr(collected, "_df"):
+        if hasattr(collected, "_df") and not isinstance(collected, pl.DataFrame):
             try:
                 collected = collected._df  # type: ignore[attr-defined]
             except Exception:

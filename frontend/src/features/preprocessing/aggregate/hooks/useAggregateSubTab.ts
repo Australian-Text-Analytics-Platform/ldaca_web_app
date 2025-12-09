@@ -106,7 +106,7 @@ export interface BasicBuilderConfig {
   startEditingCustom: (tokenId: string) => void;
   finishCustomEdit: (commit: boolean) => void;
   clearBuilder: () => void;
-  dropZoneRef: React.RefObject<HTMLDivElement>;
+  dropZoneRef: React.RefObject<HTMLDivElement | null>;
   handlers: {
     customDraftChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
     customInputKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => void;
@@ -148,6 +148,7 @@ export interface UseAggregateSubTabResult {
   preview: PreviewConfig;
   apply: ApplyConfig;
   manualExpressionActive: boolean;
+  dropZoneRef: React.RefObject<HTMLDivElement | null>;
 }
 
 const createTokenId = (): string => {
@@ -881,6 +882,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       startEditingCustom: startEditingCustomToken,
       finishCustomEdit,
       clearBuilder: clearBasicBuilder,
+      dropZoneRef,
       handlers: {
         customDraftChange: handleCustomDraftChange,
         customInputKeyDown: handleCustomInputKeyDown,
@@ -907,7 +909,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       loading: applyLoading,
       canApply,
       lastAppliedExpression,
-      currentMatchesApplied: currentExpressionMatchesApplied,
+      currentMatchesApplied: !!currentExpressionMatchesApplied,
       handleApply,
     },
     manualExpressionActive,

@@ -52,8 +52,8 @@ export interface WorkspaceGraphViewModel {
   handleEdgesChange: ReturnType<typeof useEdgesState<Edge>>[2];
   handlePaneClick: () => void;
   handleConnect: (connection: Connection) => void;
-  handleConnectStart: (event: MouseEvent, params: any) => void;
-  handleConnectEnd: (event: MouseEvent) => void;
+  handleConnectStart: (event: any, params: any) => void;
+  handleConnectEnd: (event: any) => void;
   handleInit: (instance: ReactFlowInstance) => void;
   clearSelection: (() => void) | undefined;
   connectionLineType: ConnectionLineType;
@@ -281,13 +281,13 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initialEdges);
 
-  const currentNodeIds = nodes.map((node) => node.id).join(',');
-  const currentEdgeIds = edges.map((edge) => `${edge.source}-${edge.target}`).join(',');
-  const newNodeIds = initialNodes.map((node) => node.id).join(',');
-  const newEdgeIds = initialEdges.map((edge) => `${edge.source}-${edge.target}`).join(',');
+  const currentNodeIds = nodes.map((node: Node) => node.id).join(',');
+  const currentEdgeIds = edges.map((edge: Edge) => `${edge.source}-${edge.target}`).join(',');
+  const newNodeIds = initialNodes.map((node: Node) => node.id).join(',');
+  const newEdgeIds = initialEdges.map((edge: Edge) => `${edge.source}-${edge.target}`).join(',');
 
   const currentNodesSignature = nodes
-    .map((node) => {
+    .map((node: any) => {
       const dt = node?.data?.node?.data_type ?? 'unknown';
       const lazy = node?.data?.node?.is_lazy ? '1' : '0';
       const docc = node?.data?.node?.document_column || '';
@@ -297,7 +297,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
     .join(',');
 
   const newNodesSignature = initialNodes
-    .map((node) => {
+    .map((node: any) => {
       const dt = node?.data?.node?.data_type ?? 'unknown';
       const lazy = node?.data?.node?.is_lazy ? '1' : '0';
       const docc = node?.data?.node?.document_column || '';
@@ -410,14 +410,14 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
   );
 
   const handleConnectStart = useCallback(
-    (_event: React.MouseEvent, params: any) => {
+    (_event: any, params: any) => {
       dlog('WorkspaceGraphView: onConnectStart blocked', params);
     },
     [dlog]
   );
 
   const handleConnectEnd = useCallback(
-    (_event: React.MouseEvent) => {
+    (_event: any) => {
       dlog('WorkspaceGraphView: onConnectEnd blocked');
     },
     [dlog]

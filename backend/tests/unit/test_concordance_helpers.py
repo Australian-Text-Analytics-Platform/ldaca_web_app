@@ -65,8 +65,8 @@ def test_normalize_saved_request_coerces_legacy_shape():
         "num_right_tokens": 2,
         "regex": False,
         "case_sensitive": True,
-        "combined": False,
     }
+    assert "combined" not in normalized
     for excluded in ("page", "page_size", "sort_by", "sort_order", "pagination"):
         assert excluded not in normalized
 

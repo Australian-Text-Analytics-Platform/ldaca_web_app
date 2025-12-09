@@ -6,6 +6,7 @@ import polars as pl
 import pytest
 from fastapi import HTTPException
 from ldaca_web_app_backend.api.workspaces import nodes as nodes_api
+from ldaca_web_app_backend.api.workspaces import utils as workspace_utils
 from ldaca_web_app_backend.models import ConcatPreviewRequest, ConcatRequest
 
 
@@ -89,6 +90,7 @@ def fake_workspace_manager(monkeypatch: pytest.MonkeyPatch, sample_nodes):
 
     manager = FakeWorkspaceManager(sample_nodes)
     monkeypatch.setattr(nodes_api, "workspace_manager", manager)
+    monkeypatch.setattr(workspace_utils, "workspace_manager", manager)
     return manager
 
 

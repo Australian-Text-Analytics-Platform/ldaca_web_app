@@ -187,12 +187,9 @@ class TestDocWorkspaceTypeMapping:
 
     def test_polars_type_to_js_type_categorical(self):
         """Categorical dtypes map to categorical JS type"""
-        from ldaca_web_app_backend.core.docworkspace_api import \
-            DocWorkspaceAPIUtils
+        from ldaca_web_app_backend.core.docworkspace_api import DocWorkspaceAPIUtils
 
         # Test with Polars type object
         assert (
             DocWorkspaceAPIUtils.polars_type_to_js_type(pl.Categorical) == "categorical"
-        )
-        )
         )

@@ -95,10 +95,16 @@ If you restructure into an `app/` package later, adjust the run command accordin
 ## Running Tests
 
 ```bash
-uv run pytest -q              # All tests
+uv run pytest -q              # All backend tests (preferred)
 uv run pytest -m unit         # Unit tests only
 uv run pytest -m integration  # Integration tests
 ```
+
+> **Tip:** Avoid running `pytest .` from the repository root. The desktop (Tauri) build places
+> bundled Python runtimes under `dist-tauri/` and `src-tauri/target/`; Pytest will recurse into
+> those directories and attempt to execute upstream libraries' test suites, resulting in
+> hundreds of spurious errors. The default `uv run pytest` command respects the configured
+> `testpaths=tests` and stays within the backend suite.
 
 Add markers in test functions/classes as needed.
 

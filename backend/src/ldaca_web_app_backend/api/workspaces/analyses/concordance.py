@@ -137,7 +137,7 @@ def _normalize_sort_order(sort_order: Optional[str]) -> str:
 def _materialize_base_dataframe(node_data) -> pl.DataFrame:
     if hasattr(node_data, "to_lazyframe"):
         base_df = node_data.to_lazyframe().collect()
-    elif hasattr(node_data, "_df"):
+    elif hasattr(node_data, "_df") and not isinstance(node_data, pl.DataFrame):
         base_df = node_data._df  # type: ignore[attr-defined]
     elif hasattr(node_data, "collect"):
         base_df = node_data.collect()
@@ -1181,7 +1181,9 @@ async def concordance_current_result_post(
         normalized_request = _normalize_saved_request(rec.request, rec.result) or {}
 
         # Update pagination params from query
-        if query.page is not None:
+        if query.page_number is not None:
+            normalized_request["page"] = query.page_number
+        elif query.page is not None:
             normalized_request["page"] = query.page
         if query.page_size is not None:
             normalized_request["page_size"] = query.page_size
@@ -1684,7 +1686,7 @@ async def detach_concordance(
                 underlying_df = node.data.collect()
             elif hasattr(node.data, "to_lazyframe"):
                 underlying_df = node.data.to_lazyframe().collect()  # type: ignore
-            elif hasattr(node.data, "_df"):
+            elif hasattr(node.data, "_df") and not isinstance(node.data, pl.DataFrame):
                 underlying_df = node.data._df  # type: ignore[attr-defined]
             else:
                 underlying_df = node.data

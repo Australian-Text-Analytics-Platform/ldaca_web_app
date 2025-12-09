@@ -217,7 +217,7 @@ const ConcordanceFeature: React.FC = () => {
 
     const headers = getAuthHeaders();
     await textApi.postConcordanceCurrentResult(currentWorkspaceId, body, headers);
-    const params = fetchParamsOverride ?? body;
+    const params = (fetchParamsOverride ?? body) as Record<string, unknown>;
     return refreshCurrentConcordanceResult(params);
   }, [currentWorkspaceId, getAuthHeaders, refreshCurrentConcordanceResult]);
 
