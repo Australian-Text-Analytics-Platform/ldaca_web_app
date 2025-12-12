@@ -100,6 +100,18 @@ class Workspace:
             if node in parent.children:
                 parent.children.remove(node)
         del self.nodes[node_id]
+
+        # Best-effort cleanup for on-disk persisted node payloads.
+        # The core library remains usable without any persistence context; the
+        # backend attaches `_workspace_dir` when a workspace is loaded/saved.
+        try:
+            ws_dir = getattr(self, "_workspace_dir", None)
+            if ws_dir is not None:
+                data_file = Path(ws_dir) / "data" / f"{node_id}.plbin"
+                if data_file.exists():
+                    data_file.unlink()
+        except Exception:
+            pass
         return True
 
     # Lookup helpers -------------------------------------------------

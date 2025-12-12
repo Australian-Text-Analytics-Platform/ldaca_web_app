@@ -5,6 +5,7 @@ Tests the end-to-end flow from API endpoints to file persistence.
 """
 
 from datetime import datetime
+from types import SimpleNamespace
 
 import pytest
 from httpx import AsyncClient
@@ -13,7 +14,10 @@ from ldaca_web_app_backend.api.workspaces.analyses.token_frequencies import (
     MAX_SERVER_TOKEN_LIMIT,
     SERVER_LIMIT_MULTIPLIER,
 )
+from ldaca_web_app_backend.core import analysis_store
 from ldaca_web_app_backend.core.analysis_store import list_analyses
+from ldaca_web_app_backend.core.worker import token_frequencies_task
+from ldaca_web_app_backend.core.workspace import workspace_manager
 
 
 # Helper functions
@@ -49,6 +53,59 @@ def assert_successful_result(result_dict: dict):
     assert "data" in result_dict
 
 
+def _simulate_token_frequency_completion(workspace_id: str):
+    """Run token frequencies synchronously and persist the result like the worker/task manager would."""
+
+    record = analysis_store.get_latest_analysis(
+        "test", workspace_id, task="token_frequencies"
+    )
+    assert record is not None
+
+    req = record.request or {}
+    worker_result = token_frequencies_task(
+        user_id="test",
+        workspace_id=workspace_id,
+        node_ids=req.get("node_ids") or [],
+        node_columns=req.get("node_columns") or {},
+        token_limit=req.get("token_limit") or DEFAULT_TOKEN_LIMIT,
+        stop_words=req.get("stop_words") or [],
+    )
+
+    analysis_store.save_analysis(
+        user_id="test",
+        workspace_id=workspace_id,
+        task="token_frequencies",
+        request_dict=req,
+        result_dict={
+            "status": "successful",
+            "message": "token_frequencies completed successfully",
+            "data": worker_result,
+        },
+    )
+
+
+@pytest.fixture(autouse=True)
+def _stub_task_manager(monkeypatch):
+    """Avoid spawning real worker processes in tests; mimic immediate task submission."""
+
+    class ImmediateTaskManager:
+        async def any_running(self, **_kwargs):  # pragma: no cover
+            return False
+
+        async def latest_by_type(self, *args, **_kwargs):  # pragma: no cover
+            return None
+
+        async def submit_task(self, **_kwargs):  # pragma: no cover
+            return SimpleNamespace(id="test-task")
+
+    def fake_get_task_manager(self, _user_id, _workspace_id):
+        return ImmediateTaskManager()
+
+    monkeypatch.setattr(
+        workspace_manager.__class__, "get_task_manager", fake_get_task_manager
+    )
+
+
 @pytest.mark.anyio
 class TestTokenFrequencyPersistence:
     """Test token frequency analysis persistence."""
@@ -70,10 +127,22 @@ class TestTokenFrequencyPersistence:
             request_payload,
         )
 
-        # Then: The response is successful
+        # Then: The response starts a background task
         assert response.status_code == 200
         result_data = response.json()
-        assert_successful_result(result_data)
+        assert result_data.get("state") == "running"
+        assert result_data.get("metadata", {}).get("task_id")
+
+        # Simulate worker completion and fetch persisted result
+        _simulate_token_frequency_completion(workspace_id)
+
+        result_resp = await get_json(
+            authenticated_client,
+            f"/api/workspaces/{workspace_id}/token-frequencies/current-result",
+        )
+        assert result_resp.status_code == 200
+        final_result = result_resp.json()
+        assert_successful_result(final_result)
 
         # And: An analysis record was persisted
         analyses = list_analyses(test_user["id"], workspace_id)
@@ -88,11 +157,11 @@ class TestTokenFrequencyPersistence:
         assert "limit" not in record.request
         assert record.request["token_limit"] == expected_limit
         assert record.request.get("stop_words") == []
-        assert_successful_result(record.result)
-        assert record.result.get("token_limit") == expected_limit
-        assert record.result.get("stop_words") == []
-        assert record.result.get("metadata", {}).get("stop_words") == []
-        assert record.result.get("analysis_params", {}).get("stop_words") == []
+        # Result is stored (may be wrapped by task manager); validate via endpoint contract
+        assert final_result.get("token_limit") == expected_limit
+        assert final_result.get("stop_words") == []
+        assert final_result.get("metadata", {}).get("stop_words") == []
+        assert final_result.get("analysis_params", {}).get("stop_words") == []
 
         # Validate timestamp
         saved_time = datetime.fromisoformat(record.saved_at)
@@ -119,12 +188,20 @@ class TestTokenFrequencyPersistence:
 
         assert response.status_code == 200
         result_data = response.json()
-        assert result_data.get("token_limit") == DEFAULT_TOKEN_LIMIT
+        assert result_data.get("state") == "running"
+
+        _simulate_token_frequency_completion(workspace_id)
+        result_resp = await get_json(
+            authenticated_client,
+            f"/api/workspaces/{workspace_id}/token-frequencies/current-result",
+        )
+        final_result = result_resp.json()
+        assert final_result.get("token_limit") == DEFAULT_TOKEN_LIMIT
         assert (
-            result_data.get("analysis_params", {}).get("token_limit")
+            final_result.get("analysis_params", {}).get("token_limit")
             == DEFAULT_TOKEN_LIMIT
         )
-        assert result_data.get("stop_words") == []
+        assert final_result.get("stop_words") == []
 
         analyses = list_analyses(test_user["id"], workspace_id)
         assert len(analyses) == 1
@@ -132,10 +209,10 @@ class TestTokenFrequencyPersistence:
         assert "limit" not in record.request
         assert record.request["token_limit"] == DEFAULT_TOKEN_LIMIT
         assert record.request.get("stop_words") == []
-        assert record.result.get("token_limit") == DEFAULT_TOKEN_LIMIT
-        assert record.result.get("stop_words") == []
-        assert record.result.get("metadata", {}).get("stop_words") == []
-        assert record.result.get("analysis_params", {}).get("stop_words") == []
+        assert final_result.get("token_limit") == DEFAULT_TOKEN_LIMIT
+        assert final_result.get("stop_words") == []
+        assert final_result.get("metadata", {}).get("stop_words") == []
+        assert final_result.get("analysis_params", {}).get("stop_words") == []
 
     async def test_token_frequency_overwrites_previous_analysis(
         self, authenticated_client, workspace_id, tiny_node_id, test_user
@@ -154,17 +231,19 @@ class TestTokenFrequencyPersistence:
         }
 
         # When: We call the endpoint twice
-        await post_json(
+        first_resp = await post_json(
             authenticated_client,
             f"/api/workspaces/{workspace_id}/token-frequencies",
             first_request,
         )
+        assert first_resp.status_code == 200
 
-        await post_json(
+        second_resp = await post_json(
             authenticated_client,
             f"/api/workspaces/{workspace_id}/token-frequencies",
             second_request,
         )
+        assert second_resp.status_code == 200
 
         # Then: Only one analysis record exists (the latest)
         analyses = list_analyses(test_user["id"], workspace_id)
@@ -218,12 +297,21 @@ class TestTokenFrequencyPersistence:
             request_payload,
         )
 
-        # Then: The response is successful
+        # Then: The response starts a background task
         assert response.status_code == 200
         result_data = response.json()
-        assert_successful_result(result_data)
-        assert result_data.get("token_limit") == DEFAULT_TOKEN_LIMIT
-        assert result_data.get("stop_words") == []
+        assert result_data.get("state") == "running"
+        assert result_data.get("metadata", {}).get("task_id")
+
+        _simulate_token_frequency_completion(workspace_id)
+        result_resp = await get_json(
+            authenticated_client,
+            f"/api/workspaces/{workspace_id}/token-frequencies/current-result",
+        )
+        final_result = result_resp.json()
+        assert_successful_result(final_result)
+        assert final_result.get("token_limit") == DEFAULT_TOKEN_LIMIT
+        assert final_result.get("stop_words") == []
 
         # And: The analysis record contains both nodes
         analyses = list_analyses(test_user["id"], workspace_id)
@@ -233,10 +321,10 @@ class TestTokenFrequencyPersistence:
         assert set(record.request["node_ids"]) == {sample_node_id, tiny_node_id}
         assert record.request["token_limit"] == DEFAULT_TOKEN_LIMIT
         assert record.request.get("stop_words") == []
-        assert record.result.get("token_limit") == DEFAULT_TOKEN_LIMIT
-        assert record.result.get("stop_words") == []
-        assert record.result.get("metadata", {}).get("stop_words") == []
-        assert record.result.get("analysis_params", {}).get("stop_words") == []
+        assert final_result.get("token_limit") == DEFAULT_TOKEN_LIMIT
+        assert final_result.get("stop_words") == []
+        assert final_result.get("metadata", {}).get("stop_words") == []
+        assert final_result.get("analysis_params", {}).get("stop_words") == []
 
     async def test_current_result_update_persists_preferences(
         self, authenticated_client, workspace_id, tiny_node_id, test_user
@@ -255,6 +343,7 @@ class TestTokenFrequencyPersistence:
             initial_request,
         )
         assert initial_response.status_code == 200
+        assert initial_response.json().get("state") == "running"
 
         update_payload = {"token_limit": 30, "stop_words": ["alpha", "beta"]}
         update_response = await post_json(
@@ -678,6 +767,9 @@ class TestWorkspaceGraphEnrichment:
             request_payload,
         )
 
+        # Simulate worker completion so graph shows populated results.
+        _simulate_token_frequency_completion(workspace_id)
+
         # When: We get the workspace graph
         response = await get_json(
             authenticated_client, f"/api/workspaces/{workspace_id}/graph"
@@ -807,7 +899,8 @@ class TestAnalysisPersistenceEdgeCases:
         )
         assert ws1_response_payload.status_code == 200
         ws1_result = ws1_response_payload.json()
-        assert ws1_result.get("state") == "successful"
+        assert ws1_result.get("state") == "running"
+        assert ws1_result.get("metadata", {}).get("task_id")
 
         ws2_response_payload = await post_json(
             authenticated_client,
@@ -816,7 +909,8 @@ class TestAnalysisPersistenceEdgeCases:
         )
         assert ws2_response_payload.status_code == 200
         ws2_result = ws2_response_payload.json()
-        assert ws2_result.get("state") == "successful"
+        assert ws2_result.get("state") == "running"
+        assert ws2_result.get("metadata", {}).get("task_id")
 
         # Then: Each workspace has its own isolated analyses
         ws1_analyses = list_analyses(test_user["id"], ws1_id)

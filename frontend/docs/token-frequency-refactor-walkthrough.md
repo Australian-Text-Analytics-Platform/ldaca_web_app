@@ -7,7 +7,7 @@ Welcome to the guided tour for breaking the existing `TokenFrequencyTab` monolit
 1. **Selection Orchestration** – Locks nodes, captures snapshots, aligns node colors, and makes sure concordance hand-offs inherit the same context.
 2. **Hydration & Persistence** – Pulls `current-request`/`current-result`, pipes stop words & token limits back to the backend, and reflects preference changes locally.
 3. **Visualization** – Generates per-node word clouds, the comparative cloud, bar charts, and a custom stats table with head/tail trimming.
-4. **Experience Glue** – Handles loading states, validation, stop word editing UX, and navigation to Concordance when a token is clicked.
+4. **Experience Glue** – Handles loading states, validation, stop word editing UX, and navigation to Concordance when a token is clicked. In the modern implementation, long-running runs are handled as **background tasks**: the tab tracks `metadata.task_id`, shows the shared `AnalysisTaskBanner` via `useAnalysisTaskLifecycle`, and auto-refreshes `current-result` when the task reaches a terminal state.
 
 > **Checkpoint question:** Why isn't the existing component easy to reuse elsewhere?
 >
@@ -72,7 +72,7 @@ features/analysis/token-frequency/
    - `useTokenFrequencyState` (wraps the new shared hooks) for state + actions.
    - Visualization components configured by props (colors, click handlers).
 2. Hydration occurs inside the hook via `useAnalysisHydration`, which exposes `hydrate()` and preference persistence helpers.
-3. API interactions (`tokenFrequencies`, `defaultStopWords`, `clearTokenFrequencies`) live inside `api.ts` and return typed responses so components stay declarative.
+3. API interactions (`tokenFrequencies`, `defaultStopWords`, `clearTokenFrequencies`) live inside `api.ts` and return typed responses (including `metadata.task_id` on async runs) so components stay declarative.
 4. Concordance hand-off becomes a dedicated helper, `launchConcordanceFromToken`, exported for other features.
 
 ### TanStack Table integration

@@ -2,13 +2,66 @@
 Parametrized and comprehensive tests for analysis persistence.
 """
 
+from types import SimpleNamespace
+
 import pytest
 from ldaca_web_app_backend.api.workspaces.analyses.token_frequencies import (
     DEFAULT_TOKEN_LIMIT,
     MAX_SERVER_TOKEN_LIMIT,
     SERVER_LIMIT_MULTIPLIER,
 )
+from ldaca_web_app_backend.core import analysis_store
 from ldaca_web_app_backend.core.analysis_store import list_analyses
+from ldaca_web_app_backend.core.worker import token_frequencies_task
+from ldaca_web_app_backend.core.workspace import workspace_manager
+
+
+def _simulate_token_frequency_completion(workspace_id: str):
+    record = analysis_store.get_latest_analysis(
+        "test", workspace_id, task="token_frequencies"
+    )
+    assert record is not None
+    req = record.request or {}
+    worker_result = token_frequencies_task(
+        user_id="test",
+        workspace_id=workspace_id,
+        node_ids=req.get("node_ids") or [],
+        node_columns=req.get("node_columns") or {},
+        token_limit=req.get("token_limit") or DEFAULT_TOKEN_LIMIT,
+        stop_words=req.get("stop_words") or [],
+    )
+    analysis_store.save_analysis(
+        user_id="test",
+        workspace_id=workspace_id,
+        task="token_frequencies",
+        request_dict=req,
+        result_dict={
+            "status": "successful",
+            "message": "token_frequencies completed successfully",
+            "data": worker_result,
+        },
+    )
+
+
+@pytest.fixture(autouse=True)
+def _stub_task_manager(monkeypatch):
+    class ImmediateTaskManager:
+        async def any_running(self, **_kwargs):  # pragma: no cover
+            return False
+
+        async def latest_by_type(self, *args, **_kwargs):  # pragma: no cover
+            return None
+
+        async def submit_task(self, **_kwargs):  # pragma: no cover
+            return SimpleNamespace(id="test-task")
+
+    def fake_get_task_manager(self, _user_id, _workspace_id):
+        return ImmediateTaskManager()
+
+    monkeypatch.setattr(
+        workspace_manager.__class__, "get_task_manager", fake_get_task_manager
+    )
+
 
 # Analysis type configurations for parametrized testing
 ANALYSIS_CONFIGS = [
@@ -79,7 +132,20 @@ class TestParametrizedAnalysisPersistence:
         # Verify expected result structure (state + data; message optional)
         for key in analysis_config["expected_result_keys"]:
             assert key in result_data
-        assert result_data.get("state") == "successful"
+
+        if analysis_config["task"] == "token_frequencies":
+            assert result_data.get("state") == "running"
+            assert result_data.get("metadata", {}).get("task_id")
+            _simulate_token_frequency_completion(workspace_id)
+            final = (
+                await authenticated_client.get(
+                    f"/api/workspaces/{workspace_id}/token-frequencies/current-result"
+                )
+            ).json()
+            assert final.get("state") == "successful"
+            result_data = final
+        else:
+            assert result_data.get("state") == "successful"
 
         # And: An analysis record was persisted
         analyses = list_analyses(test_user["id"], workspace_id)
@@ -105,23 +171,27 @@ class TestParametrizedAnalysisPersistence:
             assert "limit" not in record.request
             assert record.request.get("token_limit") == expected_limit
             assert record.request.get("stop_words") == expected_stop_words
-            assert record.result.get("token_limit") == expected_limit
-            assert record.result.get("stop_words") == expected_stop_words
+            # Result may be stored wrapped by the task manager; validate via endpoint payload (result_data)
+            assert result_data.get("token_limit") == expected_limit
+            assert result_data.get("stop_words") == expected_stop_words
             assert (
-                record.result.get("metadata", {}).get("stop_words")
-                == expected_stop_words
+                result_data.get("metadata", {}).get("stop_words") == expected_stop_words
             )
             assert (
-                record.result.get("analysis_params", {}).get("stop_words")
+                result_data.get("analysis_params", {}).get("stop_words")
                 == expected_stop_words
             )
         else:
             assert record.request == request_payload
 
         # Verify result structure matches response
-        for key in analysis_config["expected_result_keys"]:
-            assert key in record.result
-        assert record.result.get("state") == "successful"
+        if analysis_config["task"] == "token_frequencies":
+            # Stored result is task-manager wrapped; current-result endpoint is authoritative
+            assert result_data.get("state") == "successful"
+        else:
+            for key in analysis_config["expected_result_keys"]:
+                assert key in record.result
+            assert record.result.get("state") == "successful"
 
 
 @pytest.mark.anyio
@@ -219,37 +289,29 @@ class TestAnalysisDataIntegrity:
 
         assert response.status_code == 200
         api_result = response.json()
-        expected_limit = DEFAULT_TOKEN_LIMIT
-        assert api_result.get("token_limit") == expected_limit
-        assert (
-            api_result.get("analysis_params", {}).get("token_limit") == expected_limit
-        )
+        assert api_result.get("state") == "running"
 
-        # Then: The persisted data matches the API response
+        _simulate_token_frequency_completion(workspace_id)
+        final = (
+            await authenticated_client.get(
+                f"/api/workspaces/{workspace_id}/token-frequencies/current-result"
+            )
+        ).json()
+        expected_limit = DEFAULT_TOKEN_LIMIT
+        assert final.get("token_limit") == expected_limit
+        assert final.get("analysis_params", {}).get("token_limit") == expected_limit
+
+        # Then: The persisted request is present and includes default limit/stop_words
         analyses = list_analyses(test_user["id"], workspace_id)
-        persisted_result = analyses[0].result
-        assert persisted_result.get("token_limit") == expected_limit
-        assert (
-            persisted_result.get("analysis_params", {}).get("token_limit")
-            == expected_limit
-        )
+        assert analyses
         assert analyses[0].request.get("token_limit") == expected_limit
         assert "limit" not in analyses[0].request
-        assert api_result.get("stop_words") == []
-        assert persisted_result.get("stop_words") == []
-        assert persisted_result.get("metadata", {}).get("stop_words") == []
-        assert persisted_result.get("analysis_params", {}).get("stop_words") == []
-
-        # Key fields should match exactly
-        assert persisted_result["state"] == api_result["state"]
-        # message may be absent; only compare if both present
-        if "message" in persisted_result and "message" in api_result:
-            assert persisted_result["message"] == api_result["message"]
-        assert persisted_result["data"] == api_result["data"]
+        assert final.get("stop_words") == []
+        assert final.get("metadata", {}).get("stop_words") == []
 
         # Check data structure integrity
-        assert isinstance(persisted_result["data"], dict)
-        for node_id, node_data in persisted_result["data"].items():
+        assert isinstance(final.get("data"), dict)
+        for node_id, node_data in final["data"].items():
             assert "data" in node_data
             assert "columns" in node_data
             assert isinstance(node_data["data"], list)
@@ -287,23 +349,27 @@ emoji test 🚀 🎉 💫"""
             f"/api/workspaces/{workspace_id}/token-frequencies", json=request_payload
         )
 
-        # Then: The analysis completes successfully
+        # Then: Task starts successfully
         assert response.status_code == 200
+        assert response.json().get("state") == "running"
 
-        # And: Unicode is preserved in persistence
-        analyses = list_analyses(test_user["id"], workspace_id)
-        assert len(analyses) == 1
+        _simulate_token_frequency_completion(workspace_id)
+        final = (
+            await authenticated_client.get(
+                f"/api/workspaces/{workspace_id}/token-frequencies/current-result"
+            )
+        ).json()
+        assert final.get("state") == "successful"
 
-        # Verify the analysis contains unicode tokens
-        result_data = analyses[0].result["data"]
-        # Should contain at least some unicode tokens from our test data
-        all_tokens = []
-        for node_data in result_data.values():
-            for row in node_data["data"]:
-                all_tokens.extend(row)
-
-        # Check that we have some unicode content (exact tokens depend on tokenization)
-        assert len(all_tokens) > 0  # Basic sanity check
+        # Verify the analysis contains some tokens
+        result_data = final.get("data") or {}
+        all_tokens = [
+            row.get("token")
+            for node_data in result_data.values()
+            for row in (node_data.get("data") or [])
+            if isinstance(row, dict)
+        ]
+        assert len([t for t in all_tokens if isinstance(t, str) and t]) > 0
 
     async def test_large_result_handling(
         self, authenticated_client, workspace_id, test_user, temp_data_root
@@ -342,22 +408,29 @@ emoji test 🚀 🎉 💫"""
         # Then: The analysis handles large data correctly
         assert response.status_code == 200
 
-        # And: Large results are persisted correctly
-        analyses = list_analyses(test_user["id"], workspace_id)
-        assert len(analyses) == 1
+        _simulate_token_frequency_completion(workspace_id)
+        final = (
+            await authenticated_client.get(
+                f"/api/workspaces/{workspace_id}/token-frequencies/current-result"
+            )
+        ).json()
+        assert final.get("state") == "successful"
 
-        result_data = analyses[0].result["data"]
+        # And: Large results are present in the final payload
+        result_data = final.get("data") or {}
 
         # Verify we got substantial results
         total_tokens = sum(len(node_data["data"]) for node_data in result_data.values())
         assert total_tokens >= DEFAULT_TOKEN_LIMIT
 
-        metadata = analyses[0].result.get("metadata", {})
+        metadata = final.get("metadata", {})
         expected_server_limit = min(
             DEFAULT_TOKEN_LIMIT * SERVER_LIMIT_MULTIPLIER,
             MAX_SERVER_TOKEN_LIMIT,
         )
         assert metadata.get("token_limit") == DEFAULT_TOKEN_LIMIT
         assert metadata.get("server_limit") == expected_server_limit
+        analyses = list_analyses(test_user["id"], workspace_id)
+        assert len(analyses) == 1
         assert analyses[0].request.get("token_limit") == DEFAULT_TOKEN_LIMIT
         assert "limit" not in analyses[0].request

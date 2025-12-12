@@ -7,6 +7,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 import polars as pl
 from fastapi import APIRouter, Depends, HTTPException
 
+from ....core.analysis_store import clear_analyses, get_latest_analysis, save_analysis
 from ....core.auth import get_current_user
 from ....core.services.quotation_client import (
     QuotationServiceError,
@@ -79,15 +80,10 @@ def _normalize_pagination(
     return normalized_page, normalized_size
 
 
-def _paginate_dataframe(
-    df: pl.DataFrame,
-    *,
-    page: int,
-    page_size: int,
-    sort_by: Optional[str],
-    sort_order: str,
-) -> Dict[str, Any]:
-    """Apply sorting and pagination to a DataFrame and emit a response payload."""
+def _apply_sort(
+    df: pl.DataFrame, *, sort_by: Optional[str], sort_order: str
+) -> Tuple[pl.DataFrame, Optional[str], str]:
+    """Apply optional sorting and return (sorted_df, effective_sort_by, sort_order)."""
     working = df
     effective_sort_by = sort_by if sort_by and sort_by in working.columns else None
     normalized_sort_order = _normalize_sort_order(sort_order)
@@ -95,70 +91,7 @@ def _paginate_dataframe(
         working = working.sort(
             pl.col(effective_sort_by), descending=normalized_sort_order == "desc"
         )
-
-    total_rows = working.height
-    total_pages = max(1, math.ceil(total_rows / page_size)) if total_rows else 1
-    if page > total_pages:
-        page = total_pages
-    if page < 1:
-        page = 1
-    start_idx = (page - 1) * page_size
-    paginated = working.slice(start_idx, page_size)
-
-    return {
-        "data": paginated.to_dicts(),
-        "columns": list(working.columns),
-        "total_rows": total_rows,
-        "pagination": {
-            "page": page,
-            "page_size": page_size,
-            "total_pages": total_pages,
-            "has_next": (start_idx + page_size) < total_rows,
-            "has_prev": page > 1,
-        },
-        "sorting": {
-            "sort_by": effective_sort_by,
-            "sort_order": normalized_sort_order,
-        },
-    }
-
-
-def _rows_to_dataframe(
-    rows: List[Dict[str, Any]], columns: Optional[List[str]] = None
-) -> pl.DataFrame:
-    """Construct a DataFrame from row dictionaries with optional column hints."""
-    if rows:
-        return pl.DataFrame(rows)
-    if columns:
-        return pl.DataFrame({col: [] for col in columns})
-    return pl.DataFrame([])
-
-
-def _paginate_from_storage(
-    stored_blob: Dict[str, Any],
-    *,
-    page: int,
-    page_size: int,
-    sort_by: Optional[str],
-    sort_order: Optional[str],
-) -> Dict[str, Any]:
-    """Paginate a previously stored quotation result without recomputation."""
-    rows = stored_blob.get("rows") or []
-    columns = stored_blob.get("columns")
-    df = _rows_to_dataframe(rows, columns)
-    default_sort_by = stored_blob.get("default_sort_by")
-    default_sort_order = stored_blob.get("default_sort_order")
-    effective_sort_by = sort_by or default_sort_by
-    effective_sort_order = sort_order or default_sort_order
-    normalized_sort_order = _normalize_sort_order(effective_sort_order)
-    paginated = _paginate_dataframe(
-        df,
-        page=page,
-        page_size=page_size,
-        sort_by=effective_sort_by,
-        sort_order=normalized_sort_order,
-    )
-    return paginated
+    return working, effective_sort_by, normalized_sort_order
 
 
 def _extract_context_preference(record_result: Optional[Dict[str, Any]]) -> int:
@@ -376,6 +309,13 @@ async def _compute_on_demand_page(
     base_df = _materialise_base_dataframe(node.data)
     base_with_idx = base_df.with_row_index("document_idx")
 
+    total_docs = base_with_idx.height
+    total_pages = max(1, math.ceil(total_docs / page_size)) if total_docs else 1
+    if page > total_pages:
+        page = total_pages
+    if page < 1:
+        page = 1
+
     start_doc = (page - 1) * page_size
     slice_df = base_with_idx.slice(start_doc, page_size)
 
@@ -384,25 +324,30 @@ async def _compute_on_demand_page(
     )
     joined_slice = _join_quotes_with_base(slice_df, quote_df)
 
-    page_payload = _paginate_dataframe(
-        joined_slice,
-        page=1,
-        page_size=page_size,
-        sort_by=sort_by,
-        sort_order=sort_order,
+    # NOTE: pagination is document-based (page_size counts documents), so we do NOT
+    # slice again after the join. All quote rows for the selected document slice
+    # should be returned.
+    sorted_slice, effective_sort_by, normalized_sort_order = _apply_sort(
+        joined_slice, sort_by=sort_by, sort_order=sort_order
     )
 
-    total_docs = base_with_idx.height
-    page_payload["pagination"].update({
-        "page": page,
-        "page_size": page_size,
-        "total_pages": max(1, math.ceil(total_docs / page_size)),
-        "has_next": (start_doc + page_size) < total_docs,
-        "has_prev": page > 1,
-    })
-    page_payload["total_rows"] = total_docs
-    page_payload["column"] = column
-    return page_payload
+    return {
+        "data": sorted_slice.to_dicts(),
+        "columns": list(sorted_slice.columns),
+        "total_rows": total_docs,
+        "pagination": {
+            "page": page,
+            "page_size": page_size,
+            "total_pages": total_pages,
+            "has_next": (start_doc + page_size) < total_docs,
+            "has_prev": page > 1,
+        },
+        "sorting": {
+            "sort_by": effective_sort_by,
+            "sort_order": normalized_sort_order,
+        },
+        "column": column,
+    }
 
 
 def _stable_document_items(
@@ -504,33 +449,32 @@ async def _compute_quote_dataframe(
         payload = await _extract_remote_paginated(engine, documents)
         return _remote_payload_to_dataframe(payload)
 
+    # Local engine: rely on docframe's Polars text namespace.
     if not use_base_only:
-        base_with_idx = None
-        try:
-            if hasattr(node.data, "with_row_index"):
-                base_with_idx = node.data.with_row_index("document_idx")
-        except Exception:  # pragma: no cover - docframe fallback
-            base_with_idx = None
+        node_data = getattr(node, "data", None)
+        if node_data is None:
+            raise ValueError("Node has no data")
 
-        if base_with_idx is not None and hasattr(base_with_idx, "text"):
-            quote_raw = base_with_idx.text.quotation(
-                column=column, explode=True, unnest=True
+        base_with_idx = (
+            node_data.with_row_index("document_idx")
+            if hasattr(node_data, "with_row_index")
+            else node_data
+        )
+
+        if not hasattr(base_with_idx, "text"):
+            raise ValueError(
+                "This node does not support quotation extraction (docframe text namespace not available)"
             )
-        else:
-            quote_raw = node.data.text.quotation(
-                column=column, explode=True, unnest=True
-            )
+
+        quote_raw = base_with_idx.text.quotation(column, explode=True, unnest=True)
         return _ensure_quote_dataframe(_to_polars_dataframe(quote_raw))
 
-    try:
-        import docframe  # noqa: F401  # Ensure text namespace is registered
-    except Exception:
-        pass
+    if not hasattr(base_df, "text"):
+        raise ValueError(
+            "This slice does not support quotation extraction (docframe text namespace not available)"
+        )
 
-    if hasattr(base_df, "text"):
-        quote_raw = base_df.text.quotation(column=column, explode=True, unnest=True)
-    else:  # pragma: no cover - fallback
-        quote_raw = base_df.select(column).to_pandas()
+    quote_raw = base_df.text.quotation(column, explode=True, unnest=True)
     return _ensure_quote_dataframe(_to_polars_dataframe(quote_raw))
 
 
@@ -568,10 +512,6 @@ async def quotation_current_request(
     workspace_id: str, current_user: dict = Depends(get_current_user)
 ):
     user_id = current_user["id"]
-    try:
-        from ....core.analysis_store import get_latest_analysis
-    except Exception as e:  # pragma: no cover - unlikely import error
-        raise HTTPException(status_code=500, detail=f"analysis_store unavailable: {e}")
     rec = get_latest_analysis(user_id, workspace_id, task="quotation")
     if not rec:
         return None
@@ -588,10 +528,6 @@ async def quotation_current_result(
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    try:
-        from ....core.analysis_store import get_latest_analysis
-    except Exception as e:  # pragma: no cover
-        raise HTTPException(status_code=500, detail=f"analysis_store unavailable: {e}")
     rec = get_latest_analysis(user_id, workspace_id, task="quotation")
     if not rec:
         return None
@@ -643,13 +579,6 @@ async def update_quotation_current_result(
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    try:
-        from ....core.analysis_store import get_latest_analysis, save_analysis
-    except Exception as exc:  # pragma: no cover
-        raise HTTPException(
-            status_code=500, detail=f"analysis_store unavailable: {exc}"
-        )
-
     record = get_latest_analysis(user_id, workspace_id, task="quotation")
     if not record:
         raise HTTPException(status_code=404, detail="No quotation analysis found")
@@ -759,11 +688,6 @@ async def clear_quotation_results(
     workspace_id: str, current_user: dict = Depends(get_current_user)
 ):
     user_id = current_user["id"]
-    try:
-        from ....core.analysis_store import clear_analyses
-    except Exception as e:  # pragma: no cover
-        raise HTTPException(status_code=500, detail=f"analysis_store unavailable: {e}")
-
     removed = clear_analyses(user_id, workspace_id, task="quotation")
     return {
         "state": "successful",
@@ -780,11 +704,7 @@ async def get_quotation(
     request: QuotationRequest,
     current_user: dict = Depends(get_current_user),
 ):
-    """Compute quotation rows with optional metadata join, sorting, and pagination.
-
-    Mirrors original logic from base.py; any changes must retain backward-compatible
-    response shape consumed by frontend & tests.
-    """
+    """Compute quotation rows with optional metadata join, sorting, and pagination."""
     user_id = current_user["id"]
     try:
         node, node_data = get_node_with_data_or_400(user_id, workspace_id, node_id)
@@ -813,8 +733,6 @@ async def get_quotation(
 
         context_length_pref = DEFAULT_CONTEXT_LENGTH
         try:
-            from ....core.analysis_store import get_latest_analysis
-
             previous = get_latest_analysis(user_id, workspace_id, task="quotation")
             if previous and isinstance(previous.result, dict):
                 context_length_pref = _extract_context_preference(previous.result)
@@ -829,8 +747,6 @@ async def get_quotation(
         request_dict = request.model_dump()
         request_dict.update({"node_id": node_id, "engine": engine.model_dump()})
         try:  # best-effort persistence without caching rows
-            from ....core.analysis_store import save_analysis
-
             save_analysis(
                 user_id=user_id,
                 workspace_id=workspace_id,

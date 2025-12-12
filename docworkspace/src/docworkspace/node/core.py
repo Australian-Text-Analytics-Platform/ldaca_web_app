@@ -9,15 +9,14 @@ from __future__ import annotations
 
 import uuid
 from enum import Enum
+from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
 
 import polars as pl
 from polars import DataFrame, LazyFrame
 
-from docframe import (
-    DocDataFrame,  # type: ignore  # runtime import
-    DocLazyFrame,
-)
+from docframe import DocDataFrame  # type: ignore  # runtime import
+from docframe import DocLazyFrame
 
 if False:  # TYPE_CHECKING replacement to avoid runtime import cycle
     from ..workspace.core import Workspace  # pragma: no cover
@@ -316,15 +315,14 @@ class Node:
             info_dict["document"] = self.document
         return info_dict
 
-    def _normalized_type(self) -> SerializableDataType:
-        if isinstance(self.data, DocLazyFrame):
-            return "DocLazyFrame"
-        return "LazyFrame"
-
     def serialize(self, format: str = "json") -> Dict[str, Any]:
         if format != "json":
             raise ValueError(f"Unsupported format: {format}")
-        normalized = self._normalized_type()
+
+        # For workspace persistence and API transport we intentionally serialize the
+        # *underlying* Polars LazyFrame payload. DocLazyFrame is reconstructed from
+        # the persisted `document` metadata on load.
+        normalized: SerializableDataType = "LazyFrame"
 
         # Suppress the deprecation warning for LazyFrame serialization
         # This is mainly used for testing and persistence
@@ -340,7 +338,7 @@ class Node:
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", UserWarning)
-            serialized_data = self.data.serialize(format="json")
+            serialized_data = _unwrap_lazyframe(self.data).serialize(format="json")
         return {
             "node_metadata": node_metadata,
             "serialized_data": serialized_data,
@@ -352,17 +350,16 @@ class Node:
         serialized_node: Dict[str, Any],
         workspace: "Workspace",
         format: str = "json",
+        base_path: Path | None = None,
     ) -> "Node":
         import polars as pl
-
-        from docframe import DocDataFrame, DocLazyFrame
 
         if format != "json":
             raise ValueError(f"Unsupported format: {format}")
 
         node_meta = serialized_node["node_metadata"]
+        data_path = serialized_node.get("data_path")
         data_blob = serialized_node.get("serialized_data")
-        data_type = node_meta["data_type"]
 
         # Polars/DocFrame .serialize(format="json") returns a JSON string (or array-string)
         # that DataFrame.deserialize expects as a file path *unless* provided a file-like.
@@ -370,28 +367,30 @@ class Node:
         # as a (very long) file path, triggering OSError: File name too long.
         # We detect non-path strings and wrap them in StringIO so Polars treats them as
         # file-like objects containing the serialized payload.
-        from io import StringIO
-
-        def _wrap(blob: Any):  # type: ignore[override]
-            if isinstance(blob, str):
-                return StringIO(blob)
-            return blob
-
-        if data_blob is None:
-            raise ValueError("Missing serialized data for node")
-
-        if data_type == "DocLazyFrame":
-            data = DocLazyFrame.deserialize(_wrap(data_blob), format="json")
-        elif data_type == "LazyFrame":
-            data = pl.LazyFrame.deserialize(_wrap(data_blob), format="json")
-        elif data_type == "DocDataFrame":
-            doc_df = DocDataFrame.deserialize(_wrap(data_blob), format="json")
-            data = doc_df.to_doclazyframe()
-        elif data_type == "DataFrame":
-            eager_df = pl.DataFrame.deserialize(_wrap(data_blob), format="json")
-            data = eager_df.lazy()
+        if data_path is not None:
+            if base_path is None:
+                raise ValueError(
+                    "Cannot load node with data_path without a base_path (workspace directory)"
+                )
+            file_path = (base_path / str(data_path)).resolve()
+            if not file_path.exists():
+                raise FileNotFoundError(f"Missing node data file: {file_path}")
+            with file_path.open("rb") as f:
+                data = pl.LazyFrame.deserialize(f, format="binary")
         else:
-            raise ValueError(f"Unknown data type: {node_meta['data_type']}")
+            # Backward compatibility: inline JSON payload inside metadata.json
+            from io import StringIO
+
+            def _wrap(blob: Any):  # type: ignore[override]
+                if isinstance(blob, str):
+                    return StringIO(blob)
+                return blob
+
+            if data_blob is None:
+                raise ValueError(
+                    "Missing node data (expected data_path or serialized_data)"
+                )
+            data = pl.LazyFrame.deserialize(_wrap(data_blob), format="json")
         node = cls.__new__(cls)
         node.id = node_meta["id"]
         node.name = node_meta["name"]
@@ -419,7 +418,4 @@ class Node:
         )
 
 
-__all__ = ["Node"]
-__all__ = ["Node"]
-__all__ = ["Node"]
 __all__ = ["Node"]

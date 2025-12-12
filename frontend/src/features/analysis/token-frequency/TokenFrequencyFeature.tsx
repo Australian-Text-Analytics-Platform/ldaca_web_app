@@ -6,15 +6,18 @@ import { useWorkspaceSelection } from '../../../hooks/useWorkspaceSelection';
 import { useWorkspaceActions } from '../../../hooks/useWorkspaceActions';
 import { useWorkspaceStatus } from '../../../hooks/useWorkspaceStatus';
 import { useAuth } from '../../../hooks/useAuth';
+import { workspacesApi } from '../../../api/workspaces';
 import { TokenFrequencyRequest, TokenFrequencyResponse, textApi } from '../../../api/text';
 import { resolveTokenFrequencyNodeContext, type TokenFrequencyAnalysisParams } from '../../../components/tabs/tokenFrequencyHelpers';
 import AnalysisLockedNotice from '../../../components/tabs/AnalysisLockedNotice';
+import AnalysisTaskBanner from '../../../components/tabs/AnalysisTaskBanner';
+import type { AnalysisTaskStatus } from '../../../hooks/useAnalysisTaskStatus';
+import useAnalysisTaskLifecycle, { type AnalysisTaskRefreshContext } from '../../../hooks/useAnalysisTaskLifecycle';
 import { Wordcloud } from '@visx/wordcloud';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../../components/ui/table';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
-import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../../../components/ui/alert-dialog';
 import { Play, Loader2, Trash2, Table2, Download, X, ChevronLeft, ChevronRight, Lightbulb } from 'lucide-react';
 import { Text } from '@visx/text';
 import { createNodeSnapshots, applySelectedColumnsToSnapshots } from '../../../hooks/useSchemaManagement';
@@ -24,9 +27,7 @@ import { useUIStore } from '../../../stores';
 import { useAnalysisStore } from '../../../stores/analysisStore';
 import {
   clampDisplayTokenLimit,
-  computeServerLimit,
   DEFAULT_TOKEN_LIMIT,
-  MAX_DISPLAY_TOKEN_LIMIT,
   toFiniteNumber,
   formatNumber,
   isNonEmptyString,
@@ -48,8 +49,6 @@ type NormalizedNodeResult = {
   rows: any[];
   /** Additional metadata from backend */
   metadata: Record<string, unknown>;
-  /** Original raw entry for debugging */
-  rawEntry: unknown;
 };
 
 type NodeResultView = NormalizedNodeResult & {
@@ -103,6 +102,25 @@ const extractMetadata = (entry: unknown): Record<string, unknown> => {
   return {};
 };
 
+/**
+ * Safe max helper that avoids `Math.max(...bigArray)` which can throw
+ * `RangeError: Maximum call stack size exceeded` for large arrays.
+ */
+const maxBy = <T,>(items: T[], selector: (item: T) => number, fallback: number): number => {
+  let max = fallback;
+  for (const item of items) {
+    const value = selector(item);
+    if (Number.isFinite(value) && value > max) {
+      max = value;
+    }
+  }
+  return max;
+};
+
+// Token limit is a UI preference only. We keep a hard max of 100 for the input
+// as a sanity check, but we still store the full backend result in `results`.
+const MAX_TOKEN_LIMIT_INPUT = 100;
+
 function TokenFrequencyFeature() {
   const { selectedNodes } = useWorkspaceSelection();
   const { selectNodes } = useWorkspaceActions();
@@ -117,6 +135,7 @@ function TokenFrequencyFeature() {
   const { getAuthHeaders } = useAuth();
   const setCurrentView = useUIStore((state) => state.setCurrentView);
   const setPendingConcordance = useAnalysisStore((state) => state.setPendingConcordance);
+  const setTasks = useAnalysisStore((state) => state.setTasks);
 
   const {
     isLocked,
@@ -146,6 +165,7 @@ function TokenFrequencyFeature() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isLoadingStopWords, setIsLoadingStopWords] = useState(false);
   const [results, setResults] = useState<TokenFrequencyResponse | null>(null);
+  const [localTokenFrequencyTaskId, setLocalTokenFrequencyTaskId] = useState<string | null>(null);
   // Statistical table head/tail preview & sorting
   const [headTailN, setHeadTailN] = useState<number>(10);
   // Sorting state (supports tri-state: none -> desc -> asc -> none)
@@ -165,7 +185,6 @@ function TokenFrequencyFeature() {
   const [isApplyingTokenLimit, setIsApplyingTokenLimit] = useState(false);
   const previousBackendLimitRef = useRef<number | null>(null);
   const tokenLimitInputChangedRef = useRef(false);
-  const [limitClampAlertOpen, setLimitClampAlertOpen] = useState(false);
   const wordCloudRefs = useRef<Record<string, SVGSVGElement | null>>({});
   const wordCloudExportScale = 3;
   const fallbackStopWordsRef = useRef<string[]>([]);
@@ -178,10 +197,11 @@ function TokenFrequencyFeature() {
       ? rawLimit
       : DEFAULT_TOKEN_LIMIT;
     const { limit: normalizedLimit } = clampDisplayTokenLimit(target);
-    setTokenLimitOverride(normalizedLimit);
-    setTokenLimitInput(String(normalizedLimit));
+    const inputLimit = Math.min(normalizedLimit, MAX_TOKEN_LIMIT_INPUT);
+    setTokenLimitOverride(inputLimit);
+    setTokenLimitInput(String(inputLimit));
     setTokenLimitError(null);
-    previousBackendLimitRef.current = normalizedLimit;
+    previousBackendLimitRef.current = inputLimit;
     tokenLimitInputChangedRef.current = false;
   }, [setTokenLimitOverride, setTokenLimitInput, setTokenLimitError]);
 
@@ -350,7 +370,6 @@ function TokenFrequencyFeature() {
         displayName,
         rows,
         metadata,
-        rawEntry: entry ?? null,
       };
     });
 
@@ -431,10 +450,10 @@ function TokenFrequencyFeature() {
 
   const effectiveTokenLimit = useMemo(() => {
     if (typeof tokenLimitOverride === 'number' && Number.isFinite(tokenLimitOverride)) {
-      return tokenLimitOverride;
+      return Math.min(tokenLimitOverride, MAX_TOKEN_LIMIT_INPUT);
     }
     if (typeof backendTokenLimit === 'number' && Number.isFinite(backendTokenLimit)) {
-      return clampDisplayTokenLimit(backendTokenLimit).limit;
+      return Math.min(clampDisplayTokenLimit(backendTokenLimit).limit, MAX_TOKEN_LIMIT_INPUT);
     }
     return DEFAULT_TOKEN_LIMIT;
   }, [tokenLimitOverride, backendTokenLimit]);
@@ -472,7 +491,8 @@ function TokenFrequencyFeature() {
         displayRows = limitedRows;
       }
 
-      const maxFrequency = rawRows.length > 0 ? Math.max(...rawRows.map((r: any) => Number(r.frequency) || 0)) : 1;
+      const maxFrequencyRaw = rawRows.length > 0 ? maxBy(rawRows, (r: any) => Number(r?.frequency) || 0, 0) : 0;
+      const maxFrequency = maxFrequencyRaw > 0 ? maxFrequencyRaw : 1;
 
       return {
         ...result,
@@ -491,7 +511,10 @@ function TokenFrequencyFeature() {
       if (!currentWorkspaceId) return;
       const payload: Record<string, any> = {};
       if (partial.token_limit !== undefined) {
-        payload.token_limit = clampDisplayTokenLimit(partial.token_limit).limit;
+        payload.token_limit = Math.min(
+          clampDisplayTokenLimit(partial.token_limit).limit,
+          MAX_TOKEN_LIMIT_INPUT
+        );
       }
       if (partial.stop_words !== undefined) {
         payload.stop_words = partial.stop_words;
@@ -515,6 +538,75 @@ function TokenFrequencyFeature() {
     if (!currentWorkspaceId) return null;
     return textApi.getTokenFrequenciesCurrentResult(currentWorkspaceId, getAuthHeaders());
   }, [currentWorkspaceId, getAuthHeaders]);
+
+  const refreshCurrentTokenFrequencyResult = useCallback(async () => {
+    if (!currentWorkspaceId) {
+      return null;
+    }
+
+    try {
+      const response = await textApi.getTokenFrequenciesCurrentResult(currentWorkspaceId, getAuthHeaders());
+      const typedResponse = response as TokenFrequencyResponse | null;
+      if (typedResponse) {
+        setResults(typedResponse);
+      }
+      return typedResponse;
+    } catch (error) {
+      console.error('Failed to refresh token frequency results automatically', error);
+      return null;
+    }
+  }, [currentWorkspaceId, getAuthHeaders, setResults]);
+
+  const tokenFrequencyFallbackBanner = useCallback(
+    (status: AnalysisTaskStatus) => {
+      if (results?.state !== 'running') {
+        return null;
+      }
+
+      return {
+        taskId:
+          (results as any)?.metadata?.task_id ??
+          localTokenFrequencyTaskId ??
+          status.activeTaskId ??
+          null,
+        message:
+          status.bannerMessage?.trim() ||
+          results.message?.trim() ||
+          'Token frequency analysis is running…',
+      };
+    },
+    [results, localTokenFrequencyTaskId]
+  );
+
+  const handleTokenFrequencyTaskRefresh = useCallback(
+    async (context: AnalysisTaskRefreshContext) => {
+      const refreshed = await refreshCurrentTokenFrequencyResult();
+      if (!refreshed && context.reason === 'terminal' && context.taskState === 'failed') {
+        setResults({
+          state: 'failed',
+          message: context.task?.message || 'Token frequency analysis failed',
+          data: null,
+        } as TokenFrequencyResponse);
+      }
+
+      if (context.reason === 'terminal' && context.taskId) {
+        setLocalTokenFrequencyTaskId((prev) => (prev === context.taskId ? null : prev));
+      }
+    },
+    [refreshCurrentTokenFrequencyResult, setResults]
+  );
+
+  const {
+    status: tokenFrequencyTaskStatus,
+    banner: tokenFrequencyWaitingBanner,
+  } = useAnalysisTaskLifecycle({
+    taskType: 'token_frequencies',
+    workspaceId: currentWorkspaceId,
+    manualActiveTaskId: localTokenFrequencyTaskId,
+    fallbackRunningBanner: tokenFrequencyFallbackBanner,
+    pollWhileActive: true,
+    onRefresh: handleTokenFrequencyTaskRefresh,
+  });
 
   const applyHydratedRequest = useCallback(
     async (requestPayload: any | null) => {
@@ -649,12 +741,10 @@ function TokenFrequencyFeature() {
 
         if (nextTokenLimit !== undefined && Number.isFinite(nextTokenLimit)) {
           const { limit: normalizedLimit } = clampDisplayTokenLimit(nextTokenLimit);
-          const serverLimit = computeServerLimit(normalizedLimit);
-          metadata.token_limit = normalizedLimit;
-          metadata.server_limit = serverLimit;
-          analysisParams.token_limit = normalizedLimit;
-          analysisParams.server_limit = serverLimit;
-          nextTokenLimit = normalizedLimit;
+          const inputLimit = Math.min(normalizedLimit, MAX_TOKEN_LIMIT_INPUT);
+          metadata.token_limit = inputLimit;
+          analysisParams.token_limit = inputLimit;
+          nextTokenLimit = inputLimit;
         }
 
         delete metadata.limit;
@@ -687,7 +777,6 @@ function TokenFrequencyFeature() {
   );
 
   const applyTokenLimitWithValidation = useCallback(async () => {
-    const userInitiatedChange = tokenLimitInputChangedRef.current;
     tokenLimitInputChangedRef.current = false;
 
     const parsed = toFiniteNumber(tokenLimitInput);
@@ -700,10 +789,11 @@ function TokenFrequencyFeature() {
       setTokenLimitError('Enter a whole number greater than zero.');
       return;
     }
-    const { limit: targetLimit, wasClamped } = clampDisplayTokenLimit(normalized);
-    const clampTriggeredByUser = wasClamped && userInitiatedChange;
-    if (clampTriggeredByUser) {
-      setLimitClampAlertOpen(true);
+    const { limit: normalizedLimit } = clampDisplayTokenLimit(normalized);
+    const targetLimit = Math.min(normalizedLimit, MAX_TOKEN_LIMIT_INPUT);
+    if (normalizedLimit > MAX_TOKEN_LIMIT_INPUT) {
+      // Keep the input box within its max bound; no modal/alert.
+      setTokenLimitInput(String(MAX_TOKEN_LIMIT_INPUT));
     }
 
     setTokenLimitError(null);
@@ -743,7 +833,7 @@ function TokenFrequencyFeature() {
         await persistTokenPreferences({ stop_words: words });
         updateResultsPreferencesLocally({ stopWords: words });
       } catch (e) {
-        if (localStorage.getItem('debugTF') === '1') console.warn('Failed to save stop words', e);
+        console.warn('Failed to save stop words', e);
       }
     },
     [results, persistTokenPreferences, updateResultsPreferencesLocally]
@@ -761,7 +851,22 @@ function TokenFrequencyFeature() {
 
   const handleTokenLimitInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     tokenLimitInputChangedRef.current = true;
-    setTokenLimitInput(event.target.value);
+    const raw = event.target.value;
+    if (!raw) {
+      setTokenLimitInput(raw);
+      if (tokenLimitError) setTokenLimitError(null);
+      return;
+    }
+    const parsed = toFiniteNumber(raw);
+    if (parsed !== null) {
+      const floored = Math.floor(parsed);
+      if (Number.isFinite(floored) && floored > MAX_TOKEN_LIMIT_INPUT) {
+        setTokenLimitInput(String(MAX_TOKEN_LIMIT_INPUT));
+        if (tokenLimitError) setTokenLimitError(null);
+        return;
+      }
+    }
+    setTokenLimitInput(raw);
     if (tokenLimitError) setTokenLimitError(null);
   };
 
@@ -775,12 +880,23 @@ function TokenFrequencyFeature() {
       void applyTokenLimitWithValidation();
     }
   };
-  // Removed legacy popover logic
 
   useEffect(() => {
     if (!currentWorkspaceId) return;
     void hydrateFromServer();
   }, [currentWorkspaceId, hydrateFromServer]);
+
+  useEffect(() => {
+    if (!currentWorkspaceId) {
+      setLocalTokenFrequencyTaskId(null);
+    }
+  }, [currentWorkspaceId]);
+
+  useEffect(() => {
+    if (tokenFrequencyTaskStatus.tasks.length === 0) {
+      setLocalTokenFrequencyTaskId(null);
+    }
+  }, [tokenFrequencyTaskStatus.tasks.length]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof document === 'undefined') return;
@@ -802,20 +918,6 @@ function TokenFrequencyFeature() {
       document.removeEventListener('visibilitychange', maybeHydrate);
     };
   }, [hydrateFromServer, results, currentWorkspaceId, lastCompareNodeIds]);
-
-  // Debug results changes
-  useEffect(() => {
-      if (results) {
-      if (localStorage.getItem('debugTF') === '1') {
-        console.debug('Results updated:', results);
-        console.debug('Results state:', (results as any).state);
-        console.debug('Results data:', results.data);
-      }
-      if (results.data) {
-        if (localStorage.getItem('debugTF') === '1') console.debug('Data entries:', Object.entries(results.data));
-      }
-    }
-  }, [results]);
 
   // Reset modal page when sort/filter state changes or modal opens
   useEffect(() => {
@@ -891,9 +993,11 @@ function TokenFrequencyFeature() {
       };
 
       const response = await textApi.tokenFrequencies(currentWorkspaceId, request, getAuthHeaders());
-
-      if (localStorage.getItem('debugTF') === '1') console.debug('Token Frequency Response:', response);
       setResults(response);
+      const responseTaskId = (response as any)?.metadata?.task_id;
+      if (typeof responseTaskId === 'string' && responseTaskId.trim()) {
+        setLocalTokenFrequencyTaskId(responseTaskId);
+      }
       setLastCompareNodeIds(request.node_ids);
 
       if (Array.isArray(response.stop_words)) {
@@ -915,6 +1019,7 @@ function TokenFrequencyFeature() {
       }
     } catch (error) {
       console.error('Error calculating token frequencies:', error);
+      setLocalTokenFrequencyTaskId(null);
       setResults({
         state: 'failed',
         message: error instanceof Error ? error.message : 'Unknown error occurred',
@@ -926,13 +1031,76 @@ function TokenFrequencyFeature() {
   };
 
   const handleClearResults = async () => {
-    try {
-      if (currentWorkspaceId) {
-        await textApi.clearTokenFrequencies(currentWorkspaceId, getAuthHeaders());
+    if (currentWorkspaceId) {
+      const headers = getAuthHeaders();
+
+      const taskIds = new Set<string>();
+      const candidates = [
+        (results as any)?.metadata?.task_id,
+        localTokenFrequencyTaskId,
+        tokenFrequencyTaskStatus.activeTaskId,
+        tokenFrequencyTaskStatus.runningTask?.task_id,
+        tokenFrequencyTaskStatus.queuedTask?.task_id,
+        tokenFrequencyTaskStatus.terminalTask?.task_id,
+      ];
+      candidates.forEach((candidate) => {
+        if (typeof candidate === 'string' && candidate.trim()) {
+          taskIds.add(candidate);
+        }
+      });
+
+      if (taskIds.size > 0) {
+        await Promise.all(
+          Array.from(taskIds).map(async (taskId) => {
+            try {
+              await workspacesApi.cancelTasks(currentWorkspaceId, { task_id: taskId }, headers);
+            } catch (error) {
+              console.warn('Failed to cancel token frequency task before clearing', { taskId, error });
+            }
+          })
+        );
+        await Promise.all(
+          Array.from(taskIds).map(async (taskId) => {
+            try {
+              await workspacesApi.clearTasks(currentWorkspaceId, { task_id: taskId }, headers);
+            } catch (error) {
+              console.warn('Failed to clear token frequency task from task manager', { taskId, error });
+            }
+          })
+        );
       }
-    } catch (e) {
-      console.error('Failed to clear backend analyses/cache:', e);
+
+      try {
+        await textApi.clearTokenFrequencies(currentWorkspaceId, headers);
+      } catch (error) {
+        console.error('Failed to clear backend analyses/cache:', error);
+      }
     }
+    setLocalTokenFrequencyTaskId(null);
+    setTasks((prev) => {
+      if (!Array.isArray(prev)) return prev;
+
+      const taskIds = new Set<string>();
+      const candidates = [
+        (results as any)?.metadata?.task_id,
+        localTokenFrequencyTaskId,
+        tokenFrequencyTaskStatus.activeTaskId,
+        tokenFrequencyTaskStatus.runningTask?.task_id,
+        tokenFrequencyTaskStatus.queuedTask?.task_id,
+        tokenFrequencyTaskStatus.terminalTask?.task_id,
+      ];
+      candidates.forEach((candidate) => {
+        if (typeof candidate === 'string' && candidate.trim()) {
+          taskIds.add(candidate);
+        }
+      });
+
+      if (taskIds.size === 0) {
+        return prev;
+      }
+
+      return prev.filter((task) => task && !taskIds.has(task.task_id));
+    });
     setResults(null);
     setLastCompareNodeIds([]);
   unlockSelection();
@@ -975,7 +1143,7 @@ function TokenFrequencyFeature() {
       try {
         selectNodes(uniqueNodeIds);
       } catch (e) {
-        if (localStorage.getItem('debugTF') === '1') console.warn('Failed to sync workspace selection for concordance handoff:', e);
+        console.warn('Failed to sync workspace selection for concordance handoff:', e);
       }
     }
 
@@ -1001,12 +1169,6 @@ function TokenFrequencyFeature() {
     });
 
     setCurrentView('concordance');
-
-    if (localStorage.getItem('debugTF') === '1') {
-      console.debug(
-        `Navigating to concordance with token: "${trimmedToken}" via store (nodes=${uniqueNodeIds.join(', ') || '∅'})`
-      );
-    }
   };
 
   // Right-click handler: add token to stop word list if not present
@@ -1134,7 +1296,8 @@ function TokenFrequencyFeature() {
       value: item.frequency
     }));
 
-    const maxFrequency = overrideMaxFreq ?? (data.length > 0 ? Math.max(...data.map(d => d.frequency)) : 1);
+    const computedMaxFrequency = data.length > 0 ? maxBy(data, (d: any) => Number(d?.frequency) || 0, 0) : 0;
+    const maxFrequency = overrideMaxFreq ?? (computedMaxFrequency > 0 ? computedMaxFrequency : 1);
     const fontScale = (datum: any) => Math.max(12, Math.min(48, (datum.value / maxFrequency) * 36 + 12));
     const fontSizeSetter = (datum: any) => fontScale(datum);
 
@@ -1190,7 +1353,7 @@ function TokenFrequencyFeature() {
   // Derive filtered results data according to the applied stop-word set
   const renderChart = (nodeId: string, displayName: string, data: any[], color: string, fullRows: any[], maxFrequency?: number) => {
     // Find max frequency for bar width calculation (guard against empty arrays)
-    const maxFreqRaw = data.length > 0 ? Math.max(...data.map(item => item.frequency)) : 0;
+    const maxFreqRaw = data.length > 0 ? maxBy(data, (item: any) => Number(item?.frequency) || 0, 0) : 0;
     const maxFreq = maxFreqRaw > 0 ? maxFreqRaw : 1;
     const exportKey = nodeId || displayName;
 
@@ -1330,8 +1493,18 @@ function TokenFrequencyFeature() {
 
       </Card>
 
+      {tokenFrequencyWaitingBanner && (
+        <AnalysisTaskBanner
+          analysisName="Token frequency"
+          status={tokenFrequencyWaitingBanner.status}
+          taskId={tokenFrequencyWaitingBanner.taskId}
+          message={tokenFrequencyWaitingBanner.message}
+          className="mt-4"
+        />
+      )}
+
       {/* Results */}
-      {results && (
+      {results?.state === 'successful' && (
         <Card>
           <CardHeader className="space-y-1">
             <CardTitle>Token Frequency Results</CardTitle>
@@ -1342,7 +1515,6 @@ function TokenFrequencyFeature() {
             )}
           </CardHeader>
           <CardContent className="space-y-6">
-            {(results as any).state === 'successful' ? (
               <>
                 <div className="rounded-md border border-blue-200 bg-blue-50/80 p-3 text-sm text-blue-800 dark:border-blue-500/40 dark:bg-blue-500/10 dark:text-blue-100">
                   <div className="flex items-start gap-2">
@@ -1360,7 +1532,7 @@ function TokenFrequencyFeature() {
                         aria-label="Number of tokens to show"
                         type="number"
                         min={1}
-                        max={MAX_DISPLAY_TOKEN_LIMIT}
+                        max={MAX_TOKEN_LIMIT_INPUT}
                         inputMode="numeric"
                         value={tokenLimitInput}
                         onChange={handleTokenLimitInputChange}
@@ -1377,7 +1549,7 @@ function TokenFrequencyFeature() {
                       )}
                     </div>
                     <span className={`text-[11px] ${tokenLimitError ? 'text-destructive' : 'text-muted-foreground'}`}>
-                      {tokenLimitError ?? `Enter a positive whole number (max ${MAX_DISPLAY_TOKEN_LIMIT}).`}
+                      {tokenLimitError ?? `Enter a positive whole number (max ${MAX_TOKEN_LIMIT_INPUT}).`}
                     </span>
                   </div>
                   <div className="flex flex-col gap-2">
@@ -1502,17 +1674,8 @@ function TokenFrequencyFeature() {
                     // Ensure we don't exceed cloudLimit
                     selected = selected.slice(0, Math.min(cloudLimit, selected.length));
 
-                    // // Debug print of selected tokens with juxRank
-                    // const debugOn = (typeof window !== 'undefined') && localStorage.getItem('debugTF') === '1';
-                    // if (debugOn) {
-                    //   const dbg = [...selected]
-                    //     .sort((a, b) => a.juxRank - b.juxRank)
-                    //     .map(s => ({ token: s.token, juxRank: Number.isFinite(s.juxRank) ? Number(s.juxRank.toFixed(6)) : s.juxRank, O1: s.o1, O2: s.o2, LogRatio: Number(s.logratio.toFixed(6)) }));
-                    //   // eslint-disable-next-line no-console
-                    //   console.log('Unified Word Cloud selected tokens (by juxRank low→high):', dbg);
-                    // }
-
-                    const maxTotal = Math.max(...selected.map(w => w.total));
+                    const maxTotalRaw = selected.length > 0 ? maxBy(selected, (w: any) => Number(w?.total) || 0, 0) : 0;
+                    const maxTotal = maxTotalRaw > 0 ? maxTotalRaw : 1;
 
                     // Simple hex interpolation
                     const hexToRgb = (hex: string) => {
@@ -2085,11 +2248,16 @@ function TokenFrequencyFeature() {
                 </div>
               )}
               </>
-            ) : (
-              <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-                {results.message ?? 'The analysis failed. Please try again.'}
-              </div>
-            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {results?.state === 'failed' && (
+        <Card>
+          <CardContent>
+            <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              {results?.message ?? 'The analysis failed. Please try again.'}
+            </div>
           </CardContent>
         </Card>
       )}
@@ -2102,19 +2270,6 @@ function TokenFrequencyFeature() {
         </div>
       )}
 
-      <AlertDialog open={limitClampAlertOpen} onOpenChange={setLimitClampAlertOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Token limit capped</AlertDialogTitle>
-            <AlertDialogDescription>
-              Word clouds can display up to {MAX_DISPLAY_TOKEN_LIMIT} tokens. Your requested value has been reset to this limit.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction autoFocus>OK</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 };

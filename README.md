@@ -6,7 +6,7 @@ Multi-platform text analytics application with web and desktop support.
 
 This project uses **npm workspaces** to manage multiple packages:
 
-```
+```text
 ldaca_web_app/
 ├── package.json              # Root workspace (Tauri CLI, orchestration)
 ├── frontend/                 # React frontend workspace
@@ -44,5 +44,6 @@ See [QUICKSTART.md](./QUICKSTART.md) for detailed instructions.
 - [Frontend Documentation](./frontend/README.md)
 
 ## TODO
-- [ ] Now because topic modeling registers a background task in the task center, the clear endpoint should also clear the corresponding task in the task center.
-I also want you to modify the saved result a bit to include the task_id, and the frontend can show the task id somewhere small. And when calling the clear endpoint, it should include that task_id so that the backend knows which task to delete in the task center. Also, make the task_id.
+
+- [x] Ensure analysis tabs that register background tasks also remove the corresponding task rows from the Task Center when the user clears results.
+- [x] Persist and surface `metadata.task_id` on async analysis responses so the frontend can cancel/clear tasks precisely by **task id**.

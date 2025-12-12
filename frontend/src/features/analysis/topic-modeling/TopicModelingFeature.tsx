@@ -21,7 +21,6 @@ import AnalysisLockedNotice from '../../../components/tabs/AnalysisLockedNotice'
 import AnalysisTaskBanner from '../../../components/tabs/AnalysisTaskBanner';
 import type { AnalysisTaskStatus } from '../../../hooks/useAnalysisTaskStatus';
 import useAnalysisTaskLifecycle, { type AnalysisTaskRefreshContext } from '../../../hooks/useAnalysisTaskLifecycle';
-// Define local lightweight response/topic interfaces if not exported (legacy code referenced these)
 interface TopicModelingTopic { id: number; label: string; size: number[]; total_size: number; x: number; y: number; }
 interface TopicModelingResponse { state?: 'running' | 'successful' | 'failed' | 'cancelled'; message?: string; data?: { topics: TopicModelingTopic[]; corpus_sizes?: number[] }; metadata?: { task_id?: string; [k: string]: any } }
 
@@ -88,7 +87,6 @@ const TopicModelingFeature: React.FC = () => {
   const setResultSafely = useCallback((newResult: TopicModelingResponse | null) => {
     // Prevent downgrading from successful to running (race condition fix)
     if (resultRef.current?.state === 'successful' && newResult?.state === 'running') {
-      console.debug('TopicModelingTab: Ignoring stale running update that would hide successful results');
       return;
     }
 
@@ -676,13 +674,47 @@ const TopicModelingFeature: React.FC = () => {
                     if (!currentWorkspaceId) return;
                     setIsClearing(true);
                     try {
+                      const taskIds = new Set<string>();
+                      const candidates = [
+                        (result as any)?.metadata?.task_id,
+                        topicTaskStatus.activeTaskId,
+                        topicRunningTask?.task_id,
+                        topicSuccessfulTask?.task_id,
+                        topicFailedTask?.task_id,
+                      ];
+                      candidates.forEach((candidate) => {
+                        if (typeof candidate === 'string' && candidate.trim()) {
+                          taskIds.add(candidate);
+                        }
+                      });
+
                       try {
-                        await workspacesApi.cancelTasks(currentWorkspaceId, { task_type: 'topic_modeling' }, getAuthHeaders());
+                        if (taskIds.size > 0) {
+                          await Promise.all(
+                            Array.from(taskIds).map(async (taskId) => {
+                              try {
+                                await workspacesApi.cancelTasks(currentWorkspaceId, { task_id: taskId }, getAuthHeaders());
+                              } catch {
+                                /* ignore cancellation errors */
+                              }
+                            })
+                          );
+                        }
                       } catch {
                         /* ignore cancellation errors */
                       }
                       try {
-                        await workspacesApi.clearTasks(currentWorkspaceId, { task_type: 'topic_modeling' }, getAuthHeaders());
+                        if (taskIds.size > 0) {
+                          await Promise.all(
+                            Array.from(taskIds).map(async (taskId) => {
+                              try {
+                                await workspacesApi.clearTasks(currentWorkspaceId, { task_id: taskId }, getAuthHeaders());
+                              } catch {
+                                /* ignore task clearing errors */
+                              }
+                            })
+                          );
+                        }
                       } catch {
                         /* ignore task clearing errors */
                       }
@@ -704,7 +736,25 @@ const TopicModelingFeature: React.FC = () => {
                       recomputeAutoColumns();
                       setTasks((prev: any[]) =>
                         Array.isArray(prev)
-                          ? prev.filter((task) => task?.task_type !== 'topic_modeling')
+                          ? (() => {
+                              const taskIds = new Set<string>();
+                              const candidates = [
+                                (result as any)?.metadata?.task_id,
+                                topicTaskStatus.activeTaskId,
+                                topicRunningTask?.task_id,
+                                topicSuccessfulTask?.task_id,
+                                topicFailedTask?.task_id,
+                              ];
+                              candidates.forEach((candidate) => {
+                                if (typeof candidate === 'string' && candidate.trim()) {
+                                  taskIds.add(candidate);
+                                }
+                              });
+                              if (taskIds.size === 0) {
+                                return prev;
+                              }
+                              return prev.filter((task) => task && !taskIds.has(task.task_id));
+                            })()
                           : prev
                       );
                     }

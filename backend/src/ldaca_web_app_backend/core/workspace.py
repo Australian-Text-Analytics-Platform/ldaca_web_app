@@ -15,10 +15,8 @@ from typing import Any, Dict, Optional, Union
 
 import polars as pl
 from docworkspace import Node, Workspace  # type: ignore
-from docworkspace.workspace.io import (
-    read_workspace,  # type: ignore
-    write_workspace,
-)
+from docworkspace.workspace.io import read_workspace  # type: ignore
+from docworkspace.workspace.io import write_workspace
 
 from .docworkspace_api import (
     DocWorkspaceAPIUtils,
@@ -381,9 +379,12 @@ class WorkspaceManager:
             try:
                 workspace_dir = self.get_workspace_dir(user_id, workspace_id)
                 if workspace_dir is not None:
-                    candidate = workspace_dir / "data" / f"{node_id}.lazy"
-                    if candidate.exists():
-                        candidate.unlink()
+                    # Current workspace persistence stores node payloads as
+                    # Polars binary blobs under data/<node_id>.plbin.
+                    for suffix in (".plbin", ".lazy"):
+                        candidate = workspace_dir / "data" / f"{node_id}{suffix}"
+                        if candidate.exists():
+                            candidate.unlink()
             except Exception:
                 pass
             self._save(user_id, workspace_id, ws)

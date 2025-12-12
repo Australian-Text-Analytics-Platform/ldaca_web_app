@@ -568,11 +568,10 @@ class TokenFrequencyRequest(BaseModel):
         None  # Maps node_id -> column_name (optional for auto-detection)
     )
     stop_words: Optional[List[str]] = None
-    token_limit: Optional[int] = Field(default=None, alias="limit")
+    token_limit: Optional[int] = None
 
     # Pydantic v2 model config
     model_config = ConfigDict(
-        populate_by_name=True,
         json_schema_extra={
             "example": {
                 "node_ids": ["node1", "node2"],
@@ -582,14 +581,6 @@ class TokenFrequencyRequest(BaseModel):
             }
         },
     )
-
-    @model_validator(mode="before")
-    @classmethod
-    def _support_token_limit_alias(cls, values: Dict[str, Any]):
-        if isinstance(values, dict):
-            if "token_limit" not in values and "limit" in values:
-                values["token_limit"] = values["limit"]
-        return values
 
 
 class TokenFrequencyData(BaseModel):

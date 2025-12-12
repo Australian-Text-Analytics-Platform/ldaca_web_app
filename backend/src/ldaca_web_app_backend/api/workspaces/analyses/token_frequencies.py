@@ -3,10 +3,10 @@
 Paths preserved exactly as /workspaces/{workspace_id}/token-frequencies*.
 """
 
+import asyncio
 import math
 
 import polars as pl
-from docframe.core.text_utils import compute_token_frequencies
 from fastapi import APIRouter, Depends, HTTPException
 
 from docframe import DocDataFrame, DocLazyFrame
@@ -14,12 +14,7 @@ from docframe import DocDataFrame, DocLazyFrame
 from ....core.analysis_store import clear_analyses, get_latest_analysis, save_analysis
 from ....core.auth import get_current_user
 from ....core.workspace import workspace_manager
-from ....models import (
-    TokenFrequencyData,
-    TokenFrequencyRequest,
-    TokenFrequencyResponse,
-    TokenStatisticsData,
-)
+from ....models import TokenFrequencyRequest, TokenFrequencyResponse
 
 # This router uses the same '/workspaces' prefix as the base router so paths are identical
 # to their original definitions when included at top level.
@@ -120,18 +115,11 @@ def _normalize_limit_payload(payload: dict | None) -> dict:
         return {"token_limit": limit, "stop_words": []}
 
     merged = {**payload}
-    if "token_limit" not in merged and "limit" in merged:
-        merged["token_limit"] = merged["limit"]
-
     candidate = merged.get("token_limit")
-    if candidate is None:
-        candidate = merged.get("limit")
 
     limit = _coerce_limit_value(candidate)
     merged["token_limit"] = limit
     merged["stop_words"] = _sanitize_stop_words(merged.get("stop_words"))
-    if "limit" in merged:
-        merged.pop("limit", None)
     return merged
 
 
@@ -159,13 +147,9 @@ def _prepare_result_blob(
     limit_candidates = [
         limit_override,
         normalized_result.get("token_limit"),
-        normalized_result.get("limit"),
         existing_params.get("token_limit"),
-        existing_params.get("limit"),
         existing_metadata.get("token_limit"),
-        existing_metadata.get("limit"),
         normalized_request.get("token_limit"),
-        normalized_request.get("limit"),
     ]
 
     limit_value = next(
@@ -179,16 +163,6 @@ def _prepare_result_blob(
 
     if limit_override is not None:
         limit_value = _coerce_limit_value(limit_override)
-
-    # Remove legacy limit fields after deriving the effective value
-    for container in (
-        existing_metadata,
-        existing_params,
-        normalized_request,
-        normalized_result,
-    ):
-        if isinstance(container, dict):
-            container.pop("limit", None)
 
     if stop_words_override is _STOP_WORDS_UNSET:
         stop_candidates = [
@@ -230,6 +204,28 @@ def _prepare_result_blob(
         normalized_result["state"] = "successful"
 
     return normalized_result, normalized_request, limit_value, stop_words
+
+
+def _unwrap_task_manager_result(result_dict: dict) -> dict:
+    """Handle the ProcessTaskManager result wrapper.
+
+    For worker-backed tasks, analysis_store may contain a wrapper like:
+      {"status": "successful", "message": "...", "data": <worker_result>}
+
+    For historical/synchronous paths, analysis_store may contain the final
+    response payload directly.
+    """
+
+    if not isinstance(result_dict, dict):
+        return {}
+    # If it's already the final response blob, keep it.
+    if "state" in result_dict and "message" in result_dict:
+        return result_dict
+    # If it's wrapped (ProcessTaskManager convention), unwrap the inner payload.
+    inner = result_dict.get("data")
+    if isinstance(inner, dict):
+        return inner
+    return result_dict
 
 
 @router.get("/{workspace_id}/token-frequencies/current-request")
@@ -289,17 +285,19 @@ async def token_frequencies_current_result(
     if not rec:
         return None
     stored = rec.result
-    if isinstance(stored, dict):
-        request_payload = rec.request if isinstance(rec.request, dict) else {}
-        result_blob, _normalized_request, _limit_value, _stop_words = (
-            _prepare_result_blob(
-                stored,
-                request_payload,
-            )
-        )
-        return result_blob
-    # Fallback: wrap non-dict legacy formats
-    return {"state": "successful", "message": "ok", "data": stored}
+    if not isinstance(stored, dict):
+        return None
+
+    stored = _unwrap_task_manager_result(stored)
+    if not isinstance(stored, dict) or not stored:
+        return None
+
+    request_payload = rec.request if isinstance(rec.request, dict) else {}
+    result_blob, _normalized_request, _limit_value, _stop_words = _prepare_result_blob(
+        stored,
+        request_payload,
+    )
+    return result_blob
 
 
 @router.post("/{workspace_id}/token-frequencies/current-result")
@@ -314,15 +312,16 @@ async def update_token_frequencies_current_result(
         raise HTTPException(status_code=404, detail="No token frequency analysis found")
 
     request_payload = {**record.request} if isinstance(record.request, dict) else {}
-    result_payload = {**record.result} if isinstance(record.result, dict) else {}
+    result_payload_raw = {**record.result} if isinstance(record.result, dict) else {}
+    result_payload = _unwrap_task_manager_result(result_payload_raw)
+    if not isinstance(result_payload, dict):
+        result_payload = {}
 
     limit_override = None
     stop_words_override = _STOP_WORDS_UNSET
     if isinstance(updates, dict):
         if "token_limit" in updates:
             limit_override = updates.get("token_limit")
-        elif "limit" in updates:
-            limit_override = updates.get("limit")
         if "stop_words" in updates:
             stop_words_override = updates.get("stop_words")
     else:
@@ -337,7 +336,6 @@ async def update_token_frequencies_current_result(
 
     # Merge the normalized request back with any untouched fields (e.g., node selections)
     request_payload.update(normalized_request)
-    request_payload.pop("limit", None)
 
     # Preserve an informative message for callers when available
     try:
@@ -377,265 +375,152 @@ async def calculate_token_frequencies(
     request: TokenFrequencyRequest,
     current_user: dict = Depends(get_current_user),
 ):
-    """Calculate token frequencies for the specified nodes."""
+    """Start token frequency analysis in a background worker process.
+
+    Mirrors the concordance/topic-modeling convention:
+    - POST submits a process-backed task and returns a task_id (state=running)
+    - request is persisted immediately into analysis_store with an empty result
+    - GET current-result serves the persisted result when the worker completes
+    """
+
+    user_id = current_user["id"]
+    tm = workspace_manager.get_task_manager(user_id, workspace_id)
+
+    # Check if already running
     try:
-        user_id = current_user["id"]
-
-        if not request.node_ids:
-            raise HTTPException(
-                status_code=400, detail="At least one node ID must be provided"
-            )
-        if len(request.node_ids) > 2:
-            raise HTTPException(
-                status_code=400, detail="Maximum of 2 nodes can be compared"
-            )
-        if not request.node_columns:
-            request.node_columns = {}
-
-        requested_token_limit = getattr(request, "token_limit", None)
-        effective_limit = (
-            requested_token_limit
-            if requested_token_limit is not None and requested_token_limit > 0
-            else DEFAULT_TOKEN_LIMIT
-        )
-        if requested_token_limit is not None and requested_token_limit <= 0:
-            raise HTTPException(
-                status_code=400, detail="limit must be a positive integer"
-            )
-
-        workspace = workspace_manager.get_workspace(user_id, workspace_id)
-        if not workspace:
-            raise HTTPException(
-                status_code=404, detail=f"Workspace {workspace_id} not found"
-            )
-
-        workspace_dir = workspace_manager.get_workspace_dir(user_id, workspace_id)
-        if workspace_dir is None:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Workspace folder not found for workspace {workspace_id}",
-            )
-
-        frames_dict: dict[str, object] = {}
-        node_display_names: dict[str, str] = {}
-
-        for node_id in request.node_ids:
-            node = workspace_manager.get_node_from_workspace(
-                user_id, workspace_id, node_id
-            )
-            if not node:
-                raise HTTPException(status_code=404, detail=f"Node {node_id} not found")
-
-            node_data = node.data if hasattr(node, "data") else node
-            node_name = node.name if hasattr(node, "name") and node.name else node_id
-            node_display_names[node_id] = node_name
-
-            try:
-                is_doc_frame = isinstance(node_data, (DocDataFrame, DocLazyFrame))
-
-                if hasattr(node_data, "columns"):
-                    available_columns = node_data.columns
-                elif hasattr(node_data, "collect_schema"):
-                    available_columns = list(node_data.collect_schema().keys())
-                elif hasattr(node_data, "schema"):
-                    available_columns = list(node_data.schema.keys())
-                else:
-                    available_columns = []
-
-                column_name = request.node_columns.get(node_id)
-
-                if not column_name:
-                    if is_doc_frame:
-                        if (
-                            hasattr(node_data, "document_column")
-                            and node_data.document_column
-                        ):
-                            column_name = node_data.document_column
-                        else:
-                            for col in [
-                                "document",
-                                "text",
-                                "content",
-                                "body",
-                                "message",
-                            ]:
-                                if col in available_columns:
-                                    column_name = col
-                                    break
-                            if not column_name:
-                                raise HTTPException(
-                                    status_code=400,
-                                    detail=(
-                                        f"Could not auto-detect text column for DocFrame node {node_id}. "
-                                        f"Available columns: {available_columns}. Please specify a column name."
-                                    ),
-                                )
-                    else:
-                        raise HTTPException(
-                            status_code=400,
-                            detail=f"Column specification required for node {node_id}. Available columns: {available_columns}",
-                        )
-
-                if column_name not in available_columns:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Column '{column_name}' not found in node {node_id}. Available columns: {available_columns}",
-                    )
-
-                processed_frame = _prepare_doclazy_frame(
-                    node,
-                    column_name,
-                    user_id,
-                    workspace_id,
-                )
-
-                frames_dict[node_id] = processed_frame
-
-            except HTTPException:
-                raise
-            except Exception as e:
-                raise HTTPException(
-                    status_code=500, detail=f"Error processing node {node_id}: {str(e)}"
-                )
-
-        # IMPORTANT CHANGE: Backend now ignores provided stop_words for raw frequency computation.
-        # Stop words are purely a frontend display filter; we persist them in the saved request
-        # so the UI can restore the user's filter preference without losing raw counts.
-        # Previously: frames=frames_dict, stop_words=request.stop_words
-        requested_stop_words = _sanitize_stop_words(request.stop_words)
-
-        frequency_results, stats_df = compute_token_frequencies(
-            frames=frames_dict, stop_words=None
-        )
-
-        # Return full vocabulary; UI limit is purely presentation/persistence only.
-        response_data: dict[str, dict] = {}
-        server_limit = min(
-            max(effective_limit * SERVER_LIMIT_MULTIPLIER, DEFAULT_TOKEN_LIMIT),
-            MAX_SERVER_TOKEN_LIMIT,
-        )
-        for frame_key, freq_dict in frequency_results.items():
-            sorted_tokens = sorted(freq_dict.items(), key=lambda x: x[1], reverse=True)
-            filtered_tokens = [
-                (token, freq) for token, freq in sorted_tokens if freq > 0
-            ]
-            total_tokens = len(filtered_tokens)
-            display_name = node_display_names.get(frame_key, frame_key)
-            response_data[frame_key] = {
-                "data": [
-                    TokenFrequencyData(token=token, frequency=freq)
-                    for token, freq in filtered_tokens
-                ],
-                "columns": ["token", "frequency"],
-                "metadata": {
-                    # Preserve legacy key but signal that backend did not truncate.
-                    "applied_server_limit": None,
-                    "total_tokens_before_limit": total_tokens,
-                    "total_tokens_returned": total_tokens,
-                    "truncated": False,
-                    "token_limit": effective_limit,
-                    "node_id": frame_key,
-                    "display_name": display_name,
-                    "node_name": display_name,
-                },
-            }
-
-        statistics_data = None
-        if (
-            len(request.node_ids) == 2
-            and stats_df is not None
-            and not stats_df.is_empty()
+        if await tm.any_running(
+            task_type="token_frequencies", user_id=user_id, workspace_id=workspace_id
         ):
-            statistics_data = []
-            for row in stats_df.iter_rows(named=True):
-                statistics_data.append(
-                    TokenStatisticsData(
-                        token=row["token"],
-                        freq_corpus_0=int(row["freq_corpus_0"]),
-                        freq_corpus_1=int(row["freq_corpus_1"]),
-                        expected_0=_safe_float(row["expected_0"]),
-                        expected_1=_safe_float(row["expected_1"]),
-                        corpus_0_total=int(row["corpus_0_total"]),
-                        corpus_1_total=int(row["corpus_1_total"]),
-                        percent_corpus_0=_safe_float(row["percent_corpus_0"]),
-                        percent_corpus_1=_safe_float(row["percent_corpus_1"]),
-                        percent_diff=_safe_float(row["percent_diff"]),
-                        log_likelihood_llv=_safe_float(row["log_likelihood_llv"]),
-                        bayes_factor_bic=_safe_float(row["bayes_factor_bic"]),
-                        effect_size_ell=_safe_float(row["effect_size_ell"]),
-                        relative_risk=_safe_float(row["relative_risk"], default=None)
-                        if row["relative_risk"] is not None
-                        else None,
-                        log_ratio=_safe_float(row["log_ratio"], default=None)
-                        if row["log_ratio"] is not None
-                        else None,
-                        odds_ratio=_safe_float(row["odds_ratio"], default=None)
-                        if row["odds_ratio"] is not None
-                        else None,
-                        significance=str(row["significance"]),
-                    )
-                )
-
-        request_dict = (
-            request.model_dump(exclude_none=True)
-            if hasattr(request, "model_dump")
-            else request.dict(exclude_none=True)
-        )
-        request_dict["stop_words"] = requested_stop_words
-        if "limit" in request_dict and "token_limit" not in request_dict:
-            request_dict["token_limit"] = request_dict["limit"]
-        request_dict.pop("limit", None)
-
-        analysis_params_dict = {**request_dict}
-        analysis_params_dict["token_limit"] = effective_limit
-        analysis_params_dict["server_limit"] = server_limit
-
-        result_payload = {
-            "state": "successful",
-            "message": f"Successfully calculated token frequencies for {len(frames_dict)} node(s)",
-            "data": response_data,
-            "statistics": statistics_data,
-            "token_limit": effective_limit,
-            "analysis_params": analysis_params_dict,
-            "metadata": {
-                "token_limit": effective_limit,
-                "server_limit": server_limit,
-                "stop_words": requested_stop_words,
-                "node_display_names": {**node_display_names},
-            },
-            "stop_words": requested_stop_words,
-        }
-
-        prepared_result, normalized_request, _limit_value, _stop_words = (
-            _prepare_result_blob(
-                result_payload,
-                request_dict,
+            latest = await tm.latest_by_type(
+                "token_frequencies", user_id=user_id, workspace_id=workspace_id
             )
-        )
+            return {
+                "state": "running",
+                "message": "Token frequency analysis already running",
+                "data": None,
+                "metadata": {"task_id": latest.id if latest else None},
+            }
+    except Exception:
+        # Non-fatal: proceed to submit
+        pass
 
-        result_model = TokenFrequencyResponse(**prepared_result)
-
-        try:  # pragma: no cover
-            save_analysis(
-                user_id=user_id,
-                workspace_id=workspace_id,
-                task="token_frequencies",
-                request_dict=normalized_request,
-                result_dict=prepared_result,
-            )
-        except Exception as _persist_err:  # pragma: no cover
-            print(
-                f"[analysis_persist] token_frequencies save failed for workspace {workspace_id}: {_persist_err}"
-            )
-            import traceback
-
-            traceback.print_exc()
-
-        return result_model
-
-    except HTTPException:
-        raise
-    except Exception as e:
+    if not request.node_ids:
         raise HTTPException(
-            status_code=500, detail=f"Error calculating token frequencies: {str(e)}"
+            status_code=400, detail="At least one node ID must be provided"
         )
+    if len(request.node_ids) > 2:
+        raise HTTPException(
+            status_code=400, detail="Maximum of 2 nodes can be compared"
+        )
+    if not request.node_columns:
+        request.node_columns = {}
+
+    requested_token_limit = getattr(request, "token_limit", None)
+    effective_limit = (
+        requested_token_limit
+        if requested_token_limit is not None and requested_token_limit > 0
+        else DEFAULT_TOKEN_LIMIT
+    )
+    if requested_token_limit is not None and requested_token_limit <= 0:
+        raise HTTPException(
+            status_code=400, detail="token_limit must be a positive integer"
+        )
+
+    workspace = workspace_manager.get_workspace(user_id, workspace_id)
+    if not workspace:
+        raise HTTPException(
+            status_code=404, detail=f"Workspace {workspace_id} not found"
+        )
+
+    validated_columns: dict[str, str] = {}
+    node_display_names: dict[str, str] = {}
+
+    for node_id in request.node_ids:
+        node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
+        if not node:
+            raise HTTPException(status_code=404, detail=f"Node {node_id} not found")
+
+        node_data = node.data if hasattr(node, "data") else node
+        node_name = node.name if hasattr(node, "name") and node.name else node_id
+        node_display_names[node_id] = node_name
+
+        is_doc_frame = isinstance(node_data, (DocDataFrame, DocLazyFrame))
+
+        if hasattr(node_data, "columns"):
+            available_columns = node_data.columns
+        elif hasattr(node_data, "collect_schema"):
+            available_columns = list(node_data.collect_schema().keys())
+        elif hasattr(node_data, "schema"):
+            available_columns = list(node_data.schema.keys())
+        else:
+            available_columns = []
+
+        column_name = request.node_columns.get(node_id)
+        if not column_name:
+            if is_doc_frame and getattr(node_data, "document_column", None):
+                column_name = node_data.document_column
+            else:
+                for col in ["document", "text", "content", "body", "message"]:
+                    if col in available_columns:
+                        column_name = col
+                        break
+        if not column_name:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Could not determine text column for node {node_id}. Available columns: {available_columns}"
+                ),
+            )
+        if column_name not in available_columns:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Column '{column_name}' not found in node {node_id}. Available columns: {available_columns}",
+            )
+
+        # Persist chosen document column for future analyses (lightweight)
+        _prepare_doclazy_frame(node, column_name, user_id, workspace_id)
+        validated_columns[node_id] = column_name
+
+    # Stop words are UI-only preferences; persist them but do not apply to compute.
+    requested_stop_words = _sanitize_stop_words(request.stop_words)
+
+    task_info = await tm.submit_task(
+        user_id=user_id,
+        workspace_id=workspace_id,
+        task_type="token_frequencies",
+        task_args={
+            "node_ids": request.node_ids,
+            "node_columns": validated_columns,
+            "token_limit": effective_limit,
+            "stop_words": requested_stop_words,
+        },
+    )
+
+    # Persist request immediately (result will be saved by ProcessTaskManager on completion)
+    request_dict = (
+        request.model_dump(exclude_none=True)
+        if hasattr(request, "model_dump")
+        else request.dict(exclude_none=True)
+    )
+    request_dict["node_columns"] = validated_columns
+    request_dict["token_limit"] = effective_limit
+    request_dict["stop_words"] = requested_stop_words
+
+    normalized_request = _normalize_limit_payload(request_dict)
+    await asyncio.to_thread(
+        save_analysis,
+        user_id,
+        workspace_id,
+        "token_frequencies",
+        normalized_request,
+        {},
+    )
+
+    return {
+        "state": "running",
+        "message": "Token frequency analysis started",
+        "data": None,
+        "token_limit": effective_limit,
+        "stop_words": requested_stop_words,
+        "metadata": {"task_id": task_info.id},
+    }

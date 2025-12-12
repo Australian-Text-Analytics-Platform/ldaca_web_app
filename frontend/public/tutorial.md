@@ -132,6 +132,8 @@ Open the “Token Frequency” tab.
 - Select up to two nodes in the sidebar (checkboxes) and pick the text column for each (if the nodes are of Doc types (DocDataFrame and DocLazyFrame), then the document column will be automatically selected). ![select nodes for token freq](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/blS4WX.png)
 - Optional: add stop words (words to ignore such as “the,” “and”). You can auto‑fill common English stop words. ![stop words](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/jXNEgf.png)
 - Click “Calculate Token Frequencies.”
+- If the corpus is large, the app runs the analysis as a background task. You’ll see a temporary progress banner (spinner + step message), and the task appears in the Task Center in the sidebar.
+- When the task finishes, the Token Frequency results panel refreshes automatically.
 - View a word cloud per node and a bar chart list of top tokens. ![freq comp](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/xCpfEK.png)
 - Click a token to jump to the Concordance tab and see the token in context. Right‑click a token to add it to stop words. ![tok op](https://cdn.jsdelivr.net/gh/AlexDrBanana/images@main/uPic/tok_freq_op.gif)
 

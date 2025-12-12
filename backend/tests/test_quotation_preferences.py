@@ -195,6 +195,39 @@ async def test_update_quotation_current_result_returns_page_payload(
 
 
 @pytest.mark.asyncio
+async def test_quotation_current_result_returns_all_quotes_for_document_page(
+    authenticated_client, seeded_paginated_quotation, monkeypatch
+):
+    """Page size is in documents; all quotes within the selected docs should be returned."""
+
+    async def fake_compute(node, base_df, column, engine, *, use_base_only=False):
+        doc_ids = base_df.get_column("document_idx").to_list()
+        rows = []
+        for idx in doc_ids:
+            if idx == 0:
+                rows.append({"document_idx": 0, "quote": "alpha-1", "quote_row_idx": 0})
+                rows.append({"document_idx": 0, "quote": "alpha-2", "quote_row_idx": 1})
+            elif idx == 1:
+                rows.append({"document_idx": 1, "quote": "beta-1", "quote_row_idx": 0})
+        return pl.DataFrame(rows)
+
+    monkeypatch.setattr(
+        "ldaca_web_app_backend.api.workspaces.analyses.quotation._compute_quote_dataframe",
+        fake_compute,
+    )
+
+    response = await authenticated_client.get(
+        f"/api/workspaces/{WORKSPACE_ID}/quotation/current-result",
+        params={"page": 1, "page_size": 1},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["pagination"]["page"] == 1
+    assert payload["pagination"]["page_size"] == 1
+    assert [row["quote"] for row in payload["data"]] == ["alpha-1", "alpha-2"]
+
+
+@pytest.mark.asyncio
 async def test_quotation_endpoint_recomputes_on_demand(
     authenticated_client, monkeypatch, seeded_paginated_quotation
 ):

@@ -8,7 +8,7 @@ import polars as pl
 import pytest
 from docworkspace import Node, Workspace
 
-from docframe import DocDataFrame
+from docframe import DocDataFrame, DocLazyFrame
 
 
 class TestWorkspace:
@@ -170,7 +170,6 @@ class TestWorkspace:
         assert summary["total_nodes"] == 4
         assert summary["root_nodes"] == 2
         assert summary["leaf_nodes"] == 2
-        assert "DataFrame" in summary["node_types"]
         assert "LazyFrame" in summary["node_types"]
 
     def test_workspace_iteration(self, workspace, sample_df):
@@ -349,7 +348,11 @@ class TestWorkspaceSerialization:
         assert loaded.get_metadata("modified_at") == "2024-02-02T00:00:00Z"
 
     def test_workspace_serialized_file_structure(self, populated_workspace):
-        """Validate on-disk JSON structure contains expected envelope keys."""
+        """Validate on-disk JSON structure contains expected envelope keys.
+
+        Node payloads are persisted as separate binary files under ./data and
+        referenced via `data_path` in metadata.json.
+        """
         with tempfile.TemporaryDirectory() as tmpdir:
             meta_path = Path(tmpdir) / "metadata.json"
             populated_workspace.serialize(meta_path)
@@ -363,10 +366,57 @@ class TestWorkspaceSerialization:
             # Ensure each node entry has required composite sections
             for n in data["nodes"]:
                 assert "node_metadata" in n
-                assert "serialized_data" in n
-                assert "data_path" not in n
-                payload = n["serialized_data"]
-                assert payload is not None
+                assert "data_path" in n
+                assert "serialized_data" not in n
+                rel_path = n["data_path"]
+                assert isinstance(rel_path, str)
+                # Ensure the referenced file exists on disk
+                abs_path = (Path(tmpdir) / rel_path).resolve()
+                assert abs_path.exists(), f"Missing node data file: {abs_path}"
+                assert abs_path.stat().st_size > 0
+
+    def test_remove_node_deletes_binary_file_when_workspace_dir_attached(self):
+        """Removing a node should delete its persisted data/<node_id>.plbin file.
+
+        This is a best-effort cleanup that only runs when the workspace has a
+        `_workspace_dir` attached (the backend attaches this when persisting).
+        """
+        workspace = Workspace("ws")
+        df = pl.DataFrame({"a": [1, 2, 3]})
+        node = workspace.add_node(Node(data=df, name="n", workspace=workspace))
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Persist once to create the binary file
+            meta_path = Path(tmpdir) / "metadata.json"
+            workspace.serialize(meta_path)
+
+            # Simulate backend behavior: attach workspace dir for file cleanup
+            setattr(workspace, "_workspace_dir", Path(tmpdir))
+
+            payload_file = Path(tmpdir) / "data" / f"{node.id}.plbin"
+            assert payload_file.exists()
+
+            assert workspace.remove_node(node.id) is True
+            assert not payload_file.exists()
+
+    def test_write_workspace_removes_orphan_plbin_files(self):
+        """Persisting should clean up stale *.plbin files not referenced by nodes."""
+        workspace = Workspace("ws")
+        df = pl.DataFrame({"a": [1]})
+        workspace.add_node(Node(data=df, name="n", workspace=workspace))
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            meta_path = Path(tmpdir) / "metadata.json"
+            workspace.serialize(meta_path)
+
+            orphan = Path(tmpdir) / "data" / "orphan.plbin"
+            orphan.parent.mkdir(parents=True, exist_ok=True)
+            orphan.write_bytes(b"not a real polars payload")
+            assert orphan.exists()
+
+            # Re-save; should remove orphan
+            workspace.serialize(meta_path)
+            assert not orphan.exists()
 
 
 class TestWorkspaceGraphOperations:

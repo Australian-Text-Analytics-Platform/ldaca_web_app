@@ -1,4 +1,5 @@
 import csv
+from types import SimpleNamespace
 
 import pytest
 from ldaca_web_app_backend.api.workspaces.analyses.token_frequencies import (
@@ -6,7 +7,57 @@ from ldaca_web_app_backend.api.workspaces.analyses.token_frequencies import (
     MAX_SERVER_TOKEN_LIMIT,
     SERVER_LIMIT_MULTIPLIER,
 )
+from ldaca_web_app_backend.core import analysis_store
 from ldaca_web_app_backend.core.utils import get_user_data_folder
+from ldaca_web_app_backend.core.worker import token_frequencies_task
+from ldaca_web_app_backend.core.workspace import workspace_manager
+
+
+def _simulate_token_frequency_completion(workspace_id: str):
+    record = analysis_store.get_latest_analysis(
+        "test", workspace_id, task="token_frequencies"
+    )
+    assert record is not None
+    req = record.request or {}
+    worker_result = token_frequencies_task(
+        user_id="test",
+        workspace_id=workspace_id,
+        node_ids=req.get("node_ids") or [],
+        node_columns=req.get("node_columns") or {},
+        token_limit=req.get("token_limit") or DEFAULT_TOKEN_LIMIT,
+        stop_words=req.get("stop_words") or [],
+    )
+    analysis_store.save_analysis(
+        user_id="test",
+        workspace_id=workspace_id,
+        task="token_frequencies",
+        request_dict=req,
+        result_dict={
+            "status": "successful",
+            "message": "token_frequencies completed successfully",
+            "data": worker_result,
+        },
+    )
+
+
+@pytest.fixture(autouse=True)
+def _stub_task_manager(monkeypatch):
+    class ImmediateTaskManager:
+        async def any_running(self, **_kwargs):  # pragma: no cover
+            return False
+
+        async def latest_by_type(self, *args, **_kwargs):  # pragma: no cover
+            return None
+
+        async def submit_task(self, **_kwargs):  # pragma: no cover
+            return SimpleNamespace(id="test-task")
+
+    def fake_get_task_manager(self, _user_id, _workspace_id):
+        return ImmediateTaskManager()
+
+    monkeypatch.setattr(
+        workspace_manager.__class__, "get_task_manager", fake_get_task_manager
+    )
 
 
 def _write_token_csv(folder, filename, start, end):
@@ -51,7 +102,16 @@ async def test_token_frequencies_full_table_and_metadata(
         json=payload,
     )
     assert response.status_code == 200, response.text
-    data = response.json()
+    start_payload = response.json()
+    assert start_payload.get("state") == "running"
+    assert start_payload.get("metadata", {}).get("task_id")
+
+    _simulate_token_frequency_completion(workspace_id)
+    result_response = await authenticated_client.get(
+        f"/api/workspaces/{workspace_id}/token-frequencies/current-result"
+    )
+    assert result_response.status_code == 200
+    data = result_response.json()
 
     assert data["state"] == "successful"
     assert data.get("token_limit") == DEFAULT_TOKEN_LIMIT

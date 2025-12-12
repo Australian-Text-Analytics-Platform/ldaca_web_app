@@ -39,36 +39,15 @@ def test_sanitize_request_excludes_pagination_keys(raw_request):
 
 
 def test_normalize_saved_request_coerces_legacy_shape():
+    # We no longer support legacy request formats. Requests must include
+    # `node_ids` and `node_columns`.
     raw_request = {
         "node_id": "node-legacy",
         "column": "text",
         "search_word": "alpha",
-        "num_left_tokens": 4,
-        "num_right_tokens": 2,
-        "regex": False,
-        "case_sensitive": True,
-        "combined": False,
-        "page": 3,
-        "page_size": 10,
-        "sort_by": "document_idx",
-        "sort_order": "desc",
     }
-    raw_result = {"analysis_params": {"node_id": "node-legacy", "column": "text"}}
 
-    normalized = _normalize_saved_request(raw_request, raw_result)
-
-    assert normalized == {
-        "node_ids": ["node-legacy"],
-        "node_columns": {"node-legacy": "text"},
-        "search_word": "alpha",
-        "num_left_tokens": 4,
-        "num_right_tokens": 2,
-        "regex": False,
-        "case_sensitive": True,
-    }
-    assert "combined" not in normalized
-    for excluded in ("page", "page_size", "sort_by", "sort_order", "pagination"):
-        assert excluded not in normalized
+    assert _normalize_saved_request(raw_request) is None
 
 
 def test_filter_concordance_rows_removes_blank_entries():

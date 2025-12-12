@@ -1,7 +1,4 @@
 export const DEFAULT_TOKEN_LIMIT = 10;
-export const MAX_DISPLAY_TOKEN_LIMIT = 100;
-export const SERVER_LIMIT_MULTIPLIER = 5;
-export const MAX_SERVER_TOKEN_LIMIT = 5000;
 
 type ClampResult = {
   limit: number;
@@ -10,20 +7,12 @@ type ClampResult = {
 
 export const clampDisplayTokenLimit = (value: number | null | undefined): ClampResult => {
   const numeric = typeof value === 'number' && Number.isFinite(value) ? value : DEFAULT_TOKEN_LIMIT;
-  const normalized = Math.max(1, Math.floor(numeric));
-  const bounded = Math.min(normalized, MAX_DISPLAY_TOKEN_LIMIT);
+  const floored = Math.floor(numeric);
+  const bounded = Math.max(1, Number.isFinite(floored) ? floored : DEFAULT_TOKEN_LIMIT);
   return {
     limit: bounded,
-    wasClamped: bounded !== normalized,
+    wasClamped: bounded !== floored,
   };
-};
-
-export const computeServerLimit = (limit: number | null | undefined): number => {
-  const numeric = typeof limit === 'number' && Number.isFinite(limit) ? limit : DEFAULT_TOKEN_LIMIT;
-  return Math.min(
-    Math.max(Math.floor(numeric) * SERVER_LIMIT_MULTIPLIER, DEFAULT_TOKEN_LIMIT),
-    MAX_SERVER_TOKEN_LIMIT
-  );
 };
 
 export const toFiniteNumber = (value: unknown): number | null => {

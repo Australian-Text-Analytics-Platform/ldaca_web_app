@@ -4,8 +4,8 @@ Routes preserved exactly for backward compatibility."""
 import json
 from typing import Any, Dict, Optional
 
-from docworkspace.workspace.io import (  # type: ignore
-    deserialize_workspace,
+from docworkspace.workspace.io import (
+    deserialize_workspace,  # type: ignore
     serialize_workspace,
 )
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
@@ -262,14 +262,31 @@ async def get_workspace_graph(
     try:  # enrichment with latest analyses
         from ...core.analysis_store import list_analyses  # type: ignore
 
+        def _unwrap_task_manager_result(result: Any) -> Any:
+            """Unwrap ProcessTaskManager's persisted wrapper.
+
+            The process task manager persists results as:
+              {"status": "successful", "message": "...", "data": <analysis_payload>}
+
+            Most API consumers expect the analysis payload directly (which includes
+            fields like "state").
+            """
+
+            if isinstance(result, dict) and "status" in result and "data" in result:
+                unwrapped = result.get("data")
+                return unwrapped if unwrapped is not None else result
+            return result
+
         records = list_analyses(user_id, workspace_id)
         latest: Dict[str, Any] = {}
         for r in records:
+            raw_result = getattr(r, "result", None)
+            unwrapped_result = _unwrap_task_manager_result(raw_result)
             latest[str(r.task)] = {
                 "task": str(r.task),
                 "saved_at": json_sanitize(getattr(r, "saved_at", None)),
                 "request": json_sanitize(getattr(r, "request", None)),
-                "result": json_sanitize(getattr(r, "result", None)),
+                "result": json_sanitize(unwrapped_result),
             }
         graph_data["latest_analysis"] = latest
     except Exception:

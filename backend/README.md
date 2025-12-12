@@ -195,8 +195,10 @@ For any clarifications or to automate the refactor into the proposed structure, 
 The token frequency endpoint behavior:
 
 1. Stop words are frontend-only: the backend ignores the provided list when computing raw counts (they are persisted only so the UI can restore the filter preference). This keeps the operation reversible without recomputation.
-2. Persistence returns the full stored `TokenFrequencyResponse` (including `statistics`). Earlier flattening removed `statistics` which caused the unified word cloud and stats table to disappear after tab switching—this is fixed.
-3. The numeric "limit" provided in the request (and the default of 10 in the UI) is a presentation parameter only. The backend returns the full vocabulary (subject only to inherent processing constraints of the underlying data). The client applies the limit when rendering bar charts / word clouds.
-4. Unified Word Cloud derives from the persisted `statistics`; no additional backend metadata is required.
+1. Persistence returns the full stored `TokenFrequencyResponse` (including `statistics`). Earlier flattening removed `statistics` which caused the unified word cloud and stats table to disappear after tab switching—this is fixed.
+1. The numeric "limit" provided in the request (and the default of 10 in the UI) is a presentation parameter only. The backend returns the full vocabulary (subject only to inherent processing constraints of the underlying data). The client applies the limit when rendering bar charts / word clouds.
+1. Unified Word Cloud derives from the persisted `statistics`; no additional backend metadata is required.
+1. Token Frequency is executed as a **background task** for large corpora. The initial `POST /api/workspaces/{workspace_id}/token-frequencies` returns immediately with `state: "running"` and `metadata.task_id`. The final result is retrieved via `GET /api/workspaces/{workspace_id}/token-frequencies/current-result` once the task completes (the UI auto-refreshes when the task transitions to a terminal state).
+1. Task cancellation/clearing is **task-id based**. The Task Center uses the workspace task endpoints to cancel/clear by `task_id` (not by task type), while `POST /token-frequencies/clear` clears the stored analysis payload.
 
 If extremely large vocabularies become a performance issue in the future, consider adding an opt-in pagination or download endpoint rather than implicit truncation.

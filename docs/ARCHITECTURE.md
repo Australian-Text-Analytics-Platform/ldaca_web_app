@@ -88,9 +88,13 @@ The LDaCA (Language Data Commons of Australia) Web Application is a full-stack t
 - **Display folder naming**: derived from the workspace name (sanitized), with suffixes `_1`, `_2`, ... on collisions; the folder name is discoverability-only—the canonical `id` and `name` live in `metadata.json`.
 - **Metadata envelope** (`metadata.json`):
   - `workspace_metadata`: `{ id, name, version, description, created_at, modified_at }`
-  - `nodes`: array of `{ node_metadata: { id, name, operation, data_type, document_column, parents }, serialized_data }`
-    - `serialized_data` is the JSON payload emitted by Polars/DocFrame `serialize(format="json")`. Node payloads are fully inlined—no auxiliary `data/` folder or relative paths remain.
-- **Import/Export**: lifecycle endpoints operate on `metadata.json` inside the workspace folder; legacy single-file `workspace_<id>.json` persistence has been removed.
+  - `nodes`: array of `{ node_metadata: { id, name, operation, data_type, document, parents }, data_path, data_format }`
+    - `data_path` is a **relative path** (e.g. `data/<node_id>.plbin`) to a binary payload written via `polars.LazyFrame.serialize(format="binary")`.
+    - `data_format` currently uses `polars-binary-v1`.
+    - On load, the binary payload is deserialized back to a `polars.LazyFrame`, then wrapped into a `DocLazyFrame` iff `node_metadata.document` is set.
+- **Import/Export**:
+  - **On-disk persistence** uses the folder-per-workspace format above (small `metadata.json` + binary node files under `data/`).
+  - **JSON import/export APIs** still accept/emit inline JSON payloads (legacy `serialized_data`) for portability.
 
 #### Core Classes
 
@@ -352,12 +356,12 @@ Frontend stores token, includes in Authorization header
 - **Result**: Any API that stages data (file uploads, concordance detach, quotation clips) now hands the workspace graph a proper DocLazyFrame, so downstream analyses automatically inherit the `document_column` metadata without collecting.
 
 **analysis.py** - Text Analysis:
-- `POST /api/workspaces/{workspace_id}/analysis/token-frequencies`: Compute token frequencies
+- `POST /api/workspaces/{workspace_id}/token-frequencies`: Start token frequency analysis (background task)
   - **Implementation**:
-    - Resolves the workspace folder, but no longer needs to chdir into it because all staged nodes now embed absolute parquet paths inside their lazy plans.
-    - Normalizes requested stop words via `_sanitize_stop_words()` but purposefully passes `stop_words=None` to `compute_token_frequencies()`. This keeps the persisted vocabulary untouched while the UI applies stop-word filters purely as a presentation preference.
-    - Ensures each node is converted to a `DocLazyFrame` via `_prepare_doclazy_frame()` before handing it to docframe so document columns are recorded back on the node for future analyses.
-    - Persists the request/result pair with `save_analysis()` exactly as before so “Current request/result” endpoints keep restoring the last-used limits.
+    - Validates the selected nodes/columns and ensures each node is treated as a `DocLazyFrame` via `_prepare_doclazy_frame()`.
+    - Persists the request immediately via `save_analysis(..., result_dict={})` so “Current request” endpoints can restore the last-used UI settings.
+    - Submits a `token_frequencies` task to `ProcessTaskManager` (same convention as concordance/topic modeling) and returns `{"state": "running", "metadata": {"task_id": ...}}`.
+    - The worker computes frequencies via `compute_token_frequencies(frames, stop_words=None)` (stop words remain a UI-only preference) and the task manager persists the completed result.
 - `POST /api/workspaces/{workspace_id}/analysis/concordance`: Extract concordances
   - **Implementation**: Calls `node.data.select(pl.col(column).text.concordance(...))`, returns results
 - `POST /api/workspaces/{workspace_id}/analysis/topic-modeling`: Run topic modeling
@@ -1108,6 +1112,11 @@ This section provides comprehensive documentation of every backend file and its 
 **Endpoints** (documented in Background Task System section above):
 - `GET /{workspace_id}/tasks`, `GET /{workspace_id}/tasks/{task_id}`, `DELETE /{workspace_id}/tasks/{task_id}`, etc.
 
+**Cancel/Clear semantics**:
+
+- `POST /{workspace_id}/tasks/cancel` and `POST /{workspace_id}/tasks/clear` accept either a `task_id` (single-task operation) or a `task_type` (bulk operation).
+- The frontend uses **task-id-only** cancellation/clearing so that “Clear Results” does not accidentally affect other in-flight tasks.
+
 ##### `dependencies.py` - FastAPI Dependencies
 
 **Functions**:
@@ -1155,6 +1164,8 @@ result = lazy_frame.with_columns(expr.alias('A + Total Count'))
 
 The clear endpoint delegates to `clear_analyses_and_cache()` which removes the stored analysis payloads, prunes the shared concordance cache, **and calls `ProcessTaskManager.clear_tasks(task_type="concordance")`** for the current user/workspace. The JSON response includes
 
+For **precise Task Center cleanup**, the frontend additionally cancels/clears the specific task(s) associated with the current results by calling the workspace task endpoints with `task_id` (not task type). This avoids clearing unrelated concordance jobs that might be running for other tabs or older requests.
+
 ```json
 {
   "state": "successful",
@@ -1198,9 +1209,17 @@ allowing the frontend task sidebar to immediately drop any lingering concordance
 ##### `token_frequencies.py` - Token Frequency Comparisons
 
 **Endpoints**:
-- `POST /{workspace_id}/token-frequencies`: Compute token frequencies for multiple nodes
-  - **Implementation**: Similar to frequency_analysis but for multi-node comparison
-- `GET /{workspace_id}/token-frequencies/{analysis_id}`: Get specific analysis
+- `POST /{workspace_id}/token-frequencies`: Start token frequency analysis (background task)
+  - **Implementation**:
+    1. Validate inputs and normalize UI-only stop words.
+    2. Persist the request immediately via `analysis_store.save_analysis(..., result_dict={})`.
+    3. Submit the `token_frequencies` task via `ProcessTaskManager` and return `state="running"` plus `metadata.task_id`.
+- `GET /{workspace_id}/token-frequencies/current-request`: Get last request
+- `POST /{workspace_id}/token-frequencies/current-request`: Persist UI request updates (e.g., token_limit, stop_words)
+- `GET /{workspace_id}/token-frequencies/current-result`: Get last result
+  - **Note**: The task manager persists results wrapped as `{status, message, data}`; API handlers unwrap this to return the analysis payload.
+- `POST /{workspace_id}/token-frequencies/current-result`: Persist display preference updates (currently stop_words/token_limit)
+- `POST /{workspace_id}/token-frequencies/clear`: Clear results and purge `token_frequencies` tasks from ProcessTaskManager
 
 ##### `topic_modeling.py` - Topic Modeling
 
@@ -1226,7 +1245,7 @@ Like concordance, the clear endpoint returns a `cleared` summary with `analyses_
 **Endpoints**:
 
 - `POST /{workspace_id}/quotation`: Extract quotations
-  - **Implementation**: Materialises the target node into a Polars `DataFrame`, slices only the requested document page, feeds that slice into `_compute_quote_dataframe()` (local engines delegate to DocFrame's `text.quotation()`, remote engines batch the slice through `_extract_remote_paginated()`), joins the exploded quotation rows back to the sliced metadata, and persists only the current page envelope to `analysis_store`. Each request recomputes the slice on demand—no cached rows are stored or reused across requests.
+  - **Implementation**: Materialises the target node into a Polars `DataFrame`, slices only the requested document page (so `page_size` counts documents, not quote rows), feeds that slice into `_compute_quote_dataframe()` (local engines delegate to DocFrame's `text.quotation()`, remote engines batch the slice through `_extract_remote_paginated()`), joins the exploded quotation rows back to the sliced metadata, and returns all quote rows for the selected documents. Each request recomputes the slice on demand—no cached rows are stored or reused across requests.
 - `POST /{workspace_id}/nodes/{node_id}/quotation/detach`: Join exploded quotation rows with the source table and persist as a new node. The handler reuses `_build_joined_quotation_frames()` to materialise the current data on demand and skips all caching layers so detach always reflects the latest node contents.
 - `GET /{workspace_id}/quotation/current-request`: Get last request
 - `GET /{workspace_id}/quotation/current-result`: Get last result
@@ -1405,45 +1424,48 @@ The end result is a single source of truth for selection (Zustand) and a single 
 **Purpose**: Token frequency analysis with word clouds and statistics.
 
 **Key Features**:
-- Multi-node comparison (select multiple nodes in graph)
+- Multi-node comparison (compare up to two nodes)
 - Unified word cloud (combined frequencies across selected nodes)
 - Per-node word clouds and tables
 - Statistical measures (log-likelihood, Bayes factor, effect size)
 - Stop-word filtering is applied entirely in the browser. The feature keeps the full backend payload intact, derives `nodeDisplayResults` via `useMemo`, and walks the unbounded token list to “backfill” slots so that each word cloud/table still renders up to the learner’s configured `token_limit` even after common words are filtered out.
 - For UX/performance parity, the input is clamped to **100 tokens max**. Requests above that ceiling are automatically reset to 100 and the learner sees an alert explaining that word clouds can’t render larger payloads.
+- Uses the shared analysis-task UX: a temporary progress banner (spinner + progress message) while the backend task runs, plus automatic refresh of `/token-frequencies/current-result` when the task reaches a terminal state.
 
 **Implementation**:
-- Fetches token frequencies: `useMutation({mutationFn: (params) => api.computeTokenFrequencies(workspaceId, params)})`
-- Backend now returns the full vocabulary; the feature enforces the user’s preferred `token_limit` locally before rendering the table or clouds.
-- Generates word clouds using `react-wordcloud` library
-- Displays statistics tables with sorting/filtering
-- Locks analysis results (prevents re-computation on node selection changes)
+- Starts analysis with `textApi.tokenFrequencies(workspaceId, request, headers)`.
+  - The backend returns immediately with `state: "running"` and `metadata.task_id`.
+  - The feature stores that `task_id` locally and wires it into `useAnalysisTaskLifecycle({ taskType: 'token_frequencies', manualActiveTaskId: taskId, ... })`.
+  - `AnalysisTaskBanner` renders the consistent “working…” banner and progress message.
+- Refresh behavior: when the task completes (or while active, if polling is enabled), the feature fetches `GET /token-frequencies/current-result` and updates the results panel.
+- Rendering: the backend returns the full vocabulary; the feature applies `token_limit` and stop-word filtering locally before rendering tables/charts.
+- “Clear Results” does two things:
+  1. Clears the stored analysis payload via `POST /token-frequencies/clear`.
+  2. Cancels/clears Task Center rows by calling `POST /workspaces/{workspace_id}/tasks/cancel` + `POST /workspaces/{workspace_id}/tasks/clear` **with `task_id` only**.
 
 **Walkthrough Q**: *How does the UI keep results manageable if the backend never truncates?*
 
 **Answer**: Treat this feature like a teaching demo for lazy data handling:
 1. Read `result.metadata.token_limit` (default 10) plus `metadata.server_limit` to learn the saved UI preference.
 2. Slice the unbounded `data` array with `data.slice(0, token_limit)` when rendering each table/word cloud.
-3. Surface `total_tokens_before_limit` and `total_tokens_returned` so students can see that `applied_server_limit` is always `null` unless a legacy record is loaded.
+3. Surface `total_tokens_before_limit` and `total_tokens_returned` so students can see that `applied_server_limit` is always `null` in the modern implementation.
 4. Persist the learner’s stop words via `/token-frequencies/current-request`, ensuring the UI filter stays in sync with the saved metadata without ever discarding raw frequencies.
+5. Track `metadata.task_id` for each run and use it to cancel/clear the exact background task record associated with the current results.
 
 **Locking Mechanism** (Bug Fixed):
 ```tsx
-// Only use locked nodes for analysis, not currently selected nodes
-const analysisNodeIds = useMemo(() => {
-  if (lastCompareNodeIds.length > 0) {
-    return lastCompareNodeIds;  // Use locked analysis
-  }
-  return [];  // No locked analysis yet
-}, [lastCompareNodeIds]);  // NOT dependent on selectedNodes!
+// The feature "locks" to the nodes that were actually analyzed.
+// This prevents the results panel from changing just because the user clicks
+// other nodes in the graph after starting the analysis.
+const analysisNodeIds = useMemo(() => lastCompareNodeIds.slice(0, 2), [lastCompareNodeIds]);
 
-// normalized results ONLY include nodes from analysisNodeIds
+// Normalize backend result entries using analysisNodeIds (not current selection).
+// The details of result matching vary by backend payload shape, but the intent
+// is: only show the node(s) that were part of the last request.
 const normalizedNodeResults = useMemo(() => {
-  if (!results || !results.data) return [];
-  return analysisNodeIds.map(nodeId => 
-    results.data.find(r => r.node_id === nodeId) || {node_id: nodeId, frequencies: {}}
-  ).slice(0, 2);  // Max 2 for binary comparison
-}, [results, analysisNodeIds]);  // Only depends on locked IDs
+  if (!results) return [];
+  return analysisNodeIds.map((nodeId) => ({ nodeId }));
+}, [results, analysisNodeIds]);
 ```
 
 **Key Insight**: Analysis results locked to prevent UI changes when selecting additional nodes in graph view.
@@ -1778,7 +1800,7 @@ export const useSelectionStore = create<SelectionStore>()(
 
 ##### Analysis Task Lifecycle (`hooks/useAnalysisTaskLifecycle.ts`)
 
-**Purpose**: Centralize analysis task UX (banners, polling, and result refresh) for Concordance, Topic Modeling, and future analysis tabs. The hook wraps `useAnalysisTaskStatus` and the SSE-driven task inbox (via `useWorkspaceTaskStream`) so each tab no longer re-implements the same polling/terminal-handling logic, even as the low-level SSE client moves into the feature module.
+**Purpose**: Centralize analysis task UX (banners, polling, and result refresh) for Token Frequency, Concordance, Topic Modeling, and future analysis tabs. The hook wraps `useAnalysisTaskStatus` and the SSE-driven task inbox (via `useWorkspaceTaskStream`) so each tab no longer re-implements the same polling/terminal-handling logic, even as the low-level SSE client moves into the feature module.
 
 **Inputs**:
 
@@ -1786,7 +1808,7 @@ export const useSelectionStore = create<SelectionStore>()(
 - `workspaceId`: Ensures polling/refresh only runs when a workspace is mounted; also resets internal refs when the user switches workspaces.
 - `manualActiveTaskId` *(optional)*: Allows tabs to pass the task id returned from an immediate POST response before the SSE stream echoes the task. Concordance uses this to start polling immediately after `/concordance` responds.
 - `fallbackRunningBanner`: Either a static object or a resolver function `(status) => BannerFallback | null`. Tabs provide a resolver so `AnalysisTaskBanner` can still show a spinner when the current result says `state: 'running'` even if the SSE queue hasn’t emitted a queued/running task yet.
-- `pollWhileActive`/`pollIntervalMs`: Enables lightweight polling for analyses whose results are only exposed via `/current-result` (Concordance). Topic Modeling leaves polling off because the SSE stream plus `topicModelingReady` markers are sufficient.
+- `pollWhileActive`/`pollIntervalMs`: Enables lightweight polling for analyses whose results are only exposed via `/current-result` (Concordance, Token Frequency). Topic Modeling leaves polling off because the SSE stream plus `topicModelingReady` markers are sufficient.
 - `onRefresh(context)`: Async callback invoked for two reasons:
   - `context.reason === 'poll'`: Fired on the configured interval while a task is active.
   - `context.reason === 'terminal'`: Fired once per terminal task transition (`successful`, `failed`, `cancelled`). The context exposes `task`, `taskId`, and `taskState` so tabs can decide how to fetch or synthesize their UI state.
@@ -1796,6 +1818,8 @@ export const useSelectionStore = create<SelectionStore>()(
 1. **Banner Synthesis** – Computes an `AnalysisTaskBannerState` by checking `status.bannerStatus` (running/queued from SSE). If no official status exists, the fallback resolver runs so tabs can derive a “running” message from their cached `result` payload.
 2. **Polling Loop** – When `pollWhileActive` is true and either the SSE state or `manualActiveTaskId` indicates an active task, the hook schedules a `window.setInterval` and repeatedly calls `onRefresh({reason: 'poll', ...})`. React cleans up the timer automatically when dependencies change.
 3. **Terminal Deduplication** – Internally tracks `{taskId, state}` pairs so `onRefresh({reason: 'terminal'})` only fires once per completion even if Zustand re-renders multiple times.
+
+**Note on task clearing**: The hook uses `taskType` to *filter and display* task status (SSE inbox + banner synthesis). However, when removing tasks from the Task Center, the frontend clears by **`task_id` only**.
 
 **Example (Concordance Tab)**:
 
@@ -1909,35 +1933,26 @@ Frontend stores selectedNodes = [node1.id, node2.id] in Zustand
     ↓
 User clicks "Compare Token Frequencies"
     ↓
-Frontend: POST /api/workspaces/{workspace_id}/analysis/token-frequencies
-  {node_ids: [node1.id, node2.id], column: 'document', token_limit: 100}
+Frontend: POST /api/workspaces/{workspace_id}/token-frequencies
+  {node_ids: [node1.id, node2.id], node_columns: {node1.id: 'document', node2.id: 'document'}, token_limit: 100, stop_words: [...]}  # stop_words is UI-only
     ↓
-Backend: api/workspaces/analysis.py compute_token_frequencies_endpoint()
+Backend: api/workspaces/analyses/token_frequencies.py calculate_token_frequencies()
   1. Load workspace
-  2. Get nodes: frames = {n.name: n for n in [workspace.nodes[id] for id in node_ids]}
-  3. Call docframe utility: 
-     freq_dicts, stats_df = compute_token_frequencies(frames, stop_words=None)
-       - Implementation (docframe/core/text_utils.py):
-         * For each frame: tokenize document column, flatten to token list
-         * Build universal vocabulary (union of all tokens across frames)
-         * For each frame: count token frequencies, ensure all vocab present
-         * If 2 frames: compute log-likelihood statistics
-           - Expected frequency: (token_total * corpus_total) / grand_total
-           - G² statistic: 2 * Σ(observed * log(observed/expected))
-           - Bayes Factor (BIC): G² - (dof * log(grand_total))
-           - Effect Size (ELL): G² / (grand_total * log(min_expected))
-         * Return (freq_dicts, stats_df)
-        * Backend intentionally ignores `token_limit` when generating `freq_dicts`; truncation is now 100% a presentation concern handled in the UI.
-  4. Generate analysis ID: str(uuid.uuid4())
-  5. Store results in workspace metadata: workspace.set_metadata(f"analysis_{analysis_id}", result)
-  6. Persist workspace
-  7. Return {analysis_id, frequencies: freq_dicts, statistics: stats_df.to_dicts()}
+  2. Validate node_ids/node_columns and record document-column metadata via `_prepare_doclazy_frame()`
+  3. Persist the request immediately in `analysis_store` with an empty result `{}`
+  4. Submit a `token_frequencies` background task via `ProcessTaskManager` and return:
+     {"state": "running", "metadata": {"task_id": "..."}}
     ↓
-Frontend: Receives analysis result
-  1. Stores in TanStack Query cache: queryKey ['analysis', workspace_id, analysis_id]
-  2. Locks analysis: setLastCompareNodeIds([node1.id, node2.id])
-  3. Reads metadata (`total_tokens_before_limit`, `applied_server_limit`, `token_limit`) so it can explain to the learner that the server returned every token and the UI will now slice locally.
-  4. Renders TokenFrequencyTab:
+Task manager:
+  - Runs `core/worker.py token_frequencies_task()` in a separate process
+  - Persists the completed analysis to `analysis_store` (wrapped as `{status, message, data}`)
+    ↓
+Frontend:
+  1. Optionally polls task status / subscribes to SSE task stream
+  2. Fetches results via:
+     GET /api/workspaces/{workspace_id}/token-frequencies/current-result
+     (handler unwraps the task-manager wrapper and returns the analysis payload)
+  3. Renders TokenFrequencyTab:
      - Unified word cloud (combined frequencies)
      - Per-node word clouds
      - Statistics table (sorted by log-likelihood)
@@ -1947,7 +1962,7 @@ Frontend: Receives analysis result
 > **Answer**: Treat `token_limit` as a persisted preference, not a hard cap. The backend copies it into `analysis_params.token_limit` and `metadata.token_limit` so the UI can (a) remember the student’s preferred table length, (b) label results with `applied_server_limit = null` when nothing was truncated, and (c) apply the limit client-side without recomputing the analysis. This separation keeps the data layer lossless while the presentation layer stays friendly for beginners.
 ```
 
-**Key Insight**: Analysis results stored in workspace metadata; frontend locks analysis to prevent UI changes on new node selection.
+**Key Insight**: Token frequency requests/results are stored in `analysis_store`; the initial POST returns a `task_id` immediately, and the UI can restore prior settings via the “current request/result” endpoints without recomputing.
 
 ### Pattern 4: Workspace Graph Rendering
 
@@ -2403,45 +2418,56 @@ workspace_manager.persist(user_id, workspace_id)
 ### Pattern 3: Compute Token Frequencies
 
 ```python
-# Backend
-from docframe.core.text_utils import compute_token_frequencies
+# Backend (high level)
+# - Persist the request immediately
+# - Submit a background task
+# - Persist the result under the current-result key when the worker finishes
 
-# Get nodes from workspace
-frames = {
-    "corpus1": workspace.nodes[node1_id],
-    "corpus2": workspace.nodes[node2_id],
-}
+from ldaca_web_app_backend.core import analysis_store
+from ldaca_web_app_backend.core.workspace import workspace_manager
 
-# Compute frequencies and statistics
-freq_dicts, stats_df = compute_token_frequencies(frames, stop_words=None)
+analysis_store.save_analysis(user_id, workspace_id, "token_frequencies", request_dict, result_dict={})
 
-# IMPORTANT: The backend now returns the entire vocabulary and only records the
-# student's preferred `token_limit` in metadata. Stop words are stored so the UI
-# can filter them locally without re-running the analysis.
+tm = workspace_manager.get_task_manager(user_id, workspace_id)
+task_info = await tm.submit_task(
+    task_type="token_frequencies",
+    task_args={
+        "user_id": user_id,
+        "workspace_id": workspace_id,
+        "node_ids": request_dict["node_ids"],
+        "node_columns": request_dict["node_columns"],
+        # stop_words are persisted for UI, but computation uses stop_words=None
+    },
+)
 
-# Store in workspace metadata
-workspace.set_metadata("token_freq_analysis", {
-    "frequencies": freq_dicts,
-    "statistics": stats_df.to_dicts(),
-})
+return {"state": "running", "metadata": {"task_id": task_info.id}}
+
+# Worker process
+# from docframe.core.text_utils import compute_token_frequencies
+# freq_dicts, stats_df = compute_token_frequencies(frames, stop_words=None)
 ```
 
 ```typescript
-// Frontend
-const tokenFreqMutation = useMutation({
-  mutationFn: (params) => api.computeTokenFrequencies(workspaceId, params),
-  onSuccess: (data) => {
-    setAnalysisResults(data);
-    setShowAnalysisPanel(true);
+// Frontend (high level)
+// 1) Kick off the background task
+const response = await textApi.tokenFrequencies(workspaceId, request, getAuthHeaders());
+const taskId = response?.metadata?.task_id;
+
+// 2) Show consistent task UX and refresh current-result when the task finishes
+const { banner } = useAnalysisTaskLifecycle({
+  taskType: 'token_frequencies',
+  workspaceId,
+  manualActiveTaskId: taskId,
+  pollWhileActive: true,
+  onRefresh: async (ctx) => {
+    if (ctx.reason === 'terminal') {
+      const latest = await textApi.getTokenFrequenciesCurrentResult(workspaceId, getAuthHeaders());
+      setResults(latest);
+    }
   },
 });
 
-// Trigger analysis (token_limit is purely a UI preference)
-tokenFreqMutation.mutate({
-  node_ids: selectedNodes,
-  column: 'document',
-  token_limit: 100,
-});
+// 3) Render locally-limited + stopword-filtered views from the full payload
 ```
 
 ### Pattern 4: Visualize Workspace Graph

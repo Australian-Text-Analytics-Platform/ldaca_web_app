@@ -111,7 +111,6 @@ const ConcordanceFeature: React.FC = () => {
   const defaultPalette = useMemo(() => [
     '#2563eb', '#dc2626', '#16a34a', '#9333ea', '#d97706', '#0d9488', '#db2777', '#4f46e5', '#65a30d', '#0891b2', '#92400e', '#6b7280'
   ], []);
-  // legacy inline picker state removed in favor of shared component
   const [viewMode, setViewMode] = useState<'separated'|'combined'>('separated');
   const [combinedPage, setCombinedPage] = useState(1);
   const [combinedPageSize] = useState(20);
@@ -265,21 +264,6 @@ const ConcordanceFeature: React.FC = () => {
     onRefresh: handleTaskRefresh,
   });
 
-  // Debug results changes
-  useEffect(() => {
-    if (!results || localStorage.getItem('debugConc') !== '1') {
-      return;
-    }
-
-    console.debug('Concordance results updated:', results);
-    console.debug('Results state:', results.state);
-    console.debug('Results data:', results.data);
-
-    if (results.data) {
-      console.debug('Data entries:', Object.entries(results.data));
-    }
-  }, [results]);
-
   useEffect(() => {
     if (viewMode === 'combined' && results && results.combinable === false) {
       setViewMode('separated');
@@ -348,10 +332,6 @@ const ConcordanceFeature: React.FC = () => {
     }
     lastPendingConcordanceRef.current = pendingConcordance.timestamp;
 
-    if (localStorage.getItem('debugConc') === '1') {
-      console.debug('Processing pending concordance search:', pendingConcordance);
-    }
-
     if (pendingConcordance.searchWord) {
       setSearchWord(pendingConcordance.searchWord);
     }
@@ -370,9 +350,7 @@ const ConcordanceFeature: React.FC = () => {
           try {
             selectNodes(targetIds);
           } catch (error) {
-            if (localStorage.getItem('debugConc') === '1') {
-              console.warn('Failed to sync workspace selection from pending concordance:', error);
-            }
+            console.warn('Failed to sync workspace selection from pending concordance:', error);
           }
         }
       }
@@ -398,11 +376,6 @@ const ConcordanceFeature: React.FC = () => {
     if (shouldAutoRun && pendingConcordance.searchWord && hasNodeTargets) {
       const delay = 50;
       timeoutId = window.setTimeout(() => {
-        if (localStorage.getItem('debugConc') === '1') {
-          console.debug(
-            `Auto-triggering concordance search for: ${pendingConcordance.searchWord} (delay=${delay}ms, autoRun=${pendingConcordance.autoRun})`
-          );
-        }
         setShouldAutoSearch(true);
       }, delay);
     }
@@ -568,9 +541,6 @@ const ConcordanceFeature: React.FC = () => {
         }
 
         response = await textApi.concordance(currentWorkspaceId, request, authHeaders);
-        if (localStorage.getItem('debugConc') === '1') {
-          console.debug('Multi-Node Concordance Response:', response);
-        }
         setResults(response);
         const responseTaskId = (response as any)?.metadata?.task_id;
         if (typeof responseTaskId === 'string' && responseTaskId.trim().length > 0) {
@@ -716,21 +686,49 @@ const ConcordanceFeature: React.FC = () => {
   const handleClearResults = async () => {
     if (currentWorkspaceId) {
       const headers = getAuthHeaders();
+
+      const taskIds = new Set<string>();
+      const candidates = [
+        (results as any)?.metadata?.task_id,
+        localConcordanceTaskId,
+        concordanceTaskStatus.activeTaskId,
+        concordanceTaskStatus.runningTask?.task_id,
+        concordanceTaskStatus.queuedTask?.task_id,
+        concordanceTaskStatus.terminalTask?.task_id,
+      ];
+      candidates.forEach((candidate) => {
+        if (typeof candidate === 'string' && candidate.trim()) {
+          taskIds.add(candidate);
+        }
+      });
+
       try {
-        await workspacesApi.cancelTasks(
-          currentWorkspaceId,
-          { task_type: 'concordance' },
-          headers,
-        );
+        if (taskIds.size > 0) {
+          await Promise.all(
+            Array.from(taskIds).map(async (taskId) => {
+              try {
+                await workspacesApi.cancelTasks(currentWorkspaceId, { task_id: taskId }, headers);
+              } catch (error) {
+                console.warn('Failed to cancel concordance task before clearing', { taskId, error });
+              }
+            })
+          );
+        }
       } catch (error) {
         console.warn('Failed to cancel concordance tasks before clearing', error);
       }
       try {
-        await workspacesApi.clearTasks(
-          currentWorkspaceId,
-          { task_type: 'concordance' },
-          headers,
-        );
+        if (taskIds.size > 0) {
+          await Promise.all(
+            Array.from(taskIds).map(async (taskId) => {
+              try {
+                await workspacesApi.clearTasks(currentWorkspaceId, { task_id: taskId }, headers);
+              } catch (error) {
+                console.warn('Failed to clear concordance task from task manager', { taskId, error });
+              }
+            })
+          );
+        }
       } catch (error) {
         console.warn('Failed to clear concordance tasks from task manager', error);
       }
@@ -740,9 +738,28 @@ const ConcordanceFeature: React.FC = () => {
         console.error('Failed to clear backend analyses/cache:', error);
       }
     }
-    setTasks((prev) =>
-      Array.isArray(prev) ? prev.filter((task) => task?.task_type !== 'concordance') : prev
-    );
+
+    setTasks((prev) => {
+      if (!Array.isArray(prev)) return prev;
+      const taskIds = new Set<string>();
+      const candidates = [
+        (results as any)?.metadata?.task_id,
+        localConcordanceTaskId,
+        concordanceTaskStatus.activeTaskId,
+        concordanceTaskStatus.runningTask?.task_id,
+        concordanceTaskStatus.queuedTask?.task_id,
+        concordanceTaskStatus.terminalTask?.task_id,
+      ];
+      candidates.forEach((candidate) => {
+        if (typeof candidate === 'string' && candidate.trim()) {
+          taskIds.add(candidate);
+        }
+      });
+      if (taskIds.size === 0) {
+        return prev;
+      }
+      return prev.filter((task) => task && !taskIds.has(task.task_id));
+    });
     setResults(null);
     setNodePagination({});
     setCombinedPage(1);
@@ -1341,7 +1358,8 @@ const ConcordanceFeature: React.FC = () => {
                     } else if (showMetadata) {
                       isSortable = true;
                     } else {
-                      const allowed = ['l1','r1','l1_freq','r1_freq','document_idx'];
+                      // When metadata is hidden, keep sorting available for core numeric/index columns.
+                      const allowed = ['document_idx', 'start_idx', 'end_idx', 'l1', 'r1', 'l1_freq', 'r1_freq'];
                       isSortable = allowed.includes(keyLower);
                     }
                     return isSortable ? (
@@ -1713,11 +1731,6 @@ const ConcordanceFeature: React.FC = () => {
                 {results.data && Object.keys(results.data).length > 0 ? (
                   <div className={`grid gap-6 ${viewMode==='combined' ? 'grid-cols-1' : 'grid-cols-1'}`}>
                     {Object.entries(results.data).filter(([k]) => viewMode==='combined' ? k==='__COMBINED__' : k !== '__COMBINED__').map(([nodeName, nodeData]) => {
-                      if (localStorage.getItem('debugConc') === '1') {
-                        console.debug('Trying to match nodeName:', nodeName);
-                        console.debug('Available nodes:', selectedNodes.map(n => ({ id: n.id, name: n.data?.name, nodeName: n.name })));
-                      }
-                      
                       const nodesForDetail = panelSelectedNodes;
                       const keyedOrder = Object.keys(results.data);
                       const approxIndex = keyedOrder.indexOf(nodeName);
@@ -1741,9 +1754,6 @@ const ConcordanceFeature: React.FC = () => {
                       const requestNodeId = resolvedNodeId || nodeName;
                       const selection = effectiveNodeColumnSelections.find(sel => sel.nodeId === resolvedNodeId);
                       const column = selection?.column || '';
-                      if (localStorage.getItem('debugConc') === '1') {
-                        console.debug('Final match - nodeId:', resolvedNodeId, 'column:', column, 'paginationKey:', paginationKey);
-                      }
                       
                       return renderConcordanceTable(nodeName, nodeData, {
                         nodeId: node?.id || '',
