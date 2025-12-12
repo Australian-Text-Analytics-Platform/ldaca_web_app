@@ -49,7 +49,6 @@ export interface AggregateSubTabProps {
   selectedNodeId: string | null;
   selectedNodes: WorkspaceNodeLike[];
   workspaceNodes: WorkspaceNodeLike[];
-  getNodeShape: (nodeId: string) => Promise<{ shape: [number, number]; is_lazy: boolean; calculated: boolean } | null>;
   isLoading: {
     nodeData: boolean;
     graph: boolean;

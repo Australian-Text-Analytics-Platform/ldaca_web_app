@@ -10,7 +10,6 @@ type WorkspaceDataSlice = {
   nodes: WorkspaceInternal['nodes'];
   workspaceGraph: WorkspaceInternal['workspaceGraph'];
   nodeData: WorkspaceInternal['nodeData'];
-  getNodeShape: WorkspaceInternal['getNodeShape'];
 };
 
 type WorkspaceSelectionSlice = {
@@ -52,11 +51,9 @@ export const WorkspaceProvider = ({ children }: WorkspaceProviderProps) => {
     nodes: workspace.nodes,
     workspaceGraph: workspace.workspaceGraph,
     nodeData: workspace.nodeData,
-    getNodeShape: workspace.getNodeShape,
   }), [
     workspace.currentWorkspace,
     workspace.currentWorkspaceId,
-    workspace.getNodeShape,
     workspace.nodeData,
     workspace.nodes,
     workspace.workspaces,

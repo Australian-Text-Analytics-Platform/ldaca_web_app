@@ -5,7 +5,7 @@ from ldaca_web_app_backend.api.workspaces import nodes as nodes_api
 
 class _DummyNode:
     def __init__(self, frame: pl.DataFrame):
-        self.data = frame
+        self.data = frame.lazy()
         self.name = "dummy"
 
 
@@ -82,6 +82,7 @@ async def test_compute_column_apply_mutates_node(authenticated_client, monkeypat
     payload = response.json()
     assert payload["column_name"] == "A_plus_B"
     assert payload["state"] == "successful"
-    assert "A_plus_B" in node.data.columns
-    assert node.data["A_plus_B"].to_list() == [4, 6]
+    collected = node.data.collect()
+    assert "A_plus_B" in collected.columns
+    assert collected["A_plus_B"].to_list() == [4, 6]
     assert persist_calls["count"] == 1

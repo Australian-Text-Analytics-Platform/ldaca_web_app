@@ -28,7 +28,3 @@ export type SidebarWorkspaceNode = {
     [key: string]: unknown;
   };
 };
-
-export type NodeShapeResult = {
-  shape?: [number, number];
-};

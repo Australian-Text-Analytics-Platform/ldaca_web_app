@@ -32,12 +32,11 @@ class NodeSummary(BaseModel):
     id: str
     name: str
     data_type: DataType
-    is_lazy: bool
     operation: Optional[str] = None
-    shape: Optional[tuple[Optional[int], int]] = None
+    shape: tuple[int, int] = (0, 0)
     columns: List[str] = Field(default_factory=list)
     node_schema: List[ColumnSchema] = Field(default_factory=list, alias="schema")
-    document_column: Optional[str] = None
+    document: Optional[str] = None
     parent_ids: List[str] = Field(default_factory=list)
     child_ids: List[str] = Field(default_factory=list)
 

@@ -44,6 +44,11 @@ export const useWorkspaceNodeMutations = ({
     return currentWorkspaceId;
   }, [currentWorkspaceId]);
 
+  const invalidateWorkspaceSummaries = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.workspaces });
+    queryClient.invalidateQueries({ queryKey: queryKeys.currentWorkspace });
+  }, [queryClient]);
+
   const setCurrentWorkspaceMutation = useMutation<any, unknown, string | null, { previousId: string | null }>({
     mutationFn: (workspaceId: string | null) => workspacesApi.current.set(workspaceId, authHeaders),
     onMutate: async (workspaceId: string | null) => {
@@ -210,6 +215,7 @@ export const useWorkspaceNodeMutations = ({
         queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
         queryClient.invalidateQueries({ queryKey: queryKeys.nodeData(currentWorkspaceId, nodeId) });
       }
+      invalidateWorkspaceSummaries();
       endOperation('deleteNode');
     },
     onError: (error: any) => {
@@ -222,20 +228,15 @@ export const useWorkspaceNodeMutations = ({
     mutationFn: ({
       workspaceId,
       filename,
-      mode,
-      documentColumn,
     }: {
       workspaceId: string;
       filename: string;
-      mode?: 'DocLazyFrame' | 'LazyFrame' | 'DocDataFrame' | 'DataFrame';
-      documentColumn?: string | null;
     }) =>
       nodesApi.createFromFile(
         workspaceId,
         filename,
         undefined,
         authHeaders,
-        { mode, document_column: documentColumn ?? undefined }
       ),
     onMutate: () => {
       startOperation('createNode');
@@ -244,6 +245,7 @@ export const useWorkspaceNodeMutations = ({
       if (currentWorkspaceId) {
         queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
       }
+      invalidateWorkspaceSummaries();
       endOperation('createNode');
     },
     onError: (error: any) => {
@@ -494,116 +496,6 @@ export const useWorkspaceNodeMutations = ({
     },
   });
 
-  const convertToDocDataFrameMutation = useMutation({
-    mutationFn: ({ nodeId, documentColumn }: { nodeId: string; documentColumn: string }) =>
-      nodesApi.convert(ensureWorkspaceSelected(), nodeId, 'docdataframe', documentColumn, authHeaders),
-    onMutate: () => startOperation('convertToDocDataFrame'),
-    onSuccess: (_data, variables) => {
-      if (currentWorkspaceId && variables?.nodeId) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
-        queryClient.invalidateQueries({ queryKey: queryKeys.nodeData(currentWorkspaceId, variables.nodeId) });
-        queryClient.invalidateQueries({ queryKey: queryKeys.nodeSchema(currentWorkspaceId, variables.nodeId) });
-      }
-      endOperation('convertToDocDataFrame');
-    },
-    onError: (error: any) => {
-      setOperationError('convertToDocDataFrame', error.message);
-      endOperation('convertToDocDataFrame');
-    },
-  });
-
-  const convertToDataFrameMutation = useMutation({
-    mutationFn: ({ nodeId }: { nodeId: string }) =>
-      nodesApi.convert(ensureWorkspaceSelected(), nodeId, 'dataframe', undefined, authHeaders),
-    onMutate: () => startOperation('convertToDataFrame'),
-    onSuccess: (_data, variables) => {
-      if (currentWorkspaceId && variables?.nodeId) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
-        queryClient.invalidateQueries({ queryKey: queryKeys.nodeData(currentWorkspaceId, variables.nodeId) });
-        queryClient.invalidateQueries({ queryKey: queryKeys.nodeSchema(currentWorkspaceId, variables.nodeId) });
-      }
-      endOperation('convertToDataFrame');
-    },
-    onError: (error: any) => {
-      setOperationError('convertToDataFrame', error.message);
-      endOperation('convertToDataFrame');
-    },
-  });
-
-  const convertToDocLazyFrameMutation = useMutation({
-    mutationFn: ({ nodeId, documentColumn }: { nodeId: string; documentColumn: string }) =>
-      nodesApi.convert(ensureWorkspaceSelected(), nodeId, 'doclazyframe', documentColumn, authHeaders),
-    onMutate: () => startOperation('convertToDocLazyFrame'),
-    onSuccess: (_data, variables) => {
-      if (currentWorkspaceId && variables?.nodeId) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
-        queryClient.invalidateQueries({ queryKey: queryKeys.nodeData(currentWorkspaceId, variables.nodeId) });
-        queryClient.invalidateQueries({ queryKey: queryKeys.nodeSchema(currentWorkspaceId, variables.nodeId) });
-      }
-      endOperation('convertToDocLazyFrame');
-    },
-    onError: (error: any) => {
-      setOperationError('convertToDocLazyFrame', error.message);
-      endOperation('convertToDocLazyFrame');
-    },
-  });
-
-  const convertToLazyFrameMutation = useMutation({
-    mutationFn: ({ nodeId }: { nodeId: string }) =>
-      nodesApi.convert(ensureWorkspaceSelected(), nodeId, 'lazyframe', undefined, authHeaders),
-    onMutate: () => startOperation('convertToLazyFrame'),
-    onSuccess: (_data, variables) => {
-      if (currentWorkspaceId && variables?.nodeId) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
-        queryClient.invalidateQueries({ queryKey: queryKeys.nodeData(currentWorkspaceId, variables.nodeId) });
-        queryClient.invalidateQueries({ queryKey: queryKeys.nodeSchema(currentWorkspaceId, variables.nodeId) });
-      }
-      endOperation('convertToLazyFrame');
-    },
-    onError: (error: any) => {
-      setOperationError('convertToLazyFrame', error.message);
-      endOperation('convertToLazyFrame');
-    },
-  });
-
-  const resetDocumentColumnMutation = useMutation({
-    mutationFn: ({ nodeId, documentColumn }: { nodeId: string; documentColumn?: string }) =>
-      nodesApi.resetDocument(ensureWorkspaceSelected(), nodeId, documentColumn, authHeaders),
-    onMutate: async ({ nodeId, documentColumn }) => {
-      startOperation('resetDocumentColumn');
-      if (!currentWorkspaceId) return;
-      await queryClient.cancelQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
-      const previous = queryClient.getQueryData(queryKeys.workspaceGraph(currentWorkspaceId));
-      queryClient.setQueryData(queryKeys.workspaceGraph(currentWorkspaceId), (old: any) => {
-        if (!old?.nodes) return old;
-        return {
-          ...old,
-          nodes: old.nodes.map((node: any) =>
-            node.id === nodeId
-              ? { ...node, data: { ...node.data, documentColumn: documentColumn || node.data?.documentColumn } }
-              : node
-          ),
-        };
-      });
-      return { previous };
-    },
-    onSuccess: (_data, variables) => {
-      if (currentWorkspaceId && variables?.nodeId) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
-        queryClient.invalidateQueries({ queryKey: queryKeys.nodeData(currentWorkspaceId, variables.nodeId) });
-        queryClient.invalidateQueries({ queryKey: queryKeys.nodeSchema(currentWorkspaceId, variables.nodeId) });
-      }
-      endOperation('resetDocumentColumn');
-    },
-    onError: (error: any, _vars, context: any) => {
-      setOperationError('resetDocumentColumn', error.message);
-      if (context?.previous && currentWorkspaceId) {
-        queryClient.setQueryData(queryKeys.workspaceGraph(currentWorkspaceId), context.previous);
-      }
-      endOperation('resetDocumentColumn');
-    },
-  });
-
   const actions = useMemo(() => ({
     setCurrentWorkspace: (workspaceId: string | null) => setCurrentWorkspaceMutation.mutate(workspaceId),
     createWorkspace: (name: string, description?: string) => createWorkspaceMutation.mutateAsync({ name, description }),
@@ -615,15 +507,10 @@ export const useWorkspaceNodeMutations = ({
       renameNodeMutation.mutateAsync({ workspaceId: ensureWorkspaceSelected(), nodeId, newName }),
     deleteNode: (nodeId: string) =>
       deleteNodeMutation.mutateAsync({ workspaceId: ensureWorkspaceSelected(), nodeId }),
-    createNodeFromFile: (
-      filename: string,
-      opts?: { mode?: 'DocLazyFrame' | 'LazyFrame' | 'DocDataFrame' | 'DataFrame'; documentColumn?: string | null }
-    ) =>
+    createNodeFromFile: (filename: string) =>
       createNodeMutation.mutateAsync({
         workspaceId: ensureWorkspaceSelected(),
         filename,
-        mode: opts?.mode,
-        documentColumn: opts?.documentColumn,
       }),
     joinNodes: (
       leftNodeId: string,
@@ -663,14 +550,6 @@ export const useWorkspaceNodeMutations = ({
     renameColumn: (nodeId: string, column: string, newName: string) =>
       renameColumnMutation.mutateAsync({ nodeId, column, newName }),
     deleteColumn: (nodeId: string, column: string) => deleteColumnMutation.mutateAsync({ nodeId, column }),
-    convertToDocDataFrame: (nodeId: string, documentColumn: string) =>
-      convertToDocDataFrameMutation.mutateAsync({ nodeId, documentColumn }),
-    convertToDataFrame: (nodeId: string) => convertToDataFrameMutation.mutateAsync({ nodeId }),
-    convertToDocLazyFrame: (nodeId: string, documentColumn: string) =>
-      convertToDocLazyFrameMutation.mutateAsync({ nodeId, documentColumn }),
-    convertToLazyFrame: (nodeId: string) => convertToLazyFrameMutation.mutateAsync({ nodeId }),
-    resetDocumentColumn: (nodeId: string, documentColumn?: string) =>
-      resetDocumentColumnMutation.mutateAsync({ nodeId, documentColumn }),
     refreshNodeSchema: async (nodeId: string): Promise<NodeSchemaResponse | null> => {
       if (!currentWorkspaceId) return null;
       const graphData = queryClient.getQueryData(queryKeys.workspaceGraph(currentWorkspaceId)) as any;
@@ -702,10 +581,6 @@ export const useWorkspaceNodeMutations = ({
     authHeaders,
     castNodeMutation,
     concatNodesMutation,
-    convertToDataFrameMutation,
-    convertToDocDataFrameMutation,
-    convertToDocLazyFrameMutation,
-    convertToLazyFrameMutation,
     createNodeMutation,
     createWorkspaceMutation,
     currentWorkspaceId,
@@ -717,7 +592,6 @@ export const useWorkspaceNodeMutations = ({
     queryClient,
     renameColumnMutation,
     renameNodeMutation,
-    resetDocumentColumnMutation,
     saveWorkspaceAsMutation,
     saveWorkspaceMutation,
     setCurrentWorkspaceMutation,

@@ -19,7 +19,8 @@ class TestWorkspaceAPI:
         ) as mock_get:
             mock_get.return_value = {}
             response = await authenticated_client.get("/api/workspaces/")
-            assert response.status_code == 200
+            if response.status_code != 200:
+                pytest.fail(response.text)
             data = response.json()
             assert data["workspaces"] == []
 
@@ -60,6 +61,7 @@ class TestWorkspaceAPI:
             "created_at": "2024-01-01T00:00:00Z",
             "modified_at": "2024-01-01T00:00:00Z",
         }.get(key, "")
+        mock_workspace.id = "new-workspace-123"
 
         # Mock workspace_manager methods for create flow
         with (
@@ -120,6 +122,31 @@ class TestWorkspaceAPI:
             assert data["workspace_id"] == "workspace-123"
             assert data["name"] == "Test Workspace"
             assert data["total_nodes"] == 5  # Latest docworkspace terminology
+
+    async def test_get_node_data_handles_lazy_relative_paths(
+        self,
+        authenticated_client,
+        workspace_id,
+        tiny_node_id,
+    ):
+        """Fetch node data to ensure lazy plans with relative parquet paths resolve."""
+
+        # Page through the node's data
+        resp = await authenticated_client.get(
+            f"/api/workspaces/{workspace_id}/nodes/{tiny_node_id}/data",
+            params={"page": 1, "page_size": 5},
+        )
+
+        assert resp.status_code == 200, resp.text
+        payload = resp.json()
+
+        assert "data" in payload and isinstance(payload["data"], list)
+        assert len(payload["data"]) > 0
+        assert "columns" in payload
+        # Ensure pagination metadata present
+        pagination = payload.get("pagination", {})
+        assert pagination.get("page") == 1
+        assert pagination.get("page_size") == 5
 
     async def test_get_workspace_not_found(self, authenticated_client):
         """Test getting non-existent workspace"""
@@ -212,7 +239,6 @@ class TestWorkspaceAPI:
             mock_node.info.return_value = {
                 "id": "uploaded-node-123",
                 "name": "test_data",
-                "dtype": "polars.DataFrame",
                 "shape": (3, 3),
                 "lazy": False,
                 "columns": ["id", "name", "content"],
@@ -272,7 +298,7 @@ class TestWorkspaceAPI:
             "created_at": ["2024-01-01T10:30:15", "2024-01-02T14:45:30"],
             "name": ["Alice", "Bob"],
         })
-        mock_node.data = test_df
+        mock_node.data = test_df.lazy()
 
         with (
             patch(
@@ -340,7 +366,7 @@ class TestWorkspaceAPI:
         import polars as pl
 
         mock_node = Mock()
-        mock_node.data = pl.DataFrame({"existing_col": [1, 2, 3]})
+        mock_node.data = pl.DataFrame({"existing_col": [1, 2, 3]}).lazy()
 
         with patch(
             "ldaca_web_app_backend.api.workspaces.workspace_manager.get_node_from_workspace"
@@ -420,6 +446,48 @@ class TestWorkspaceAPI:
             assert response_data.get("state") == "successful"
             assert response_data["cast_info"]["column"] == "created_at"
 
+    async def test_cast_node_doclazy_preserves_document_column(
+        self, authenticated_client
+    ):
+        """DocLazyFrame nodes remain DocLazyFrame and keep their document column after casting."""
+        import polars as pl
+
+        docframe = pytest.importorskip("docframe")
+        DocLazyFrame = docframe.DocLazyFrame  # type: ignore[attr-defined]
+
+        mock_node = Mock()
+        lazy_data = pl.DataFrame({
+            "text": ["doc one", "doc two"],
+            "score": ["1", "2"],
+        }).lazy()
+        mock_node.data = DocLazyFrame(lazy_data, document_column="text")  # type: ignore[arg-type]
+
+        with (
+            patch(
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_node_from_workspace"
+            ) as mock_get_node,
+            patch(
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.persist"
+            ) as mock_save,
+            patch(
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_workspace"
+            ) as mock_get_workspace,
+        ):
+            mock_get_node.return_value = mock_node
+            mock_get_workspace.return_value = Mock()
+
+            cast_data = {"column": "score", "target_type": "integer"}
+            response = await authenticated_client.post(
+                "/api/workspaces/test-workspace/nodes/test-node/cast", json=cast_data
+            )
+
+            assert response.status_code == 200
+            payload = response.json()
+            assert payload.get("state") == "successful"
+            assert isinstance(mock_node.data, DocLazyFrame)
+            assert mock_node.data.document_column == "text"
+            mock_save.assert_called_once()
+
     async def test_cast_node_datetime_to_string(self, authenticated_client):
         """Test casting datetime column to string"""
         from datetime import datetime
@@ -434,7 +502,7 @@ class TestWorkspaceAPI:
             ],
             "name": ["Alice", "Bob"],
         })
-        mock_node.data = test_df
+        mock_node.data = test_df.lazy()
 
         with (
             patch(
@@ -465,7 +533,7 @@ class TestWorkspaceAPI:
         import polars as pl
 
         mock_node = Mock()
-        mock_node.data = pl.DataFrame({"test_col": ["1", "2", "3"]})
+        mock_node.data = pl.DataFrame({"test_col": ["1", "2", "3"]}).lazy()
 
         with (
             patch(
@@ -500,7 +568,7 @@ class TestWorkspaceAPI:
         import polars as pl
 
         mock_node = Mock()
-        mock_node.data = pl.DataFrame({"test_col": ["1.5", "2.7", "3.14"]})
+        mock_node.data = pl.DataFrame({"test_col": ["1.5", "2.7", "3.14"]}).lazy()
 
         with (
             patch(
@@ -526,7 +594,7 @@ class TestWorkspaceAPI:
         import polars as pl
 
         mock_node = Mock()
-        mock_node.data = pl.DataFrame({"label": ["A", "B", "A"]})
+        mock_node.data = pl.DataFrame({"label": ["A", "B", "A"]}).lazy()
 
         with (
             patch(
@@ -554,7 +622,7 @@ class TestWorkspaceAPI:
         """Unique values endpoint returns all values and null metadata"""
         import polars as pl
 
-        source_df = pl.DataFrame({"category": ["alpha", "beta", "alpha", None]})
+        source_df = pl.DataFrame({"category": ["alpha", "beta", "alpha", None]}).lazy()
 
         class DummyNode:
             def __init__(self):
@@ -581,7 +649,7 @@ class TestWorkspaceAPI:
         import polars as pl
 
         mock_node = Mock()
-        mock_node.data = pl.DataFrame({"test_col": [1, 2, 3]})
+        mock_node.data = pl.DataFrame({"test_col": [1, 2, 3]}).lazy()
 
         with patch(
             "ldaca_web_app_backend.api.workspaces.workspace_manager.get_node_from_workspace"
@@ -605,14 +673,14 @@ class TestWorkspaceAPI:
         left_node.data = pl.DataFrame({
             "username": ["alice", "bob"],
             "left_data": [1, 2],
-        })
+        }).lazy()
         left_node.name = "left_node"
 
         right_node = Mock()
         right_node.data = pl.DataFrame({
             "username": ["alice", "bob"],
             "right_data": [10, 20],
-        })
+        }).lazy()
         right_node.name = "right_node"
 
         # Mock joined result node
@@ -677,3 +745,62 @@ class TestWorkspaceAPI:
         # Should get FastAPI validation error
         assert response.status_code == 422
         assert "field required" in response.json()["detail"][0]["msg"].lower()
+
+    async def test_join_preview_handles_absolute_paths(
+        self, authenticated_client, tmp_path
+    ):
+        """Join preview should work without relying on workspace cwd hacks."""
+
+        import polars as pl
+
+        workspace_dir = tmp_path / "workspace"
+        data_dir = workspace_dir / "data"
+        data_dir.mkdir(parents=True)
+
+        left_df = pl.DataFrame({"user_id": [1, 2], "left_value": ["a", "b"]})
+        right_df = pl.DataFrame({"user_id": [1, 2], "right_value": [10, 20]})
+
+        left_df.write_parquet(data_dir / "left.parquet")
+        right_df.write_parquet(data_dir / "right.parquet")
+
+        left_lazy = pl.scan_parquet(data_dir / "left.parquet")
+        right_lazy = pl.scan_parquet(data_dir / "right.parquet")
+
+        class DummyNode:
+            def __init__(self, data, name):
+                self.data = data
+                self.name = name
+
+        left_node = DummyNode(left_lazy, "left_node")
+        right_node = DummyNode(right_lazy, "right_node")
+
+        with patch(
+            "ldaca_web_app_backend.api.workspaces.workspace_manager.get_node_from_workspace"
+        ) as mock_get_node:
+
+            def _side_effect(_, __, node_id):
+                if node_id == "left-node-id":
+                    return left_node
+                if node_id == "right-node-id":
+                    return right_node
+                return None
+
+            mock_get_node.side_effect = _side_effect
+
+            response = await authenticated_client.post(
+                "/api/workspaces/test-workspace/nodes/join/preview",
+                params={
+                    "left_node_id": "left-node-id",
+                    "right_node_id": "right-node-id",
+                    "left_on": "user_id",
+                    "right_on": "user_id",
+                    "how": "inner",
+                    "page": 1,
+                    "page_size": 5,
+                },
+            )
+
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        assert payload["pagination"]["total_rows"] == 2
+        assert [row["left_value"] for row in payload["data"]] == ["a", "b"]

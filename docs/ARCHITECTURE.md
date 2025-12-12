@@ -36,7 +36,7 @@ The LDaCA (Language Data Commons of Australia) Web Application is a full-stack t
                                │
                                │ HTTP/JSON (REST API)
                                ├──────────────────────────────────┐
-                               │                                  │
+                              # Node will automatically support CustomDataFrame via __getattr__ delegation.
 ┌──────────────────────────────▼────────┐  ┌──────────────────────▼──────┐
 │      Backend (FastAPI)                │  │    Authentication           │
 │  - Routers (workspaces, files, text) │  │  - Google OAuth (optional)  │
@@ -82,6 +82,16 @@ The LDaCA (Language Data Commons of Australia) Web Application is a full-stack t
 
 **Purpose**: Graph-based data management library tracking DataFrame transformations as nodes with parent-child relationships.
 
+#### Workspace persistence (folder-per-workspace)
+
+- **Location**: `DATA_ROOT/users/<user>/user_workspaces/<display_folder>/metadata.json`
+- **Display folder naming**: derived from the workspace name (sanitized), with suffixes `_1`, `_2`, ... on collisions; the folder name is discoverability-only—the canonical `id` and `name` live in `metadata.json`.
+- **Metadata envelope** (`metadata.json`):
+  - `workspace_metadata`: `{ id, name, version, description, created_at, modified_at }`
+  - `nodes`: array of `{ node_metadata: { id, name, operation, data_type, document_column, parents }, serialized_data }`
+    - `serialized_data` is the JSON payload emitted by Polars/DocFrame `serialize(format="json")`. Node payloads are fully inlined—no auxiliary `data/` folder or relative paths remain.
+- **Import/Export**: lifecycle endpoints operate on `metadata.json` inside the workspace folder; legacy single-file `workspace_<id>.json` persistence has been removed.
+
 #### Core Classes
 
 ##### `Node` (`node/core.py`)
@@ -89,11 +99,12 @@ The LDaCA (Language Data Commons of Australia) Web Application is a full-stack t
 **Purpose**: Wraps DataFrames/LazyFrames with relationship tracking and transparent method delegation.
 
 **Key Features**:
-- **Data Wrapping**: Supports pl.DataFrame, pl.LazyFrame, DocDataFrame, DocLazyFrame
+- **Data Wrapping**: Accepts pl.DataFrame, pl.LazyFrame, DocDataFrame, DocLazyFrame inputs but immediately normalizes them to LazyFrame/DocLazyFrame so every stored node remains lazy.
+- **Lazy Contract Enforcement**: Backend helpers (`drop_column`, `rename_column`, `cast`, etc.) assume lazy inputs and now raise when eager frames slip through, so violations surface close to the API edge.
 - **Transparent Operations**: All DataFrame methods work directly (`node.filter()`, `node.select()`, etc.)
 - **Automatic Relationship Tracking**: Operations create child nodes and link parents
 - **Lazy Preservation**: Maintains laziness for performance optimization
-- **Metadata Storage**: Tracks operation descriptions, custom metadata
+- **Metadata Storage**: Tracks operation descriptions
 
 **Implementation**:
 - Uses `__getattr__` delegation to forward method calls to underlying data
@@ -108,8 +119,7 @@ The LDaCA (Language Data Commons of Australia) Web Application is a full-stack t
   - **Implementation**: Delegates to `data.select()`, preserves lazy if applicable
 - `join(other_node, on, how)`: Joins with another node, creates child with TWO parents
   - **Implementation**: Extracts data from both nodes, calls `data.join()`, links both as parents
-- `collect()`: Materializes lazy frame to eager frame
-  - **Implementation**: Calls `data.collect()`, wraps in new Node, marks as non-lazy
+- `materialize()`: Explicitly collects the underlying lazy frame and re-wraps it as LazyFrame/DocLazyFrame so downstream callers can inspect persisted data while keeping the node lazy afterward.
 - `info()`: Returns node metadata (id, name, dtype, shape, schema, parents, children)
   - **Implementation**: Extracts schema using `data.schema` (Polars) or `data.collect_schema()` (LazyFrame)
 
@@ -306,6 +316,8 @@ Frontend stores token, includes in Authorization header
 
 **Purpose**: CRUD operations for workspaces and nodes, plus text analysis.
 
+**Routing note**: Only the `/api/...` prefixed routes are exposed. The older prefix-less workspace router that mirrored the same paths has been removed, so desktop and web clients should always call the `/api` versions documented below.
+
 **base.py** - Workspace Management:
 - `POST /api/workspaces`: Create workspace
   - **Implementation**: Creates `Workspace(name)`, persists via `WorkspaceManager.persist()`
@@ -330,9 +342,22 @@ Frontend stores token, includes in Authorization header
 - `GET /api/workspaces/{workspace_id}/nodes/{node_id}/data`: Get node data (paginated)
   - **Implementation**: Uses `DocWorkspaceAPIUtils.get_paginated_data()`, materializes if lazy
 
+**Helper – `stage_dataframe_as_lazy` (`api/workspaces/utils.py`)**
+- **Question**: How do derived analyses (concordance detach, quotes, etc.) stay lazy after we persist them?  
+  **Answer**: Every detach path funnels through `stage_dataframe_as_lazy(data, workspace_dir, node_name, document_column)` which writes a parquet file under `<workspace>/data/`, reopens it via `pl.scan_parquet`, and wraps the result in a `DocLazyFrame` whenever a document column is known.
+- **Key steps**:
+  1. Sanitize the node name into a safe filename and persist the eager Polars DataFrame.
+  2. Reload the newly written parquet using its absolute path (no working-directory swapping required) so every lazy plan keeps a fully qualified reference to the file on disk.
+  3. Wrap the lazy scan in `DocLazyFrame(document_column=...)` twice (before and after docframe import) to guarantee DocLazyFrame propagation even if schema resolution needs a retry.
+- **Result**: Any API that stages data (file uploads, concordance detach, quotation clips) now hands the workspace graph a proper DocLazyFrame, so downstream analyses automatically inherit the `document_column` metadata without collecting.
+
 **analysis.py** - Text Analysis:
 - `POST /api/workspaces/{workspace_id}/analysis/token-frequencies`: Compute token frequencies
-  - **Implementation**: Calls `compute_token_frequencies()` from docframe, stores result, returns analysis ID
+  - **Implementation**:
+    - Resolves the workspace folder, but no longer needs to chdir into it because all staged nodes now embed absolute parquet paths inside their lazy plans.
+    - Normalizes requested stop words via `_sanitize_stop_words()` but purposefully passes `stop_words=None` to `compute_token_frequencies()`. This keeps the persisted vocabulary untouched while the UI applies stop-word filters purely as a presentation preference.
+    - Ensures each node is converted to a `DocLazyFrame` via `_prepare_doclazy_frame()` before handing it to docframe so document columns are recorded back on the node for future analyses.
+    - Persists the request/result pair with `save_analysis()` exactly as before so “Current request/result” endpoints keep restoring the last-used limits.
 - `POST /api/workspaces/{workspace_id}/analysis/concordance`: Extract concordances
   - **Implementation**: Calls `node.data.select(pl.col(column).text.concordance(...))`, returns results
 - `POST /api/workspaces/{workspace_id}/analysis/topic-modeling`: Run topic modeling
@@ -348,6 +373,8 @@ Frontend stores token, includes in Authorization header
 
 - `convert_node_info_for_api(node)`: Converts node.info() to JSON-safe format
   - **Implementation**: Gets raw `node.info()`, converts schema to JS types, stringifies dtype
+  - **Question**: How does the frontend learn whether a node is lazy?  
+    **Answer**: `docworkspace.Node.info()` now emits a `lazy: bool` flag by inspecting whether the backing object is a `pl.LazyFrame` or `DocLazyFrame`. `convert_node_info_for_api` simply passes it through so React Query can badge nodes without collecting them first.
   - **Type conversion**: `pl.Int64` → `"Int64"`, `pl.Utf8` → `"String"`, etc.
   
 - `workspace_to_react_flow(workspace, layout_algorithm='grid')`: Converts workspace to React Flow format
@@ -357,9 +384,18 @@ Frontend stores token, includes in Authorization header
     3. Iterate parent relationships, create `ReactFlowEdge` for each (source=parent.id, target=node.id)
     4. Return `WorkspaceGraph(nodes, edges, workspace_info)`
   - **Layout algorithms**: grid (rows/columns), vertical (top-down), horizontal (left-right), circular
+  - **Shape source**: Each node’s `data.shape` is populated via `compute_node_shape`, so every consumer (React Flow cards, sidebar hovercards, selection panels) reads the same precomputed tuple.
+
+- `compute_node_shape(node)`: Centralized helper for reporting `(rows, columns)` and doc-wrapper metadata
+  - **Implementation**:
+    1. If the node wraps a DocFrame object, prefer its cached `shape`/`is_doc_wrapper` fields without collecting.
+    2. For lazy frames, run `node.len()` defensively to estimate rows without materializing columns.
+    3. Fall back to eager `frame.shape` or `[len(columns), len(schema)]` when upstream metadata is missing.
+    4. Return `{ shape: [rows, cols], calculated: bool, doc_wrapper: bool }` so API callers can differentiate inferred vs. authoritative sizes.
+  - **Usage**: `node_to_summary`, the workspace graph serializer, and the `/nodes/{id}/shape` endpoint all call this helper, ensuring every surface reports the same numbers without extra per-node endpoints.
   
 - `node_to_summary(node)`: Creates NodeSummary for API responses
-  - **Implementation**: Extracts id, name, dtype, shape, columns, schema
+  - **Implementation**: Extracts id, name, dtype, columns, schema, plus the shared `compute_node_shape` payload
   - **Handles lazy**: For lazy frames, uses `collect_schema()` to avoid materialization
   
 - `get_paginated_data(node, page=1, page_size=100)`: Paginates node data
@@ -729,6 +765,7 @@ WorkspaceManager._analysis_state = {
 - `POST /sequential-analysis/current-result`:
   - **Body**: Chart metadata overrides (currently `chart_type`), plus optional summary snippets consumed by the UI.
   - Reads the stored result from `analysis_store`, applies metadata update, and re-saves so subsequent GET calls reflect the new chart selection.
+  - Records are stored under the canonical task name `sequential_analysis` only; legacy `frequency_analysis` aliases are no longer queried or cleared.
 
 **Topic Modeling** (`api/workspaces/analyses/topic_modeling.py`):
 
@@ -852,6 +889,8 @@ This section provides comprehensive documentation of every backend file and its 
 
 **Key Functions**:
 - `convert_node_info_for_api(node)`: Node → NodeSummary dict
+  - **Question**: What extra metadata ships with each node summary now?  
+    **Answer**: Alongside schema, dtype, and lineage, the helper forwards the raw `lazy` boolean emitted by `node.info()`, enabling the frontend to badge “Lazy” nodes without materializing them.
 - `workspace_to_react_flow(workspace, layout_algorithm)`: Workspace → WorkspaceGraph
 - `node_to_summary(node)`: Node → NodeSummary Pydantic model
 - `get_paginated_data(node, page, page_size)`: Paginated node data
@@ -1187,7 +1226,8 @@ Like concordance, the clear endpoint returns a `cleared` summary with `analyses_
 **Endpoints**:
 
 - `POST /{workspace_id}/quotation`: Extract quotations
-  - **Implementation**: Materialises the target node into a Polars `DataFrame`, feeds it into `_compute_quote_dataframe()`, joins the exploded quotation rows back to the original metadata, and persists the response envelope to `analysis_store`. The local engine path delegates to DocFrame's `text.quotation()` and mirrors the legacy explode/unnest behaviour, while the remote engine path streams batches through `_extract_remote_paginated()` so that the external service limit defined by `settings.quotation_service_max_batch_size` is honoured before pagination.
+  - **Implementation**: Materialises the target node into a Polars `DataFrame`, slices only the requested document page, feeds that slice into `_compute_quote_dataframe()` (local engines delegate to DocFrame's `text.quotation()`, remote engines batch the slice through `_extract_remote_paginated()`), joins the exploded quotation rows back to the sliced metadata, and persists only the current page envelope to `analysis_store`. Each request recomputes the slice on demand—no cached rows are stored or reused across requests.
+- `POST /{workspace_id}/nodes/{node_id}/quotation/detach`: Join exploded quotation rows with the source table and persist as a new node. The handler reuses `_build_joined_quotation_frames()` to materialise the current data on demand and skips all caching layers so detach always reflects the latest node contents.
 - `GET /{workspace_id}/quotation/current-request`: Get last request
 - `GET /{workspace_id}/quotation/current-result`: Get last result
 - `POST /{workspace_id}/quotation/current-result`: Update cached display preferences (currently only `context_length`) without recomputing quotations. The handler merges `{ "preferences": { "context_length": <int> } }` into the stored result entry after clamping values to 2,000 words.
@@ -1332,13 +1372,13 @@ Because the graph is no longer the “global selection source”, other surfaces
 **Purpose**: Provide a tri-section sidebar (Views, Nodes, Tasks) that mirrors workspace selection, exposes navigation, and surfaces long-running analysis jobs. The component consumes WorkspaceProvider slices exactly like the graph, so the two stay synchronized without bespoke props.
 
 **Key Pieces**:
-- `SidebarNodesSection` receives `nodes`, `selectedNodeIds`, and `onToggleNodeSelection` props. Toggling a checkbox simply calls `useWorkspaceActions().toggleNodeSelection`, which writes into `selectionStore`. Hover cards fetch shapes lazily via `getNodeShape` (cached in `sessionStorage`) so the UI can show “rows × cols” without prefetching every node.
+- `SidebarNodesSection` receives `nodes`, `selectedNodeIds`, and `onToggleNodeSelection` props. Toggling a checkbox simply calls `useWorkspaceActions().toggleNodeSelection`, which writes into `selectionStore`. Node metadata already ships with `data.shape` thanks to `DocWorkspaceAPIUtils.compute_node_shape`, so hover cards format the tuple directly—no extra fetches or sessionStorage cache required.
 - `SidebarTasksSection` reads `tasks` from `analysisStore` (populated by the feature-scoped task inbox) and offers Cancel/Clear buttons that call the workspace task endpoints. Connection pills reflect the status returned by `useWorkspaceTaskStream` (the compatibility hook built on `useWorkspaceTaskInbox`), so the UI still shows `connecting`, `open`, and `error` states even though the underlying SSE client now lives in `src/features/workspace/task-stream`.
 - The Views list reflects `useUIStore().currentView` so selecting “Token Frequency” or “Topic Modeling” updates the same store that the tab router consumes.
 
 **Data/Task Wiring**:
 ```tsx
-const { workspaceGraph, currentWorkspaceId, getNodeShape } = useWorkspaceData();
+const { workspaceGraph, currentWorkspaceId } = useWorkspaceData();
 const { selectedNodeIds } = useWorkspaceSelection();
 const { toggleNodeSelection } = useWorkspaceActions();
 const { tasks, setTasks } = useAnalysisStore();
@@ -1348,7 +1388,6 @@ const taskStream = useWorkspaceTaskStream(currentWorkspaceId);
   nodes={(workspaceGraph?.nodes ?? []) as SidebarWorkspaceNode[]}
   selectedNodeIds={selectedNodeIds}
   onToggleNodeSelection={toggleNodeSelection}
-  getNodeShape={getNodeShape}
 />
 
 <SidebarTasksSection
@@ -1524,7 +1563,7 @@ All of the above are re-exported through `common/index.ts`, so analysis tabs onl
 1. *Pick an active workspace* – the component pulls `{ workspaces, currentWorkspaceId, workspaceGraph }` from `useWorkspaceData()` and mirrors the selection via `useWorkspaceActions().setCurrentWorkspace`. The summary card also surfaces node counts (`workspaceGraph?.nodes.length`) plus created/modified timestamps so learners can tell which workspace they’re editing.
 2. *Manage workspace metadata* – rename/save/save-as buttons call the memoized workspace mutations (`renameWorkspace`, `saveWorkspace`, `saveWorkspaceAs`) that live inside `useWorkspaceNodeMutations`. The “Create workspace” form simply forwards the name/description to `createWorkspace`, while delete buttons call `deleteWorkspace(workspaceId)` after a confirmation prompt.
 3. *Upload and inspect files* – `useFiles({ authHeaders })` drives the file table, leveraging the existing TanStack Query cache for `/files/`. Uploads flow through `handleUploadFile`, deletes though `handleDeleteFile`, downloads via `handleDownloadFile`, and “Import sample data” is wired straight to `filesApi.importSampleData`. The component renders `FilePreviewPanel` and `AddFilePanel` as dialogs so learners can preview/inspect a file before adding it to the workspace.
-4. *Add a file to the active workspace* – when the learner clicks **Add**, the component opens `AddFilePanel` and, on confirmation, dispatches `createNodeFromFile(filename, { mode, documentColumn })`. Success and failure states feed a single `statusMessage` banner, giving immediate feedback without exposing implementation details.
+4. *Add a file to the active workspace* – when the learner clicks **Add**, the component opens `AddFilePanel` and, on confirmation, dispatches `createNodeFromFile(filename)`. The backend now stages every upload as a DocLazyFrame (document columns are inferred server-side), so the dialog simply handles sheet selection and confirmation. Success and failure states feed a single `statusMessage` banner, giving immediate feedback without exposing implementation details.
 
 **Implementation Highlights**:
 - Uses lightweight helpers (`formatBytes`, `formatTimestamp`) so the file table can display human-readable metadata without reformatting on every render.
@@ -1552,11 +1591,11 @@ const [addFileName, setAddFileName] = useState<string | null>(null);
   filename={addFileName}
   open={Boolean(addFileName)}
   onClose={() => setAddFileName(null)}
-  onConfirm={(options) => workspaceActions.createNodeFromFile(addFileName!, options)}
+  onConfirm={() => workspaceActions.createNodeFromFile(addFileName!)}
 />
 ```
 
-That snippet shows the same “question → answer” rhythm used in tutorials: once the learner clicks **Add**, the dialog gathers DocFrame mode + document column and then calls `createNodeFromFile`. The surrounding status banner reports whether the mutation succeeded so students know when it’s safe to switch into the preprocessing or analysis tabs.
+That snippet shows the same “question → answer” rhythm used in tutorials: once the learner clicks **Add**, the dialog double-checks the sheet/preview and then calls `createNodeFromFile`. The surrounding status banner reports whether the mutation succeeded so students know when it’s safe to switch into the preprocessing or analysis tabs.
 
 ##### API Client (`api/client.ts`)
 
@@ -1610,7 +1649,7 @@ client.interceptors.request.use(config => {
 **Purpose**: Split the 1.2k-line monolith into focused hooks while keeping `WorkspaceProvider` the single wiring point. `useWorkspaceInternal()` now composes:
 
 - `useWorkspaceCore.ts` – owns auth headers, the current workspace id, selection/pagination helpers (via Zustand selectors), and UI operation bookkeeping. It exposes memoized setters (`handlePageChange`, `handlePageSizeChange`) plus normalized loading/error maps.
-- `useWorkspaceQueries.ts` – runs every TanStack Query fetch (workspaces list, current workspace, graph, node data, node shape cache) using the data provided by `useWorkspaceCore`. Returns derived arrays like `nodes`, `selectedNode`, `selectedNodes`, and aggregated loading/error objects.
+- `useWorkspaceQueries.ts` – runs every TanStack Query fetch (workspaces list, current workspace, graph + per-node metadata, node data) using the data provided by `useWorkspaceCore`. Because the graph response already includes `data.shape`, there is no standalone “node shape” cache anymore. Returns derived arrays like `nodes`, `selectedNode`, `selectedNodes`, and aggregated loading/error objects.
 - `useWorkspaceNodeMutations.ts` – encapsulates workspace/node mutations and their invalidation/configuration logic (workspace CRUD, joins, casts, conversions, schema refresh, etc.). It expects the state setters from `useWorkspaceCore`, so selection clears and pagination resets stay centralized.
 - `useWorkspaceInternal.ts` – stitches the three hooks together, adds the text-task mutations (concordance/quotation) plus selection helpers, and exports the same `{ data, selection, actions, status }` slices that `WorkspaceProvider` already exposes.
 
@@ -1961,7 +2000,7 @@ The workspace screen is now implemented using feature-scoped modules under `fron
 
 #### Data View (`features/workspace/data-view`)
 
-- **Hook – `useWorkspaceDataTable`**: Centralizes every selector for the data table (selected node metadata, TanStack Table pagination handlers, mutation callbacks). The hook also tracks tab ordering for multi-selection and pulls actual shapes on-demand via `getNodeShape`.
+- **Hook – `useWorkspaceDataTable`**: Centralizes every selector for the data table (selected node metadata, TanStack Table pagination handlers, mutation callbacks). The hook also tracks tab ordering for multi-selection and formats shapes straight from `node.data.shape`, which is already present on every workspace graph node.
 - **Services – `services/schemaMutations.ts`**: Pure helpers that normalize type names, manage column mutation payloads, and keep table metadata consistent when casting/renaming columns.
 - **Presentational Components**:
   - `WorkspaceSelectionTabs` renders pills that reflect Zustand selections and exposes drag-friendly reordering callbacks supplied by the hook.
@@ -2112,22 +2151,24 @@ def extract_polars_data(data):
 # Node will automatically support CustomDataFrame via __getattr__ delegation
 ```
 
+> **Note**: Even when new wrappers are registered, the constructor immediately converts them to a LazyFrame/DocLazyFrame. Custom types therefore need to expose `.lazy()` or `.to_lazyframe()` so they can be normalized.
+
 ## Performance Considerations
 
 ### Lazy Evaluation
 
 **DocWorkspace + Polars LazyFrame**:
-- Operations on LazyFrame nodes remain lazy until `.collect()` called
-- Backend endpoints should avoid materializing large lazy frames
-- Frontend pagination uses `node.data.slice(start, end).collect()` to materialize only visible rows
+- Operations remain lazy until you explicitly collect the underlying plan (e.g., `node.data.collect()` or `node.materialize()`).
+- Backend endpoints should avoid materializing large lazy frames.
+- Frontend pagination uses `node.data.slice(start, end).collect()` to materialize only visible rows.
 
 **Example**:
 ```python
 # Efficient: only materializes 100 rows
 data = node.data.slice(page * page_size, page_size).collect()
 
-# Inefficient: materializes entire dataset
-data = node.collect().data[page * page_size:(page + 1) * page_size]
+# Inefficient: materializes entire dataset upfront
+data = node.data.collect()
 ```
 
 ### Workspace Serialization

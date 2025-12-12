@@ -34,20 +34,17 @@ def simulate_flow_nodes_logic(
         # Convert state.nodes to ReactFlow format
         source_nodes = []
         for node in state_nodes:
-            source_nodes.append(
-                {
-                    "id": node["node_id"],
-                    "type": "default",
-                    "position": {"x": 0, "y": 0},
-                    "data": {
-                        "label": node["name"],
-                        "nodeId": node["node_id"],
-                        "nodeName": node["name"],
-                        "dataType": node["data_type"],
-                        "isLazy": node.get("is_lazy", False),
-                    },
-                }
-            )
+            source_nodes.append({
+                "id": node["node_id"],
+                "type": "default",
+                "position": {"x": 0, "y": 0},
+                "data": {
+                    "label": node["name"],
+                    "nodeId": node["node_id"],
+                    "nodeName": node["name"],
+                    "dataType": node["data_type"],
+                },
+            })
         source_type = "nodes"
 
     return {
@@ -71,13 +68,11 @@ class TestDuplicateNodePrevention:
                 "node_id": "node1",
                 "name": "parent1",
                 "data_type": "DataFrame",
-                "is_lazy": False,
             },
             {
                 "node_id": "node2",
                 "name": "parent2",
                 "data_type": "DataFrame",
-                "is_lazy": False,
             },
         ]
 
@@ -91,7 +86,6 @@ class TestDuplicateNodePrevention:
                     "data": {
                         "nodeName": "parent1",
                         "dataType": "DataFrame",
-                        "isLazy": False,
                     },
                 },
                 {
@@ -99,7 +93,6 @@ class TestDuplicateNodePrevention:
                     "data": {
                         "nodeName": "parent2",
                         "dataType": "DataFrame",
-                        "isLazy": False,
                     },
                 },
             ],
@@ -128,7 +121,6 @@ class TestDuplicateNodePrevention:
                 "node_id": "node3",
                 "name": "joined",
                 "data_type": "DataFrame",
-                "is_lazy": False,
             }
         ]
 
@@ -171,7 +163,6 @@ class TestDuplicateNodePrevention:
                 "node_id": "node3",
                 "name": "joined",
                 "data_type": "DataFrame",
-                "is_lazy": False,
             }
         ]
 
@@ -183,7 +174,6 @@ class TestDuplicateNodePrevention:
                     "data": {
                         "nodeName": "parent1",
                         "dataType": "DataFrame",
-                        "isLazy": False,
                     },
                 },
                 {
@@ -191,7 +181,6 @@ class TestDuplicateNodePrevention:
                     "data": {
                         "nodeName": "parent2",
                         "dataType": "DataFrame",
-                        "isLazy": False,
                     },
                 },
                 {
@@ -199,7 +188,6 @@ class TestDuplicateNodePrevention:
                     "data": {
                         "nodeName": "joined",
                         "dataType": "DataFrame",
-                        "isLazy": False,
                     },
                 },
             ],
@@ -241,4 +229,4 @@ class TestDuplicateNodePrevention:
             assert node_data["nodeId"] == expected_node_id
             assert node_data["nodeName"] == expected_name
             assert node_data["dataType"] == "DataFrame"
-            assert node_data["isLazy"] is False
+            assert "isLazy" not in node_data

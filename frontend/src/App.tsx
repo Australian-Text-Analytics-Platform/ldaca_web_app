@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, Suspense, lazy } from 'react';
+import { useState, useEffect, useRef, useCallback, Suspense, lazy, type ReactNode } from 'react';
 import { useAuth, AuthPhase, REFRESH_FAILURE_THRESHOLD } from './hooks/useAuth';
 import { useBackendHealth } from './hooks/useBackendHealth';
 import { QueryProvider } from './providers/QueryProvider';
@@ -11,6 +11,7 @@ import FeedbackPanel from './components/panels/FeedbackPanel';
 import { useUIStore } from './stores';
 import { useShallow } from 'zustand/react/shallow';
 import { SidebarInset, SidebarProvider, SidebarTrigger } from './components/ui/sidebar';
+import { Toaster } from './components/ui/sonner';
 
 // Lazy load components for code splitting
 const TutorialView = lazy(() => import('./components/TutorialView'));
@@ -341,9 +342,10 @@ const App: React.FC = () => {
     window.addEventListener('hashchange', check);
     return () => window.removeEventListener('hashchange', check);
   }, []);
+  let content: ReactNode;
 
   if (isTutorial) {
-    return (
+    content = (
       <Suspense fallback={
         <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
           <div className="text-center">
@@ -355,10 +357,8 @@ const App: React.FC = () => {
         <TutorialView />
       </Suspense>
     );
-  }
-
-  if (!backendReady) {
-    return (
+  } else if (!backendReady) {
+    content = (
       <BlockingScreen
         title="Starting backend services"
         description="Hang tight while we verify the backend is up and happy."
@@ -366,9 +366,16 @@ const App: React.FC = () => {
         hint={backendError ? `Last error: ${backendError}` : 'If this takes more than ~30s, check the backend logs.'}
       />
     );
+  } else {
+    content = <WorkspaceShell />;
   }
 
-  return <WorkspaceShell />;
+  return (
+    <>
+      {content}
+      <Toaster />
+    </>
+  );
 };
 
 type BlockingCopy = {

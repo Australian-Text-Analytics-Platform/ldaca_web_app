@@ -7,10 +7,13 @@ All business logic is handled by the DocWorkspace library itself.
 
 import logging
 import os
-from typing import Optional, cast
+import re
+from typing import Any, Optional, cast
 
 import polars as pl
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
+
+from docframe import DocLazyFrame
 
 from ...core.auth import get_current_user
 from ...core.docworkspace_api import DocWorkspaceAPIUtils
@@ -31,13 +34,6 @@ from .utils import get_node_or_404, get_node_with_data_or_400
 
 # Router for workspace endpoints (was accidentally removed during edits)
 router = APIRouter(prefix="/workspaces", tags=["workspace"])
-
-# Optional docframe types (DocDataFrame / DocLazyFrame) used in conversions
-try:  # pragma: no cover - optional dependency handling
-    from docframe import DocDataFrame, DocLazyFrame  # type: ignore
-except Exception:  # pragma: no cover
-    DocDataFrame = None  # type: ignore
-    DocLazyFrame = None  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -206,24 +202,18 @@ async def add_node_to_workspace(
     workspace_id: str,
     filename: str,
     mode: str = Query(
-        "DocLazyFrame",
+        "LazyFrame",
         description=(
-            "How to treat the file: 'DocLazyFrame' (wrap as DocLazyFrame), 'LazyFrame' (plain Polars LazyFrame), "
-            "'DocDataFrame' (wrap as DocDataFrame), or 'DataFrame' (plain Polars DataFrame)"
+            "How to treat the file: currently only 'LazyFrame' is supported; files are staged as parquet and reloaded lazily."
         ),
-    ),
-    document_column: Optional[str] = Query(
-        None, description="Explicit document/text column to use when mode is Doc*"
     ),
     current_user: dict = Depends(get_current_user),
 ):
     """Add a data file as a new node to workspace.
 
-    Supported modes:
-    - DocLazyFrame: wrap underlying Polars as DocLazyFrame (lazy, text-aware)
-    - LazyFrame: use plain Polars LazyFrame
-    - DocDataFrame: wrap underlying Polars as DocDataFrame (eager, text-aware)
-    - DataFrame: use plain Polars DataFrame (eager)
+    Files are eagerly loaded into a Polars DataFrame, persisted as parquet under the workspace's `data/` folder,
+    and then reloaded as a LazyFrame (or DocLazyFrame). This separates bulk data from `metadata.json` while keeping
+    lazy processing semantics.
     """
     user_id = current_user["id"]
 
@@ -240,98 +230,47 @@ async def add_node_to_workspace(
         # Load the data
         data = load_data_file(file_path)
 
-        # Normalize: convert pandas -> polars without triggering LazyFrame schema resolution
-        if hasattr(data, "iloc"):
-            # pandas DataFrame
-            data = pl.DataFrame(data)
-
-        # Validate requested mode
-        valid_modes = {"DocLazyFrame", "LazyFrame", "DocDataFrame", "DataFrame"}
+        # Validate requested mode (lazy-only workflow)
+        valid_modes = {"LazyFrame"}
         if mode not in valid_modes:
             raise HTTPException(
                 status_code=400,
                 detail=f"Invalid mode '{mode}'. Expected one of {sorted(list(valid_modes))}",
             )
 
-        # Import docframe only when needed
-        _DocDF = None
-        _DocLF = None
-        if mode in {"DocLazyFrame", "DocDataFrame"}:
-            try:
-                from docframe.core.docframe import (
-                    DocDataFrame as _DocDF,  # type: ignore
-                )
-                from docframe.core.docframe import (
-                    DocLazyFrame as _DocLF,  # type: ignore
-                )
-
-                import docframe  # noqa: F401
-            except Exception:  # pragma: no cover
-                raise HTTPException(
-                    status_code=500,
-                    detail="docframe library not available for Doc* modes",
-                )
-
-        # Guess document column if needed (Doc* modes only)
-        if mode in {"DocLazyFrame", "DocDataFrame"} and document_column is None:
-            try:
-                # _DocDF.guess_document_column works with both DataFrame and LazyFrame
-                document_column = _DocDF.guess_document_column(data)  # type: ignore[arg-type]
-            except Exception:
-                document_column = None
-
-        # Apply mode
-        if mode == "DocLazyFrame":
-            # Ensure LazyFrame
-            if isinstance(data, pl.DataFrame):
-                data = data.lazy()
-            # Wrap as DocLazyFrame using namespace or constructor
-            try:
-                # Namespace available when 'import docframe' succeeds
-                data = data.text.to_doclazyframe(document_column=document_column)  # type: ignore[attr-defined]
-            except Exception:
-                # Fallback to direct constructor
-                if isinstance(data, pl.LazyFrame):
-                    data = _DocLF(data, document_column=document_column)  # type: ignore[misc]
-        elif mode == "LazyFrame":
-            # If it's a Doc* wrapper, unwrap
-            try:
-                if hasattr(data, "lazyframe"):
-                    data = data.lazyframe  # type: ignore[attr-defined]
-                elif hasattr(data, "dataframe"):
-                    df_inner = data.dataframe  # type: ignore[attr-defined]
-                    data = df_inner.lazy()
-            except Exception:
-                pass
-            if isinstance(data, pl.DataFrame):
-                data = data.lazy()
-        elif mode == "DocDataFrame":
-            # Ensure eager DataFrame
-            if hasattr(data, "collect") and isinstance(data, pl.LazyFrame):
-                try:
-                    data = data.collect()
-                except Exception:
-                    # As a safe fallback, select all then collect
-                    data = pl.select([pl.all()]).collect()
-            # Wrap as DocDataFrame
-            try:
-                data = data.text.to_docdataframe(document_column=document_column)  # type: ignore[attr-defined]
-            except Exception:
-                if isinstance(data, pl.DataFrame):
-                    data = _DocDF(data, document_column=document_column)  # type: ignore[misc]
-        else:  # DataFrame
-            # Unwrap if Doc*, then ensure eager DataFrame
-            try:
-                if hasattr(data, "dataframe"):
-                    data = data.dataframe  # type: ignore[attr-defined]
-                elif hasattr(data, "lazyframe"):
-                    data = data.lazyframe.collect()  # type: ignore[attr-defined]
-            except Exception:
-                pass
+        # Normalize to an eager Polars DataFrame
+        try:
+            if hasattr(data, "lazyframe"):
+                data = data.lazyframe  # type: ignore[attr-defined]
             if isinstance(data, pl.LazyFrame):
                 data = data.collect()
+            elif hasattr(data, "dataframe"):
+                data = pl.DataFrame(getattr(data, "dataframe"))  # type: ignore[arg-type]
+            elif hasattr(data, "iloc"):
+                data = pl.DataFrame(data)  # pandas -> polars
+            elif not isinstance(data, pl.DataFrame):
+                data = pl.DataFrame(data)
+        except Exception as exc:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Failed to coerce data to Polars DataFrame: {exc}",
+            )
 
-        # Create node name from filename
+        # Resolve workspace folder and stage parquet copy
+        workspace_dir = workspace_manager.get_workspace_dir(user_id, workspace_id)
+        if workspace_dir is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Workspace folder not found for workspace {workspace_id}",
+            )
+
+        data_dir = workspace_dir / "data"
+        data_dir.mkdir(parents=True, exist_ok=True)
+
+        def _safe_stem(name: str) -> str:
+            stem = re.sub(r"[^A-Za-z0-9_.-]+", "_", name).strip("._") or "data"
+            return stem
+
         node_name = filename
         for ext in [
             ".csv",
@@ -345,28 +284,36 @@ async def add_node_to_workspace(
                 node_name = node_name[: -len(ext)]
                 break
 
-        # Accept docframe wrapper types as valid (unwrap not required for Node creation)
-        doc_wrappers: tuple[type, ...] = tuple()
-        try:  # pragma: no cover - optional dependency
-            from docframe import DocDataFrame as _DocDF  # type: ignore
-            from docframe import DocLazyFrame as _DocLF
+        base_stem = _safe_stem(node_name)
+        parquet_path = data_dir / f"{base_stem}.parquet"
+        suffix = 1
+        while parquet_path.exists():
+            parquet_path = data_dir / f"{base_stem}_{suffix}.parquet"
+            suffix += 1
 
-            doc_wrappers = (_DocDF, _DocLF)
-        except Exception:
-            pass
-
-        if not isinstance(data, (pl.DataFrame, pl.LazyFrame)) and not (
-            doc_wrappers and isinstance(data, doc_wrappers)  # type: ignore[arg-type]
-        ):
+        try:
+            data.write_parquet(parquet_path)
+        except Exception as exc:
             raise HTTPException(
-                status_code=400,
-                detail=f"Unsupported data type loaded from file: {type(data)}. Expected Polars (DataFrame/LazyFrame) or docframe wrappers.",
+                status_code=500,
+                detail=f"Failed to persist parquet for workspace: {exc}",
             )
 
+        # Reload as LazyFrame with workspace-relative path to keep plans portable
+        lazy_data: pl.LazyFrame | Any
+        try:
+            lazy_data = pl.scan_parquet(parquet_path)
+        except Exception as exc:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to reload parquet as LazyFrame: {exc}",
+            )
+
+        # Create node name from filename
         node = workspace_manager.add_node_to_workspace(
             user_id=user_id,
             workspace_id=workspace_id,
-            data=cast(pl.DataFrame | pl.LazyFrame, data),
+            data=cast(pl.DataFrame | pl.LazyFrame, lazy_data),
             node_name=node_name,
         )
 
@@ -444,8 +391,6 @@ async def cast_node(
         Dictionary with the updated node information after casting
     """
     try:
-        import polars as pl
-
         user_id = current_user["id"]
 
         # Validate cast_data structure
@@ -476,37 +421,35 @@ async def cast_node(
         # Get node using shared helper (guarantees data presence)
         node, current_df = get_node_with_data_or_400(user_id, workspace_id, node_id)
 
-        # Work directly with the node's data - preserve the original data type
-        # Don't convert between DataFrame/LazyFrame/DocDataFrame types
-
-        # Get original data type for logging
-        if hasattr(current_df, "collect"):
-            # LazyFrame - get schema without collecting (use collect_schema to avoid warning)
-            schema = current_df.collect_schema()
-            original_type = (
-                str(schema[column_name]) if column_name in schema else "unknown"
-            )
-            columns = list(schema.keys())
-        elif hasattr(current_df, "schema"):
-            # DataFrame or DocDataFrame with schema
-            original_type = (
-                str(current_df.schema[column_name])
-                if column_name in current_df.schema
-                else "unknown"
-            )
-            columns = list(current_df.schema.keys())
-        elif hasattr(current_df, "columns"):
-            # Direct columns access
-            columns = current_df.columns
-            try:
-                # Try to get dtype from the column
-                original_type = str(current_df[column_name].dtype)
-            except Exception:
-                original_type = "unknown"
+        is_doc_lazy = isinstance(current_df, DocLazyFrame)
+        document_column: Optional[str] = None
+        if is_doc_lazy:
+            document_column = current_df.document_column
+            lazyframe = current_df.lazyframe
+        elif isinstance(current_df, pl.LazyFrame):
+            lazyframe = current_df
         else:
             raise HTTPException(
-                status_code=400, detail="Cannot determine column structure"
+                status_code=400,
+                detail=(
+                    "Node data must be lazy (DocLazyFrame or LazyFrame). "
+                    "Workspaces no longer support eager node payloads."
+                ),
             )
+
+        schema = lazyframe.collect_schema()
+        columns = list(schema.keys())
+        if column_name not in columns:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Column '{column_name}' not found in data. "
+                    f"Available columns: {columns}"
+                ),
+            )
+
+        original_dtype = schema[column_name]
+        original_type = str(original_dtype)
 
         if column_name not in columns:
             raise HTTPException(
@@ -554,18 +497,7 @@ async def cast_node(
             elif target_lower in ("string", "utf8", "str", "text"):
                 # Datetime -> string (optionally with format) or no-op if already string
                 # Detect current dtype (best effort)
-                try:
-                    if (
-                        hasattr(current_df, "schema")
-                        and column_name in current_df.schema
-                    ):  # DataFrame
-                        col_dtype = current_df.schema[column_name]
-                    elif hasattr(current_df, "collect_schema"):  # LazyFrame
-                        col_dtype = current_df.collect_schema().get(column_name, None)
-                    else:
-                        col_dtype = None
-                except Exception:
-                    col_dtype = None
+                col_dtype = original_type
 
                 if str(col_dtype).startswith("Datetime"):
                     if datetime_format:
@@ -629,15 +561,9 @@ async def cast_node(
                 )
 
             # Perform a small head() sample validation to surface conversion errors early
-            # Works for both LazyFrame (collect) and DataFrame (no collect needed).
             try:
-                if hasattr(current_df, "head"):
-                    _sample = current_df.head(50).with_columns(cast_expr)
-                    if hasattr(_sample, "collect"):
-                        _ = _sample.collect()
-                    else:
-                        # DataFrame path: building the sample is sufficient to validate expression
-                        _ = _sample
+                sample_plan = lazyframe.head(50).with_columns(cast_expr)
+                sample_plan.collect()
             except Exception as sample_err:
                 raise HTTPException(
                     status_code=400,
@@ -647,22 +573,25 @@ async def cast_node(
                 )
 
             # Apply the casting with .with_columns(); preserve original frame type after validation
-            casted_data = current_df.with_columns(cast_expr)
-            # Update the node data in-place (preserving the original type)
-            node.data = casted_data
+            casted_lazy = lazyframe.with_columns(cast_expr)
+            if is_doc_lazy:
+                if not document_column:
+                    raise HTTPException(
+                        status_code=500,
+                        detail="DocLazyFrame node is missing document column metadata.",
+                    )
+                node.data = DocLazyFrame(  # type: ignore[misc]
+                    casted_lazy, document_column=document_column
+                )
+            else:
+                node.data = casted_lazy
 
             # Save workspace to disk
             # Ensure current workspace is persisted after casting
             workspace_manager.persist(user_id, workspace_id)
             # Get new data type for response
-            if hasattr(casted_data, "collect"):
-                # LazyFrame - use collect_schema to avoid warning
-                new_schema = casted_data.collect_schema()
-                new_type = str(new_schema[column_name])
-            elif hasattr(casted_data, "schema"):
-                new_type = str(casted_data.schema[column_name])
-            else:
-                new_type = target_type
+            new_schema = casted_lazy.collect_schema()
+            new_type = str(new_schema[column_name])
             return {
                 "state": "successful",
                 "node_id": node_id,
@@ -819,4 +748,5 @@ async def export_nodes(
 # ============================================================================
 
 
+# ============================================================================
 # ============================================================================

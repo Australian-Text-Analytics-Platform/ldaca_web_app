@@ -10,23 +10,16 @@ export const queryClient = new QueryClient({
       staleTime: 5 * 60 * 1000, // 5 minutes
       // How long data stays in cache
       gcTime: 10 * 60 * 1000, // 10 minutes (renamed from cacheTime in v5)
-      // Retry failed requests
-      retry: (failureCount, error: any) => {
-        // Don't retry auth errors
-        if (error?.response?.status === 401 || error?.response?.status === 403) {
-          return false;
-        }
-        // Retry up to 3 times for other errors
-        return failureCount < 3;
-      },
+      // Disable automatic retries to avoid duplicate requests
+      retry: false,
       // Refetch on window focus for important data
       refetchOnWindowFocus: true,
       // Don't refetch on reconnect by default (we'll enable for specific queries)
       refetchOnReconnect: false,
     },
     mutations: {
-      // Retry mutations once
-      retry: 1,
+      // Disable mutation retries to avoid duplicate requests
+      retry: false,
     },
   },
 });

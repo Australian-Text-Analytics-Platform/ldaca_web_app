@@ -17,17 +17,14 @@ def graph(workspace: "Workspace") -> Dict[str, object]:
     nodes_payload: List[Dict[str, object]] = []
     edges_payload: List[Dict[str, str]] = []
     for node in workspace.nodes.values():
-        nodes_payload.append(
-            {
-                "id": node.id,
-                "name": node.name,
-                "type": type(node.data).__name__,
-                "lazy": node.is_lazy,
-                "operation": node.operation or "load",
-                "parent_count": len(node.parents),
-                "child_count": len(node.children),
-            }
-        )
+        nodes_payload.append({
+            "id": node.id,
+            "name": node.name,
+            "type": type(node.data).__name__,
+            "operation": node.operation or "load",
+            "parent_count": len(node.parents),
+            "child_count": len(node.children),
+        })
         for child in node.children:
             edges_payload.append({"source": node.id, "target": child.id})
     return {

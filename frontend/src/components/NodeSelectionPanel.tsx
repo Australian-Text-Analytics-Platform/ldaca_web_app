@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import React, { useCallback, useMemo, type ReactNode } from 'react';
 import { AlertTriangle, Lock } from 'lucide-react';
 import { cn } from '../lib/utils';
 import type { NodeColumnSelection, NodeColumnSource, WorkspaceNodeLike } from '@/features/analysis/common/nodeSelectionTypes';
@@ -30,8 +30,7 @@ interface NodeSelectionPanelProps {
   showColumnPicker?: boolean;
   columnLabelFn?: (node: WorkspaceNodeLike, idx: number) => string;
   renderNodeMeta?: (node: WorkspaceNodeLike) => React.ReactNode;
-  showShape?: boolean; // fetch shape if available and not supplied via renderNodeMeta
-  getNodeShapeFn?: (nodeId: string) => Promise<{ shape: [number, number]; is_lazy: boolean; calculated: boolean } | null>;
+  showShape?: boolean; // display shape if present on node metadata
   disabled?: boolean; // disables interactions but keeps UI fully visible
   locked?: boolean;   // shows a small lock icon in the header when true
   originalCount?: number; // total selection count prior to slicing for display
@@ -63,7 +62,6 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
   columnLabelFn,
   renderNodeMeta,
   showShape = false,
-  getNodeShapeFn,
   disabled = false,
   locked = false,
   originalCount,
@@ -74,52 +72,10 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
   statusVariant = 'warning',
 }) => {
   const getColumnLabel = (node: WorkspaceNodeLike, idx: number) => (columnLabelFn ? columnLabelFn(node, idx) : 'Text Column:');
-  const [shapes, setShapes] = useState<Record<string,string>>({});
-
   // Compute stable list of selected node ids to avoid retriggering on object identity changes
   const selectedNodeIds = useMemo(() => (
     selectedNodes.map((node, idx) => getNodeIdentifier(node, idx))
   ), [selectedNodes]);
-
-  useEffect(() => {
-    if (!showShape || !getNodeShapeFn) return;
-    let cancelled = false;
-    const fetchShapes = async () => {
-      await Promise.all(selectedNodeIds.map(async (nodeId: string) => {
-        if (!nodeId) return;
-        if (shapes[nodeId]) return;
-        // Check sessionStorage cache to avoid duplicate network calls on StrictMode double-mount or tab switches
-        try {
-          const cacheKey = `node-shape:${nodeId}`;
-          const cached = typeof window !== 'undefined' ? window.sessionStorage.getItem(cacheKey) : null;
-          if (cached) {
-            if (!cancelled) setShapes(prev => ({ ...prev, [nodeId]: cached }));
-            return;
-          }
-        } catch {
-          // ignore storage errors
-        }
-        try {
-          const res = await getNodeShapeFn(nodeId);
-          if (!cancelled && res?.shape) {
-            const val = `${res.shape[0]} × ${res.shape[1]}`;
-            setShapes(prev => ({ ...prev, [nodeId]: val }));
-            try {
-              if (typeof window !== 'undefined') {
-                window.sessionStorage.setItem(`node-shape:${nodeId}`, val);
-              }
-            } catch {
-              // ignore storage errors
-            }
-          }
-        } catch {
-          // ignore fetch errors
-        }
-      }));
-    };
-    fetchShapes();
-    return () => { cancelled = true; };
-  }, [getNodeShapeFn, selectedNodeIds, shapes, showShape]);
   const columnSelectionsByNode = useMemo(() => {
     const map = new Map<string, NodeColumnSelection>();
     nodeColumnSelections.forEach((selection) => {
@@ -137,17 +93,30 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
     fallbackToAllColumns,
   });
 
+  const formatShape = useCallback((node: WorkspaceNodeLike): string => {
+    const rawShape =
+      (node.data?.shape as [number | null, number | null] | undefined) ||
+      ((node as { shape?: [number | null, number | null] }).shape ?? null);
+    if (!rawShape) {
+      return '—';
+    }
+    const [rows, cols] = rawShape;
+    const formatPart = (value: number | null | undefined) =>
+      typeof value === 'number' && Number.isFinite(value) ? value.toLocaleString() : '?';
+    return `${formatPart(rows)} × ${formatPart(cols)}`;
+  }, []);
+
   const renderMetaContent = useCallback(
-    ({ node, nodeId }: NodeSelectionRenderArgs) => {
+    ({ node }: NodeSelectionRenderArgs) => {
       if (renderNodeMeta) {
         return renderNodeMeta(node);
       }
       if (showShape) {
-        return `Shape: ${shapes[nodeId] || '…'}`;
+        return `Shape: ${formatShape(node)}`;
       }
       return null;
     },
-    [renderNodeMeta, showShape, shapes]
+    [formatShape, renderNodeMeta, showShape]
   );
 
   const renderColumnSelector = useCallback(

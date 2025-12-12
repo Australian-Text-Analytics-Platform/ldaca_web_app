@@ -18,9 +18,6 @@ export interface ConcatSubTabProps {
   selectedNodeIds: string[];
   currentWorkspaceId: string | null;
   workspaceNodes: WorkspaceNodeLike[];
-  getNodeShape: (
-    nodeId: string,
-  ) => Promise<{ shape: [number, number]; is_lazy: boolean; calculated: boolean } | null>;
   concatNodes: (nodeIds: string[], newNodeName?: string) => Promise<void>;
   concatPreview: (
     nodeIds: string[],

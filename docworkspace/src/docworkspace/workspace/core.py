@@ -38,7 +38,9 @@ class Workspace:
         self.id = str(uuid.uuid4())
         self.name = name or f"workspace_{self.id[:8]}"
         self.nodes: Dict[str, Node] = {}
-        self._metadata: Dict[str, Any] = {}
+        self.description: str = ""
+        self.created_at: Optional[str] = None
+        self.modified_at: Optional[str] = None
         if data is not None:
             self._load_initial_data(data, data_name, csv_lazy, **csv_kwargs)
 
@@ -128,10 +130,36 @@ class Workspace:
 
     # Metadata --------------------------------------------------------
     def get_metadata(self, key: str) -> Any:
-        return self._metadata.get(key)
+        if key == "description":
+            return self.description
+        if key == "created_at":
+            return self.created_at
+        if key == "modified_at":
+            return self.modified_at
+        return None
 
     def set_metadata(self, key: str, value: Any) -> None:
-        self._metadata[key] = value
+        if key == "description":
+            self.description = value if value is not None else ""
+            return
+        if key == "created_at":
+            self.created_at = value
+            return
+        if key == "modified_at":
+            self.modified_at = value
+            return
+        raise ValueError(f"Unsupported metadata key: {key}")
+
+    @property
+    def metadata_keys(self) -> list[str]:
+        keys: list[str] = []
+        if self.description:
+            keys.append("description")
+        if self.created_at:
+            keys.append("created_at")
+        if self.modified_at:
+            keys.append("modified_at")
+        return keys
 
     # Dunder ----------------------------------------------------------
     def __repr__(self) -> str:  # pragma: no cover
@@ -150,12 +178,12 @@ class Workspace:
 
     # Backward-compatible helpers (serialize/deserialize & summaries) ----
     def serialize(self, path: Any, format: str = "json") -> Any:  # pragma: no cover
-        """Serialize workspace to file (json only).
+        """Serialize workspace to a metadata.json file inside a folder (json only).
 
         Parameters
         ----------
         path : str | Path
-            Destination file path (must end with .json when format=json)
+            Destination directory or metadata.json file path.
         format : str
             Currently only 'json' supported. 'binary' raises NotImplementedError.
         """
@@ -199,36 +227,10 @@ class Workspace:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Workspace":  # pragma: no cover
-        """Build workspace from dictionary supporting both legacy & new formats.
-
-        Legacy shape:
-          {"id":..., "name":..., "nodes": {node_id: node_dict, ...}, "relationships": [...], "metadata": {...}}
-        New shape (serialize_workspace output):
-          {"workspace_metadata": {...}, "nodes": [ {node_metadata..., data_metadata..., serialized_data...}, ...] }
-        """
-        # Detect new format
-        if "workspace_metadata" in data:
-            return cls.deserialize(data)
-        # Legacy path: transform into new serialization envelope
-        nodes_list: list[dict[str, Any]] = []
-        for node_id, node_payload in data.get("nodes", {}).items():
-            # If already in new node format keep as-is; else wrap minimal fields
-            if isinstance(node_payload, dict) and "node_metadata" in node_payload:
-                nodes_list.append(node_payload)
-            else:
-                # Minimal fallback; cannot reconstruct original dataframe without serialized content
-                # Skip nodes lacking proper serialization to avoid crashing tests
-                continue
-        wrapper = {
-            "workspace_metadata": {
-                "id": data.get("id"),
-                "name": data.get("name", "restored_workspace"),
-                "version": 1,
-                "metadata": data.get("metadata", {}),
-            },
-            "nodes": nodes_list,
-        }
-        return cls.deserialize(wrapper)
+        """Build workspace from dictionary using the current serialization format."""
+        if "workspace_metadata" not in data:
+            raise ValueError("Invalid workspace dict: missing workspace_metadata")
+        return cls.deserialize(data)
 
     def summary(self, json: bool = False) -> Dict[str, Any]:  # pragma: no cover
         from .analysis import summary

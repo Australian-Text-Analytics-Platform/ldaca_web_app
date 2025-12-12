@@ -8,6 +8,8 @@ from typing import Optional
 import polars as pl
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
+from docframe import DocDataFrame, DocLazyFrame  # type: ignore
+
 from ...core.auth import get_current_user
 from ...core.utils import get_user_data_folder, load_data_file
 from ...core.workspace import workspace_manager
@@ -36,18 +38,9 @@ async def upload_file_to_workspace(
 
         data_obj = load_data_file(file_path)
 
-        try:  # Lazy import to avoid hard dependency during tests
-            from docframe import DocDataFrame, DocLazyFrame  # type: ignore
-        except ImportError:  # pragma: no cover - docframe is expected to be installed
-            DocDataFrame = DocLazyFrame = None  # type: ignore
-
         node_data = data_obj
 
-        if DocDataFrame is not None and isinstance(node_data, DocDataFrame):  # type: ignore[arg-type]
-            pass
-        elif DocLazyFrame is not None and isinstance(node_data, DocLazyFrame):  # type: ignore[arg-type]
-            pass
-        else:
+        if not isinstance(node_data, (DocDataFrame, DocLazyFrame)):
             if (
                 hasattr(node_data, "iloc")
                 and hasattr(node_data, "dtypes")
@@ -87,4 +80,5 @@ async def upload_file_to_workspace(
     except HTTPException:
         raise
     except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to upload file: {e}")
         raise HTTPException(status_code=400, detail=f"Failed to upload file: {e}")

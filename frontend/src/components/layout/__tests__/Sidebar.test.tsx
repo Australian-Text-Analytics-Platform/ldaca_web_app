@@ -110,7 +110,6 @@ beforeEach(() => {
   workspaceDataState = {
     workspaceGraph: { nodes: [{ id: 'n1' }, { id: 'n2' }] },
     currentWorkspaceId: 'workspace-123',
-    getNodeShape: vi.fn(),
   };
   workspaceSelectionState = { selectedNodeIds: ['n1'] };
   workspaceActionsState = { toggleNodeSelection: vi.fn() };

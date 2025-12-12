@@ -82,7 +82,7 @@ def test_csv_preview_supported_types_and_preview(client, tmp_path):
     data = resp.json()
     assert data["file_type"] == "csv"
     assert "DocLazyFrame" in data["supported_types"]
-    assert "DataFrame" in data["supported_types"]
+    assert "LazyFrame" in data["supported_types"]
     assert data["columns"] == ["a", "b"]
     assert len(data["preview"]) == 2
 
@@ -112,7 +112,7 @@ def test_excel_preview_sheet_names_and_selection(client, tmp_path):
     assert resp1.status_code == 200
     j1 = resp1.json()
     assert j1["file_type"] == "excel"
-    assert "DataFrame" in j1["supported_types"]
+    assert "DocLazyFrame" in j1["supported_types"]
     assert isinstance(j1.get("sheet_names"), list)
     assert j1.get("selected_sheet")
     assert len(j1["preview"]) >= 1
@@ -187,7 +187,7 @@ def test_zip_preview_uses_docframe(client, tmp_path):
     assert payload["file_type"] == "zip"
     assert payload["columns"][:3] == ["file_path", "base_name", "extension"]
     assert payload["columns"][3] in {"text", "document"}
-    assert "DocDataFrame" in payload["supported_types"]
+    assert "DocLazyFrame" in payload["supported_types"]
     assert any(row["base_name"] == "1" for row in payload["preview"])
 
 

@@ -2,10 +2,10 @@ import json
 
 import polars as pl
 import pytest
-
-from docframe import DocDataFrame, DocLazyFrame  # type: ignore
 from docworkspace.node import Node  # type: ignore
 from docworkspace.workspace import Workspace  # type: ignore
+
+from docframe import DocDataFrame, DocLazyFrame  # type: ignore
 
 
 def build_sample_objects():
@@ -38,20 +38,20 @@ def test_workspace_serialize_deserialize_preserves_types(tmp_path):
 
     # Collect types by node name
     type_map = {n.name: type(n.data).__name__ for n in ws2.nodes.values()}
-    assert type_map["df"] == "DataFrame"
+    assert type_map["df"] == "LazyFrame"
     assert type_map["lazy"] == "LazyFrame"
-    assert type_map["docdf"] == "DocDataFrame"
+    assert type_map["docdf"] == "DocLazyFrame"
     assert type_map["doclazy"] == "DocLazyFrame"
 
     # Round-trip data content sanity
     df_node = next(n for n in ws2.nodes.values() if n.name == "df")
-    assert isinstance(df_node.data, pl.DataFrame)
-    assert df_node.data.select(pl.col("a")).to_series().to_list() == [1, 2, 3]
+    assert isinstance(df_node.data, pl.LazyFrame)
+    assert df_node.data.select(pl.col("a")).collect().to_series().to_list() == [1, 2, 3]
 
     docdf_node = next(n for n in ws2.nodes.values() if n.name == "docdf")
-    assert isinstance(docdf_node.data, DocDataFrame)
+    assert isinstance(docdf_node.data, DocLazyFrame)
     assert docdf_node.data.document_column == "text"
-    assert docdf_node.data.to_dataframe().shape == (2, 1)
+    assert docdf_node.data.collect().to_dataframe().shape == (2, 1)
 
     doclazy_node = next(n for n in ws2.nodes.values() if n.name == "doclazy")
     assert isinstance(doclazy_node.data, DocLazyFrame)

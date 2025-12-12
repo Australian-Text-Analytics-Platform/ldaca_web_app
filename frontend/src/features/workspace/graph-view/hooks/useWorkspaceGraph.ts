@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import type { MouseEvent } from 'react';
 import {
   Connection,
   ConnectionLineType,
@@ -10,33 +9,18 @@ import {
   useEdgesState,
   useNodesState,
 } from '@xyflow/react';
-import { useQueryClient } from '@tanstack/react-query';
 
 import CustomNode from '@/components/CustomNode';
 import { useWorkspaceActions } from '@/hooks/useWorkspaceActions';
 import { useWorkspaceData } from '@/hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '@/hooks/useWorkspaceSelection';
 import { useWorkspaceStatus } from '@/hooks/useWorkspaceStatus';
-import { queryKeys } from '@/lib/queryKeys';
 import type { NodeShape as WorkspaceNodeShape } from '../../../../types';
 
 import { computeDagreLayout } from '../services/graphLayout';
 
 const EDGE_STROKE = '#0f172a';
 const nodeTypes = { customNode: CustomNode } as const;
-
-const invalidateNodeQueries = (
-  queryClient: ReturnType<typeof useQueryClient>,
-  workspaceId: string | null | undefined,
-  nodeId: string
-) => {
-  if (!workspaceId) {
-    return;
-  }
-  queryClient.invalidateQueries({ queryKey: queryKeys.nodeData(workspaceId, nodeId) });
-  queryClient.invalidateQueries({ queryKey: queryKeys.nodeSchema(workspaceId, nodeId) });
-  queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(workspaceId) });
-};
 
 export interface WorkspaceGraphViewModel {
   nodes: Node[];
@@ -69,21 +53,15 @@ export interface WorkspaceGraphViewModel {
 }
 
 export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
-  const { workspaceGraph, currentWorkspaceId } = useWorkspaceData();
+  const { workspaceGraph } = useWorkspaceData();
   const { selectedNodeIds } = useWorkspaceSelection();
   const { isLoading } = useWorkspaceStatus();
   const {
     deleteNode,
     renameNode,
     toggleNodeSelection,
-    convertToDocDataFrame,
-    convertToDataFrame,
-    convertToDocLazyFrame,
-    convertToLazyFrame,
-    resetDocumentColumn,
     clearSelection,
   } = useWorkspaceActions();
-  const queryClient = useQueryClient();
 
   const DEBUG_GRAPH =
     typeof window !== 'undefined' &&
@@ -93,87 +71,26 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
       console.log(...args);
     }
   }, [DEBUG_GRAPH]);
-
-  const pendingDeletes = useRef<Set<string>>(new Set());
-
   const handleDelete = useCallback(
     (nodeId: string) => {
-      if (!deleteNode || pendingDeletes.current.has(nodeId)) {
+      if (!nodeId || !deleteNode) {
         return;
       }
-      pendingDeletes.current.add(nodeId);
-      deleteNode(nodeId)
-        .finally(() => {
-          pendingDeletes.current.delete(nodeId);
-        });
+      deleteNode(nodeId);
     },
     [deleteNode]
   );
 
   const handleRename = useCallback(
     (nodeId: string, newName: string) => {
-      if (!renameNode) {
+      if (!nodeId || !newName?.trim() || !renameNode) {
         return;
       }
-      renameNode(nodeId, newName);
+      renameNode(nodeId, newName.trim());
     },
     [renameNode]
   );
 
-  const handleConvertToDocDataFrame = useCallback(
-    (nodeId: string, documentColumn: string) => {
-      if (!convertToDocDataFrame) {
-        return;
-      }
-      convertToDocDataFrame(nodeId, documentColumn);
-      invalidateNodeQueries(queryClient, currentWorkspaceId, nodeId);
-    },
-    [convertToDocDataFrame, currentWorkspaceId, queryClient]
-  );
-
-  const handleConvertToDataFrame = useCallback(
-    (nodeId: string) => {
-      if (!convertToDataFrame) {
-        return;
-      }
-      convertToDataFrame(nodeId);
-      invalidateNodeQueries(queryClient, currentWorkspaceId, nodeId);
-    },
-    [convertToDataFrame, currentWorkspaceId, queryClient]
-  );
-
-  const handleConvertToDocLazyFrame = useCallback(
-    (nodeId: string, documentColumn: string) => {
-      if (!convertToDocLazyFrame) {
-        return;
-      }
-      convertToDocLazyFrame(nodeId, documentColumn);
-      invalidateNodeQueries(queryClient, currentWorkspaceId, nodeId);
-    },
-    [convertToDocLazyFrame, currentWorkspaceId, queryClient]
-  );
-
-  const handleConvertToLazyFrame = useCallback(
-    (nodeId: string) => {
-      if (!convertToLazyFrame) {
-        return;
-      }
-      convertToLazyFrame(nodeId);
-      invalidateNodeQueries(queryClient, currentWorkspaceId, nodeId);
-    },
-    [convertToLazyFrame, currentWorkspaceId, queryClient]
-  );
-
-  const handleResetDocument = useCallback(
-    (nodeId: string, documentColumn?: string) => {
-      if (!resetDocumentColumn) {
-        return;
-      }
-      resetDocumentColumn(nodeId, documentColumn);
-      invalidateNodeQueries(queryClient, currentWorkspaceId, nodeId);
-    },
-    [resetDocumentColumn, currentWorkspaceId, queryClient]
-  );
 
   const initialNodes = useMemo(() => {
     if (!workspaceGraph?.nodes) {
@@ -191,7 +108,6 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
       const dataType = rawNodeType || 'unknown';
       const columns = Array.isArray(node.data?.columns) ? node.data.columns : [];
       const isLazyNode = Boolean(
-        node.data?.isLazy ||
         node.data?.lazy ||
         (typeof rawNodeType === 'string' && rawNodeType.toLowerCase().includes('lazyframe'))
       );
@@ -208,13 +124,6 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
       if (backendShape && Array.isArray(backendShape) && backendShape.length === 2) {
         shape[0] = typeof backendShape[0] === 'number' ? backendShape[0] : null;
         shape[1] = typeof backendShape[1] === 'number' ? backendShape[1] : null;
-      }
-
-      if (isLazyNode) {
-        shape[0] = null;
-        if (shape[1] === null && columns.length > 0) {
-          shape[1] = columns.length;
-        }
       }
 
       const position = positions.get(node.id) || { x: index * 320, y: 50 };
@@ -238,17 +147,11 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
                   node.data.schema.map((col: any) => [col.name, col.js_type])
                 )
               : {},
-            is_lazy: node.data?.isLazy || node.data?.lazy || false,
           },
           isMultiSelected:
             (selectedNodeIds?.length || 0) > 1 && Boolean(selectedNodeIds?.includes?.(node.id)),
           onDelete: handleDelete,
           onRename: handleRename,
-          onConvertToDocDataFrame: handleConvertToDocDataFrame,
-          onConvertToDataFrame: handleConvertToDataFrame,
-          onConvertToDocLazyFrame: handleConvertToDocLazyFrame,
-          onConvertToLazyFrame: handleConvertToLazyFrame,
-          onResetDocument: handleResetDocument,
         },
         hidden: false,
         draggable: true,
@@ -257,7 +160,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
         connectable: false,
       } as Node;
     });
-  }, [workspaceGraph, selectedNodeIds, handleDelete, handleRename, handleConvertToDocDataFrame, handleConvertToDataFrame, handleConvertToDocLazyFrame, handleConvertToLazyFrame, handleResetDocument, dlog]);
+  }, [workspaceGraph, selectedNodeIds, handleDelete, handleRename, dlog]);
 
   const initialEdges = useMemo(() => {
     if (!workspaceGraph?.edges) {
@@ -289,20 +192,18 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
   const currentNodesSignature = nodes
     .map((node: any) => {
       const dt = node?.data?.node?.data_type ?? 'unknown';
-      const lazy = node?.data?.node?.is_lazy ? '1' : '0';
       const docc = node?.data?.node?.document_column || '';
       const name = node?.data?.node?.name || '';
-      return `${node.id}:${dt}:${lazy}:${docc}:${name}`;
+      return `${node.id}:${dt}:${docc}:${name}`;
     })
     .join(',');
 
   const newNodesSignature = initialNodes
     .map((node: any) => {
       const dt = node?.data?.node?.data_type ?? 'unknown';
-      const lazy = node?.data?.node?.is_lazy ? '1' : '0';
       const docc = node?.data?.node?.document_column || '';
       const name = node?.data?.node?.name || '';
-      return `${node.id}:${dt}:${lazy}:${docc}:${name}`;
+      return `${node.id}:${dt}:${docc}:${name}`;
     })
     .join(',');
 

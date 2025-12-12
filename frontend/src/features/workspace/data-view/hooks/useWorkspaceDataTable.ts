@@ -46,7 +46,7 @@ const buildTabDescriptor = (node: WorkspaceSelectionTab['id'], label?: string, i
 });
 
 export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
-  const { currentWorkspaceId, nodeData, getNodeShape } = useWorkspaceData();
+  const { currentWorkspaceId, nodeData } = useWorkspaceData();
   const {
     selectedNode,
     selectedNodes,
@@ -128,46 +128,15 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
     [toggleNodeSelection]
   );
 
-  const [actualShape, setActualShape] = useState<[number, number] | null>(null);
-  const [isLoadingShape, setIsLoadingShape] = useState(false);
-
-  useEffect(() => {
-    if (selectedNode && selectedNode.data?.shape?.[0] === null && getNodeShape) {
-      setIsLoadingShape(true);
-      getNodeShape(selectedNode.id)
-        .then((shapeData) => {
-          if (shapeData && shapeData.shape) {
-            setActualShape(shapeData.shape as [number, number]);
-          }
-        })
-        .catch((error) => {
-          console.error('Failed to fetch actual shape:', error);
-        })
-        .finally(() => {
-          setIsLoadingShape(false);
-        });
-    } else {
-      setActualShape(null);
-      setIsLoadingShape(false);
-    }
-  }, [selectedNode, getNodeShape]);
-
   const displayShape = useMemo(() => {
     if (selectedNode?.data?.shape) {
       const [rows, cols] = selectedNode.data.shape;
-      if (rows === null) {
-        if (actualShape) {
-          return actualShape;
-        }
-        if (isLoadingShape) {
-          return ['...', cols] as [string, number | string];
-        }
-        return ['?', cols] as [string, number | string];
-      }
-      return [rows, cols] as [number | string, number | string];
+      const formatPart = (value: number | null | undefined) =>
+        typeof value === 'number' && Number.isFinite(value) ? value.toLocaleString() : '?';
+      return [formatPart(rows), formatPart(cols)] as [string, string];
     }
-    return ['?', '?'];
-  }, [selectedNode, actualShape, isLoadingShape]);
+    return ['?', '?'] as [string, string];
+  }, [selectedNode]);
 
   const rowsLoaded = useMemo(() => (Array.isArray(nodeData.data) ? nodeData.data.length : 0), [nodeData.data]);
 

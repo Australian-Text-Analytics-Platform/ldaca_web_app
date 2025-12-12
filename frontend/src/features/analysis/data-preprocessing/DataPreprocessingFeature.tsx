@@ -15,7 +15,7 @@ type DataPrepSubtab = 'filter' | 'slice' | 'join' | 'concat' | 'aggregate';
 
 const DataPreprocessingFeature: React.FC = () => {
   const { selectedNodeId, selectedNode, selectedNodes, selectedNodeIds } = useWorkspaceSelection();
-  const { nodeData, currentWorkspaceId, nodes: workspaceNodes = [], getNodeShape } = useWorkspaceData();
+  const { nodeData, currentWorkspaceId, nodes: workspaceNodes = [] } = useWorkspaceData();
   const {
     filterNode,
     filterPreview,
@@ -71,7 +71,6 @@ const DataPreprocessingFeature: React.FC = () => {
             nodeData={nodeData}
             currentWorkspaceId={currentWorkspaceId}
             workspaceNodes={workspaceNodes}
-            getNodeShape={getNodeShape}
             filterNode={filterNode}
             filterPreview={filterPreview}
             isLoading={isLoading}
@@ -85,7 +84,6 @@ const DataPreprocessingFeature: React.FC = () => {
             selectedNode={selectedNode}
             selectedNodes={selectedNodes}
             workspaceNodes={workspaceNodes}
-            getNodeShape={getNodeShape}
             sliceNode={sliceNode}
             slicePreview={slicePreview}
             isLoading={isLoading}
@@ -98,7 +96,6 @@ const DataPreprocessingFeature: React.FC = () => {
             selectedNodeIds={selectedNodeIds}
             currentWorkspaceId={currentWorkspaceId}
             workspaceNodes={workspaceNodes}
-            getNodeShape={getNodeShape}
             joinNodes={joinNodes}
             isLoading={isLoading}
             onAlert={handleAlert}
@@ -110,7 +107,6 @@ const DataPreprocessingFeature: React.FC = () => {
             selectedNodeIds={selectedNodeIds}
             currentWorkspaceId={currentWorkspaceId}
             workspaceNodes={workspaceNodes}
-            getNodeShape={getNodeShape}
             concatNodes={concatNodes}
             concatPreview={concatPreview}
             isLoading={isLoading}
@@ -123,7 +119,6 @@ const DataPreprocessingFeature: React.FC = () => {
             selectedNodeId={selectedNodeId}
             selectedNodes={selectedNodes}
             workspaceNodes={workspaceNodes}
-            getNodeShape={getNodeShape}
             isLoading={isLoading}
             onAlert={handleAlert}
             computeColumnPreview={computeColumnPreview}

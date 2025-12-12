@@ -381,13 +381,25 @@ def test_user():
 
 @pytest.fixture
 async def workspace_id(authenticated_client):
-    """Create a test workspace and return its ID."""
+    """Create a test workspace and ensure it's deleted after the test."""
     response = await authenticated_client.post(
         "/api/workspaces",
         json={"name": "test_workspace", "description": "Test workspace for analysis"},
     )
     assert response.status_code == 200
-    return response.json()["workspace_id"]
+    workspace_id = response.json()["workspace_id"]
+
+    try:
+        yield workspace_id
+    finally:
+        cleanup_response = await authenticated_client.delete(
+            f"/api/workspaces/{workspace_id}"
+        )
+        if cleanup_response.status_code not in (200, 404):
+            raise AssertionError(
+                f"Failed to delete test workspace {workspace_id}: "
+                f"status={cleanup_response.status_code} body={cleanup_response.text}"
+            )
 
 
 @pytest.fixture

@@ -106,7 +106,7 @@ const extractMetadata = (entry: unknown): Record<string, unknown> => {
 function TokenFrequencyFeature() {
   const { selectedNodes } = useWorkspaceSelection();
   const { selectNodes } = useWorkspaceActions();
-  const { currentWorkspaceId, getNodeShape } = useWorkspaceData();
+  const { currentWorkspaceId } = useWorkspaceData();
   const { isLoading } = useWorkspaceStatus();
 
   const { getColumnInfos } = useNodeColumnInfos({
@@ -1287,7 +1287,6 @@ function TokenFrequencyFeature() {
             maxCompare={2}
             className="border border-dashed border-muted-foreground/40 rounded-lg bg-muted/30 p-4"
             showShape
-            getNodeShapeFn={getNodeShape}
             disabled={!!isLocked}
             locked={!!isLocked}
             showColorPicker={true}

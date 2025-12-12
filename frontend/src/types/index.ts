@@ -101,7 +101,6 @@ export interface WorkspaceNode {
   data_type?: string; // e.g., 'polars.dataframe.frame.DataFrame', 'pandas.core.frame.DataFrame', 'docframe.corpus.DocDataFrame'
   column_schema?: Record<string, string>; // Column name to data type mapping
   dtypes?: Record<string, string>; // Alternative name for column types
-  is_lazy?: boolean; // Whether the node uses lazy evaluation
   [key: string]: unknown;
 }
 
@@ -123,7 +122,6 @@ export interface CastResponse {
   is_text_data: boolean;
   data_type: string;
   operation: string;
-  is_lazy?: boolean; // Whether the node uses lazy evaluation
   cast_info: {
     column: string;
     original_type: string;

@@ -2,7 +2,7 @@ import React from 'react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 import { Copy, Check } from 'lucide-react';
-import type { NodeShapeResult, SidebarWorkspaceNode } from './types';
+import type { SidebarWorkspaceNode } from './types';
 
 type CopiedField = { nodeId: string; field: 'name' | 'id' } | null;
 
@@ -10,19 +10,16 @@ type SidebarNodesSectionProps = {
   nodes: SidebarWorkspaceNode[];
   selectedNodeIds?: string[];
   onToggleNodeSelection: (nodeId: string) => void;
-  getNodeShape?: (nodeId: string) => Promise<NodeShapeResult | null>;
 };
 
 const SidebarNodesSection: React.FC<SidebarNodesSectionProps> = ({
   nodes,
   selectedNodeIds,
   onToggleNodeSelection,
-  getNodeShape,
 }) => {
   const [copiedField, setCopiedField] = React.useState<CopiedField>(null);
   const copyTimeoutRef = React.useRef<number | null>(null);
   const [hoveredNodeId, setHoveredNodeId] = React.useState<string | null>(null);
-  const [nodeShapes, setNodeShapes] = React.useState<Record<string, string>>({});
 
   const handleCopy = React.useCallback(
     async (value: string | undefined | null, nodeId: string, field: 'name' | 'id') => {
@@ -63,52 +60,16 @@ const SidebarNodesSection: React.FC<SidebarNodesSectionProps> = ({
     }
   }, []);
 
-  React.useEffect(() => {
-    if (!getNodeShape || nodes.length === 0) return;
-
-    let cancelled = false;
-
-    const fetchShapes = async () => {
-      const promises = nodes.map(async (node) => {
-        if (nodeShapes[node.id]) return;
-
-        try {
-          const cacheKey = `node-shape:${node.id}`;
-          const cached = typeof window !== 'undefined' ? window.sessionStorage.getItem(cacheKey) : null;
-          if (cached) {
-            if (!cancelled) {
-              setNodeShapes((prev) => ({ ...prev, [node.id]: cached }));
-            }
-            return;
-          }
-
-          const shapeData = await getNodeShape(node.id);
-          if (!cancelled && shapeData?.shape) {
-            const shapeStr = `${shapeData.shape[0]} × ${shapeData.shape[1]}`;
-            setNodeShapes((prev) => ({ ...prev, [node.id]: shapeStr }));
-
-            try {
-              if (typeof window !== 'undefined') {
-                window.sessionStorage.setItem(cacheKey, shapeStr);
-              }
-            } catch {
-              // Ignore storage errors
-            }
-          }
-        } catch {
-          // Ignore fetch errors
-        }
-      });
-
-      await Promise.all(promises);
-    };
-
-    void fetchShapes();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [getNodeShape, nodes, nodeShapes]);
+  const formatShapeLabel = React.useCallback((node: SidebarWorkspaceNode): string => {
+    const rawShape = node.data?.shape || (node as { shape?: [number | null, number | null] }).shape;
+    if (!rawShape) {
+      return '—';
+    }
+    const [rows, cols] = rawShape;
+    const formatPart = (value: number | null | undefined) =>
+      typeof value === 'number' && Number.isFinite(value) ? value.toLocaleString() : '?';
+    return `${formatPart(rows)} × ${formatPart(cols)}`;
+  }, []);
 
   const nodeCount = nodes.length;
   const selectedCount = selectedNodeIds?.length ?? 0;
@@ -124,7 +85,7 @@ const SidebarNodesSection: React.FC<SidebarNodesSectionProps> = ({
           nodes.map((node) => {
             const name = node?.data?.nodeName || node?.data?.label || node?.label || '';
             const dtype = node?.data?.nodeType || node?.data?.dataType || node?.type || 'unknown';
-            const shape = nodeShapes[node.id] || '—';
+            const shape = formatShapeLabel(node);
             const checked = selectedNodeIds?.includes(node.id);
             const copyNameValue = name && name.length > 0 ? name : node.id;
             const displayName = copyNameValue || 'Untitled node';

@@ -1,6 +1,8 @@
+from types import SimpleNamespace
 from typing import Any, Dict, List
 from unittest.mock import MagicMock
 
+import polars as pl
 import pytest
 from ldaca_web_app_backend.core.analysis_store import get_latest_analysis, save_analysis
 from ldaca_web_app_backend.core.workspace import workspace_manager
@@ -12,9 +14,18 @@ TASK = "quotation"
 
 def _prime_workspace_state():
     """Ensure the workspace manager exposes in-memory state for analysis_store."""
+    base_df = pl.DataFrame({"text": ["alpha doc", "beta doc"]})
+
+    class DummyWorkspace:
+        def __init__(self, df):
+            self._df = df
+
+        def get_node(self, node_id):
+            return SimpleNamespace(id=node_id, data=self._df)
+
     workspace_manager._current[USER_ID] = {  # type: ignore[attr-defined]
         "id": WORKSPACE_ID,
-        "ws": MagicMock(name="Workspace"),
+        "ws": DummyWorkspace(base_df),
     }
     workspace_manager._ensure_analysis_state(USER_ID, WORKSPACE_ID)  # type: ignore[attr-defined]
 
@@ -44,19 +55,6 @@ def _seed_paginated_analysis(rows: List[Dict[str, Any]], context_length: int = 1
             },
             "sorting": {"sort_by": "document_idx", "sort_order": "asc"},
             "preferences": {"context_length": context_length},
-            "_stored": {
-                "rows": rows,
-                "columns": list(rows[0].keys()) if rows else ["document_idx"],
-                "total_rows": len(rows),
-                "default_page": 1,
-                "default_page_size": 1,
-                "default_sort_by": "document_idx",
-                "default_sort_order": "asc",
-                "column": "text",
-                "node_id": "node-1",
-                "engine": {"type": "local"},
-                "preferences": {"context_length": context_length},
-            },
         },
     )
 
@@ -95,7 +93,7 @@ async def test_update_context_length_persists_preference(
     authenticated_client, seeded_quotation_analysis
 ):
     response = await authenticated_client.post(
-        f"/workspaces/{WORKSPACE_ID}/quotation/current-result",
+        f"/api/workspaces/{WORKSPACE_ID}/quotation/current-result",
         json={"context_length": 42},
     )
     assert response.status_code == 200
@@ -120,14 +118,14 @@ async def test_update_context_length_clamps_bounds(authenticated_client):
 
     try:
         high_response = await authenticated_client.post(
-            f"/workspaces/{WORKSPACE_ID}/quotation/current-result",
+            f"/api/workspaces/{WORKSPACE_ID}/quotation/current-result",
             json={"context_length": 99999},
         )
         assert high_response.status_code == 200
         assert high_response.json()["data"]["context_length"] == 2000
 
         low_response = await authenticated_client.post(
-            f"/workspaces/{WORKSPACE_ID}/quotation/current-result",
+            f"/api/workspaces/{WORKSPACE_ID}/quotation/current-result",
             json={"context_length": -5},
         )
         assert low_response.status_code == 200
@@ -142,10 +140,24 @@ async def test_update_context_length_clamps_bounds(authenticated_client):
 
 @pytest.mark.asyncio
 async def test_quotation_current_result_respects_page_params(
-    authenticated_client, seeded_paginated_quotation
+    authenticated_client, seeded_paginated_quotation, monkeypatch
 ):
+    async def fake_compute(node, base_df, column, engine, *, use_base_only=False):
+        doc_ids = base_df.get_column("document_idx").to_list()
+        rows = []
+        for idx in doc_ids:
+            if idx == 0:
+                rows.append({"document_idx": 0, "quote": "alpha"})
+            elif idx == 1:
+                rows.append({"document_idx": 1, "quote": "beta"})
+        return pl.DataFrame(rows)
+
+    monkeypatch.setattr(
+        "ldaca_web_app_backend.api.workspaces.analyses.quotation._compute_quote_dataframe",
+        fake_compute,
+    )
     response = await authenticated_client.get(
-        f"/workspaces/{WORKSPACE_ID}/quotation/current-result",
+        f"/api/workspaces/{WORKSPACE_ID}/quotation/current-result",
         params={"page": 2, "page_size": 1},
     )
     assert response.status_code == 200
@@ -156,13 +168,77 @@ async def test_quotation_current_result_respects_page_params(
 
 @pytest.mark.asyncio
 async def test_update_quotation_current_result_returns_page_payload(
-    authenticated_client, seeded_paginated_quotation
+    authenticated_client, seeded_paginated_quotation, monkeypatch
 ):
+    async def fake_compute(node, base_df, column, engine, *, use_base_only=False):
+        doc_ids = base_df.get_column("document_idx").to_list()
+        rows = []
+        for idx in doc_ids:
+            if idx == 0:
+                rows.append({"document_idx": 0, "quote": "alpha"})
+            elif idx == 1:
+                rows.append({"document_idx": 1, "quote": "beta"})
+        return pl.DataFrame(rows)
+
+    monkeypatch.setattr(
+        "ldaca_web_app_backend.api.workspaces.analyses.quotation._compute_quote_dataframe",
+        fake_compute,
+    )
     response = await authenticated_client.post(
-        f"/workspaces/{WORKSPACE_ID}/quotation/current-result",
+        f"/api/workspaces/{WORKSPACE_ID}/quotation/current-result",
         json={"page": 2, "page_size": 1},
     )
     assert response.status_code == 200
     payload = response.json()
     assert payload["pagination"]["page"] == 2
     assert payload["data"][0]["quote"] == "beta"
+
+
+@pytest.mark.asyncio
+async def test_quotation_endpoint_recomputes_on_demand(
+    authenticated_client, monkeypatch, seeded_paginated_quotation
+):
+    class DummyWorkspace:
+        def __init__(self, df):
+            self._df = df
+
+        def get_node(self, node_id):
+            return SimpleNamespace(id=node_id, data=self._df, name=node_id)
+
+    base_df = pl.DataFrame({"text": ["alpha doc", "beta doc"]})
+    workspace_manager._current[USER_ID] = {
+        "id": WORKSPACE_ID,
+        "ws": DummyWorkspace(base_df),
+    }
+    workspace_manager._ensure_analysis_state(USER_ID, WORKSPACE_ID)
+
+    recompute_called = False
+
+    async def fake_compute(node, base_df_slice, column, engine, *, use_base_only=False):
+        nonlocal recompute_called
+        recompute_called = True
+        doc_ids = base_df_slice.get_column("document_idx").to_list()
+        rows = []
+        for idx in doc_ids:
+            if idx == 0:
+                rows.append({"document_idx": 0, "quote": "alpha"})
+            elif idx == 1:
+                rows.append({"document_idx": 1, "quote": "beta"})
+        return pl.DataFrame(rows)
+
+    monkeypatch.setattr(
+        "ldaca_web_app_backend.api.workspaces.analyses.quotation._compute_quote_dataframe",
+        fake_compute,
+    )
+
+    response = await authenticated_client.post(
+        f"/api/workspaces/{WORKSPACE_ID}/nodes/node-1/quotation",
+        json={"column": "text", "page": 2, "page_size": 1},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["pagination"]["page"] == 2
+    assert payload["data"][0]["quote"] == "beta"
+    assert recompute_called is True
+    assert recompute_called is True

@@ -1,18 +1,18 @@
 """Workspace lifecycle endpoints extracted from base.py.
 Routes preserved exactly for backward compatibility."""
 
+import json
 from typing import Any, Dict, Optional
 
+from docworkspace.workspace.io import (  # type: ignore
+    deserialize_workspace,
+    serialize_workspace,
+)
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse
 
 from ...core.auth import get_current_user
 from ...core.json_utils import json_sanitize
-from ...core.utils import (
-    generate_workspace_id,
-    get_user_data_folder,
-    get_user_workspace_folder,
-)
+from ...core.utils import generate_workspace_id
 from ...core.workspace import workspace_manager
 from ...models import WorkspaceCreateRequest, WorkspaceInfo
 
@@ -53,7 +53,7 @@ async def create_workspace(
         workspace = workspace_manager.create_workspace(
             user_id=user_id, name=request.name, description=request.description or ""
         )
-        workspace_id = workspace.get_metadata("id")
+        workspace_id = workspace.id
         workspace_info = workspace_manager.get_workspace_info(user_id, workspace_id)
         if not workspace_info:
             raise HTTPException(status_code=500, detail="Failed to get workspace info")
@@ -165,27 +165,26 @@ async def save_workspace(
 
 @router.post("/{workspace_id}/save-as")
 async def save_workspace_as(
-    workspace_id: str, filename: str, current_user: dict = Depends(get_current_user)
+    workspace_id: str, folder_name: str, current_user: dict = Depends(get_current_user)
 ):
     user_id = current_user["id"]
     source = workspace_manager.get_workspace(user_id, workspace_id)
     if not source:
         raise HTTPException(status_code=404, detail="Workspace not found")
-    user_folder = get_user_data_folder(user_id)
-    tmp_path = user_folder / f"_tmp_clone_{workspace_id}.json"
     try:
-        source.serialize(tmp_path)
-        from docworkspace import Workspace as DWWorkspace  # type: ignore
-
-        new_ws = DWWorkspace.deserialize(tmp_path)  # type: ignore
+        payload = serialize_workspace(source)
         new_id = generate_workspace_id()
-        new_ws.set_metadata("id", new_id)
-        new_ws.set_metadata("created_at", source.get_metadata("created_at"))
-        new_ws.set_metadata("modified_at", source.get_metadata("modified_at"))
-        new_ws.name = filename.replace(".json", "")
-        target = get_user_workspace_folder(user_id)
-        target.mkdir(parents=True, exist_ok=True)
-        new_ws.serialize(target / f"workspace_{new_id}.json")
+        new_name = folder_name.replace(".json", "")
+
+        ws_meta = payload.get("workspace_metadata", {})
+        ws_meta["id"] = new_id
+        ws_meta["name"] = new_name
+        payload["workspace_metadata"] = ws_meta
+
+        new_ws = deserialize_workspace(payload)
+        new_ws.id = new_id
+
+        workspace_manager._save(user_id, new_id, new_ws)
         info = workspace_manager.get_workspace_info(user_id, new_id)
         return {
             "state": "successful",
@@ -196,36 +195,6 @@ async def save_workspace_as(
         raise HTTPException(
             status_code=500, detail=f"Failed to save workspace copy: {e}"
         )
-    finally:
-        try:
-            if tmp_path.exists():
-                tmp_path.unlink()
-        except Exception:
-            pass
-
-
-@router.get("/{workspace_id}/download")
-async def download_workspace(
-    workspace_id: str, current_user: dict = Depends(get_current_user)
-):
-    user_id = current_user["id"]
-    current_id = workspace_manager.get_current_workspace_id(user_id)
-    if current_id == workspace_id:
-        try:
-            ws = workspace_manager.get_workspace(user_id, workspace_id)
-            if ws:
-                workspace_manager.persist(user_id, workspace_id)
-        except Exception:
-            pass
-    user_folder = get_user_workspace_folder(user_id)
-    json_path = user_folder / f"workspace_{workspace_id}.json"
-    if not json_path.exists():
-        raise HTTPException(status_code=404, detail="Workspace file not found")
-    return FileResponse(
-        json_path,
-        media_type="application/json",
-        filename=f"workspace_{workspace_id}.json",
-    )
 
 
 @router.post("/import")
@@ -238,29 +207,28 @@ async def import_workspace(
         raise HTTPException(
             status_code=400, detail="Only .json workspace files are supported"
         )
-    target_folder = get_user_workspace_folder(user_id)
-    target_folder.mkdir(parents=True, exist_ok=True)
-    tmp_path = target_folder / ("_tmp_upload_" + filename)
     try:
         content = await file.read()
-        with open(tmp_path, "wb") as f:
-            f.write(content)
-        from docworkspace import Workspace as DWWorkspace  # type: ignore
+        try:
+            payload = json.loads(content.decode("utf-8"))
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Invalid JSON payload: {e}")
 
         try:
-            new_ws = DWWorkspace.deserialize(tmp_path)  # type: ignore
+            new_ws = deserialize_workspace(payload)
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Invalid workspace JSON: {e}")
+
         new_id = generate_workspace_id()
-        new_ws.set_metadata("id", new_id)
+        new_ws.id = new_id
         base_name = filename.rsplit("/", 1)[-1].rsplit(".json", 1)[0]
         if not getattr(new_ws, "name", None):
             try:
                 new_ws.name = base_name
             except Exception:
                 pass
-        final_path = target_folder / f"workspace_{new_id}.json"
-        new_ws.serialize(final_path)
+
+        workspace_manager._save(user_id, new_id, new_ws)
         info = workspace_manager.get_workspace_info(user_id, new_id) or {
             "workspace_id": new_id,
             "name": getattr(new_ws, "name", base_name),
@@ -270,12 +238,6 @@ async def import_workspace(
         raise
     except Exception as e:  # pragma: no cover
         raise HTTPException(status_code=500, detail=f"Failed to import workspace: {e}")
-    finally:
-        try:
-            if tmp_path.exists():
-                tmp_path.unlink()
-        except Exception:
-            pass
 
 
 @router.get("/{workspace_id}/info")
@@ -321,4 +283,5 @@ async def get_workspace_nodes(
 ):
     user_id = current_user["id"]
     summaries = workspace_manager.get_node_summaries(user_id, workspace_id)
+    return {"nodes": summaries}
     return {"nodes": summaries}

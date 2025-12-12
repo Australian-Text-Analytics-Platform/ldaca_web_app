@@ -14,7 +14,7 @@ import { useAggregateSubTab, type AggregateSubTabProps } from './hooks/useAggreg
 export type { AggregateSubTabProps } from './hooks/useAggregateSubTab';
 
 export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
-  const { getNodeShape, isLoading } = props;
+  const { isLoading } = props;
   const {
     nodeSelection,
     expression,
@@ -124,7 +124,6 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
             showColorPicker={false}
             showColumnPicker={false}
             originalCount={nodeSelection.originalCount}
-            getNodeShapeFn={getNodeShape}
             disabled={isLoading.operations}
             showShape
           />

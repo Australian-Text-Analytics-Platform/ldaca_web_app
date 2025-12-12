@@ -1,7 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { submitFeedback } from '../../api/feedback';
 import { useAuth } from '../../hooks/useAuth';
-import { Dialog, DialogContent } from '../ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Loader2 } from 'lucide-react';
@@ -77,6 +77,10 @@ export const FeedbackPanel: React.FC<FeedbackPanelProps> = ({ open, onClose }) =
       }}
     >
       <DialogContent className="w-full max-w-xl border-none bg-transparent p-0 shadow-none">
+        <DialogHeader className="sr-only">
+          <DialogTitle>Send feedback</DialogTitle>
+          <DialogDescription>Share ideas, report issues, or suggest improvements.</DialogDescription>
+        </DialogHeader>
         <form onSubmit={handleSubmit}>
           <Card>
             <CardHeader>

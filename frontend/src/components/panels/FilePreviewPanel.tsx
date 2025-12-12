@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo } from 'react';
 import { useFilePreview } from '../../hooks/useFilePreview';
-import { Dialog, DialogContent } from '../ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
@@ -47,6 +47,10 @@ export const FilePreviewPanel: React.FC<FilePreviewPanelProps> = ({ filename, op
       }}
     >
       <DialogContent className="w-full max-w-[min(80vw,_1000px)] border-none bg-transparent p-0 shadow-none">
+        <DialogHeader className="sr-only">
+          <DialogTitle>{filename ? `Preview: ${filename}` : 'File preview'}</DialogTitle>
+          <DialogDescription>Inspect the first rows of the uploaded file before adding it to a workspace.</DialogDescription>
+        </DialogHeader>
         <Card className="flex h-[85vh] w-full max-h-[90vh] min-w-0 flex-col">
           <CardHeader className="border-b px-6 py-4">
             <CardTitle className="truncate text-lg font-semibold">Preview{filename ? `: ${filename}` : ''}</CardTitle>

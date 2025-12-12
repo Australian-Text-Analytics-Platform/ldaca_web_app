@@ -42,14 +42,22 @@ class TestInMemoryPersistence:
         from ldaca_web_app_backend.core.workspace import workspace_manager
 
         user_id = "meta_user"
-        with patch(
-            "ldaca_web_app_backend.core.workspace.get_user_workspace_folder",
-            return_value=tmp_path / user_id / "user_workspaces",
+        workspace_root = tmp_path / user_id / "user_workspaces"
+        workspace_root.mkdir(parents=True, exist_ok=True)
+        with (
+            patch(
+                "ldaca_web_app_backend.core.workspace.get_user_workspace_folder",
+                return_value=workspace_root,
+            ),
+            patch(
+                "ldaca_web_app_backend.core.utils.get_user_workspace_folder",
+                return_value=workspace_root,
+            ),
         ):
             ws = workspace_manager.create_workspace(
                 user_id, name="Meta Test", description="Desc"
             )
-            wid = ws.get_metadata("id")
+            wid = ws.id
             save_analysis(
                 user_id,
                 wid,
@@ -73,14 +81,22 @@ class TestInMemoryPersistence:
         from ldaca_web_app_backend.core.workspace import workspace_manager
 
         user_id = "ser_user"
-        with patch(
-            "ldaca_web_app_backend.core.workspace.get_user_workspace_folder",
-            return_value=tmp_path / user_id / "user_workspaces",
+        workspace_root = tmp_path / user_id / "user_workspaces"
+        workspace_root.mkdir(parents=True, exist_ok=True)
+        with (
+            patch(
+                "ldaca_web_app_backend.core.workspace.get_user_workspace_folder",
+                return_value=workspace_root,
+            ),
+            patch(
+                "ldaca_web_app_backend.core.utils.get_user_workspace_folder",
+                return_value=workspace_root,
+            ),
         ):
             ws = workspace_manager.create_workspace(
                 user_id, name="Serialize Test", description="Desc"
             )
-            wid = ws.get_metadata("id")
+            wid = ws.id
             save_analysis(
                 user_id,
                 wid,
@@ -90,9 +106,9 @@ class TestInMemoryPersistence:
             )
             workspace_manager.unload_workspace(user_id, save=True)
             workspace_manager.get_workspace(user_id, wid)
-            workspace_file = (
-                tmp_path / user_id / "user_workspaces" / f"workspace_{wid}.json"
-            )
-            assert workspace_file.exists()
-            content = workspace_file.read_text()
+            workspace_dir = workspace_manager.get_workspace_dir(user_id, wid)
+            assert workspace_dir is not None
+            metadata_path = workspace_dir / "metadata.json"
+            assert metadata_path.exists()
+            content = metadata_path.read_text()
             assert "token_frequencies" not in content

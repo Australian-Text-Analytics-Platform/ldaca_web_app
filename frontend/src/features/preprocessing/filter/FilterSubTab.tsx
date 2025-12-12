@@ -20,7 +20,6 @@ export const FilterSubTab: React.FC<FilterSubTabProps> = (props) => {
     applyFilter,
     applyButtonDisabled,
     preview,
-    getNodeShape,
     selectedNodesOriginalCount,
   } = useFilterSubTabSections(props);
 
@@ -60,7 +59,6 @@ export const FilterSubTab: React.FC<FilterSubTabProps> = (props) => {
             showColumnPicker={false}
             showHeaderLabel
             showShape
-            getNodeShapeFn={getNodeShape}
             disabled={selectionPanel.disabled}
             originalCount={selectedNodesOriginalCount}
           />

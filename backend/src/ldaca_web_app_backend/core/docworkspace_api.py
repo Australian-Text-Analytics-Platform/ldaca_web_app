@@ -6,10 +6,12 @@ docworkspace to keep the core library general-purpose.
 """
 
 import math
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import polars as pl
 from docworkspace import Node, Workspace
+
+from docframe import DocLazyFrame
 
 # Import API models
 from .api_models import (
@@ -118,14 +120,29 @@ class DocWorkspaceAPIUtils:
                 info["schema"]
             )
 
-        # Ensure dtype is a string for JSON serialization
-        if "dtype" in info and not isinstance(info["dtype"], str):
-            dtype = info["dtype"]
-            info["dtype"] = f"{dtype.__module__}.{dtype.__name__}"
+        # Remove internal-only fields from display while preserving document metadata
+        info.pop("dtype", None)
+        document_value = info.pop("document", None)
+        if document_value is None:
+            document_value = info.pop("document_column", None)
+        if document_value is not None:
+            info["document"] = document_value
 
         # Explicitly add columns field for frontend compatibility
         if "columns" not in info:
-            cols = getattr(node, "columns", [])
+            cols = []
+            try:
+                data_obj = getattr(node, "data", node)
+                if isinstance(data_obj, DocLazyFrame):
+                    data_obj = data_obj.lazyframe
+
+                if hasattr(data_obj, "collect_schema"):
+                    cols = data_obj.collect_schema().names()
+                elif hasattr(data_obj, "columns"):
+                    cols = data_obj.columns
+            except Exception:
+                pass
+
             # Sanitize non-serializable objects (e.g., Mock) that could cause recursion
             if isinstance(cols, (list, tuple)):
                 safe_cols = list(cols)
@@ -147,28 +164,36 @@ class DocWorkspaceAPIUtils:
         schema_data = []
 
         try:
-            # Get the underlying data schema
-            if hasattr(node, "columns"):
-                columns = node.columns
-                # Try to get schema from underlying data
-                if hasattr(node.data, "schema"):
-                    data_schema = node.data.schema
-                    for col_name in columns:
-                        if col_name in data_schema:
-                            polars_type = data_schema[col_name]  # Keep as type object
-                            # Pass the actual type object, not string
-                            js_type = DocWorkspaceAPIUtils.polars_type_to_js_type(
-                                polars_type
-                            )
-                            schema_data.append(
-                                ColumnSchema(
-                                    name=col_name,
-                                    dtype=str(
-                                        polars_type
-                                    ),  # Convert to string for storage
-                                    js_type=js_type,
-                                )
-                            )
+            data_obj = getattr(node, "data", node)
+
+            # Unwrap DocLazyFrame
+            if isinstance(data_obj, DocLazyFrame):
+                data_obj = data_obj.lazyframe
+
+            # Get schema efficiently
+            data_schema = None
+            if hasattr(data_obj, "collect_schema"):
+                data_schema = data_obj.collect_schema()
+            elif hasattr(data_obj, "schema"):
+                data_schema = data_obj.schema
+
+            if data_schema:
+                # data_schema is Schema object or dict
+                items = (
+                    data_schema.items()
+                    if hasattr(data_schema, "items")
+                    else data_schema
+                )
+
+                for col_name, polars_type in items:
+                    js_type = DocWorkspaceAPIUtils.polars_type_to_js_type(polars_type)
+                    schema_data.append(
+                        ColumnSchema(
+                            name=col_name,
+                            dtype=str(polars_type),  # Convert to string for storage
+                            js_type=js_type,
+                        )
+                    )
         except Exception:
             # Fallback for any schema extraction issues
             pass
@@ -190,42 +215,69 @@ class DocWorkspaceAPIUtils:
             return DataType.POLARS_DATAFRAME
 
     @staticmethod
+    def compute_node_shape(target: Any) -> Tuple[int, int]:
+        """Calculate the actual shape of a node.
+
+        Always returns (rows, cols). For lazy frames, this triggers a count query.
+        """
+        data_obj = getattr(target, "data", target)
+
+        # 1. Try direct shape attribute (e.g. DataFrame)
+        if hasattr(data_obj, "shape"):
+            try:
+                shape = data_obj.shape
+                if isinstance(shape, (list, tuple)) and len(shape) >= 2:
+                    return (int(shape[0]), int(shape[1]))
+            except Exception:
+                pass
+
+        # 2. Handle LazyFrame (Polars or DocLazyFrame)
+        # Unwrap DocLazyFrame if needed to get to the Polars LazyFrame
+        inner_obj = data_obj
+        if isinstance(data_obj, DocLazyFrame):
+            inner_obj = data_obj.lazyframe
+
+        rows = 0
+        cols = 0
+
+        # Get columns count
+        try:
+            # Prefer collect_schema() for LazyFrame to avoid PerformanceWarning
+            if hasattr(inner_obj, "collect_schema"):
+                cols = len(inner_obj.collect_schema())
+            elif hasattr(inner_obj, "columns"):
+                cols = len(inner_obj.columns)
+        except Exception:
+            pass
+
+        # Get row count (force calculation for lazy frames)
+        try:
+            if hasattr(inner_obj, "select") and hasattr(inner_obj, "collect"):
+                # Efficient count for Polars LazyFrame
+                rows = inner_obj.select(pl.len()).collect().item()
+        except Exception:
+            pass
+
+        return (rows, cols)
+
+    @staticmethod
     def node_to_summary(node: Any) -> NodeSummary:
         """Convert a Node to NodeSummary for API responses."""
         try:
             # Get basic node information
             columns = getattr(node, "columns", [])
 
-            # Implement two-tier shape interface for performance:
-            # For LazyFrames: return (None, column_count) to avoid expensive row calculation
-            # For DataFrames: return full (row_count, column_count)
-            shape = None
-            try:
-                if node.is_lazy:
-                    # For lazy frames, only get column count without materializing
-                    if hasattr(node.data, "collect_schema"):
-                        column_count = len(node.data.collect_schema().names())
-                        shape = (None, column_count)
-                    elif hasattr(node.data, "columns"):
-                        column_count = len(node.data.columns)
-                        shape = (None, column_count)
-                else:
-                    # For materialized DataFrames, get full shape
-                    if hasattr(node.data, "shape"):
-                        shape = node.data.shape
-            except (AttributeError, Exception):
-                shape = None
+            shape = DocWorkspaceAPIUtils.compute_node_shape(node)
 
             node_summary = NodeSummary(
                 id=node.id,
                 name=node.name,
                 data_type=DocWorkspaceAPIUtils.get_data_type(node),
-                is_lazy=node.is_lazy,
                 operation=getattr(node, "operation", None),
                 shape=shape,
                 columns=columns,
                 schema=DocWorkspaceAPIUtils.get_node_schema(node),  # alias
-                document_column=getattr(node, "document_column", None),
+                document=getattr(node, "document", None),
                 parent_ids=[parent.id for parent in getattr(node, "parents", [])],
                 child_ids=[child.id for child in getattr(node, "children", [])],
             )
@@ -238,9 +290,9 @@ class DocWorkspaceAPIUtils:
                 id=getattr(node, "id", "unknown"),
                 name=getattr(node, "name", "unknown"),
                 data_type=DataType.POLARS_DATAFRAME,  # Default fallback
-                is_lazy=getattr(node, "is_lazy", False),
                 columns=[],
                 schema=[],
+                shape=(0, 0),
             )
 
     @staticmethod
@@ -320,23 +372,7 @@ class DocWorkspaceAPIUtils:
                 i, len(workspace.nodes), layout_algorithm, node_spacing
             )
 
-            # Get shape using the same logic as node_to_summary
-            shape = None
-            try:
-                if node.is_lazy:
-                    # For lazy frames, only get column count without materializing
-                    if hasattr(node.data, "collect_schema"):
-                        column_count = len(node.data.collect_schema().names())
-                        shape = [None, column_count]  # Use list for JSON compatibility
-                    elif hasattr(node.data, "columns"):
-                        column_count = len(node.data.columns)
-                        shape = [None, column_count]
-                else:
-                    # For materialized DataFrames, get full shape
-                    if hasattr(node.data, "shape"):
-                        shape = list(node.data.shape)  # Convert tuple to list for JSON
-            except (AttributeError, Exception):
-                shape = None
+            shape = DocWorkspaceAPIUtils.compute_node_shape(node)
 
             react_node = ReactFlowNode(
                 id=node_id,
@@ -345,10 +381,9 @@ class DocWorkspaceAPIUtils:
                 data={
                     "label": node.name,
                     "nodeType": DocWorkspaceAPIUtils.get_data_type(node).value,
-                    "isLazy": node.is_lazy,
                     "shape": shape,
                     "columns": getattr(node, "columns", []),
-                    "documentColumn": getattr(node, "document_column", None),
+                    "document": getattr(node, "document", None),
                 },
                 connectable=True,
             )

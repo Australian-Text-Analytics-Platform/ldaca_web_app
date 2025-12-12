@@ -32,10 +32,6 @@ import AnalysisTaskBanner from '../../../components/tabs/AnalysisTaskBanner';
 import type { AnalysisTaskStatus } from '../../../hooks/useAnalysisTaskStatus';
 import useAnalysisTaskLifecycle, { type AnalysisTaskRefreshContext } from '../../../hooks/useAnalysisTaskLifecycle';
 
-const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const isLikelyNodeId = (value?: string | null): boolean =>
-  typeof value === 'string' && uuidPattern.test(value.trim());
-
 const sanitizeResultParams = (params?: Record<string, unknown>): Record<string, unknown> | undefined => {
   if (!params) return undefined;
   const cleaned = Object.entries(params).reduce<Record<string, unknown>>((acc, [key, value]) => {
@@ -56,7 +52,7 @@ const ConcordanceFeature: React.FC = () => {
   const resultsRef = useRef<HTMLDivElement | null>(null);
   const { selectedNodes } = useWorkspaceSelection();
   const { isLoading } = useWorkspaceStatus();
-  const { currentWorkspaceId, getNodeShape } = useWorkspaceData();
+  const { currentWorkspaceId } = useWorkspaceData();
   const { detachConcordance, selectNodes } = useWorkspaceActions();
 
   const { getColumnInfos } = useNodeColumnInfos({
@@ -208,18 +204,19 @@ const ConcordanceFeature: React.FC = () => {
   }, [currentWorkspaceId, getAuthHeaders, setResults]);
 
   const updateStoredResult = useCallback(async (
-    body: ConcordanceResultQuery,
-    fetchParamsOverride?: Record<string, unknown>
+    body: ConcordanceResultQuery
   ): Promise<ConcordanceAnalysisResponse | null> => {
     if (!currentWorkspaceId) {
       return null;
     }
 
     const headers = getAuthHeaders();
-    await textApi.postConcordanceCurrentResult(currentWorkspaceId, body, headers);
-    const params = (fetchParamsOverride ?? body) as Record<string, unknown>;
-    return refreshCurrentConcordanceResult(params);
-  }, [currentWorkspaceId, getAuthHeaders, refreshCurrentConcordanceResult]);
+    const response = await textApi.postConcordanceCurrentResult(currentWorkspaceId, body, headers) as ConcordanceAnalysisResponse;
+    if (response) {
+      setResults(response);
+    }
+    return response;
+  }, [currentWorkspaceId, getAuthHeaders, setResults]);
 
   const concordanceFallbackBanner = useCallback(
     (status: AnalysisTaskStatus) => {
@@ -830,89 +827,85 @@ const ConcordanceFeature: React.FC = () => {
   }, [viewMode, results, combinedPage, combinedPageSize, updateStoredResult]);
 
   const handleSort = (columnName: string, nodeKey: string, requestNodeId?: string) => {
-    setNodePagination(prev => {
-      const currentNodePagination = prev[nodeKey] || {
-        currentPage: 1,
-        pageSize: globalPageSize,
-        sortBy: '',
-        sortOrder: 'asc' as 'asc' | 'desc'
-      };
+    const currentNodePagination = nodePagination[nodeKey] || {
+      currentPage: 1,
+      pageSize: globalPageSize,
+      sortBy: '',
+      sortOrder: 'asc' as 'asc' | 'desc'
+    };
 
-      const isSameColumn = currentNodePagination.sortBy === columnName;
-      const newSortOrder = isSameColumn ? (currentNodePagination.sortOrder === 'asc' ? 'desc' : 'asc') : 'asc';
+    const isSameColumn = currentNodePagination.sortBy === columnName;
+    const newSortOrder = isSameColumn ? (currentNodePagination.sortOrder === 'asc' ? 'desc' : 'asc') : 'asc';
 
-      // Trigger backend resort using current-result POST
-      const pageSize = currentNodePagination.pageSize;
-      if (!currentWorkspaceId) {
-        return prev;
+    setNodePagination(prev => ({
+      ...prev,
+      [nodeKey]: {
+        ...currentNodePagination,
+        currentPage: 1, // reset to first page on new sort
+        sortBy: columnName,
+        sortOrder: newSortOrder
       }
-      const targetNodeId = requestNodeId ?? nodeKey;
-      void (async () => {
-        setNodeLoading(prev => ({ ...prev, [nodeKey]: true }));
-        try {
-          const overrides: ConcordanceResultQuery = {
-            node_id: targetNodeId,
-            sort_by: columnName,
-            sort_order: newSortOrder,
-            page: 1,
-            page_size: pageSize,
-          };
-          await updateStoredResult(overrides);
-        } finally {
-          setNodeLoading(prev => ({ ...prev, [nodeKey]: false }));
-        }
-      })();
+    }));
 
-      return {
-        ...prev,
-        [nodeKey]: {
-          ...currentNodePagination,
-          currentPage: 1, // reset to first page on new sort
-          sortBy: columnName,
-          sortOrder: newSortOrder
-        }
-      };
-    });
+    // Trigger backend resort using current-result POST
+    const pageSize = currentNodePagination.pageSize;
+    if (!currentWorkspaceId) {
+      return;
+    }
+    const targetNodeId = requestNodeId ?? nodeKey;
+    void (async () => {
+      setNodeLoading(prev => ({ ...prev, [nodeKey]: true }));
+      try {
+        const overrides: ConcordanceResultQuery = {
+          node_id: targetNodeId,
+          sort_by: columnName,
+          sort_order: newSortOrder,
+          page: 1,
+          page_size: pageSize,
+        };
+        await updateStoredResult(overrides);
+      } finally {
+        setNodeLoading(prev => ({ ...prev, [nodeKey]: false }));
+      }
+    })();
   };
 
   const handlePageChange = (newPage: number, nodeKey: string, requestNodeId?: string) => {
-    setNodePagination(prev => {
-      const currentNodePagination = prev[nodeKey] || {
-        currentPage: 1,
-        pageSize: globalPageSize,
-        sortBy: '',
-        sortOrder: 'asc' as 'asc' | 'desc'
-      };
+    const currentNodePagination = nodePagination[nodeKey] || {
+      currentPage: 1,
+      pageSize: globalPageSize,
+      sortBy: '',
+      sortOrder: 'asc' as 'asc' | 'desc'
+    };
 
-      // Trigger backend page update using current-result POST
-      if (!currentWorkspaceId) {
-        return prev;
+    setNodePagination(prev => ({
+      ...prev,
+      [nodeKey]: {
+        ...currentNodePagination,
+        currentPage: newPage
       }
-      const targetNodeId = requestNodeId ?? nodeKey;
-      void (async () => {
-        setNodeLoading(prev => ({ ...prev, [nodeKey]: true }));
-        try {
-          const overrides: ConcordanceResultQuery = {
-            node_id: targetNodeId,
-            page: newPage,
-            page_size: currentNodePagination.pageSize,
-            sort_by: currentNodePagination.sortBy || undefined,
-            sort_order: currentNodePagination.sortOrder,
-          };
-          await updateStoredResult(overrides);
-        } finally {
-          setNodeLoading(prev => ({ ...prev, [nodeKey]: false }));
-        }
-      })();
+    }));
 
-      return {
-        ...prev,
-        [nodeKey]: {
-          ...currentNodePagination,
-          currentPage: newPage
-        }
-      };
-    });
+    // Trigger backend page update using current-result POST
+    if (!currentWorkspaceId) {
+      return;
+    }
+    const targetNodeId = requestNodeId ?? nodeKey;
+    void (async () => {
+      setNodeLoading(prev => ({ ...prev, [nodeKey]: true }));
+      try {
+        const overrides: ConcordanceResultQuery = {
+          node_id: targetNodeId,
+          page: newPage,
+          page_size: currentNodePagination.pageSize,
+          sort_by: currentNodePagination.sortBy || undefined,
+          sort_order: currentNodePagination.sortOrder,
+        };
+        await updateStoredResult(overrides);
+      } finally {
+        setNodeLoading(prev => ({ ...prev, [nodeKey]: false }));
+      }
+    })();
   };
 
   const persistResultPreferences = useCallback(async (partial: { pageSize?: number; showMetadata?: boolean }) => {
@@ -942,10 +935,13 @@ const ConcordanceFeature: React.FC = () => {
         fetchParams.page_size = partial.pageSize ?? globalPageSize;
       }
 
-      return await updateStoredResult(
-        { ...preferenceUpdates, update_only: true } as ConcordanceResultQuery,
-        fetchParams,
-      );
+      const mergedBody = {
+        ...preferenceUpdates,
+        ...fetchParams,
+        update_only: false
+      } as ConcordanceResultQuery;
+
+      return await updateStoredResult(mergedBody);
     } catch (error) {
       console.error('Failed to persist concordance preferences', error);
       throw error;
@@ -1138,10 +1134,9 @@ const ConcordanceFeature: React.FC = () => {
   const renderConcordanceTable = (
     nodeKey: string,
     nodeData: any,
-    context: { nodeId: string; paginationKey: string; requestNodeId: string; column: string; displayName?: string }
+    context: { nodeId: string; paginationKey: string; requestNodeId: string; column: string }
   ) => {
-    const { nodeId: actualNodeId, paginationKey, requestNodeId, column, displayName } = context;
-    const headingLabel = displayName?.trim() || nodeKey;
+    const { nodeId: actualNodeId, paginationKey, requestNodeId, column } = context;
     const effectiveNodeId = actualNodeId || requestNodeId;
     const detachNodeId = actualNodeId || (labelToNodeId?.[nodeKey] ?? requestNodeId);
     const canDetach = Boolean(detachNodeId) && detachNodeId !== '__COMBINED__';
@@ -1201,7 +1196,7 @@ const ConcordanceFeature: React.FC = () => {
               className="max-h-96"
               style={{ scrollbarGutter: 'stable both-edges' }}
             >
-              <div className="min-w-max">
+              <div className="min-w-max pb-4">
                 <Table className="min-w-[720px]">
                 <TableHeader className="bg-gray-50">
                   <TableRow>
@@ -1309,9 +1304,6 @@ const ConcordanceFeature: React.FC = () => {
     if (!nodeData.data || nodeData.data.length === 0) {
       return (
         <div key={nodeKey} className="mb-6">
-          <div className="h-16 mb-4 flex items-center">
-            <h3 className="text-lg font-semibold text-gray-800 break-words leading-tight w-full">{headingLabel}</h3>
-          </div>
           <div className="bg-white p-4 rounded-lg border">
             <div className="text-center text-gray-500">
               No results found for “{searchWord}”
@@ -1329,9 +1321,6 @@ const ConcordanceFeature: React.FC = () => {
 
     return (
       <div key={nodeKey} className="mb-6">
-        <div className="h-16 mb-4 flex items-center">
-          <h3 className="text-lg font-semibold text-gray-800 break-words leading-tight w-full">{headingLabel}</h3>
-        </div>
         <div className="overflow-hidden rounded-lg border border-border bg-card">
           <ScrollArea
             type="always"
@@ -1339,7 +1328,7 @@ const ConcordanceFeature: React.FC = () => {
             className="max-h-96"
             style={{ scrollbarGutter: 'stable both-edges' }}
           >
-            <div className="min-w-max">
+            <div className="min-w-max pb-4">
               <Table className="min-w-[720px]">
               <TableHeader className="bg-gray-50">
                 <TableRow>
@@ -1493,7 +1482,6 @@ const ConcordanceFeature: React.FC = () => {
             maxCompare={2}
             className="border border-dashed border-muted-foreground/40 rounded-lg bg-muted/30 p-4"
             showShape
-            getNodeShapeFn={getNodeShape}
             disabled={!!isLocked}
             locked={!!isLocked}
             showColorPicker={true}
@@ -1753,24 +1741,6 @@ const ConcordanceFeature: React.FC = () => {
                       const requestNodeId = resolvedNodeId || nodeName;
                       const selection = effectiveNodeColumnSelections.find(sel => sel.nodeId === resolvedNodeId);
                       const column = selection?.column || '';
-                      const metadataNameCandidates = [
-                        (nodeData?.metadata as any)?.node_label,
-                        (nodeData?.metadata as any)?.node_name,
-                        (nodeData?.metadata as any)?.source_node_name,
-                      ];
-                      const nodeNameCandidates = [
-                        (node as any)?.data?.display_name,
-                        (node as any)?.data?.name,
-                        (node as any)?.name,
-                        (node as any)?.label,
-                        (node as any)?.data?.label,
-                      ];
-                      const candidateLabel = [...nodeNameCandidates, ...metadataNameCandidates, !isLikelyNodeId(nodeName) ? nodeName : undefined]
-                        .find((value) => typeof value === 'string' && value.trim().length > 0 && !isLikelyNodeId(value));
-                      const selectionIndex = node ? nodesForDetail.findIndex((n: any) => n.id === node.id) : -1;
-                      const fallbackOrdinal = selectionIndex >= 0 ? selectionIndex : approxIndex;
-                      const friendlyName = candidateLabel || (fallbackOrdinal >= 0 ? `Node ${fallbackOrdinal + 1}` : 'Selected node');
-                      
                       if (localStorage.getItem('debugConc') === '1') {
                         console.debug('Final match - nodeId:', resolvedNodeId, 'column:', column, 'paginationKey:', paginationKey);
                       }
@@ -1780,7 +1750,6 @@ const ConcordanceFeature: React.FC = () => {
                         paginationKey,
                         requestNodeId,
                         column,
-                        displayName: friendlyName,
                       });
                     })}
                   </div>

@@ -59,7 +59,6 @@ export const ConcatSubTab: React.FC<ConcatSubTabProps> = (props) => {
             showColumnPicker={false}
             showHeaderLabel
             showShape
-            getNodeShapeFn={props.getNodeShape}
             disabled={selectionPanel.disabled}
             originalCount={selectionPanel.originalCount}
             statusMessage={selectionPanel.statusMessage || undefined}

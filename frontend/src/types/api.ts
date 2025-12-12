@@ -75,7 +75,6 @@ export interface GraphNode {
     onDelete?: (nodeId: string) => void;
     onRename?: (nodeId: string, newName: string) => void;
     onSelect?: (nodeId: string) => void;
-    onConvertToDocDataFrame?: (nodeId: string, documentColumn: string) => void;
   };
 }
 

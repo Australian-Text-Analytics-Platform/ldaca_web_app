@@ -14,9 +14,11 @@ import { Input } from '../../../components/ui/input';
 import { Label } from '../../../components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../../components/ui/table';
 import { Badge } from '../../../components/ui/badge';
+import { toast } from 'sonner';
 import {
   AlertDialog,
   AlertDialogAction,
+  AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
   AlertDialogFooter,
@@ -46,19 +48,6 @@ const formatTimestamp = (value?: number | string | null): string => {
   return date ? date.toLocaleString() : '—';
 };
 
-type AddMode = 'DocLazyFrame' | 'LazyFrame' | 'DocDataFrame' | 'DataFrame';
-
-interface StatusMessage {
-  type: 'success' | 'error' | 'info';
-  text: string;
-}
-
-const statusTone: Record<StatusMessage['type'], string> = {
-  success: 'border-emerald-300 bg-emerald-50 text-emerald-800',
-  error: 'border-destructive bg-destructive/10 text-destructive',
-  info: 'border-blue-200 bg-blue-50 text-blue-900',
-};
-
 const getWorkspaceId = (workspace: Record<string, any>): string | null =>
   workspace?.workspace_id || workspace?.id || workspace?.unique_id || null;
 
@@ -86,14 +75,26 @@ export const DataLoaderFeature: React.FC = () => {
   const [newWorkspaceName, setNewWorkspaceName] = useState('');
   const [newWorkspaceDescription, setNewWorkspaceDescription] = useState('');
   const [renameValue, setRenameValue] = useState('');
-  const [statusMessage, setStatusMessage] = useState<StatusMessage | null>(null);
   const [previewFile, setPreviewFile] = useState<string | null>(null);
   const [addFileName, setAddFileName] = useState<string | null>(null);
   const [importingSamples, setImportingSamples] = useState(false);
   const [workspaceAlertOpen, setWorkspaceAlertOpen] = useState(false);
+  const [workspaceToDelete, setWorkspaceToDelete] = useState<{ id: string; name?: string | null } | null>(null);
+  const [deletingWorkspace, setDeletingWorkspace] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const hasWorkspaceSelected = Boolean(currentWorkspaceId);
+
+  const notify = useCallback((type: 'success' | 'error' | 'info', message: string) => {
+    const duration = type === 'error' ? 6000 : 3500;
+    if (type === 'success') {
+      toast.success(message, { duration });
+    } else if (type === 'error') {
+      toast.error(message, { duration });
+    } else {
+      toast(message, { duration });
+    }
+  }, []);
 
   useEffect(() => {
     const active = workspaces.find((ws: any) => getWorkspaceId(ws) === currentWorkspaceId);
@@ -101,12 +102,6 @@ export const DataLoaderFeature: React.FC = () => {
       setRenameValue(active.name);
     }
   }, [currentWorkspaceId, workspaces]);
-
-  useEffect(() => {
-    if (!statusMessage) return;
-    const timer = window.setTimeout(() => setStatusMessage(null), 5000);
-    return () => window.clearTimeout(timer);
-  }, [statusMessage]);
 
   const sortedWorkspaces = useMemo(() => {
     return [...workspaces].sort((a: any, b: any) => {
@@ -133,31 +128,31 @@ export const DataLoaderFeature: React.FC = () => {
       await workspaceActions.createWorkspace(trimmed, newWorkspaceDescription.trim() || undefined);
       setNewWorkspaceName('');
       setNewWorkspaceDescription('');
-      setStatusMessage({ type: 'success', text: `Workspace "${trimmed}" created.` });
+      notify('success', `Workspace "${trimmed}" created.`);
     } catch (error) {
-      setStatusMessage({ type: 'error', text: (error as Error).message || 'Failed to create workspace.' });
+      notify('error', (error as Error).message || 'Failed to create workspace.');
     }
-  }, [newWorkspaceDescription, newWorkspaceName, workspaceActions]);
+  }, [newWorkspaceDescription, newWorkspaceName, notify, workspaceActions]);
 
   const handleRenameWorkspace = useCallback(async () => {
     if (!hasWorkspaceSelected || !renameValue.trim()) return;
     try {
       await workspaceActions.renameWorkspace(renameValue.trim());
-      setStatusMessage({ type: 'success', text: 'Workspace renamed.' });
+      notify('success', 'Workspace renamed.');
     } catch (error) {
-      setStatusMessage({ type: 'error', text: (error as Error).message || 'Failed to rename workspace.' });
+      notify('error', (error as Error).message || 'Failed to rename workspace.');
     }
-  }, [hasWorkspaceSelected, renameValue, workspaceActions]);
+  }, [hasWorkspaceSelected, notify, renameValue, workspaceActions]);
 
   const handleSaveWorkspace = useCallback(async () => {
     if (!hasWorkspaceSelected) return;
     try {
       await workspaceActions.saveWorkspace();
-      setStatusMessage({ type: 'success', text: 'Workspace saved.' });
+      notify('success', 'Workspace saved.');
     } catch (error) {
-      setStatusMessage({ type: 'error', text: (error as Error).message || 'Failed to save workspace.' });
+      notify('error', (error as Error).message || 'Failed to save workspace.');
     }
-  }, [hasWorkspaceSelected, workspaceActions]);
+  }, [hasWorkspaceSelected, notify, workspaceActions]);
 
   const handleSaveWorkspaceAs = useCallback(async () => {
     if (!hasWorkspaceSelected) return;
@@ -165,33 +160,49 @@ export const DataLoaderFeature: React.FC = () => {
     if (!filename) return;
     try {
       await workspaceActions.saveWorkspaceAs(filename.trim());
-      setStatusMessage({ type: 'success', text: `Workspace saved as ${filename}.` });
+      notify('success', `Workspace saved as ${filename}.`);
     } catch (error) {
-      setStatusMessage({ type: 'error', text: (error as Error).message || 'Failed to save workspace copy.' });
+      notify('error', (error as Error).message || 'Failed to save workspace copy.');
     }
-  }, [hasWorkspaceSelected, workspaceActions]);
+  }, [hasWorkspaceSelected, notify, workspaceActions]);
 
-  const handleDeleteWorkspace = useCallback(async (workspaceId: string) => {
-    const target = workspaces.find((ws: any) => getWorkspaceId(ws) === workspaceId);
-    const confirmed = window.confirm(`Delete workspace ${target?.name || workspaceId}? This cannot be undone.`);
-    if (!confirmed) return;
+  const openDeleteWorkspaceDialog = useCallback(
+    (workspaceId: string) => {
+      const target = workspaces.find((ws: any) => getWorkspaceId(ws) === workspaceId);
+      setWorkspaceToDelete({ id: workspaceId, name: target?.name });
+    },
+    [workspaces],
+  );
+
+  const handleConfirmDeleteWorkspace = useCallback(async () => {
+    if (!workspaceToDelete) return;
+    setDeletingWorkspace(true);
     try {
-      await workspaceActions.deleteWorkspace(workspaceId);
-      setStatusMessage({ type: 'success', text: 'Workspace deleted.' });
+      await workspaceActions.deleteWorkspace(workspaceToDelete.id);
+      notify('success', 'Workspace deleted.');
     } catch (error) {
-      setStatusMessage({ type: 'error', text: (error as Error).message || 'Failed to delete workspace.' });
+      notify('error', (error as Error).message || 'Failed to delete workspace.');
+    } finally {
+      setDeletingWorkspace(false);
+      setWorkspaceToDelete(null);
     }
-  }, [workspaces, workspaceActions]);
+  }, [notify, workspaceActions, workspaceToDelete]);
 
   const handleImportSampleData = useCallback(async () => {
     setImportingSamples(true);
-    setStatusMessage({ type: 'info', text: 'Importing sample data…' });
     try {
-      await filesApi.importSampleData(authHeaders);
-      await refetchFiles();
-      setStatusMessage({ type: 'success', text: 'Sample data imported.' });
+      await toast.promise(
+        filesApi.importSampleData(authHeaders).then(async () => {
+          await refetchFiles();
+        }),
+        {
+          loading: 'Importing sample data…',
+          success: 'Sample data imported.',
+          error: (error) => (error as Error)?.message || 'Failed to import sample data.',
+        },
+      );
     } catch (error) {
-      setStatusMessage({ type: 'error', text: (error as Error).message || 'Failed to import sample data.' });
+      console.error('[DataLoaderFeature] import sample data failed', error);
     } finally {
       setImportingSamples(false);
     }
@@ -207,28 +218,28 @@ export const DataLoaderFeature: React.FC = () => {
     try {
       const success = await handleUploadFile(file);
       if (success) {
-        setStatusMessage({ type: 'success', text: `Uploaded ${file.name}.` });
+        notify('success', `Uploaded ${file.name}.`);
       } else {
-        setStatusMessage({ type: 'error', text: 'Upload failed.' });
+        notify('error', 'Upload failed.');
       }
     } catch (error) {
-      setStatusMessage({ type: 'error', text: (error as Error).message || 'Upload failed.' });
+      notify('error', (error as Error).message || 'Upload failed.');
     } finally {
       event.target.value = '';
     }
-  }, [handleUploadFile]);
+  }, [handleUploadFile, notify]);
 
-  const handleAddToWorkspace = useCallback(async (options: { mode: AddMode; documentColumn?: string | null }) => {
+  const handleAddToWorkspace = useCallback(async () => {
     if (!addFileName) return;
     try {
-      await workspaceActions.createNodeFromFile(addFileName, options);
-      setStatusMessage({ type: 'success', text: `${addFileName} added to workspace.` });
+      await workspaceActions.createNodeFromFile(addFileName);
+      notify('success', `${addFileName} added to workspace.`);
     } catch (error) {
-      setStatusMessage({ type: 'error', text: (error as Error).message || 'Failed to add file to workspace.' });
+      notify('error', (error as Error).message || 'Failed to add file to workspace.');
     } finally {
       setAddFileName(null);
     }
-  }, [addFileName, workspaceActions]);
+  }, [addFileName, notify, workspaceActions]);
 
   const workspaceFolder = fileListResponse?.user_folder || dataFolder || 'data/';
   const workspaceBusy = isLoading.workspaces || isLoading.currentWorkspace;
@@ -240,22 +251,17 @@ export const DataLoaderFeature: React.FC = () => {
         <p className="text-sm text-muted-foreground">
           Manage workspaces, upload corpora, and add files to the active workspace. Use this tab before running downstream analyses.
         </p>
-        {statusMessage && (
-          <div className={`rounded-md border px-4 py-2 text-sm ${statusTone[statusMessage.type]}`}>
-            {statusMessage.text}
-          </div>
-        )}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
+        <Card className="flex h-[480px] flex-col">
           <CardHeader>
             <CardTitle>Active workspace</CardTitle>
             <CardDescription>
               Choose or rename the workspace where new nodes will be added. Save regularly to persist your progress.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="flex-1 space-y-4 overflow-y-auto pr-1">
             {currentWorkspace ? (
               <div className="rounded-md border border-border/60 bg-muted/30 px-4 py-3 text-sm">
                 <div className="flex flex-wrap items-center gap-2 text-base font-semibold text-foreground">
@@ -317,68 +323,70 @@ export const DataLoaderFeature: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="flex h-[480px] flex-col">
           <CardHeader>
             <CardTitle>Workspace manager</CardTitle>
             <CardDescription>Switch between saved workspaces or remove ones you no longer need.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="flex flex-1 flex-col overflow-hidden">
             {workspaceBusy && !sortedWorkspaces.length ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" /> Loading workspaces…
               </div>
             ) : sortedWorkspaces.length === 0 ? (
-              <div className="rounded-md border border-dashed border-muted-foreground/60 px-4 py-3 text-sm text-muted-foreground">
+              <div className="rounded-md border border-dashed border-muted-foreground/60 px-4 py-3 text-center text-sm text-muted-foreground">
                 No workspaces yet. Create one to get started.
               </div>
             ) : (
-              sortedWorkspaces.map((workspace: any) => {
-                const workspaceId = getWorkspaceId(workspace);
-                if (!workspaceId) return null;
-                const isActive = workspaceId === currentWorkspaceId;
-                return (
-                  <div
-                    key={workspaceId}
-                    className={`flex flex-col gap-2 rounded-md border px-4 py-3 sm:flex-row sm:items-center sm:justify-between ${
-                      isActive ? 'border-primary bg-primary/5' : 'border-border/70 bg-background'
-                    }`}
-                  >
-                    <div>
-                      <div className="font-medium text-foreground">{workspace.name || workspaceId}</div>
-                      <div className="text-xs text-muted-foreground">
-                        Updated {formatTimestamp(workspace.modified_at || workspace.updated_at)} · {workspace.dataframe_count ?? workspace.node_count ?? 0} nodes
+              <div className="space-y-3 overflow-y-auto pr-2">
+                {sortedWorkspaces.map((workspace: any) => {
+                  const workspaceId = getWorkspaceId(workspace);
+                  if (!workspaceId) return null;
+                  const isActive = workspaceId === currentWorkspaceId;
+                  return (
+                    <div
+                      key={workspaceId}
+                      className={`flex flex-col gap-2 rounded-md border px-4 py-3 sm:flex-row sm:items-center sm:justify-between ${
+                        isActive ? 'border-primary bg-primary/5' : 'border-border/70 bg-background'
+                      }`}
+                    >
+                      <div>
+                        <div className="font-medium text-foreground">{workspace.name || workspaceId}</div>
+                        <div className="text-xs text-muted-foreground">
+                          Updated {formatTimestamp(workspace.modified_at || workspace.updated_at)} · {workspace.dataframe_count ?? workspace.node_count ?? 0} nodes
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        size="sm"
-                        variant={isActive ? 'outline' : 'secondary'}
-                        onClick={() => workspaceActions.setCurrentWorkspace(workspaceId)}
-                        disabled={isActive}
-                      >
-                        {isActive ? 'Active' : 'Activate'}
-                      </Button>
-                      {isActive && (
+                      <div className="flex flex-wrap gap-2">
                         <Button
                           size="sm"
-                          variant="outline"
-                          onClick={() => workspaceActions.setCurrentWorkspace(null)}
-                          disabled={workspaceBusy}
+                          variant={isActive ? 'outline' : 'secondary'}
+                          onClick={() => workspaceActions.setCurrentWorkspace(workspaceId)}
+                          disabled={isActive}
                         >
-                          <LogOut className="mr-1.5 h-4 w-4" /> Unload
+                          {isActive ? 'Active' : 'Activate'}
                         </Button>
-                      )}
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => handleDeleteWorkspace(workspaceId)}
-                      >
-                        <Trash2 className="mr-1.5 h-4 w-4" /> Delete
-                      </Button>
+                        {isActive && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => workspaceActions.setCurrentWorkspace(null)}
+                            disabled={workspaceBusy}
+                          >
+                            <LogOut className="mr-1.5 h-4 w-4" /> Unload
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => openDeleteWorkspaceDialog(workspaceId)}
+                        >
+                          <Trash2 className="mr-1.5 h-4 w-4" /> Delete
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                );
-              })
+                  );
+                })}
+              </div>
             )}
           </CardContent>
         </Card>
@@ -495,6 +503,31 @@ export const DataLoaderFeature: React.FC = () => {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogAction onClick={() => setWorkspaceAlertOpen(false)}>Got it</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={Boolean(workspaceToDelete)} onOpenChange={(open) => !open && setWorkspaceToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete workspace?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {workspaceToDelete
+                ? `This will permanently delete "${workspaceToDelete.name || workspaceToDelete.id}" and its data. This action cannot be undone.`
+                : 'This will permanently delete the workspace and its data. This action cannot be undone.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setWorkspaceToDelete(null)} disabled={deletingWorkspace}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDeleteWorkspace}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deletingWorkspace}
+            >
+              {deletingWorkspace ? 'Deleting…' : 'Delete workspace'}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

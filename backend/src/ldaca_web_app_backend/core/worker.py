@@ -5,11 +5,8 @@ This module provides isolation for CPU-intensive tasks like topic modeling,
 avoiding GIL issues and Numba threading conflicts by running work in separate processes.
 """
 
-import asyncio
 import multiprocessing as mp
 import os
-import sys
-import time
 from concurrent.futures import Future, ProcessPoolExecutor
 from typing import Any, Dict, Optional
 
@@ -48,9 +45,6 @@ def _configure_worker_environment():
 
         # Test 2: Check if Numba can actually use TBB
         try:
-            import numba
-            from numba import config
-
             # Try to initialize Numba with TBB temporarily
             old_layer = os.environ.get("NUMBA_THREADING_LAYER")
             try:
@@ -126,12 +120,12 @@ def topic_modeling_task(
     try:
         # Import heavy libraries after environment is configured
         import polars as pl
-        from docframe.core.text_utils import topic_visualization
 
         # Import workspace manager (this should be lightweight)
         from ldaca_web_app_backend.core.workspace import workspace_manager
 
         from docframe import DocDataFrame, DocLazyFrame
+        from docframe.core.text_utils import topic_visualization
 
         print(
             f"[Worker {os.getpid()}] Starting topic modeling task for workspace {workspace_id}"

@@ -40,7 +40,7 @@ interface AutoNodeColumnsHookReturn {
 /**
  * Shared hook that:
  * 1. Maintains node -> text column selections.
- * 2. Auto-selects a default column for Doc* nodes (documentColumn) or heuristic fallback if enabled.
+ * 2. Auto-selects a default column for Doc* nodes (document field) or heuristic fallback if enabled.
  * 3. Persists selections per workspace (sessionStorage) so switching tabs retains user choices.
  * 4. Never overwrites an explicit user choice or a hydrated backend request unless replace=true.
  * 5. Designed to be tab-agnostic; by default Concordance & Token Frequency share the same persisted mapping.
@@ -192,7 +192,13 @@ export function useAutoNodeColumns(
         let column = '';
         if (node) {
           const cols = deriveColumnInfos(node).map((info) => info.name);
-            const documentColumn = node.data?.documentColumn || node.data?.document_column;
+            const documentColumn =
+              node.data?.document ??
+              node.data?.document_column ??
+              node.data?.documentColumn ??
+              node.data?.node?.document ??
+              node.data?.node?.document_column ??
+              node.data?.node?.documentColumn;
             const isDocType = !!(node.data?.nodeType && node.data.nodeType.includes('Doc'));
             if (documentColumn && cols.includes(documentColumn)) {
               column = documentColumn;

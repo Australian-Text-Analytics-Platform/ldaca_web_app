@@ -46,7 +46,6 @@ export const useWorkspaceInternal = () => {
     selectedNode,
     selectedNodes,
     nodeData,
-    getNodeShape,
     queryLoadingState,
     queryErrorState,
     currentWorkspaceIdFromQuery,
@@ -279,7 +278,6 @@ export const useWorkspaceInternal = () => {
     isLoading,
     errors,
     actions,
-    getNodeShape,
     handlePageChange,
     handlePageSizeChange,
   };

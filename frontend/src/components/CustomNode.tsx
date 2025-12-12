@@ -1,43 +1,28 @@
 import { memo, useState, useEffect, useRef, useCallback } from 'react';
 import { NodeProps, Handle, Position } from '@xyflow/react';
-import { Settings2, Trash2 } from 'lucide-react';
+import { Settings2, Trash2, Copy, Check } from 'lucide-react';
 import { WorkspaceNode } from '../types';
-import DocumentColumnPanel from './panels/DocumentColumnPanel';
-import { formatDataType, getTypeStyleClass } from '../utils/typeFormatting';
-import { useWorkspaceData } from '../hooks/useWorkspaceData';
-import { Badge } from './ui/badge';
 
 type DebugWindow = Window & { __LDACA_DEBUG_GRAPH?: boolean };
-type DocumentAwareNode = WorkspaceNode & { document_column?: string | null };
+type DocumentAwareNode = WorkspaceNode & { document?: string | null };
 
 interface CustomNodeData {
   node: WorkspaceNode;
   isMultiSelected?: boolean;
   onDelete: (nodeId: string) => void;
   onRename?: (nodeId: string, newName: string) => void;
-  onConvertToDocDataFrame?: (nodeId: string, documentColumn: string) => void;
-  onConvertToDataFrame?: (nodeId: string) => void;
-  onConvertToDocLazyFrame?: (nodeId: string, documentColumn: string) => void;
-  onConvertToLazyFrame?: (nodeId: string) => void;
-  onResetDocument?: (nodeId: string, documentColumn?: string) => void;
 }
 
 function CustomNode({ data, selected }: NodeProps<any>) {
-  const { node: initialNode, isMultiSelected = false, onDelete, onRename, onConvertToDocDataFrame, onConvertToDataFrame, onConvertToDocLazyFrame, onConvertToLazyFrame, onResetDocument } = data as CustomNodeData;
+  const { node: initialNode, isMultiSelected = false, onDelete, onRename } = data as CustomNodeData;
   // Keep a local state but always sync with props to prevent staleness after in-place updates
   const [node, setNode] = useState(initialNode);
   const [showMenu, setShowMenu] = useState(false);
-  const [showDocColumnPanel, setShowDocColumnPanel] = useState(false);
-  const [docConversionTarget, setDocConversionTarget] = useState<'docdataframe' | 'doclazyframe' | 'reset' | null>(null);
   const [isRenaming, setIsRenaming] = useState(false);
   const [newName, setNewName] = useState('');
-  const [isHoveringShape, setIsHoveringShape] = useState(false);
-  const [hoveredShape, setHoveredShape] = useState<[number, number] | null>(null);
-  const [isLoadingHoverShape, setIsLoadingHoverShape] = useState(false);
+  const [copied, setCopied] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
-
-  const { getNodeShape, currentWorkspaceId } = useWorkspaceData();
 
   const debugWindow: DebugWindow | null = typeof window !== 'undefined' ? (window as DebugWindow) : null;
   const DEBUG_GRAPH = Boolean(debugWindow?.__LDACA_DEBUG_GRAPH) || (typeof window !== 'undefined' && localStorage.getItem('debugGraph') === '1');
@@ -57,43 +42,7 @@ function CustomNode({ data, selected }: NodeProps<any>) {
 
   const nodeName = node?.name || 'Loading...';
   const nodeShape = node?.shape;
-  const nodeDataType = node?.data_type || initialNode?.data_type || 'unknown';
-  const documentColumn = (node as DocumentAwareNode)?.document_column ?? null;
-  const nodeColumns = node?.columns || [];
-
-  // Format the data type for better display
-  const formattedType = formatDataType(nodeDataType);
-
-  // Determine if conversion options should be shown - updated for complete module.class format
-  const isPolarsDataFrameOrLazy = formattedType.category === 'polars' && (formattedType.full.includes('DataFrame') || formattedType.full.includes('LazyFrame'));
-  const isDocDataFrameOrLazy = formattedType.category === 'docframe' && (formattedType.full.includes('DocDataFrame') || formattedType.full.includes('DocLazyFrame'));
-  const isDocDataFrame = formattedType.full.includes('DocDataFrame');
-  const isDocLazyFrame = formattedType.full.includes('DocLazyFrame');
-
-  // Handle shape hover for lazy frames with null first element
-  const handleShapeMouseEnter = useCallback(async () => {
-    if (nodeShape && nodeShape[0] === null && getNodeShape && node?.node_id) {
-      setIsHoveringShape(true);
-      setIsLoadingHoverShape(true);
-      
-      try {
-        const shapeData = await getNodeShape(node.node_id);
-        if (shapeData && shapeData.shape) {
-          setHoveredShape(shapeData.shape as [number, number]);
-        }
-      } catch (error) {
-        console.error('Failed to fetch shape on hover:', error);
-      } finally {
-        setIsLoadingHoverShape(false);
-      }
-    }
-  }, [nodeShape, getNodeShape, node?.node_id]);
-
-  const handleShapeMouseLeave = useCallback(() => {
-    setIsHoveringShape(false);
-    setHoveredShape(null);
-    setIsLoadingHoverShape(false);
-  }, []);
+  const documentName = (node as DocumentAwareNode)?.document ?? null;
 
   // Close menu when clicking outside (capture to beat React Flow internal handlers)
   useEffect(() => {
@@ -119,70 +68,6 @@ function CustomNode({ data, selected }: NodeProps<any>) {
     setShowMenu(false);
     // TODO: Implement save functionality
     console.debug('Save node data:', node.node_id);
-  };
-
-  const handleToDocDataFrameClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setShowMenu(false);
-    setDocConversionTarget('docdataframe');
-    setShowDocColumnPanel(true);
-  };
-
-  const handleToDataFrameClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setShowMenu(false);
-    if (onConvertToDataFrame && node?.node_id) {
-      onConvertToDataFrame(node.node_id);
-    }
-  };
-
-  const handleToDocLazyFrameClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setShowMenu(false);
-    setDocConversionTarget('doclazyframe');
-    setShowDocColumnPanel(true);
-  };
-
-  const handleToLazyFrameClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setShowMenu(false);
-    if (onConvertToLazyFrame && node?.node_id) {
-      onConvertToLazyFrame(node.node_id);
-    }
-  };
-
-  const handleDocLazyToDocDataFrame = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setShowMenu(false);
-    if (onConvertToDocDataFrame && node?.node_id) {
-      if (documentColumn) {
-        onConvertToDocDataFrame(node.node_id, documentColumn);
-      } else {
-        setDocConversionTarget('docdataframe');
-        setShowDocColumnPanel(true);
-      }
-    }
-  };
-
-  const handleDocDataFrameToDocLazy = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setShowMenu(false);
-    if (onConvertToDocLazyFrame && node?.node_id) {
-      if (documentColumn) {
-        onConvertToDocLazyFrame(node.node_id, documentColumn);
-      } else {
-        setDocConversionTarget('doclazyframe');
-        setShowDocColumnPanel(true);
-      }
-    }
-  };
-
-  const handleResetDocument = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setShowMenu(false);
-    if (!node?.node_id || !onResetDocument) return;
-    setDocConversionTarget('reset');
-    setShowDocColumnPanel(true);
   };
 
   const handleRenameClick = (e: React.MouseEvent) => {
@@ -217,17 +102,13 @@ function CustomNode({ data, selected }: NodeProps<any>) {
     }
   };
 
-  const handleDocColumnConfirm = (documentColumn: string) => {
-    if (!node?.node_id) return;
-    if (docConversionTarget === 'docdataframe' && onConvertToDocDataFrame) {
-      onConvertToDocDataFrame(node.node_id, documentColumn);
-    } else if (docConversionTarget === 'doclazyframe' && onConvertToDocLazyFrame) {
-      onConvertToDocLazyFrame(node.node_id, documentColumn);
-    } else if (docConversionTarget === 'reset' && onResetDocument) {
-      onResetDocument(node.node_id, documentColumn);
+  const handleCopyId = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (node?.node_id) {
+      navigator.clipboard.writeText(node.node_id);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     }
-  setShowDocColumnPanel(false);
-  setDocConversionTarget(null);
   };
 
   // Unified highlight style: apply the multi-select (green) style for any selection (single or multi)
@@ -238,6 +119,13 @@ function CustomNode({ data, selected }: NodeProps<any>) {
       ? 'border-green-500 bg-green-50 shadow-lg ring-2 ring-green-200'
       : 'border-border shadow-md'}
   `;
+
+  const formatShapePart = (value: number | null | undefined) =>
+    typeof value === 'number' && Number.isFinite(value) ? value.toLocaleString() : '?';
+
+  const shapeLabel = nodeShape
+    ? `${formatShapePart(nodeShape[0])} × ${formatShapePart(nodeShape[1])}`
+    : null;
 
   dlog('CustomNode rendering:', {
     nodeId: node?.node_id,
@@ -328,75 +216,6 @@ function CustomNode({ data, selected }: NodeProps<any>) {
                   Rename
                 </button>
                 
-                {/* Show conversion options for polars DataFrames/LazyFrames */}
-                {isPolarsDataFrameOrLazy && (
-                  <>
-                    <button
-                      onClick={handleToDocDataFrameClick}
-                      className="w-full text-left px-3 py-2 text-xs hover:bg-muted/60 border-t border-border/60"
-                    >
-                      to DocDataFrame
-                    </button>
-                    <button
-                      onClick={handleToDocLazyFrameClick}
-                      className="w-full text-left px-3 py-2 text-xs hover:bg-muted/60 border-t border-border/60"
-                    >
-                      to DocLazyFrame
-                    </button>
-                    {/* Add direct materialization for plain LazyFrame -> DataFrame (non-doc) */}
-                    {formattedType.full.includes('LazyFrame') && !formattedType.full.includes('Doc') && (
-                      <button
-                        onClick={handleToDataFrameClick}
-                        className="w-full text-left px-3 py-2 text-xs hover:bg-muted/60 border-t border-border/60"
-                      >
-                        to DataFrame
-                      </button>
-                    )}
-                  </>
-                )}
-                
-                {/* Show conversion options for DocDataFrame/DocLazyFrame */}
-                {isDocDataFrameOrLazy && (
-                  <>
-                    <button
-                      onClick={handleToDataFrameClick}
-                      className="w-full text-left px-3 py-2 text-xs hover:bg-muted/60 border-t border-border/60"
-                    >
-                      to DataFrame
-                    </button>
-                    <button
-                      onClick={handleToLazyFrameClick}
-                      className="w-full text-left px-3 py-2 text-xs hover:bg-muted/60 border-t border-border/60"
-                    >
-                      to LazyFrame
-                    </button>
-                    {isDocLazyFrame && (
-                      <button
-                        onClick={handleDocLazyToDocDataFrame}
-                        className="w-full text-left px-3 py-2 text-xs hover:bg-muted/60 border-t border-border/60"
-                      >
-                        to DocDataFrame
-                      </button>
-                    )}
-                    {isDocDataFrame && (
-                      <button
-                        onClick={handleDocDataFrameToDocLazy}
-                        className="w-full text-left px-3 py-2 text-xs hover:bg-muted/60 border-t border-border/60"
-                      >
-                        to DocLazyFrame
-                      </button>
-                    )}
-                    {(isDocDataFrame || isDocLazyFrame) && (
-                      <button
-                        onClick={handleResetDocument}
-                        className="w-full text-left px-3 py-2 text-xs hover:bg-yellow-50 border-t border-border/60 text-yellow-700"
-                        title="Change which column is treated as document"
-                      >
-                        Reset document column
-                      </button>
-                    )}
-                  </>
-                )}
               </div>
             )}
           </div>
@@ -414,47 +233,28 @@ function CustomNode({ data, selected }: NodeProps<any>) {
       </div>
 
       {/* Node Body */}
-      <div className="p-3 bg-white rounded-b-lg">
-        <div 
-          className={`font-mono text-xs px-2 py-1 rounded ${getTypeStyleClass(formattedType.category)} cursor-help`}
-          title={`Full type: ${formattedType.full}`}
-        >
-          {formattedType.display}
-          {node?.is_lazy && (
-            <Badge variant="secondary" className="ml-2 border border-amber-200 bg-amber-100 text-amber-800">
-              lazy
-            </Badge>
-          )}
-        </div>
-        {documentColumn && (formattedType.full.includes('DocDataFrame') || formattedType.full.includes('DocLazyFrame')) && (
-          <div className="font-mono text-xs text-gray-700 mt-1">
-            document: <span className="text-gray-900">{documentColumn}</span>
+      <div className="p-3 bg-white rounded-b-lg space-y-1">
+        <div className="flex items-center justify-between group">
+          <div className="font-mono text-xs text-gray-500 truncate max-w-[180px]" title={node?.node_id}>
+            id: {node?.node_id?.substring(0, 8)}...
           </div>
-        )}
-        {nodeShape ? (
-          <div 
-            className="font-mono text-xs text-gray-600 mt-1 relative"
-            onMouseEnter={nodeShape[0] === null ? handleShapeMouseEnter : undefined}
-            onMouseLeave={nodeShape[0] === null ? handleShapeMouseLeave : undefined}
+          <button
+            onClick={handleCopyId}
+            className="p-1 hover:bg-gray-100 rounded transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+            title="Copy ID"
           >
-            Shape: ({(() => {
-              if (nodeShape[0] === null) {
-                if (isHoveringShape) {
-                  if (isLoadingHoverShape) {
-                    return '...';
-                  } else if (hoveredShape) {
-                    return hoveredShape[0];
-                  }
-                }
-                return '?';
-              }
-              return nodeShape[0];
-            })()} × {nodeShape[1] ?? '?'})
-            
-            {/* Tooltip removed per UX request; inline value update remains */}
-          </div>
+            {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3 text-gray-400" />}
+          </button>
+        </div>
+        {shapeLabel ? (
+          <div className="font-mono text-xs text-gray-700">Shape: {shapeLabel}</div>
         ) : (
-          <div className="font-mono text-xs text-gray-400 italic mt-1">No data preview</div>
+          <div className="font-mono text-xs text-gray-400 italic">Shape unavailable</div>
+        )}
+        {documentName && (
+          <div className="font-mono text-xs text-gray-600">
+            document: <span className="text-gray-900">{documentName}</span>
+          </div>
         )}
       </div>
 
@@ -462,19 +262,6 @@ function CustomNode({ data, selected }: NodeProps<any>) {
       <Handle type="target" position={Position.Left} className="!w-2 !h-2 !bg-gray-400 opacity-0 pointer-events-none" />
       <Handle type="source" position={Position.Right} className="!w-2 !h-2 !bg-gray-400 opacity-0 pointer-events-none" />
 
-      {/* Panel for selecting document column */}
-      <DocumentColumnPanel
-        open={showDocColumnPanel}
-        onClose={() => {
-          setShowDocColumnPanel(false);
-          setDocConversionTarget(null);
-        }}
-        onConfirm={handleDocColumnConfirm}
-        columns={nodeColumns}
-        nodeName={nodeName}
-        workspaceId={currentWorkspaceId}
-        nodeId={node?.node_id || null}
-      />
     </div>
   );
 };

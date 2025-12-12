@@ -5,12 +5,6 @@ import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
 import type { PreviewPagination, PreviewRow } from '../../types';
 import { buildWorkspaceNodeMap, deriveNodeLabel } from '../../utils/nodeMetadata';
 
-export interface NodeShapeInfo {
-  shape: [number, number];
-  is_lazy: boolean;
-  calculated: boolean;
-}
-
 export interface SliceOperationResult {
   success?: boolean;
   message?: string;
@@ -26,7 +20,6 @@ export interface SliceSubTabProps {
   selectedNode: WorkspaceNodeLike | null;
   selectedNodes: WorkspaceNodeLike[];
   workspaceNodes: WorkspaceNodeLike[];
-  getNodeShape: (nodeId: string) => Promise<NodeShapeInfo | null>;
   sliceNode: (nodeId: string, request: SliceRequestPayload) => Promise<SliceOperationResult>;
   slicePreview: (
     nodeId: string,

@@ -14,9 +14,6 @@ export interface JoinSubTabProps {
   selectedNodeIds: string[];
   currentWorkspaceId: string | null;
   workspaceNodes: WorkspaceNodeLike[];
-  getNodeShape: (
-    nodeId: string,
-  ) => Promise<{ shape: [number, number]; is_lazy: boolean; calculated: boolean } | null>;
   joinNodes: (
     leftNodeId: string,
     rightNodeId: string,

@@ -4,7 +4,7 @@ import pytest
 @pytest.mark.asyncio
 async def test_quotation_clear_endpoint(authenticated_client):
     response = await authenticated_client.post(
-        "/workspaces/test-workspace/quotation/clear"
+        "/api/workspaces/test-workspace/quotation/clear"
     )
     assert response.status_code == 200
     payload = response.json()

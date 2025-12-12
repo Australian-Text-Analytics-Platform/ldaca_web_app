@@ -5,10 +5,25 @@ Migrated from test_join_behavior.py with proper pytest structure.
 
 import polars as pl
 import pytest
+from docworkspace import Node
 
 import docframe as dc
 from docframe import DocDataFrame
-from docworkspace import Node
+
+
+def _materialize_to_dataframe(data):
+    """Return a plain polars DataFrame regardless of lazy/doc wrappers."""
+
+    if hasattr(data, "collect"):
+        collected = data.collect()
+    else:
+        collected = data
+
+    # DocDataFrame exposes .dataframe for underlying Polars object
+    if hasattr(collected, "dataframe"):
+        return collected.dataframe  # type: ignore[attr-defined]
+
+    return collected
 
 
 class TestJoinBehavior:
@@ -38,7 +53,7 @@ class TestJoinBehavior:
 
     def test_join_returns_regular_dataframe(self, regular_dataframe, doc_dataframe):
         """Test that joins between regular and DocDataFrame return regular DataFrame"""
-        if dc is None or Node is None:
+        if dc is None:
             pytest.skip("Required dependencies not available")
 
         # Create nodes
@@ -47,12 +62,10 @@ class TestJoinBehavior:
 
         # Perform join
         joined_node = node1.join(node2, on="id", how="inner")
-        joined_data = joined_node.data
+        joined_data = _materialize_to_dataframe(joined_node.data)
 
-        # Verify the result is a regular DataFrame, not DocDataFrame
+        # Verify the result is a regular DataFrame
         assert isinstance(joined_data, pl.DataFrame)
-        if DocDataFrame is not None:
-            assert not isinstance(joined_data, DocDataFrame)
 
         # Verify join worked correctly
         assert joined_data.shape[0] == 3  # All rows should match
@@ -62,14 +75,14 @@ class TestJoinBehavior:
 
     def test_join_preserves_data_integrity(self, regular_dataframe, doc_dataframe):
         """Test that data integrity is preserved in joins"""
-        if dc is None or Node is None:
+        if dc is None:
             pytest.skip("Required dependencies not available")
 
         node1 = Node(regular_dataframe, name="regular_data")
         node2 = Node(doc_dataframe, name="doc_data")
 
         joined_node = node1.join(node2, on="id", how="inner")
-        joined_data = joined_node.data
+        joined_data = _materialize_to_dataframe(joined_node.data)
 
         # Check specific values to ensure data integrity
         first_row = joined_data.filter(pl.col("id") == 1).row(0, named=True)
@@ -79,7 +92,7 @@ class TestJoinBehavior:
 
     def test_left_join_behavior(self, regular_dataframe):
         """Test left join behavior with different DataFrame types"""
-        if dc is None or Node is None:
+        if dc is None:
             pytest.skip("Required dependencies not available")
 
         # Create a smaller DocDataFrame for left join testing
@@ -94,11 +107,9 @@ class TestJoinBehavior:
 
         # Left join should keep all rows from regular_dataframe
         left_joined = node1.join(node2, on="id", how="left")
-        result = left_joined.data
+        result = _materialize_to_dataframe(left_joined.data)
 
         assert isinstance(result, pl.DataFrame)
-        if DocDataFrame is not None:
-            assert not isinstance(result, DocDataFrame)
         assert result.shape[0] == 3  # All original rows preserved
 
         # Check that missing value is handled correctly

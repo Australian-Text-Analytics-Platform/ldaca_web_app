@@ -2,9 +2,9 @@
 
 import polars as pl
 import pytest
+from docworkspace import Node, Workspace
 
 from docframe import DocDataFrame, DocLazyFrame
-from docworkspace import Node, Workspace
 
 
 class TestNode:
@@ -36,7 +36,7 @@ class TestNode:
         node = Node(sample_df, "test_node", workspace)
 
         assert node.name == "test_node"
-        assert not node.is_lazy
+        assert isinstance(node.data, pl.LazyFrame)
         assert len(node.parents) == 0
         assert len(node.children) == 0
         assert node.workspace == workspace
@@ -46,7 +46,7 @@ class TestNode:
         node = Node(sample_df, "test_node")
 
         assert node.name == "test_node"
-        assert not node.is_lazy
+        assert isinstance(node.data, pl.LazyFrame)
         assert node.workspace is not None
         assert isinstance(node.workspace, Workspace)
         assert node.id in node.workspace.nodes
@@ -54,50 +54,22 @@ class TestNode:
     def test_node_lazy_status_polars_dataframe(self, sample_df):
         """Test lazy status for polars DataFrame."""
         node = Node(sample_df, "test_node")
-        assert not node.is_lazy
+        assert isinstance(node.data, pl.LazyFrame)
 
     def test_node_lazy_status_polars_lazyframe(self, sample_lazy_df):
         """Test lazy status for polars LazyFrame."""
         node = Node(sample_lazy_df, "test_node")
-        assert node.is_lazy
+        assert isinstance(node.data, pl.LazyFrame)
 
     def test_node_lazy_status_doc_dataframe(self, sample_doc_df):
         """Test lazy status for DocDataFrame with DataFrame."""
         node = Node(sample_doc_df, "test_node")
-        assert not node.is_lazy
+        assert isinstance(node.data, DocLazyFrame)
 
     def test_node_lazy_status_doc_lazyframe(self, sample_doc_lazy_df):
         """Test lazy status for DocLazyFrame."""
         node = Node(sample_doc_lazy_df, "test_node")
-        assert node.is_lazy
-
-    def test_node_collect_lazyframe(self, sample_lazy_df):
-        """Test collecting a lazy node."""
-        node = Node(sample_lazy_df, "test_node")
-        assert node.is_lazy
-
-        collected_node = node.collect()
-        # collect() creates a new node to preserve computation history
-        assert collected_node != node
-        assert node.is_lazy  # Original node stays lazy
-        assert not collected_node.is_lazy  # New node is materialized
-        assert isinstance(collected_node.data, pl.DataFrame)
-        assert collected_node in node.children  # New node is child of original
-
-    def test_node_collect_doc_lazyframe(self, sample_doc_lazy_df):
-        """Test collecting a lazy DocDataFrame node."""
-        node = Node(sample_doc_lazy_df, "test_node")
-        assert node.is_lazy
-
-        collected_node = node.collect()
-        # collect() creates a new node to preserve computation history
-        assert collected_node != node
-        assert node.is_lazy  # Original node stays lazy
-        assert not collected_node.is_lazy  # New node is materialized
-        assert isinstance(collected_node.data, DocDataFrame)
-        assert collected_node in node.children  # New node is child of original
-        assert isinstance(node.data, DocLazyFrame)  # Original stays as DocLazyFrame
-        assert isinstance(collected_node.data, DocDataFrame)  # New node is DocDataFrame
+        assert isinstance(node.data, DocLazyFrame)
 
     def test_node_filter(self, sample_df):
         """Test filtering a Node."""
@@ -121,7 +93,7 @@ class TestNode:
 
         assert len(sliced.parents) == 1
         assert sliced.parents[0] == node
-        assert len(sliced.data) == 2
+        assert sliced.data.collect().height == 2
 
     def test_node_join(self):
         """Test joining two Nodes."""
@@ -138,14 +110,13 @@ class TestNode:
         assert len(merged.parents) == 2
         assert node1 in merged.parents
         assert node2 in merged.parents
-        assert len(merged.data.columns) == 3  # key, value1, value2
+        assert len(merged.data.collect_schema().names()) == 3  # key, value1, value2
 
     def test_node_materialize(self, sample_lazy_df):
         """Test materializing a lazy Node."""
         node = Node(sample_lazy_df, "test_node")
 
         # Before materializing
-        assert node.is_lazy
         assert isinstance(node.data, pl.LazyFrame)
 
         # Materialize
@@ -153,21 +124,20 @@ class TestNode:
 
         # After materializing
         assert result is node  # Should return self
-        assert not node.is_lazy  # Should be materialized
-        assert isinstance(node.data, pl.DataFrame)
+        assert isinstance(node.data, pl.LazyFrame)
 
     def test_node_attribute_delegation(self, sample_df):
         """Test that Node delegates attributes to the underlying data."""
         node = Node(sample_df, "test_node")
 
         # Test property access
-        assert node.shape == sample_df.shape
+        assert node.shape is None
         assert list(node.columns) == list(sample_df.columns)
 
         # Test method call that returns a new DataFrame
         head_node = node.head(2)
         assert isinstance(head_node, Node)
-        assert len(head_node.data) == 2
+        assert head_node.data.collect().height == 2
         assert head_node.parents[0] == node
 
     def test_node_info(self, sample_df):
@@ -178,19 +148,17 @@ class TestNode:
         info = node.info()
 
         assert info["name"] == "test_node"
-        assert (
-            info["dtype"] == pl.DataFrame
-        )  # Changed from "type" to "dtype" and comparing class
-        assert info["lazy"] is False
+        assert info["dtype"] == pl.LazyFrame
         assert info["operation"] == "load"
         assert info["shape"] == (3, 2)
         assert "schema" in info  # Schema should be present instead of columns
         assert len(info["schema"]) == 2  # Should have 2 columns
+        assert info.get("document") is None
 
         # Test that info returns raw types (no JSON conversion in core library)
         raw_info = node.info()
         # dtype should be the actual type object, not a string
-        assert raw_info["dtype"] == pl.DataFrame
+        assert raw_info["dtype"] == pl.LazyFrame
         # schema should be raw Polars schema, not converted to JS types
         assert hasattr(raw_info["schema"], "items")  # Polars schema has items() method
 
@@ -200,8 +168,8 @@ class TestNode:
 
         repr_str = repr(node)
         assert "test_node" in repr_str
-        assert "DataFrame" in repr_str
-        assert "lazy=False" in repr_str
+        assert "LazyFrame" in repr_str
+        assert "document=None" in repr_str
 
 
 class TestNodeRelationships:
@@ -215,13 +183,11 @@ class TestNodeRelationships:
     @pytest.fixture
     def sample_df(self):
         """Create a sample DataFrame."""
-        return pl.DataFrame(
-            {
-                "id": [1, 2, 3, 4, 5],
-                "category": ["A", "B", "A", "B", "C"],
-                "value": [10, 20, 30, 40, 50],
-            }
-        )
+        return pl.DataFrame({
+            "id": [1, 2, 3, 4, 5],
+            "category": ["A", "B", "A", "B", "C"],
+            "value": [10, 20, 30, 40, 50],
+        })
 
     def test_filter_creates_parent_child_relationship(self, workspace, sample_df):
         """Test that filter operation creates proper parent-child relationship."""

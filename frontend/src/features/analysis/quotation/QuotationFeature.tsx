@@ -19,6 +19,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../../../components/ui/dialog';
 import { Badge } from '../../../components/ui/badge';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../../../components/ui/alert-dialog';
+import {
   Table,
   TableBody,
   TableCell,
@@ -246,7 +255,7 @@ const resolveNodeId = (node: any, fallbackIndex = 0): string => {
 
 const QuotationFeature: React.FC = () => {
   const { selectedNodes, handlePageChange: baseHandlePageChange, handlePageSizeChange: baseHandlePageSizeChange } = useWorkspaceSelection();
-  const { currentWorkspaceId, getNodeShape, nodeData } = useWorkspaceData();
+  const { currentWorkspaceId, nodeData } = useWorkspaceData();
   const { quotationSearch, detachQuotation } = useWorkspaceActions();
   const { getAuthHeaders } = useAuth();
 
@@ -288,6 +297,8 @@ const QuotationFeature: React.FC = () => {
   const [contextLength, setContextLength] = useState(DEFAULT_CONTEXT_LENGTH);
   const [contextLengthError, setContextLengthError] = useState<string | null>(null);
   const [isSavingContextLength, setIsSavingContextLength] = useState(false);
+  const [errorDialogOpen, setErrorDialogOpen] = useState(false);
+  const [errorDialogMessage, setErrorDialogMessage] = useState<string>('');
 
   const { getColumnInfos } = useNodeColumnInfos({
     workspaceId: currentWorkspaceId,
@@ -303,6 +314,16 @@ const QuotationFeature: React.FC = () => {
   const displayedNodes = useMemo(() => (
     panelSelectedNodes.slice(0, 1)
   ), [panelSelectedNodes]);
+
+  const originalColumnsByNode = useMemo<Record<string, string[]>>(() => {
+    const map: Record<string, string[]> = {};
+    displayedNodes.forEach((node, idx) => {
+      const nodeId = resolveNodeId(node, idx);
+      if (!nodeId) return;
+      map[nodeId] = getColumnInfos(node).map((info) => info.name);
+    });
+    return map;
+  }, [displayedNodes, getColumnInfos]);
 
   const resolvedEnginePayload = useMemo(() => {
     if (engineConfig.type === 'remote') {
@@ -382,6 +403,25 @@ const QuotationFeature: React.FC = () => {
     return { type: 'local' };
   }, [resolvedEnginePayload, engineConfig.url, updateRemoteUrl]);
 
+  const getErrorMessage = useCallback((error: any): string => {
+    const detail = error?.response?.data?.detail ?? error?.data?.detail ?? (error?.body as any)?.detail;
+    if (typeof detail === 'string' && detail.trim().length) return detail;
+    if (detail && typeof detail === 'object') {
+      try {
+        return JSON.stringify(detail);
+      } catch {
+        /* ignore */
+      }
+    }
+    if (typeof error?.message === 'string' && error.message.trim().length) return error.message;
+    return 'An unexpected error occurred while loading quotations.';
+  }, []);
+
+  const showErrorDialog = useCallback((message: string) => {
+    setErrorDialogMessage(message || 'An unexpected error occurred.');
+    setErrorDialogOpen(true);
+  }, []);
+
   const handleEngineDialogSave = useCallback(() => {
     const payload = buildEngineRequest();
     if (!payload) {
@@ -413,7 +453,6 @@ const QuotationFeature: React.FC = () => {
     setContextLengthInput(String(normalized));
   }, []);
 
-  const getStringColumns = useCallback((node: any) => getColumnInfos(node).map(info => info.name), [getColumnInfos]);
 
   const applyContextLengthInput = useCallback(async () => {
     const trimmed = contextLengthInput.trim();
@@ -480,6 +519,37 @@ const QuotationFeature: React.FC = () => {
   // Deprecated per-node loading indicator; rely on DataView-like UX
   const [nodeDetaching, setNodeDetaching] = useState<Record<string, boolean>>({});
   const [resultsByNode, setResultsByNode] = useState<Record<string, QuotationResultState>>({});
+
+  const primaryResultInfo = useMemo(() => {
+    const firstNode = displayedNodes[0];
+    if (!firstNode) {
+      return null;
+    }
+    const nodeId = resolveNodeId(firstNode, 0);
+    const state = resultsByNode[nodeId];
+    if (!state) {
+      return null;
+    }
+    const pagination = state.pagination || {};
+    const pageSize = Number(pagination.page_size) || DEFAULT_PAGE_SIZE;
+    const totalRows =
+      typeof pagination.total_rows === 'number'
+        ? pagination.total_rows
+        : state.rows?.length ?? 0;
+    const totalPages =
+      typeof pagination.total_pages === 'number' && pagination.total_pages > 0
+        ? pagination.total_pages
+        : pageSize > 0
+        ? Math.max(1, Math.ceil(Math.max(totalRows, state.rows?.length ?? 0) / pageSize))
+        : 1;
+    return {
+      pageSize,
+      totalRows,
+      totalPages,
+    };
+  }, [displayedNodes, resultsByNode]);
+
+  const pageSizeControlValue = String(primaryResultInfo?.pageSize ?? DEFAULT_PAGE_SIZE);
 
   const currentRequestParams = useMemo(() => {
     const targetNode = (isLocked && lockedNodesSnapshot.length ? lockedNodesSnapshot[0] : displayedNodes[0]) as any;
@@ -829,21 +899,27 @@ const QuotationFeature: React.FC = () => {
       engine: engineConfigForRequest,
     };
 
-    const result = await quotationSearch(nodeId, requestPayload);
-    applyContextLengthPreferenceFromResult(result);
-    const normalized = updateResultState(nodeId, column, result);
-    return {
-      normalized,
-      request: {
-        column,
-        page: requestPayload.page,
-        page_size: requestPayload.page_size,
-        sort_by: requestPayload.sort_by ?? null,
-        sort_order: requestPayload.sort_order,
-        engine_type: engineConfigForRequest.type,
-        engine_url: engineConfigForRequest.type === 'remote' ? (engineConfigForRequest.url ?? '') : null,
-      },
-    };
+    try {
+      const result = await quotationSearch(nodeId, requestPayload);
+      applyContextLengthPreferenceFromResult(result);
+      const normalized = updateResultState(nodeId, column, result);
+      return {
+        normalized,
+        request: {
+          column,
+          page: requestPayload.page,
+          page_size: requestPayload.page_size,
+          sort_by: requestPayload.sort_by ?? null,
+          sort_order: requestPayload.sort_order,
+          engine_type: engineConfigForRequest.type,
+          engine_url: engineConfigForRequest.type === 'remote' ? (engineConfigForRequest.url ?? '') : null,
+        },
+      };
+    } catch (error: any) {
+      console.error('Failed to fetch quotations', error);
+      showErrorDialog(getErrorMessage(error));
+      return null;
+    }
   };
 
   const updateStoredQuotationResult = useCallback(async (
@@ -872,59 +948,67 @@ const QuotationFeature: React.FC = () => {
       sort_order: overrides.sort_order ?? state.sortOrder ?? 'asc',
     };
 
-    const response = await textApi.postQuotationCurrentResult(
-      currentWorkspaceId,
-      payload,
-      getAuthHeaders()
-    );
+    try {
+      const response = await textApi.postQuotationCurrentResult(
+        currentWorkspaceId,
+        payload,
+        getAuthHeaders()
+      );
 
-    if (!response) {
+      if (!response) {
+        return null;
+      }
+
+      applyContextLengthPreferenceFromResult(response);
+      const normalized = updateResultState(nodeId, column, response);
+      setHasLoaded(true);
+      setLockedRequestParams((prev) => {
+        const engineSnapshot = (() => {
+          if (prev?.engine_type) {
+            return {
+              engine_type: prev.engine_type,
+              engine_url: prev.engine_url ?? null,
+            };
+          }
+          if (resolvedEnginePayload.type === 'remote') {
+            const url = resolvedEnginePayload.isValid
+              ? resolvedEnginePayload.normalizedUrl
+              : resolvedEnginePayload.rawUrl;
+            return {
+              engine_type: 'remote' as const,
+              engine_url: url,
+            };
+          }
+          return {
+            engine_type: 'local' as const,
+            engine_url: null,
+          };
+        })();
+
+        return {
+          ...engineSnapshot,
+          column,
+          page: normalized.pagination.page,
+          page_size: normalized.pagination.page_size,
+          sort_by: normalized.sorting.sort_by ?? null,
+          sort_order: normalized.sorting.sort_order,
+        } as Record<string, unknown>;
+      });
+
+      return normalized;
+    } catch (error: any) {
+      console.error('Failed to refresh quotation results', error);
+      showErrorDialog(getErrorMessage(error));
       return null;
     }
-
-    applyContextLengthPreferenceFromResult(response);
-    const normalized = updateResultState(nodeId, column, response);
-    setHasLoaded(true);
-    setLockedRequestParams((prev) => {
-      const engineSnapshot = (() => {
-        if (prev?.engine_type) {
-          return {
-            engine_type: prev.engine_type,
-            engine_url: prev.engine_url ?? null,
-          };
-        }
-        if (resolvedEnginePayload.type === 'remote') {
-          const url = resolvedEnginePayload.isValid
-            ? resolvedEnginePayload.normalizedUrl
-            : resolvedEnginePayload.rawUrl;
-          return {
-            engine_type: 'remote' as const,
-            engine_url: url,
-          };
-        }
-        return {
-          engine_type: 'local' as const,
-          engine_url: null,
-        };
-      })();
-
-      return {
-        ...engineSnapshot,
-        column,
-        page: normalized.pagination.page,
-        page_size: normalized.pagination.page_size,
-        sort_by: normalized.sorting.sort_by ?? null,
-        sort_order: normalized.sorting.sort_order,
-      } as Record<string, unknown>;
-    });
-
-    return normalized;
   }, [
     applyContextLengthPreferenceFromResult,
     currentWorkspaceId,
     getAuthHeaders,
+    getErrorMessage,
     nodeState,
     resolveLockedNodeContext,
+    showErrorDialog,
     resolvedEnginePayload,
     setLockedRequestParams,
     updateResultState,
@@ -1005,6 +1089,10 @@ const QuotationFeature: React.FC = () => {
   };
 
   const handleSort = async (nodeId: string, column: string) => {
+    const sortableColumns = new Set(originalColumnsByNode[nodeId] || []);
+    if (!sortableColumns.has(column)) {
+      return;
+    }
     const state = nodeState[nodeId] || {
       currentPage: 1,
       pageSize: DEFAULT_PAGE_SIZE,
@@ -1050,7 +1138,7 @@ const QuotationFeature: React.FC = () => {
           : { type: 'local' },
       });
     } catch (e: any) {
-      alert(`Error detaching quotation: ${e?.message || 'Unknown error'}`);
+      showErrorDialog(getErrorMessage(e));
     } finally {
       setNodeDetaching(prev => ({ ...prev, [nodeId]: false }));
     }
@@ -1245,7 +1333,6 @@ const QuotationFeature: React.FC = () => {
               maxCompare={1}
               className="border border-dashed border-muted-foreground/40 rounded-lg bg-muted/30 p-4"
               showShape
-              getNodeShapeFn={getNodeShape}
               showColorPicker={false}
               disabled={!!isLocked}
               locked={!!isLocked}
@@ -1337,57 +1424,48 @@ const QuotationFeature: React.FC = () => {
           </CardContent>
         </Card>
 
-        {hasLoaded && displayedNodes.length > 0 && displayedNodes.map((node, idx) => {
-          const nodeId = resolveNodeId(node, idx);
-          const nodeLabel = node.name || node.data?.name || node.data?.label || nodeId;
-          const originalColumns = getStringColumns(node);
-          const selection = activeSelections.find((s) => s.nodeId === nodeId);
-          const textCol = selection?.column || '';
-          
-          // Core quotation columns from backend
-          const coreQuotationCols = [
-            'document_idx', 'speaker', 'speaker_start_idx', 'speaker_end_idx',
-            'quote', 'quote_start_idx', 'quote_end_idx',
-            'verb', 'verb_start_idx', 'verb_end_idx',
-            'quote_type', 'quote_token_count', 'is_floating_quote', 'quote_row_idx',
-            textCol // Include the selected text column
-          ].filter(c => c); // Remove empty values
-          
-          const resultState = resultsByNode[nodeId];
-          const fallbackRows: any[] = Array.isArray(nodeData?.data) ? nodeData.data : [];
-          const rowsForRender = resultState?.rows?.length ? resultState.rows : fallbackRows;
-          const columnsSource = resultState?.columns?.length
-            ? resultState.columns
-            : (rowsForRender.length > 0
-              ? Object.keys(rowsForRender[0]).filter((key) => !key.startsWith('__'))
-              : originalColumns);
-
-          const allCols = columnsSource.filter((c: string) => !c.startsWith('__'));
-
-          const cols = showMetadata
-            ? allCols
-            : allCols.filter((c: string) => coreQuotationCols.includes(c));
-          return (
-            <Card key={nodeId} className="overflow-hidden">
-              <CardHeader className="gap-1 border-b bg-muted/40">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <CardTitle className="text-base">Quotations for {nodeLabel}</CardTitle>
-                    <CardDescription>Text column: {textCol || 'Select a text column to view highlighted quotations.'}</CardDescription>
+        {hasLoaded && displayedNodes.length > 0 && (
+          <Card>
+            <CardHeader className="space-y-4">
+              <div className="space-y-1">
+                <CardTitle>Search Results</CardTitle>
+                <CardDescription>Highlight speaker, quote, and verb spans for the selected node.</CardDescription>
+              </div>
+              <div className="space-y-2 text-sm">
+                <div className="flex flex-wrap items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <label htmlFor="quotation-page-size" className="text-sm font-medium text-foreground">
+                      Results per page
+                    </label>
+                    <Select value={pageSizeControlValue} onValueChange={(value) => handlePageSizeChange(Number(value))}>
+                      <SelectTrigger className="h-9 w-[130px] text-left" id="quotation-page-size">
+                        <SelectValue placeholder="Rows" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[10, 20, 50, 100].map((sz) => (
+                          <SelectItem key={sz} value={String(sz)}>
+                            {sz}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <label className="flex items-center gap-2 text-sm text-foreground whitespace-nowrap">
+                  <label className="flex items-center gap-2 text-sm text-foreground">
                     <input
                       type="checkbox"
-                      checked={showMetadata}
-                      onChange={(e) => setShowMetadata(e.target.checked)}
                       className="h-4 w-4"
+                      checked={showMetadata}
+                      onChange={(event) => setShowMetadata(event.target.checked)}
                     />
                     <span>Show metadata</span>
                   </label>
-                </div>
-                <div className="mt-4 rounded-md border border-border/60 bg-muted/20 px-4 py-2">
-                  <div className="flex flex-wrap items-center gap-3 text-sm">
-                    <span className="uppercase tracking-wide text-[10px] font-semibold text-foreground/80">Context length (words per side)</span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label
+                      htmlFor="quotation-context-length"
+                      className="text-sm font-medium text-foreground"
+                    >
+                      Context length (words per side)
+                    </label>
                     <Input
                       id="quotation-context-length"
                       aria-label="Context length in words"
@@ -1402,205 +1480,285 @@ const QuotationFeature: React.FC = () => {
                       }}
                       onBlur={handleContextLengthBlur}
                       onKeyDown={handleContextLengthKeyDown}
-                      className="h-8 w-20 text-right"
+                      className="h-9 w-24 text-right"
                       inputMode="numeric"
                       disabled={isSavingContextLength}
                     />
                     {isSavingContextLength && (
-                      <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
                         <span>Saving…</span>
                       </div>
                     )}
-                    <span className={`text-[11px] ${contextLengthError ? 'text-destructive' : 'text-muted-foreground'}`}>
-                      {contextLengthError ?? `Enter a whole number between 0 and ${MAX_CONTEXT_LENGTH}.`}
-                    </span>
                   </div>
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="overflow-hidden rounded-lg border border-border bg-card">
-                  <ScrollArea
-                    type="always"
-                    scrollbars="both"
-                    className="max-h-[70vh]"
-                    style={{ scrollbarGutter: 'stable both-edges' }}
-                  >
-                    <div className="min-w-max">
-                      <Table className="min-w-full">
-                        <TableHeader className="bg-gray-50 sticky top-0 z-10">
-                          <TableRow>
-                            {cols.map((c: string) => (
-                              <TableHead
-                                key={c}
-                                className="h-10 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500 select-none cursor-pointer hover:bg-gray-100 hover:text-gray-700 transition-colors whitespace-nowrap"
-                                onClick={() => handleSort(nodeId, c)}
-                              >
-                                <div className="flex items-center gap-1.5">
-                                  <span>{c}</span>
-                                  <ArrowUpDown className="h-3 w-3 opacity-50" />
-                                </div>
-                              </TableHead>
-                            ))}
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {rowsForRender.length === 0 ? (
-                            <TableRow>
-                              <TableCell className="h-24 text-center text-muted-foreground" colSpan={cols.length || 1}>
-                                No quotations
-                              </TableCell>
-                            </TableRow>
-                          ) : (
-                            rowsForRender.map((row: any, idx: number) => (
-                              <TableRow key={idx} className="hover:bg-muted/50 transition-colors">
-                              {cols.map((c: string, i: number) => {
-                                const val = row?.[c];
-                                const rowWithSpans = row;
-                                const cellKey = `${nodeId}:${idx}:${i}`;
-                                const content = (c === textCol)
-                                  ? renderHighlightedText(typeof val === 'string' ? val : (val ?? ''), rowWithSpans, cellKey)
-                                  : (val !== undefined && val !== null ? String(val) : '');
-                                return (
-                                  <TableCell
-                                    key={i}
-                                    className="px-4 py-2.5 text-sm align-top"
-                                    style={{ lineHeight: 1.6 }}
-                                  >
-                                    {content}
-                                  </TableCell>
-                                );
-                              })}
-                            </TableRow>
-                          ))
-                        )}
-                      </TableBody>
-                    </Table>
+                <span className={`text-xs ${contextLengthError ? 'text-destructive' : 'text-muted-foreground'}`}>
+                  {contextLengthError ?? `Enter a whole number between 0 and ${MAX_CONTEXT_LENGTH}.`}
+                </span>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-8">
+              {displayedNodes.map((node, idx) => {
+                const nodeId = resolveNodeId(node, idx);
+                const originalColumns = originalColumnsByNode[nodeId] || [];
+                const selection = activeSelections.find((s) => s.nodeId === nodeId);
+                const textCol = selection?.column || '';
+
+                const quotationColumnOrder = [
+                  'speaker',
+                  'speaker_start_idx',
+                  'speaker_end_idx',
+                  'quote',
+                  'quote_start_idx',
+                  'quote_end_idx',
+                  'verb',
+                  'verb_start_idx',
+                  'verb_end_idx',
+                  'quote_type',
+                  'quote_token_count',
+                  'is_floating_quote',
+                  'quote_row_idx',
+                ];
+
+                const coreQuotationCols = ['document_idx', ...quotationColumnOrder, textCol].filter(Boolean);
+
+                const resultState = resultsByNode[nodeId];
+                const fallbackRows: any[] = Array.isArray(nodeData?.data) ? nodeData.data : [];
+                const rowsForRender = resultState?.rows?.length ? resultState.rows : fallbackRows;
+                const columnsSource = resultState?.columns?.length
+                  ? resultState.columns
+                  : rowsForRender.length > 0
+                  ? Object.keys(rowsForRender[0]).filter((key) => !key.startsWith('__'))
+                  : originalColumns;
+
+                const allCols = columnsSource.filter((c: string) => !c.startsWith('__'));
+
+                const orderedColumns = (() => {
+                  const set = new Set(allCols);
+                  const docIdx = set.has('document_idx') ? ['document_idx'] : [];
+                  const quoteCols = quotationColumnOrder.filter((c) => set.has(c));
+                  const docColArr = textCol && set.has(textCol) ? [textCol] : [];
+                  const originalMeta = (originalColumnsByNode[nodeId] || [])
+                    .filter((c) => c !== textCol && c !== 'document_idx' && set.has(c));
+                  const remainder = allCols.filter(
+                    (c) =>
+                      !docIdx.includes(c)
+                      && !quoteCols.includes(c)
+                      && !docColArr.includes(c)
+                      && !originalMeta.includes(c),
+                  );
+                  return [...docIdx, ...quoteCols, ...docColArr, ...originalMeta, ...remainder];
+                })();
+
+                const cols = showMetadata
+                  ? orderedColumns
+                  : orderedColumns.filter((c: string) => coreQuotationCols.includes(c));
+
+                return (
+                  <section key={nodeId} className="space-y-4">
+                    <div className="border-b border-border/60 pb-4">
+                      <p className="text-sm text-muted-foreground">
+                        Text column: {textCol || 'Select a text column to view highlighted quotations.'}
+                      </p>
                     </div>
-                  </ScrollArea>
-                </div>
-                  {(() => {
-                    const pag = resultState?.pagination || ((nodeData as any)?.pagination ?? {});
-                    const page = Number(pag.page) || 1;
-                    const page_size = Number(pag.page_size) || DEFAULT_PAGE_SIZE;
-                    const total_rows = Number(pag.total_rows) || rowsForRender.length;
-                    const total_pages = Number(pag.total_pages) || (page_size > 0 ? Math.max(1, Math.ceil((total_rows || 1) / page_size)) : 1);
-                    const has_prev = typeof pag.has_prev === 'boolean' ? pag.has_prev : page > 1;
-                    const has_next = typeof pag.has_next === 'boolean' ? pag.has_next : page < total_pages;
-                    return (
-                      <div className="flex flex-col gap-4 border-t border-border bg-muted/30 px-4 py-3 md:flex-row md:items-center md:justify-between">
-                        <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                          <div className="flex items-center gap-2">
-                            <span>Show</span>
-                            <Select value={String(page_size)} onValueChange={(value) => handlePageSizeChange(Number(value))}>
-                              <SelectTrigger className="h-8 w-[110px] text-left">
-                                <SelectValue placeholder="Rows" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {[10, 20, 50, 100].map(sz => (
-                                  <SelectItem key={sz} value={String(sz)}>
-                                    {sz}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <span>rows</span>
-                          </div>
-                          <div>
+
+                    <div className="overflow-hidden rounded-lg border border-border bg-card">
+                      <ScrollArea
+                        type="always"
+                        scrollbars="both"
+                        className="max-h-[70vh]"
+                        style={{ scrollbarGutter: 'stable both-edges' }}
+                      >
+                        <div className="min-w-max">
+                          <Table className="min-w-full text-sm">
+                            <TableHeader className="bg-muted">
+                              <TableRow className="border-b border-border/60">
+                                {cols.map((c: string) => {
+                                  const sortable = (originalColumnsByNode[nodeId] || []).includes(c);
+                                  const active = resultState?.sorting?.sort_by === c;
+                                  return (
+                                    <TableHead
+                                      key={c}
+                                      className={`h-10 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground/90 select-none whitespace-nowrap ${sortable ? 'cursor-pointer' : 'cursor-default opacity-75'}`}
+                                      onClick={sortable ? () => handleSort(nodeId, c) : undefined}
+                                    >
+                                      <div className="flex items-center gap-1.5">
+                                        <span>{c}</span>
+                                        {sortable && (
+                                          <ArrowUpDown className={`h-3 w-3 ${active ? 'text-foreground' : 'opacity-60'}`} />
+                                        )}
+                                      </div>
+                                    </TableHead>
+                                  );
+                                })}
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {rowsForRender.length === 0 ? (
+                                <TableRow>
+                                  <TableCell className="h-24 text-center text-muted-foreground" colSpan={cols.length || 1}>
+                                    No quotations
+                                  </TableCell>
+                                </TableRow>
+                              ) : (
+                                rowsForRender.map((row: any, rowIdx: number) => (
+                                  <TableRow
+                                    key={rowIdx}
+                                    className="border-b border-border/60 last:border-b-0 hover:bg-muted/40"
+                                  >
+                                    {cols.map((c: string, cellIdx: number) => {
+                                      const val = row?.[c];
+                                      const cellKey = `${nodeId}:${rowIdx}:${cellIdx}`;
+                                      const content =
+                                        c === textCol
+                                          ? renderHighlightedText(
+                                              typeof val === 'string' ? val : val ?? '',
+                                              row,
+                                              cellKey,
+                                            )
+                                          : val !== undefined && val !== null
+                                          ? String(val)
+                                          : '';
+                                      return (
+                                        <TableCell
+                                          key={cellIdx}
+                                          className="px-4 py-3 align-top text-sm leading-relaxed"
+                                        >
+                                          {content}
+                                        </TableCell>
+                                      );
+                                    })}
+                                  </TableRow>
+                                ))
+                              )}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </ScrollArea>
+                    </div>
+
+                    {(() => {
+                      const pag = resultState?.pagination || ((nodeData as any)?.pagination ?? {});
+                      const page = Number(pag.page) || 1;
+                      const page_size = Number(pag.page_size) || DEFAULT_PAGE_SIZE;
+                      const total_rows = Number(pag.total_rows) || rowsForRender.length;
+                      const total_pages =
+                        Number(pag.total_pages) ||
+                        (page_size > 0 ? Math.max(1, Math.ceil((total_rows || 1) / page_size)) : 1);
+                      const has_prev = typeof pag.has_prev === 'boolean' ? pag.has_prev : page > 1;
+                      const has_next = typeof pag.has_next === 'boolean' ? pag.has_next : page < total_pages;
+                      return (
+                        <div className="flex flex-col gap-4 rounded-lg border border-border bg-muted/20 px-4 py-3 md:flex-row md:items-center md:justify-between">
+                          <div className="text-sm text-muted-foreground">
                             Showing {Math.min((page - 1) * page_size + 1, total_rows)} to {Math.min(page * page_size, total_rows)} of {total_rows} rows
                           </div>
-                        </div>
 
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => handlePageChange(1)}
-                            disabled={!has_prev}
-                            title="First page"
-                          >
-                            <ChevronsLeft className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => handlePageChange(page - 1)}
-                            disabled={!has_prev}
-                            title="Previous page"
-                          >
-                            <ChevronLeft className="h-4 w-4" />
-                          </Button>
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <span>Page</span>
-                            <Input
-                              type="number"
-                              value={page}
-                              onChange={(e) => {
-                                const newPage = Number(e.target.value);
-                                if (Number.isFinite(newPage) && newPage >= 1 && newPage <= total_pages) {
-                                  handlePageChange(newPage);
-                                }
-                              }}
-                              className="h-8 w-20 text-center"
-                              min={1}
-                              max={total_pages}
-                            />
-                            <span>of {total_pages}</span>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              className="h-9 w-9"
+                              onClick={() => handlePageChange(1)}
+                              disabled={!has_prev}
+                              title="First page"
+                            >
+                              <ChevronsLeft className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              className="h-9 w-9"
+                              onClick={() => handlePageChange(page - 1)}
+                              disabled={!has_prev}
+                              title="Previous page"
+                            >
+                              <ChevronLeft className="h-4 w-4" />
+                            </Button>
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <span>Page</span>
+                              <Input
+                                type="number"
+                                value={page}
+                                onChange={(e) => {
+                                  const newPage = Number(e.target.value);
+                                  if (Number.isFinite(newPage) && newPage >= 1 && newPage <= total_pages) {
+                                    handlePageChange(newPage);
+                                  }
+                                }}
+                                className="h-9 w-20 text-center"
+                                min={1}
+                                max={total_pages}
+                              />
+                              <span>of {total_pages}</span>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              className="h-9 w-9"
+                              onClick={() => handlePageChange(page + 1)}
+                              disabled={!has_next}
+                              title="Next page"
+                            >
+                              <ChevronRight className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              className="h-9 w-9"
+                              onClick={() => handlePageChange(total_pages)}
+                              disabled={!has_next}
+                              title="Last page"
+                            >
+                              <ChevronsRight className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={() => handleDetach(nodeId)}
+                              disabled={Boolean(nodeDetaching[nodeId])}
+                              className="bg-green-600 text-white hover:bg-green-700"
+                            >
+                              {nodeDetaching[nodeId] ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Detaching…
+                                </>
+                              ) : (
+                                <>
+                                  <Unlink className="mr-2 h-4 w-4" />
+                                  Detach
+                                </>
+                              )}
+                            </Button>
                           </div>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => handlePageChange(page + 1)}
-                            disabled={!has_next}
-                            title="Next page"
-                          >
-                            <ChevronRight className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => handlePageChange(total_pages)}
-                            disabled={!has_next}
-                            title="Last page"
-                          >
-                            <ChevronsRight className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => handleDetach(nodeId)}
-                            disabled={Boolean(nodeDetaching[nodeId])}
-                          >
-                            {nodeDetaching[nodeId] ? (
-                              <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Detaching…
-                              </>
-                            ) : (
-                              <>
-                                <Unlink className="mr-2 h-4 w-4" />
-                                Detach
-                              </>
-                            )}
-                          </Button>
                         </div>
-                      </div>
-                    );
-                  })()}
-              </CardContent>
-            </Card>
-          );
-        })}
+                      );
+                    })()}
+                  </section>
+                );
+              })}
+            </CardContent>
+          </Card>
+        )}
       </div>
+
+      <AlertDialog open={errorDialogOpen} onOpenChange={setErrorDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Quotation Error</AlertDialogTitle>
+            <AlertDialogDescription className="whitespace-pre-wrap break-words">
+              {errorDialogMessage}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setErrorDialogOpen(false)}>OK</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };

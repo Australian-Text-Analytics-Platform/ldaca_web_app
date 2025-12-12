@@ -15,7 +15,6 @@ import { useJoinSubTab, type JoinSubTabProps } from './hooks/useJoinSubTab';
 export type { JoinSubTabProps } from './hooks/useJoinSubTab';
 
 export const JoinSubTab: React.FC<JoinSubTabProps> = (props) => {
-  const { getNodeShape } = props;
   const {
     selectionPanel,
     sharedColumnsNotice,
@@ -73,7 +72,6 @@ export const JoinSubTab: React.FC<JoinSubTabProps> = (props) => {
             showColorPicker={false}
             showHeaderLabel
             showShape
-            getNodeShapeFn={getNodeShape}
             className="rounded-lg border border-border/60 bg-muted/40"
           />
 

@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { workspacesApi } from '../../api/workspaces';
 import { nodesApi } from '../../api/nodes';
@@ -52,7 +52,6 @@ export const useWorkspaceQueries = ({
     queryFn: () => workspacesApi.list(authHeaders),
     enabled: isAuthenticated,
     staleTime: 5 * 60 * 1000,
-    retry: false,
   });
 
   const currentWorkspaceQuery = useQuery({
@@ -60,7 +59,6 @@ export const useWorkspaceQueries = ({
     queryFn: () => workspacesApi.current.get(authHeaders),
     enabled: isAuthenticated,
     staleTime: 60 * 1000,
-    retry: false,
   });
 
   const graphQuery = useQuery({
@@ -75,7 +73,6 @@ export const useWorkspaceQueries = ({
     enabled: isAuthenticated && !!currentWorkspaceId,
     refetchOnWindowFocus: false,
     staleTime: 30 * 1000,
-    retry: false,
   });
 
   const nodeDataQuery = useQuery({
@@ -91,7 +88,6 @@ export const useWorkspaceQueries = ({
     },
     enabled: isAuthenticated && !!currentWorkspaceId && !!selectedNodeId,
     staleTime: 30 * 1000,
-    retry: false,
   });
 
   const workspaces = workspacesQuery.data || [];
@@ -111,49 +107,6 @@ export const useWorkspaceQueries = ({
   );
 
   const nodeData = nodeDataQuery.data || { data: [], page: 0, total_pages: 0 };
-
-  const getNodeShape = useCallback(
-    async (
-      nodeId: string
-    ): Promise<{ shape: [number, number]; is_lazy: boolean; calculated: boolean } | null> => {
-      if (!currentWorkspaceId) return null;
-
-      const cacheKey = `node-shape:${currentWorkspaceId}:${nodeId}`;
-      if (typeof window !== 'undefined') {
-        try {
-          const cached = window.sessionStorage.getItem(cacheKey);
-          if (cached) {
-            const parts = cached.split('×').map((token) => token.trim());
-            if (parts.length === 2) {
-              const r = parseInt(parts[0], 10);
-              const c = parseInt(parts[1], 10);
-              if (!Number.isNaN(r) && !Number.isNaN(c)) {
-                return { shape: [r, c], is_lazy: false, calculated: true } as any;
-              }
-            }
-          }
-        } catch {
-          // ignore cache read errors
-        }
-      }
-
-      try {
-        const shapeData = await nodesApi.shape(currentWorkspaceId, nodeId, authHeaders);
-        if (shapeData?.shape && typeof window !== 'undefined') {
-          try {
-            window.sessionStorage.setItem(cacheKey, `${shapeData.shape[0]} × ${shapeData.shape[1]}`);
-          } catch {
-            // ignore cache write errors
-          }
-        }
-        return shapeData;
-      } catch (error) {
-        console.error('Failed to get node shape:', error);
-        return null;
-      }
-    },
-    [authHeaders, currentWorkspaceId]
-  );
 
   const queryLoadingState = useMemo(
     () => ({
@@ -189,7 +142,6 @@ export const useWorkspaceQueries = ({
     selectedNode,
     selectedNodes,
     nodeData,
-    getNodeShape,
     queryLoadingState,
     queryErrorState,
     currentWorkspaceIdFromQuery: currentWorkspaceQuery.data,

@@ -16,16 +16,12 @@ from .api.files import router as files_router
 from .api.text import router as text_router
 from .api.users import router as users_router
 from .api.workspaces import router as workspaces_router
+
+# Ensure DocWorkspace classes are extended with API methods (e.g., to_api_graph).
+# Importing this module applies the monkey patches on startup.
+from .core import docworkspace_api  # noqa: F401
 from .db import cleanup_expired_sessions, init_db
 from .settings import settings
-
-# Ensure DocWorkspace classes are extended with API methods (e.g., to_api_graph)
-# Importing this module applies monkey patches when DOCWORKSPACE is available.
-try:  # Import for side effects; ignore if unavailable during certain test setups
-    from .core import docworkspace_api  # noqa: F401
-except Exception:
-    # Non-fatal: workspace graph endpoint will fall back to legacy shapes
-    pass
 
 
 @asynccontextmanager
@@ -108,15 +104,6 @@ app.include_router(text_router, prefix="/api", tags=["text_analysis"])
 app.include_router(workspaces_router, prefix="/api", tags=["workspace_management"])
 app.include_router(users_router, prefix="/api", tags=["user_management"])
 app.include_router(admin_router, prefix="/api", tags=["administration"])
-
-# Legacy compatibility: expose workspace routes without the /api prefix for tests and
-# older clients that expect the original path structure. Hidden from OpenAPI docs to
-# avoid duplicate entries.
-app.include_router(
-    workspaces_router,
-    tags=["workspace_management"],
-    include_in_schema=False,
-)
 
 
 # =============================================================================

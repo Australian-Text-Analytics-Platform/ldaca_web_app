@@ -1,7 +1,5 @@
 import { get, post, del, httpRequest } from './http';
 
-export type ConversionTarget = 'docdataframe' | 'dataframe' | 'doclazyframe' | 'lazyframe';
-
 export interface ColumnUniqueValuesResponse {
   column_name: string;
   unique_count: number;
@@ -91,9 +89,12 @@ export const nodesApi = {
       method: 'DELETE',
       headers,
     }),
-  createFromFile: (ws: string, filename: string, nodeName?: string, headers: Record<string,string> = {}, options?: { mode?: string; document_column?: string | null }) => httpRequest(`/workspaces/${ws}/nodes`, { method: 'POST', headers, params: { filename, node_name: nodeName, mode: options?.mode ?? 'DocLazyFrame', document_column: options?.document_column ?? undefined } }),
-  convert: (ws: string, node: string, target: ConversionTarget, documentColumn?: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/nodes/${node}/convert`, { method: 'POST', headers, params: { target, ...(documentColumn && { document_column: documentColumn }) } }),
-  resetDocument: (ws: string, node: string, documentColumn?: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/nodes/${node}/reset-document`, { method: 'POST', headers, params: documentColumn ? { document_column: documentColumn } : {} }),
+  createFromFile: (ws: string, filename: string, nodeName?: string, headers: Record<string,string> = {}) =>
+    httpRequest(`/workspaces/${ws}/nodes`, {
+      method: 'POST',
+      headers,
+      params: { filename, node_name: nodeName, mode: 'LazyFrame' },
+    }),
   join: (ws: string, req: JoinNodesRequest, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/nodes/join`, { method: 'POST', headers, params: req }),
   joinPreview: (
     ws: string,

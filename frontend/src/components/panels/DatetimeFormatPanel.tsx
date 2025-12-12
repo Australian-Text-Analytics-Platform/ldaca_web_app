@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Dialog, DialogContent } from '../ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 
@@ -70,6 +70,10 @@ export const DatetimeFormatPanel: React.FC<DatetimeFormatPanelProps> = ({
       }}
     >
       <DialogContent className="w-full max-w-lg border-none bg-transparent p-0 shadow-none">
+        <DialogHeader className="sr-only">
+          <DialogTitle>Convert {columnName || 'column'} to datetime</DialogTitle>
+          <DialogDescription>Provide a strftime format or let Auto Fill guess it from sample values.</DialogDescription>
+        </DialogHeader>
         <Card>
           <CardHeader>
             <CardTitle>

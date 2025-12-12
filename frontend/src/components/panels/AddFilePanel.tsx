@@ -1,68 +1,18 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useFilePreview } from '../../hooks/useFilePreview';
-import columnPersistence from '../../utils/columnPersistence';
-import { useWorkspaceData } from '../../hooks/useWorkspaceData';
-import { Dialog, DialogContent } from '../ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-
-const ALL_MODES = ['DocLazyFrame', 'LazyFrame', 'DocDataFrame', 'DataFrame'] as const;
-
-type AddMode = (typeof ALL_MODES)[number];
-type DocumentMode = Extract<AddMode, 'DocLazyFrame' | 'DocDataFrame'>;
 
 interface AddFilePanelProps {
   filename: string | null;
   open: boolean;
   onClose: () => void;
-  onConfirm: (opts: { mode: AddMode; documentColumn?: string | null }) => Promise<void> | void;
-}
-
-const isDocumentMode = (mode: AddMode): mode is DocumentMode => mode === 'DocLazyFrame' || mode === 'DocDataFrame';
-
-const coerceMode = (mode: string | null | undefined): AddMode => {
-  if (!mode) return 'DocLazyFrame';
-  return isAddMode(mode) ? mode : 'DocLazyFrame';
-};
-
-const isAddMode = (value: string): value is AddMode => {
-  switch (value) {
-    case 'DocLazyFrame':
-    case 'LazyFrame':
-    case 'DocDataFrame':
-    case 'DataFrame':
-      return true;
-    default:
-      return false;
-  }
-};
-
-type PreviewRow = Record<string, unknown>;
-
-function guessDocumentColumn(columns: string[], rows: ReadonlyArray<PreviewRow>): string | null {
-  if (!columns.length || !rows.length) return null;
-  const stringCols = columns.filter((col) => rows.some((row) => typeof row[col] === 'string' && row[col] !== 'None'));
-  if (!stringCols.length) return null;
-  if (stringCols.length === 1) return stringCols[0];
-  const averages: Record<string, number> = {};
-  stringCols.forEach((col) => {
-    let total = 0;
-    let count = 0;
-    rows.forEach((row) => {
-      const value = row[col];
-      if (typeof value === 'string') {
-        total += value.length;
-        count++;
-      }
-    });
-    averages[col] = count ? total / count : 0;
-  });
-  return stringCols.sort((a, b) => averages[b] - averages[a])[0];
+  onConfirm: () => Promise<void> | void;
 }
 
 export const AddFilePanel: React.FC<AddFilePanelProps> = ({ filename, open, onClose, onConfirm }) => {
-  const { currentWorkspaceId } = useWorkspaceData();
   const {
     previewData,
     columns,
@@ -71,38 +21,14 @@ export const AddFilePanel: React.FC<AddFilePanelProps> = ({ filename, open, onCl
     loading,
     error,
     fileType,
-    supportedTypes,
     sheetNames,
     selectedSheet,
     setSelectedSheet
   } = useFilePreview();
 
-  const [mode, setMode] = useState<AddMode>('DocLazyFrame');
-  const [documentColumn, setDocumentColumn] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const guessedColumn = useMemo(
-    () => guessDocumentColumn(columns, previewData as ReadonlyArray<PreviewRow>),
-    [columns, previewData]
-  );
-
-  const filePersistenceCtx = useMemo(
-    () => ({
-      workspaceId: currentWorkspaceId ?? null,
-      scope: 'add-file-panel',
-      storage: 'local' as const
-    }),
-    [currentWorkspaceId]
-  );
-
-  const persistedDocumentColumn = useMemo(() => {
-    if (!filename) return null;
-    return columnPersistence.get(filePersistenceCtx, filename);
-  }, [filePersistenceCtx, filename]);
-
   const resetState = useCallback(() => {
-    setMode('DocLazyFrame');
-    setDocumentColumn(null);
     setSubmitting(false);
     if (selectedSheet) {
       setSelectedSheet(null);
@@ -118,29 +44,6 @@ export const AddFilePanel: React.FC<AddFilePanelProps> = ({ filename, open, onCl
     }
   }, [open, filename, fetchPreview, resetState]);
 
-  useEffect(() => {
-    if (!supportedTypes || supportedTypes.length === 0) return;
-    const fallback = coerceMode(supportedTypes[0]);
-    if (!supportedTypes.includes(mode)) {
-      setMode(fallback);
-    }
-    }, [supportedTypes, mode]);
-
-  useEffect(() => {
-    if (!open) return;
-
-    if (!isDocumentMode(mode)) {
-      setDocumentColumn(null);
-      return;
-    }
-
-    if (fileType === 'text') {
-      setDocumentColumn(columns[0] || 'text');
-      return;
-    }
-
-    setDocumentColumn((prev) => prev || persistedDocumentColumn || guessedColumn || null);
-  }, [mode, guessedColumn, persistedDocumentColumn, open, fileType, columns]);
 
   const handleClose = useCallback(() => {
     onClose();
@@ -150,21 +53,12 @@ export const AddFilePanel: React.FC<AddFilePanelProps> = ({ filename, open, onCl
     if (!filename) return;
     try {
       setSubmitting(true);
-      await onConfirm({
-        mode,
-        documentColumn: isDocumentMode(mode) ? documentColumn || undefined : undefined
-      });
-      if (isDocumentMode(mode) && filename && documentColumn && fileType !== 'text') {
-        columnPersistence.set(filePersistenceCtx, filename, documentColumn);
-      }
+      await onConfirm();
       handleClose();
     } finally {
       setSubmitting(false);
     }
-  }, [filename, mode, documentColumn, onConfirm, filePersistenceCtx, handleClose, fileType]);
-
-  const autoDocumentColumn = isDocumentMode(mode) && fileType === 'text';
-  const allowDocumentColumn = isDocumentMode(mode) && !autoDocumentColumn;
+  }, [filename, onConfirm, handleClose]);
 
   return (
     <Dialog
@@ -176,11 +70,15 @@ export const AddFilePanel: React.FC<AddFilePanelProps> = ({ filename, open, onCl
       }}
     >
       <DialogContent className="w-full max-w-[min(80vw,_960px)] border-none bg-transparent p-0 shadow-none">
+        <DialogHeader className="sr-only">
+          <DialogTitle>{filename ? `Add file: ${filename}` : 'Add file to workspace'}</DialogTitle>
+          <DialogDescription>Files are staged as DocLazyFrames automatically. Choose an optional sheet, inspect the preview, and confirm.</DialogDescription>
+        </DialogHeader>
         <Card className="flex w-full max-h-[90vh] min-w-0 flex-col">
           <CardHeader className="border-b px-6 py-4">
             <CardTitle className="truncate text-lg font-semibold">Add File{filename ? `: ${filename}` : ''}</CardTitle>
             <CardDescription>
-              Configure how the file should be added to the current workspace. Options are pre-filled using recent choices.
+              Files are added as DocLazyFrames automatically. Choose an optional sheet, inspect the preview, and confirm to stage the node lazily.
             </CardDescription>
           </CardHeader>
 
@@ -212,63 +110,6 @@ export const AddFilePanel: React.FC<AddFilePanelProps> = ({ filename, open, onCl
                 <p className="mt-1 text-xs text-muted-foreground">The first sheet loads by default. Choose another to refresh the preview.</p>
               </div>
             )}
-
-            <div>
-              <label className="mb-2 block text-sm font-medium text-foreground">Mode</label>
-              <div className="grid w-full gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                {(supportedTypes?.length ? supportedTypes : [...ALL_MODES]).filter(isAddMode).map((type) => (
-                  <label
-                    key={type}
-                    className={`flex cursor-pointer items-center justify-center gap-2 rounded border border-border bg-background p-2 text-sm shadow-sm transition hover:bg-accent/70 ${
-                      mode === type ? 'border-primary ring-1 ring-primary' : ''
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="add-mode"
-                      value={type}
-                      checked={mode === type}
-                      onChange={() => setMode(type)}
-                    />
-                    <span className="font-medium">{type}</span>
-                  </label>
-                ))}
-              </div>
-              <p className="mt-1 text-xs text-muted-foreground">Doc* modes enable text-aware operations; plain modes add data without text semantics.</p>
-            </div>
-
-            {allowDocumentColumn && (
-              <div>
-                <label className="mb-2 block text-sm font-medium text-foreground">Text / document column</label>
-                {loading ? (
-                  <div className="text-sm text-muted-foreground">Loading preview…</div>
-                ) : error ? (
-                  <div className="text-sm text-destructive">{error}</div>
-                ) : (
-                  <Select value={documentColumn || ''} onValueChange={(value) => setDocumentColumn(value || null)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a column" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {columns.map((column) => (
-                        <SelectItem key={column} value={column}>
-                          {column}
-                          {column === guessedColumn ? ' (guessed)' : ''}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-                <p className="mt-1 text-xs text-muted-foreground">A preferred column is pre-selected automatically; change it if needed.</p>
-              </div>
-            )}
-
-            {autoDocumentColumn && (
-              <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-                Plain text files expose a single column (“{documentColumn ?? 'text'}”). It will be used automatically as the document column.
-              </div>
-            )}
-
             <div>
               <label className="mb-2 block text-sm font-medium text-foreground">Preview (first rows)</label>
               <div className="max-h-60 w-full min-w-0 max-w-full overflow-x-auto overflow-y-auto rounded border border-border">
@@ -315,7 +156,7 @@ export const AddFilePanel: React.FC<AddFilePanelProps> = ({ filename, open, onCl
               <Button variant="outline" onClick={handleClose} type="button">
                 Cancel
               </Button>
-              <Button onClick={handleConfirm} disabled={submitting || (allowDocumentColumn && !documentColumn)}>
+              <Button onClick={handleConfirm} disabled={submitting}>
                 {submitting ? 'Adding…' : 'Add to Workspace'}
               </Button>
             </div>

@@ -865,9 +865,6 @@ const handleUpdateResults = async () => {
             maxCompare={1}
             className="border border-dashed border-muted-foreground/40 rounded-lg bg-muted/30 p-4"
             showShape
-            getNodeShapeFn={async (_id: string) => {
-              return null;
-            }}
             showColorPicker={false}
             disabled={!!isLocked}
             locked={!!isLocked}

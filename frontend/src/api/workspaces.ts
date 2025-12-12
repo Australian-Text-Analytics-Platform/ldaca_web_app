@@ -10,7 +10,6 @@ export const workspacesApi = {
   graph: (id: string, headers: Record<string,string> = {}) => get(`/workspaces/${id}/graph`, headers),
   save: (id: string, headers: Record<string,string> = {}) => post(`/workspaces/${id}/save`, {}, headers),
   saveAs: (id: string, filename: string, headers: Record<string,string> = {}) => post(`/workspaces/${id}/save-as`, {}, headers, { filename }),
-  download: (id: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${id}/download`, { method: 'GET', headers, expectBlob: true }),
   updateName: (id: string, newName: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${id}/name`, { method: 'PUT', headers, params: { new_name: newName } }),
   clearAnalysis: (id: string, task?: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${id}/analysis/clear`, { method: 'POST', headers, params: task ? { task } : {} }),
   listTasks: (id: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${id}/tasks`, { method: 'GET', headers }),

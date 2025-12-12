@@ -6,9 +6,9 @@ from pathlib import Path
 
 import polars as pl
 import pytest
+from docworkspace import Node, Workspace
 
 from docframe import DocDataFrame
-from docworkspace import Node, Workspace
 
 
 class TestWorkspace:
@@ -66,7 +66,7 @@ class TestWorkspace:
         )
 
         assert len(workspace.nodes) == 1
-        assert node.is_lazy
+        assert isinstance(node.data, pl.LazyFrame)
         assert node.name == "lazy_data"
 
     def test_load_csv(self, workspace, sample_df):
@@ -82,8 +82,8 @@ class TestWorkspace:
 
             assert len(workspace.nodes) == 1
             assert node.name == "csv_data"
-            assert len(node.data) == 3
-            assert not node.is_lazy
+            assert node.data.collect().height == 3
+            assert isinstance(node.data, pl.LazyFrame)
         finally:
             os.unlink(temp_path)
 
@@ -96,8 +96,7 @@ class TestWorkspace:
 
         assert len(workspace.nodes) == 1
         assert node.name == "doc_data"
-        assert isinstance(node.data, DocDataFrame)
-        assert not node.is_lazy
+        assert isinstance(node.data, DocLazyFrame)
 
     def test_get_node_by_name(self, workspace, sample_df):
         """Test getting a node by name."""
@@ -140,15 +139,19 @@ class TestWorkspace:
     def test_metadata(self, workspace):
         """Test workspace metadata operations."""
         # Set metadata
-        workspace.set_metadata("key1", "value1")
-        workspace.set_metadata("key2", 42)
-        workspace.set_metadata("key3", {"nested": "data"})
+        workspace.set_metadata("description", "Example workspace")
+        workspace.set_metadata("created_at", "2024-01-01T00:00:00Z")
+        workspace.set_metadata("modified_at", "2024-01-02T00:00:00Z")
 
         # Get metadata
-        assert workspace.get_metadata("key1") == "value1"
-        assert workspace.get_metadata("key2") == 42
-        assert workspace.get_metadata("key3") == {"nested": "data"}
+        assert workspace.get_metadata("description") == "Example workspace"
+        assert workspace.get_metadata("created_at") == "2024-01-01T00:00:00Z"
+        assert workspace.get_metadata("modified_at") == "2024-01-02T00:00:00Z"
         assert workspace.get_metadata("nonexistent") is None
+
+        # Unsupported metadata should raise
+        with pytest.raises(ValueError):
+            workspace.set_metadata("project", "test")
 
     def test_workspace_summary(self, workspace, sample_df):
         """Test workspace summary."""
@@ -207,13 +210,16 @@ class TestWorkspaceSerialization:
     def populated_workspace(self):
         """Create a workspace with some nodes and relationships."""
         workspace = Workspace("test_workspace")
-        workspace.set_metadata("test_key", "test_value")
-        workspace.set_metadata("version", 1.0)
+        workspace.set_metadata("description", "serialized workspace")
+        workspace.set_metadata("created_at", "2024-01-01T00:00:00Z")
+        workspace.set_metadata("modified_at", "2024-01-01T12:00:00Z")
 
         # Create nodes
-        df1 = pl.DataFrame(
-            {"id": [1, 2, 3], "category": ["A", "B", "A"], "value": [10, 20, 30]}
-        )
+        df1 = pl.DataFrame({
+            "id": [1, 2, 3],
+            "category": ["A", "B", "A"],
+            "value": [10, 20, 30],
+        })
 
         df2 = pl.DataFrame({"id": [1, 2, 3], "extra": ["x", "y", "z"]})
 
@@ -228,21 +234,25 @@ class TestWorkspaceSerialization:
 
     def test_workspace_serialization_roundtrip(self, populated_workspace):
         """Round-trip workspace serialization using JSON format (pickle removed)."""
-        with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
-            temp_path = f.name
+        with tempfile.TemporaryDirectory() as tmpdir:
+            meta_path = Path(tmpdir) / "metadata.json"
 
-        try:
             # Serialize
-            populated_workspace.serialize(temp_path)
+            populated_workspace.serialize(meta_path)
 
             # Deserialize
-            loaded_workspace = Workspace.deserialize(temp_path)
+            loaded_workspace = Workspace.deserialize(meta_path)
 
             # Check workspace properties
             assert loaded_workspace.name == populated_workspace.name
             assert len(loaded_workspace.nodes) == len(populated_workspace.nodes)
-            assert loaded_workspace.get_metadata("test_key") == "test_value"
-            assert loaded_workspace.get_metadata("version") == 1.0
+            assert (
+                loaded_workspace.get_metadata("description") == "serialized workspace"
+            )
+            assert loaded_workspace.get_metadata("created_at") == "2024-01-01T00:00:00Z"
+            assert (
+                loaded_workspace.get_metadata("modified_at") == "2024-01-01T12:00:00Z"
+            )
 
             # Check nodes exist
             root1 = loaded_workspace.get_node_by_name("root1")
@@ -254,28 +264,23 @@ class TestWorkspaceSerialization:
             assert len(root1.children) == 2  # filtered and merged
             assert len(root2.children) == 1  # merged
 
-        finally:
-            os.unlink(temp_path)
-
     def test_json_serialization(self, populated_workspace):
         """Explicit JSON serialization test (legacy name retained for compatibility)."""
-        with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
-            temp_path = f.name
+        with tempfile.TemporaryDirectory() as tmpdir:
+            meta_path = Path(tmpdir) / "metadata.json"
 
-        try:
             # Serialize
-            populated_workspace.serialize(temp_path)
+            populated_workspace.serialize(meta_path)
 
             # Deserialize
-            loaded_workspace = Workspace.deserialize(temp_path)
+            loaded_workspace = Workspace.deserialize(meta_path)
 
             # Check workspace properties
             assert loaded_workspace.name == populated_workspace.name
             assert len(loaded_workspace.nodes) == len(populated_workspace.nodes)
-            assert loaded_workspace.get_metadata("test_key") == "test_value"
-
-        finally:
-            os.unlink(temp_path)
+            assert (
+                loaded_workspace.get_metadata("description") == "serialized workspace"
+            )
 
     def test_serialization_with_lazy_nodes(self):
         """Test serialization of workspace containing lazy nodes."""
@@ -289,24 +294,20 @@ class TestWorkspaceSerialization:
         )
         lazy_node.filter(pl.col("a") > 1)
 
-        with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
-            temp_path = f.name
+        with tempfile.TemporaryDirectory() as tmpdir:
+            meta_path = Path(tmpdir) / "metadata.json"
 
-        try:
             # Serialize (JSON format only)
-            workspace.serialize(temp_path)
+            workspace.serialize(meta_path)
 
             # Deserialize
-            loaded_workspace = Workspace.deserialize(temp_path)
+            loaded_workspace = Workspace.deserialize(meta_path)
 
             # Check nodes
             loaded_lazy = loaded_workspace.get_node_by_name("lazy_node")
             assert loaded_lazy is not None
             # After serialization, lazy frames should remain lazy
-            assert loaded_lazy.is_lazy
-
-        finally:
-            os.unlink(temp_path)
+            assert isinstance(loaded_lazy.data, pl.LazyFrame)
 
     def test_load_from_dict(self):
         """Test loading workspace from dictionary (for API compatibility)."""
@@ -314,19 +315,28 @@ class TestWorkspaceSerialization:
         workspace = Workspace("test")
         df = pl.DataFrame({"a": [1, 2, 3]})
         node = workspace.add_node(Node(data=df, name="test_df", workspace=workspace))
+        workspace.set_metadata("description", "dict workspace")
+        workspace.set_metadata("created_at", "2024-02-01T00:00:00Z")
+        workspace.set_metadata("modified_at", "2024-02-02T00:00:00Z")
 
         # Create workspace dict using new serialization format
         workspace_dict = {
-            "id": workspace.id,
-            "name": workspace.name,
-            "nodes": {},
-            "metadata": {},
-            "relationships": [],
+            "workspace_metadata": {
+                "id": workspace.id,
+                "name": workspace.name,
+                "version": 1,
+                "description": workspace.get_metadata("description"),
+                "created_at": workspace.get_metadata("created_at"),
+                "modified_at": workspace.get_metadata("modified_at"),
+            },
+            "nodes": [],
         }
 
         # Convert nodes using new format
-        for node_id, node in workspace.nodes.items():
-            workspace_dict["nodes"][node_id] = node.serialize()
+        for _, node in workspace.nodes.items():
+            node_payload = node.serialize()
+            node_payload["node_metadata"]["parents"] = [p.id for p in node.parents]
+            workspace_dict["nodes"].append(node_payload)
 
         # Load from dict
         loaded = Workspace.from_dict(workspace_dict)
@@ -334,27 +344,29 @@ class TestWorkspaceSerialization:
         assert loaded.name == workspace.name
         assert len(loaded.nodes) == 1
         assert loaded.get_node_by_name("test_df") is not None
+        assert loaded.get_metadata("description") == "dict workspace"
+        assert loaded.get_metadata("created_at") == "2024-02-01T00:00:00Z"
+        assert loaded.get_metadata("modified_at") == "2024-02-02T00:00:00Z"
 
     def test_workspace_serialized_file_structure(self, populated_workspace):
         """Validate on-disk JSON structure contains expected envelope keys."""
-        with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
-            temp_path = f.name
-        try:
-            populated_workspace.serialize(temp_path)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            meta_path = Path(tmpdir) / "metadata.json"
+            populated_workspace.serialize(meta_path)
             import json as _json
 
-            with open(temp_path, "r", encoding="utf-8") as fh:
+            with open(meta_path, "r", encoding="utf-8") as fh:
                 data = _json.load(fh)
             assert "workspace_metadata" in data
             assert "nodes" in data
             assert isinstance(data["nodes"], list)
             # Ensure each node entry has required composite sections
             for n in data["nodes"]:
-                for key in ("node_metadata", "data_metadata", "serialized_data"):
-                    assert key in n
-                assert isinstance(n["serialized_data"], str)
-        finally:
-            os.unlink(temp_path)
+                assert "node_metadata" in n
+                assert "serialized_data" in n
+                assert "data_path" not in n
+                payload = n["serialized_data"]
+                assert payload is not None
 
 
 class TestWorkspaceGraphOperations:
@@ -396,7 +408,6 @@ class TestWorkspaceGraphOperations:
                 "id",
                 "name",
                 "type",
-                "lazy",
                 "operation",
                 "parent_count",
                 "child_count",
@@ -429,18 +440,16 @@ class TestWorkspaceGraphOperations:
         workspace2 = Workspace("test2", data=lazy_df, data_name="lazy_data")
         assert len(workspace2.nodes) == 1
         node = list(workspace2.nodes.values())[0]
-        assert node.is_lazy
+        assert isinstance(node.data, pl.LazyFrame)
 
     def test_workspace_csv_loading(self):
         """Test workspace CSV loading functionality."""
         # Create a temporary CSV file
-        df = pl.DataFrame(
-            {
-                "name": ["Alice", "Bob", "Charlie"],
-                "age": [25, 30, 35],
-                "city": ["NYC", "LA", "Chicago"],
-            }
-        )
+        df = pl.DataFrame({
+            "name": ["Alice", "Bob", "Charlie"],
+            "age": [25, 30, 35],
+            "city": ["NYC", "LA", "Chicago"],
+        })
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
             df.write_csv(f.name)
@@ -451,15 +460,15 @@ class TestWorkspaceGraphOperations:
             workspace1 = Workspace("csv_test1", data=temp_path, data_name="csv_data")
             assert len(workspace1.nodes) == 1
             node1 = list(workspace1.nodes.values())[0]
-            assert node1.is_lazy
+            assert isinstance(node1.data, pl.LazyFrame)
 
-            # Test eager loading
+            # Test eager loading (still coerced to lazy)
             workspace2 = Workspace(
                 "csv_test2", data=temp_path, data_name="csv_data", csv_lazy=False
             )
             assert len(workspace2.nodes) == 1
             node2 = list(workspace2.nodes.values())[0]
-            assert not node2.is_lazy
+            assert isinstance(node2.data, pl.LazyFrame)
         finally:
             Path(temp_path).unlink()
 
@@ -487,21 +496,24 @@ class TestWorkspaceGraphOperations:
         workspace = Workspace("metadata_test")
 
         # Set metadata
-        workspace.set_metadata("project", "test_project")
-        workspace.set_metadata("version", "1.0.0")
-        workspace.set_metadata("tags", ["test", "development"])
+        workspace.set_metadata("description", "meta")
+        workspace.set_metadata("created_at", "2024-03-01T00:00:00Z")
+        workspace.set_metadata("modified_at", "2024-03-02T00:00:00Z")
 
         # Get metadata
-        assert workspace.get_metadata("project") == "test_project"
-        assert workspace.get_metadata("version") == "1.0.0"
-        assert workspace.get_metadata("tags") == ["test", "development"]
+        assert workspace.get_metadata("description") == "meta"
+        assert workspace.get_metadata("created_at") == "2024-03-01T00:00:00Z"
+        assert workspace.get_metadata("modified_at") == "2024-03-02T00:00:00Z"
         assert workspace.get_metadata("nonexistent") is None
 
         # Check summary includes metadata
         summary = workspace.summary()
         assert "metadata_keys" in summary
-        assert "project" in summary["metadata_keys"]
-        assert "version" in summary["metadata_keys"]
+        assert set(summary["metadata_keys"]) == {
+            "description",
+            "created_at",
+            "modified_at",
+        }
 
     def test_workspace_boolean_and_len_operations(self):
         """Test workspace boolean evaluation and length operations."""
@@ -543,7 +555,7 @@ class TestWorkspaceGraphOperations:
         parent = workspace.add_node(Node(df, "parent"))
         child = parent.filter(pl.col("col") > 2)
 
-        assert child.is_lazy
+        assert isinstance(child.data, pl.LazyFrame)
         assert len(workspace.nodes) == 2
 
         # Remove parent with materialization
@@ -553,4 +565,4 @@ class TestWorkspaceGraphOperations:
         assert len(workspace.nodes) == 1
         # Child should now be materialized
         remaining_node = list(workspace.nodes.values())[0]
-        assert not remaining_node.is_lazy
+        assert isinstance(remaining_node.data, pl.LazyFrame)

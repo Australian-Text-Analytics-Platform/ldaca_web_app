@@ -57,7 +57,6 @@ export const SliceSubTab: React.FC<SliceSubTabProps> = (props) => {
             showColumnPicker={false}
             showHeaderLabel
             showShape
-            getNodeShapeFn={props.getNodeShape}
             disabled={selectionPanel.disabled}
             originalCount={selectionPanel.originalCount}
           />

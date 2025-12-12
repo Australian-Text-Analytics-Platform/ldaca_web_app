@@ -19,30 +19,18 @@ router = APIRouter(prefix="/workspaces")
 VALID_CHART_TYPES = {"line", "bar", "area"}
 DEFAULT_CHART_TYPE = "line"
 SEQUENTIAL_TASK = "sequential_analysis"
-LEGACY_TASKS = ("frequency_analysis",)
 
 
 def _get_latest_record(user_id: str, workspace_id: str):
-    """Fetch the latest sequential analysis record, checking legacy task names."""
+    """Fetch the latest sequential analysis record under the canonical task name."""
 
-    record = get_latest_analysis(user_id, workspace_id, task=SEQUENTIAL_TASK)
-    if record:
-        return record
-
-    for legacy_task in LEGACY_TASKS:
-        record = get_latest_analysis(user_id, workspace_id, task=legacy_task)
-        if record:
-            return record
-    return None
+    return get_latest_analysis(user_id, workspace_id, task=SEQUENTIAL_TASK)
 
 
 def _clear_records(user_id: str, workspace_id: str) -> int:
-    """Remove sequential analysis records across current and legacy task names."""
+    """Remove sequential analysis records for the canonical task name."""
 
-    removed = clear_analyses(user_id, workspace_id, task=SEQUENTIAL_TASK)
-    for legacy_task in LEGACY_TASKS:
-        removed += clear_analyses(user_id, workspace_id, task=legacy_task)
-    return removed
+    return clear_analyses(user_id, workspace_id, task=SEQUENTIAL_TASK)
 
 
 @router.get("/{workspace_id}/sequential-analysis/current-request")

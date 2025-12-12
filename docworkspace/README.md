@@ -299,8 +299,9 @@ Node(data, name=None, workspace=None, parents=None, operation=None)
 ```
 
 #### Properties
-- `is_lazy: bool` - Whether the underlying data is lazy
+
 - `document_column: Optional[str]` - Document column for DocDataFrames
+- `data: DataFrame | LazyFrame | DocDataFrame | DocLazyFrame` - Underlying frame-like object
 
 #### Methods
 - `collect() -> Node` - Materialize lazy data (creates new node)
@@ -309,7 +310,9 @@ Node(data, name=None, workspace=None, parents=None, operation=None)
 - `json_schema() -> Dict[str, str]` - Get JSON-compatible schema
 
 #### DataFrame Operations
+
 All Polars DataFrame/LazyFrame operations are available directly:
+
 - `filter(condition) -> Node`
 - `select(columns) -> Node`
 - `with_columns(*exprs) -> Node`
@@ -320,19 +323,22 @@ All Polars DataFrame/LazyFrame operations are available directly:
 
 ### Workspace Class
 
-#### Constructor
+#### Constructor (Workspace)
+
 ```python
 Workspace(name=None, data=None, data_name=None, csv_lazy=True, **csv_kwargs)
 ```
 
-#### Properties
+#### Properties (Workspace)
+
 - `id: str` - Unique workspace identifier
 - `name: str` - Human-readable name
 - `nodes: Dict[str, Node]` - All nodes in the workspace
 
-#### Methods
+#### Methods (Workspace)
 
 ##### Node Management
+
 - `add_node(node) -> Node` - Add a node to the workspace
 - `remove_node(node_id, materialize_children=False) -> bool` - Remove a node
 - `get_node(node_id) -> Optional[Node]` - Get node by ID
@@ -340,6 +346,7 @@ Workspace(name=None, data=None, data_name=None, csv_lazy=True, **csv_kwargs)
 - `list_nodes() -> List[Node]` - Get all nodes
 
 ##### Graph Operations
+
 - `get_root_nodes() -> List[Node]` - Nodes with no parents
 - `get_leaf_nodes() -> List[Node]` - Nodes with no children
 - `get_descendants(node_id) -> List[Node]` - All descendant nodes
@@ -347,16 +354,19 @@ Workspace(name=None, data=None, data_name=None, csv_lazy=True, **csv_kwargs)
 - `get_topological_order() -> List[Node]` - Topologically sorted nodes
 
 ##### Visualization
+
 - `visualize_graph() -> str` - Text-based graph visualization
 - `graph() -> Dict` - Generic graph structure
 - `to_react_flow_json() -> Dict` - React Flow compatible format
 
 ##### Serialization
+
 - `serialize(file_path)` - Save workspace to JSON
 - `deserialize(file_path) -> Workspace` - Load workspace from JSON
 - `from_dict(workspace_dict) -> Workspace` - Create from dictionary
 
 ##### Metadata
+
 - `get_metadata(key) -> Any` - Get workspace metadata
 - `set_metadata(key, value)` - Set workspace metadata
 - `summary() -> Dict` - Get workspace summary
@@ -365,6 +375,7 @@ Workspace(name=None, data=None, data_name=None, csv_lazy=True, **csv_kwargs)
 ### FastAPI Integration
 
 #### Models
+
 - `NodeSummary` - API-friendly node representation
 - `WorkspaceGraph` - React Flow compatible graph
 - `PaginatedData` - Paginated data response
@@ -372,6 +383,7 @@ Workspace(name=None, data=None, data_name=None, csv_lazy=True, **csv_kwargs)
 - `OperationResult` - Operation result wrapper
 
 #### Utilities
+
 ```python
 FastAPIUtils.node_to_summary(node) -> NodeSummary
 FastAPIUtils.get_paginated_data(node, page=1, page_size=100) -> PaginatedData
@@ -438,7 +450,7 @@ workspace = Workspace(
 
 # Get the loaded node
 raw_data = workspace.get_node_by_name("raw_data")
-print(f"Is lazy: {raw_data.is_lazy}")  # True
+print(f"Is lazy: {isinstance(raw_data.data, pl.LazyFrame)}")  # True
 
 # Chain transformations (all remain lazy)
 cleaned = raw_data.filter(pl.col("value").is_not_null())
@@ -450,12 +462,12 @@ aggregated = normalized.group_by("category").agg([
     pl.count().alias("count")
 ])
 
-# Still lazy until we collect
-print(f"Aggregated is lazy: {aggregated.is_lazy}")  # True
+# Still lazy until we collect (check underlying data type)
+print(f"Aggregated is lazy: {isinstance(aggregated.data, pl.LazyFrame)}")  # True
 
 # Materialize only the final result
 result = aggregated.collect()
-print(f"Result is lazy: {result.is_lazy}")  # False
+print(f"Result is lazy: {isinstance(result.data, pl.LazyFrame)}")  # False
 
 # Save the entire workspace with lazy evaluation preserved
 workspace.serialize("lazy_analysis.json")
@@ -533,7 +545,7 @@ pytest tests/test_workspace.py -v
 
 ### Project Structure
 
-```
+```text
 docworkspace/
 ├── docworkspace/           # Main package
 │   ├── __init__.py        # Package exports
@@ -558,6 +570,7 @@ Part of the LDaCA (Language Data Commons of Australia) ecosystem.
 ## Changelog
 
 ### Version 0.1.0
+
 - Initial release
 - Core Node and Workspace functionality
 - Support for Polars and DocFrame data types

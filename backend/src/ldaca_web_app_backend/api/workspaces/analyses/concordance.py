@@ -1,3 +1,60 @@
+import asyncio
+import logging
+import time
+from copy import deepcopy
+from typing import Any, Dict, List, Optional, Tuple
+
+import polars as pl
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+
+from docframe import DocDataFrame, DocLazyFrame
+
+from ....core.auth import get_current_user
+from ....core.workspace import workspace_manager
+from ....models import (
+    ConcordanceAnalysisRequest,
+    ConcordanceDetachRequest,
+    ConcordanceMetadata,
+)
+from ..utils import stage_dataframe_as_lazy
+
+
+def _prepare_doclazy_frame(node, column_name: str, user_id: str, workspace_id: str):
+    """Convert node data to a DocLazyFrame with the provided document column."""
+
+    data = getattr(node, "data", None)
+    if data is None:
+        raise HTTPException(status_code=400, detail="Node has no data")
+
+    if isinstance(data, DocLazyFrame):
+        processed = (
+            data
+            if data.document_column == column_name
+            else data.with_document_column(column_name)
+        )
+    elif isinstance(data, DocDataFrame):
+        processed = DocLazyFrame(data.dataframe.lazy(), document_column=column_name)  # type: ignore[misc]
+    elif isinstance(data, pl.LazyFrame):
+        processed = DocLazyFrame(data, document_column=column_name)  # type: ignore[misc]
+    elif isinstance(data, pl.DataFrame):
+        processed = DocLazyFrame(data.lazy(), document_column=column_name)  # type: ignore[misc]
+    else:  # pragma: no cover
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported node data type for text analysis: {type(data).__name__}",
+        )
+
+    try:
+        node.document = column_name
+        node.data = processed
+        workspace_manager.persist(user_id, workspace_id)
+    except Exception:
+        pass
+
+    return processed
+
+
 """Concordance analysis endpoints extracted from legacy monolithic base.py.
 
 Includes:
@@ -16,24 +73,6 @@ multi-node combined view, persistence via analysis_store, detach semantics, and
 detail retrieval endpoint. Route shapes & response payloads unchanged to avoid
 frontend/test regressions.
 """
-
-import asyncio
-import logging
-import time
-from copy import deepcopy
-from typing import Any, Dict, List, Optional, Tuple
-
-import polars as pl
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
-
-from ....core.auth import get_current_user
-from ....core.workspace import workspace_manager
-from ....models import (
-    ConcordanceAnalysisRequest,
-    ConcordanceDetachRequest,
-    ConcordanceMetadata,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -369,6 +408,28 @@ class ConcordanceResultQuery(BaseModel):
     sort_order: Optional[str] = None
     show_metadata: Optional[bool] = None
     update_only: bool = False
+
+
+def _apply_result_query_overrides(
+    normalized_request: Dict[str, Any],
+    query: "ConcordanceResultQuery",
+) -> Dict[str, Any]:
+    """Apply pagination/sorting overrides from ConcordanceResultQuery.
+
+    Keep this narrowly scoped and behavior-preserving: only write keys when
+    the query explicitly provides them.
+    """
+
+    page = query.page_number if query.page_number is not None else query.page
+    if page is not None:
+        normalized_request["page"] = page
+    if query.page_size is not None:
+        normalized_request["page_size"] = query.page_size
+    if query.sort_by is not None:
+        normalized_request["sort_by"] = query.sort_by
+    if query.sort_order is not None:
+        normalized_request["sort_order"] = query.sort_order
+    return normalized_request
 
 
 def _normalize_saved_request(
@@ -1126,7 +1187,9 @@ def _process_dataframe_result(
 
 @router.get("/{workspace_id}/concordance/current-result")
 async def concordance_current_result(
-    workspace_id: str, current_user: dict = Depends(get_current_user)
+    workspace_id: str,
+    query: ConcordanceResultQuery = Depends(),
+    current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
     try:
@@ -1143,11 +1206,17 @@ async def concordance_current_result(
     result_data = rec.result.get("data") if isinstance(rec.result, dict) else None
     if isinstance(result_data, dict) and "node_results" in result_data:
         normalized_request = _normalize_saved_request(rec.request, rec.result) or {}
+
+        _apply_result_query_overrides(normalized_request, query)
         return _process_dataframe_result(result_data, normalized_request)
 
     normalized_request = _normalize_saved_request(rec.request, rec.result)
     if not normalized_request:
         return None
+
+    # Update pagination params from query for legacy path too
+    _apply_result_query_overrides(normalized_request, query)
+
     normalized_result = _normalize_saved_result(rec.result, normalized_request)
     if not normalized_result:
         return None
@@ -1180,18 +1249,7 @@ async def concordance_current_result_post(
     if isinstance(result_data, dict) and "node_results" in result_data:
         normalized_request = _normalize_saved_request(rec.request, rec.result) or {}
 
-        # Update pagination params from query
-        if query.page_number is not None:
-            normalized_request["page"] = query.page_number
-        elif query.page is not None:
-            normalized_request["page"] = query.page
-        if query.page_size is not None:
-            normalized_request["page_size"] = query.page_size
-        if query.sort_by is not None:
-            normalized_request["sort_by"] = query.sort_by
-        if query.sort_order is not None:
-            normalized_request["sort_order"] = query.sort_order
-
+        _apply_result_query_overrides(normalized_request, query)
         return _process_dataframe_result(result_data, normalized_request)
 
     normalized_request = _normalize_saved_request(rec.request, rec.result)
@@ -1200,8 +1258,6 @@ async def concordance_current_result_post(
 
     if stored_blob:
         mutable_result = deepcopy(base_result) if isinstance(base_result, dict) else {}
-        if not isinstance(mutable_result, dict):
-            mutable_result = {}
         stored_blob = mutable_result.get("_stored") or {}
         if not isinstance(stored_blob, dict):
             stored_blob = {}
@@ -1640,6 +1696,12 @@ async def detach_concordance(
         node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
         if not node:
             raise HTTPException(status_code=404, detail="Node not found")
+        workspace_dir = workspace_manager.get_workspace_dir(user_id, workspace_id)
+        if workspace_dir is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Workspace folder not found for workspace {workspace_id}",
+            )
         if hasattr(node.data, "columns"):
             available_columns = node.data.columns
         elif hasattr(node.data, "schema"):
@@ -1651,6 +1713,8 @@ async def detach_concordance(
                 status_code=400,
                 detail=f"Column '{request.column}' not found. Available columns: {available_columns}",
             )
+        # Persist chosen text column for future analyses
+        _prepare_doclazy_frame(node, request.column, user_id, workspace_id)
         if hasattr(node.data, "text"):
             cache_key = _concordance_cache_key(
                 user_id,
@@ -1721,21 +1785,16 @@ async def detach_concordance(
                     node.name if hasattr(node, "name") and node.name else node_id
                 )
                 new_node_name = f"{original_name}_conc_{request.search_word}"
-            data_for_node = final_data
-            try:  # pragma: no cover
-                from docframe import DocDataFrame as _DDF  # type: ignore
-                from docframe import DocLazyFrame as _DLF  # type: ignore
-
-                if isinstance(node.data, (_DDF, _DLF)):
-                    doc_col = getattr(node.data, "document_column", None)
-                    if doc_col and doc_col in final_data.columns:
-                        data_for_node = _DDF(final_data, document_column=doc_col)
-            except Exception:
-                pass
+            document_column = getattr(node, "document", None) or getattr(
+                node.data, "document_column", None
+            )
+            lazy_data = stage_dataframe_as_lazy(
+                final_data, workspace_dir, new_node_name, document_column
+            )
             new_node = workspace_manager.add_node_to_workspace(
                 user_id=user_id,
                 workspace_id=workspace_id,
-                data=data_for_node,
+                data=lazy_data,
                 node_name=new_node_name,
                 operation="concordance_detach",
                 parents=[node],

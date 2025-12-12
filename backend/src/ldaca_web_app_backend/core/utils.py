@@ -2,11 +2,13 @@
 Core utilities for the LDaCA Web App
 """
 
+import json
 import os
+import re
 import shutil
 import uuid
 from pathlib import Path
-from typing import Any, Dict, Union
+from typing import Any, Dict, Optional, Union
 
 import polars as pl
 
@@ -44,6 +46,95 @@ def get_user_workspace_folder(user_id: str) -> Path:
     workspace_folder = user_folder / "user_workspaces"
     workspace_folder.mkdir(parents=True, exist_ok=True)
     return workspace_folder
+
+
+def sanitize_workspace_folder_name(name: str) -> str:
+    """Create a filesystem-safe folder name from a workspace name."""
+
+    safe = re.sub(r"[^A-Za-z0-9._-]+", "_", name.strip())
+    safe = safe.strip("._")
+    return safe or "workspace"
+
+
+def allocate_workspace_folder(user_id: str, workspace_name: str) -> Path:
+    """Create (and return) a unique folder for a workspace under the user's root."""
+
+    base = get_user_workspace_folder(user_id)
+    base.mkdir(parents=True, exist_ok=True)
+
+    preferred = sanitize_workspace_folder_name(workspace_name)
+    candidate = preferred
+    counter = 1
+    while (base / candidate).exists():
+        candidate = f"{preferred}_{counter}"
+        counter += 1
+    folder = base / candidate
+    folder.mkdir(parents=True, exist_ok=True)
+    return folder
+
+
+def ensure_display_folder_name(current_folder: Path, desired_name: str) -> Path:
+    """Ensure the on-disk folder name matches the desired display name (with suffixes).
+
+    If the current folder name already matches the sanitized desired name, it is
+    returned unchanged. Otherwise, the folder is renamed to the first available
+    `<name>`, `<name>_1`, `<name>_2`, ... variant within the same parent.
+    """
+
+    parent = current_folder.parent
+    desired = sanitize_workspace_folder_name(desired_name)
+    target = parent / desired
+
+    if current_folder == target:
+        return current_folder
+
+    if not target.exists():
+        current_folder.rename(target)
+        return target
+
+    counter = 1
+    while True:
+        candidate = parent / f"{desired}_{counter}"
+        if candidate == current_folder:
+            return current_folder
+        if not candidate.exists():
+            current_folder.rename(candidate)
+            return candidate
+        counter += 1
+
+
+def load_workspace_metadata(metadata_path: Path) -> Optional[Dict[str, Any]]:
+    """Load workspace metadata JSON from the given path.
+
+    Returns None if the file does not exist or cannot be parsed.
+    """
+
+    if not metadata_path.exists() or not metadata_path.is_file():
+        return None
+    try:
+        with metadata_path.open("r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
+def find_workspace_folder_by_id(user_id: str, workspace_id: str) -> Optional[Path]:
+    """Locate the workspace folder for a given workspace ID, if it exists."""
+
+    base = get_user_workspace_folder(user_id)
+    if not base.exists():
+        return None
+    for candidate in base.iterdir():
+        if not candidate.is_dir():
+            continue
+        metadata_path = candidate / "metadata.json"
+        data = load_workspace_metadata(metadata_path)
+        if not data:
+            continue
+        ws_meta = data.get("workspace_metadata", {})
+        if ws_meta.get("id") == workspace_id:
+            return candidate
+    return None
 
 
 def setup_user_folders(user_id: str) -> Dict[str, Path]:
@@ -204,30 +295,19 @@ def serialize_dataframe_for_json(df) -> Dict[str, Any]:
                 "preview": [],
                 "is_text_data": False,
                 "data_type": f"{type(None).__module__}.{type(None).__name__}",
-                "is_lazy": False,
             }
 
         # Extract underlying data if this is wrapped in docworkspace.Node
         underlying_data = df
         is_doc_type = False
         doc_column = None
-        is_lazy = False
 
         # Handle docworkspace.Node wrapper
         if hasattr(df, "data") and hasattr(df, "name") and hasattr(df, "id"):
             # This is likely an docworkspace.Node - extract the underlying data
             underlying_data = df.data
-            # Use the Node's is_lazy property if available
-            if hasattr(df, "is_lazy"):
-                is_lazy = df.is_lazy
-            else:
-                # Fallback: check if underlying data is LazyFrame
-                if hasattr(underlying_data, "__class__"):
-                    underlying_type_name = underlying_data.__class__.__name__
-                    if "Lazy" in underlying_type_name:
-                        is_lazy = True
             print(
-                f"DEBUG: Extracted data from docworkspace.Node, underlying type: {type(underlying_data)}, is_lazy: {is_lazy}"
+                f"DEBUG: Extracted data from docworkspace.Node, underlying type: {type(underlying_data)}"
             )
 
         # Extract underlying polars data if this is a DocDataFrame or DocLazyFrame
@@ -241,7 +321,6 @@ def serialize_dataframe_for_json(df) -> Dict[str, Any]:
             # This is a DocLazyFrame - get underlying polars LazyFrame
             underlying_data = underlying_data.lazyframe
             is_doc_type = True
-            is_lazy = True  # DocLazyFrame is always lazy
             doc_column = getattr(df, "active_document_name", None)
             print("DEBUG: Extracted polars LazyFrame from DocLazyFrame")
 
@@ -358,12 +437,11 @@ def serialize_dataframe_for_json(df) -> Dict[str, Any]:
             "preview": preview,
             "is_text_data": is_doc_type,
             "data_type": data_type_clean,
-            "is_lazy": is_lazy or "LazyFrame" in data_type_clean,
         }
 
         # Add document column info for DocDataFrame
         if is_doc_type and doc_column:
-            result["document_column"] = doc_column
+            result["document"] = doc_column
 
         return result
 
@@ -373,7 +451,6 @@ def serialize_dataframe_for_json(df) -> Dict[str, Any]:
         fallback_type = type(df) if df is not None else type(None)
         # Initialize variables that might not be set
         is_doc_type = getattr(df, "__doc_type__", False) if df is not None else False
-        is_lazy = False
         return {
             "shape": (0, 0),
             "columns": [],
@@ -381,7 +458,6 @@ def serialize_dataframe_for_json(df) -> Dict[str, Any]:
             "preview": [],
             "is_text_data": is_doc_type,
             "data_type": f"{fallback_type.__module__}.{fallback_type.__name__}",
-            "is_lazy": is_lazy,
         }
 
 
@@ -455,13 +531,12 @@ def convert_to_react_flow_graph(generic_graph: Dict[str, Any]) -> Dict[str, Any]
                 "nodeId": node_data["id"],
                 "nodeName": node_data["name"],
                 "dataType": _map_workspace_type_to_display_type(
-                    node_data.get("type", "unknown"), node_data.get("lazy", False)
+                    node_data.get("type", "unknown")
                 ),
                 "status": node_data.get("status", "ready"),
                 "operation": node_data.get("operation", "unknown"),
                 "parentCount": node_data.get("parent_count", 0),
                 "childCount": node_data.get("child_count", 0),
-                "isLazy": node_data.get("lazy", False),
                 "shape_info": node_data.get(
                     "shape_info"
                 ),  # Preserve shape_info for frontend
@@ -469,7 +544,7 @@ def convert_to_react_flow_graph(generic_graph: Dict[str, Any]) -> Dict[str, Any]
             "style": {
                 "background": _get_node_color_by_type(
                     _map_workspace_type_to_display_type(
-                        node_data.get("type", "unknown"), node_data.get("lazy", False)
+                        node_data.get("type", "unknown")
                     )
                 ),
                 "border": "2px solid #222",
@@ -494,7 +569,7 @@ def convert_to_react_flow_graph(generic_graph: Dict[str, Any]) -> Dict[str, Any]
             "source": edge_data["source"],
             "target": edge_data["target"],
             "type": "smoothstep",
-            "animated": edge_data.get("is_lazy", False),
+            "animated": False,
             "style": {"stroke": "#888", "strokeWidth": 2},
             "markerEnd": {"type": "arrow", "color": "#888"},
             "data": {"operation": edge_data.get("operation", "relationship")},
@@ -508,23 +583,17 @@ def convert_to_react_flow_graph(generic_graph: Dict[str, Any]) -> Dict[str, Any]
     }
 
 
-def _map_workspace_type_to_display_type(workspace_type: str, is_lazy: bool) -> str:
+def _map_workspace_type_to_display_type(workspace_type: str) -> str:
     """
     Map workspace node type to display type for frontend.
 
     Args:
         workspace_type: The type from workspace node (e.g., 'DataFrame', 'DocDataFrame')
-        is_lazy: Whether the node is lazy
 
     Returns:
         Display type string for frontend
     """
-    if workspace_type == "DataFrame":
-        if is_lazy:
-            return "polars.LazyFrame"
-        else:
-            return "polars.DataFrame"
-    elif workspace_type == "LazyFrame":
+    if workspace_type in {"DataFrame", "LazyFrame"}:
         return "polars.LazyFrame"
     elif workspace_type == "DocDataFrame":
         return "docframe.DocDataFrame"

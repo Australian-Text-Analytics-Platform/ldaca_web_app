@@ -72,15 +72,15 @@ def _get_supported_types_by_extension(file_type: str) -> List[str]:
 
     ft = (file_type or "").lower()
     mapping: Dict[str, List[str]] = {
-        "csv": ["DocLazyFrame", "LazyFrame", "DocDataFrame", "DataFrame"],
-        "tsv": ["DocLazyFrame", "LazyFrame", "DocDataFrame", "DataFrame"],
-        "jsonl": ["DocLazyFrame", "LazyFrame", "DocDataFrame", "DataFrame"],
-        "ndjson": ["DocLazyFrame", "LazyFrame", "DocDataFrame", "DataFrame"],
-        "json": ["DocDataFrame", "DataFrame"],
-        "parquet": ["DocLazyFrame", "LazyFrame", "DocDataFrame", "DataFrame"],
-        "excel": ["DocDataFrame", "DataFrame"],
-        "text": ["DocDataFrame", "DataFrame"],
-        "zip": ["DocDataFrame", "DataFrame"],
+        "csv": ["DocLazyFrame", "LazyFrame"],
+        "tsv": ["DocLazyFrame", "LazyFrame"],
+        "jsonl": ["DocLazyFrame", "LazyFrame"],
+        "ndjson": ["DocLazyFrame", "LazyFrame"],
+        "json": ["DocLazyFrame", "LazyFrame"],
+        "parquet": ["DocLazyFrame", "LazyFrame"],
+        "excel": ["DocLazyFrame", "LazyFrame"],
+        "text": ["DocLazyFrame", "LazyFrame"],
+        "zip": ["DocLazyFrame", "LazyFrame"],
         "unknown": [],
     }
     return mapping.get(ft, [])

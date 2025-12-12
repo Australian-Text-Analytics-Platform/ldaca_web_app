@@ -10,9 +10,8 @@ async def test_filter_preview_returns_paginated_rows(authenticated_client, monke
 
     class DummyNode:
         def __init__(self):
-            self.data = df
+            self.data = df.lazy()
             self.name = "sample"
-            self.is_lazy = False
 
     monkeypatch.setattr(
         nodes_api.workspace_manager,
@@ -51,9 +50,8 @@ async def test_filter_preview_in_operator(authenticated_client, monkeypatch):
 
     class DummyNode:
         def __init__(self):
-            self.data = df
+            self.data = df.lazy()
             self.name = "sample"
-            self.is_lazy = False
 
     monkeypatch.setattr(
         nodes_api.workspace_manager,
@@ -89,9 +87,8 @@ async def test_filter_preview_in_operator_with_null(authenticated_client, monkey
 
     class DummyNode:
         def __init__(self):
-            self.data = df
+            self.data = df.lazy()
             self.name = "sample"
-            self.is_lazy = False
 
     monkeypatch.setattr(
         nodes_api.workspace_manager,

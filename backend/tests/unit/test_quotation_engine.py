@@ -131,7 +131,7 @@ async def test_joined_frame_matches_base_layout(monkeypatch):
         "quote_row_idx": [0, 0],
     })
 
-    async def fake_compute(node_arg, base_arg, column_arg, engine_arg):
+    async def fake_compute(node_arg, base_arg, column_arg, engine_arg, **kwargs):
         assert column_arg == "text"
         return quote_rows
 

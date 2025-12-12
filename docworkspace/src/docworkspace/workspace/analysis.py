@@ -19,13 +19,10 @@ def summary(workspace: "Workspace", json: bool = False) -> Dict[str, Any]:
     root_nodes = len(workspace.get_root_nodes())
     leaf_nodes = len(workspace.get_leaf_nodes())
     node_types: Dict[str, int] = {}
-    lazy_count = 0
     for node in workspace.nodes.values():
         t = type(node.data).__name__
         node_types[t] = node_types.get(t, 0) + 1
-        if node.is_lazy:
-            lazy_count += 1
-    status_counts = {"lazy": lazy_count, "eager": total_nodes - lazy_count}
+    status_counts = {"lazy": total_nodes, "eager": 0}
     return {
         "workspace": workspace.name,
         "workspace_id": workspace.id,
@@ -34,7 +31,7 @@ def summary(workspace: "Workspace", json: bool = False) -> Dict[str, Any]:
         "leaf_nodes": leaf_nodes,
         "node_types": node_types,
         "status_counts": status_counts,
-        "metadata_keys": list(workspace._metadata.keys()),  # type: ignore[attr-defined]
+        "metadata_keys": workspace.metadata_keys,
     }
 
 

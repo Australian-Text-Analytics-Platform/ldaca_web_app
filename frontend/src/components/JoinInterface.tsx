@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { WorkspaceNode } from '../types';
-import { useWorkspaceData } from '../hooks/useWorkspaceData';
 import NodeSelectionPanel, { NodeColumnSelection, WorkspaceNodeLike } from './NodeSelectionPanel';
 import { AlertTriangle } from 'lucide-react';
 
@@ -19,7 +18,6 @@ const JoinInterface: React.FC<JoinInterfaceProps> = ({
   onCancel: _onCancel,
   loading = false
 }) => {
-  const { getNodeShape } = useWorkspaceData();
   const [leftOn, setLeftOn] = useState<string>('');
   const [rightOn, setRightOn] = useState<string>('');
   const [how, setHow] = useState<'inner' | 'left' | 'right' | 'full' | 'semi' | 'anti' | 'cross'>('left');
@@ -126,7 +124,6 @@ const JoinInterface: React.FC<JoinInterfaceProps> = ({
               showColorPicker={false}
               columnLabelFn={(node) => node.node_id === leftNode.node_id ? 'Left Column:' : 'Right Column:'}
               showShape
-              getNodeShapeFn={getNodeShape}
             />
           </div>
           {/* Right: join options (two rows) */}

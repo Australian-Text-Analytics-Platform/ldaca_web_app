@@ -80,7 +80,7 @@ const Sidebar: React.FC = () => {
   const { currentView, setCurrentView, openFeedbackModal } = useUIStore(
     useShallow(({ currentView, setCurrentView, openFeedbackModal }) => ({ currentView, setCurrentView, openFeedbackModal }))
   );
-  const { workspaceGraph, currentWorkspaceId, getNodeShape } = useWorkspaceData();
+  const { workspaceGraph, currentWorkspaceId } = useWorkspaceData();
   const { selectedNodeIds } = useWorkspaceSelection();
   const { toggleNodeSelection } = useWorkspaceActions();
   const { getAuthHeaders, user, logout, dataFolder, isMultiUserMode } = useAuth();
@@ -425,7 +425,6 @@ const Sidebar: React.FC = () => {
                             nodes={nodes}
                             selectedNodeIds={selectedNodeIds}
                             onToggleNodeSelection={toggleNodeSelection}
-                            getNodeShape={getNodeShape}
                           />
                         )}
                         {key === 'tasks' && (

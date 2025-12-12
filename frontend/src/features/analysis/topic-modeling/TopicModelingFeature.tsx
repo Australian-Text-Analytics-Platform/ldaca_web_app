@@ -53,7 +53,7 @@ function interpolateColor(c1: string, c2: string, t: number) {
 
 const TopicModelingFeature: React.FC = () => {
   const { selectedNodes } = useWorkspaceSelection();
-  const { currentWorkspaceId, getNodeShape } = useWorkspaceData();
+  const { currentWorkspaceId } = useWorkspaceData();
   const { getAuthHeaders } = useAuth();
   const topicModelingReadyTaskId = useAnalysisStore((state: any) => state.topicModelingReadyTaskId);
   const topicModelingReadyTimestamp = useAnalysisStore((state: any) => state.topicModelingReadyTimestamp);
@@ -613,7 +613,6 @@ const TopicModelingFeature: React.FC = () => {
               originalCount={displayNodeCount}
               disabled={!!isLocked}
               showShape
-              getNodeShapeFn={getNodeShape}
               showColorPicker
               locked={!!isLocked}
               allowedDataTypes={['string']}

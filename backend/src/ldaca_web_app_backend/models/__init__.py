@@ -162,8 +162,7 @@ class DataFrameNode(BaseModel):
     columns: List[str]
     created_at: str
     preview: List[Dict[str, Any]]
-    is_lazy: Optional[bool] = None  # Enhanced: lazy evaluation status
-    document_column: Optional[str] = None  # Enhanced: document column for text data
+    document: Optional[str] = None  # Enhanced: active document column for text data
     column_schema: Optional[Dict[str, str]] = (
         None  # Enhanced: column schema information
     )
@@ -184,8 +183,7 @@ class DataFrameInfo(BaseModel):
     dtypes: Dict[str, str]
     memory_usage: str
     is_text_data: bool  # Whether it's a DocPolars DocDataFrame
-    is_lazy: Optional[bool] = None  # Enhanced: lazy evaluation status
-    document_column: Optional[str] = None  # Enhanced: document column for text data
+    document: Optional[str] = None  # Enhanced: document column for text data
     column_schema: Optional[Dict[str, str]] = (
         None  # Enhanced: column schema information
     )
@@ -414,7 +412,7 @@ class SequentialAnalysisRequest(BaseModel):
 
 
 class TextAnalysisInfo(BaseModel):
-    document_column: Optional[str]
+    document: Optional[str]
     avg_document_length: Optional[float]
     total_documents: int
     vocabulary_size: Optional[int]
@@ -714,25 +712,6 @@ class FeedbackResponse(BaseModel):
     record_id: Optional[str] = None
     per_corpus_topic_counts: Optional[List[Dict[int, int]]] = None
     meta: Dict[str, Any] = {}
-
-    @classmethod
-    def from_legacy(
-        cls,
-        *,
-        success: bool,
-        message: str,
-        record_id: Optional[str] = None,
-        per_corpus_topic_counts: Optional[List[Dict[int, int]]] = None,
-        meta: Optional[Dict[str, Any]] = None,
-    ) -> "FeedbackResponse":
-        """Helper to construct from old signature (temporary shim)."""
-        return cls(
-            state="successful" if success else "failed",
-            message=message,
-            record_id=record_id,
-            per_corpus_topic_counts=per_corpus_topic_counts,
-            meta=meta or {},
-        )
 
 
 class TopicModelingResponse(BaseModel):

@@ -11,10 +11,7 @@ from ldaca_web_app_backend.core import analysis_store
 from ldaca_web_app_backend.core.worker import concordance_task
 from ldaca_web_app_backend.core.workspace import workspace_manager
 
-try:
-    from docframe import DocDataFrame  # type: ignore
-except Exception:  # pragma: no cover
-    DocDataFrame = None  # type: ignore
+from docframe import DocDataFrame
 
 
 async def _wait_for_concordance_result(
@@ -103,7 +100,6 @@ def _stub_task_manager(monkeypatch):
 
 
 @pytest.mark.anyio
-@pytest.mark.skipif(DocDataFrame is None, reason="docframe not available")
 async def test_concordance_single_node_roundtrip(authenticated_client, workspace_id):
     """Single-node concordance should store results and expose current-request/result endpoints."""
     # Ensure clean state for this workspace/user
@@ -239,7 +235,6 @@ async def test_concordance_single_node_roundtrip(authenticated_client, workspace
 
 
 @pytest.mark.anyio
-@pytest.mark.skipif(DocDataFrame is None, reason="docframe not available")
 async def test_concordance_multi_node_combined(authenticated_client, workspace_id):
     """Two-node concordance returns per-node results via async workflow."""
     analysis_store.clear_analyses("test", workspace_id, task="concordance")
@@ -328,7 +323,6 @@ async def test_concordance_multi_node_combined(authenticated_client, workspace_i
 
 
 @pytest.mark.anyio
-@pytest.mark.skipif(DocDataFrame is None, reason="docframe not available")
 async def test_concordance_combined_toggle_after_separated_request(
     authenticated_client, workspace_id
 ):
@@ -404,7 +398,6 @@ async def test_concordance_combined_toggle_after_separated_request(
 
 
 @pytest.mark.anyio
-@pytest.mark.skipif(DocDataFrame is None, reason="docframe not available")
 async def test_concordance_combined_handles_mismatched_columns(
     authenticated_client, workspace_id
 ):

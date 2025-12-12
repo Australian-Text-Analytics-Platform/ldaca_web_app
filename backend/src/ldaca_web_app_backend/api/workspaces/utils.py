@@ -1,8 +1,13 @@
 """Shared utility helpers for workspace API modules."""
 
+import re
+from pathlib import Path
 from typing import Any, Optional, Tuple
 
+import polars as pl
 from fastapi import HTTPException
+
+from docframe import DocLazyFrame
 
 from ...core.json_utils import json_sanitize  # type: ignore
 from ...core.workspace import workspace_manager
@@ -24,6 +29,86 @@ def failed(message: str, error: Any = None, status_code: int = 400):
     if error is not None:
         detail["error"] = str(error)
     raise HTTPException(status_code=status_code, detail=detail)
+
+
+def stage_dataframe_as_lazy(
+    data: Any,
+    workspace_dir: Path,
+    node_name: str,
+    document_column: Optional[str] = None,
+):
+    """Persist a dataframe to parquet under the workspace and reload as LazyFrame.
+
+    This mirrors the lazy serialize/reload pattern used by the base add-node endpoint
+    so that detached/derived nodes remain portable and lazy by default.
+    """
+
+    data_dir = workspace_dir / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+
+    def _safe_stem(name: str) -> str:
+        stem = re.sub(r"[^A-Za-z0-9_.-]+", "_", name).strip("._") or "data"
+        return stem
+
+    base_stem = _safe_stem(node_name)
+    parquet_path = data_dir / f"{base_stem}.parquet"
+    suffix = 1
+    while parquet_path.exists():
+        parquet_path = data_dir / f"{base_stem}_{suffix}.parquet"
+        suffix += 1
+
+    # Normalize to an eager Polars DataFrame before persisting
+    df: pl.DataFrame
+    try:
+        if hasattr(data, "lazyframe"):
+            data = data.lazyframe  # type: ignore[attr-defined]
+        if isinstance(data, pl.LazyFrame):
+            df = data.collect()
+        elif hasattr(data, "dataframe"):
+            df = pl.DataFrame(getattr(data, "dataframe"))  # type: ignore[arg-type]
+        elif hasattr(data, "collect") and not isinstance(data, pl.DataFrame):
+            collected = data.collect()  # type: ignore[operator]
+            df = (
+                collected
+                if isinstance(collected, pl.DataFrame)
+                else pl.DataFrame(collected)
+            )
+        else:
+            df = data if isinstance(data, pl.DataFrame) else pl.DataFrame(data)
+    except Exception as exc:  # pragma: no cover - defensive coercion
+        raise HTTPException(
+            status_code=400, detail=f"Failed to coerce data to DataFrame: {exc}"
+        )
+
+    try:
+        df.write_parquet(parquet_path)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to persist parquet for workspace: {exc}"
+        )
+
+    try:
+        lazy_data: Any = pl.scan_parquet(parquet_path)
+        if document_column:
+            try:
+                lazy_data = DocLazyFrame(lazy_data, document_column=document_column)
+            except Exception:
+                # If wrapping fails due to schema resolution, fall back for now
+                pass
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to reload parquet as LazyFrame: {exc}"
+        )
+
+    if document_column:
+        try:
+            if not isinstance(lazy_data, DocLazyFrame):
+                lazy_data = DocLazyFrame(lazy_data, document_column=document_column)
+        except Exception:
+            # If wrapping fails due to schema issues, fall back to plain LazyFrame
+            pass
+
+    return lazy_data
 
 
 def get_node_or_404(
@@ -98,4 +183,5 @@ __all__ = [
     "configure_numba_threading",
     "get_node_or_404",
     "get_node_with_data_or_400",
+    "stage_dataframe_as_lazy",
 ]

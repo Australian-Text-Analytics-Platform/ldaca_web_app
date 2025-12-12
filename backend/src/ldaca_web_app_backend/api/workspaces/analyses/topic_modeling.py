@@ -15,6 +15,8 @@ from typing import Dict
 
 from fastapi import APIRouter, Depends, HTTPException
 
+from docframe import DocDataFrame, DocLazyFrame
+
 from ....core.analysis_admin import clear_analyses_and_cache
 from ....core.auth import get_current_user
 from ....core.json_utils import json_sanitize
@@ -167,22 +169,11 @@ async def run_topic_modeling(
                 available_columns = []
             column_name = node_columns.get(node_id)
             if not column_name:
-                try:
-                    from docframe import DocDataFrame, DocLazyFrame  # type: ignore
-
-                    if isinstance(node_data, (DocDataFrame, DocLazyFrame)) and getattr(
-                        node_data, "document_column", None
-                    ):
-                        column_name = node_data.document_column  # type: ignore[attr-defined]
-                    else:
-                        common = [
-                            c
-                            for c in ["document", "text", "content", "body", "message"]
-                            if c in available_columns
-                        ]
-                        if common:
-                            column_name = common[0]
-                except ImportError:
+                if isinstance(node_data, (DocDataFrame, DocLazyFrame)):
+                    doc_col = getattr(node_data, "document_column", None)
+                    if doc_col:
+                        column_name = doc_col
+                if not column_name:
                     common = [
                         c
                         for c in ["document", "text", "content", "body", "message"]
@@ -240,6 +231,9 @@ async def run_topic_modeling(
         "data": None,
         "metadata": {"task_id": task_info.id},
     }
+
+
+__all__ = ["router"]
 
 
 __all__ = ["router"]

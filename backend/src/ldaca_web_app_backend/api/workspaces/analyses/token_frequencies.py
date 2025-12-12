@@ -5,7 +5,11 @@ Paths preserved exactly as /workspaces/{workspace_id}/token-frequencies*.
 
 import math
 
+import polars as pl
+from docframe.core.text_utils import compute_token_frequencies
 from fastapi import APIRouter, Depends, HTTPException
+
+from docframe import DocDataFrame, DocLazyFrame
 
 from ....core.analysis_store import clear_analyses, get_latest_analysis, save_analysis
 from ....core.auth import get_current_user
@@ -59,6 +63,45 @@ def _sanitize_stop_words(value) -> list[str]:
         seen.add(lowered)
         sanitized.append(token)
     return sanitized
+
+
+def _prepare_doclazy_frame(node, column_name: str, user_id: str, workspace_id: str):
+    """Convert node data to a DocLazyFrame with the requested document column.
+
+    This avoids workspace cwd juggling and simply records the chosen column on
+    the node for future reference.
+    """
+
+    data = getattr(node, "data", None)
+    if data is None:
+        raise HTTPException(status_code=400, detail="Node has no data")
+
+    if isinstance(data, DocLazyFrame):
+        processed = (
+            data
+            if data.document_column == column_name
+            else data.with_document_column(column_name)
+        )
+    elif isinstance(data, DocDataFrame):
+        processed = DocLazyFrame(data.dataframe.lazy(), document_column=column_name)  # type: ignore[misc]
+    elif isinstance(data, pl.LazyFrame):
+        processed = DocLazyFrame(data, document_column=column_name)  # type: ignore[misc]
+    elif isinstance(data, pl.DataFrame):
+        processed = DocLazyFrame(data.lazy(), document_column=column_name)  # type: ignore[misc]
+    else:  # pragma: no cover - unsupported runtime type
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported node data type for text analysis: {type(data).__name__}",
+        )
+
+    try:
+        node.document = column_name
+        node.data = processed
+        workspace_manager.persist(user_id, workspace_id)
+    except Exception:
+        pass
+
+    return processed
 
 
 def _safe_float(value, *, default: float | None = 0.0) -> float | None:
@@ -366,13 +409,11 @@ async def calculate_token_frequencies(
                 status_code=404, detail=f"Workspace {workspace_id} not found"
             )
 
-        try:
-            import polars as pl
-
-            from docframe import DocDataFrame, DocLazyFrame
-        except ImportError as e:
+        workspace_dir = workspace_manager.get_workspace_dir(user_id, workspace_id)
+        if workspace_dir is None:
             raise HTTPException(
-                status_code=500, detail=f"Required libraries not available: {str(e)}"
+                status_code=404,
+                detail=f"Workspace folder not found for workspace {workspace_id}",
             )
 
         frames_dict: dict[str, object] = {}
@@ -391,7 +432,6 @@ async def calculate_token_frequencies(
 
             try:
                 is_doc_frame = isinstance(node_data, (DocDataFrame, DocLazyFrame))
-                is_lazy = isinstance(node_data, (DocLazyFrame, pl.LazyFrame))
 
                 if hasattr(node_data, "columns"):
                     available_columns = node_data.columns
@@ -442,60 +482,12 @@ async def calculate_token_frequencies(
                         detail=f"Column '{column_name}' not found in node {node_id}. Available columns: {available_columns}",
                     )
 
-                try:
-                    from docframe import DocDataFrame as _DDF  # type: ignore
-                    from docframe import DocLazyFrame as _DLF  # type: ignore
-                except Exception as _e:  # pragma: no cover
-                    raise HTTPException(
-                        status_code=500,
-                        detail=f"docframe not available for token frequency: {_e}",
-                    )
-
-                if isinstance(node_data, _DLF):
-                    if column_name == node_data.document_column:
-                        processed_frame = node_data
-                    else:
-                        base_lazy = node_data.to_lazyframe()
-                        selected_lazy = base_lazy.select(
-                            pl.col(column_name).alias("document")
-                        )
-                        processed_frame = _DLF(
-                            selected_lazy, document_column="document"
-                        )
-                elif isinstance(node_data, _DDF):
-                    if column_name == node_data.document_column:  # type: ignore[attr-defined]
-                        processed_frame = node_data
-                    else:
-                        selected_df_any = node_data.select(
-                            pl.col(column_name).alias("document")
-                        )  # type: ignore[call-arg]
-                        if not isinstance(selected_df_any, pl.DataFrame) and hasattr(
-                            selected_df_any, "collect"
-                        ):
-                            try:  # type: ignore[call-arg]
-                                selected_df_any = selected_df_any.collect()  # type: ignore[assignment]
-                            except Exception:  # pragma: no cover
-                                pass
-                        if not isinstance(
-                            selected_df_any, pl.DataFrame
-                        ):  # pragma: no cover
-                            raise HTTPException(
-                                status_code=500,
-                                detail="Failed to materialize DataFrame for token frequency calculation",
-                            )
-                        processed_frame = _DDF(
-                            selected_df_any, document_column="document"
-                        )
-                else:
-                    selected_data = node_data.select(
-                        pl.col(column_name).alias("document")
-                    )
-                    if is_lazy:
-                        processed_frame = DocLazyFrame(selected_data)
-                    else:
-                        if hasattr(selected_data, "collect"):
-                            selected_data = selected_data.collect()
-                        processed_frame = DocDataFrame(selected_data)
+                processed_frame = _prepare_doclazy_frame(
+                    node,
+                    column_name,
+                    user_id,
+                    workspace_id,
+                )
 
                 frames_dict[node_id] = processed_frame
 
@@ -505,14 +497,6 @@ async def calculate_token_frequencies(
                 raise HTTPException(
                     status_code=500, detail=f"Error processing node {node_id}: {str(e)}"
                 )
-
-        try:
-            from docframe.core.text_utils import compute_token_frequencies
-        except ImportError:
-            raise HTTPException(
-                status_code=500,
-                detail="docframe library not available for token frequency calculation",
-            )
 
         # IMPORTANT CHANGE: Backend now ignores provided stop_words for raw frequency computation.
         # Stop words are purely a frontend display filter; we persist them in the saved request

@@ -5,10 +5,10 @@ Migrated from test_complete_lazy_flow.py with proper pytest structure.
 
 import polars as pl
 import pytest
+from docworkspace import Node, Workspace
 
 import docframe as dc
 from docframe import DocDataFrame
-from docworkspace import Node, Workspace
 
 
 class TestLazyFlowIntegration:
@@ -35,23 +35,17 @@ class TestLazyFlowIntegration:
 
     def test_node_info_includes_lazy_field(self, sample_dataframe):
         """Test that Node.info() method includes lazy field"""
-        if Node is None:
-            pytest.skip("docworkspace not available")
-
         # Create node with regular DataFrame
         node = Node(sample_dataframe, name="test_node")
         info = node.info()
 
-        # Check that info includes lazy field
+        # Check that info includes lazy field and reflects lazy-by-default contract
         assert isinstance(info, dict)
         assert "lazy" in info
-        assert info["lazy"] is False  # Regular DataFrame is not lazy
+        assert info["lazy"] is True  # Nodes always store lazy data internally
 
     def test_lazy_node_info(self, lazy_dataframe):
         """Test that lazy DataFrames are properly identified"""
-        if Node is None:
-            pytest.skip("docworkspace not available")
-
         # Create node with lazy DataFrame
         lazy_node = Node(lazy_dataframe, name="lazy_test")
         info = lazy_node.info()
@@ -65,9 +59,6 @@ class TestLazyFlowIntegration:
         self, sample_dataframe, lazy_dataframe
     ):
         """Test that operations on lazy DataFrames preserve lazy state"""
-        if Node is None:
-            pytest.skip("docworkspace not available")
-
         regular_node = Node(sample_dataframe, name="regular")
         lazy_node = Node(lazy_dataframe, name="lazy")
 
@@ -81,9 +72,6 @@ class TestLazyFlowIntegration:
 
     def test_filter_operation_lazy_preservation(self, lazy_dataframe):
         """Test that filter operations preserve lazy state when appropriate"""
-        if Node is None:
-            pytest.skip("docworkspace not available")
-
         lazy_node = Node(lazy_dataframe, name="lazy_filter_test")
 
         # Apply filter operation
@@ -95,9 +83,6 @@ class TestLazyFlowIntegration:
 
     def test_workspace_lazy_node_handling(self, sample_dataframe, lazy_dataframe):
         """Test that workspace properly handles lazy nodes"""
-        if Node is None or Workspace is None:
-            pytest.skip("docworkspace not available")
-
         # Create workspace with both regular and lazy nodes
         workspace = Workspace()
 
@@ -116,9 +101,6 @@ class TestLazyFlowIntegration:
 
     def test_lazy_state_after_collect(self, lazy_dataframe):
         """Test that lazy state changes after collect() operation"""
-        if Node is None:
-            pytest.skip("docworkspace not available")
-
         # Create lazy node
         lazy_node = Node(lazy_dataframe, name="lazy_collect_test")
         lazy_info = lazy_node.info()
@@ -133,8 +115,8 @@ class TestLazyFlowIntegration:
         collected_node = Node(collected_data, name="collected")
         collected_info = collected_node.info()
 
-        # Should no longer be lazy
-        assert collected_info["lazy"] is False
+        # Nodes wrap collected data back into lazy form, so flag remains True
+        assert collected_info["lazy"] is True
 
     def test_lazy_with_doc_dataframe(self):
         """Test lazy state with DocDataFrame integration"""
@@ -153,5 +135,5 @@ class TestLazyFlowIntegration:
 
         # Check lazy state handling with DocDataFrame
         assert "lazy" in doc_info
-        # DocDataFrame typically works with collected data
-        assert doc_info["lazy"] is False
+        # DocDataFrame inputs are normalized to DocLazyFrame internally
+        assert doc_info["lazy"] is True

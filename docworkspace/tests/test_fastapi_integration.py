@@ -5,7 +5,6 @@ from API-specific functionality and can operate independently.
 """
 
 import pytest
-
 from docworkspace import Node, Workspace
 
 
@@ -26,9 +25,10 @@ class TestCoreLibraryIndependence:
 
     def test_no_api_dependencies(self):
         """Test that core classes don't have API-specific methods."""
-        df = pytest.importorskip("polars").DataFrame(
-            {"id": [1, 2, 3], "text": ["a", "b", "c"]}
-        )
+        df = pytest.importorskip("polars").DataFrame({
+            "id": [1, 2, 3],
+            "text": ["a", "b", "c"],
+        })
 
         workspace = Workspace("test")
         node = workspace.add_node(Node(df, "test_node"))
@@ -64,14 +64,14 @@ class TestCoreLibraryIndependence:
         # Test core functionality
         assert len(workspace.nodes) == 1
         assert node.name == "test_data"
-        assert node.data.height == 3
-        assert node.data.width == 2
-        assert not node.is_lazy
+        assert node.data.collect().height == 3
+        assert node.data.collect().width == 2
+        assert isinstance(node.data, pl.LazyFrame)
 
         # Test node operations (polars delegation)
         filtered = node.filter(pl.col("x") > 1)
         assert isinstance(filtered, Node)
-        assert filtered.data.height == 2
+        assert filtered.data.collect().height == 2
 
     def test_lazy_frame_support(self):
         """Test that lazy frame support works without API dependencies."""
@@ -82,10 +82,10 @@ class TestCoreLibraryIndependence:
 
         lazy_node = workspace.add_node(Node(lazy_df, "lazy_data"))
 
-        assert lazy_node.is_lazy
+        assert isinstance(lazy_node.data, pl.LazyFrame)
         assert len(workspace.nodes) == 1
 
         # Test lazy operations
         filtered_lazy = lazy_node.filter(pl.col("a") > 1)
         assert isinstance(filtered_lazy, Node)
-        assert filtered_lazy.is_lazy
+        assert isinstance(filtered_lazy.data, pl.LazyFrame)

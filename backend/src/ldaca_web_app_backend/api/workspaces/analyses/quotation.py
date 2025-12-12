@@ -1,14 +1,12 @@
-"""Quotation analysis endpoints with cached/paginated result retrieval."""
+"""Quotation analysis endpoints with on-demand paginated result retrieval."""
 
 import logging
 import math
-import time
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import polars as pl
 from fastapi import APIRouter, Depends, HTTPException
 
-from ....core.analysis_admin import clear_quotation_cache_for
 from ....core.auth import get_current_user
 from ....core.services.quotation_client import (
     QuotationServiceError,
@@ -23,7 +21,7 @@ from ....models import (
     QuotationResultQuery,
 )
 from ....settings import settings
-from ..utils import get_node_with_data_or_400
+from ..utils import get_node_with_data_or_400, stage_dataframe_as_lazy
 
 logger = logging.getLogger(__name__)
 
@@ -32,12 +30,11 @@ MAX_CONTEXT_LENGTH = 2000
 DEFAULT_PAGE_SIZE = 50
 DEFAULT_SORT_ORDER = "asc"
 
-QUOTATION_CACHE: Dict[Tuple[str, str, str, str, str, str], Dict[str, Any]] = {}
-
 _REQUEST_STORAGE_EXCLUDE = {"page", "page_size", "sort_by", "sort_order"}
 
 
 def _normalize_context_length(value: Any) -> int:
+    """Clamp user-provided context length to the allowed range."""
     try:
         numeric = int(value)
     except (TypeError, ValueError):
@@ -49,40 +46,8 @@ def _normalize_context_length(value: Any) -> int:
     return numeric
 
 
-def _quotation_cache_key(
-    user_id: str,
-    workspace_id: str,
-    node_id: str,
-    column: str,
-    engine: QuotationEngineConfig,
-) -> Tuple[str, str, str, str, str, str]:
-    normalized_url = (engine.url or "").strip().lower() if engine.url else ""
-    return (
-        user_id,
-        workspace_id,
-        node_id,
-        column,
-        engine.type.value,
-        normalized_url,
-    )
-
-
-def _get_cached_quotation_df(
-    key: Tuple[str, str, str, str, str, str],
-) -> Optional[pl.DataFrame]:
-    entry = QUOTATION_CACHE.get(key)
-    if not entry:
-        return None
-    return entry.get("df")
-
-
-def _store_cached_quotation_df(
-    key: Tuple[str, str, str, str, str, str], df: pl.DataFrame
-) -> None:
-    QUOTATION_CACHE[key] = {"df": df, "created": time.time()}
-
-
 def _sanitize_request_for_storage(request_dict: Dict[str, Any]) -> Dict[str, Any]:
+    """Drop pagination/sort fields and nulls before persisting a request."""
     sanitized: Dict[str, Any] = {}
     for key, value in request_dict.items():
         if key in _REQUEST_STORAGE_EXCLUDE:
@@ -94,6 +59,7 @@ def _sanitize_request_for_storage(request_dict: Dict[str, Any]) -> Dict[str, Any
 
 
 def _normalize_sort_order(sort_order: Optional[str]) -> str:
+    """Normalize sort order strings to either 'asc' or 'desc'."""
     if isinstance(sort_order, str) and sort_order.lower() == "desc":
         return "desc"
     return DEFAULT_SORT_ORDER
@@ -102,6 +68,7 @@ def _normalize_sort_order(sort_order: Optional[str]) -> str:
 def _normalize_pagination(
     page: Optional[int], page_size: Optional[int]
 ) -> Tuple[int, int]:
+    """Ensure pagination inputs are positive integers with sane defaults."""
     normalized_page = max(1, int(page)) if isinstance(page, int) else 1
     try:
         normalized_size = int(page_size) if page_size is not None else DEFAULT_PAGE_SIZE
@@ -120,6 +87,7 @@ def _paginate_dataframe(
     sort_by: Optional[str],
     sort_order: str,
 ) -> Dict[str, Any]:
+    """Apply sorting and pagination to a DataFrame and emit a response payload."""
     working = df
     effective_sort_by = sort_by if sort_by and sort_by in working.columns else None
     normalized_sort_order = _normalize_sort_order(sort_order)
@@ -158,6 +126,7 @@ def _paginate_dataframe(
 def _rows_to_dataframe(
     rows: List[Dict[str, Any]], columns: Optional[List[str]] = None
 ) -> pl.DataFrame:
+    """Construct a DataFrame from row dictionaries with optional column hints."""
     if rows:
         return pl.DataFrame(rows)
     if columns:
@@ -173,6 +142,7 @@ def _paginate_from_storage(
     sort_by: Optional[str],
     sort_order: Optional[str],
 ) -> Dict[str, Any]:
+    """Paginate a previously stored quotation result without recomputation."""
     rows = stored_blob.get("rows") or []
     columns = stored_blob.get("columns")
     df = _rows_to_dataframe(rows, columns)
@@ -192,6 +162,7 @@ def _paginate_from_storage(
 
 
 def _extract_context_preference(record_result: Optional[Dict[str, Any]]) -> int:
+    """Pull the persisted context length preference from a stored result."""
     if not record_result:
         return DEFAULT_CONTEXT_LENGTH
     prefs = record_result.get("preferences")
@@ -238,6 +209,7 @@ def _to_polars_dataframe(data: Any) -> pl.DataFrame:
 
 
 def _empty_quote_dataframe() -> pl.DataFrame:
+    """Return a typed empty DataFrame shaped like a quotation result."""
     return pl.DataFrame({
         "document_idx": pl.Series("document_idx", [], dtype=pl.Int64),
         "speaker": pl.Series("speaker", [], dtype=pl.Utf8),
@@ -257,6 +229,7 @@ def _empty_quote_dataframe() -> pl.DataFrame:
 
 
 def _materialise_base_dataframe(node_data: Any) -> pl.DataFrame:
+    """Coerce node data into an eager Polars DataFrame for quotation work."""
     base_df = _to_polars_dataframe(node_data)
     if not isinstance(base_df, pl.DataFrame):
         base_df = pl.DataFrame(base_df)
@@ -264,6 +237,7 @@ def _materialise_base_dataframe(node_data: Any) -> pl.DataFrame:
 
 
 def _ensure_quote_dataframe(df: pl.DataFrame) -> pl.DataFrame:
+    """Guarantee required quotation columns and dtypes exist for downstream joins."""
     result = df
     if "document_idx" not in result.columns:
         result = result.with_row_index("document_idx")
@@ -301,6 +275,7 @@ def _ensure_quote_dataframe(df: pl.DataFrame) -> pl.DataFrame:
 def _prepare_documents_payload(
     base_df: pl.DataFrame, column: str
 ) -> Dict[str, Dict[str, Any]]:
+    """Prepare remote-service payload mapping document ids to text strings."""
     try:
         series = base_df.get_column(column)
     except (
@@ -321,6 +296,7 @@ def _prepare_documents_payload(
 
 
 def _remote_payload_to_dataframe(payload: Dict[str, Any]) -> pl.DataFrame:
+    """Convert remote quotation service payload into a normalized DataFrame."""
     results = payload.get("results", []) if isinstance(payload, dict) else []
     rows = []
     for entry in results:
@@ -363,9 +339,76 @@ def _remote_payload_to_dataframe(payload: Dict[str, Any]) -> pl.DataFrame:
     return _ensure_quote_dataframe(pl.DataFrame(rows))
 
 
+def _join_quotes_with_base(
+    base_with_idx: pl.DataFrame, quote_df: pl.DataFrame
+) -> pl.DataFrame:
+    """Attach quotation rows back to the base slice while preserving column order."""
+    joined = base_with_idx.join(quote_df, on="document_idx", how="left")
+
+    redundant = [col for col in joined.columns if col.endswith("_right")]
+    if redundant:
+        joined = joined.drop(redundant)
+
+    base_columns = list(base_with_idx.columns)
+    additional_columns = [col for col in joined.columns if col not in base_columns]
+    if additional_columns:
+        joined = joined.select(base_columns + additional_columns)
+
+    return joined
+
+
+async def _compute_on_demand_page(
+    node: Any,
+    column: str,
+    engine: QuotationEngineConfig,
+    *,
+    page: int,
+    page_size: int,
+    sort_by: Optional[str],
+    sort_order: str,
+) -> Dict[str, Any]:
+    """Compute quotations only for the requested document page.
+
+    Pagination metadata is based on document slicing; data rows include all quotes
+    found within the sliced documents.
+    """
+
+    base_df = _materialise_base_dataframe(node.data)
+    base_with_idx = base_df.with_row_index("document_idx")
+
+    start_doc = (page - 1) * page_size
+    slice_df = base_with_idx.slice(start_doc, page_size)
+
+    quote_df = await _compute_quote_dataframe(
+        node, slice_df, column, engine, use_base_only=True
+    )
+    joined_slice = _join_quotes_with_base(slice_df, quote_df)
+
+    page_payload = _paginate_dataframe(
+        joined_slice,
+        page=1,
+        page_size=page_size,
+        sort_by=sort_by,
+        sort_order=sort_order,
+    )
+
+    total_docs = base_with_idx.height
+    page_payload["pagination"].update({
+        "page": page,
+        "page_size": page_size,
+        "total_pages": max(1, math.ceil(total_docs / page_size)),
+        "has_next": (start_doc + page_size) < total_docs,
+        "has_prev": page > 1,
+    })
+    page_payload["total_rows"] = total_docs
+    page_payload["column"] = column
+    return page_payload
+
+
 def _stable_document_items(
     documents: Dict[str, Dict[str, Any]],
 ) -> List[Tuple[str, Dict[str, Any]]]:
+    """Sort document payloads deterministically to ensure stable batching."""
     items: List[Tuple[str, Dict[str, Any]]] = list(documents.items())
 
     def _key(pair: Tuple[str, Dict[str, Any]]) -> Tuple[int, Any]:
@@ -383,6 +426,7 @@ def _batched_documents(
     documents: Dict[str, Dict[str, Any]],
     batch_size: int,
 ) -> Iterable[Dict[str, Dict[str, Any]]]:
+    """Yield deterministic chunks of documents honoring the configured batch size."""
     if batch_size <= 0:
         batch_size = len(documents) or 1
 
@@ -396,6 +440,7 @@ async def _extract_remote_paginated(
     engine: QuotationEngineConfig,
     documents: Dict[str, Dict[str, Any]],
 ) -> Dict[str, Any]:
+    """Fetch remote quotation results in batches and merge payloads."""
     batch_size = max(1, int(settings.quotation_service_max_batch_size or 0))
 
     combined_payload: Dict[str, Any] = {"results": []}
@@ -443,7 +488,15 @@ async def _compute_quote_dataframe(
     base_df: pl.DataFrame,
     column: str,
     engine: QuotationEngineConfig,
+    *,
+    use_base_only: bool = False,
 ) -> pl.DataFrame:
+    """
+    Compute quotations for the provided DataFrame slice. When use_base_only=True, the
+    provided base_df is used directly (avoiding full-node recomputation) and relies on
+    the docframe text namespace being registered on the slice.
+    """
+
     if engine.type is QuotationEngineType.REMOTE:
         documents = _prepare_documents_payload(base_df, column)
         if not documents:
@@ -451,20 +504,33 @@ async def _compute_quote_dataframe(
         payload = await _extract_remote_paginated(engine, documents)
         return _remote_payload_to_dataframe(payload)
 
-    base_with_idx = None
-    try:
-        if hasattr(node.data, "with_row_index"):
-            base_with_idx = node.data.with_row_index("document_idx")
-    except Exception:  # pragma: no cover - docframe fallback
+    if not use_base_only:
         base_with_idx = None
+        try:
+            if hasattr(node.data, "with_row_index"):
+                base_with_idx = node.data.with_row_index("document_idx")
+        except Exception:  # pragma: no cover - docframe fallback
+            base_with_idx = None
 
-    if base_with_idx is not None and hasattr(base_with_idx, "text"):
-        quote_raw = base_with_idx.text.quotation(
-            column=column, explode=True, unnest=True
-        )
-    else:
-        quote_raw = node.data.text.quotation(column=column, explode=True, unnest=True)
+        if base_with_idx is not None and hasattr(base_with_idx, "text"):
+            quote_raw = base_with_idx.text.quotation(
+                column=column, explode=True, unnest=True
+            )
+        else:
+            quote_raw = node.data.text.quotation(
+                column=column, explode=True, unnest=True
+            )
+        return _ensure_quote_dataframe(_to_polars_dataframe(quote_raw))
 
+    try:
+        import docframe  # noqa: F401  # Ensure text namespace is registered
+    except Exception:
+        pass
+
+    if hasattr(base_df, "text"):
+        quote_raw = base_df.text.quotation(column=column, explode=True, unnest=True)
+    else:  # pragma: no cover - fallback
+        quote_raw = base_df.select(column).to_pandas()
     return _ensure_quote_dataframe(_to_polars_dataframe(quote_raw))
 
 
@@ -473,34 +539,23 @@ async def _build_joined_quotation_frames(
     column: str,
     engine: QuotationEngineConfig,
 ) -> Tuple[pl.DataFrame, pl.DataFrame]:
+    """Materialize node data, compute quotations, and return joined/ base frames."""
     base_df = _materialise_base_dataframe(node.data)
     if column not in base_df.columns:
         raise ValueError(
             f"Column '{column}' not found. Available columns: {list(base_df.columns)}"
         )
 
-    quote_df = await _compute_quote_dataframe(node, base_df, column, engine)
+    quote_df = await _compute_quote_dataframe(
+        node, base_df, column, engine, use_base_only=False
+    )
     quote_df = _ensure_quote_dataframe(quote_df)
 
     if quote_df.height == 0:
         return _empty_quote_dataframe(), base_df
 
     original_with_idx = base_df.with_row_index("document_idx")
-    joined = original_with_idx.join(quote_df, on="document_idx", how="left")
-
-    if "quote" in joined.columns:
-        joined = joined.filter(pl.col("quote").is_not_null())
-    elif "quote_row_idx" in joined.columns:
-        joined = joined.filter(pl.col("quote_row_idx").is_not_null())
-
-    redundant = [col for col in joined.columns if col.endswith("_right")]
-    if redundant:
-        joined = joined.drop(redundant)
-
-    base_columns = list(original_with_idx.columns)
-    additional_columns = [col for col in joined.columns if col not in base_columns]
-    if additional_columns:
-        joined = joined.select(base_columns + additional_columns)
+    joined = _join_quotes_with_base(original_with_idx, quote_df)
 
     return joined, base_df
 
@@ -542,36 +597,42 @@ async def quotation_current_result(
         return None
 
     base_result = rec.result if isinstance(rec.result, dict) else {}
-    stored_blob = base_result.get("_stored") if isinstance(base_result, dict) else None
 
-    if isinstance(stored_blob, dict):
-        default_page = stored_blob.get("default_page")
-        default_page_size = stored_blob.get("default_page_size")
+    # If pagination params are provided, recompute on-demand using stored request metadata
+    if any(v is not None for v in (page, page_size, sort_by, sort_order)):
+        base_request = rec.request if isinstance(rec.request, dict) else {}
+        node_id = base_request.get("node_id")
+        column = base_request.get("column")
+        if not node_id or not column:
+            return base_result
+
+        engine_dict = base_request.get("engine") or {}
+        try:
+            engine = QuotationEngineConfig.model_validate(engine_dict)
+        except Exception:
+            return base_result
+
+        node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
+        if not node:
+            return base_result
+
         normalized_page, normalized_size = _normalize_pagination(
-            page if page is not None else default_page,
-            page_size if page_size is not None else default_page_size,
+            page if page is not None else 1,
+            page_size if page_size is not None else DEFAULT_PAGE_SIZE,
         )
-        page_payload = _paginate_from_storage(
-            stored_blob,
+        sort_by_effective = sort_by or None
+        sort_order_effective = _normalize_sort_order(sort_order)
+
+        return await _compute_on_demand_page(
+            node,
+            column,
+            engine,
             page=normalized_page,
             page_size=normalized_size,
-            sort_by=sort_by,
-            sort_order=sort_order,
+            sort_by=sort_by_effective,
+            sort_order=sort_order_effective,
         )
 
-        prefs_source = base_result.get("preferences") or stored_blob.get("preferences")
-        preferences = {"context_length": _extract_context_preference(base_result)}
-        if isinstance(prefs_source, dict) and "context_length" in prefs_source:
-            preferences["context_length"] = _normalize_context_length(
-                prefs_source.get("context_length")
-            )
-
-        return {
-            **page_payload,
-            "preferences": preferences,
-        }
-
-    # Fallback for legacy records without stored blob
     return base_result
 
 
@@ -595,7 +656,6 @@ async def update_quotation_current_result(
 
     base_request = {**record.request} if isinstance(record.request, dict) else {}
     base_result = {**record.result} if isinstance(record.result, dict) else {}
-    stored_blob = base_result.get("_stored") if isinstance(base_result, dict) else None
 
     context_length_value = _extract_context_preference(base_result)
     if query.context_length is not None:
@@ -640,39 +700,42 @@ async def update_quotation_current_result(
             "data": {"context_length": context_length_value},
         }
 
-    if not isinstance(stored_blob, dict):
+    # Recompute the requested page on demand using the stored request metadata
+    node_id = base_request.get("node_id")
+    column = base_request.get("column")
+    if not node_id or not column:
         raise HTTPException(
-            status_code=404, detail="No paginated quotation data available"
+            status_code=404, detail="No quotation analysis found for this workspace"
         )
 
-    default_page = stored_blob.get("default_page")
-    default_page_size = stored_blob.get("default_page_size")
-    normalized_page, normalized_size = _normalize_pagination(
-        query.page if query.page is not None else default_page,
-        query.page_size if query.page_size is not None else default_page_size,
-    )
+    engine_dict = base_request.get("engine") or {}
+    try:
+        engine = QuotationEngineConfig.model_validate(engine_dict)
+    except Exception as exc:  # pragma: no cover
+        raise HTTPException(status_code=400, detail=f"Invalid engine config: {exc}")
 
-    page_payload = _paginate_from_storage(
-        stored_blob,
+    node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
+    if not node:
+        raise HTTPException(status_code=404, detail="Node not found")
+
+    normalized_page, normalized_size = _normalize_pagination(
+        query.page if query.page is not None else 1,
+        query.page_size if query.page_size is not None else DEFAULT_PAGE_SIZE,
+    )
+    sort_by = query.sort_by or None
+    sort_order = _normalize_sort_order(query.sort_order)
+
+    page_payload = await _compute_on_demand_page(
+        node,
+        column,
+        engine,
         page=normalized_page,
         page_size=normalized_size,
-        sort_by=query.sort_by,
-        sort_order=query.sort_order,
+        sort_by=sort_by,
+        sort_order=sort_order,
     )
 
-    stored_blob.update({
-        "default_page": page_payload["pagination"]["page"],
-        "default_page_size": page_payload["pagination"]["page_size"],
-        "default_sort_by": page_payload["sorting"].get("sort_by"),
-        "default_sort_order": page_payload["sorting"].get("sort_order"),
-        "preferences": preferences,
-    })
-
-    updated_result = {
-        **page_payload,
-        "preferences": preferences,
-        "_stored": stored_blob,
-    }
+    updated_result = {**page_payload, "preferences": preferences}
 
     try:
         save_analysis(
@@ -688,8 +751,7 @@ async def update_quotation_current_result(
             detail=f"Failed to persist quotation pagination update: {exc}",
         )
 
-    response_payload = {k: v for k, v in updated_result.items() if k != "_stored"}
-    return response_payload
+    return updated_result
 
 
 @router.post("/{workspace_id}/quotation/clear")
@@ -703,12 +765,10 @@ async def clear_quotation_results(
         raise HTTPException(status_code=500, detail=f"analysis_store unavailable: {e}")
 
     removed = clear_analyses(user_id, workspace_id, task="quotation")
-    cache_removed = clear_quotation_cache_for(user_id, workspace_id)
     return {
         "state": "successful",
         "cleared": {
             "analyses_removed": removed,
-            "quotation_cache_removed": cache_removed,
         },
     }
 
@@ -736,16 +796,15 @@ async def get_quotation(
                 detail="This node does not support text analysis (DocFrame text namespace not available)",
             )
 
-        joined_df, _ = await _build_joined_quotation_frames(
-            node, request.column, engine
-        )
-
         page, page_size = _normalize_pagination(request.page, request.page_size)
         sort_by = request.sort_by or None
         sort_order = _normalize_sort_order(request.sort_order)
 
-        page_payload = _paginate_dataframe(
-            joined_df,
+        # On-demand extraction for the requested page only
+        page_payload = await _compute_on_demand_page(
+            node,
+            request.column,
+            engine,
             page=page,
             page_size=page_size,
             sort_by=sort_by,
@@ -769,39 +828,18 @@ async def get_quotation(
 
         request_dict = request.model_dump()
         request_dict.update({"node_id": node_id, "engine": engine.model_dump()})
-
-        storage_blob = {
-            "rows": joined_df.to_dicts(),
-            "columns": list(joined_df.columns),
-            "total_rows": joined_df.height,
-            "default_page": result_payload["pagination"]["page"],
-            "default_page_size": result_payload["pagination"]["page_size"],
-            "default_sort_by": result_payload["sorting"].get("sort_by"),
-            "default_sort_order": result_payload["sorting"].get("sort_order"),
-            "column": request.column,
-            "node_id": node_id,
-            "engine": engine.model_dump(),
-            "preferences": result_payload["preferences"],
-        }
-
-        try:  # best-effort persistence
+        try:  # best-effort persistence without caching rows
             from ....core.analysis_store import save_analysis
 
-            persist_payload = {**result_payload, "_stored": storage_blob}
             save_analysis(
                 user_id=user_id,
                 workspace_id=workspace_id,
                 task="quotation",
                 request_dict=_sanitize_request_for_storage(request_dict),
-                result_dict=persist_payload,
+                result_dict=result_payload,
             )
         except Exception:  # pragma: no cover - persistence failures ignored
             pass
-
-        cache_key = _quotation_cache_key(
-            user_id, workspace_id, node_id, request.column, engine
-        )
-        _store_cached_quotation_df(cache_key, joined_df)
 
         return result_payload
     except HTTPException:
@@ -833,17 +871,9 @@ async def detach_quotation(
                 detail="This node does not support text analysis (DocFrame text namespace not available)",
             )
 
-        cache_key = _quotation_cache_key(
-            user_id, workspace_id, node_id, request.column, engine
+        joined_df, _ = await _build_joined_quotation_frames(
+            node, request.column, engine
         )
-        cached_df = _get_cached_quotation_df(cache_key)
-        if cached_df is not None:
-            joined_df = cached_df.clone()
-        else:
-            joined_df, _ = await _build_joined_quotation_frames(
-                node, request.column, engine
-            )
-            _store_cached_quotation_df(cache_key, joined_df)
 
         if "document_idx" in joined_df.columns:
             final_data = joined_df.drop("document_idx")
@@ -857,22 +887,24 @@ async def detach_quotation(
             original_name = node.name if getattr(node, "name", None) else node_id
             new_node_name = f"{original_name}_quotation"
 
-        data_for_node = final_data
-        try:  # pragma: no cover - best effort docframe wrapping
-            from docframe import DocDataFrame as _DDF  # type: ignore
-            from docframe import DocLazyFrame as _DLF  # type: ignore
+        document_column = getattr(node, "document", None) or getattr(
+            node.data, "document_column", None
+        )
+        workspace_dir = workspace_manager.get_workspace_dir(user_id, workspace_id)
+        if workspace_dir is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Workspace folder not found for workspace {workspace_id}",
+            )
 
-            if isinstance(node.data, (_DDF, _DLF)):
-                doc_col = getattr(node.data, "document_column", None)
-                if doc_col and doc_col in final_data.columns:
-                    data_for_node = _DDF(final_data, document_column=doc_col)
-        except Exception:
-            pass
+        lazy_data = stage_dataframe_as_lazy(
+            final_data, workspace_dir, new_node_name, document_column
+        )
 
         new_node = workspace_manager.add_node_to_workspace(
             user_id=user_id,
             workspace_id=workspace_id,
-            data=data_for_node,
+            data=lazy_data,
             node_name=new_node_name,
             operation="quotation_detach",
             parents=[node],

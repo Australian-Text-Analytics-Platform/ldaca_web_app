@@ -31,7 +31,6 @@ export interface FilterSubTabProps {
   } | null;
   currentWorkspaceId: string | null;
   workspaceNodes: WorkspaceNodeLike[];
-  getNodeShape: (nodeId: string) => Promise<{ shape: [number, number]; is_lazy: boolean; calculated: boolean } | null>;
   filterNode: (nodeId: string, request: FilterRequest) => Promise<void>;
   filterPreview: (
     nodeId: string,
@@ -109,7 +108,6 @@ export interface UseFilterSubTabSectionsResult {
   applyFilter: () => Promise<void>;
   applyButtonDisabled: boolean;
   preview: FilterPreviewConfig;
-  getNodeShape: FilterSubTabProps['getNodeShape'];
   selectedNodesOriginalCount: number;
 }
 
@@ -153,7 +151,6 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     nodeData,
     currentWorkspaceId,
     workspaceNodes,
-    getNodeShape,
     filterNode,
     filterPreview,
     isLoading,
@@ -936,7 +933,6 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
       onNextPage: handlePreviewNext,
       onPageSizeChange: setPreviewPageSize,
     },
-    getNodeShape,
     selectedNodesOriginalCount: selectedNodes.length,
   };
 };
