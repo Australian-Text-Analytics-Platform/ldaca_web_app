@@ -3,7 +3,6 @@
 Paths preserved exactly as /workspaces/{workspace_id}/token-frequencies*.
 """
 
-import asyncio
 import math
 
 import polars as pl
@@ -11,7 +10,10 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from docframe import DocDataFrame, DocLazyFrame
 
-from ....core.analysis_store import clear_analyses, get_latest_analysis, save_analysis
+from ....analysis.implementations.token_frequency import (
+    TokenFrequencyRequest as AnalysisTokenFrequencyRequest,
+)
+from ....analysis.results import GenericAnalysisResult
 from ....core.auth import get_current_user
 from ....core.workspace import workspace_manager
 from ....models import TokenFrequencyRequest, TokenFrequencyResponse
@@ -233,10 +235,25 @@ async def token_frequencies_current_request(
     workspace_id: str, current_user: dict = Depends(get_current_user)
 ):
     user_id = current_user["id"]
-    rec = get_latest_analysis(user_id, workspace_id, task="token_frequencies")
-    if not rec:
+    ws = workspace_manager.get_workspace(user_id, workspace_id)
+    if not ws:
         return None
-    stored_request = rec.request if isinstance(rec.request, dict) else {}
+
+    analysis_manager = getattr(ws, "analysis", None)
+    if not analysis_manager:
+        from ....analysis.manager import get_analysis_manager
+
+        analysis_manager = get_analysis_manager(user_id, workspace_id)
+
+    task = analysis_manager.get_current_task("token_frequencies")
+    if not task:
+        return None
+
+    stored_request = (
+        task.request.model_dump()
+        if hasattr(task.request, "model_dump")
+        else task.request.dict()
+    )
     normalized_request = _normalize_limit_payload(stored_request)
     return {
         "state": "successful",
@@ -253,27 +270,34 @@ async def update_token_frequencies_current_request(
 ):
     """Update the last saved token_frequencies request (e.g., stop_words) without recomputing results."""
     user_id = current_user["id"]
-    prev = get_latest_analysis(user_id, workspace_id, task="token_frequencies")
-    merged_req: dict = {}
-    if prev and isinstance(prev.request, dict):
-        merged_req = {**prev.request}
-    try:
-        merged_req.update(request_update or {})
-    except Exception:
-        pass
-    merged_req = _normalize_limit_payload(merged_req)
-    prev_result: dict = prev.result if prev and isinstance(prev.result, dict) else {}
-    try:
-        save_analysis(
-            user_id=user_id,
-            workspace_id=workspace_id,
-            task="token_frequencies",
-            request_dict=merged_req,
-            result_dict=prev_result,
+    ws = workspace_manager.get_workspace(user_id, workspace_id)
+    if not ws:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+
+    analysis_manager = getattr(ws, "analysis", None)
+    if not analysis_manager:
+        from ....analysis.manager import get_analysis_manager
+
+        analysis_manager = get_analysis_manager(user_id, workspace_id)
+
+    task = analysis_manager.get_current_task("token_frequencies")
+    if not task:
+        raise HTTPException(
+            status_code=404, detail="No active token frequency analysis found to update"
         )
-    except Exception as e:  # pragma: no cover
-        raise HTTPException(status_code=500, detail=f"Failed to save request: {e}")
-    return {"state": "successful", "message": "saved", "data": merged_req}
+
+    current_req_dict = task.request.model_dump()
+    current_req_dict.update(request_update or {})
+
+    try:
+        new_request = AnalysisTokenFrequencyRequest(**current_req_dict)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid request update: {e}")
+
+    task.request = new_request
+    analysis_manager.update_task(task)
+
+    return {"state": "successful", "message": "saved", "data": new_request.model_dump()}
 
 
 @router.get("/{workspace_id}/token-frequencies/current-result")
@@ -281,10 +305,21 @@ async def token_frequencies_current_result(
     workspace_id: str, current_user: dict = Depends(get_current_user)
 ):
     user_id = current_user["id"]
-    rec = get_latest_analysis(user_id, workspace_id, task="token_frequencies")
-    if not rec:
+    ws = workspace_manager.get_workspace(user_id, workspace_id)
+    if not ws:
         return None
-    stored = rec.result
+
+    analysis_manager = getattr(ws, "analysis", None)
+    if not analysis_manager:
+        from ....analysis.manager import get_analysis_manager
+
+        analysis_manager = get_analysis_manager(user_id, workspace_id)
+
+    task = analysis_manager.get_current_task("token_frequencies")
+    if not task or not task.result:
+        return None
+
+    stored = task.result.to_json()
     if not isinstance(stored, dict):
         return None
 
@@ -292,7 +327,11 @@ async def token_frequencies_current_result(
     if not isinstance(stored, dict) or not stored:
         return None
 
-    request_payload = rec.request if isinstance(rec.request, dict) else {}
+    request_payload = (
+        task.request.model_dump()
+        if hasattr(task.request, "model_dump")
+        else task.request.dict()
+    )
     result_blob, _normalized_request, _limit_value, _stop_words = _prepare_result_blob(
         stored,
         request_payload,
@@ -307,12 +346,22 @@ async def update_token_frequencies_current_result(
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    record = get_latest_analysis(user_id, workspace_id, task="token_frequencies")
-    if not record:
+    ws = workspace_manager.get_workspace(user_id, workspace_id)
+    if not ws:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+
+    analysis_manager = getattr(ws, "analysis", None)
+    if not analysis_manager:
+        from ....analysis.manager import get_analysis_manager
+
+        analysis_manager = get_analysis_manager(user_id, workspace_id)
+
+    task = analysis_manager.get_current_task("token_frequencies")
+    if not task:
         raise HTTPException(status_code=404, detail="No token frequency analysis found")
 
-    request_payload = {**record.request} if isinstance(record.request, dict) else {}
-    result_payload_raw = {**record.result} if isinstance(record.result, dict) else {}
+    request_payload = task.request.model_dump()
+    result_payload_raw = task.result.to_json() if task.result else {}
     result_payload = _unwrap_task_manager_result(result_payload_raw)
     if not isinstance(result_payload, dict):
         result_payload = {}
@@ -337,15 +386,11 @@ async def update_token_frequencies_current_result(
     # Merge the normalized request back with any untouched fields (e.g., node selections)
     request_payload.update(normalized_request)
 
-    # Preserve an informative message for callers when available
+    # Update task
     try:
-        save_analysis(
-            user_id=user_id,
-            workspace_id=workspace_id,
-            task="token_frequencies",
-            request_dict=request_payload,
-            result_dict=result_blob,
-        )
+        task.request = AnalysisTokenFrequencyRequest(**request_payload)
+        task.complete(GenericAnalysisResult(result_blob))
+        analysis_manager.update_task(task)
     except Exception as exc:  # pragma: no cover
         raise HTTPException(
             status_code=500,
@@ -360,8 +405,17 @@ async def clear_token_frequencies_results(
     workspace_id: str, current_user: dict = Depends(get_current_user)
 ):
     user_id = current_user["id"]
-    removed = clear_analyses(user_id, workspace_id, task="token_frequencies")
-    return {"state": "successful", "cleared": {"analyses_removed": removed}}
+    ws = workspace_manager.get_workspace(user_id, workspace_id)
+    if ws:
+        analysis_manager = getattr(ws, "analysis", None)
+        if not analysis_manager:
+            from ....analysis.manager import get_analysis_manager
+
+            analysis_manager = get_analysis_manager(user_id, workspace_id)
+
+        analysis_manager.clear_current_result("token_frequencies")
+
+    return {"state": "successful", "cleared": ["token_frequencies"]}
 
 
 @router.post(
@@ -496,25 +550,22 @@ async def calculate_token_frequencies(
         },
     )
 
-    # Persist request immediately (result will be saved by ProcessTaskManager on completion)
-    request_dict = (
-        request.model_dump(exclude_none=True)
-        if hasattr(request, "model_dump")
-        else request.dict(exclude_none=True)
-    )
-    request_dict["node_columns"] = validated_columns
-    request_dict["token_limit"] = effective_limit
-    request_dict["stop_words"] = requested_stop_words
+    # Create AnalysisTask in AnalysisManager
+    analysis_manager = getattr(workspace, "analysis", None)
+    if not analysis_manager:
+        from ....analysis.manager import get_analysis_manager
 
-    normalized_request = _normalize_limit_payload(request_dict)
-    await asyncio.to_thread(
-        save_analysis,
-        user_id,
-        workspace_id,
-        "token_frequencies",
-        normalized_request,
-        {},
+        analysis_manager = get_analysis_manager(user_id, workspace_id)
+
+    analysis_request = AnalysisTokenFrequencyRequest(
+        task_id=task_info.id,
+        node_ids=request.node_ids,
+        node_columns=validated_columns,
+        token_limit=effective_limit,
+        stop_words=requested_stop_words,
     )
+
+    analysis_manager.create_task("token_frequencies", analysis_request)
 
     return {
         "state": "running",

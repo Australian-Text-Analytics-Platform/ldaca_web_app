@@ -54,6 +54,7 @@ export interface WorkspaceGraphViewModel {
 
 export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
   const { workspaceGraph } = useWorkspaceData();
+  const { currentWorkspaceId } = useWorkspaceData();
   const { selectedNodeIds } = useWorkspaceSelection();
   const { isLoading } = useWorkspaceStatus();
   const {
@@ -340,7 +341,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
     edges,
     nodeTypes,
     isGraphLoading: Boolean(isLoading.graph),
-    showEmptyState: !isLoading.graph && (!workspaceGraph || initialNodes.length === 0),
+    showEmptyState: !isLoading.graph && !currentWorkspaceId,
     selectedCount,
     totalNodes,
     canClearSelection: selectedCount > 0,

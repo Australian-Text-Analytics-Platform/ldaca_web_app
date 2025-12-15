@@ -10,4 +10,4 @@ async def test_topic_modeling_clear_endpoint(authenticated_client):
     payload = response.json()
     assert payload["state"] == "successful"
     assert "cleared" in payload
-    assert "analyses_removed" in payload["cleared"]
+    assert "topic_modeling" in payload["cleared"]

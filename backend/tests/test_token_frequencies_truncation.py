@@ -2,23 +2,23 @@ import csv
 from types import SimpleNamespace
 
 import pytest
+from ldaca_web_app_backend.analysis.manager import get_analysis_manager
+from ldaca_web_app_backend.analysis.results import GenericAnalysisResult
 from ldaca_web_app_backend.api.workspaces.analyses.token_frequencies import (
     DEFAULT_TOKEN_LIMIT,
     MAX_SERVER_TOKEN_LIMIT,
     SERVER_LIMIT_MULTIPLIER,
 )
-from ldaca_web_app_backend.core import analysis_store
 from ldaca_web_app_backend.core.utils import get_user_data_folder
 from ldaca_web_app_backend.core.worker import token_frequencies_task
 from ldaca_web_app_backend.core.workspace import workspace_manager
 
 
 def _simulate_token_frequency_completion(workspace_id: str):
-    record = analysis_store.get_latest_analysis(
-        "test", workspace_id, task="token_frequencies"
-    )
-    assert record is not None
-    req = record.request or {}
+    manager = get_analysis_manager("test", workspace_id)
+    task = manager.get_current_task("token_frequencies")
+    assert task is not None
+    req = task.request.model_dump() if hasattr(task.request, "model_dump") else {}
     worker_result = token_frequencies_task(
         user_id="test",
         workspace_id=workspace_id,
@@ -27,17 +27,8 @@ def _simulate_token_frequency_completion(workspace_id: str):
         token_limit=req.get("token_limit") or DEFAULT_TOKEN_LIMIT,
         stop_words=req.get("stop_words") or [],
     )
-    analysis_store.save_analysis(
-        user_id="test",
-        workspace_id=workspace_id,
-        task="token_frequencies",
-        request_dict=req,
-        result_dict={
-            "status": "successful",
-            "message": "token_frequencies completed successfully",
-            "data": worker_result,
-        },
-    )
+    task.complete(GenericAnalysisResult(worker_result))
+    manager.update_task(task)
 
 
 @pytest.fixture(autouse=True)

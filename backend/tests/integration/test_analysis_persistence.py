@@ -9,13 +9,13 @@ from types import SimpleNamespace
 
 import pytest
 from httpx import AsyncClient
+from ldaca_web_app_backend.analysis.manager import get_analysis_manager
+from ldaca_web_app_backend.analysis.results import GenericAnalysisResult
 from ldaca_web_app_backend.api.workspaces.analyses.token_frequencies import (
     DEFAULT_TOKEN_LIMIT,
     MAX_SERVER_TOKEN_LIMIT,
     SERVER_LIMIT_MULTIPLIER,
 )
-from ldaca_web_app_backend.core import analysis_store
-from ldaca_web_app_backend.core.analysis_store import list_analyses
 from ldaca_web_app_backend.core.worker import token_frequencies_task
 from ldaca_web_app_backend.core.workspace import workspace_manager
 
@@ -54,14 +54,13 @@ def assert_successful_result(result_dict: dict):
 
 
 def _simulate_token_frequency_completion(workspace_id: str):
-    """Run token frequencies synchronously and persist the result like the worker/task manager would."""
+    """Run token frequencies synchronously and persist the result via AnalysisManager."""
 
-    record = analysis_store.get_latest_analysis(
-        "test", workspace_id, task="token_frequencies"
-    )
-    assert record is not None
+    manager = get_analysis_manager("test", workspace_id)
+    task = manager.get_current_task("token_frequencies")
+    assert task is not None
 
-    req = record.request or {}
+    req = task.request.model_dump() if hasattr(task.request, "model_dump") else {}
     worker_result = token_frequencies_task(
         user_id="test",
         workspace_id=workspace_id,
@@ -71,17 +70,28 @@ def _simulate_token_frequency_completion(workspace_id: str):
         stop_words=req.get("stop_words") or [],
     )
 
-    analysis_store.save_analysis(
-        user_id="test",
-        workspace_id=workspace_id,
-        task="token_frequencies",
-        request_dict=req,
-        result_dict={
-            "status": "successful",
-            "message": "token_frequencies completed successfully",
-            "data": worker_result,
-        },
-    )
+    task.complete(GenericAnalysisResult(worker_result))
+    manager.update_task(task)
+
+
+def _list_analysis_records(user_id: str, workspace_id: str, task: str | None = None):
+    manager = get_analysis_manager(user_id, workspace_id)
+    tasks = manager.get_all_tasks()
+    if task:
+        tasks = [t for t in tasks if t.analysis_type == task]
+    tasks.sort(key=lambda t: t.updated_at or t.created_at)
+
+    def _to_record(t):
+        req = t.request.model_dump() if hasattr(t.request, "model_dump") else t.request
+        res = t.result.to_json() if hasattr(t.result, "to_json") else t.result
+        return SimpleNamespace(
+            task=t.analysis_type,
+            saved_at=(t.updated_at or t.created_at).isoformat(),
+            request=req,
+            result=res,
+        )
+
+    return [_to_record(t) for t in tasks]
 
 
 @pytest.fixture(autouse=True)
@@ -145,7 +155,7 @@ class TestTokenFrequencyPersistence:
         assert_successful_result(final_result)
 
         # And: An analysis record was persisted
-        analyses = list_analyses(test_user["id"], workspace_id)
+        analyses = _list_analysis_records(test_user["id"], workspace_id)
         assert len(analyses) == 1
 
         record = analyses[0]
@@ -203,7 +213,7 @@ class TestTokenFrequencyPersistence:
         )
         assert final_result.get("stop_words") == []
 
-        analyses = list_analyses(test_user["id"], workspace_id)
+        analyses = _list_analysis_records(test_user["id"], workspace_id)
         assert len(analyses) == 1
         record = analyses[0]
         assert "limit" not in record.request
@@ -246,7 +256,7 @@ class TestTokenFrequencyPersistence:
         assert second_resp.status_code == 200
 
         # Then: Only one analysis record exists (the latest)
-        analyses = list_analyses(test_user["id"], workspace_id)
+        analyses = _list_analysis_records(test_user["id"], workspace_id)
         assert len(analyses) == 1
 
         record = analyses[0]
@@ -314,7 +324,7 @@ class TestTokenFrequencyPersistence:
         assert final_result.get("stop_words") == []
 
         # And: The analysis record contains both nodes
-        analyses = list_analyses(test_user["id"], workspace_id)
+        analyses = _list_analysis_records(test_user["id"], workspace_id)
         assert len(analyses) == 1
 
         record = analyses[0]
@@ -380,7 +390,7 @@ class TestTokenFrequencyPersistence:
             == expected_server_limit
         )
 
-        analyses = list_analyses(test_user["id"], workspace_id)
+        analyses = _list_analysis_records(test_user["id"], workspace_id)
         assert len(analyses) == 1
         record = analyses[0]
         assert record.request["token_limit"] == 30
@@ -407,7 +417,7 @@ class TestTokenFrequencyPersistence:
         clear_json = clear_response.json()
         assert clear_json == {"state": "successful", "message": "saved"}
 
-        analyses = list_analyses(test_user["id"], workspace_id)
+        analyses = _list_analysis_records(test_user["id"], workspace_id)
         assert len(analyses) == 1
         record = analyses[0]
         assert record.request["token_limit"] == 30  # limit unchanged
@@ -522,7 +532,7 @@ class TestSequentialAnalysisPersistence:
 
         assert result_data.get("chart_type") == "line"
 
-        analyses = list_analyses(test_user["id"], workspace_id)
+        analyses = _list_analysis_records(test_user["id"], workspace_id)
         assert len(analyses) == 1
         record = analyses[0]
         assert record.task == "sequential_analysis"
@@ -571,7 +581,7 @@ class TestSequentialAnalysisPersistence:
         current_payload = current_result_response.json()
         assert current_payload["data"]["chart_type"] == "bar"
 
-        analyses = list_analyses(test_user["id"], workspace_id)
+        analyses = _list_analysis_records(test_user["id"], workspace_id)
         assert len(analyses) == 1
         record = analyses[0]
         assert record.result.get("chart_type") == "bar"
@@ -748,8 +758,10 @@ class TestWorkspaceGraphEnrichment:
         # Then: The response includes latest_analysis as empty dict
         assert response.status_code == 200
         graph_data = response.json()
-        assert "latest_analysis" in graph_data
-        assert graph_data["latest_analysis"] == {}
+        assert "edges" in graph_data and "nodes" in graph_data
+        assert "workspace_info" in graph_data
+        # latest_analysis is no longer provided by the graph endpoint
+        assert "latest_analysis" not in graph_data
 
     async def test_graph_includes_latest_analysis_populated(
         self, authenticated_client, workspace_id, tiny_node_id, test_user
@@ -778,19 +790,9 @@ class TestWorkspaceGraphEnrichment:
         # Then: The response includes the analysis in latest_analysis
         assert response.status_code == 200
         graph_data = response.json()
-        assert "latest_analysis" in graph_data
-
-        latest_analysis = graph_data["latest_analysis"]
-        assert "token_frequencies" in latest_analysis
-
-        token_freq_data = latest_analysis["token_frequencies"]
-        assert "saved_at" in token_freq_data
-        assert "request" in token_freq_data
-        assert "result" in token_freq_data
-
-        # Validate structure matches our persistence format
-        assert_analysis_record_structure(token_freq_data, "token_frequencies")
-        assert_successful_result(token_freq_data["result"])
+        assert "edges" in graph_data and "nodes" in graph_data
+        assert "workspace_info" in graph_data
+        # Graph no longer surfaces latest_analysis; rely on AnalysisManager queries instead
 
     async def test_graph_includes_multiple_analyses(
         self, authenticated_client, workspace_id, sample_node_id, test_user
@@ -819,13 +821,8 @@ class TestWorkspaceGraphEnrichment:
         # Then: The latest_analysis structure can hold multiple analysis types
         assert response.status_code == 200
         graph_data = response.json()
-        latest_analysis = graph_data["latest_analysis"]
-
-        assert isinstance(latest_analysis, dict)
-        assert "token_frequencies" in latest_analysis
-
-        # Structure should support adding more analysis types
-        # like latest_analysis["topic_modeling"], etc.
+        assert "edges" in graph_data and "nodes" in graph_data
+        assert "workspace_info" in graph_data
 
 
 @pytest.mark.anyio
@@ -850,7 +847,7 @@ class TestAnalysisPersistenceEdgeCases:
         )
 
         # And: No analysis records were created
-        analyses = list_analyses(test_user["id"], workspace_id)
+        analyses = _list_analysis_records(test_user["id"], workspace_id)
         assert len(analyses) == 0
 
     async def test_multiple_workspaces_isolated(
@@ -913,8 +910,8 @@ class TestAnalysisPersistenceEdgeCases:
         assert ws2_result.get("metadata", {}).get("task_id")
 
         # Then: Each workspace has its own isolated analyses
-        ws1_analyses = list_analyses(test_user["id"], ws1_id)
-        ws2_analyses = list_analyses(test_user["id"], ws2_id)
+        ws1_analyses = _list_analysis_records(test_user["id"], ws1_id)
+        ws2_analyses = _list_analysis_records(test_user["id"], ws2_id)
 
         # Debug output if assertions fail
         if len(ws1_analyses) != 1 or len(ws2_analyses) != 1:
@@ -975,7 +972,7 @@ class TestAnalysisPersistencePerformance:
             assert response.status_code == 200
 
         # And: Only the latest analysis is persisted (overwrites previous)
-        analyses = list_analyses(test_user["id"], workspace_id)
+        analyses = _list_analysis_records(test_user["id"], workspace_id)
         assert len(analyses) == 1
         assert analyses[0].request["token_limit"] == DEFAULT_TOKEN_LIMIT
         assert analyses[0].request.get("stop_words") == ["delta", "epsilon"]

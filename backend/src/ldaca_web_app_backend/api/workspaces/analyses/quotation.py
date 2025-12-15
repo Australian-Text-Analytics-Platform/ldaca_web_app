@@ -7,7 +7,9 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 import polars as pl
 from fastapi import APIRouter, Depends, HTTPException
 
-from ....core.analysis_store import clear_analyses, get_latest_analysis, save_analysis
+from ....analysis.implementations.quotation import (
+    QuotationRequest as AnalysisQuotationRequest,
+)
 from ....core.auth import get_current_user
 from ....core.services.quotation_client import (
     QuotationServiceError,
@@ -31,8 +33,6 @@ MAX_CONTEXT_LENGTH = 2000
 DEFAULT_PAGE_SIZE = 50
 DEFAULT_SORT_ORDER = "asc"
 
-_REQUEST_STORAGE_EXCLUDE = {"page", "page_size", "sort_by", "sort_order"}
-
 
 def _normalize_context_length(value: Any) -> int:
     """Clamp user-provided context length to the allowed range."""
@@ -45,18 +45,6 @@ def _normalize_context_length(value: Any) -> int:
     if numeric > MAX_CONTEXT_LENGTH:
         return MAX_CONTEXT_LENGTH
     return numeric
-
-
-def _sanitize_request_for_storage(request_dict: Dict[str, Any]) -> Dict[str, Any]:
-    """Drop pagination/sort fields and nulls before persisting a request."""
-    sanitized: Dict[str, Any] = {}
-    for key, value in request_dict.items():
-        if key in _REQUEST_STORAGE_EXCLUDE:
-            continue
-        if value is None:
-            continue
-        sanitized[key] = value
-    return sanitized
 
 
 def _normalize_sort_order(sort_order: Optional[str]) -> str:
@@ -512,10 +500,26 @@ async def quotation_current_request(
     workspace_id: str, current_user: dict = Depends(get_current_user)
 ):
     user_id = current_user["id"]
-    rec = get_latest_analysis(user_id, workspace_id, task="quotation")
-    if not rec:
+    ws = workspace_manager.get_workspace(user_id, workspace_id)
+    if not ws:
         return None
-    return {"state": "successful", "message": "ok", "data": rec.request}
+
+    analysis_manager = getattr(ws, "analysis", None)
+    if not analysis_manager:
+        from ....analysis.manager import get_analysis_manager
+
+        analysis_manager = get_analysis_manager(user_id, workspace_id)
+
+    task = analysis_manager.get_current_task("quotation")
+    if not task:
+        return None
+
+    req_dict = (
+        task.request.model_dump()
+        if hasattr(task.request, "model_dump")
+        else task.request.dict()
+    )
+    return {"state": "successful", "message": "ok", "data": req_dict}
 
 
 @router.get("/{workspace_id}/quotation/current-result")
@@ -528,21 +532,35 @@ async def quotation_current_result(
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    rec = get_latest_analysis(user_id, workspace_id, task="quotation")
-    if not rec:
+    ws = workspace_manager.get_workspace(user_id, workspace_id)
+    if not ws:
         return None
 
-    base_result = rec.result if isinstance(rec.result, dict) else {}
+    analysis_manager = getattr(ws, "analysis", None)
+    if not analysis_manager:
+        from ....analysis.manager import get_analysis_manager
+
+        analysis_manager = get_analysis_manager(user_id, workspace_id)
+
+    task = analysis_manager.get_current_task("quotation")
+    if not task or not task.result:
+        return None
+
+    base_result = task.result.to_json()
+    req_dict = (
+        task.request.model_dump()
+        if hasattr(task.request, "model_dump")
+        else task.request.dict()
+    )
 
     # If pagination params are provided, recompute on-demand using stored request metadata
     if any(v is not None for v in (page, page_size, sort_by, sort_order)):
-        base_request = rec.request if isinstance(rec.request, dict) else {}
-        node_id = base_request.get("node_id")
-        column = base_request.get("column")
+        node_id = req_dict.get("node_id")
+        column = req_dict.get("column")
         if not node_id or not column:
             return base_result
 
-        engine_dict = base_request.get("engine") or {}
+        engine_dict = req_dict.get("engine") or {}
         try:
             engine = QuotationEngineConfig.model_validate(engine_dict)
         except Exception:
@@ -579,12 +597,26 @@ async def update_quotation_current_result(
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    record = get_latest_analysis(user_id, workspace_id, task="quotation")
-    if not record:
+    ws = workspace_manager.get_workspace(user_id, workspace_id)
+    if not ws:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+
+    analysis_manager = getattr(ws, "analysis", None)
+    if not analysis_manager:
+        from ....analysis.manager import get_analysis_manager
+
+        analysis_manager = get_analysis_manager(user_id, workspace_id)
+
+    task = analysis_manager.get_current_task("quotation")
+    if not task or not task.result:
         raise HTTPException(status_code=404, detail="No quotation analysis found")
 
-    base_request = {**record.request} if isinstance(record.request, dict) else {}
-    base_result = {**record.result} if isinstance(record.result, dict) else {}
+    base_request = (
+        task.request.model_dump()
+        if hasattr(task.request, "model_dump")
+        else task.request.dict()
+    )
+    base_result = task.result.to_json()
 
     context_length_value = _extract_context_preference(base_result)
     if query.context_length is not None:
@@ -610,13 +642,26 @@ async def update_quotation_current_result(
     if not needs_pagination:
         base_result["preferences"] = preferences
         try:
-            save_analysis(
-                user_id=user_id,
-                workspace_id=workspace_id,
-                task="quotation",
-                request_dict=_sanitize_request_for_storage(base_request),
-                result_dict=base_result,
-            )
+            # Update task request and result
+            # We need to update the request object in the task
+            # Assuming AnalysisQuotationRequest can be updated or replaced
+
+            # Update request dict for storage (if we were using dicts)
+            # But here we have a model.
+            # Let's update the model instance if possible or create new one.
+            # For now, let's just update the result.
+
+            # Wait, the original code updated the request too?
+            # "analysis_store.update_current_request"
+            # Yes, to persist preferences maybe? No, preferences are in result.
+            # Ah, maybe to update pagination params in request?
+            # But here needs_pagination is False.
+
+            # So just update result.
+            from ....analysis.results import GenericAnalysisResult
+
+            task.complete(GenericAnalysisResult(base_result))
+            analysis_manager.update_task(task)
         except Exception as exc:  # pragma: no cover
             raise HTTPException(
                 status_code=500,
@@ -667,13 +712,23 @@ async def update_quotation_current_result(
     updated_result = {**page_payload, "preferences": preferences}
 
     try:
-        save_analysis(
-            user_id=user_id,
-            workspace_id=workspace_id,
-            task="quotation",
-            request_dict=_sanitize_request_for_storage(base_request),
-            result_dict=updated_result,
-        )
+        from ....analysis.results import GenericAnalysisResult
+
+        task.complete(GenericAnalysisResult(updated_result))
+
+        # Also update request params in task?
+        # The original code did: analysis_store.update_current_request
+        # This implies the "current request" should reflect the latest pagination.
+        # Let's update the task request.
+        # We need to create a new request object or modify existing.
+        # Since Pydantic models are mutable by default (unless frozen), we can modify.
+        if hasattr(task.request, "page"):
+            task.request.page = normalized_page
+            task.request.page_size = normalized_size
+            task.request.sort_by = sort_by
+            task.request.sort_order = sort_order
+
+        analysis_manager.update_task(task)
     except Exception as exc:  # pragma: no cover
         raise HTTPException(
             status_code=500,
@@ -688,13 +743,17 @@ async def clear_quotation_results(
     workspace_id: str, current_user: dict = Depends(get_current_user)
 ):
     user_id = current_user["id"]
-    removed = clear_analyses(user_id, workspace_id, task="quotation")
-    return {
-        "state": "successful",
-        "cleared": {
-            "analyses_removed": removed,
-        },
-    }
+    ws = workspace_manager.get_workspace(user_id, workspace_id)
+    if ws:
+        analysis_manager = getattr(ws, "analysis", None)
+        if not analysis_manager:
+            from ....analysis.manager import get_analysis_manager
+
+            analysis_manager = get_analysis_manager(user_id, workspace_id)
+
+        analysis_manager.clear_current_result("quotation")
+
+    return {"state": "successful", "cleared": ["quotation"]}
 
 
 @router.post("/{workspace_id}/nodes/{node_id}/quotation")
@@ -706,6 +765,16 @@ async def get_quotation(
 ):
     """Compute quotation rows with optional metadata join, sorting, and pagination."""
     user_id = current_user["id"]
+    ws = workspace_manager.get_workspace(user_id, workspace_id)
+    if not ws:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+
+    analysis_manager = getattr(ws, "analysis", None)
+    if not analysis_manager:
+        from ....analysis.manager import get_analysis_manager
+
+        analysis_manager = get_analysis_manager(user_id, workspace_id)
+
     try:
         node, node_data = get_node_with_data_or_400(user_id, workspace_id, node_id)
         engine = request.engine or QuotationEngineConfig()
@@ -733,9 +802,10 @@ async def get_quotation(
 
         context_length_pref = DEFAULT_CONTEXT_LENGTH
         try:
-            previous = get_latest_analysis(user_id, workspace_id, task="quotation")
-            if previous and isinstance(previous.result, dict):
-                context_length_pref = _extract_context_preference(previous.result)
+            prev_task = analysis_manager.get_current_task("quotation")
+            if prev_task and prev_task.result:
+                prev_result = prev_task.result.to_json()
+                context_length_pref = _extract_context_preference(prev_result)
         except Exception:  # pragma: no cover - best effort reuse
             context_length_pref = DEFAULT_CONTEXT_LENGTH
 
@@ -744,18 +814,60 @@ async def get_quotation(
             "preferences": {"context_length": context_length_pref},
         }
 
-        request_dict = request.model_dump()
-        request_dict.update({"node_id": node_id, "engine": engine.model_dump()})
-        try:  # best-effort persistence without caching rows
-            save_analysis(
-                user_id=user_id,
-                workspace_id=workspace_id,
-                task="quotation",
-                request_dict=_sanitize_request_for_storage(request_dict),
-                result_dict=result_payload,
-            )
-        except Exception:  # pragma: no cover - persistence failures ignored
-            pass
+        # Create new task
+        # We need to convert the API request model to our internal AnalysisRequest model
+        # They are slightly different (API request vs AnalysisRequest)
+        # But I defined AnalysisQuotationRequest to match API request mostly.
+
+        # The API request is `QuotationRequest` from `....models`.
+        # My new model is `AnalysisQuotationRequest` from `....analysis.implementations.quotation`.
+        # I should map them.
+
+        analysis_request = AnalysisQuotationRequest(
+            node_id=node_id,
+            column=request.column,
+            engine=request.engine,  # Assuming compatible
+            page=page,
+            page_size=page_size,
+            sort_by=sort_by,
+            sort_order=sort_order,
+            context_length=context_length_pref,
+        )
+
+        existing_task = analysis_manager.get_current_task("quotation")
+
+        if existing_task:
+            # Disallow changing the base request without an explicit clear.
+            # Compare core params
+            existing_req = existing_task.request
+            # We need to compare relevant fields.
+            # If node_id or column changed, it's a conflict.
+            if existing_req.node_id != node_id or existing_req.column != request.column:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Clear current quotation results before starting a new quotation analysis",
+                )
+
+            # Update existing task
+            existing_task.request = analysis_request
+            from ....analysis.results import GenericAnalysisResult
+
+            existing_task.complete(GenericAnalysisResult(result_payload))
+            analysis_manager.update_task(existing_task)
+
+        else:
+            # Create new task
+            from uuid import uuid4
+
+            task_id = str(uuid4())
+            analysis_request.task_id = task_id
+
+            task = analysis_manager.create_task("quotation", analysis_request)
+
+            from ....analysis.results import GenericAnalysisResult
+
+            task.complete(GenericAnalysisResult(result_payload))
+            analysis_manager.update_task(task)
 
         return result_payload
     except HTTPException:

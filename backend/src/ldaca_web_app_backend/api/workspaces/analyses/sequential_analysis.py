@@ -8,8 +8,12 @@ Exposes updated paths:
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from ....core.analysis_store import clear_analyses, get_latest_analysis, save_analysis
+from ....analysis.implementations.sequential_analysis import (
+    SequentialAnalysisRequest as AnalysisSequentialAnalysisRequest,
+)
+from ....analysis.results import GenericAnalysisResult
 from ....core.auth import get_current_user
+from ....core.workspace import workspace_manager
 from ....models import SequentialAnalysisRequest
 from ..utils import get_node_with_data_or_400
 
@@ -21,27 +25,31 @@ DEFAULT_CHART_TYPE = "line"
 SEQUENTIAL_TASK = "sequential_analysis"
 
 
-def _get_latest_record(user_id: str, workspace_id: str):
-    """Fetch the latest sequential analysis record under the canonical task name."""
-
-    return get_latest_analysis(user_id, workspace_id, task=SEQUENTIAL_TASK)
-
-
-def _clear_records(user_id: str, workspace_id: str) -> int:
-    """Remove sequential analysis records for the canonical task name."""
-
-    return clear_analyses(user_id, workspace_id, task=SEQUENTIAL_TASK)
-
-
 @router.get("/{workspace_id}/sequential-analysis/current-request")
 async def sequential_analysis_current_request(
     workspace_id: str, current_user: dict = Depends(get_current_user)
 ):
     user_id = current_user["id"]
-    rec = _get_latest_record(user_id, workspace_id)
-    if not rec:
+    ws = workspace_manager.get_workspace(user_id, workspace_id)
+    if not ws:
         return None
-    return {"state": "successful", "message": "ok", "data": rec.request}
+
+    analysis_manager = getattr(ws, "analysis", None)
+    if not analysis_manager:
+        from ....analysis.manager import get_analysis_manager
+
+        analysis_manager = get_analysis_manager(user_id, workspace_id)
+
+    task = analysis_manager.get_current_task(SEQUENTIAL_TASK)
+    if not task:
+        return None
+
+    req = (
+        task.request.model_dump()
+        if hasattr(task.request, "model_dump")
+        else task.request.dict()
+    )
+    return {"state": "successful", "message": "ok", "data": req}
 
 
 @router.get("/{workspace_id}/sequential-analysis/current-result")
@@ -49,10 +57,22 @@ async def sequential_analysis_current_result(
     workspace_id: str, current_user: dict = Depends(get_current_user)
 ):
     user_id = current_user["id"]
-    rec = _get_latest_record(user_id, workspace_id)
-    if not rec:
+    ws = workspace_manager.get_workspace(user_id, workspace_id)
+    if not ws:
         return None
-    stored_result = rec.result if isinstance(rec.result, dict) else {}
+
+    analysis_manager = getattr(ws, "analysis", None)
+    if not analysis_manager:
+        from ....analysis.manager import get_analysis_manager
+
+        analysis_manager = get_analysis_manager(user_id, workspace_id)
+
+    task = analysis_manager.get_current_task(SEQUENTIAL_TASK)
+    if not task or not task.result:
+        return None
+
+    stored_result = task.result.to_json()
+    stored_result = stored_result if isinstance(stored_result, dict) else {}
     chart_type = (
         stored_result.get("chart_type") if isinstance(stored_result, dict) else None
     )
@@ -73,6 +93,36 @@ async def run_sequential_analysis(
 ):
     """Run sequential analysis on a node with DocFrame integration."""
     user_id = current_user["id"]
+    ws = workspace_manager.get_workspace(user_id, workspace_id)
+    if not ws:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+
+    analysis_manager = getattr(ws, "analysis", None)
+    if not analysis_manager:
+        from ....analysis.manager import get_analysis_manager
+
+        analysis_manager = get_analysis_manager(user_id, workspace_id)
+
+    existing_task = analysis_manager.get_current_task(SEQUENTIAL_TASK)
+    if existing_task and existing_task.request:
+        try:
+            existing_req_dict = existing_task.request.model_dump()
+            current_req_dict = request.model_dump()
+            current_req_dict["node_id"] = node_id
+
+            # Remove task_id if present in existing request
+            existing_req_dict.pop("task_id", None)
+
+            if existing_req_dict != current_req_dict:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Clear current sequential analysis results before starting a new run",
+                )
+        except HTTPException:
+            raise
+        except Exception:
+            pass
+
     try:
         node, node_data = get_node_with_data_or_400(user_id, workspace_id, node_id)
 
@@ -211,15 +261,15 @@ async def run_sequential_analysis(
             numeric_interval=request.numeric_interval,
         )
 
-        previous_record = _get_latest_record(user_id, workspace_id)
         inherited_chart_type = DEFAULT_CHART_TYPE
-        if (
-            previous_record
-            and isinstance(previous_record.result, dict)
-            and isinstance(previous_record.result.get("chart_type"), str)
-            and previous_record.result["chart_type"] in VALID_CHART_TYPES
-        ):
-            inherited_chart_type = previous_record.result["chart_type"]
+        if existing_task and existing_task.result:
+            previous_result = existing_task.result.to_json()
+            if (
+                isinstance(previous_result, dict)
+                and isinstance(previous_result.get("chart_type"), str)
+                and previous_result["chart_type"] in VALID_CHART_TYPES
+            ):
+                inherited_chart_type = previous_result["chart_type"]
 
         if hasattr(sequential_result, "to_dicts"):
             result_payload = {
@@ -238,22 +288,21 @@ async def run_sequential_analysis(
 
         result_payload["chart_type"] = inherited_chart_type
 
-        try:  # best-effort persistence
-            req_dict = (
-                request.model_dump()
-                if hasattr(request, "model_dump")
-                else request.dict()
-            )
-            req_dict = {**req_dict, "node_id": node_id}
-            save_analysis(
-                user_id=user_id,
-                workspace_id=workspace_id,
-                task=SEQUENTIAL_TASK,
-                request_dict=req_dict,
-                result_dict=result_payload,
-            )
-        except Exception as _e:  # pragma: no cover
-            print(f"[analysis_persist] sequential_analysis save failed: {_e}")
+        # Create/Update task
+        req_dict = request.model_dump()
+        req_dict["node_id"] = node_id
+
+        req_model = AnalysisSequentialAnalysisRequest(**req_dict)
+
+        if existing_task:
+            task = existing_task
+            task.request = req_model
+            task.complete(GenericAnalysisResult(result_payload))
+            analysis_manager.update_task(task)
+        else:
+            task = analysis_manager.create_task(SEQUENTIAL_TASK, req_model)
+            task.complete(GenericAnalysisResult(result_payload))
+            analysis_manager.update_task(task)
 
         return result_payload
 
@@ -272,8 +321,27 @@ async def clear_sequential_analysis_results(
     workspace_id: str, current_user: dict = Depends(get_current_user)
 ):
     user_id = current_user["id"]
-    removed = _clear_records(user_id, workspace_id)
-    return {"state": "successful", "cleared": {"analyses_removed": removed}}
+    ws = workspace_manager.get_workspace(user_id, workspace_id)
+    if not ws:
+        return {"state": "successful", "cleared": {}}
+
+    analysis_manager = getattr(ws, "analysis", None)
+    if not analysis_manager:
+        from ....analysis.manager import get_analysis_manager
+
+        analysis_manager = get_analysis_manager(user_id, workspace_id)
+
+    analysis_manager.delete_task(SEQUENTIAL_TASK)
+
+    # Also clear cache using the old helper for now, as it handles in-memory caches
+    from ....core.analysis_admin import clear_analysis_cache_for
+
+    cache_removed = clear_analysis_cache_for(user_id, workspace_id)
+
+    return {
+        "state": "successful",
+        "cleared": {"analyses_removed": 1, "concordance_cache_removed": cache_removed},
+    }
 
 
 @router.post("/{workspace_id}/sequential-analysis/current-result")
@@ -283,12 +351,23 @@ async def update_sequential_analysis_current_result(
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    record = _get_latest_record(user_id, workspace_id)
-    if not record:
+    ws = workspace_manager.get_workspace(user_id, workspace_id)
+    if not ws:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+
+    analysis_manager = getattr(ws, "analysis", None)
+    if not analysis_manager:
+        from ....analysis.manager import get_analysis_manager
+
+        analysis_manager = get_analysis_manager(user_id, workspace_id)
+
+    task = analysis_manager.get_current_task(SEQUENTIAL_TASK)
+    if not task or not task.result:
         raise HTTPException(status_code=404, detail="No sequential analysis found")
 
-    request_payload = {**record.request} if isinstance(record.request, dict) else {}
-    result_payload = {**record.result} if isinstance(record.result, dict) else {}
+    result_payload = task.result.to_json()
+    if not isinstance(result_payload, dict):
+        result_payload = {}
 
     chart_type = result_payload.get("chart_type")
     if not isinstance(chart_type, str) or chart_type not in VALID_CHART_TYPES:
@@ -305,19 +384,9 @@ async def update_sequential_analysis_current_result(
 
     result_payload["chart_type"] = chart_type
 
-    try:
-        save_analysis(
-            user_id=user_id,
-            workspace_id=workspace_id,
-            task=SEQUENTIAL_TASK,
-            request_dict=request_payload,
-            result_dict=result_payload,
-        )
-    except Exception as exc:  # pragma: no cover
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to persist sequential analysis preferences: {exc}",
-        )
+    # Update result
+    task.result = GenericAnalysisResult(result_payload)
+    analysis_manager.update_task(task)
 
     return {
         "state": "successful",

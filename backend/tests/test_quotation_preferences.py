@@ -4,8 +4,11 @@ from unittest.mock import MagicMock
 
 import polars as pl
 import pytest
-from ldaca_web_app_backend.core.analysis_store import get_latest_analysis, save_analysis
+from ldaca_web_app_backend.analysis.implementations.quotation import QuotationRequest
+from ldaca_web_app_backend.analysis.manager import get_analysis_manager
+from ldaca_web_app_backend.analysis.results import GenericAnalysisResult
 from ldaca_web_app_backend.core.workspace import workspace_manager
+from ldaca_web_app_backend.models import QuotationEngineConfig
 
 USER_ID = "test"
 WORKSPACE_ID = "test-workspace"
@@ -13,50 +16,57 @@ TASK = "quotation"
 
 
 def _prime_workspace_state():
-    """Ensure the workspace manager exposes in-memory state for analysis_store."""
+    """Prime workspace state for AnalysisManager-backed tests."""
     base_df = pl.DataFrame({"text": ["alpha doc", "beta doc"]})
 
     class DummyWorkspace:
         def __init__(self, df):
             self._df = df
+            self.metadata = {}
 
         def get_node(self, node_id):
             return SimpleNamespace(id=node_id, data=self._df)
 
+        def set_metadata(self, key, value):
+            self.metadata[key] = value
+
     workspace_manager._current[USER_ID] = {  # type: ignore[attr-defined]
         "id": WORKSPACE_ID,
         "ws": DummyWorkspace(base_df),
+        "path": None,
     }
-    workspace_manager._ensure_analysis_state(USER_ID, WORKSPACE_ID)  # type: ignore[attr-defined]
 
 
 def _cleanup_workspace_state():
     workspace_manager._current.pop(USER_ID, None)  # type: ignore[attr-defined]
-    workspace_manager.drop_analysis_state(USER_ID, WORKSPACE_ID)
+    manager = get_analysis_manager(USER_ID, WORKSPACE_ID)
+    manager.clear_all()
 
 
 def _seed_paginated_analysis(rows: List[Dict[str, Any]], context_length: int = 15):
     _prime_workspace_state()
-    save_analysis(
-        user_id=USER_ID,
-        workspace_id=WORKSPACE_ID,
-        task=TASK,
-        request_dict={"node_id": "node-1", "column": "text"},
-        result_dict={
-            "data": [rows[0]] if rows else [],
-            "columns": list(rows[0].keys()) if rows else ["document_idx"],
-            "total_rows": len(rows),
-            "pagination": {
-                "page": 1,
-                "page_size": 1,
-                "total_pages": max(1, len(rows)),
-                "has_next": len(rows) > 1,
-                "has_prev": False,
-            },
-            "sorting": {"sort_by": "document_idx", "sort_order": "asc"},
-            "preferences": {"context_length": context_length},
+    manager = get_analysis_manager(USER_ID, WORKSPACE_ID)
+    request = QuotationRequest(node_id="node-1", column="text")
+    task = manager.create_task(TASK, request)
+
+    result_dict = {
+        "data": [rows[0]] if rows else [],
+        "columns": list(rows[0].keys()) if rows else ["document_idx"],
+        "total_rows": len(rows),
+        "pagination": {
+            "page": 1,
+            "page_size": 1,
+            "total_pages": max(1, len(rows)),
+            "has_next": len(rows) > 1,
+            "has_prev": False,
         },
-    )
+        "sorting": {"sort_by": "document_idx", "sort_order": "asc"},
+        "preferences": {"context_length": context_length},
+    }
+
+    result = GenericAnalysisResult(result_dict)
+    task.complete(result)
+    manager.update_task(task)
 
 
 @pytest.fixture
@@ -73,17 +83,18 @@ def seeded_paginated_quotation():
 @pytest.fixture
 def seeded_quotation_analysis():
     _prime_workspace_state()
-    save_analysis(
-        user_id=USER_ID,
-        workspace_id=WORKSPACE_ID,
-        task=TASK,
-        request_dict={"node_id": "node-1", "column": "text"},
-        result_dict={
-            "data": [],
-            "columns": [],
-            "preferences": {"context_length": 15},
-        },
-    )
+    manager = get_analysis_manager(USER_ID, WORKSPACE_ID)
+    request = QuotationRequest(node_id="node-1", column="text")
+    task = manager.create_task(TASK, request)
+
+    result = GenericAnalysisResult({
+        "data": [],
+        "columns": [],
+        "preferences": {"context_length": 15},
+    })
+    task.complete(result)
+    manager.update_task(task)
+
     yield
     _cleanup_workspace_state()
 
@@ -100,21 +111,23 @@ async def test_update_context_length_persists_preference(
     payload = response.json()
     assert payload["data"]["context_length"] == 42
 
-    record = get_latest_analysis(USER_ID, WORKSPACE_ID, task=TASK)
-    assert record is not None
-    assert record.result["preferences"]["context_length"] == 42
+    manager = get_analysis_manager(USER_ID, WORKSPACE_ID)
+    task = manager.get_current_task(TASK)
+    assert task is not None
+    assert task.result.data["preferences"]["context_length"] == 42
 
 
 @pytest.mark.asyncio
 async def test_update_context_length_clamps_bounds(authenticated_client):
     _prime_workspace_state()
-    save_analysis(
-        user_id=USER_ID,
-        workspace_id=WORKSPACE_ID,
-        task=TASK,
-        request_dict={"node_id": "node-1"},
-        result_dict={"data": [], "columns": []},
-    )
+
+    manager = get_analysis_manager(USER_ID, WORKSPACE_ID)
+    request = QuotationRequest(node_id="node-1", column="text")
+    task = manager.create_task(TASK, request)
+
+    result = GenericAnalysisResult({"data": [], "columns": []})
+    task.complete(result)
+    manager.update_task(task)
 
     try:
         high_response = await authenticated_client.post(
@@ -131,9 +144,13 @@ async def test_update_context_length_clamps_bounds(authenticated_client):
         assert low_response.status_code == 200
         assert low_response.json()["data"]["context_length"] == 0
 
-        record = get_latest_analysis(USER_ID, WORKSPACE_ID, task=TASK)
-        assert record is not None
-        assert record.result["preferences"]["context_length"] == 0
+        manager = get_analysis_manager(USER_ID, WORKSPACE_ID)
+        task = manager.get_current_task(TASK)
+        assert task is not None
+        assert task.result is not None
+        result = task.result.to_json()
+        assert isinstance(result, dict)
+        assert result["preferences"]["context_length"] == 0
     finally:
         _cleanup_workspace_state()
 
@@ -242,8 +259,9 @@ async def test_quotation_endpoint_recomputes_on_demand(
     workspace_manager._current[USER_ID] = {
         "id": WORKSPACE_ID,
         "ws": DummyWorkspace(base_df),
+        "path": None,
     }
-    workspace_manager._ensure_analysis_state(USER_ID, WORKSPACE_ID)
+    # No workspace-level analysis bucket; AnalysisManager holds in-memory state.
 
     recompute_called = False
 

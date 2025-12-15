@@ -4,10 +4,8 @@ Routes preserved exactly for backward compatibility."""
 import json
 from typing import Any, Dict, Optional
 
-from docworkspace.workspace.io import (
-    deserialize_workspace,  # type: ignore
-    serialize_workspace,
-)
+from docworkspace.workspace.io import deserialize_workspace  # type: ignore
+from docworkspace.workspace.io import serialize_workspace
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
 from ...core.auth import get_current_user
@@ -260,7 +258,7 @@ async def get_workspace_graph(
     if not graph_data:
         raise HTTPException(status_code=404, detail="Workspace not found")
     try:  # enrichment with latest analyses
-        from ...core.analysis_store import list_analyses  # type: ignore
+        from ....analysis.manager import get_analysis_manager
 
         def _unwrap_task_manager_result(result: Any) -> Any:
             """Unwrap ProcessTaskManager's persisted wrapper.
@@ -277,14 +275,19 @@ async def get_workspace_graph(
                 return unwrapped if unwrapped is not None else result
             return result
 
-        records = list_analyses(user_id, workspace_id)
+        analysis_manager = get_analysis_manager(user_id, workspace_id)
+        records = analysis_manager.get_all_tasks()
         latest: Dict[str, Any] = {}
         for r in records:
             raw_result = getattr(r, "result", None)
+            # If result is a GenericAnalysisResult, convert to dict
+            if hasattr(raw_result, "to_json"):
+                raw_result = raw_result.to_json()
+
             unwrapped_result = _unwrap_task_manager_result(raw_result)
-            latest[str(r.task)] = {
-                "task": str(r.task),
-                "saved_at": json_sanitize(getattr(r, "saved_at", None)),
+            latest[str(r.analysis_type)] = {
+                "task": str(r.analysis_type),
+                "saved_at": json_sanitize(getattr(r, "updated_at", None)),
                 "request": json_sanitize(getattr(r, "request", None)),
                 "result": json_sanitize(unwrapped_result),
             }

@@ -309,34 +309,23 @@ class ProcessTaskManager:
     ):
         """Save analysis result to analysis store."""
         try:
-            from ldaca_web_app_backend.core.analysis_store import (
-                get_latest_analysis,
-                save_analysis,
-            )
+            from ..analysis.manager import get_analysis_manager
+            from ..analysis.results import GenericAnalysisResult
 
-            # Get the original request to preserve it
-            existing = await asyncio.to_thread(
-                get_latest_analysis, user_id, workspace_id, task_type
-            )
-            req_dict = existing.request if existing else {}
-
-            result_payload = {
-                "status": "successful",
-                "message": f"{task_type} completed successfully",
-                "data": result,
-            }
-
-            # Save with the actual result
-            await asyncio.to_thread(
-                save_analysis,
-                user_id,
-                workspace_id,
-                task_type,
-                req_dict,
-                result_payload,
-            )
-
-            logger.info(f"{task_type} result saved for task {task_info.id}")
+            analysis_manager = get_analysis_manager(user_id, workspace_id)
+            if analysis_manager:
+                task = analysis_manager.get_task(task_info.id)
+                if task:
+                    # Update the task with result
+                    task.complete(GenericAnalysisResult(result))
+                    analysis_manager.update_task(task)
+                    logger.info(
+                        f"{task_type} result saved for task {task_info.id} via AnalysisManager"
+                    )
+                else:
+                    logger.warning(f"Task {task_info.id} not found in AnalysisManager")
+            else:
+                logger.error("AnalysisManager not available")
 
         except Exception as e:
             logger.error(

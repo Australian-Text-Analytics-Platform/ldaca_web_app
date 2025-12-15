@@ -1,13 +1,15 @@
 import asyncio
 import time
 from types import SimpleNamespace
+from uuid import uuid4
 
 import polars as pl
 import pytest
+from ldaca_web_app_backend.analysis.manager import get_analysis_manager
+from ldaca_web_app_backend.analysis.results import GenericAnalysisResult
 from ldaca_web_app_backend.api.workspaces.analyses.concordance import (
     DEFAULT_CONCORDANCE_PAGE_SIZE,
 )
-from ldaca_web_app_backend.core import analysis_store
 from ldaca_web_app_backend.core.worker import concordance_task
 from ldaca_web_app_backend.core.workspace import workspace_manager
 
@@ -61,35 +63,51 @@ def _simulate_concordance_completion(workspace_id: str, request_payload: dict):
         case_sensitive=request_payload.get("case_sensitive", False),
     )
 
-    record = analysis_store.get_latest_analysis(
-        "test", workspace_id, task="concordance"
-    )
-    assert record is not None
+    user_id = "test"
+    manager = get_analysis_manager(user_id, workspace_id)
+    task = manager.get_current_task("concordance")
+    if task is None:
+        task = manager.get_current_task("multi_concordance")
+    assert task is not None
 
-    analysis_store.save_analysis(
-        user_id="test",
-        workspace_id=workspace_id,
-        task="concordance",
-        request_dict=record.request,
-        result_dict={
-            "status": "successful",
-            "message": "Concordance analysis complete",
-            "data": worker_result,
-        },
-    )
+    result = GenericAnalysisResult(worker_result)
+    task.complete(result)
+    manager.update_task(task)
+
+
+def _clear_concordance_state(user_id: str, workspace_id: str):
+    manager = get_analysis_manager(user_id, workspace_id)
+    for task_type in ("concordance", "multi_concordance"):
+        manager.delete_task(task_type)
 
 
 @pytest.fixture(autouse=True)
 def _stub_task_manager(monkeypatch):
     class ImmediateTaskManager:
-        async def any_running(self, **_kwargs):  # pragma: no cover - trivial
-            return False
+        async def any_running(self, **kwargs):  # pragma: no cover - trivial
+            user_id = kwargs.get("user_id")
+            workspace_id = kwargs.get("workspace_id")
+            task_type = kwargs.get("task_type")
+            if not user_id or not workspace_id or not task_type:
+                return False
+            manager = get_analysis_manager(user_id, workspace_id)
+            task = manager.get_current_task(task_type)
+            if task is None:
+                return False
+            stored = task.result.to_json() if task.result else None
+            return isinstance(stored, dict) and stored == {}
 
-        async def latest_by_type(self, *args, **_kwargs):  # pragma: no cover
-            return None
+        async def latest_by_type(self, task_type, **kwargs):  # pragma: no cover
+            user_id = kwargs.get("user_id")
+            workspace_id = kwargs.get("workspace_id")
+            if not user_id or not workspace_id:
+                return None
+            manager = get_analysis_manager(user_id, workspace_id)
+            task = manager.get_current_task(task_type)
+            return SimpleNamespace(id=task.task_id) if task else None
 
         async def submit_task(self, **_kwargs):  # pragma: no cover
-            return SimpleNamespace(id="test-task")
+            return SimpleNamespace(id=f"test-task-{uuid4()}")
 
     def fake_get_task_manager(self, _user_id, _workspace_id):
         return ImmediateTaskManager()
@@ -103,8 +121,7 @@ def _stub_task_manager(monkeypatch):
 async def test_concordance_single_node_roundtrip(authenticated_client, workspace_id):
     """Single-node concordance should store results and expose current-request/result endpoints."""
     # Ensure clean state for this workspace/user
-    analysis_store.clear_analyses("test", workspace_id, task="concordance")
-    analysis_store.clear_analyses("test", workspace_id, task="multi_concordance")
+    _clear_concordance_state("test", workspace_id)
 
     df = pl.DataFrame({
         "text": [
@@ -184,17 +201,22 @@ async def test_concordance_single_node_roundtrip(authenticated_client, workspace
     assert "sort_order" not in current_req_payload["data"]
     assert "pagination" not in current_req_payload["data"]
 
-    record = analysis_store.get_latest_analysis(
-        "test", workspace_id, task="concordance"
+    manager = get_analysis_manager("test", workspace_id)
+    current_task = manager.get_current_task("concordance")
+    stored_request = (
+        current_task.request.model_dump()
+        if current_task and hasattr(current_task.request, "model_dump")
+        else {}
     )
-    assert record is not None
-    assert "page" not in record.request
-    assert "page_size" not in record.request
-    assert "pagination" not in record.request
-    stored_data = (
-        record.result.get("data", {}) if isinstance(record.result, dict) else {}
-    )
-    assert "node_results" in stored_data
+    assert "page" not in stored_request
+    assert "page_size" not in stored_request
+    assert "pagination" not in stored_request
+
+    task = manager.get_current_task("concordance")
+    assert task is not None
+    stored_result = task.result.to_json() if task.result else {}
+    assert isinstance(stored_result, dict)
+    assert "node_results" in stored_result
 
     # Request a smaller page size via POST (non-persistent override)
     current_res_post = await authenticated_client.post(
@@ -237,8 +259,7 @@ async def test_concordance_single_node_roundtrip(authenticated_client, workspace
 @pytest.mark.anyio
 async def test_concordance_multi_node_combined(authenticated_client, workspace_id):
     """Two-node concordance returns per-node results via async workflow."""
-    analysis_store.clear_analyses("test", workspace_id, task="concordance")
-    analysis_store.clear_analyses("test", workspace_id, task="multi_concordance")
+    _clear_concordance_state("test", workspace_id)
 
     df_left = pl.DataFrame({
         "text": ["alpha beta", "beta alpha", "gamma alpha"],
@@ -327,8 +348,7 @@ async def test_concordance_combined_toggle_after_separated_request(
     authenticated_client, workspace_id
 ):
     """Combined toggle requests should still return successful per-node data."""
-    analysis_store.clear_analyses("test", workspace_id, task="concordance")
-    analysis_store.clear_analyses("test", workspace_id, task="multi_concordance")
+    _clear_concordance_state("test", workspace_id)
 
     df_left = pl.DataFrame({
         "text": ["alpha beta", "beta alpha", "alpha gamma"],
@@ -402,8 +422,7 @@ async def test_concordance_combined_handles_mismatched_columns(
     authenticated_client, workspace_id
 ):
     """Mismatched node schemas still return per-node concordance data."""
-    analysis_store.clear_analyses("test", workspace_id, task="concordance")
-    analysis_store.clear_analyses("test", workspace_id, task="multi_concordance")
+    _clear_concordance_state("test", workspace_id)
 
     left_df = pl.DataFrame({
         "text": ["alpha beta", "beta alpha"],

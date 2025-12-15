@@ -1,6 +1,6 @@
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import Sidebar from '../Sidebar';
 import { SidebarProvider } from '@/components/ui/sidebar';
@@ -179,5 +179,35 @@ describe('Sidebar layout shell', () => {
     statusIcon = getIndicator();
     expect(statusIcon).toHaveClass('text-red-500');
     expect(screen.getAllByTestId('tasks-section').length).toBeGreaterThan(0);
+  });
+
+  it('disables non-data views and redirects when no workspace is loaded', async () => {
+    const user = userEvent.setup();
+    const setCurrentView = vi.fn();
+    workspaceDataState = { workspaceGraph: { nodes: [] }, currentWorkspaceId: null };
+    uiStoreState = {
+      currentView: 'token-frequency',
+      setCurrentView,
+      openFeedbackModal: vi.fn(),
+    };
+
+    renderSidebar();
+
+    const dataLoaderButtons = screen.getAllByRole('button', { name: /data loader/i });
+    const concordanceButtons = screen.getAllByRole('button', { name: /concordance/i });
+
+    expect(dataLoaderButtons[0]).not.toBeDisabled();
+    concordanceButtons.forEach((button) => {
+      expect(button).toBeDisabled();
+    });
+
+    expect(mockUseWorkspaceData).toHaveBeenCalled();
+    const lastWorkspaceCall = mockUseWorkspaceData.mock.results.at(-1)?.value;
+    expect(lastWorkspaceCall?.currentWorkspaceId ?? null).toBeNull();
+
+    await waitFor(() => expect(setCurrentView).toHaveBeenCalledWith('data-loader'));
+    const callsBefore = setCurrentView.mock.calls.length;
+    await user.click(concordanceButton);
+    expect(setCurrentView.mock.calls.length).toBe(callsBefore);
   });
 });

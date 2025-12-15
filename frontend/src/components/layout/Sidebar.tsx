@@ -174,6 +174,14 @@ const Sidebar: React.FC = () => {
     return total || 1;
   }, [collapsedSections, sectionHeights]);
 
+  const isWorkspaceLoaded = Boolean(currentWorkspaceId);
+
+  React.useEffect(() => {
+    if (!isWorkspaceLoaded && currentView !== 'data-loader') {
+      setCurrentView('data-loader');
+    }
+  }, [currentView, isWorkspaceLoaded, setCurrentView]);
+
   const getSectionFlexStyle = React.useCallback(
     (key: SectionKey) => {
       if (collapsedSections[key]) {
@@ -259,11 +267,18 @@ const Sidebar: React.FC = () => {
     <SidebarMenu>
       {NAV_ITEMS.map(({ id, label, icon: Icon }) => {
         const isQuotation = id === 'quotation';
+        const isDisabled = !isWorkspaceLoaded && id !== 'data-loader';
         return (
           <SidebarMenuItem key={id}>
             <SidebarMenuButton
               isActive={currentView === id}
-              onClick={() => setCurrentView(id)}
+              onClick={() => {
+                if (isDisabled) return;
+                setCurrentView(id);
+              }}
+              disabled={isDisabled}
+              aria-disabled={isDisabled}
+              tooltip={isDisabled ? 'Load a workspace to use this view' : undefined}
             >
               <Icon />
               <span>{label}</span>
@@ -274,9 +289,12 @@ const Sidebar: React.FC = () => {
                   <SidebarMenuAction
                     aria-label="Configure quotation engine"
                     showOnHover
+                    disabled={isDisabled}
+                    aria-disabled={isDisabled}
                     onClick={(event) => {
                       event.preventDefault();
                       event.stopPropagation();
+                      if (isDisabled) return;
                       openQuotationEngineDialog();
                     }}
                   >

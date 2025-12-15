@@ -90,8 +90,8 @@ const GraphEmptyState = () => (
       <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
         <Network className="h-6 w-6" />
       </div>
-      <CardTitle>No nodes in workspace</CardTitle>
-      <CardDescription>Add some data to your workspace to see the graph visualization</CardDescription>
+      <CardTitle>No workspace loaded</CardTitle>
+      <CardDescription>Open or create a workspace in Data Loader to see the graph.</CardDescription>
     </CardHeader>
   </Card>
 );

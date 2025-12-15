@@ -17,6 +17,7 @@ import polars as pl
 from docworkspace import Node, Workspace  # type: ignore
 from docworkspace.workspace.io import read_workspace  # type: ignore
 from docworkspace.workspace.io import write_workspace
+from ldaca_web_app_backend.analysis.manager import get_analysis_manager
 
 from .docworkspace_api import (
     DocWorkspaceAPIUtils,
@@ -40,8 +41,6 @@ class WorkspaceManager:
         self._current: Dict[str, Dict[str, Any]] = {}
         # Per-user/workspace task managers (not serialized)
         self._task_managers: Dict[tuple[str, str], Any] = {}
-        # In-memory analysis cache per user/workspace
-        self._analysis_state: Dict[tuple[str, str], Dict[str, Dict[str, Any]]] = {}
         # Track on-disk workspace folder paths per user/workspace
         self._paths: Dict[tuple[str, str], Path] = {}
 
@@ -69,20 +68,16 @@ class WorkspaceManager:
         except Exception:
             pass
 
-    def _analysis_key(self, user_id: str, workspace_id: str) -> tuple[str, str]:
-        return (user_id, workspace_id)
-
-    def _ensure_analysis_state(
-        self, user_id: str, workspace_id: str
-    ) -> Dict[str, Dict[str, Any]]:
-        key = self._analysis_key(user_id, workspace_id)
-        return self._analysis_state.setdefault(key, {})
+    def _attach_analysis_manager(self, user_id: str, workspace: Workspace) -> None:
+        """Attach analysis manager to workspace instance."""
+        try:
+            workspace.analysis = get_analysis_manager(user_id, workspace.id)
+        except Exception:
+            pass
 
     def _resolve_workspace_dir(
         self, user_id: str, workspace_id: str, workspace_name: str
     ) -> Path:
-        base = get_user_workspace_folder(user_id)
-
         cached = self._get_cached_path(user_id, workspace_id)
         if cached and cached.exists():
             updated = ensure_display_folder_name(cached, workspace_name)
@@ -99,18 +94,6 @@ class WorkspaceManager:
         allocated = allocate_workspace_folder(user_id, workspace_name)
         self._set_cached_path(user_id, workspace_id, allocated)
         return allocated
-
-    def get_analysis_state(
-        self, user_id: str, workspace_id: str
-    ) -> Dict[str, Dict[str, Any]]:
-        ws = self.get_workspace(user_id, workspace_id)
-        if ws is None:
-            raise ValueError("Workspace not found")
-        return self._ensure_analysis_state(user_id, workspace_id)
-
-    def drop_analysis_state(self, user_id: str, workspace_id: str) -> None:
-        key = self._analysis_key(user_id, workspace_id)
-        self._analysis_state.pop(key, None)
 
     def _save(self, user_id: str, workspace_id: str, workspace: Workspace) -> None:
         workspace.set_metadata("modified_at", datetime.now().isoformat())
@@ -138,7 +121,7 @@ class WorkspaceManager:
             updated_dir = ensure_display_folder_name(target_dir, ws.name)
             self._attach_workspace_dir(ws, updated_dir)
             self._set_cached_path(user_id, workspace_id, updated_dir)
-            self._ensure_analysis_state(user_id, workspace_id)
+            self._attach_analysis_manager(user_id, ws)
             return ws
         except Exception as e:  # pragma: no cover
             print(
@@ -157,7 +140,7 @@ class WorkspaceManager:
         new_path = self._resolve_workspace_dir(user_id, new_id, new_ws.name)
         self._attach_workspace_dir(new_ws, new_path)
         self._current[user_id] = {"id": new_id, "ws": new_ws, "path": new_path}
-        self._ensure_analysis_state(user_id, new_id)
+        self._attach_analysis_manager(user_id, new_ws)
 
     # ---------------- Public API ----------------
     def get_current_workspace_id(self, user_id: str) -> Optional[str]:
@@ -173,12 +156,14 @@ class WorkspaceManager:
             cid, cws, _ = self._get_current_entry(user_id)
             if cid and cws:
                 self._save(user_id, cid, cws)
-                self.drop_analysis_state(user_id, cid)
+                # Analysis state is now managed by AnalysisManager attached to workspace
             self._current.pop(user_id, None)
             return True
         cid, cws, _ = self._get_current_entry(user_id)
         if cid == workspace_id and cws is not None:
-            self._ensure_analysis_state(user_id, workspace_id)
+            # Ensure analysis manager is attached if it was somehow lost (e.g. reload)
+            if not getattr(cws, "analysis", None):
+                self._attach_analysis_manager(user_id, cws)
             return True
         new_ws = self._load(user_id, workspace_id)
         if not new_ws:
@@ -209,7 +194,7 @@ class WorkspaceManager:
         write_workspace(ws, target_dir)
         self._set_cached_path(user_id, wid, target_dir)
         self._current[user_id] = {"id": wid, "ws": ws, "path": target_dir}
-        self._ensure_analysis_state(user_id, wid)
+        self._attach_analysis_manager(user_id, ws)
         return ws
 
     def get_workspace(self, user_id: str, workspace_id: str) -> Optional[Any]:
@@ -219,7 +204,7 @@ class WorkspaceManager:
                 cached = self._get_cached_path(user_id, workspace_id)
                 if cached:
                     self._attach_workspace_dir(cws, cached)
-                self._ensure_analysis_state(user_id, workspace_id)
+                self._attach_analysis_manager(user_id, cws)
             return cws
         ws = self._load(user_id, workspace_id)
         if not ws:
@@ -286,13 +271,11 @@ class WorkspaceManager:
             except Exception:
                 pass
             self._current.pop(user_id, None)
-            self.drop_analysis_state(user_id, cid)
         target_dir = self._get_cached_path(
             user_id, workspace_id
         ) or find_workspace_folder_by_id(user_id, workspace_id)
         if target_dir and target_dir.exists():
             shutil.rmtree(target_dir, ignore_errors=True)
-            self.drop_analysis_state(user_id, workspace_id)
             self._paths.pop(self._path_key(user_id, workspace_id), None)
             return True
         return False
@@ -330,7 +313,6 @@ class WorkspaceManager:
         if save:
             self._save(user_id, cid, cws)
         self._current.pop(user_id, None)
-        self.drop_analysis_state(user_id, cid)
         return True
 
     # ---------------- Node operations ----------------
@@ -473,6 +455,12 @@ class WorkspaceManager:
         if ws is not None:
             self._save(user_id, workspace_id, ws)
 
+
+# Global singleton
+workspace_manager = WorkspaceManager()
+
+# Global singleton
+workspace_manager = WorkspaceManager()
 
 # Global singleton
 workspace_manager = WorkspaceManager()

@@ -41,6 +41,7 @@ class Workspace:
         self.description: str = ""
         self.created_at: Optional[str] = None
         self.modified_at: Optional[str] = None
+        self.analysis: Any = None  # Placeholder for analysis storage/manager
         if data is not None:
             self._load_initial_data(data, data_name, csv_lazy, **csv_kwargs)
 

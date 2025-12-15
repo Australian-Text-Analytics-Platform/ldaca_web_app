@@ -10,14 +10,16 @@ Behavior preserved verbatim; only relocation for modular clarity.
 
 from __future__ import annotations
 
-import asyncio
 from typing import Dict
 
 from fastapi import APIRouter, Depends, HTTPException
 
 from docframe import DocDataFrame, DocLazyFrame
 
-from ....core.analysis_admin import clear_analyses_and_cache
+from ....analysis.implementations.topic_modeling import (
+    TopicModelingRequest as AnalysisTopicModelingRequest,
+)
+from ....analysis.models import AnalysisStatus
 from ....core.auth import get_current_user
 from ....core.json_utils import json_sanitize
 from ....core.workspace import workspace_manager
@@ -31,19 +33,29 @@ async def topic_modeling_current_request(
     workspace_id: str, current_user: dict = Depends(get_current_user)
 ):
     user_id = current_user["id"]
-    try:
-        from ldaca_web_app_backend.core.analysis_store import get_latest_analysis
-    except Exception as e:  # pragma: no cover
-        raise HTTPException(status_code=500, detail=f"analysis_store unavailable: {e}")
-    rec = await asyncio.to_thread(
-        get_latest_analysis, user_id, workspace_id, "topic_modeling"
-    )
-    if not rec:
+    ws = workspace_manager.get_workspace(user_id, workspace_id)
+    if not ws:
         return None
+
+    analysis_manager = getattr(ws, "analysis", None)
+    if not analysis_manager:
+        from ....analysis.manager import get_analysis_manager
+
+        analysis_manager = get_analysis_manager(user_id, workspace_id)
+
+    task = analysis_manager.get_current_task("topic_modeling")
+    if not task:
+        return None
+
+    req = (
+        task.request.model_dump()
+        if hasattr(task.request, "model_dump")
+        else task.request.dict()
+    )
     return {
         "state": "successful",
         "message": "ok",
-        "data": json_sanitize(rec.request),
+        "data": json_sanitize(req),
     }
 
 
@@ -53,16 +65,22 @@ async def topic_modeling_current_result(
 ):
     """Get current topic modeling result - read-only endpoint."""
     user_id = current_user["id"]
-    try:
-        from ldaca_web_app_backend.core.analysis_store import get_latest_analysis
-    except Exception as e:  # pragma: no cover
-        raise HTTPException(status_code=500, detail=f"analysis_store unavailable: {e}")
+    ws = workspace_manager.get_workspace(user_id, workspace_id)
+    if not ws:
+        return None
 
-    rec = await asyncio.to_thread(
-        get_latest_analysis, user_id, workspace_id, "topic_modeling"
-    )
-    if rec and getattr(rec, "result", None):
-        result = rec.result
+    analysis_manager = getattr(ws, "analysis", None)
+    if not analysis_manager:
+        from ....analysis.manager import get_analysis_manager
+
+        analysis_manager = get_analysis_manager(user_id, workspace_id)
+
+    task = analysis_manager.get_current_task("topic_modeling")
+    if not task:
+        return None
+
+    if task.result:
+        result = task.result.to_json()
         if isinstance(result, dict) and "data" in result:
             return {
                 "state": result.get("state", result.get("status", "successful")),
@@ -71,21 +89,13 @@ async def topic_modeling_current_result(
             }
         return {"state": "successful", "message": "ok", "data": json_sanitize(result)}
 
-    tm = workspace_manager.get_task_manager(user_id, workspace_id)
-    latest = await tm.latest_by_type(
-        "topic_modeling", user_id=user_id, workspace_id=workspace_id
-    )
-    if latest is None:
-        return None
-    status_val = (
-        latest.status.value if hasattr(latest.status, "value") else str(latest.status)
-    )
-    if status_val == "running":
+    # If task exists but no result, check status
+    if task.status == AnalysisStatus.RUNNING:
         return {"state": "running", "message": "Task is still running", "data": None}
-    if status_val == "failed":
+    if task.status == AnalysisStatus.FAILED:
         return {
             "state": "failed",
-            "message": latest.error or "Task failed",
+            "message": "Task failed",
             "data": None,
         }
     return {
@@ -101,11 +111,17 @@ async def clear_topic_modeling_results(
 ):
     """Clear persisted topic modeling analyses for the workspace."""
     user_id = current_user["id"]
+    ws = workspace_manager.get_workspace(user_id, workspace_id)
+    if ws:
+        analysis_manager = getattr(ws, "analysis", None)
+        if not analysis_manager:
+            from ....analysis.manager import get_analysis_manager
 
-    summary = await clear_analyses_and_cache(
-        user_id, workspace_id, task="topic_modeling"
-    )
-    return {"state": "successful", "cleared": summary}
+            analysis_manager = get_analysis_manager(user_id, workspace_id)
+
+        analysis_manager.clear_current_result("topic_modeling")
+
+    return {"state": "successful", "cleared": ["topic_modeling"]}
 
 
 @router.post(
@@ -129,6 +145,34 @@ async def run_topic_modeling(
             status_code=400, detail="Maximum of 2 nodes can be compared"
         )
     tm = workspace_manager.get_task_manager(user_id, workspace_id)
+
+    ws = workspace_manager.get_workspace(user_id, workspace_id)
+    if not ws:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+
+    analysis_manager = getattr(ws, "analysis", None)
+    if not analysis_manager:
+        from ....analysis.manager import get_analysis_manager
+
+        analysis_manager = get_analysis_manager(user_id, workspace_id)
+
+    existing_task = analysis_manager.get_current_task("topic_modeling")
+    if existing_task:
+        # Check if running
+        if existing_task.status == AnalysisStatus.RUNNING:
+            return {
+                "state": "running",
+                "message": "Topic modeling already running",
+                "data": None,
+                "metadata": {"task_id": existing_task.task_id},
+            }
+
+        # If completed, require clear
+        raise HTTPException(
+            status_code=409,
+            detail="Clear current topic modeling results before starting a new run",
+        )
+
     try:
         if await tm.any_running(
             task_type="topic_modeling", user_id=user_id, workspace_id=workspace_id
@@ -145,11 +189,6 @@ async def run_topic_modeling(
     except Exception:
         pass
     try:
-        workspace = workspace_manager.get_workspace(user_id, workspace_id)
-        if not workspace:
-            raise HTTPException(
-                status_code=404, detail=f"Workspace {workspace_id} not found"
-            )
         node_columns = request.node_columns or {}
         validated_columns: Dict[str, str] = {}
         for node_id in request.node_ids:
@@ -208,19 +247,18 @@ async def run_topic_modeling(
                 "use_ctfidf": bool(request.use_ctfidf),
             },
         )
-        try:  # persist request
-            from ldaca_web_app_backend.core.analysis_store import save_analysis
 
-            req_dict = (
-                request.model_dump()
-                if hasattr(request, "model_dump")
-                else request.dict()
-            )
-            await asyncio.to_thread(
-                save_analysis, user_id, workspace_id, "topic_modeling", req_dict, {}
-            )
-        except Exception as _e:  # pragma: no cover
-            print(f"[analysis_persist] save running request failed: {_e}")
+        # Create AnalysisTask
+        analysis_request = AnalysisTopicModelingRequest(
+            task_id=task_info.id,
+            node_ids=request.node_ids,
+            node_columns=validated_columns,
+            min_topic_size=request.min_topic_size,
+            use_ctfidf=request.use_ctfidf,
+        )
+
+        analysis_manager.create_task("topic_modeling", analysis_request)
+
     except HTTPException:
         raise
     except Exception as e:
@@ -235,5 +273,7 @@ async def run_topic_modeling(
 
 __all__ = ["router"]
 
+
+__all__ = ["router"]
 
 __all__ = ["router"]

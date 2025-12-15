@@ -5,23 +5,22 @@ Parametrized and comprehensive tests for analysis persistence.
 from types import SimpleNamespace
 
 import pytest
+from ldaca_web_app_backend.analysis.manager import get_analysis_manager
+from ldaca_web_app_backend.analysis.results import GenericAnalysisResult
 from ldaca_web_app_backend.api.workspaces.analyses.token_frequencies import (
     DEFAULT_TOKEN_LIMIT,
     MAX_SERVER_TOKEN_LIMIT,
     SERVER_LIMIT_MULTIPLIER,
 )
-from ldaca_web_app_backend.core import analysis_store
-from ldaca_web_app_backend.core.analysis_store import list_analyses
 from ldaca_web_app_backend.core.worker import token_frequencies_task
 from ldaca_web_app_backend.core.workspace import workspace_manager
 
 
 def _simulate_token_frequency_completion(workspace_id: str):
-    record = analysis_store.get_latest_analysis(
-        "test", workspace_id, task="token_frequencies"
-    )
-    assert record is not None
-    req = record.request or {}
+    manager = get_analysis_manager("test", workspace_id)
+    task = manager.get_current_task("token_frequencies")
+    assert task is not None
+    req = task.request.model_dump() if hasattr(task.request, "model_dump") else {}
     worker_result = token_frequencies_task(
         user_id="test",
         workspace_id=workspace_id,
@@ -30,17 +29,28 @@ def _simulate_token_frequency_completion(workspace_id: str):
         token_limit=req.get("token_limit") or DEFAULT_TOKEN_LIMIT,
         stop_words=req.get("stop_words") or [],
     )
-    analysis_store.save_analysis(
-        user_id="test",
-        workspace_id=workspace_id,
-        task="token_frequencies",
-        request_dict=req,
-        result_dict={
-            "status": "successful",
-            "message": "token_frequencies completed successfully",
-            "data": worker_result,
-        },
-    )
+    task.complete(GenericAnalysisResult(worker_result))
+    manager.update_task(task)
+
+
+def _list_analysis_records(user_id: str, workspace_id: str, task: str | None = None):
+    manager = get_analysis_manager(user_id, workspace_id)
+    tasks = manager.get_all_tasks()
+    if task:
+        tasks = [t for t in tasks if t.analysis_type == task]
+    tasks.sort(key=lambda t: t.updated_at or t.created_at)
+
+    def _to_record(t):
+        req = t.request.model_dump() if hasattr(t.request, "model_dump") else t.request
+        res = t.result.to_json() if hasattr(t.result, "to_json") else t.result
+        return SimpleNamespace(
+            task=t.analysis_type,
+            saved_at=(t.updated_at or t.created_at).isoformat(),
+            request=req,
+            result=res,
+        )
+
+    return [_to_record(t) for t in tasks]
 
 
 @pytest.fixture(autouse=True)
@@ -148,7 +158,7 @@ class TestParametrizedAnalysisPersistence:
             assert result_data.get("state") == "successful"
 
         # And: An analysis record was persisted
-        analyses = list_analyses(test_user["id"], workspace_id)
+        analyses = _list_analysis_records(test_user["id"], workspace_id)
         assert len(analyses) == 1
 
         record = analyses[0]
@@ -302,7 +312,7 @@ class TestAnalysisDataIntegrity:
         assert final.get("analysis_params", {}).get("token_limit") == expected_limit
 
         # Then: The persisted request is present and includes default limit/stop_words
-        analyses = list_analyses(test_user["id"], workspace_id)
+        analyses = _list_analysis_records(test_user["id"], workspace_id)
         assert analyses
         assert analyses[0].request.get("token_limit") == expected_limit
         assert "limit" not in analyses[0].request
@@ -430,7 +440,7 @@ emoji test 🚀 🎉 💫"""
         )
         assert metadata.get("token_limit") == DEFAULT_TOKEN_LIMIT
         assert metadata.get("server_limit") == expected_server_limit
-        analyses = list_analyses(test_user["id"], workspace_id)
+        analyses = _list_analysis_records(test_user["id"], workspace_id)
         assert len(analyses) == 1
         assert analyses[0].request.get("token_limit") == DEFAULT_TOKEN_LIMIT
         assert "limit" not in analyses[0].request

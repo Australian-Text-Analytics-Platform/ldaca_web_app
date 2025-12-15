@@ -115,6 +115,7 @@ const ConcordanceFeature: React.FC = () => {
   const [combinedPage, setCombinedPage] = useState(1);
   const [combinedPageSize] = useState(20);
   const [combinedLoading, setCombinedLoading] = useState(false);
+  const [combinedPageInput, setCombinedPageInput] = useState('1');
 
   // Map any node's id/name variants to its assigned color (used in combined table)
   const sourceColorMap = useMemo(() => {
@@ -158,6 +159,7 @@ const ConcordanceFeature: React.FC = () => {
     sortBy: string;
     sortOrder: 'asc' | 'desc';
   }>>({});
+  const [nodePageInputs, setNodePageInputs] = useState<Record<string, string>>({});
   
   // Individual node loading states for pagination/sorting (separate from main search)
   const [nodeLoading, setNodeLoading] = useState<Record<string, boolean>>({});
@@ -843,6 +845,27 @@ const ConcordanceFeature: React.FC = () => {
     }
   }, [viewMode, results, combinedPage, combinedPageSize, updateStoredResult]);
 
+  useEffect(() => {
+    setCombinedPageInput(String(combinedPage));
+  }, [combinedPage]);
+
+  useEffect(() => {
+    setNodePageInputs((prev) => {
+      const next: Record<string, string> = {};
+      Object.entries(nodePagination).forEach(([key, value]) => {
+        next[key] = String(value.currentPage ?? 1);
+      });
+
+      const prevKeys = Object.keys(prev);
+      const nextKeys = Object.keys(next);
+      const changed =
+        prevKeys.length !== nextKeys.length ||
+        nextKeys.some((key) => prev[key] !== next[key]);
+
+      return changed ? next : prev;
+    });
+  }, [nodePagination]);
+
   const handleSort = (columnName: string, nodeKey: string, requestNodeId?: string) => {
     const currentNodePagination = nodePagination[nodeKey] || {
       currentPage: 1,
@@ -1161,6 +1184,11 @@ const ConcordanceFeature: React.FC = () => {
       const rows = nodeData.data || [];
       const columns: string[] = nodeData.columns || [];
       const combinedSorting = nodeData.sorting || { sort_by: '', sort_order: 'asc' };
+      const combinedTotalPages = nodeData.pagination?.total_pages ?? 1;
+      const parsedCombinedInput = parseInt(combinedPageInput, 10);
+      const combinedTargetPage = Number.isFinite(parsedCombinedInput)
+        ? Math.min(Math.max(parsedCombinedInput, 1), combinedTotalPages)
+        : null;
       const handleCombinedSort = (col: string) => {
         const isSame = combinedSorting.sort_by === col;
         const nextOrder: 'asc'|'desc' = isSame && combinedSorting.sort_order === 'asc' ? 'desc' : 'asc';
@@ -1295,6 +1323,31 @@ const ConcordanceFeature: React.FC = () => {
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
                 <div className="text-sm text-gray-600">Page {combinedPage} of {nodeData.pagination.total_pages}</div>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="number"
+                    min={1}
+                    max={nodeData.pagination.total_pages}
+                    value={combinedPageInput}
+                    onChange={(e) => setCombinedPageInput(e.target.value)}
+                    className="w-20 rounded-md border border-input bg-background px-2 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    aria-label="Go to combined page"
+                  />
+                  <Button
+                    onClick={() => {
+                      if (combinedTargetPage === null) {
+                        setCombinedPageInput('');
+                        return;
+                      }
+                      setCombinedPage(combinedTargetPage);
+                    }}
+                    disabled={!combinedPageInput.trim() || combinedTargetPage === null || combinedTargetPage === combinedPage}
+                    variant="outline"
+                    size="sm"
+                  >
+                    Go
+                  </Button>
+                </div>
                 <Button
                   onClick={() => combinedPage < nodeData.pagination.total_pages && setCombinedPage(p => p+1)}
                   disabled={combinedPage >= nodeData.pagination.total_pages}
@@ -1333,6 +1386,12 @@ const ConcordanceFeature: React.FC = () => {
     const currentNodePagination = nodePagination[paginationKey];
     const currentPage = currentNodePagination?.currentPage ?? 1;
     const nodeIsLoading = Boolean(nodeLoading[paginationKey]);
+    const nodePageInput = nodePageInputs[paginationKey] ?? String(currentPage);
+    const totalPages = nodeData.pagination?.total_pages ?? 1;
+    const parsedNodeInput = parseInt(nodePageInput, 10);
+    const targetNodePage = Number.isFinite(parsedNodeInput)
+      ? Math.min(Math.max(parsedNodeInput, 1), totalPages)
+      : null;
     const detachingKey = detachNodeId ?? "";
     const isDetaching = detachingKey ? Boolean(nodeDetaching[detachingKey]) : false;
 
@@ -1420,6 +1479,32 @@ const ConcordanceFeature: React.FC = () => {
                 <div className="mr-2 inline-block h-3 w-3 animate-spin rounded-full border-b border-muted-foreground"></div>
               )}
               Page {currentPage} of {nodeData.pagination.total_pages}
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <input
+                type="number"
+                min={1}
+                max={nodeData.pagination.total_pages}
+                value={nodePageInput}
+                onChange={(e) => setNodePageInputs((prev) => ({ ...prev, [paginationKey]: e.target.value }))}
+                className="w-20 rounded-md border border-input bg-background px-2 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                aria-label={`Go to page for ${nodeKey}`}
+              />
+              <Button
+                onClick={() => {
+                  if (targetNodePage === null) {
+                    setNodePageInputs((prev) => ({ ...prev, [paginationKey]: '' }));
+                    return;
+                  }
+                  handlePageChange(targetNodePage, paginationKey, requestNodeId);
+                }}
+                disabled={!nodePageInput.trim() || targetNodePage === null || targetNodePage === currentPage || nodeIsLoading}
+                variant="outline"
+                size="sm"
+              >
+                Go
+              </Button>
             </div>
             
             <Button

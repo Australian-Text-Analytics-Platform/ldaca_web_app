@@ -333,19 +333,6 @@ def mock_google_token():
     }
 
 
-@pytest.fixture
-def mock_datetime():
-    """Mock datetime.utcnow for deterministic timestamps used by analysis_store."""
-    from datetime import datetime
-    from unittest.mock import patch
-
-    fixed_time = datetime(2024, 1, 15, 12, 30, 45)
-    with patch("ldaca_web_app_backend.core.analysis_store.datetime") as mock_dt:
-        mock_dt.utcnow.return_value = fixed_time
-        mock_dt.now.return_value = fixed_time
-        yield fixed_time
-
-
 # Test data constants
 SAMPLE_DATAFRAME_DATA = [
     {"name": "Alice", "age": 25, "city": "New York"},

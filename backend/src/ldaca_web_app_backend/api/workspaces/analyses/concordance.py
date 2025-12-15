@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import time
 from typing import Any, Dict, List, Optional, Tuple
@@ -70,50 +69,6 @@ This module supports the worker-backed `data.node_results` schema stored in
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/workspaces", tags=["concordance"])
-
-
-# ---------------------------------------------------------------------------
-# In-memory concordance cache (moved from base.py lines ~125-158, 549-558)
-# ---------------------------------------------------------------------------
-CONCORDANCE_CACHE: Dict[Tuple[str, str, str, str, str, int, int, bool, bool], dict] = {}
-
-
-def _concordance_cache_key(
-    user_id: str,
-    workspace_id: str,
-    node_id: str,
-    column: str,
-    search_word: str,
-    num_left_tokens: int,
-    num_right_tokens: int,
-    regex: bool,
-    case_sensitive: bool,
-):
-    return (
-        user_id,
-        workspace_id,
-        node_id,
-        column,
-        search_word,
-        num_left_tokens,
-        num_right_tokens,
-        regex,
-        case_sensitive,
-    )
-
-
-def _get_cached_concordance_df(key):  # pragma: no cover - simple accessor
-    entry = CONCORDANCE_CACHE.get(key)
-    if not entry:
-        return None
-    return entry.get("df")
-
-
-def _store_concordance_df(key, df):  # pragma: no cover
-    CONCORDANCE_CACHE[key] = {"df": df, "created": time.time()}
-
-
-## Cache clearing now handled by analysis_admin.clear_concordance_cache_for
 
 
 # ---------------------------------------------------------------------------
@@ -228,8 +183,29 @@ async def run_concordance(
 ):
     user_id = current_user["id"]
     tm = workspace_manager.get_task_manager(user_id, workspace_id)
+    ws = workspace_manager.get_workspace(user_id, workspace_id)
+    if not ws:
+        raise HTTPException(status_code=404, detail="Workspace not found")
 
-    # Check if already running
+    analysis_manager = getattr(ws, "analysis", None)
+    if not analysis_manager:
+        from ....analysis.manager import get_analysis_manager
+
+        analysis_manager = get_analysis_manager(user_id, workspace_id)
+
+    existing_task = analysis_manager.get_current_task("concordance")
+    if existing_task and existing_task.status == "running":
+        if await tm.any_running(
+            task_type="concordance", user_id=user_id, workspace_id=workspace_id
+        ):
+            return {
+                "state": "running",
+                "message": "Concordance analysis already running",
+                "data": None,
+                "metadata": {"task_id": existing_task.task_id},
+            }
+
+    # Safety net: if the task manager thinks something is running, return it.
     if await tm.any_running(
         task_type="concordance", user_id=user_id, workspace_id=workspace_id
     ):
@@ -308,16 +284,21 @@ async def run_concordance(
             },
         )
 
-        # Persist request
-        from ....core.analysis_store import save_analysis
+        # Persist request as the single "current" run for this analysis.
+        from ....analysis.implementations.concordance import ConcordanceRequest
 
-        req_dict = (
-            request.model_dump() if hasattr(request, "model_dump") else request.dict()
+        analysis_request = ConcordanceRequest(
+            task_id=task_info.id,
+            node_ids=request.node_ids,
+            node_columns=validated_columns,
+            search_word=request.search_word,
+            num_left_tokens=request.num_left_tokens,
+            num_right_tokens=request.num_right_tokens,
+            regex=request.regex,
+            case_sensitive=request.case_sensitive,
         )
-        req_dict = _sanitize_request_for_storage(req_dict)
-        await asyncio.to_thread(
-            save_analysis, user_id, workspace_id, "concordance", req_dict, {}
-        )
+
+        analysis_manager.create_task("concordance", analysis_request)
 
         return {
             "state": "running",
@@ -334,16 +315,27 @@ async def concordance_current_request(
     workspace_id: str, current_user: dict = Depends(get_current_user)
 ):
     user_id = current_user["id"]
-    try:
-        from ....core.analysis_store import get_latest_analysis
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"analysis_store unavailable: {e}")
-    rec = get_latest_analysis(user_id, workspace_id, task="concordance")
-    if not rec:
-        rec = get_latest_analysis(user_id, workspace_id, task="multi_concordance")
-    if not rec:
+    ws = workspace_manager.get_workspace(user_id, workspace_id)
+    if not ws:
         return None
-    normalized_request = _normalize_saved_request(rec.request)
+
+    analysis_manager = getattr(ws, "analysis", None)
+    if not analysis_manager:
+        from ....analysis.manager import get_analysis_manager
+
+        analysis_manager = get_analysis_manager(user_id, workspace_id)
+
+    task = analysis_manager.get_current_task("concordance")
+    if not task:
+        return None
+
+    # Convert request model to dict for response
+    req_dict = (
+        task.request.model_dump()
+        if hasattr(task.request, "model_dump")
+        else task.request.dict()
+    )
+    normalized_request = _normalize_saved_request(req_dict)
     if not normalized_request:
         return None
     return {"state": "successful", "message": "ok", "data": normalized_request}
@@ -492,22 +484,62 @@ async def concordance_current_result(
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    try:
-        from ....core.analysis_store import get_latest_analysis
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"analysis_store unavailable: {e}")
-    rec = get_latest_analysis(user_id, workspace_id, task="concordance")
-    if not rec:
-        rec = get_latest_analysis(user_id, workspace_id, task="multi_concordance")
-    if not rec:
+    ws = workspace_manager.get_workspace(user_id, workspace_id)
+    if not ws:
         return None
 
-    result_data = rec.result.get("data") if isinstance(rec.result, dict) else None
-    if not isinstance(result_data, dict) or "node_results" not in result_data:
+    analysis_manager = getattr(ws, "analysis", None)
+    if not analysis_manager:
+        from ....analysis.manager import get_analysis_manager
+
+        analysis_manager = get_analysis_manager(user_id, workspace_id)
+
+    task = analysis_manager.get_current_task("concordance")
+    if not task:
         return None
 
-    normalized_request = _normalize_saved_request(rec.request) or {}
+    # If task is running, check if it finished in TM
+    if task.status == "running":
+        tm = workspace_manager.get_task_manager(user_id, workspace_id)
+        tm_task = await tm.get_task(task.task_id)
+        if tm_task:
+            if tm_task.status == "successful":
+                # Task finished, update result
+                # Result from TM is likely a dict with node_results
+                result_data = tm_task.result
+
+                from ....analysis.results import GenericAnalysisResult
+
+                task.complete(GenericAnalysisResult(result_data))
+                analysis_manager.update_task(task)
+
+            elif tm_task.status == "failed":
+                task.fail(tm_task.error or "Task failed")
+                analysis_manager.update_task(task)
+                return None  # Or return error info?
+
+    if not task.result:
+        return None
+
+    # Process result for response
+    # The result data is in task.result.data (if GenericAnalysisResult)
+    result_data = task.result.to_json()
+
+    # Need request for pagination params
+    req_dict = (
+        task.request.model_dump()
+        if hasattr(task.request, "model_dump")
+        else task.request.dict()
+    )
+    normalized_request = _normalize_saved_request(req_dict) or {}
     _apply_result_query_overrides(normalized_request, query)
+
+    # result_data should be the dict with "node_results"
+    if not isinstance(result_data, dict) or "node_results" not in result_data:
+        # Maybe it's the old format or something else?
+        # If it's GenericAnalysisResult, it returns self.data.
+        pass
+
     return _process_dataframe_result(result_data, normalized_request)
 
 
@@ -518,30 +550,65 @@ async def concordance_current_result_post(
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    try:
-        from ....core.analysis_store import get_latest_analysis
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"analysis_store unavailable: {e}")
-    rec = get_latest_analysis(user_id, workspace_id, task="concordance")
-    if not rec:
-        rec = get_latest_analysis(user_id, workspace_id, task="multi_concordance")
-    if not rec or not rec.request:
+    ws = workspace_manager.get_workspace(user_id, workspace_id)
+    if not ws:
+        return None
+
+    analysis_manager = getattr(ws, "analysis", None)
+    if not analysis_manager:
+        from ....analysis.manager import get_analysis_manager
+
+        analysis_manager = get_analysis_manager(user_id, workspace_id)
+
+    task = analysis_manager.get_current_task("concordance")
+    if not task:
         return {
             "state": "failed",
             "message": "No analysis found for concordance",
             "data": None,
         }
 
-    result_data = rec.result.get("data") if isinstance(rec.result, dict) else None
-    if not isinstance(result_data, dict) or "node_results" not in result_data:
+    # If task is running, check if it finished in TM (same logic as GET)
+    if task.status == "running":
+        tm = workspace_manager.get_task_manager(user_id, workspace_id)
+        tm_task = await tm.get_task(task.task_id)
+        if tm_task:
+            if tm_task.status == "successful":
+                result_data = tm_task.result
+                from ....analysis.results import GenericAnalysisResult
+
+                task.complete(GenericAnalysisResult(result_data))
+                analysis_manager.update_task(task)
+            elif tm_task.status == "failed":
+                task.fail(tm_task.error or "Task failed")
+                analysis_manager.update_task(task)
+                return {
+                    "state": "failed",
+                    "message": f"Analysis failed: {task.error}",
+                    "data": None,
+                }
+
+    if not task.result:
         return {
             "state": "failed",
             "message": "No concordance results available",
             "data": None,
         }
 
-    normalized_request = _normalize_saved_request(rec.request) or {}
+    result_data = task.result.to_json()
+
+    req_dict = (
+        task.request.model_dump()
+        if hasattr(task.request, "model_dump")
+        else task.request.dict()
+    )
+    normalized_request = _normalize_saved_request(req_dict) or {}
     _apply_result_query_overrides(normalized_request, query)
+
+    if not isinstance(result_data, dict) or "node_results" not in result_data:
+        # Handle unexpected result format
+        pass
+
     return _process_dataframe_result(result_data, normalized_request)
 
 
@@ -550,21 +617,27 @@ async def clear_concordance_results(
     workspace_id: str, current_user: dict = Depends(get_current_user)
 ):
     user_id = current_user["id"]
-    from ....core.analysis_admin import clear_analyses_and_cache
+    ws = workspace_manager.get_workspace(user_id, workspace_id)
+    if ws:
+        analysis_manager = getattr(ws, "analysis", None)
+        if not analysis_manager:
+            from ....analysis.manager import get_analysis_manager
 
-    summary = await clear_analyses_and_cache(user_id, workspace_id, task="concordance")
-    return {"state": "successful", "cleared": summary}
+            analysis_manager = get_analysis_manager(user_id, workspace_id)
+
+        analysis_manager.clear_current_result("concordance")
+
+    return {"state": "successful", "cleared": ["concordance"]}
 
 
 @router.post("/{workspace_id}/concordance/cache/clear")
 async def clear_concordance_cache(
     workspace_id: str, current_user: dict = Depends(get_current_user)
 ):
-    user_id = current_user["id"]
-    from ....core.analysis_admin import clear_concordance_cache_for
-
-    removed = clear_concordance_cache_for(user_id, workspace_id)
-    return {"state": "successful", "removed": removed}
+    # Cache is removed, so this is a no-op or alias to clear results
+    return await clear_concordance_results(workspace_id, current_user)
+    # Cache is removed, so this is a no-op or alias to clear results
+    return await clear_concordance_results(workspace_id, current_user)
 
 
 @router.post("/{workspace_id}/concordance/multi-node/clear")
@@ -572,21 +645,12 @@ async def clear_multi_concordance_results(
     workspace_id: str, current_user: dict = Depends(get_current_user)
 ):
     user_id = current_user["id"]
-    try:
-        from ....core.analysis_store import clear_analyses
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"analysis_store unavailable: {e}")
-    removed = clear_analyses(user_id, workspace_id, task="multi_concordance")
-    from ....core.analysis_admin import clear_concordance_cache_for
+    from ....core.analysis_admin import clear_analyses_and_cache
 
-    cache_removed = clear_concordance_cache_for(user_id, workspace_id)
-    return {
-        "state": "successful",
-        "cleared": {
-            "analyses_removed": removed,
-            "concordance_cache_removed": cache_removed,
-        },
-    }
+    summary = await clear_analyses_and_cache(
+        user_id, workspace_id, task="multi_concordance"
+    )
+    return {"state": "successful", "cleared": summary}
 
 
 # ---------------------------------------------------------------------------
@@ -624,31 +688,17 @@ async def detach_concordance(
         # Persist chosen text column for future analyses
         _prepare_doclazy_frame(node, request.column, user_id, workspace_id)
         if hasattr(node.data, "text"):
-            cache_key = _concordance_cache_key(
-                user_id,
-                workspace_id,
-                node_id,
-                request.column,
-                request.search_word,
-                request.num_left_tokens,
-                request.num_right_tokens,
-                request.regex,
-                request.case_sensitive,
+            # Compute concordance directly (no caching)
+            concordance_result = node.data.text.concordance(
+                column=request.column,
+                search_word=request.search_word,
+                num_left_tokens=request.num_left_tokens,
+                num_right_tokens=request.num_right_tokens,
+                regex=request.regex,
+                case_sensitive=request.case_sensitive,
+                explode=True,
+                unnest=True,
             )
-            concordance_result = _get_cached_concordance_df(cache_key)
-
-            if concordance_result is None:
-                concordance_result = node.data.text.concordance(
-                    column=request.column,
-                    search_word=request.search_word,
-                    num_left_tokens=request.num_left_tokens,
-                    num_right_tokens=request.num_right_tokens,
-                    regex=request.regex,
-                    case_sensitive=request.case_sensitive,
-                    explode=True,
-                    unnest=True,
-                )
-                _store_concordance_df(cache_key, concordance_result)
 
             if "document_idx" not in concordance_result.columns:
                 concordance_with_idx = concordance_result.with_row_index("document_idx")
