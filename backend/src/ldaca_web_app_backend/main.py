@@ -3,7 +3,10 @@ Enhanced LDaCA Web App API - Main FastAPI Application
 Modular, production-ready text analysis platform with multi-user support
 """
 
+import os
+import sys
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -24,12 +27,57 @@ from .db import cleanup_expired_sessions, init_db
 from .settings import settings
 
 
+def _configure_nltk_data_path() -> None:
+    """Configure NLTK data path for bundled runtime, with proper Windows path handling."""
+    try:
+        import nltk
+        
+        # Check if running in bundled desktop app
+        backend_runtime = os.environ.get("LDACA_BACKEND_RUNTIME")
+        if backend_runtime:
+            runtime_path = Path(backend_runtime)
+            
+            # Look for nltk_data in the bundled Python directory
+            possible_locations = [
+                runtime_path / "python" / "nltk_data",
+                runtime_path / "nltk_data",
+            ]
+            
+            for nltk_data_dir in possible_locations:
+                if nltk_data_dir.exists():
+                    # Convert to absolute path with proper Windows handling
+                    abs_path = str(nltk_data_dir.resolve())
+                    
+                    # On Windows, normalize the path to avoid mixed separators
+                    if sys.platform == "win32":
+                        # Convert to forward slashes for NLTK's internal path handling
+                        # This prevents the mixed separator issue
+                        abs_path = abs_path.replace("\\", "/")
+                    
+                    # Prepend to NLTK data path (highest priority)
+                    if abs_path not in nltk.data.path:
+                        nltk.data.path.insert(0, abs_path)
+                        print(f"✅ Configured NLTK data path: {abs_path}")
+                    break
+            else:
+                print("⚠️  No bundled nltk_data found, will use system defaults")
+        
+    except ImportError:
+        # NLTK not available, skip configuration
+        pass
+    except Exception as e:
+        print(f"⚠️  Error configuring NLTK data path: {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager"""
     # Startup
     print("Starting LDaCA Web App...")
     print("=" * 50)
+    
+    # Configure NLTK data path for bundled runtime
+    _configure_nltk_data_path()
 
     # Ensure DATA_ROOT and data folders exist before DB init
     settings.get_data_root().mkdir(parents=True, exist_ok=True)
