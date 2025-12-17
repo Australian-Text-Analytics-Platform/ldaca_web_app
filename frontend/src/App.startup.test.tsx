@@ -88,7 +88,6 @@ vi.mock('./features/analysis/token-frequency/TokenFrequencyFeature', lazyCompone
 const baseAuthInfo: AuthInfoResponse = {
   authenticated: true,
   user: null,
-  multi_user_mode: false,
   available_auth_methods: [],
   requires_authentication: false,
 };

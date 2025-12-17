@@ -11,7 +11,6 @@ class TestCurrentAuthConfiguration:
         assert response.status_code == 200
         data = response.json()
         assert data["authenticated"] is True
-        assert data["multi_user_mode"] is False
         assert data["requires_authentication"] is False
         assert data["user"]["id"] == TEST_USER_ID
         assert data["user"]["email"] == TEST_USER_EMAIL

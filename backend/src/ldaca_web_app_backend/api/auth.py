@@ -49,9 +49,9 @@ async def get_auth_info(authorization: Optional[str] = Header(None)):
                 email=settings.single_user_email,
                 picture=None,
             ),
-            multi_user_mode=False,
             available_auth_methods=[],
             requires_authentication=False,
+            data_folder=str(settings.get_data_root()),
         )
 
     # Multi-user mode - check for existing authentication
@@ -69,9 +69,9 @@ async def get_auth_info(authorization: Optional[str] = Header(None)):
                     email=user["email"],
                     picture=user["picture"],
                 ),
-                multi_user_mode=True,
                 available_auth_methods=get_available_auth_methods(),
                 requires_authentication=True,
+                data_folder=str(settings.get_data_root()),
             )
         except HTTPException:
             # Invalid token - fall through to unauthenticated response
@@ -82,9 +82,9 @@ async def get_auth_info(authorization: Optional[str] = Header(None)):
     return AuthInfoResponse(
         authenticated=False,
         user=None,
-        multi_user_mode=True,
         available_auth_methods=get_available_auth_methods(),
         requires_authentication=True,
+        data_folder=str(settings.get_data_root()),
     )
 
 

@@ -34,9 +34,9 @@ class AuthInfoResponse(BaseModel):
 
     authenticated: bool
     user: Optional[User] = None
-    multi_user_mode: bool
     available_auth_methods: List[AuthMethod] = []
     requires_authentication: bool
+    data_folder: Optional[str] = None
 
 
 class GoogleIn(BaseModel):

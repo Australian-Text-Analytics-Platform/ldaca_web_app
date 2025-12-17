@@ -1,6 +1,7 @@
 import { useEffect, useCallback, useSyncExternalStore } from 'react';
 import { AuthInfoResponse } from '../types';
 import { authApi } from '../api/auth';
+import { configApi, ConfigResponse } from '../api/config';
 
 if (import.meta.env.DEV) {
   console.debug('[useAuth] module loaded', import.meta.url);
@@ -22,6 +23,7 @@ export type AuthPhase =
 type AuthSnapshot = {
   phase: AuthPhase;
   authInfo: AuthInfoResponse | null;
+  config: ConfigResponse | null;
 };
 
 // ------------------------------------------------------------
@@ -29,6 +31,7 @@ type AuthSnapshot = {
 // authentication lifecycle (and StrictMode double-mounts are safe).
 // ------------------------------------------------------------
 let globalAuthInfo: AuthInfoResponse | null = null;
+let globalConfig: ConfigResponse | null = null;
 let globalPhase: AuthPhase = { status: 'bootstrapping', attempts: 0 };
 let globalBootstrapAttempts = 0;
 let globalRefreshFailures = 0;
@@ -39,13 +42,18 @@ const listeners = new Set<() => void>();
 const computeSnapshot = (): AuthSnapshot => ({
   phase: globalPhase,
   authInfo: globalAuthInfo,
+  config: globalConfig,
 });
 
 let currentSnapshot: AuthSnapshot = computeSnapshot();
 
 const notify = () => {
   const nextSnapshot = computeSnapshot();
-  if (nextSnapshot.phase === currentSnapshot.phase && nextSnapshot.authInfo === currentSnapshot.authInfo) {
+  if (
+    nextSnapshot.phase === currentSnapshot.phase &&
+    nextSnapshot.authInfo === currentSnapshot.authInfo &&
+    nextSnapshot.config === currentSnapshot.config
+  ) {
     return;
   }
   currentSnapshot = nextSnapshot;
@@ -112,6 +120,11 @@ const runAuthFetch = (reason: FetchReason): Promise<void> => {
 
   inFlight = (async () => {
     try {
+      // Fetch config if not already loaded
+      if (!globalConfig) {
+        globalConfig = await configApi.getConfig();
+      }
+
       const info = await authApi.info(buildAuthHeaders(), { timeoutMs: AUTH_INFO_TIMEOUT_MS });
       globalAuthInfo = info;
       globalBootstrapAttempts = 0;
@@ -183,12 +196,13 @@ export interface UseAuthOptions {
 export const useAuth = (options: UseAuthOptions = {}) => {
   const autoStart = options.autoStart ?? false;
   const debugLabel = options.debugLabel ?? 'useAuth';
-  const { phase, authInfo } = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+  const { phase, authInfo, config } = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 
   if (import.meta.env.DEV) {
     console.debug(`[useAuth] snapshot (${debugLabel})`, {
       phase: phase.status,
       hasAuthInfo: Boolean(authInfo),
+      hasConfig: Boolean(config),
       inFlight: Boolean(inFlight),
     });
   }
@@ -206,7 +220,7 @@ export const useAuth = (options: UseAuthOptions = {}) => {
   }, []);
 
   const loginWithGoogle = useCallback(async (idToken: string) => {
-    if (!globalAuthInfo?.multi_user_mode) {
+    if (!globalConfig?.multi_user_mode) {
       throw new Error('Google login not available in single-user mode');
     }
 
@@ -221,7 +235,7 @@ export const useAuth = (options: UseAuthOptions = {}) => {
   }, []);
 
   const logout = useCallback(async () => {
-    if (!globalAuthInfo?.multi_user_mode) {
+    if (!globalConfig?.multi_user_mode) {
       return;
     }
 
@@ -250,7 +264,7 @@ export const useAuth = (options: UseAuthOptions = {}) => {
 
   const isAuthenticated = authInfo?.authenticated ?? false;
   const user = authInfo?.user ?? null;
-  const isMultiUserMode = authInfo?.multi_user_mode ?? false;
+  const isMultiUserMode = config?.multi_user_mode ?? false;
   const requiresAuthentication = authInfo?.requires_authentication ?? false;
   const availableAuthMethods = authInfo?.available_auth_methods ?? [];
   const dataFolder = authInfo?.data_folder ?? null;

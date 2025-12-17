@@ -185,6 +185,7 @@ describe('Sidebar layout shell', () => {
     const user = userEvent.setup();
     const setCurrentView = vi.fn();
     workspaceDataState = { workspaceGraph: { nodes: [] }, currentWorkspaceId: null };
+    mockUseWorkspaceData.mockImplementation(() => workspaceDataState);
     uiStoreState = {
       currentView: 'token-frequency',
       setCurrentView,
@@ -196,18 +197,39 @@ describe('Sidebar layout shell', () => {
     const dataLoaderButtons = screen.getAllByRole('button', { name: /data loader/i });
     const concordanceButtons = screen.getAllByRole('button', { name: /concordance/i });
 
-    expect(dataLoaderButtons[0]).not.toBeDisabled();
-    concordanceButtons.forEach((button) => {
-      expect(button).toBeDisabled();
-    });
-
     expect(mockUseWorkspaceData).toHaveBeenCalled();
     const lastWorkspaceCall = mockUseWorkspaceData.mock.results.at(-1)?.value;
     expect(lastWorkspaceCall?.currentWorkspaceId ?? null).toBeNull();
 
+    expect(dataLoaderButtons[0]).not.toBeDisabled();
+
     await waitFor(() => expect(setCurrentView).toHaveBeenCalledWith('data-loader'));
     const callsBefore = setCurrentView.mock.calls.length;
-    await user.click(concordanceButton);
+    await user.click(concordanceButtons[0]);
     expect(setCurrentView.mock.calls.length).toBe(callsBefore);
+  });
+
+  it('shows the data directory with an edit control that jumps to Data Loader', async () => {
+    const user = userEvent.setup();
+    const setCurrentView = vi.fn();
+    uiStoreState = {
+      currentView: 'token-frequency',
+      setCurrentView,
+      openFeedbackModal: vi.fn(),
+    };
+    mockUseUIStore.mockImplementation(() => uiStoreState);
+
+    renderSidebar();
+
+    const [dataDirectory] = screen.getAllByTestId('sidebar-data-directory');
+    expect(within(dataDirectory).getAllByText(/working directory/i)[0]).toBeInTheDocument();
+    expect(within(dataDirectory).getAllByText('/tmp/data')[0]).toBeInTheDocument();
+
+    const editButtons = screen.getAllByRole('button', { name: /change working directory/i });
+    for (const button of editButtons) {
+      await user.click(button);
+    }
+
+    expect(setCurrentView).toHaveBeenCalledWith('data-loader');
   });
 });

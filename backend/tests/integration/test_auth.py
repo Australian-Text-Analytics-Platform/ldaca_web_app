@@ -22,7 +22,6 @@ class TestAuthenticationAPI:
         # Validate response structure
         required_fields = [
             "authenticated",
-            "multi_user_mode",
             "requires_authentication",
             "available_auth_methods",
         ]

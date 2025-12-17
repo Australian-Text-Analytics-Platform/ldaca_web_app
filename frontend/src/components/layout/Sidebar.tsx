@@ -24,6 +24,7 @@ import { useAnalysisStore } from '@/stores/analysisStore';
 import { useUIStore } from '@/stores';
 import { useQuotationEngineDialogStore } from '@/stores/quotationEngineStore';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { DataFolderDialog } from '@/components/dialogs/DataFolderDialog';
 import SidebarNodesSection from '@/components/layout/sidebar/SidebarNodesSection';
 import SidebarTasksSection from '@/components/layout/sidebar/SidebarTasksSection';
 import type {
@@ -45,6 +46,7 @@ import {
   TrendingUp,
   Upload,
   ChevronDown,
+  Pencil,
 } from 'lucide-react';
 import type { ViewType } from '@/stores';
 import logo from '@/logo.png';
@@ -106,6 +108,12 @@ const Sidebar: React.FC = () => {
     setCurrentView('quotation');
     openEngineDialog();
   }, [setCurrentView, openEngineDialog]);
+
+  const [isDataFolderDialogOpen, setIsDataFolderDialogOpen] = React.useState(false);
+
+  const handleEditDataFolder = React.useCallback(() => {
+    setIsDataFolderDialogOpen(true);
+  }, []);
 
   const nodeCount = nodes.length;
   const isConnected = taskStreamStatus === 'open';
@@ -366,11 +374,6 @@ const Sidebar: React.FC = () => {
             </Button>
           )}
         </div>
-        {dataFolder && (
-          <p className="mt-1 text-[10px] text-muted-foreground/70 break-all leading-tight">
-            Data: {dataFolder}
-          </p>
-        )}
       </SidebarHeader>
       <SidebarContent className="flex-1 overflow-hidden">
         <div ref={sectionsContainerRef} className="flex h-full flex-col gap-2 overflow-hidden">
@@ -466,7 +469,34 @@ const Sidebar: React.FC = () => {
         </div>
       </SidebarContent>
 
-      <SidebarFooter className="px-3 py-2">
+      <SidebarFooter className="space-y-2 px-3 py-2">
+        <div
+          className="rounded-md border border-border/60 bg-muted/30 px-3 py-2"
+          data-testid="sidebar-data-directory"
+        >
+          <div className="flex items-start gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-foreground">Working directory</p>
+              <p className="mt-0.5 text-[11px] leading-tight text-muted-foreground break-all">
+                {dataFolder || 'Not configured'}
+              </p>
+            </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 shrink-0 text-muted-foreground"
+                  aria-label="Change working directory"
+                  onClick={handleEditDataFolder}
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Change working directory</TooltipContent>
+            </Tooltip>
+          </div>
+        </div>
         <div className="flex gap-2">
           <Button
             variant="ghost"
@@ -488,6 +518,10 @@ const Sidebar: React.FC = () => {
       </SidebarFooter>
 
       <SidebarRail />
+      <DataFolderDialog
+        open={isDataFolderDialogOpen}
+        onOpenChange={setIsDataFolderDialogOpen}
+      />
     </SidebarRoot>
   );
 };

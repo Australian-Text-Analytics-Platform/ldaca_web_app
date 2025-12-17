@@ -261,64 +261,66 @@ export const DataLoaderFeature: React.FC = () => {
               Choose or rename the workspace where new nodes will be added. Save regularly to persist your progress.
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex-1 space-y-4 overflow-y-auto pr-1">
-            {currentWorkspace ? (
-              <div className="rounded-md border border-border/60 bg-muted/30 px-4 py-3 text-sm">
-                <div className="flex flex-wrap items-center gap-2 text-base font-semibold text-foreground">
-                  {currentWorkspace.name}
-                  <Badge>{nodeCount} nodes</Badge>
+          <CardContent className="flex flex-1 flex-col overflow-hidden">
+            <div className="flex-1 space-y-4 overflow-y-auto pr-2">
+              {currentWorkspace ? (
+                <div className="rounded-md border border-border/60 bg-muted/30 px-4 py-3 text-sm">
+                  <div className="flex flex-wrap items-center gap-2 text-base font-semibold text-foreground">
+                    {currentWorkspace.name}
+                    <Badge>{nodeCount} nodes</Badge>
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    Updated {formatTimestamp(currentWorkspace.modified_at || currentWorkspace.updated_at)} · Created {formatTimestamp(currentWorkspace.created_at)}
+                  </div>
                 </div>
-                <div className="mt-1 text-xs text-muted-foreground">
-                  Updated {formatTimestamp(currentWorkspace.modified_at || currentWorkspace.updated_at)} · Created {formatTimestamp(currentWorkspace.created_at)}
+              ) : (
+                <div className="rounded-md border border-dashed border-muted-foreground/50 px-4 py-3 text-sm text-muted-foreground">
+                  No workspace selected. Pick one below or create a new workspace.
                 </div>
-              </div>
-            ) : (
-              <div className="rounded-md border border-dashed border-muted-foreground/50 px-4 py-3 text-sm text-muted-foreground">
-                No workspace selected. Pick one below or create a new workspace.
-              </div>
-            )}
+              )}
 
-            <div className="space-y-2">
-              <Label htmlFor="rename-workspace">Rename workspace</Label>
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <Input
-                  id="rename-workspace"
-                  value={renameValue}
-                  onChange={(event) => setRenameValue(event.target.value)}
-                  placeholder="Enter new name"
-                  disabled={!hasWorkspaceSelected || workspaceBusy}
-                />
-                <Button onClick={handleRenameWorkspace} disabled={!hasWorkspaceSelected || !renameValue.trim()}>
-                  Rename
+              <div className="space-y-2">
+                <Label htmlFor="rename-workspace">Rename workspace</Label>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Input
+                    id="rename-workspace"
+                    value={renameValue}
+                    onChange={(event) => setRenameValue(event.target.value)}
+                    placeholder="Enter new name"
+                    disabled={!hasWorkspaceSelected || workspaceBusy}
+                  />
+                  <Button onClick={handleRenameWorkspace} disabled={!hasWorkspaceSelected || !renameValue.trim()}>
+                    Rename
+                  </Button>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" onClick={handleSaveWorkspace} disabled={!hasWorkspaceSelected}>
+                  <RefreshCcw className="mr-2 h-4 w-4" /> Save
+                </Button>
+                <Button variant="outline" onClick={handleSaveWorkspaceAs} disabled={!hasWorkspaceSelected}>
+                  <FolderPlus className="mr-2 h-4 w-4" /> Save as…
                 </Button>
               </div>
-            </div>
 
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" onClick={handleSaveWorkspace} disabled={!hasWorkspaceSelected}>
-                <RefreshCcw className="mr-2 h-4 w-4" /> Save
-              </Button>
-              <Button variant="outline" onClick={handleSaveWorkspaceAs} disabled={!hasWorkspaceSelected}>
-                <FolderPlus className="mr-2 h-4 w-4" /> Save as…
-              </Button>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="new-workspace-name">Create workspace</Label>
-              <Input
-                id="new-workspace-name"
-                value={newWorkspaceName}
-                onChange={(event) => setNewWorkspaceName(event.target.value)}
-                placeholder="Workspace name"
-              />
-              <Input
-                value={newWorkspaceDescription}
-                onChange={(event) => setNewWorkspaceDescription(event.target.value)}
-                placeholder="Optional description"
-              />
-              <Button onClick={handleCreateWorkspace} disabled={!newWorkspaceName.trim()}>
-                <Plus className="mr-2 h-4 w-4" /> Create workspace
-              </Button>
+              <div className="space-y-2">
+                <Label htmlFor="new-workspace-name">Create workspace</Label>
+                <Input
+                  id="new-workspace-name"
+                  value={newWorkspaceName}
+                  onChange={(event) => setNewWorkspaceName(event.target.value)}
+                  placeholder="Workspace name"
+                />
+                <Input
+                  value={newWorkspaceDescription}
+                  onChange={(event) => setNewWorkspaceDescription(event.target.value)}
+                  placeholder="Optional description"
+                />
+                <Button onClick={handleCreateWorkspace} disabled={!newWorkspaceName.trim()}>
+                  <Plus className="mr-2 h-4 w-4" /> Create workspace
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
