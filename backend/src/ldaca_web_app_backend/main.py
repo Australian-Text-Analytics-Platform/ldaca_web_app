@@ -63,9 +63,13 @@ def _configure_nltk_data_path() -> None:
                     # Convert to string path - avoid absolute() on Windows as it can be slow
                     abs_path = str(nltk_data_dir)
                     
-                    # On Windows, normalize the path
+                    # On Windows, normalize the path and remove UNC prefix
                     if sys.platform == "win32":
                         print(f"[main] Normalizing path for Windows: {abs_path}", flush=True)
+                        # Remove UNC prefix (\\?\) which causes issues with NLTK
+                        if abs_path.startswith("\\\\?\\"):
+                            abs_path = abs_path[4:]
+                            print(f"[main] Removed UNC prefix: {abs_path}", flush=True)
                         abs_path = os.path.normpath(abs_path)
                         print(f"[main] Normalized to: {abs_path}", flush=True)
                     
