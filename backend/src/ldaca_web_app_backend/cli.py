@@ -9,8 +9,11 @@ import sys
 
 def main():
     """Main entry point for the CLI."""
+    print("[cli] CLI main() called", flush=True)
     import uvicorn
+    print("[cli] uvicorn imported", flush=True)
     from ldaca_web_app_backend.settings import settings
+    print("[cli] settings imported", flush=True)
 
     # Setup cleanup handlers for child processes
     def cleanup_child_processes():
@@ -66,6 +69,7 @@ def main():
         sys.exit(0)
 
     # Register signal handlers for graceful shutdown
+    print("[cli] Registering signal handlers", flush=True)
     signal.signal(signal.SIGINT, signal_handler)  # Ctrl+C
     signal.signal(signal.SIGTERM, signal_handler)  # Kill signal
     if hasattr(signal, "SIGQUIT"):
@@ -73,38 +77,56 @@ def main():
 
     # Register cleanup to run on normal exit too
     atexit.register(cleanup_child_processes)
+    print("[cli] Signal handlers registered", flush=True)
 
     # Ensure data root exists
+    print("[cli] Getting data root", flush=True)
     data_root = settings.get_data_root()
+    print(f"[cli] Creating data root: {data_root}", flush=True)
     data_root.mkdir(parents=True, exist_ok=True)
+    print("[cli] Data root created", flush=True)
 
-    print("Starting LDaCA Web App Backend")
-    print(f"Data folder: {data_root}")
-    print(f"Server: http://{settings.server_host}:{settings.backend_port}")
-    print(f"Multi-user mode: {settings.multi_user}")
-    print()
+    print("[cli] Starting LDaCA Web App Backend", flush=True)
+    print(f"[cli] Data folder: {data_root}", flush=True)
+    print(f"[cli] Server: http://{settings.server_host}:{settings.backend_port}", flush=True)
+    print(f"[cli] Multi-user mode: {settings.multi_user}", flush=True)
+    print(flush=True)
 
     # Detect if running from PyInstaller bundle
     # PyInstaller sets sys.frozen = True and creates sys._MEIPASS
     is_frozen = getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS")
+    print(f"[cli] Is frozen: {is_frozen}", flush=True)
+    print(f"[cli] Debug mode: {settings.debug}", flush=True)
 
     # Never use reload in frozen executables - it causes port conflicts
     # and doesn't work properly with bundled code
     use_reload = settings.debug and not is_frozen
+    print(f"[cli] Use reload: {use_reload}", flush=True)
 
     # Import the app object directly to run uvicorn in the same process
     # Running with a string path causes uvicorn to spawn a subprocess,
     # which makes it harder to kill when Tauri terminates the parent
+    print("[cli] Importing FastAPI app", flush=True)
     from ldaca_web_app_backend.main import app as fastapi_app
+    print("[cli] FastAPI app imported successfully", flush=True)
 
     # Run the FastAPI app in-process (not as subprocess)
-    uvicorn.run(
-        fastapi_app,  # Pass app object directly, not string path
-        host=settings.server_host,
-        port=settings.backend_port,
-        reload=use_reload,
-        log_level="info",
-    )
+    print(f"[cli] Starting uvicorn on {settings.server_host}:{settings.backend_port}", flush=True)
+    print("[cli] Calling uvicorn.run()...", flush=True)
+    try:
+        uvicorn.run(
+            fastapi_app,  # Pass app object directly, not string path
+            host=settings.server_host,
+            port=settings.backend_port,
+            reload=use_reload,
+            log_level="info",
+        )
+        print("[cli] uvicorn.run() returned (server stopped)", flush=True)
+    except Exception as e:
+        print(f"[cli] ERROR in uvicorn.run(): {e}", flush=True)
+        import traceback
+        print(f"[cli] Traceback: {traceback.format_exc()}", flush=True)
+        raise
 
 
 if __name__ == "__main__":
@@ -113,13 +135,17 @@ if __name__ == "__main__":
     # re-execute the main script. We must prevent them from starting
     # additional uvicorn servers.
     import multiprocessing as mp
-
+    
+    print("[cli] __main__ block executed", flush=True)
     mp.freeze_support()  # Required for Windows frozen executables
+    print(f"[cli] Current process: {mp.current_process().name}", flush=True)
 
     # Only run the server in the main process, not in worker children
     # Worker processes will have names like 'Process-1', 'Process-2', etc.
     # The main process has name 'MainProcess'
     if mp.current_process().name == "MainProcess":
+        print("[cli] Running in MainProcess, starting server", flush=True)
         main()
-    # Child processes will exit here without starting uvicorn
+    else:
+        print(f"[cli] Running in child process ({mp.current_process().name}), skipping server startup", flush=True)
     # Child processes will exit here without starting uvicorn
