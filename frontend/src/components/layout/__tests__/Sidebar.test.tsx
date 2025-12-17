@@ -207,7 +207,7 @@ describe('Sidebar layout shell', () => {
 
     await waitFor(() => expect(setCurrentView).toHaveBeenCalledWith('data-loader'));
     const callsBefore = setCurrentView.mock.calls.length;
-    await user.click(concordanceButton);
+    await user.click(concordanceButtons[0]);
     expect(setCurrentView.mock.calls.length).toBe(callsBefore);
   });
 });
