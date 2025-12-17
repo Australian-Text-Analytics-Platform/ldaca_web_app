@@ -46,13 +46,13 @@ def _configure_nltk_data_path() -> None:
             for nltk_data_dir in possible_locations:
                 if nltk_data_dir.exists():
                     # Convert to absolute path with proper Windows handling
-                    abs_path = str(nltk_data_dir.resolve())
+                    # Use str() without resolve() to avoid potential I/O blocking
+                    abs_path = str(nltk_data_dir.absolute())
                     
-                    # On Windows, normalize the path to avoid mixed separators
+                    # On Windows, use backslashes (Windows native) instead of forward slashes
+                    # The patched NLTK functions in text_utils.py will handle normalization
                     if sys.platform == "win32":
-                        # Convert to forward slashes for NLTK's internal path handling
-                        # This prevents the mixed separator issue
-                        abs_path = abs_path.replace("\\", "/")
+                        abs_path = os.path.normpath(abs_path)
                     
                     # Prepend to NLTK data path (highest priority)
                     if abs_path not in nltk.data.path:
