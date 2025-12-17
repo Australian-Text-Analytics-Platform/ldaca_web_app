@@ -34,7 +34,10 @@ def _configure_nltk_data_path() -> None:
         
         # Check if running in bundled desktop app
         backend_runtime = os.environ.get("LDACA_BACKEND_RUNTIME")
-        if backend_runtime:
+        if not backend_runtime:
+            return
+        
+        try:
             runtime_path = Path(backend_runtime)
             
             # Look for nltk_data in the bundled Python directory
@@ -44,13 +47,14 @@ def _configure_nltk_data_path() -> None:
             ]
             
             for nltk_data_dir in possible_locations:
-                if nltk_data_dir.exists():
-                    # Convert to absolute path with proper Windows handling
-                    # Use str() without resolve() to avoid potential I/O blocking
-                    abs_path = str(nltk_data_dir.absolute())
+                try:
+                    if not nltk_data_dir.exists():
+                        continue
                     
-                    # On Windows, use backslashes (Windows native) instead of forward slashes
-                    # The patched NLTK functions in text_utils.py will handle normalization
+                    # Convert to string path - avoid absolute() on Windows as it can be slow
+                    abs_path = str(nltk_data_dir)
+                    
+                    # On Windows, normalize the path
                     if sys.platform == "win32":
                         abs_path = os.path.normpath(abs_path)
                     
@@ -59,14 +63,22 @@ def _configure_nltk_data_path() -> None:
                         nltk.data.path.insert(0, abs_path)
                         print(f"✅ Configured NLTK data path: {abs_path}")
                     break
+                except Exception as e:
+                    # If this location fails, try the next one
+                    print(f"⚠️  Failed to configure {nltk_data_dir}: {e}")
+                    continue
             else:
                 print("⚠️  No bundled nltk_data found, will use system defaults")
+        
+        except Exception as e:
+            print(f"⚠️  Error accessing runtime path: {e}")
         
     except ImportError:
         # NLTK not available, skip configuration
         pass
     except Exception as e:
-        print(f"⚠️  Error configuring NLTK data path: {e}")
+        # Catch any other errors to prevent startup failure
+        print(f"⚠️  Unexpected error configuring NLTK data path: {e}")
 
 
 @asynccontextmanager
