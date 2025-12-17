@@ -29,91 +29,170 @@ from .settings import settings
 
 def _configure_nltk_data_path() -> None:
     """Configure NLTK data path for bundled runtime, with proper Windows path handling."""
+    print("[main] Starting NLTK data path configuration...", flush=True)
     try:
         import nltk
+        print("[main] NLTK imported successfully", flush=True)
         
         # Check if running in bundled desktop app
         backend_runtime = os.environ.get("LDACA_BACKEND_RUNTIME")
+        print(f"[main] LDACA_BACKEND_RUNTIME={backend_runtime}", flush=True)
         if not backend_runtime:
+            print("[main] Not running in bundled app, skipping NLTK path config", flush=True)
             return
         
         try:
             runtime_path = Path(backend_runtime)
+            print(f"[main] Runtime path: {runtime_path}", flush=True)
             
             # Look for nltk_data in the bundled Python directory
             possible_locations = [
                 runtime_path / "python" / "nltk_data",
                 runtime_path / "nltk_data",
             ]
+            print(f"[main] Checking {len(possible_locations)} possible NLTK data locations", flush=True)
             
             for nltk_data_dir in possible_locations:
                 try:
+                    print(f"[main] Checking: {nltk_data_dir}", flush=True)
                     if not nltk_data_dir.exists():
+                        print(f"[main] Does not exist: {nltk_data_dir}", flush=True)
                         continue
+                    print(f"[main] Found: {nltk_data_dir}", flush=True)
                     
                     # Convert to string path - avoid absolute() on Windows as it can be slow
                     abs_path = str(nltk_data_dir)
                     
                     # On Windows, normalize the path
                     if sys.platform == "win32":
+                        print(f"[main] Normalizing path for Windows: {abs_path}", flush=True)
                         abs_path = os.path.normpath(abs_path)
+                        print(f"[main] Normalized to: {abs_path}", flush=True)
                     
                     # Prepend to NLTK data path (highest priority)
                     if abs_path not in nltk.data.path:
+                        print(f"[main] Adding to nltk.data.path: {abs_path}", flush=True)
                         nltk.data.path.insert(0, abs_path)
-                        print(f"✅ Configured NLTK data path: {abs_path}")
+                        print(f"✅ Configured NLTK data path: {abs_path}", flush=True)
+                    else:
+                        print(f"[main] Path already in nltk.data.path: {abs_path}", flush=True)
                     break
                 except Exception as e:
                     # If this location fails, try the next one
-                    print(f"⚠️  Failed to configure {nltk_data_dir}: {e}")
+                    import traceback
+                    print(f"[main] ⚠️  Failed to configure {nltk_data_dir}: {e}", flush=True)
+                    print(f"[main] Traceback: {traceback.format_exc()}", flush=True)
                     continue
             else:
-                print("⚠️  No bundled nltk_data found, will use system defaults")
+                print("[main] ⚠️  No bundled nltk_data found, will use system defaults", flush=True)
         
         except Exception as e:
-            print(f"⚠️  Error accessing runtime path: {e}")
+            import traceback
+            print(f"[main] ⚠️  Error accessing runtime path: {e}", flush=True)
+            print(f"[main] Traceback: {traceback.format_exc()}", flush=True)
         
-    except ImportError:
+    except ImportError as e:
         # NLTK not available, skip configuration
+        print(f"[main] NLTK not available: {e}", flush=True)
         pass
     except Exception as e:
         # Catch any other errors to prevent startup failure
-        print(f"⚠️  Unexpected error configuring NLTK data path: {e}")
+        import traceback
+        print(f"[main] ⚠️  Unexpected error configuring NLTK data path: {e}", flush=True)
+        print(f"[main] Traceback: {traceback.format_exc()}", flush=True)
+    
+    print("[main] NLTK data path configuration complete", flush=True)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager"""
+    # Setup file logging for packaged app (especially Windows)
+    log_file = None
+    try:
+        from datetime import datetime
+        # Log to a file in the runtime directory for debugging packaged apps
+        backend_runtime = os.environ.get("LDACA_BACKEND_RUNTIME")
+        if backend_runtime:
+            log_dir = Path(backend_runtime) / "logs"
+            log_dir.mkdir(parents=True, exist_ok=True)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            log_file_path = log_dir / f"backend_startup_{timestamp}.log"
+            log_file = open(log_file_path, "w", encoding="utf-8")
+            # Redirect stdout and stderr to both console and file
+            import sys
+            class TeeOutput:
+                def __init__(self, file_obj, original):
+                    self.file = file_obj
+                    self.original = original
+                def write(self, data):
+                    self.original.write(data)
+                    self.original.flush()
+                    if self.file:
+                        self.file.write(data)
+                        self.file.flush()
+                def flush(self):
+                    self.original.flush()
+                    if self.file:
+                        self.file.flush()
+            sys.stdout = TeeOutput(log_file, sys.__stdout__)
+            sys.stderr = TeeOutput(log_file, sys.__stderr__)
+            print(f"[main] Log file created: {log_file_path}", flush=True)
+    except Exception as e:
+        print(f"[main] Failed to setup file logging: {e}", flush=True)
+    
     # Startup
-    print("Starting LDaCA Web App...")
-    print("=" * 50)
+    print("="*70, flush=True)
+    print("[main] Starting LDaCA Web App...", flush=True)
+    print(f"[main] Platform: {sys.platform}", flush=True)
+    print(f"[main] Python version: {sys.version}", flush=True)
+    print("="*70, flush=True)
     
     # Configure NLTK data path for bundled runtime
+    print("[main] Step 1: Configuring NLTK data path", flush=True)
     _configure_nltk_data_path()
+    print("[main] Step 1 complete", flush=True)
 
     # Ensure DATA_ROOT and data folders exist before DB init
+    print("[main] Step 2: Creating data folders", flush=True)
     settings.get_data_root().mkdir(parents=True, exist_ok=True)
     settings.get_user_data_folder().mkdir(parents=True, exist_ok=True)
     settings.get_sample_data_folder().mkdir(parents=True, exist_ok=True)
-    print(f"Sample data folder: {settings.get_sample_data_folder()}")
+    print(f"[main] Sample data folder: {settings.get_sample_data_folder()}", flush=True)
     settings.get_database_backup_folder().mkdir(parents=True, exist_ok=True)
+    print("[main] Step 2 complete", flush=True)
 
     # Initialize database
+    print("[main] Step 3: Initializing database", flush=True)
     await init_db()
+    print("[main] Step 3a: Database initialized", flush=True)
     await cleanup_expired_sessions()
+    print("[main] Step 3 complete", flush=True)
 
     # Worker pool will start lazily on first task submission
-    print("Worker pool configured for lazy initialization")
+    print("[main] Step 4: Configuring worker pool", flush=True)
+    print("[main] Worker pool configured for lazy initialization", flush=True)
+    print("[main] Step 4 complete", flush=True)
 
+    print("="*70, flush=True)
+    print(f"[main] ✅ Backend startup complete!", flush=True)
     print(
-        f"API Documentation: http://{settings.server_host}:{settings.backend_port}/api/docs"
+        f"[main] API Documentation: http://{settings.server_host}:{settings.backend_port}/api/docs"
     )
-    print(f"Health Check: http://{settings.server_host}:{settings.backend_port}/health")
+    print(f"[main] Health Check: http://{settings.server_host}:{settings.backend_port}/health", flush=True)
+    print("="*70, flush=True)
 
     yield  # Application runs here
 
     # Shutdown
-    print("Shutting down Enhanced LDaCA Web App API...")
+    print("[main] Shutting down Enhanced LDaCA Web App API...", flush=True)
+    
+    # Close log file if it was opened
+    if log_file:
+        try:
+            log_file.close()
+        except Exception:
+            pass
 
     # Shutdown worker pool with timeout to prevent hanging
     try:
