@@ -9,6 +9,43 @@ import sys
 
 def main():
     """Main entry point for the CLI."""
+    # Setup file logging immediately for packaged app debugging
+    import os
+    from pathlib import Path
+    from datetime import datetime
+    
+    log_file = None
+    try:
+        backend_runtime = os.environ.get("LDACA_BACKEND_RUNTIME")
+        if backend_runtime:
+            log_dir = Path(backend_runtime) / "logs"
+            log_dir.mkdir(parents=True, exist_ok=True)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            log_file_path = log_dir / f"cli_startup_{timestamp}.log"
+            log_file = open(log_file_path, "w", encoding="utf-8", buffering=1)  # Line buffered
+            
+            # Redirect stdout/stderr to both console and file
+            class TeeOutput:
+                def __init__(self, file_obj, original):
+                    self.file = file_obj
+                    self.original = original
+                def write(self, data):
+                    self.original.write(data)
+                    self.original.flush()
+                    if self.file:
+                        self.file.write(data)
+                        self.file.flush()
+                def flush(self):
+                    self.original.flush()
+                    if self.file:
+                        self.file.flush()
+            
+            sys.stdout = TeeOutput(log_file, sys.__stdout__)
+            sys.stderr = TeeOutput(log_file, sys.__stderr__)
+            print(f"[cli] Log file created: {log_file_path}", flush=True)
+    except Exception as e:
+        print(f"[cli] Failed to setup CLI logging: {e}", flush=True)
+    
     print("[cli] CLI main() called", flush=True)
     import uvicorn
     print("[cli] uvicorn imported", flush=True)
