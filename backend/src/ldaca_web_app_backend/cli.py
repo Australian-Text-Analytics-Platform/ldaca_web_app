@@ -39,6 +39,9 @@ def main():
                     self.original.flush()
                     if self.file:
                         self.file.flush()
+                def isatty(self):
+                    # Return False for file output (no TTY colors)
+                    return False
             
             sys.stdout = TeeOutput(log_file, sys.__stdout__)
             sys.stderr = TeeOutput(log_file, sys.__stderr__)
