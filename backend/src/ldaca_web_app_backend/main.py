@@ -77,22 +77,22 @@ def _configure_nltk_data_path() -> None:
                     if abs_path not in nltk.data.path:
                         print(f"[main] Adding to nltk.data.path: {abs_path}", flush=True)
                         nltk.data.path.insert(0, abs_path)
-                        print(f"✅ Configured NLTK data path: {abs_path}", flush=True)
+                        print(f"[main] SUCCESS: Configured NLTK data path: {abs_path}", flush=True)
                     else:
                         print(f"[main] Path already in nltk.data.path: {abs_path}", flush=True)
                     break
                 except Exception as e:
                     # If this location fails, try the next one
                     import traceback
-                    print(f"[main] ⚠️  Failed to configure {nltk_data_dir}: {e}", flush=True)
+                    print(f"[main] WARNING: Failed to configure {nltk_data_dir}: {e}", flush=True)
                     print(f"[main] Traceback: {traceback.format_exc()}", flush=True)
                     continue
             else:
-                print("[main] ⚠️  No bundled nltk_data found, will use system defaults", flush=True)
+                print("[main] WARNING: No bundled nltk_data found, will use system defaults", flush=True)
         
         except Exception as e:
             import traceback
-            print(f"[main] ⚠️  Error accessing runtime path: {e}", flush=True)
+            print(f"[main] WARNING: Error accessing runtime path: {e}", flush=True)
             print(f"[main] Traceback: {traceback.format_exc()}", flush=True)
         
     except ImportError as e:
@@ -102,7 +102,7 @@ def _configure_nltk_data_path() -> None:
     except Exception as e:
         # Catch any other errors to prevent startup failure
         import traceback
-        print(f"[main] ⚠️  Unexpected error configuring NLTK data path: {e}", flush=True)
+        print(f"[main] WARNING: Unexpected error configuring NLTK data path: {e}", flush=True)
         print(f"[main] Traceback: {traceback.format_exc()}", flush=True)
     
     print("[main] NLTK data path configuration complete", flush=True)
@@ -130,8 +130,15 @@ async def lifespan(app: FastAPI):
                     self.file = file_obj
                     self.original = original
                 def write(self, data):
-                    self.original.write(data)
-                    self.original.flush()
+                    try:
+                        self.original.write(data)
+                        self.original.flush()
+                    except UnicodeEncodeError:
+                        # Windows console may not support all Unicode characters
+                        # Replace problematic characters with ASCII equivalents
+                        safe_data = data.encode('ascii', 'replace').decode('ascii')
+                        self.original.write(safe_data)
+                        self.original.flush()
                     if self.file:
                         self.file.write(data)
                         self.file.flush()
@@ -182,7 +189,7 @@ async def lifespan(app: FastAPI):
     print("[main] Step 4 complete", flush=True)
 
     print("="*70, flush=True)
-    print(f"[main] ✅ Backend startup complete!", flush=True)
+    print(f"[main] SUCCESS: Backend startup complete!", flush=True)
     print(
         f"[main] API Documentation: http://{settings.server_host}:{settings.backend_port}/api/docs"
     )

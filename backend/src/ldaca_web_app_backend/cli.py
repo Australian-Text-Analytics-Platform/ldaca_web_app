@@ -30,8 +30,15 @@ def main():
                     self.file = file_obj
                     self.original = original
                 def write(self, data):
-                    self.original.write(data)
-                    self.original.flush()
+                    try:
+                        self.original.write(data)
+                        self.original.flush()
+                    except UnicodeEncodeError:
+                        # Windows console may not support all Unicode characters
+                        # Replace problematic characters with ASCII equivalents
+                        safe_data = data.encode('ascii', 'replace').decode('ascii')
+                        self.original.write(safe_data)
+                        self.original.flush()
                     if self.file:
                         self.file.write(data)
                         self.file.flush()
