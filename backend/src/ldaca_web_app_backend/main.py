@@ -124,7 +124,6 @@ async def lifespan(app: FastAPI):
             log_file_path = log_dir / f"backend_startup_{timestamp}.log"
             log_file = open(log_file_path, "w", encoding="utf-8")
             # Redirect stdout and stderr to both console and file
-            import sys
             class TeeOutput:
                 def __init__(self, file_obj, original):
                     self.file = file_obj
@@ -189,7 +188,7 @@ async def lifespan(app: FastAPI):
     print("[main] Step 4 complete", flush=True)
 
     print("="*70, flush=True)
-    print(f"[main] SUCCESS: Backend startup complete!", flush=True)
+    print("[main] SUCCESS: Backend startup complete!", flush=True)
     print(
         f"[main] API Documentation: http://{settings.server_host}:{settings.backend_port}/api/docs"
     )
