@@ -32,26 +32,33 @@ def _configure_nltk_data_path() -> None:
     print("[main] Starting NLTK data path configuration...", flush=True)
     try:
         import nltk
+
         print("[main] NLTK imported successfully", flush=True)
-        
+
         # Check if running in bundled desktop app
         backend_runtime = os.environ.get("LDACA_BACKEND_RUNTIME")
         print(f"[main] LDACA_BACKEND_RUNTIME={backend_runtime}", flush=True)
         if not backend_runtime:
-            print("[main] Not running in bundled app, skipping NLTK path config", flush=True)
+            print(
+                "[main] Not running in bundled app, skipping NLTK path config",
+                flush=True,
+            )
             return
-        
+
         try:
             runtime_path = Path(backend_runtime)
             print(f"[main] Runtime path: {runtime_path}", flush=True)
-            
+
             # Look for nltk_data in the bundled Python directory
             possible_locations = [
                 runtime_path / "python" / "nltk_data",
                 runtime_path / "nltk_data",
             ]
-            print(f"[main] Checking {len(possible_locations)} possible NLTK data locations", flush=True)
-            
+            print(
+                f"[main] Checking {len(possible_locations)} possible NLTK data locations",
+                flush=True,
+            )
+
             for nltk_data_dir in possible_locations:
                 try:
                     print(f"[main] Checking: {nltk_data_dir}", flush=True)
@@ -59,42 +66,61 @@ def _configure_nltk_data_path() -> None:
                         print(f"[main] Does not exist: {nltk_data_dir}", flush=True)
                         continue
                     print(f"[main] Found: {nltk_data_dir}", flush=True)
-                    
+
                     # Convert to string path - avoid absolute() on Windows as it can be slow
                     abs_path = str(nltk_data_dir)
-                    
+
                     # On Windows, normalize the path and remove UNC prefix
                     if sys.platform == "win32":
-                        print(f"[main] Normalizing path for Windows: {abs_path}", flush=True)
+                        print(
+                            f"[main] Normalizing path for Windows: {abs_path}",
+                            flush=True,
+                        )
                         # Remove UNC prefix (\\?\) which causes issues with NLTK
                         if abs_path.startswith("\\\\?\\"):
                             abs_path = abs_path[4:]
                             print(f"[main] Removed UNC prefix: {abs_path}", flush=True)
                         abs_path = os.path.normpath(abs_path)
                         print(f"[main] Normalized to: {abs_path}", flush=True)
-                    
+
                     # Prepend to NLTK data path (highest priority)
                     if abs_path not in nltk.data.path:
-                        print(f"[main] Adding to nltk.data.path: {abs_path}", flush=True)
+                        print(
+                            f"[main] Adding to nltk.data.path: {abs_path}", flush=True
+                        )
                         nltk.data.path.insert(0, abs_path)
-                        print(f"[main] SUCCESS: Configured NLTK data path: {abs_path}", flush=True)
+                        print(
+                            f"[main] SUCCESS: Configured NLTK data path: {abs_path}",
+                            flush=True,
+                        )
                     else:
-                        print(f"[main] Path already in nltk.data.path: {abs_path}", flush=True)
+                        print(
+                            f"[main] Path already in nltk.data.path: {abs_path}",
+                            flush=True,
+                        )
                     break
                 except Exception as e:
                     # If this location fails, try the next one
                     import traceback
-                    print(f"[main] WARNING: Failed to configure {nltk_data_dir}: {e}", flush=True)
+
+                    print(
+                        f"[main] WARNING: Failed to configure {nltk_data_dir}: {e}",
+                        flush=True,
+                    )
                     print(f"[main] Traceback: {traceback.format_exc()}", flush=True)
                     continue
             else:
-                print("[main] WARNING: No bundled nltk_data found, will use system defaults", flush=True)
-        
+                print(
+                    "[main] WARNING: No bundled nltk_data found, will use system defaults",
+                    flush=True,
+                )
+
         except Exception as e:
             import traceback
+
             print(f"[main] WARNING: Error accessing runtime path: {e}", flush=True)
             print(f"[main] Traceback: {traceback.format_exc()}", flush=True)
-        
+
     except ImportError as e:
         # NLTK not available, skip configuration
         print(f"[main] NLTK not available: {e}", flush=True)
@@ -102,9 +128,13 @@ def _configure_nltk_data_path() -> None:
     except Exception as e:
         # Catch any other errors to prevent startup failure
         import traceback
-        print(f"[main] WARNING: Unexpected error configuring NLTK data path: {e}", flush=True)
+
+        print(
+            f"[main] WARNING: Unexpected error configuring NLTK data path: {e}",
+            flush=True,
+        )
         print(f"[main] Traceback: {traceback.format_exc()}", flush=True)
-    
+
     print("[main] NLTK data path configuration complete", flush=True)
 
 
@@ -115,6 +145,7 @@ async def lifespan(app: FastAPI):
     log_file = None
     try:
         from datetime import datetime
+
         # Log to a file in the runtime directory for debugging packaged apps
         backend_runtime = os.environ.get("LDACA_BACKEND_RUNTIME")
         if backend_runtime:
@@ -123,11 +154,13 @@ async def lifespan(app: FastAPI):
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             log_file_path = log_dir / f"backend_startup_{timestamp}.log"
             log_file = open(log_file_path, "w", encoding="utf-8")
+
             # Redirect stdout and stderr to both console and file
             class TeeOutput:
                 def __init__(self, file_obj, original):
                     self.file = file_obj
                     self.original = original
+
                 def write(self, data):
                     try:
                         self.original.write(data)
@@ -135,32 +168,35 @@ async def lifespan(app: FastAPI):
                     except UnicodeEncodeError:
                         # Windows console may not support all Unicode characters
                         # Replace problematic characters with ASCII equivalents
-                        safe_data = data.encode('ascii', 'replace').decode('ascii')
+                        safe_data = data.encode("ascii", "replace").decode("ascii")
                         self.original.write(safe_data)
                         self.original.flush()
                     if self.file:
                         self.file.write(data)
                         self.file.flush()
+
                 def flush(self):
                     self.original.flush()
                     if self.file:
                         self.file.flush()
+
                 def isatty(self):
                     # Return False for file output (no TTY colors)
                     return False
+
             sys.stdout = TeeOutput(log_file, sys.__stdout__)
             sys.stderr = TeeOutput(log_file, sys.__stderr__)
             print(f"[main] Log file created: {log_file_path}", flush=True)
     except Exception as e:
         print(f"[main] Failed to setup file logging: {e}", flush=True)
-    
+
     # Startup
-    print("="*70, flush=True)
+    print("=" * 70, flush=True)
     print("[main] Starting LDaCA Web App...", flush=True)
     print(f"[main] Platform: {sys.platform}", flush=True)
     print(f"[main] Python version: {sys.version}", flush=True)
-    print("="*70, flush=True)
-    
+    print("=" * 70, flush=True)
+
     # Configure NLTK data path for bundled runtime
     print("[main] Step 1: Configuring NLTK data path", flush=True)
     _configure_nltk_data_path()
@@ -187,19 +223,22 @@ async def lifespan(app: FastAPI):
     print("[main] Worker pool configured for lazy initialization", flush=True)
     print("[main] Step 4 complete", flush=True)
 
-    print("="*70, flush=True)
+    print("=" * 70, flush=True)
     print("[main] SUCCESS: Backend startup complete!", flush=True)
     print(
         f"[main] API Documentation: http://{settings.server_host}:{settings.backend_port}/api/docs"
     )
-    print(f"[main] Health Check: http://{settings.server_host}:{settings.backend_port}/health", flush=True)
-    print("="*70, flush=True)
+    print(
+        f"[main] Health Check: http://{settings.server_host}:{settings.backend_port}/health",
+        flush=True,
+    )
+    print("=" * 70, flush=True)
 
     yield  # Application runs here
 
     # Shutdown
     print("[main] Shutting down Enhanced LDaCA Web App API...", flush=True)
-    
+
     # Close log file if it was opened
     if log_file:
         try:
