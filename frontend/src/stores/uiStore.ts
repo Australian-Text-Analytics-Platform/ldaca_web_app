@@ -41,6 +41,7 @@ interface UIState {
     renameModal: boolean;
     deleteConfirmModal: boolean;
     feedbackModal: boolean;
+    tutorialModal: boolean;
   };
 }
 
@@ -75,6 +76,8 @@ interface UIActions {
   closeDeleteConfirmModal: () => void;
   openFeedbackModal: () => void;
   closeFeedbackModal: () => void;
+  openTutorialModal: () => void;
+  closeTutorialModal: () => void;
   closeAllModals: () => void;
 }
 
@@ -98,6 +101,7 @@ export const useUIStore = create<UIStore>()(
         renameModal: false,
         deleteConfirmModal: false,
         feedbackModal: false,
+        tutorialModal: false,
       },
 
       // View management
@@ -200,6 +204,14 @@ export const useUIStore = create<UIStore>()(
 
       closeFeedbackModal: () => set((state) => {
         state.modals.feedbackModal = false;
+      }),
+
+      openTutorialModal: () => set((state) => {
+        state.modals.tutorialModal = true;
+      }),
+
+      closeTutorialModal: () => set((state) => {
+        state.modals.tutorialModal = false;
       }),
       
       closeAllModals: () => set((state) => {

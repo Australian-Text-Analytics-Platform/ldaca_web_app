@@ -164,7 +164,8 @@ def _ensure_quote_dataframe(df: pl.DataFrame) -> pl.DataFrame:
         result = result.with_row_index("document_idx")
     if "quote_row_idx" not in result.columns:
         result = result.with_columns(
-            pl.arange(0, result.height, eager=True)
+            pl
+            .arange(0, result.height, eager=True)
             .cast(pl.Int64)
             .alias("quote_row_idx")
         )
@@ -561,6 +562,10 @@ async def quotation_current_result(
             return base_result
 
         engine_dict = req_dict.get("engine") or {}
+        # Filter out internal fields that are not in public model
+        engine_dict = {
+            k: v for k, v in engine_dict.items() if k not in ("api_key", "model")
+        }
         try:
             engine = QuotationEngineConfig.model_validate(engine_dict)
         except Exception:
@@ -683,6 +688,10 @@ async def update_quotation_current_result(
         )
 
     engine_dict = base_request.get("engine") or {}
+    # Filter out internal fields that are not in public model
+    engine_dict = {
+        k: v for k, v in engine_dict.items() if k not in ("api_key", "model")
+    }
     try:
         engine = QuotationEngineConfig.model_validate(engine_dict)
     except Exception as exc:  # pragma: no cover
@@ -826,7 +835,7 @@ async def get_quotation(
         analysis_request = AnalysisQuotationRequest(
             node_id=node_id,
             column=request.column,
-            engine=request.engine,  # Assuming compatible
+            engine=request.engine.model_dump(mode="json") if request.engine else None,
             page=page,
             page_size=page_size,
             sort_by=sort_by,
@@ -890,74 +899,35 @@ async def detach_quotation(
 ):
     """Detach quotation results (full-table) by joining exploded quotations with original table into a new node."""
     user_id = current_user["id"]
+    tm = workspace_manager.get_task_manager(user_id, workspace_id)
+
+    node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
+    if not node:
+        raise HTTPException(status_code=404, detail="Node not found")
+
     try:
-        node, node_data = get_node_with_data_or_400(user_id, workspace_id, node_id)
-        engine = request.engine or QuotationEngineConfig()
-        if engine.type is QuotationEngineType.LOCAL and not hasattr(node_data, "text"):
-            raise HTTPException(
-                status_code=400,
-                detail="This node does not support text analysis (DocFrame text namespace not available)",
-            )
-
-        joined_df, _ = await _build_joined_quotation_frames(
-            node, request.column, engine
-        )
-
-        if "document_idx" in joined_df.columns:
-            final_data = joined_df.drop("document_idx")
-        else:
-            final_data = joined_df.clone()
-
-        # New node name
-        if request.new_node_name:
-            new_node_name = request.new_node_name
-        else:
-            original_name = node.name if getattr(node, "name", None) else node_id
-            new_node_name = f"{original_name}_quotation"
-
-        document_column = getattr(node, "document", None) or getattr(
-            node.data, "document_column", None
-        )
-        workspace_dir = workspace_manager.get_workspace_dir(user_id, workspace_id)
-        if workspace_dir is None:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Workspace folder not found for workspace {workspace_id}",
-            )
-
-        lazy_data = stage_dataframe_as_lazy(
-            final_data, workspace_dir, new_node_name, document_column
-        )
-
-        new_node = workspace_manager.add_node_to_workspace(
+        task_info = await tm.submit_task(
             user_id=user_id,
             workspace_id=workspace_id,
-            data=lazy_data,
-            node_name=new_node_name,
-            operation="quotation_detach",
-            parents=[node],
+            task_type="quotation_detach",
+            task_args={
+                "node_id": node_id,
+                "column": request.column,
+                "engine_config": request.engine.model_dump() if request.engine else {},
+                "new_node_name": request.new_node_name,
+            },
+            task_name="Detach Quotation",
         )
-        if not new_node:
-            raise HTTPException(
-                status_code=500, detail="Failed to create detached quotation node"
-            )
 
-        total_rows = final_data.height if hasattr(final_data, "height") else -1
         return {
-            "state": "successful",
-            "message": f"Successfully created detached quotation node '{new_node_name}' with {total_rows if total_rows >= 0 else 'unknown'} rows",
-            "new_node_id": new_node.id,
-            "new_node_name": new_node_name,
-            "total_rows": total_rows,
+            "state": "running",
+            "message": "Quotation detach started",
+            "data": None,
+            "metadata": {"task_id": task_info.id},
         }
-    except HTTPException:
-        raise
-    except QuotationServiceError as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-    except Exception as e:  # pragma: no cover
-        logger.exception("Error detaching quotation results")
+
+    except Exception as e:
+        logger.exception("Error submitting detach quotation task")
         raise HTTPException(
-            status_code=500, detail=f"Error detaching quotation results: {str(e)}"
+            status_code=500, detail=f"Error submitting detach task: {str(e)}"
         )

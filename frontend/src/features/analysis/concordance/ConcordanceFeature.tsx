@@ -989,7 +989,7 @@ const ConcordanceFeature: React.FC = () => {
   }, [combinedPage, combinedPageSize, currentWorkspaceId, globalPageSize, updateStoredResult, viewMode]);
 
   const handleRowClick = (row: any, nodeId: string, column: string) => {
-    if (!currentWorkspaceId || row.document_idx === undefined) return;
+    if (!currentWorkspaceId) return;
 
     const record = { ...row };
     const availableColumns = Object.keys(record);
@@ -1234,16 +1234,15 @@ const ConcordanceFeature: React.FC = () => {
               </Button>
             </div>
           </div>
-          <div className="overflow-hidden rounded-lg border border-border bg-card">
+          <div className="rounded-lg border border-border bg-card">
             <ScrollArea
-              type="always"
+              type="hover"
               scrollbars="both"
-              className="max-h-96"
-              style={{ scrollbarGutter: 'stable both-edges' }}
+              className="h-[400px]"
             >
-              <div className="min-w-max pb-4">
-                <Table className="min-w-[720px]">
-                <TableHeader className="bg-gray-50">
+              <div className="min-w-max">
+                <Table className="min-w-[720px]" disableContainer>
+                <TableHeader className="bg-gray-50 sticky top-0 z-10">
                   <TableRow>
                     {displayColumns.map((c: string) => {
                       const lower = c.toLowerCase();
@@ -1397,16 +1396,15 @@ const ConcordanceFeature: React.FC = () => {
 
     return (
       <div key={nodeKey} className="mb-6">
-        <div className="overflow-hidden rounded-lg border border-border bg-card">
+        <div className="rounded-lg border border-border bg-card">
           <ScrollArea
-            type="always"
+            type="hover"
             scrollbars="both"
-            className="max-h-96"
-            style={{ scrollbarGutter: 'stable both-edges' }}
+            className="h-[400px]"
           >
-            <div className="min-w-max pb-4">
-              <Table className="min-w-[720px]">
-              <TableHeader className="bg-gray-50">
+            <div className="min-w-max">
+              <Table className="min-w-[720px]" disableContainer>
+              <TableHeader className="bg-gray-50 sticky top-0 z-10">
                 <TableRow>
                   {displayColumns.map(key => {
                     const neverSortable = ['left_context','matched_text','right_context'];
@@ -1437,9 +1435,7 @@ const ConcordanceFeature: React.FC = () => {
                     key={index} 
                     className={`cursor-pointer ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
                     onClick={() => {
-                      if (effectiveNodeId) {
-                        handleRowClick(row, effectiveNodeId, column);
-                      }
+                      handleRowClick(row, effectiveNodeId, column);
                     }}
                   >
                     {displayColumns.map((colKey: string, cellIndex) => (

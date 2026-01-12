@@ -120,12 +120,12 @@ def topic_modeling_task(
     try:
         # Import heavy libraries after environment is configured
         import polars as pl
+        from docframe.core.text_utils import topic_visualization
+
+        from docframe import DocDataFrame, DocLazyFrame
 
         # Import workspace manager (this should be lightweight)
         from ldaca_web_app_backend.core.workspace import workspace_manager
-
-        from docframe import DocDataFrame, DocLazyFrame
-        from docframe.core.text_utils import topic_visualization
 
         print(
             f"[Worker {os.getpid()}] Starting topic modeling task for workspace {workspace_id}"
@@ -440,6 +440,499 @@ def concordance_task(
         raise
 
 
+def _filter_concordance_rows(df: "pl.DataFrame") -> "pl.DataFrame":
+    """Filter out empty concordance matches."""
+    import polars as pl
+
+    if not isinstance(df, pl.DataFrame) or df.height == 0:
+        return df
+
+    candidate_columns = [
+        col
+        for col in ("matched_text", "left_context", "right_context")
+        if col in df.columns
+    ]
+    if not candidate_columns:
+        return df
+
+    try:
+        non_empty_checks = [
+            (
+                pl
+                .col(col)
+                .cast(pl.Utf8, strict=False)
+                .str.strip_chars()
+                .str.len_chars()
+                .fill_null(0)
+                > 0
+            )
+            for col in candidate_columns
+        ]
+        mask = pl.any_horizontal(non_empty_checks)
+        return df.filter(mask)
+    except Exception:
+        fallback_mask = pl.any_horizontal([
+            pl.col(col).is_not_null() for col in candidate_columns
+        ])
+        return df.filter(fallback_mask)
+
+
+def concordance_detach_task(
+    user_id: str,
+    workspace_id: str,
+    node_id: str,
+    column: str,
+    search_word: str,
+    num_left_tokens: int,
+    num_right_tokens: int,
+    regex: bool,
+    case_sensitive: bool,
+    new_node_name: Optional[str] = None,
+    progress_callback: Optional[callable] = None,
+) -> Dict[str, Any]:
+    """Execute concordance detach in a worker process."""
+    _configure_worker_environment()
+
+    try:
+        import re
+        from pathlib import Path
+
+        import polars as pl
+
+        from docframe import DocLazyFrame
+        from ldaca_web_app_backend.core.workspace import workspace_manager
+
+        print(
+            f"[Worker {os.getpid()}] Starting concordance detach task for workspace {workspace_id}"
+        )
+
+        if progress_callback:
+            progress_callback(0.1, "Initializing workspace...")
+
+        workspace = workspace_manager.get_workspace(user_id, workspace_id)
+        if not workspace:
+            success = workspace_manager.set_current_workspace(user_id, workspace_id)
+            if success:
+                workspace = workspace_manager.get_workspace(user_id, workspace_id)
+
+        if not workspace:
+            raise ValueError(
+                f"Workspace {workspace_id} not found (worker process cannot access workspace)"
+            )
+
+        workspace_dir = workspace_manager.get_workspace_dir(user_id, workspace_id)
+        if not workspace_dir:
+            raise ValueError(f"Workspace folder not found for {workspace_id}")
+
+        if progress_callback:
+            progress_callback(0.2, "Loading node data...")
+
+        node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
+        if not node:
+            raise ValueError(f"Node {node_id} not found")
+
+        node_data = getattr(node, "data", node)
+
+        # Check columns
+        if hasattr(node_data, "columns"):
+            available_columns = node_data.columns
+        elif hasattr(node_data, "collect_schema"):
+            available_columns = list(node_data.collect_schema().keys())
+        elif hasattr(node_data, "schema"):
+            try:
+                available_columns = list(node_data.schema.keys())
+            except Exception:
+                available_columns = []
+        else:
+            available_columns = []
+
+        if available_columns and column not in available_columns:
+            raise ValueError(
+                f"Column '{column}' not found. Available columns: {available_columns}"
+            )
+
+        if not hasattr(node_data, "text"):
+            raise ValueError("This node does not support text analysis")
+
+        if progress_callback:
+            progress_callback(0.4, "Computing concordance matches...")
+
+        # Compute concordance
+        concordance_result = node_data.text.concordance(
+            column=column,
+            search_word=search_word,
+            num_left_tokens=num_left_tokens,
+            num_right_tokens=num_right_tokens,
+            regex=regex,
+            case_sensitive=case_sensitive,
+            explode=True,
+            unnest=True,
+        )
+
+        if "document_idx" not in concordance_result.columns:
+            concordance_with_idx = concordance_result.with_row_index("document_idx")
+        else:
+            concordance_with_idx = concordance_result
+
+        # Materialize underlying data
+        if progress_callback:
+            progress_callback(0.6, "Joining with original data...")
+
+        if isinstance(node_data, pl.LazyFrame):
+            underlying_df = node_data.collect()
+        elif hasattr(node_data, "to_lazyframe"):
+            underlying_df = node_data.to_lazyframe().collect()
+        elif hasattr(node_data, "_df") and not isinstance(node_data, pl.DataFrame):
+            underlying_df = node_data._df
+        else:
+            underlying_df = node_data
+
+        if isinstance(underlying_df, pl.LazyFrame):
+            underlying_df = underlying_df.collect()
+
+        if not isinstance(underlying_df, pl.DataFrame):
+            raise ValueError("Failed to materialize underlying data")
+
+        original_with_idx = underlying_df.with_row_index("document_idx")
+
+        other_df = concordance_with_idx.select([
+            "document_idx",
+            "left_context",
+            "matched_text",
+            "right_context",
+            "start_idx",
+            "end_idx",
+            "l1",
+            "r1",
+            "l1_freq",
+            "r1_freq",
+        ])
+
+        # Filter empty rows
+        other_df = _filter_concordance_rows(other_df)
+
+        final_data = original_with_idx.join(
+            other_df, on="document_idx", how="right"
+        ).drop("document_idx")
+
+        # Determine new node name
+        if new_node_name:
+            effective_node_name = new_node_name
+        else:
+            original_name = (
+                node.name if hasattr(node, "name") and node.name else node_id
+            )
+            effective_node_name = f"{original_name}_conc_{search_word}"
+
+        if progress_callback:
+            progress_callback(0.8, "Persisting new node...")
+
+        document_column = getattr(node, "document", None) or getattr(
+            node_data, "document_column", None
+        )
+
+        # Stage data (lazy persist) logic inline to avoid helper dependency or copy helper
+        data_dir = workspace_dir / "data"
+        data_dir.mkdir(parents=True, exist_ok=True)
+
+        def _safe_stem(name: str) -> str:
+            stem = re.sub(r"[^A-Za-z0-9_.-]+", "_", name).strip("._") or "data"
+            return stem
+
+        base_stem = _safe_stem(effective_node_name)
+        parquet_path = data_dir / f"{base_stem}.parquet"
+        suffix = 1
+        while parquet_path.exists():
+            parquet_path = data_dir / f"{base_stem}_{suffix}.parquet"
+            suffix += 1
+
+        try:
+            final_data.write_parquet(parquet_path)
+        except Exception as exc:
+            raise RuntimeError(f"Failed to write parquet: {exc}")
+
+        try:
+            lazy_data = pl.scan_parquet(parquet_path)
+            if document_column:
+                try:
+                    lazy_data = DocLazyFrame(lazy_data, document_column=document_column)
+                except Exception:
+                    pass
+        except Exception as exc:
+            raise RuntimeError(f"Failed to reload parquet: {exc}")
+
+        if progress_callback:
+            progress_callback(0.9, "Finalizing result...")
+
+        # We do NOT add the node here anymore. Main process handles graph updates.
+
+        total_rows = final_data.height
+
+        if progress_callback:
+            progress_callback(1.0, "Analysis completed, registering result...")
+
+        return {
+            "success": True,
+            "message": f"Concordance analysis complete. Found {len(concordance_result)} matches.",
+            "parquet_path": str(parquet_path),
+            "new_node_name": effective_node_name,
+            "parent_node_id": node_id,
+            "document_column": document_column,
+            "total_rows": total_rows,
+            "concordance_matches": len(concordance_result),
+        }
+
+    except Exception as e:
+        print(f"[Worker {os.getpid()}] Concordance detach failed: {str(e)}")
+        if progress_callback:
+            progress_callback(-1, f"Failed: {str(e)}")
+        raise
+
+
+def quotation_detach_task(
+    user_id: str,
+    workspace_id: str,
+    node_id: str,
+    column: str,
+    engine_config: Dict[str, Any],
+    new_node_name: Optional[str] = None,
+    progress_callback: Optional[callable] = None,
+) -> Dict[str, Any]:
+    """Execute quotation detach in a worker process."""
+    _configure_worker_environment()
+
+    try:
+        import asyncio
+        import re
+        from pathlib import Path
+
+        import polars as pl
+
+        from docframe import DocLazyFrame
+        from ldaca_web_app_backend.core.workspace import workspace_manager
+        from ldaca_web_app_backend.models import (
+            QuotationEngineConfig,
+            QuotationEngineType,
+        )
+
+        # Helper to convert to polars and ensure quote dataframe
+        # We need to replicate _to_polars_dataframe, _ensure_quote_dataframe, _join_quotes_with_base logic here
+        # or abstract them. For robustness and isolation, inline/copy is safer for worker.
+
+        print(
+            f"[Worker {os.getpid()}] Starting quotation detach task for workspace {workspace_id}"
+        )
+
+        if progress_callback:
+            progress_callback(0.1, "Initializing workspace...")
+
+        workspace = workspace_manager.get_workspace(user_id, workspace_id)
+        if not workspace:
+            workspace_manager.set_current_workspace(user_id, workspace_id)
+            workspace = workspace_manager.get_workspace(user_id, workspace_id)
+
+        if not workspace:
+            raise ValueError(f"Workspace {workspace_id} not found")
+
+        workspace_dir = workspace_manager.get_workspace_dir(user_id, workspace_id)
+        if not workspace_dir:
+            raise ValueError(f"Workspace folder not found")
+
+        if progress_callback:
+            progress_callback(0.2, "Loading node data...")
+
+        node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
+        if not node:
+            raise ValueError(f"Node {node_id} not found")
+
+        node_data = getattr(node, "data", node)
+
+        try:
+            engine = QuotationEngineConfig.model_validate(engine_config)
+        except Exception as e:
+            raise ValueError(f"Invalid engine config: {e}")
+
+        if engine.type is QuotationEngineType.LOCAL and not hasattr(node_data, "text"):
+            raise ValueError("This node does not support text analysis")
+
+        # Materialize base dataframe
+        if hasattr(node_data, "lazyframe"):
+            base_df = node_data.lazyframe.collect()
+        elif isinstance(node_data, pl.LazyFrame):
+            base_df = node_data.collect()
+        elif hasattr(node_data, "dataframe"):
+            base_df = pl.DataFrame(getattr(node_data, "dataframe"))
+        elif hasattr(node_data, "collect") and not isinstance(node_data, pl.DataFrame):
+            collected = node_data.collect()
+            base_df = (
+                collected
+                if isinstance(collected, pl.DataFrame)
+                else pl.DataFrame(collected)
+            )
+        else:
+            base_df = (
+                node_data
+                if isinstance(node_data, pl.DataFrame)
+                else pl.DataFrame(node_data)
+            )
+
+        if not isinstance(base_df, pl.DataFrame):
+            base_df = pl.DataFrame(base_df)
+
+        if column not in base_df.columns:
+            raise ValueError(f"Column '{column}' not found")
+
+        if progress_callback:
+            progress_callback(0.4, "Extracting quotations...")
+
+        # Compute quotes
+        if engine.type is QuotationEngineType.REMOTE:
+            # Remote not fully supported in standalone worker task without async loop management?
+            # Workers are sync functions in multiprocessing.
+            # But quotation logic is async.
+            # We can run async here.
+
+            # Need to import remote logic. It is in core.services.quotation_client
+            from ldaca_web_app_backend.core.services.quotation_client import (
+                extract_remote_quotations,
+            )
+
+            # And helpers from quotation analysis...
+            # This isgetting complicated to copy all remote logic.
+            # Assumption: detached is mostly local for now?
+            # If remote is needed, we need to replicate _prepare_documents_payload, etc.
+
+            raise NotImplementedError(
+                "Remote quotation detach not yet supported in background task"
+            )
+
+        # Local engine
+        if not hasattr(base_df, "text"):
+            # Need to wrap in DocLazyFrame?
+            # base_df is eager DataFrame. DocFrame methods work on eager too if registered.
+            # But docframe text namespace must be available.
+            pass
+
+        # Ideally we should use the node's data if possible since it might be DocLazyFrame
+        # But we materialized it.
+        # DocFrame needs to be imported for the namespace to be active on Polars objects?
+        # Typically one creates a DocDataFrame/DocLazyFrame wrapper.
+
+        if not hasattr(base_df, "text"):
+            # try wrapping
+            try:
+                base_df = DocDataFrame(base_df, document_column=column)  # type: ignore
+            except Exception:
+                pass
+
+        if not hasattr(base_df, "text"):
+            raise ValueError("Could not access DocFrame text namespace on dataframe")
+
+        quote_raw = base_df.text.quotation(column, explode=True, unnest=True)
+
+        # To Polars
+        if hasattr(quote_raw, "_df"):
+            quote_df = quote_raw._df
+        else:
+            quote_df = quote_raw
+
+        if not isinstance(quote_df, pl.DataFrame):
+            quote_df = pl.DataFrame(quote_df)
+
+        # Ensure quote dataframe columns
+        # ... (simplified version of _ensure_quote_dataframe)
+        if "document_idx" not in quote_df.columns:
+            quote_df = quote_df.with_row_index("document_idx")
+
+        if progress_callback:
+            progress_callback(0.6, "Structuring results...")
+
+        if quote_df.height == 0:
+            joined_df = base_df
+        else:
+            original_with_idx = base_df.with_row_index("document_idx")
+            joined_df = original_with_idx.join(quote_df, on="document_idx", how="left")
+
+            redundant = [col for col in joined_df.columns if col.endswith("_right")]
+            if redundant:
+                joined_df = joined_df.drop(redundant)
+
+        if "document_idx" in joined_df.columns:
+            final_data = joined_df.drop("document_idx")
+        else:
+            final_data = joined_df
+
+        # New node name
+        if new_node_name:
+            effective_node_name = new_node_name
+        else:
+            original_name = node.name if getattr(node, "name", None) else node_id
+            effective_node_name = f"{original_name}_quotation"
+
+        document_column = getattr(node, "document", None) or getattr(
+            node_data, "document_column", None
+        )
+
+        if progress_callback:
+            progress_callback(0.8, "Persisting result...")
+
+        # Stage data
+        data_dir = workspace_dir / "data"
+        data_dir.mkdir(parents=True, exist_ok=True)
+
+        def _safe_stem(name: str) -> str:
+            stem = re.sub(r"[^A-Za-z0-9_.-]+", "_", name).strip("._") or "data"
+            return stem
+
+        base_stem = _safe_stem(effective_node_name)
+        parquet_path = data_dir / f"{base_stem}.parquet"
+        suffix = 1
+        while parquet_path.exists():
+            parquet_path = data_dir / f"{base_stem}_{suffix}.parquet"
+            suffix += 1
+
+        try:
+            final_data.write_parquet(parquet_path)
+        except Exception as exc:
+            raise RuntimeError(f"Failed to write parquet: {exc}")
+
+        try:
+            lazy_data = pl.scan_parquet(parquet_path)
+            if document_column:
+                try:
+                    lazy_data = DocLazyFrame(lazy_data, document_column=document_column)
+                except Exception:
+                    pass
+        except Exception as exc:
+            raise RuntimeError(f"Failed to reload parquet: {exc}")
+
+        if progress_callback:
+            progress_callback(0.9, "Finalizing result...")
+
+        # We do NOT add the node here anymore. Main process handles graph updates.
+
+        total_rows = final_data.height
+
+        if progress_callback:
+            progress_callback(1.0, "Analysis completed, registering result...")
+
+        return {
+            "state": "successful",
+            "message": f"Quotation extraction complete with {total_rows} rows",
+            "parquet_path": str(parquet_path),
+            "new_node_name": effective_node_name,
+            "parent_node_id": node_id,
+            "document_column": document_column,
+            "total_rows": total_rows,
+        }
+
+    except Exception as e:
+        print(f"[Worker {os.getpid()}] Quotation detach failed: {str(e)}")
+        if progress_callback:
+            progress_callback(-1, f"Failed: {str(e)}")
+        raise
+
+
 def _safe_float(value, *, default: float | None = 0.0) -> float | None:
     try:
         number = float(value)
@@ -502,10 +995,10 @@ def token_frequencies_task(
         import math
 
         import polars as pl
-        from ldaca_web_app_backend.core.workspace import workspace_manager
+        from docframe.core.text_utils import compute_token_frequencies
 
         from docframe import DocDataFrame, DocLazyFrame
-        from docframe.core.text_utils import compute_token_frequencies
+        from ldaca_web_app_backend.core.workspace import workspace_manager
 
         print(
             f"[Worker {os.getpid()}] Starting token frequencies task for workspace {workspace_id}"
@@ -845,5 +1338,7 @@ def get_worker_pool() -> WorkerPool:
 TASK_REGISTRY = {
     "topic_modeling": topic_modeling_task,
     "concordance": concordance_task,
+    "concordance_detach": concordance_detach_task,
+    "quotation_detach": quotation_detach_task,
     "token_frequencies": token_frequencies_task,
 }

@@ -77,8 +77,8 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 const Sidebar: React.FC = () => {
-  const { currentView, setCurrentView, openFeedbackModal } = useUIStore(
-    useShallow(({ currentView, setCurrentView, openFeedbackModal }) => ({ currentView, setCurrentView, openFeedbackModal }))
+  const { currentView, setCurrentView, openFeedbackModal, openTutorialModal } = useUIStore(
+    useShallow(({ currentView, setCurrentView, openFeedbackModal, openTutorialModal }) => ({ currentView, setCurrentView, openFeedbackModal, openTutorialModal }))
   );
   const { workspaceGraph, currentWorkspaceId } = useWorkspaceData();
   const { selectedNodeIds } = useWorkspaceSelection();
@@ -471,7 +471,7 @@ const Sidebar: React.FC = () => {
           <Button
             variant="ghost"
             className="flex-1 justify-center"
-            onClick={() => window.open('#/tutorial', '_blank', 'noopener,noreferrer')}
+            onClick={openTutorialModal}
           >
             <BookOpen className="h-4 w-4" />
             <span>Tutorial</span>

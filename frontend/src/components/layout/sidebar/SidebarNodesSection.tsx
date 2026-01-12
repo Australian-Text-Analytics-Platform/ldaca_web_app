@@ -84,7 +84,6 @@ const SidebarNodesSection: React.FC<SidebarNodesSectionProps> = ({
         {nodes.length ? (
           nodes.map((node) => {
             const name = node?.data?.nodeName || node?.data?.label || node?.label || '';
-            const dtype = node?.data?.nodeType || node?.data?.dataType || node?.type || 'unknown';
             const shape = formatShapeLabel(node);
             const checked = selectedNodeIds?.includes(node.id);
             const copyNameValue = name && name.length > 0 ? name : node.id;
@@ -151,10 +150,6 @@ const SidebarNodesSection: React.FC<SidebarNodesSectionProps> = ({
                   )}
                 >
                   <span className="flex items-center gap-1">
-                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground/80">Type</span>
-                    <span className="font-medium text-foreground">{dtype}</span>
-                  </span>
-                  <span className="flex items-center gap-1">
                     <span className="text-[10px] uppercase tracking-wide text-muted-foreground/80">Shape</span>
                     <span className="font-medium text-foreground">{shape}</span>
                   </span>
@@ -164,15 +159,15 @@ const SidebarNodesSection: React.FC<SidebarNodesSectionProps> = ({
                       event.stopPropagation();
                       void handleCopy(node.id, node.id, 'id');
                     }}
-                    className="flex items-center gap-1 text-left text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    className="flex min-w-0 max-w-full items-center gap-1 text-left text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                     title="Copy node id"
                   >
-                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground/80">ID</span>
-                    <span className="max-w-[160px] truncate font-mono text-[11px] text-foreground">{node.id}</span>
+                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground/80 shrink-0">ID</span>
+                    <span className="truncate font-mono text-[11px] text-foreground">{node.id}</span>
                     {isIdCopied ? (
-                      <Check className="h-3.5 w-3.5 text-emerald-500" aria-hidden="true" />
+                      <Check className="h-3.5 w-3.5 shrink-0 text-emerald-500" aria-hidden="true" />
                     ) : (
-                      <Copy className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+                      <Copy className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
                     )}
                   </button>
                 </div>

@@ -278,21 +278,23 @@ export const DataLoaderFeature: React.FC = () => {
               </div>
             )}
 
-            <div className="space-y-2">
-              <Label htmlFor="rename-workspace">Rename workspace</Label>
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <Input
-                  id="rename-workspace"
-                  value={renameValue}
-                  onChange={(event) => setRenameValue(event.target.value)}
-                  placeholder="Enter new name"
-                  disabled={!hasWorkspaceSelected || workspaceBusy}
-                />
-                <Button onClick={handleRenameWorkspace} disabled={!hasWorkspaceSelected || !renameValue.trim()}>
-                  Rename
-                </Button>
+            {hasWorkspaceSelected && (
+              <div className="space-y-2">
+                <Label htmlFor="rename-workspace">Rename workspace</Label>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Input
+                    id="rename-workspace"
+                    value={renameValue}
+                    onChange={(event) => setRenameValue(event.target.value)}
+                    placeholder="Enter new name"
+                    disabled={!hasWorkspaceSelected || workspaceBusy}
+                  />
+                  <Button onClick={handleRenameWorkspace} disabled={!hasWorkspaceSelected || !renameValue.trim()}>
+                    Rename
+                  </Button>
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" onClick={handleSaveWorkspace} disabled={!hasWorkspaceSelected}>
@@ -301,25 +303,34 @@ export const DataLoaderFeature: React.FC = () => {
               <Button variant="outline" onClick={handleSaveWorkspaceAs} disabled={!hasWorkspaceSelected}>
                 <FolderPlus className="mr-2 h-4 w-4" /> Save as…
               </Button>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="new-workspace-name">Create workspace</Label>
-              <Input
-                id="new-workspace-name"
-                value={newWorkspaceName}
-                onChange={(event) => setNewWorkspaceName(event.target.value)}
-                placeholder="Workspace name"
-              />
-              <Input
-                value={newWorkspaceDescription}
-                onChange={(event) => setNewWorkspaceDescription(event.target.value)}
-                placeholder="Optional description"
-              />
-              <Button onClick={handleCreateWorkspace} disabled={!newWorkspaceName.trim()}>
-                <Plus className="mr-2 h-4 w-4" /> Create workspace
+              <Button
+                variant="outline"
+                onClick={() => workspaceActions.setCurrentWorkspace(null)}
+                disabled={!hasWorkspaceSelected || workspaceBusy}
+              >
+                <LogOut className="mr-2 h-4 w-4" /> Unload
               </Button>
             </div>
+
+            {!hasWorkspaceSelected && (
+              <div className="space-y-2">
+                <Label htmlFor="new-workspace-name">Create workspace</Label>
+                <Input
+                  id="new-workspace-name"
+                  value={newWorkspaceName}
+                  onChange={(event) => setNewWorkspaceName(event.target.value)}
+                  placeholder="Workspace name"
+                />
+                <Input
+                  value={newWorkspaceDescription}
+                  onChange={(event) => setNewWorkspaceDescription(event.target.value)}
+                  placeholder="Optional description"
+                />
+                <Button onClick={handleCreateWorkspace} disabled={!newWorkspaceName.trim()}>
+                  <Plus className="mr-2 h-4 w-4" /> Create workspace
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -365,16 +376,6 @@ export const DataLoaderFeature: React.FC = () => {
                         >
                           {isActive ? 'Active' : 'Activate'}
                         </Button>
-                        {isActive && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => workspaceActions.setCurrentWorkspace(null)}
-                            disabled={workspaceBusy}
-                          >
-                            <LogOut className="mr-1.5 h-4 w-4" /> Unload
-                          </Button>
-                        )}
                         <Button
                           size="sm"
                           variant="destructive"
@@ -451,14 +452,18 @@ export const DataLoaderFeature: React.FC = () => {
                           <Button size="sm" variant="secondary" onClick={() => setPreviewFile(file.filename)}>
                             <Eye className="mr-1.5 h-4 w-4" /> Preview
                           </Button>
-                          <Button size="sm" onClick={() => {
-                            if (!hasWorkspaceSelected) {
-                              setWorkspaceAlertOpen(true);
-                              return;
-                            }
-                            setAddFileName(file.filename);
-                            setSelectedFile(file.filename);
-                          }}>
+                          <Button
+                            size="sm"
+                            disabled={!hasWorkspaceSelected}
+                            onClick={() => {
+                              if (!hasWorkspaceSelected) {
+                                setWorkspaceAlertOpen(true);
+                                return;
+                              }
+                              setAddFileName(file.filename);
+                              setSelectedFile(file.filename);
+                            }}
+                          >
                             <Plus className="mr-1.5 h-4 w-4" /> Add
                           </Button>
                           <Button size="sm" variant="outline" onClick={() => handleDownloadFile(file.filename)}>

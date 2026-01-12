@@ -12,6 +12,7 @@ import { useUIStore } from './stores';
 import { useShallow } from 'zustand/react/shallow';
 import { SidebarInset, SidebarProvider, SidebarTrigger } from './components/ui/sidebar';
 import { Toaster } from './components/ui/sonner';
+import { Dialog, DialogContent, DialogTitle } from './components/ui/dialog';
 
 // Lazy load components for code splitting
 const TutorialView = lazy(() => import('./components/TutorialView'));
@@ -36,10 +37,14 @@ const WorkspaceShell: React.FC = () => {
     currentView,
     closeFeedbackModal,
     feedbackOpen,
+    tutorialModal,
+    closeTutorialModal,
   } = useUIStore(useShallow((state) => ({
     currentView: state.currentView,
     closeFeedbackModal: state.closeFeedbackModal,
     feedbackOpen: state.modals.feedbackModal,
+    tutorialModal: state.modals.tutorialModal,
+    closeTutorialModal: state.closeTutorialModal,
   })));
   const {
     phase,
@@ -179,7 +184,7 @@ const WorkspaceShell: React.FC = () => {
   // Show login screen if not authenticated and in multi-user mode
   if (shouldShowLoginCard) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
+      <div className="min-h-screen bg-linear-to-br from-slate-50 to-blue-50 flex items-center justify-center">
         <ErrorBoundary>
           <div className="bg-white p-8 rounded-xl shadow-lg max-w-md w-full mx-4">
             <h1 className="text-2xl font-bold text-gray-800 mb-6 text-center">
@@ -201,7 +206,19 @@ const WorkspaceShell: React.FC = () => {
     <QueryProvider>
       <WorkspaceProvider>
         <ErrorBoundary>
-          <SidebarProvider className="bg-gradient-to-br from-slate-50 to-blue-50">
+          <SidebarProvider className="bg-linear-to-br from-slate-50 to-blue-50">
+            {/* Tutorial Modal */}
+            <Dialog open={tutorialModal} onOpenChange={(open) => !open && closeTutorialModal()}>
+              <DialogContent className="max-w-5xl h-[85vh] flex flex-col p-0 gap-0 overflow-hidden">
+                <DialogTitle className="sr-only">Tutorial</DialogTitle>
+                <div className="flex-1 overflow-y-auto">
+                  <Suspense fallback={<div className="p-8 flex items-center justify-center h-full"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>}>
+                    <TutorialView onClose={closeTutorialModal} />
+                  </Suspense>
+                </div>
+              </DialogContent>
+            </Dialog>
+
             {(showRefreshBanner || showRefreshChip) && (
               <div className="pointer-events-none fixed left-1/2 top-4 z-50 flex -translate-x-1/2 flex-col gap-2">
                 {showRefreshBanner && bannerAttemptsLabel && (
@@ -297,7 +314,7 @@ const WorkspaceShell: React.FC = () => {
                           aria-label="Collapse right panel"
                           title="Collapse"
                         >
-                          <span className="overflow-hidden whitespace-nowrap transition-all duration-200 max-w-0 group-hover:max-w-[120px] mr-1">Collapse</span>
+                          <span className="overflow-hidden whitespace-nowrap transition-all duration-200 max-w-0 group-hover:max-w-30 mr-1">Collapse</span>
                           <span aria-hidden>❯</span>
                         </button>
                       )}
@@ -307,13 +324,13 @@ const WorkspaceShell: React.FC = () => {
                     </aside>
 
                     {isRightCollapsed && (
-                      <button
+                        <button
                         onClick={toggleRightPanel}
                         className="group absolute top-2 right-2 z-30 rounded-md border border-gray-300 bg-white/90 backdrop-blur px-2 py-1 text-gray-700 hover:bg-gray-50 shadow flex items-center"
                         aria-label="Expand right panel"
                         title="Expand"
                       >
-                        <span className="overflow-hidden whitespace-nowrap transition-all duration-200 max-w-0 group-hover:max-w-[90px] mr-1">Show</span>
+                        <span className="overflow-hidden whitespace-nowrap transition-all duration-200 max-w-0 group-hover:max-w-24 mr-1">Show</span>
                         <span aria-hidden>❮</span>
                       </button>
                     )}
@@ -329,35 +346,14 @@ const WorkspaceShell: React.FC = () => {
 };
 
 /**
- * Top-level app entry that handles tutorial routing and backend health gating
+ * Top-level app entry that handles backend health gating
  * before rendering the main workspace shell.
  */
 const App: React.FC = () => {
-  const [isTutorial, setIsTutorial] = useState(false);
   const { ready: backendReady, error: backendError } = useBackendHealth();
-
-  useEffect(() => {
-    const check = () => setIsTutorial(window.location.hash.replace(/^#/, '') === '/tutorial');
-    check();
-    window.addEventListener('hashchange', check);
-    return () => window.removeEventListener('hashchange', check);
-  }, []);
   let content: ReactNode;
 
-  if (isTutorial) {
-    content = (
-      <Suspense fallback={
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading Tutorial...</p>
-          </div>
-        </div>
-      }>
-        <TutorialView />
-      </Suspense>
-    );
-  } else if (!backendReady) {
+  if (!backendReady) {
     content = (
       <BlockingScreen
         title="Starting backend services"

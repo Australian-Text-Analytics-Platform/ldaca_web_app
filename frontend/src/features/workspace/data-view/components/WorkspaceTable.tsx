@@ -734,7 +734,6 @@ export function WorkspaceTable({
           type="always"
           scrollbars="both"
           className="flex-1 rounded-t-lg border border-border shadow-sm bg-white"
-          style={{ scrollbarGutter: 'stable both-edges' }}
         >
           <Table disableContainer>
             <TableHeader className="sticky top-0 z-20 bg-muted">
