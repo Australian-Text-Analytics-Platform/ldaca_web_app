@@ -347,6 +347,7 @@ export const DataLoaderFeature: React.FC = () => {
                 </Button>
               </div>
             )}
+            </div>
           </CardContent>
         </Card>
 
@@ -528,7 +529,7 @@ export const DataLoaderFeature: React.FC = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={Boolean(workspaceToDelete)} onOpenChange={(open) => !open && setWorkspaceToDelete(null)}>
+      <AlertDialog open={Boolean(workspaceToDelete)} onOpenChange={(open: boolean) => !open && setWorkspaceToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete workspace?</AlertDialogTitle>
