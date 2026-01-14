@@ -488,6 +488,13 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
             nextOperator !== 'is_null'
           ) {
             prefillDatetimeValue(id, columnInfo.name, nextOperator);
+          } else if (
+            (columnInfo.dataType === 'integer' || columnInfo.dataType === 'float') &&
+            selectedNodeId &&
+            currentWorkspaceId &&
+            (nextOperator === 'gte' || nextOperator === 'lte')
+          ) {
+            prefillNumericValue(id, columnInfo.name, nextOperator);
           }
         }
       }
@@ -512,6 +519,14 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
           if (value !== 'is_null') {
             prefillDatetimeValue(id, updated.column, value as FilterCondition['operator']);
           }
+        } else if (
+          (updated.dataType === 'integer' || updated.dataType === 'float') &&
+          updated.column &&
+          selectedNodeId &&
+          currentWorkspaceId &&
+          (value === 'gte' || value === 'lte')
+        ) {
+          prefillNumericValue(id, updated.column, value as FilterCondition['operator']);
         }
       }
       
@@ -597,6 +612,41 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
       }));
     } catch (error) {
       console.error('Failed to fetch describe data for pre-filling:', error);
+    }
+  };
+
+  const prefillNumericValue = async (
+    conditionId: string,
+    column: string,
+    operator: FilterCondition['operator']
+  ) => {
+    if (!selectedNodeId || !currentWorkspaceId) return;
+
+    try {
+      const describeData = await nodesApi.describeColumn(currentWorkspaceId, selectedNodeId, column);
+
+      setConditions(prev => prev.map(c => {
+        if (c.id !== conditionId) return c;
+
+        let newValue: ConditionValue = (c.value as string | number) ?? '';
+
+        switch (operator) {
+          case 'gte':
+            if (describeData.min !== undefined && describeData.min !== null) {
+              newValue = describeData.min;
+            }
+            break;
+          case 'lte':
+            if (describeData.max !== undefined && describeData.max !== null) {
+              newValue = describeData.max;
+            }
+            break;
+        }
+
+        return { ...c, value: newValue };
+      }));
+    } catch (error) {
+      console.error('Failed to fetch describe data for numeric pre-filling:', error);
     }
   };
 

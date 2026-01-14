@@ -20,7 +20,7 @@ const markdownComponents: Components = {
  * TutorialView: renders the markdown from public/tutorial.md.
  * This page is shown when opening the app with location.hash === '#/tutorial'.
  */
-const TutorialView: React.FC = () => {
+const TutorialView: React.FC<{ onClose?: () => void }> = ({ onClose }) => {
   const [content, setContent] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -101,9 +101,16 @@ const TutorialView: React.FC = () => {
             <button
               type="button"
               className="text-sm text-blue-600 hover:text-blue-700"
-              onClick={() => { window.location.hash = ''; window.location.reload(); }}
+              onClick={() => {
+                if (onClose) {
+                  onClose();
+                } else {
+                  window.location.hash = '';
+                  window.location.reload();
+                }
+              }}
             >
-              Back to app
+              {onClose ? 'Close' : 'Back to app'}
             </button>
             <div className="flex items-center space-x-2">
               <button

@@ -1,6 +1,8 @@
 import { useCallback, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { useAnalysisStore } from '@/stores/analysisStore';
+import { queryKeys } from '@/lib/queryKeys';
 import type { TaskItem } from '@/stores/analysisStore';
 import {
   type TaskEventPayload,
@@ -67,6 +69,7 @@ const mergeTaskUpdates = (
 export const useWorkspaceTaskInbox = (
   workspaceId: string | null
 ): WorkspaceTaskStreamClientState => {
+  const queryClient = useQueryClient();
   const { getAuthHeaders } = useAuth();
   const setTasks = useAnalysisStore((state) => state.setTasks);
   const markTopicModelingReady = useAnalysisStore((state) => state.markTopicModelingReady);
@@ -80,6 +83,26 @@ export const useWorkspaceTaskInbox = (
       }
 
       switch (payload.type) {
+        case 'workspace_updated': {
+          if (workspaceId) {
+            
+            // Invalidate graph
+            queryClient.invalidateQueries({
+              queryKey: queryKeys.workspaceGraph(workspaceId),
+            });
+            
+            // Invalidate node lists
+            queryClient.invalidateQueries({
+              queryKey: queryKeys.workspaceNodes(workspaceId),
+            });
+
+            // Force refetch nodes data if needed
+            queryClient.refetchQueries({
+              queryKey: queryKeys.workspaceGraph(workspaceId),
+            });
+          }
+          break;
+        }
         case 'tasks_snapshot': {
           if (Array.isArray(payload.tasks)) {
             setTasks((prevTasks: TaskItem[]) =>

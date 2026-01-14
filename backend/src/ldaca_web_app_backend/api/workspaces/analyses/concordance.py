@@ -356,7 +356,8 @@ def _filter_concordance_rows(df: pl.DataFrame) -> pl.DataFrame:
     try:
         non_empty_checks = [
             (
-                pl.col(col)
+                pl
+                .col(col)
                 .cast(pl.Utf8, strict=False)
                 .str.strip_chars()
                 .str.len_chars()
@@ -664,121 +665,40 @@ async def detach_concordance(
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    try:
-        node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
-        if not node:
-            raise HTTPException(status_code=404, detail="Node not found")
-        workspace_dir = workspace_manager.get_workspace_dir(user_id, workspace_id)
-        if workspace_dir is None:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Workspace folder not found for workspace {workspace_id}",
-            )
-        if hasattr(node.data, "columns"):
-            available_columns = node.data.columns
-        elif hasattr(node.data, "schema"):
-            available_columns = list(node.data.schema.keys())
-        else:
-            available_columns = []
-        if available_columns and request.column not in available_columns:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Column '{request.column}' not found. Available columns: {available_columns}",
-            )
-        # Persist chosen text column for future analyses
-        _prepare_doclazy_frame(node, request.column, user_id, workspace_id)
-        if hasattr(node.data, "text"):
-            # Compute concordance directly (no caching)
-            concordance_result = node.data.text.concordance(
-                column=request.column,
-                search_word=request.search_word,
-                num_left_tokens=request.num_left_tokens,
-                num_right_tokens=request.num_right_tokens,
-                regex=request.regex,
-                case_sensitive=request.case_sensitive,
-                explode=True,
-                unnest=True,
-            )
+    tm = workspace_manager.get_task_manager(user_id, workspace_id)
 
-            if "document_idx" not in concordance_result.columns:
-                concordance_with_idx = concordance_result.with_row_index("document_idx")
-            else:
-                concordance_with_idx = concordance_result
-            if isinstance(node.data, pl.LazyFrame):
-                underlying_df = node.data.collect()
-            elif hasattr(node.data, "to_lazyframe"):
-                underlying_df = node.data.to_lazyframe().collect()  # type: ignore
-            elif hasattr(node.data, "_df") and not isinstance(node.data, pl.DataFrame):
-                underlying_df = node.data._df  # type: ignore[attr-defined]
-            else:
-                underlying_df = node.data
-            if isinstance(underlying_df, pl.LazyFrame):
-                underlying_df = underlying_df.collect()
-            if not isinstance(underlying_df, pl.DataFrame):
-                raise HTTPException(
-                    status_code=500,
-                    detail="Failed to materialize underlying data for concordance detach",
-                )
-            original_with_idx = underlying_df.with_row_index("document_idx")
-            other_df = concordance_with_idx.select([
-                "document_idx",
-                "left_context",
-                "matched_text",
-                "right_context",
-                "start_idx",
-                "end_idx",
-                "l1",
-                "r1",
-                "l1_freq",
-                "r1_freq",
-            ])
-            other_df = _filter_concordance_rows(other_df)
-            final_data = original_with_idx.join(
-                other_df, on="document_idx", how="right"
-            ).drop("document_idx")
-            if request.new_node_name:
-                new_node_name = request.new_node_name
-            else:
-                original_name = (
-                    node.name if hasattr(node, "name") and node.name else node_id
-                )
-                new_node_name = f"{original_name}_conc_{request.search_word}"
-            document_column = getattr(node, "document", None) or getattr(
-                node.data, "document_column", None
-            )
-            lazy_data = stage_dataframe_as_lazy(
-                final_data, workspace_dir, new_node_name, document_column
-            )
-            new_node = workspace_manager.add_node_to_workspace(
-                user_id=user_id,
-                workspace_id=workspace_id,
-                data=lazy_data,
-                node_name=new_node_name,
-                operation="concordance_detach",
-                parents=[node],
-            )
-            if not new_node:
-                raise HTTPException(
-                    status_code=500, detail="Failed to create detached concordance node"
-                )
-            total_rows = final_data.height if hasattr(final_data, "height") else -1
-            return {
-                "success": True,
-                "message": f"Successfully created detached concordance node '{new_node_name}' with {total_rows if total_rows >= 0 else 'unknown'} rows",
-                "new_node_id": new_node.id,
-                "new_node_name": new_node_name,
-                "total_rows": total_rows,
-                "concordance_matches": len(concordance_result),
-            }
-        else:
-            raise HTTPException(
-                status_code=400,
-                detail="This node does not support text analysis (DocFrame text namespace not available)",
-            )
-    except HTTPException:
-        raise
+    # Validate node existence before submitting
+    node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
+    if not node:
+        raise HTTPException(status_code=404, detail="Node not found")
+
+    try:
+        task_info = await tm.submit_task(
+            user_id=user_id,
+            workspace_id=workspace_id,
+            task_type="concordance_detach",
+            task_args={
+                "node_id": node_id,
+                "column": request.column,
+                "search_word": request.search_word,
+                "num_left_tokens": request.num_left_tokens,
+                "num_right_tokens": request.num_right_tokens,
+                "regex": request.regex,
+                "case_sensitive": request.case_sensitive,
+                "new_node_name": request.new_node_name,
+            },
+            task_name=f"Detach Concordance: {request.search_word}",
+        )
+
+        return {
+            "state": "running",
+            "message": "Concordance detach started",
+            "data": None,
+            "metadata": {"task_id": task_info.id},
+        }
+
     except Exception as e:
-        print(f"ERROR: Error in detach concordance: {str(e)}")
+        print(f"ERROR: Error in detach concordance task submission: {str(e)}")
         raise HTTPException(
-            status_code=500, detail=f"Error detaching concordance results: {str(e)}"
+            status_code=500, detail=f"Error submitting detach task: {str(e)}"
         )

@@ -25,6 +25,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../../../components/ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../../../components/ui/dialog';
 
 const formatBytes = (bytes?: number | null): string => {
   if (!bytes || Number.isNaN(bytes)) return '—';
@@ -81,6 +89,8 @@ export const DataLoaderFeature: React.FC = () => {
   const [workspaceAlertOpen, setWorkspaceAlertOpen] = useState(false);
   const [workspaceToDelete, setWorkspaceToDelete] = useState<{ id: string; name?: string | null } | null>(null);
   const [deletingWorkspace, setDeletingWorkspace] = useState(false);
+  const [saveAsOpen, setSaveAsOpen] = useState(false);
+  const [saveAsName, setSaveAsName] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const hasWorkspaceSelected = Boolean(currentWorkspaceId);
@@ -156,15 +166,20 @@ export const DataLoaderFeature: React.FC = () => {
 
   const handleSaveWorkspaceAs = useCallback(async () => {
     if (!hasWorkspaceSelected) return;
-    const filename = window.prompt('Enter filename for workspace export (e.g., my_workspace.json):');
-    if (!filename) return;
+    setSaveAsOpen(true);
+  }, [hasWorkspaceSelected]);
+
+  const confirmSaveAs = useCallback(async () => {
+    if (!saveAsName.trim()) return;
     try {
-      await workspaceActions.saveWorkspaceAs(filename.trim());
-      notify('success', `Workspace saved as ${filename}.`);
+      await workspaceActions.saveWorkspaceAs(saveAsName.trim());
+      notify('success', `Workspace saved as ${saveAsName}.`);
+      setSaveAsOpen(false);
+      setSaveAsName('');
     } catch (error) {
       notify('error', (error as Error).message || 'Failed to save workspace copy.');
     }
-  }, [hasWorkspaceSelected, notify, workspaceActions]);
+  }, [notify, saveAsName, workspaceActions]);
 
   const openDeleteWorkspaceDialog = useCallback(
     (workspaceId: string) => {
@@ -279,6 +294,7 @@ export const DataLoaderFeature: React.FC = () => {
                 </div>
               )}
 
+            {hasWorkspaceSelected && (
               <div className="space-y-2">
                 <Label htmlFor="rename-workspace">Rename workspace</Label>
                 <div className="flex flex-col gap-2 sm:flex-row">
@@ -294,16 +310,25 @@ export const DataLoaderFeature: React.FC = () => {
                   </Button>
                 </div>
               </div>
+            )}
 
-              <div className="flex flex-wrap gap-2">
-                <Button variant="outline" onClick={handleSaveWorkspace} disabled={!hasWorkspaceSelected}>
-                  <RefreshCcw className="mr-2 h-4 w-4" /> Save
-                </Button>
-                <Button variant="outline" onClick={handleSaveWorkspaceAs} disabled={!hasWorkspaceSelected}>
-                  <FolderPlus className="mr-2 h-4 w-4" /> Save as…
-                </Button>
-              </div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" onClick={handleSaveWorkspace} disabled={!hasWorkspaceSelected}>
+                <RefreshCcw className="mr-2 h-4 w-4" /> Save
+              </Button>
+              <Button variant="outline" onClick={handleSaveWorkspaceAs} disabled={!hasWorkspaceSelected}>
+                <FolderPlus className="mr-2 h-4 w-4" /> Save as…
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => workspaceActions.setCurrentWorkspace(null)}
+                disabled={!hasWorkspaceSelected || workspaceBusy}
+              >
+                <LogOut className="mr-2 h-4 w-4" /> Unload
+              </Button>
+            </div>
 
+            {!hasWorkspaceSelected && (
               <div className="space-y-2">
                 <Label htmlFor="new-workspace-name">Create workspace</Label>
                 <Input
@@ -321,7 +346,7 @@ export const DataLoaderFeature: React.FC = () => {
                   <Plus className="mr-2 h-4 w-4" /> Create workspace
                 </Button>
               </div>
-            </div>
+            )}
           </CardContent>
         </Card>
 
@@ -367,16 +392,6 @@ export const DataLoaderFeature: React.FC = () => {
                         >
                           {isActive ? 'Active' : 'Activate'}
                         </Button>
-                        {isActive && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => workspaceActions.setCurrentWorkspace(null)}
-                            disabled={workspaceBusy}
-                          >
-                            <LogOut className="mr-1.5 h-4 w-4" /> Unload
-                          </Button>
-                        )}
                         <Button
                           size="sm"
                           variant="destructive"
@@ -453,14 +468,18 @@ export const DataLoaderFeature: React.FC = () => {
                           <Button size="sm" variant="secondary" onClick={() => setPreviewFile(file.filename)}>
                             <Eye className="mr-1.5 h-4 w-4" /> Preview
                           </Button>
-                          <Button size="sm" onClick={() => {
-                            if (!hasWorkspaceSelected) {
-                              setWorkspaceAlertOpen(true);
-                              return;
-                            }
-                            setAddFileName(file.filename);
-                            setSelectedFile(file.filename);
-                          }}>
+                          <Button
+                            size="sm"
+                            disabled={!hasWorkspaceSelected}
+                            onClick={() => {
+                              if (!hasWorkspaceSelected) {
+                                setWorkspaceAlertOpen(true);
+                                return;
+                              }
+                              setAddFileName(file.filename);
+                              setSelectedFile(file.filename);
+                            }}
+                          >
                             <Plus className="mr-1.5 h-4 w-4" /> Add
                           </Button>
                           <Button size="sm" variant="outline" onClick={() => handleDownloadFile(file.filename)}>
@@ -533,6 +552,33 @@ export const DataLoaderFeature: React.FC = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={saveAsOpen} onOpenChange={setSaveAsOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Save Workspace As</DialogTitle>
+            <DialogDescription>
+              Enter a filename for the workspace export (e.g., my_workspace.json)
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Input
+              value={saveAsName}
+              onChange={(e) => setSaveAsName(e.target.value)}
+              placeholder="filename.json"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') confirmSaveAs();
+              }}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSaveAsOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={confirmSaveAs}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

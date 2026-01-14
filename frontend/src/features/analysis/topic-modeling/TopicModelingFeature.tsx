@@ -16,6 +16,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../..
 import { Input } from '../../../components/ui/input';
 import { Checkbox } from '../../../components/ui/checkbox';
 import { AlertTriangle, Loader2, Play, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { applySelectedColumnsToSnapshots } from '../../../hooks/useSchemaManagement';
 import AnalysisLockedNotice from '../../../components/tabs/AnalysisLockedNotice';
 import AnalysisTaskBanner from '../../../components/tabs/AnalysisTaskBanner';
@@ -260,7 +261,7 @@ const TopicModelingFeature: React.FC = () => {
     if (!currentWorkspaceId || panelNodeIds.length === 0) return;
     if (runningRef.current) return; // guard double click
     if (panelHasMissingColumns) {
-      alert('Select a text column for all selected nodes');
+      toast.error('Select a text column for all selected nodes');
       return;
     }
   const requestNodeIds = panelNodeIds.slice(0, 2);

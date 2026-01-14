@@ -27,6 +27,7 @@ dependencies = [
     "psutil>=6.1.0", # Process management for proper cleanup of child processes
     "docframe", # Includes nltk, polars, spacy, bertopic
     "docworkspace",
+    "pyarrow>=16.0.0",
 ]
 
 [project.optional-dependencies]

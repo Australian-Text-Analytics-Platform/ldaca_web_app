@@ -20,6 +20,7 @@ import { Input } from '../../../components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Play, Loader2, Trash2, Table2, Download, X, ChevronLeft, ChevronRight, Lightbulb } from 'lucide-react';
 import { Text } from '@visx/text';
+import { toast } from 'sonner';
 import { createNodeSnapshots, applySelectedColumnsToSnapshots } from '../../../hooks/useSchemaManagement';
 import { type NodeColumnSelection } from '../../../hooks/useAutoNodeColumns';
 import useNodeColumnInfos from '../../../hooks/useNodeColumnInfos';
@@ -968,7 +969,7 @@ function TokenFrequencyFeature() {
 
     const incompleteSelections = effectiveNodeColumnSelections.filter((sel) => !sel.column);
     if (incompleteSelections.length > 0) {
-      alert('Please select a text column for all selected nodes.');
+      toast.error('Please select a text column for all selected nodes.');
       return;
     }
 

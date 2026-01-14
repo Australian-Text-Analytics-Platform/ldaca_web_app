@@ -19,6 +19,46 @@ from .worker import TASK_REGISTRY, get_worker_pool
 logger = logging.getLogger(__name__)
 
 
+TASK_PROGRESS_MESSAGES = {
+    "topic_modeling": {
+        "loading": "Loading data...",
+        "processing": "Processing text data...",
+        "generating": "Generating topics...",
+        "finalizing": "Finalizing results...",
+    },
+    "concordance": {
+        "loading": "Loading data...",
+        "processing": "Searching text...",
+        "generating": "Compiling matches...",
+        "finalizing": "Formatting results...",
+    },
+    "token_frequencies": {
+        "loading": "Loading data...",
+        "processing": "Counting tokens...",
+        "generating": "Calculating statistics...",
+        "finalizing": "Formatting results...",
+    },
+    "concordance_detach": {
+        "loading": "Loading node data...",
+        "processing": "Computing concordance matches...",
+        "generating": "Joining with original data...",
+        "finalizing": "Creating new workspace node...",
+    },
+    "quotation_detach": {
+        "loading": "Loading node data...",
+        "processing": "Extracting quotations...",
+        "generating": "Structuring results...",
+        "finalizing": "Creating new workspace node...",
+    },
+    "default": {
+        "loading": "Loading data...",
+        "processing": "Processing...",
+        "generating": "Analyzing...",
+        "finalizing": "Finalizing...",
+    },
+}
+
+
 class TaskStatus(str, Enum):
     PENDING = "pending"
     RUNNING = "running"
@@ -164,6 +204,37 @@ class ProcessTaskManager:
             ),
         }
 
+    def _get_progress_status(
+        self, task_type: Optional[str], elapsed: float
+    ) -> Tuple[float, str]:
+        """Calculate progress and get message based on task type and elapsed time."""
+        messages = (
+            TASK_PROGRESS_MESSAGES.get(task_type, TASK_PROGRESS_MESSAGES["default"])
+            if task_type
+            else TASK_PROGRESS_MESSAGES["default"]
+        )
+
+        if elapsed < 10:
+            # Initial phase (0-20%)
+            estimated_progress = 0.2 * (elapsed / 10.0)
+            phase_message = messages["loading"]
+        elif elapsed < 30:
+            # Second phase (20-70%)
+            elapsed_in_phase = elapsed - 10
+            estimated_progress = 0.2 + 0.5 * (elapsed_in_phase / 20.0)
+            phase_message = messages["processing"]
+        elif elapsed < 60:
+            # Third phase (70-90%)
+            elapsed_in_phase = elapsed - 30
+            estimated_progress = 0.7 + 0.2 * (elapsed_in_phase / 30.0)
+            phase_message = messages["generating"]
+        else:
+            # Final phase (capped at 90%)
+            estimated_progress = 0.9
+            phase_message = messages["finalizing"]
+
+        return estimated_progress, phase_message
+
     async def _progress_ticker(
         self, task_info: TaskInfo, user_id: str, workspace_id: str
     ):
@@ -176,22 +247,12 @@ class ProcessTaskManager:
                 if task_info.status != TaskStatus.RUNNING or not task_info.started_at:
                     break
 
-                # Simulate progress based on elapsed time (same phases as list())
+                # Simulate progress based on elapsed time
                 elapsed = time.time() - task_info.started_at
-                if elapsed < 10:
-                    estimated_progress = 0.2 * (elapsed / 10.0)
-                    phase_message = "Loading data..."
-                elif elapsed < 30:
-                    elapsed_in_phase = elapsed - 10
-                    estimated_progress = 0.2 + 0.5 * (elapsed_in_phase / 20.0)
-                    phase_message = "Processing text data..."
-                elif elapsed < 60:
-                    elapsed_in_phase = elapsed - 30
-                    estimated_progress = 0.7 + 0.2 * (elapsed_in_phase / 30.0)
-                    phase_message = "Generating topics..."
-                else:
-                    estimated_progress = 0.9
-                    phase_message = "Finalizing results..."
+                task_type = task_info.metadata.get("task_type")
+                estimated_progress, phase_message = self._get_progress_status(
+                    task_type, elapsed
+                )
 
                 # Update progress store and task_info
                 self._progress_store[task_info.id] = {
@@ -230,46 +291,118 @@ class ProcessTaskManager:
             # Update task status
             task_info.update_status()
 
-            if (
-                task_info.status == TaskStatus.SUCCESSFUL
-                and task_info.metadata.get("task_type") in TASK_REGISTRY
-            ):
+            if task_info.status == TaskStatus.SUCCESSFUL:
                 task_type = task_info.metadata.get("task_type")
-                try:
-                    # Save the analysis result
-                    await self._save_analysis_result(
-                        user_id, workspace_id, task_type, task_info, result
-                    )
-                    result_persisted = True
 
-                    # Emit analysis_saved event ONLY after successful save
-                    await self.emit(
-                        user_id,
-                        workspace_id,
-                        {
-                            "type": "analysis_saved",
-                            "task_type": task_type,
-                            "task_id": task_info.id,
-                            "timestamp": time.time(),
-                        },
-                    )
-                except Exception as save_error:
-                    logger.error(
-                        f"Failed to save {task_type} result for task {task_info.id}: {save_error}"
-                    )
+                # Handle DETACH tasks (add node to workspace)
+                if task_type in ["concordance_detach", "quotation_detach"]:
+                    try:
+                        import polars as pl
 
-                    # Emit analysis save failure event
-                    await self.emit(
-                        user_id,
-                        workspace_id,
-                        {
-                            "type": "analysis_save_failed",
-                            "task_type": task_type,
-                            "task_id": task_info.id,
-                            "message": f"Failed to save result: {str(save_error)}",
-                            "timestamp": time.time(),
-                        },
-                    )
+                        from docframe import DocLazyFrame
+
+                        from .workspace import workspace_manager
+
+                        # Result contains path and info
+                        data = result
+                        parquet_path = data.get("parquet_path")
+                        new_node_name = data.get("new_node_name")
+                        parent_id = data.get("parent_node_id")
+                        doc_col = data.get("document_column")
+
+                        if not parquet_path:
+                            raise ValueError("Task result missing parquet_path")
+
+                        lazy_df = pl.scan_parquet(parquet_path)
+                        if doc_col:
+                            try:
+                                lazy_df = DocLazyFrame(lazy_df, document_column=doc_col)
+                            except Exception:
+                                pass
+
+                        parent_node = workspace_manager.get_node_from_workspace(
+                            user_id, workspace_id, parent_id
+                        )
+
+                        new_node = workspace_manager.add_node_to_workspace(
+                            user_id=user_id,
+                            workspace_id=workspace_id,
+                            data=lazy_df,
+                            node_name=new_node_name,
+                            operation=task_type,
+                            parents=[parent_node] if parent_node else [],
+                        )
+
+                        if new_node:
+                            result_persisted = True
+                            await self.emit(
+                                user_id,
+                                workspace_id,
+                                {
+                                    "type": "workspace_updated",
+                                    "task_type": task_type,
+                                    "task_id": task_info.id,
+                                    "new_node_id": new_node.id,
+                                    "timestamp": time.time(),
+                                },
+                            )
+                        else:
+                            raise RuntimeError("Failed to add node to workspace")
+
+                    except Exception as detach_err:
+                        logger.error(
+                            f"Failed to finalize detach task {task_info.id}: {detach_err}"
+                        )
+                        task_info.status = TaskStatus.FAILED
+                        task_info.error = str(detach_err)
+                        # We must send an update to reflect the failure
+                        await self.emit(
+                            user_id,
+                            workspace_id,
+                            {
+                                "type": "task_changed",
+                                "task": self._serialize_task(task_info),
+                                "timestamp": time.time(),
+                            },
+                        )
+
+                # Handle ANALYSIS tasks (save to AnalysisManager)
+                elif task_type in TASK_REGISTRY:
+                    try:
+                        # Save the analysis result
+                        await self._save_analysis_result(
+                            user_id, workspace_id, task_type, task_info, result
+                        )
+                        result_persisted = True
+
+                        # Emit analysis_saved event ONLY after successful save
+                        await self.emit(
+                            user_id,
+                            workspace_id,
+                            {
+                                "type": "analysis_saved",
+                                "task_type": task_type,
+                                "task_id": task_info.id,
+                                "timestamp": time.time(),
+                            },
+                        )
+                    except Exception as save_error:
+                        logger.error(
+                            f"Failed to save {task_type} result for task {task_info.id}: {save_error}"
+                        )
+
+                        # Emit analysis save failure event
+                        await self.emit(
+                            user_id,
+                            workspace_id,
+                            {
+                                "type": "analysis_save_failed",
+                                "task_type": task_type,
+                                "task_id": task_info.id,
+                                "message": f"Failed to save result: {str(save_error)}",
+                                "timestamp": time.time(),
+                            },
+                        )
 
             # Always emit task_changed for completion with accurate result_persisted flag
             await self.emit(
@@ -480,26 +613,10 @@ class ProcessTaskManager:
                 if task_info.status == TaskStatus.RUNNING and task_info.started_at:
                     # For running tasks, simulate progress based on elapsed time
                     elapsed = time.time() - task_info.started_at
-
-                    # More realistic progress simulation with phases
-                    if elapsed < 10:
-                        # Initial phase: data loading (0-20%)
-                        estimated_progress = 0.2 * (elapsed / 10.0)
-                        phase_message = "Loading data..."
-                    elif elapsed < 30:
-                        # Processing phase: text processing (20-70%)
-                        elapsed_in_phase = elapsed - 10
-                        estimated_progress = 0.2 + 0.5 * (elapsed_in_phase / 20.0)
-                        phase_message = "Processing text data..."
-                    elif elapsed < 60:
-                        # Final phase: topic modeling (70-90%)
-                        elapsed_in_phase = elapsed - 30
-                        estimated_progress = 0.7 + 0.2 * (elapsed_in_phase / 30.0)
-                        phase_message = "Generating topics..."
-                    else:
-                        # Capped at 90% until actual completion
-                        estimated_progress = 0.9
-                        phase_message = "Finalizing results..."
+                    task_type = task_info.metadata.get("task_type")
+                    estimated_progress, phase_message = self._get_progress_status(
+                        task_type, elapsed
+                    )
 
                     # Update or create progress info
                     if task_info.id not in self._progress_store:
@@ -645,26 +762,10 @@ class ProcessTaskManager:
                 if task_info.status == TaskStatus.RUNNING and task_info.started_at:
                     # For running tasks, simulate progress based on elapsed time
                     elapsed = time.time() - task_info.started_at
-
-                    # More realistic progress simulation with phases
-                    if elapsed < 10:
-                        # Initial phase: data loading (0-20%)
-                        estimated_progress = 0.2 * (elapsed / 10.0)
-                        phase_message = "Loading data..."
-                    elif elapsed < 30:
-                        # Processing phase: text processing (20-70%)
-                        elapsed_in_phase = elapsed - 10
-                        estimated_progress = 0.2 + 0.5 * (elapsed_in_phase / 20.0)
-                        phase_message = "Processing text data..."
-                    elif elapsed < 60:
-                        # Final phase: topic modeling (70-90%)
-                        elapsed_in_phase = elapsed - 30
-                        estimated_progress = 0.7 + 0.2 * (elapsed_in_phase / 30.0)
-                        phase_message = "Generating topics..."
-                    else:
-                        # Capped at 90% until actual completion
-                        estimated_progress = 0.9
-                        phase_message = "Finalizing results..."
+                    task_type = task_info.metadata.get("task_type")
+                    estimated_progress, phase_message = self._get_progress_status(
+                        task_type, elapsed
+                    )
 
                     # Update or create progress info
                     if task_id not in self._progress_store:

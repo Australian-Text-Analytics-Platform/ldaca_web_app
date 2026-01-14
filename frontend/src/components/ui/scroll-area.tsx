@@ -7,6 +7,8 @@ type ScrollAreaScrollbarOption = "vertical" | "horizontal" | "both" | "none"
 
 type ScrollAreaProps = React.ComponentProps<typeof ScrollAreaPrimitive.Root> & {
   scrollbars?: ScrollAreaScrollbarOption
+  children?: React.ReactNode
+  className?: string
 }
 
 function ScrollArea({

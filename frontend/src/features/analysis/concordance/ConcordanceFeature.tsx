@@ -1,5 +1,6 @@
 // NodeSelectionPanel now handles color selection UI inline
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
 import { Tabs, TabsList, TabsTrigger } from '../../../components/ui/tabs';
 import { useWorkspaceSelection } from '../../../hooks/useWorkspaceSelection';
@@ -17,6 +18,7 @@ import useNodeColumnInfos from '../../../hooks/useNodeColumnInfos';
 import { Button } from '../../../components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Play, Loader2, Trash2, Link as LinkIcon, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { toast } from 'sonner';
 import {
   Table,
   TableBody,
@@ -31,6 +33,7 @@ import AnalysisLockedNotice from '../../../components/tabs/AnalysisLockedNotice'
 import AnalysisTaskBanner from '../../../components/tabs/AnalysisTaskBanner';
 import type { AnalysisTaskStatus } from '../../../hooks/useAnalysisTaskStatus';
 import useAnalysisTaskLifecycle, { type AnalysisTaskRefreshContext } from '../../../hooks/useAnalysisTaskLifecycle';
+import { queryKeys } from '../../../lib/queryKeys';
 
 const sanitizeResultParams = (params?: Record<string, unknown>): Record<string, unknown> | undefined => {
   if (!params) return undefined;
@@ -50,6 +53,7 @@ const sanitizeResultParams = (params?: Record<string, unknown>): Record<string, 
 const ConcordanceFeature: React.FC = () => {
   // Anchor ref for results container to stabilize scroll on view mode toggle
   const resultsRef = useRef<HTMLDivElement | null>(null);
+  const queryClient = useQueryClient();
   const { selectedNodes } = useWorkspaceSelection();
   const { isLoading } = useWorkspaceStatus();
   const { currentWorkspaceId } = useWorkspaceData();
@@ -254,6 +258,16 @@ const ConcordanceFeature: React.FC = () => {
     [refreshCurrentConcordanceResult, setResults, setLocalConcordanceTaskId]
   );
 
+  const handleDetachTaskRefresh = useCallback(
+    async (context: AnalysisTaskRefreshContext) => {
+      if (!currentWorkspaceId) return;
+      if (context.reason === 'terminal' && context.taskState === 'successful') {
+        await queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
+      }
+    },
+    [currentWorkspaceId, queryClient]
+  );
+
   const {
     status: concordanceTaskStatus,
     banner: concordanceWaitingBanner,
@@ -264,6 +278,12 @@ const ConcordanceFeature: React.FC = () => {
     fallbackRunningBanner: concordanceFallbackBanner,
     pollWhileActive: true,
     onRefresh: handleTaskRefresh,
+  });
+
+  useAnalysisTaskLifecycle({
+    taskType: 'concordance_detach',
+    workspaceId: currentWorkspaceId,
+    onRefresh: handleDetachTaskRefresh,
   });
 
   useEffect(() => {
@@ -435,7 +455,7 @@ const ConcordanceFeature: React.FC = () => {
 
     const trimmedSearch = searchWord.trim();
     if (!trimmedSearch) {
-      alert('Please enter a search word.');
+      toast.error('Please enter a search word.');
       return;
     }
 
@@ -457,7 +477,7 @@ const ConcordanceFeature: React.FC = () => {
 
     const incompleteSelections = effectiveSelections.filter((sel) => !sel.column);
     if (incompleteSelections.length > 0) {
-      alert('Please select a text column for all selected nodes.');
+      toast.error('Please select a text column for all selected nodes.');
       return;
     }
 
@@ -989,7 +1009,7 @@ const ConcordanceFeature: React.FC = () => {
   }, [combinedPage, combinedPageSize, currentWorkspaceId, globalPageSize, updateStoredResult, viewMode]);
 
   const handleRowClick = (row: any, nodeId: string, column: string) => {
-    if (!currentWorkspaceId || row.document_idx === undefined) return;
+    if (!currentWorkspaceId) return;
 
     const record = { ...row };
     const availableColumns = Object.keys(record);
@@ -1128,7 +1148,7 @@ const ConcordanceFeature: React.FC = () => {
     } catch (error) {
       console.error('Error detaching concordance:', error);
       // Only show error messages, not success messages
-      alert(`Error detaching concordance: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      toast.error(`Error detaching concordance: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setNodeDetaching(prev => ({ ...prev, [nodeId]: false }));
     }
@@ -1234,16 +1254,15 @@ const ConcordanceFeature: React.FC = () => {
               </Button>
             </div>
           </div>
-          <div className="overflow-hidden rounded-lg border border-border bg-card">
+          <div className="rounded-lg border border-border bg-card">
             <ScrollArea
-              type="always"
+              type="hover"
               scrollbars="both"
-              className="max-h-96"
-              style={{ scrollbarGutter: 'stable both-edges' }}
+              className="h-[400px]"
             >
-              <div className="min-w-max pb-4">
-                <Table className="min-w-[720px]">
-                <TableHeader className="bg-gray-50">
+              <div className="min-w-max">
+                <Table className="min-w-[720px]" disableContainer>
+                <TableHeader className="bg-gray-50 sticky top-0 z-10">
                   <TableRow>
                     {displayColumns.map((c: string) => {
                       const lower = c.toLowerCase();
@@ -1397,16 +1416,15 @@ const ConcordanceFeature: React.FC = () => {
 
     return (
       <div key={nodeKey} className="mb-6">
-        <div className="overflow-hidden rounded-lg border border-border bg-card">
+        <div className="rounded-lg border border-border bg-card">
           <ScrollArea
-            type="always"
+            type="hover"
             scrollbars="both"
-            className="max-h-96"
-            style={{ scrollbarGutter: 'stable both-edges' }}
+            className="h-[400px]"
           >
-            <div className="min-w-max pb-4">
-              <Table className="min-w-[720px]">
-              <TableHeader className="bg-gray-50">
+            <div className="min-w-max">
+              <Table className="min-w-[720px]" disableContainer>
+              <TableHeader className="bg-gray-50 sticky top-0 z-10">
                 <TableRow>
                   {displayColumns.map(key => {
                     const neverSortable = ['left_context','matched_text','right_context'];
@@ -1437,9 +1455,7 @@ const ConcordanceFeature: React.FC = () => {
                     key={index} 
                     className={`cursor-pointer ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
                     onClick={() => {
-                      if (effectiveNodeId) {
-                        handleRowClick(row, effectiveNodeId, column);
-                      }
+                      handleRowClick(row, effectiveNodeId, column);
                     }}
                   >
                     {displayColumns.map((colKey: string, cellIndex) => (
