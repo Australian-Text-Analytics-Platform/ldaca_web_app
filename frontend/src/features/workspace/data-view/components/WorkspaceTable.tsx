@@ -28,6 +28,7 @@ import {
   TableHeader,
   TableRow,
 } from '../../../../components/ui/table';
+import { toast } from 'sonner';
 import { DatetimeFormatPanel } from '../../../../components/panels/DatetimeFormatPanel';
 import { ConfirmDialog } from '../../../../components/ui/confirm-dialog';
 import { TablePaginationControls } from './TablePaginationControls';
@@ -233,11 +234,7 @@ export function WorkspaceTable({
       } catch (error) {
         console.error('WorkspaceTable: cast error', error);
         const message = error instanceof Error ? error.message : String(error);
-        try {
-          alert(`Failed to convert column "${column}" to ${targetType}: ${message}`);
-        } catch {
-          // ignore alert failures
-        }
+        toast.error(`Failed to convert column "${column}" to ${targetType}: ${message}`);
       } finally {
         setLoadingCast((prev) => ({ ...prev, [column]: false }));
       }
@@ -326,11 +323,7 @@ export function WorkspaceTable({
 
       const trimmed = value.trim();
       if (!trimmed) {
-        try {
-          alert('Column name cannot be empty.');
-        } catch {
-          /* ignore */
-        }
+        toast.error('Column name cannot be empty.');
         return;
       }
 
@@ -341,11 +334,7 @@ export function WorkspaceTable({
 
       const nameConflict = columns.some((existing) => existing !== column && existing === trimmed);
       if (nameConflict) {
-        try {
-          alert(`A column named "${trimmed}" already exists.`);
-        } catch {
-          /* ignore */
-        }
+        toast.error(`A column named "${trimmed}" already exists.`);
         return;
       }
 
@@ -360,11 +349,7 @@ export function WorkspaceTable({
       } catch (error) {
         console.error('WorkspaceTable: rename column error', error);
         const message = error instanceof Error ? error.message : String(error);
-        try {
-          alert(`Failed to rename column "${column}": ${message}`);
-        } catch {
-          /* ignore */
-        }
+        toast.error(`Failed to rename column "${column}": ${message}`);
       } finally {
         setColumnBusy(column, false);
       }
@@ -414,11 +399,7 @@ export function WorkspaceTable({
     } catch (error) {
       console.error('WorkspaceTable: delete column error', error);
       const message = error instanceof Error ? error.message : String(error);
-      try {
-        alert(`Failed to delete column "${column}": ${message}`);
-      } catch {
-        /* ignore */
-      }
+      toast.error(`Failed to delete column "${column}": ${message}`);
     } finally {
       setColumnBusy(column, false);
     }

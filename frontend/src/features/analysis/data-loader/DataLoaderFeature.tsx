@@ -25,6 +25,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../../../components/ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../../../components/ui/dialog';
 
 const formatBytes = (bytes?: number | null): string => {
   if (!bytes || Number.isNaN(bytes)) return '—';
@@ -81,6 +89,8 @@ export const DataLoaderFeature: React.FC = () => {
   const [workspaceAlertOpen, setWorkspaceAlertOpen] = useState(false);
   const [workspaceToDelete, setWorkspaceToDelete] = useState<{ id: string; name?: string | null } | null>(null);
   const [deletingWorkspace, setDeletingWorkspace] = useState(false);
+  const [saveAsOpen, setSaveAsOpen] = useState(false);
+  const [saveAsName, setSaveAsName] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const hasWorkspaceSelected = Boolean(currentWorkspaceId);
@@ -156,15 +166,20 @@ export const DataLoaderFeature: React.FC = () => {
 
   const handleSaveWorkspaceAs = useCallback(async () => {
     if (!hasWorkspaceSelected) return;
-    const filename = window.prompt('Enter filename for workspace export (e.g., my_workspace.json):');
-    if (!filename) return;
+    setSaveAsOpen(true);
+  }, [hasWorkspaceSelected]);
+
+  const confirmSaveAs = useCallback(async () => {
+    if (!saveAsName.trim()) return;
     try {
-      await workspaceActions.saveWorkspaceAs(filename.trim());
-      notify('success', `Workspace saved as ${filename}.`);
+      await workspaceActions.saveWorkspaceAs(saveAsName.trim());
+      notify('success', `Workspace saved as ${saveAsName}.`);
+      setSaveAsOpen(false);
+      setSaveAsName('');
     } catch (error) {
       notify('error', (error as Error).message || 'Failed to save workspace copy.');
     }
-  }, [hasWorkspaceSelected, notify, workspaceActions]);
+  }, [notify, saveAsName, workspaceActions]);
 
   const openDeleteWorkspaceDialog = useCallback(
     (workspaceId: string) => {
@@ -536,6 +551,33 @@ export const DataLoaderFeature: React.FC = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={saveAsOpen} onOpenChange={setSaveAsOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Save Workspace As</DialogTitle>
+            <DialogDescription>
+              Enter a filename for the workspace export (e.g., my_workspace.json)
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Input
+              value={saveAsName}
+              onChange={(e) => setSaveAsName(e.target.value)}
+              placeholder="filename.json"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') confirmSaveAs();
+              }}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSaveAsOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={confirmSaveAs}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

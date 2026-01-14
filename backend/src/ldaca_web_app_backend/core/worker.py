@@ -120,12 +120,12 @@ def topic_modeling_task(
     try:
         # Import heavy libraries after environment is configured
         import polars as pl
-        from docframe.core.text_utils import topic_visualization
-
-        from docframe import DocDataFrame, DocLazyFrame
 
         # Import workspace manager (this should be lightweight)
         from ldaca_web_app_backend.core.workspace import workspace_manager
+
+        from docframe import DocDataFrame, DocLazyFrame
+        from docframe.core.text_utils import topic_visualization
 
         print(
             f"[Worker {os.getpid()}] Starting topic modeling task for workspace {workspace_id}"
@@ -458,8 +458,7 @@ def _filter_concordance_rows(df: "pl.DataFrame") -> "pl.DataFrame":
     try:
         non_empty_checks = [
             (
-                pl
-                .col(col)
+                pl.col(col)
                 .cast(pl.Utf8, strict=False)
                 .str.strip_chars()
                 .str.len_chars()
@@ -498,9 +497,9 @@ def concordance_detach_task(
         from pathlib import Path
 
         import polars as pl
-
-        from docframe import DocLazyFrame
         from ldaca_web_app_backend.core.workspace import workspace_manager
+
+        from docframe import DocDataFrame, DocLazyFrame
 
         print(
             f"[Worker {os.getpid()}] Starting concordance detach task for workspace {workspace_id}"
@@ -707,13 +706,13 @@ def quotation_detach_task(
         from pathlib import Path
 
         import polars as pl
-
-        from docframe import DocLazyFrame
         from ldaca_web_app_backend.core.workspace import workspace_manager
         from ldaca_web_app_backend.models import (
             QuotationEngineConfig,
             QuotationEngineType,
         )
+
+        from docframe import DocDataFrame, DocLazyFrame
 
         # Helper to convert to polars and ensure quote dataframe
         # We need to replicate _to_polars_dataframe, _ensure_quote_dataframe, _join_quotes_with_base logic here
@@ -753,114 +752,125 @@ def quotation_detach_task(
             raise ValueError(f"Invalid engine config: {e}")
 
         if engine.type is QuotationEngineType.LOCAL and not hasattr(node_data, "text"):
-            raise ValueError("This node does not support text analysis")
-
-        # Materialize base dataframe
-        if hasattr(node_data, "lazyframe"):
-            base_df = node_data.lazyframe.collect()
-        elif isinstance(node_data, pl.LazyFrame):
-            base_df = node_data.collect()
-        elif hasattr(node_data, "dataframe"):
-            base_df = pl.DataFrame(getattr(node_data, "dataframe"))
-        elif hasattr(node_data, "collect") and not isinstance(node_data, pl.DataFrame):
-            collected = node_data.collect()
-            base_df = (
-                collected
-                if isinstance(collected, pl.DataFrame)
-                else pl.DataFrame(collected)
-            )
-        else:
-            base_df = (
-                node_data
-                if isinstance(node_data, pl.DataFrame)
-                else pl.DataFrame(node_data)
-            )
-
-        if not isinstance(base_df, pl.DataFrame):
-            base_df = pl.DataFrame(base_df)
-
-        if column not in base_df.columns:
-            raise ValueError(f"Column '{column}' not found")
+            # Check if we can wrap it
+            pass  # Will handle below
 
         if progress_callback:
             progress_callback(0.4, "Extracting quotations...")
 
+        quote_df: pl.DataFrame
+
         # Compute quotes
         if engine.type is QuotationEngineType.REMOTE:
-            # Remote not fully supported in standalone worker task without async loop management?
-            # Workers are sync functions in multiprocessing.
-            # But quotation logic is async.
-            # We can run async here.
+            # Materialize base dataframe for remote upload
+            if hasattr(node_data, "lazyframe"):
+                base_df = node_data.lazyframe.collect()
+            elif isinstance(node_data, pl.LazyFrame):
+                base_df = node_data.collect()
+            elif hasattr(node_data, "dataframe"):
+                base_df = pl.DataFrame(getattr(node_data, "dataframe"))
+            elif hasattr(node_data, "collect") and not isinstance(
+                node_data, pl.DataFrame
+            ):
+                collected = node_data.collect()
+                base_df = (
+                    collected
+                    if isinstance(collected, pl.DataFrame)
+                    else pl.DataFrame(collected)
+                )
+            else:
+                base_df = (
+                    node_data
+                    if isinstance(node_data, pl.DataFrame)
+                    else pl.DataFrame(node_data)
+                )
 
-            # Need to import remote logic. It is in core.services.quotation_client
-            from ldaca_web_app_backend.core.services.quotation_client import (
-                extract_remote_quotations,
+            if not isinstance(base_df, pl.DataFrame):
+                base_df = pl.DataFrame(base_df)
+
+            from ldaca_web_app_backend.api.workspaces.analyses.quotation import (
+                _ensure_quote_dataframe,
+                _extract_remote_paginated,
+                _prepare_documents_payload,
+                _remote_payload_to_dataframe,
             )
 
-            # And helpers from quotation analysis...
-            # This isgetting complicated to copy all remote logic.
-            # Assumption: detached is mostly local for now?
-            # If remote is needed, we need to replicate _prepare_documents_payload, etc.
+            documents = _prepare_documents_payload(base_df, column)
+            if not documents:
+                quote_df = _ensure_quote_dataframe(pl.DataFrame(), text_column=column)
+            else:
+                payload = asyncio.get_event_loop().run_until_complete(
+                    _extract_remote_paginated(engine, documents)
+                )
+                quote_df = _remote_payload_to_dataframe(payload)
+                if "document_idx" in quote_df.columns:
+                    base_with_idx = base_df.with_row_index("__row__")
+                    quote_df = quote_df.join(
+                        base_with_idx.select(
+                            pl.col("__row__"),
+                            pl.col(column).alias(column),
+                        ),
+                        left_on="document_idx",
+                        right_on="__row__",
+                        how="left",
+                    ).drop([
+                        col
+                        for col in ("document_idx", "__row__")
+                        if col in quote_df.columns
+                    ])
+                quote_df = _ensure_quote_dataframe(quote_df, text_column=column)
+        else:
+            # Local Engine - use docframe directly
+            if not hasattr(node_data, "text"):
+                # Try to wrap as DocDataFrame if needed, similar to logic elsewhere
+                try:
+                    # If it's a polars object, wrap it
+                    df_to_wrap = node_data
+                    if hasattr(node_data, "collect"):
+                        df_to_wrap = node_data.collect()
 
-            raise NotImplementedError(
-                "Remote quotation detach not yet supported in background task"
+                    if isinstance(df_to_wrap, pl.DataFrame):
+                        base_df_wrapped = DocDataFrame(
+                            df_to_wrap, document_column=column
+                        )  # type: ignore
+                        node_data = base_df_wrapped
+                    else:
+                        raise ValueError("Cannot access text namespace")
+                except Exception:
+                    raise ValueError(
+                        "This node does not support text analysis (text namespace missing)"
+                    )
+
+            quote_raw = node_data.text.quotation(column, explode=True, unnest=True)
+
+            # Materialize result
+            if hasattr(quote_raw, "collect"):
+                quote_df = quote_raw.collect()
+            elif isinstance(quote_raw, pl.DataFrame):
+                quote_df = quote_raw
+            elif hasattr(quote_raw, "_df"):
+                quote_df = quote_raw._df
+                if hasattr(quote_df, "collect"):
+                    quote_df = quote_df.collect()
+            else:
+                quote_df = pl.DataFrame(quote_raw)
+
+            if not isinstance(quote_df, pl.DataFrame):
+                quote_df = pl.DataFrame(quote_df)
+
+            if progress_callback:
+                progress_callback(0.6, "Structuring results...")
+
+            if "quote" in quote_df.columns:
+                quote_df = quote_df.filter(pl.col("quote").is_not_null())
+
+            from ldaca_web_app_backend.api.workspaces.analyses.quotation import (
+                _ensure_quote_dataframe as _ensure_df,
             )
 
-        # Local engine
-        if not hasattr(base_df, "text"):
-            # Need to wrap in DocLazyFrame?
-            # base_df is eager DataFrame. DocFrame methods work on eager too if registered.
-            # But docframe text namespace must be available.
-            pass
+            quote_df = _ensure_df(quote_df, text_column=column)
 
-        # Ideally we should use the node's data if possible since it might be DocLazyFrame
-        # But we materialized it.
-        # DocFrame needs to be imported for the namespace to be active on Polars objects?
-        # Typically one creates a DocDataFrame/DocLazyFrame wrapper.
-
-        if not hasattr(base_df, "text"):
-            # try wrapping
-            try:
-                base_df = DocDataFrame(base_df, document_column=column)  # type: ignore
-            except Exception:
-                pass
-
-        if not hasattr(base_df, "text"):
-            raise ValueError("Could not access DocFrame text namespace on dataframe")
-
-        quote_raw = base_df.text.quotation(column, explode=True, unnest=True)
-
-        # To Polars
-        if hasattr(quote_raw, "_df"):
-            quote_df = quote_raw._df
-        else:
-            quote_df = quote_raw
-
-        if not isinstance(quote_df, pl.DataFrame):
-            quote_df = pl.DataFrame(quote_df)
-
-        # Ensure quote dataframe columns
-        # ... (simplified version of _ensure_quote_dataframe)
-        if "document_idx" not in quote_df.columns:
-            quote_df = quote_df.with_row_index("document_idx")
-
-        if progress_callback:
-            progress_callback(0.6, "Structuring results...")
-
-        if quote_df.height == 0:
-            joined_df = base_df
-        else:
-            original_with_idx = base_df.with_row_index("document_idx")
-            joined_df = original_with_idx.join(quote_df, on="document_idx", how="left")
-
-            redundant = [col for col in joined_df.columns if col.endswith("_right")]
-            if redundant:
-                joined_df = joined_df.drop(redundant)
-
-        if "document_idx" in joined_df.columns:
-            final_data = joined_df.drop("document_idx")
-        else:
-            final_data = joined_df
+        final_data = quote_df
 
         # New node name
         if new_node_name:
@@ -995,10 +1005,10 @@ def token_frequencies_task(
         import math
 
         import polars as pl
-        from docframe.core.text_utils import compute_token_frequencies
+        from ldaca_web_app_backend.core.workspace import workspace_manager
 
         from docframe import DocDataFrame, DocLazyFrame
-        from ldaca_web_app_backend.core.workspace import workspace_manager
+        from docframe.core.text_utils import compute_token_frequencies
 
         print(
             f"[Worker {os.getpid()}] Starting token frequencies task for workspace {workspace_id}"

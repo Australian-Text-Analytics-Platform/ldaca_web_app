@@ -24,13 +24,13 @@ from ....models import (
     QuotationResultQuery,
 )
 from ....settings import settings
-from ..utils import get_node_with_data_or_400, stage_dataframe_as_lazy
+from ..utils import get_node_with_data_or_400
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_CONTEXT_LENGTH = 20
 MAX_CONTEXT_LENGTH = 2000
-DEFAULT_PAGE_SIZE = 50
+DEFAULT_PAGE_SIZE = 100
 DEFAULT_SORT_ORDER = "asc"
 
 
@@ -69,17 +69,24 @@ def _normalize_pagination(
 
 
 def _apply_sort(
-    df: pl.DataFrame, *, sort_by: Optional[str], sort_order: str
+    df: pl.DataFrame,
+    *,
+    sort_by: Optional[str],
+    sort_order: str,
+    allowed_columns: Optional[Iterable[str]] = None,
 ) -> Tuple[pl.DataFrame, Optional[str], str]:
-    """Apply optional sorting and return (sorted_df, effective_sort_by, sort_order)."""
-    working = df
-    effective_sort_by = sort_by if sort_by and sort_by in working.columns else None
+    """Apply optional sorting constrained to allowed columns."""
+
+    permitted = set(allowed_columns or df.columns)
+    effective_sort_by = sort_by if sort_by and sort_by in permitted else None
     normalized_sort_order = _normalize_sort_order(sort_order)
+
     if effective_sort_by:
-        working = working.sort(
+        df = df.sort(
             pl.col(effective_sort_by), descending=normalized_sort_order == "desc"
         )
-    return working, effective_sort_by, normalized_sort_order
+
+    return df, effective_sort_by, normalized_sort_order
 
 
 def _extract_context_preference(record_result: Optional[Dict[str, Any]]) -> int:
@@ -129,10 +136,10 @@ def _to_polars_dataframe(data: Any) -> pl.DataFrame:
     return pl.DataFrame(data)
 
 
-def _empty_quote_dataframe() -> pl.DataFrame:
-    """Return a typed empty DataFrame shaped like a quotation result."""
-    return pl.DataFrame({
-        "document_idx": pl.Series("document_idx", [], dtype=pl.Int64),
+def _empty_quote_dataframe(text_column: Optional[str] = None) -> pl.DataFrame:
+    """Return a typed empty DataFrame shaped like a quotation result (no document_idx)."""
+
+    columns: Dict[str, pl.Series] = {
         "speaker": pl.Series("speaker", [], dtype=pl.Utf8),
         "speaker_start_idx": pl.Series("speaker_start_idx", [], dtype=pl.Int64),
         "speaker_end_idx": pl.Series("speaker_end_idx", [], dtype=pl.Int64),
@@ -146,7 +153,12 @@ def _empty_quote_dataframe() -> pl.DataFrame:
         "quote_token_count": pl.Series("quote_token_count", [], dtype=pl.Int64),
         "is_floating_quote": pl.Series("is_floating_quote", [], dtype=pl.Boolean),
         "quote_row_idx": pl.Series("quote_row_idx", [], dtype=pl.Int64),
-    })
+    }
+
+    if text_column:
+        columns[text_column] = pl.Series(text_column, [], dtype=pl.Utf8)
+
+    return pl.DataFrame(columns)
 
 
 def _materialise_base_dataframe(node_data: Any) -> pl.DataFrame:
@@ -157,21 +169,20 @@ def _materialise_base_dataframe(node_data: Any) -> pl.DataFrame:
     return base_df
 
 
-def _ensure_quote_dataframe(df: pl.DataFrame) -> pl.DataFrame:
-    """Guarantee required quotation columns and dtypes exist for downstream joins."""
+def _ensure_quote_dataframe(
+    df: pl.DataFrame, *, text_column: Optional[str] = None
+) -> pl.DataFrame:
+    """Guarantee required quotation columns and dtypes exist (without document_idx)."""
+
     result = df
-    if "document_idx" not in result.columns:
-        result = result.with_row_index("document_idx")
     if "quote_row_idx" not in result.columns:
         result = result.with_columns(
-            pl
-            .arange(0, result.height, eager=True)
+            pl.arange(0, result.height, eager=True)
             .cast(pl.Int64)
             .alias("quote_row_idx")
         )
-    # Enforce stable dtypes for numeric columns used downstream
+
     cast_map = {
-        "document_idx": pl.Int64,
         "speaker_start_idx": pl.Int64,
         "speaker_end_idx": pl.Int64,
         "quote_start_idx": pl.Int64,
@@ -191,6 +202,10 @@ def _ensure_quote_dataframe(df: pl.DataFrame) -> pl.DataFrame:
         boolean_exprs.append(pl.col("is_floating_quote").cast(pl.Boolean, strict=False))
     if numeric_exprs or boolean_exprs:
         result = result.with_columns(*numeric_exprs, *boolean_exprs)
+
+    if text_column and text_column not in result.columns:
+        result = result.with_columns(pl.lit(None).alias(text_column))
+
     return result
 
 
@@ -261,24 +276,6 @@ def _remote_payload_to_dataframe(payload: Dict[str, Any]) -> pl.DataFrame:
     return _ensure_quote_dataframe(pl.DataFrame(rows))
 
 
-def _join_quotes_with_base(
-    base_with_idx: pl.DataFrame, quote_df: pl.DataFrame
-) -> pl.DataFrame:
-    """Attach quotation rows back to the base slice while preserving column order."""
-    joined = base_with_idx.join(quote_df, on="document_idx", how="left")
-
-    redundant = [col for col in joined.columns if col.endswith("_right")]
-    if redundant:
-        joined = joined.drop(redundant)
-
-    base_columns = list(base_with_idx.columns)
-    additional_columns = [col for col in joined.columns if col not in base_columns]
-    if additional_columns:
-        joined = joined.select(base_columns + additional_columns)
-
-    return joined
-
-
 async def _compute_on_demand_page(
     node: Any,
     column: str,
@@ -289,16 +286,28 @@ async def _compute_on_demand_page(
     sort_by: Optional[str],
     sort_order: str,
 ) -> Dict[str, Any]:
-    """Compute quotations only for the requested document page.
+    """Compute quotations only for the requested document page (explode & unnest).
 
-    Pagination metadata is based on document slicing; data rows include all quotes
-    found within the sliced documents.
+    Pagination metadata counts documents; returned rows are exploded quotations for
+    those documents. Sorting is applied to the base documents only, never on
+    quotation metadata columns.
     """
 
     base_df = _materialise_base_dataframe(node.data)
-    base_with_idx = base_df.with_row_index("document_idx")
+    if column not in base_df.columns:
+        raise ValueError(
+            f"Column '{column}' not found. Available columns: {list(base_df.columns)}"
+        )
 
-    total_docs = base_with_idx.height
+    sortable_columns = set(base_df.columns)
+    sorted_base, effective_sort_by, normalized_sort_order = _apply_sort(
+        base_df,
+        sort_by=sort_by,
+        sort_order=sort_order,
+        allowed_columns=sortable_columns,
+    )
+
+    total_docs = sorted_base.height
     total_pages = max(1, math.ceil(total_docs / page_size)) if total_docs else 1
     if page > total_pages:
         page = total_pages
@@ -306,23 +315,19 @@ async def _compute_on_demand_page(
         page = 1
 
     start_doc = (page - 1) * page_size
-    slice_df = base_with_idx.slice(start_doc, page_size)
+    slice_df = sorted_base.slice(start_doc, page_size)
 
     quote_df = await _compute_quote_dataframe(
         node, slice_df, column, engine, use_base_only=True
     )
-    joined_slice = _join_quotes_with_base(slice_df, quote_df)
+    quote_df = _ensure_quote_dataframe(quote_df, text_column=column)
 
-    # NOTE: pagination is document-based (page_size counts documents), so we do NOT
-    # slice again after the join. All quote rows for the selected document slice
-    # should be returned.
-    sorted_slice, effective_sort_by, normalized_sort_order = _apply_sort(
-        joined_slice, sort_by=sort_by, sort_order=sort_order
-    )
+    if "quote" in quote_df.columns:
+        quote_df = quote_df.filter(pl.col("quote").is_not_null())
 
     return {
-        "data": sorted_slice.to_dicts(),
-        "columns": list(sorted_slice.columns),
+        "data": quote_df.to_dicts(),
+        "columns": list(quote_df.columns),
         "total_rows": total_docs,
         "pagination": {
             "page": page,
@@ -434,9 +439,26 @@ async def _compute_quote_dataframe(
     if engine.type is QuotationEngineType.REMOTE:
         documents = _prepare_documents_payload(base_df, column)
         if not documents:
-            return _empty_quote_dataframe()
+            return _empty_quote_dataframe(text_column=column)
         payload = await _extract_remote_paginated(engine, documents)
-        return _remote_payload_to_dataframe(payload)
+        quote_df = _remote_payload_to_dataframe(payload)
+
+        # Attach the source text column using the remote identifier, then drop it
+        if "document_idx" in quote_df.columns:
+            base_with_idx = base_df.with_row_index("__row__")
+            quote_df = quote_df.join(
+                base_with_idx.select(
+                    pl.col("__row__"),
+                    pl.col(column).alias(column),
+                ),
+                left_on="document_idx",
+                right_on="__row__",
+                how="left",
+            ).drop([
+                col for col in ("document_idx", "__row__") if col in quote_df.columns
+            ])
+
+        return _ensure_quote_dataframe(quote_df, text_column=column)
 
     # Local engine: rely on docframe's Polars text namespace.
     if not use_base_only:
@@ -444,19 +466,15 @@ async def _compute_quote_dataframe(
         if node_data is None:
             raise ValueError("Node has no data")
 
-        base_with_idx = (
-            node_data.with_row_index("document_idx")
-            if hasattr(node_data, "with_row_index")
-            else node_data
-        )
-
-        if not hasattr(base_with_idx, "text"):
+        if not hasattr(node_data, "text"):
             raise ValueError(
                 "This node does not support quotation extraction (docframe text namespace not available)"
             )
 
-        quote_raw = base_with_idx.text.quotation(column, explode=True, unnest=True)
-        return _ensure_quote_dataframe(_to_polars_dataframe(quote_raw))
+        quote_raw = node_data.text.quotation(column, explode=True, unnest=True)
+        return _ensure_quote_dataframe(
+            _to_polars_dataframe(quote_raw), text_column=column
+        )
 
     if not hasattr(base_df, "text"):
         raise ValueError(
@@ -464,33 +482,7 @@ async def _compute_quote_dataframe(
         )
 
     quote_raw = base_df.text.quotation(column, explode=True, unnest=True)
-    return _ensure_quote_dataframe(_to_polars_dataframe(quote_raw))
-
-
-async def _build_joined_quotation_frames(
-    node: Any,
-    column: str,
-    engine: QuotationEngineConfig,
-) -> Tuple[pl.DataFrame, pl.DataFrame]:
-    """Materialize node data, compute quotations, and return joined/ base frames."""
-    base_df = _materialise_base_dataframe(node.data)
-    if column not in base_df.columns:
-        raise ValueError(
-            f"Column '{column}' not found. Available columns: {list(base_df.columns)}"
-        )
-
-    quote_df = await _compute_quote_dataframe(
-        node, base_df, column, engine, use_base_only=False
-    )
-    quote_df = _ensure_quote_dataframe(quote_df)
-
-    if quote_df.height == 0:
-        return _empty_quote_dataframe(), base_df
-
-    original_with_idx = base_df.with_row_index("document_idx")
-    joined = _join_quotes_with_base(original_with_idx, quote_df)
-
-    return joined, base_df
+    return _ensure_quote_dataframe(_to_polars_dataframe(quote_raw), text_column=column)
 
 
 router = APIRouter(prefix="/workspaces", tags=["quotation"])  # maintain path parity

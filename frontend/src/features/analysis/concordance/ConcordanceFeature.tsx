@@ -1,5 +1,6 @@
 // NodeSelectionPanel now handles color selection UI inline
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
 import { Tabs, TabsList, TabsTrigger } from '../../../components/ui/tabs';
 import { useWorkspaceSelection } from '../../../hooks/useWorkspaceSelection';
@@ -17,6 +18,7 @@ import useNodeColumnInfos from '../../../hooks/useNodeColumnInfos';
 import { Button } from '../../../components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Play, Loader2, Trash2, Link as LinkIcon, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { toast } from 'sonner';
 import {
   Table,
   TableBody,
@@ -31,6 +33,7 @@ import AnalysisLockedNotice from '../../../components/tabs/AnalysisLockedNotice'
 import AnalysisTaskBanner from '../../../components/tabs/AnalysisTaskBanner';
 import type { AnalysisTaskStatus } from '../../../hooks/useAnalysisTaskStatus';
 import useAnalysisTaskLifecycle, { type AnalysisTaskRefreshContext } from '../../../hooks/useAnalysisTaskLifecycle';
+import { queryKeys } from '../../../lib/queryKeys';
 
 const sanitizeResultParams = (params?: Record<string, unknown>): Record<string, unknown> | undefined => {
   if (!params) return undefined;
@@ -50,6 +53,7 @@ const sanitizeResultParams = (params?: Record<string, unknown>): Record<string, 
 const ConcordanceFeature: React.FC = () => {
   // Anchor ref for results container to stabilize scroll on view mode toggle
   const resultsRef = useRef<HTMLDivElement | null>(null);
+  const queryClient = useQueryClient();
   const { selectedNodes } = useWorkspaceSelection();
   const { isLoading } = useWorkspaceStatus();
   const { currentWorkspaceId } = useWorkspaceData();
@@ -254,6 +258,16 @@ const ConcordanceFeature: React.FC = () => {
     [refreshCurrentConcordanceResult, setResults, setLocalConcordanceTaskId]
   );
 
+  const handleDetachTaskRefresh = useCallback(
+    async (context: AnalysisTaskRefreshContext) => {
+      if (!currentWorkspaceId) return;
+      if (context.reason === 'terminal' && context.taskState === 'successful') {
+        await queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
+      }
+    },
+    [currentWorkspaceId, queryClient]
+  );
+
   const {
     status: concordanceTaskStatus,
     banner: concordanceWaitingBanner,
@@ -264,6 +278,12 @@ const ConcordanceFeature: React.FC = () => {
     fallbackRunningBanner: concordanceFallbackBanner,
     pollWhileActive: true,
     onRefresh: handleTaskRefresh,
+  });
+
+  useAnalysisTaskLifecycle({
+    taskType: 'concordance_detach',
+    workspaceId: currentWorkspaceId,
+    onRefresh: handleDetachTaskRefresh,
   });
 
   useEffect(() => {
@@ -435,7 +455,7 @@ const ConcordanceFeature: React.FC = () => {
 
     const trimmedSearch = searchWord.trim();
     if (!trimmedSearch) {
-      alert('Please enter a search word.');
+      toast.error('Please enter a search word.');
       return;
     }
 
@@ -457,7 +477,7 @@ const ConcordanceFeature: React.FC = () => {
 
     const incompleteSelections = effectiveSelections.filter((sel) => !sel.column);
     if (incompleteSelections.length > 0) {
-      alert('Please select a text column for all selected nodes.');
+      toast.error('Please select a text column for all selected nodes.');
       return;
     }
 
@@ -1128,7 +1148,7 @@ const ConcordanceFeature: React.FC = () => {
     } catch (error) {
       console.error('Error detaching concordance:', error);
       // Only show error messages, not success messages
-      alert(`Error detaching concordance: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      toast.error(`Error detaching concordance: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setNodeDetaching(prev => ({ ...prev, [nodeId]: false }));
     }

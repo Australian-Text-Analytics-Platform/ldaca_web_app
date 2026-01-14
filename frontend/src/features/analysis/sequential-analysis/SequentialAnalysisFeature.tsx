@@ -15,6 +15,7 @@ import { normalizeSchemaFromInfo } from '../../../hooks/useSchemaManagement';
 import { Button } from '../../../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Input } from '../../../components/ui/input';
+import { toast } from 'sonner';
 import {
   Select,
   SelectContent,
@@ -291,7 +292,7 @@ const SequentialAnalysisFeature: React.FC = () => {
 const handleAnalyze = async () => {
     const nodeIdForAnalysis = activeNodeId;
     if (!nodeIdForAnalysis || !currentWorkspaceId) {
-      alert('Please select a node first');
+      toast.error('Please select a node first');
       return;
     }
 
@@ -302,7 +303,7 @@ const handleAnalyze = async () => {
       (results?.analysis_params?.time_column as string | undefined) ||
       '';
     if (!picked) {
-      alert('Please select a time column');
+      toast.error('Please select a time column');
       return;
     }
 
@@ -313,11 +314,11 @@ const handleAnalyze = async () => {
 
     if (derivedColumnType === 'numeric') {
       if (numericIntervalValue === null || numericIntervalValue <= 0) {
-        alert('Please enter a numeric interval greater than 0.');
+        toast.error('Please enter a numeric interval greater than 0.');
         return;
       }
       if (numericOriginInput.trim().length > 0 && numericOriginValue === null) {
-        alert('Numeric origin must be a valid number.');
+        toast.error('Numeric origin must be a valid number.');
         return;
       }
     }
@@ -384,7 +385,7 @@ const handleAnalyze = async () => {
       } catch { /* ignore */ }
     } catch (error) {
       console.error('Sequential analysis error:', error);
-      alert(`Error performing sequential analysis: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      toast.error(`Error performing sequential analysis: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsAnalyzing(false);
     }

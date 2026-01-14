@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
 import AnalysisLockedNotice from '../../../components/tabs/AnalysisLockedNotice';
 import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
@@ -37,6 +38,8 @@ import {
 } from '../../../components/ui/table';
 import { ScrollArea } from '../../../components/ui/scroll-area';
 import { ArrowUpDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2, Search, Trash2, Unlink } from 'lucide-react';
+import useAnalysisTaskLifecycle, { type AnalysisTaskRefreshContext } from '../../../hooks/useAnalysisTaskLifecycle';
+import { queryKeys } from '../../../lib/queryKeys';
 
 interface QuotationResultState {
   rows: any[];
@@ -56,8 +59,8 @@ interface QuotationResultState {
   column: string;
 }
 
-const DEFAULT_PAGE_SIZE = 20;
-const DEFAULT_CONTEXT_LENGTH = 20;
+const DEFAULT_PAGE_SIZE = 100;
+const DEFAULT_CONTEXT_LENGTH = 5;
 const MAX_CONTEXT_LENGTH = 2000;
 
 const clampContextLength = (value: number): number => {
@@ -254,6 +257,7 @@ const resolveNodeId = (node: any, fallbackIndex = 0): string => {
 };
 
 const QuotationFeature: React.FC = () => {
+  const queryClient = useQueryClient();
   const { selectedNodes, handlePageChange: baseHandlePageChange, handlePageSizeChange: baseHandlePageSizeChange } = useWorkspaceSelection();
   const { currentWorkspaceId, nodeData } = useWorkspaceData();
   const { quotationSearch, detachQuotation } = useWorkspaceActions();
@@ -300,9 +304,25 @@ const QuotationFeature: React.FC = () => {
   const [errorDialogOpen, setErrorDialogOpen] = useState(false);
   const [errorDialogMessage, setErrorDialogMessage] = useState<string>('');
 
+  const handleDetachTaskRefresh = useCallback(
+    async (context: AnalysisTaskRefreshContext) => {
+      if (!currentWorkspaceId) return;
+      if (context.reason === 'terminal' && context.taskState === 'successful') {
+        await queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
+      }
+    },
+    [currentWorkspaceId, queryClient]
+  );
+
   const { getColumnInfos } = useNodeColumnInfos({
     workspaceId: currentWorkspaceId,
     nodes: panelSelectedNodes,
+  });
+
+  useAnalysisTaskLifecycle({
+    taskType: 'quotation_detach',
+    workspaceId: currentWorkspaceId,
+    onRefresh: handleDetachTaskRefresh,
   });
 
   type ColumnSelection = (typeof nodeColumnSelections)[number];
@@ -656,7 +676,8 @@ const QuotationFeature: React.FC = () => {
       textDecorationLine: decorations as any,
       textDecorationColor: colors.join(' ') as any,
       textDecorationThickness: '2px',
-      textUnderlineOffset: '2px',
+      textUnderlineOffset: '4px',
+      textDecorationSkipInk: 'none',
       display: 'inline',
     } as React.CSSProperties;
   };
@@ -1442,7 +1463,7 @@ const QuotationFeature: React.FC = () => {
                         <SelectValue placeholder="Rows" />
                       </SelectTrigger>
                       <SelectContent>
-                        {[10, 20, 50, 100].map((sz) => (
+                        {[50, 100, 200, 400].map((sz) => (
                           <SelectItem key={sz} value={String(sz)}>
                             {sz}
                           </SelectItem>
@@ -1500,15 +1521,18 @@ const QuotationFeature: React.FC = () => {
             <CardContent className="space-y-8">
               {displayedNodes.map((node, idx) => {
                 const nodeId = resolveNodeId(node, idx);
-                const originalColumns = originalColumnsByNode[nodeId] || [];
                 const selection = activeSelections.find((s) => s.nodeId === nodeId);
                 const textCol = selection?.column || '';
 
-                const quotationColumnOrder = [
+                const resultState = resultsByNode[nodeId];
+                const fallbackRows: any[] = Array.isArray(nodeData?.data) ? nodeData.data : [];
+                const rowsForRender = resultState?.rows?.length ? resultState.rows : fallbackRows;
+                const rowsWithQuotes = rowsForRender.filter((row: any) => row?.quote);
+
+                const metaColumns = [
                   'speaker',
                   'speaker_start_idx',
                   'speaker_end_idx',
-                  'quote',
                   'quote_start_idx',
                   'quote_end_idx',
                   'verb',
@@ -1520,39 +1544,29 @@ const QuotationFeature: React.FC = () => {
                   'quote_row_idx',
                 ];
 
-                const coreQuotationCols = ['document_idx', ...quotationColumnOrder, textCol].filter(Boolean);
-
-                const resultState = resultsByNode[nodeId];
-                const fallbackRows: any[] = Array.isArray(nodeData?.data) ? nodeData.data : [];
-                const rowsForRender = resultState?.rows?.length ? resultState.rows : fallbackRows;
-                const columnsSource = resultState?.columns?.length
-                  ? resultState.columns
-                  : rowsForRender.length > 0
-                  ? Object.keys(rowsForRender[0]).filter((key) => !key.startsWith('__'))
-                  : originalColumns;
-
-                const allCols = columnsSource.filter((c: string) => !c.startsWith('__'));
-
-                const orderedColumns = (() => {
-                  const set = new Set(allCols);
-                  const docIdx = set.has('document_idx') ? ['document_idx'] : [];
-                  const quoteCols = quotationColumnOrder.filter((c) => set.has(c));
-                  const docColArr = textCol && set.has(textCol) ? [textCol] : [];
-                  const originalMeta = (originalColumnsByNode[nodeId] || [])
-                    .filter((c) => c !== textCol && c !== 'document_idx' && set.has(c));
-                  const remainder = allCols.filter(
-                    (c) =>
-                      !docIdx.includes(c)
-                      && !quoteCols.includes(c)
-                      && !docColArr.includes(c)
-                      && !originalMeta.includes(c),
-                  );
-                  return [...docIdx, ...quoteCols, ...docColArr, ...originalMeta, ...remainder];
+                const allCols = (() => {
+                  if (Array.isArray(resultState?.columns) && resultState.columns.length) {
+                    return resultState.columns.filter((c: string) => !c.startsWith('__'));
+                  }
+                  if (rowsWithQuotes.length) {
+                    return Object.keys(rowsWithQuotes[0]).filter((c) => !c.startsWith('__'));
+                  }
+                  return [] as string[];
                 })();
 
-                const cols = showMetadata
-                  ? orderedColumns
-                  : orderedColumns.filter((c: string) => coreQuotationCols.includes(c));
+                const mainColumn = textCol || (allCols.includes('quote') ? 'quote' : allCols[0] || 'quote');
+                const baseColumns = (originalColumnsByNode[nodeId] || []).filter((c) => c !== textCol && !c.startsWith('__'));
+                const presentMeta = metaColumns.filter((c) => allCols.includes(c));
+
+                const cols = (() => {
+                  const ordered: string[] = [];
+                  if (mainColumn) ordered.push(mainColumn);
+                  if (showMetadata) {
+                    ordered.push(...baseColumns);
+                    ordered.push(...presentMeta);
+                  }
+                  return ordered.length ? Array.from(new Set(ordered)) : [mainColumn];
+                })();
 
                 return (
                   <section key={nodeId} className="space-y-4">
@@ -1562,16 +1576,14 @@ const QuotationFeature: React.FC = () => {
                       </p>
                     </div>
 
-                    <div className="overflow-hidden rounded-lg border border-border bg-card">
+                    <div className="rounded-lg border border-border bg-card">
                       <ScrollArea
-                        type="always"
                         scrollbars="both"
                         className="max-h-[70vh]"
-                        style={{ scrollbarGutter: 'stable both-edges' }}
                       >
-                        <div className="min-w-max">
-                          <Table className="min-w-full text-sm">
-                            <TableHeader className="bg-muted">
+                        <div className="min-w-max h-full">
+                          <Table className="min-w-full text-sm" disableContainer>
+                            <TableHeader className="bg-muted sticky top-0 z-10">
                               <TableRow className="border-b border-border/60">
                                 {cols.map((c: string) => {
                                   const sortable = (originalColumnsByNode[nodeId] || []).includes(c);
@@ -1594,14 +1606,14 @@ const QuotationFeature: React.FC = () => {
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {rowsForRender.length === 0 ? (
+                              {rowsWithQuotes.length === 0 ? (
                                 <TableRow>
                                   <TableCell className="h-24 text-center text-muted-foreground" colSpan={cols.length || 1}>
                                     No quotations
                                   </TableCell>
                                 </TableRow>
                               ) : (
-                                rowsForRender.map((row: any, rowIdx: number) => (
+                                rowsWithQuotes.map((row: any, rowIdx: number) => (
                                   <TableRow
                                     key={rowIdx}
                                     className="border-b border-border/60 last:border-b-0 hover:bg-muted/40"
@@ -1609,16 +1621,16 @@ const QuotationFeature: React.FC = () => {
                                     {cols.map((c: string, cellIdx: number) => {
                                       const val = row?.[c];
                                       const cellKey = `${nodeId}:${rowIdx}:${cellIdx}`;
-                                      const content =
-                                        c === textCol
-                                          ? renderHighlightedText(
-                                              typeof val === 'string' ? val : val ?? '',
-                                              row,
-                                              cellKey,
-                                            )
-                                          : val !== undefined && val !== null
-                                          ? String(val)
-                                          : '';
+                                      const shouldHighlight = textCol ? c === textCol : c === 'quote';
+                                      const content = shouldHighlight
+                                        ? renderHighlightedText(
+                                            typeof val === 'string' ? val : val ?? '',
+                                            row,
+                                            cellKey,
+                                          )
+                                        : val !== undefined && val !== null
+                                        ? String(val)
+                                        : '';
                                       return (
                                         <TableCell
                                           key={cellIdx}
@@ -1641,7 +1653,7 @@ const QuotationFeature: React.FC = () => {
                       const pag = resultState?.pagination || ((nodeData as any)?.pagination ?? {});
                       const page = Number(pag.page) || 1;
                       const page_size = Number(pag.page_size) || DEFAULT_PAGE_SIZE;
-                      const total_rows = Number(pag.total_rows) || rowsForRender.length;
+                      const total_rows = Number(pag.total_rows) || rowsWithQuotes.length;
                       const total_pages =
                         Number(pag.total_pages) ||
                         (page_size > 0 ? Math.max(1, Math.ceil((total_rows || 1) / page_size)) : 1);

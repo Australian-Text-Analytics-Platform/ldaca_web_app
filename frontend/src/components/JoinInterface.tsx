@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { WorkspaceNode } from '../types';
 import NodeSelectionPanel, { NodeColumnSelection, WorkspaceNodeLike } from './NodeSelectionPanel';
 import { AlertTriangle } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface JoinInterfaceProps {
   leftNode: WorkspaceNode;
@@ -49,7 +50,7 @@ const JoinInterface: React.FC<JoinInterfaceProps> = ({
 
   const handleJoin = async () => {
     if (!leftOn || !rightOn) {
-      alert('Please select columns to join on');
+      toast.error('Please select columns to join on');
       return;
     }
     
@@ -74,7 +75,7 @@ const JoinInterface: React.FC<JoinInterfaceProps> = ({
   // which collapses the join interface naturally (selectedNodes length becomes 1).
     } catch (error) {
       console.error('Error joining nodes:', error);
-      alert('Failed to join nodes. Please try again.');
+      toast.error('Failed to join nodes. Please try again.');
     } finally {
       setIsLoading(false);
     }

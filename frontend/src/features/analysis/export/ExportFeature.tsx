@@ -9,6 +9,7 @@ import { Button } from '../../../components/ui/button';
 import { Badge } from '../../../components/ui/badge';
 import { Label } from '../../../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
+import { toast } from 'sonner';
 
 type DownloadStatus = 'idle' | 'downloading';
 
@@ -67,7 +68,7 @@ const ExportFeature: React.FC = () => {
   setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
     } catch (e) {
       console.error(e);
-      alert('Failed to export nodes');
+      toast.error('Failed to export nodes');
     } finally {
       setExporting(false);
     }
@@ -98,7 +99,7 @@ const ExportFeature: React.FC = () => {
   setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
     } catch (e) {
       console.error(e);
-      alert('Failed to download node');
+      toast.error('Failed to download node');
     } finally {
       setDownloadingIds((s) => ({ ...s, [id]: 'idle' }));
     }
