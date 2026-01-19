@@ -7,7 +7,6 @@ All business logic is handled by the DocWorkspace library itself.
 
 import logging
 import os
-import re
 from typing import Any, Optional, cast
 
 import polars as pl
@@ -22,7 +21,7 @@ from ...core.docworkspace_api import DocWorkspaceAPIUtils
 from ...core.utils import get_user_data_folder, load_data_file
 from ...core.workspace import workspace_manager
 from ...core.workspace_node_data_ops import NodeDataError, drop_column, rename_column
-from .utils import get_node_or_404, get_node_with_data_or_400
+from .utils import get_node_or_404, get_node_with_data_or_400, stage_dataframe_as_lazy
 
 # json_sanitize no longer needed directly in this module
 
@@ -264,13 +263,6 @@ async def add_node_to_workspace(
                 detail=f"Workspace folder not found for workspace {workspace_id}",
             )
 
-        data_dir = workspace_dir / "data"
-        data_dir.mkdir(parents=True, exist_ok=True)
-
-        def _safe_stem(name: str) -> str:
-            stem = re.sub(r"[^A-Za-z0-9_.-]+", "_", name).strip("._") or "data"
-            return stem
-
         node_name = filename
         for ext in [
             ".csv",
@@ -284,30 +276,16 @@ async def add_node_to_workspace(
                 node_name = node_name[: -len(ext)]
                 break
 
-        base_stem = _safe_stem(node_name)
-        parquet_path = data_dir / f"{base_stem}.parquet"
-        suffix = 1
-        while parquet_path.exists():
-            parquet_path = data_dir / f"{base_stem}_{suffix}.parquet"
-            suffix += 1
+        document_column = getattr(data, "document_column", None) or getattr(
+            data, "active_document_name", None
+        )
 
-        try:
-            data.write_parquet(parquet_path)
-        except Exception as exc:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to persist parquet for workspace: {exc}",
-            )
-
-        # Reload as LazyFrame with workspace-relative path to keep plans portable
-        lazy_data: pl.LazyFrame | Any
-        try:
-            lazy_data = pl.scan_parquet(parquet_path)
-        except Exception as exc:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to reload parquet as LazyFrame: {exc}",
-            )
+        lazy_data = stage_dataframe_as_lazy(
+            data,
+            workspace_dir,
+            node_name=node_name,
+            document_column=document_column,
+        )
 
         # Create node name from filename
         node = workspace_manager.add_node_to_workspace(
@@ -480,7 +458,8 @@ async def cast_node(
                     # If the parsed result is already timezone aware we convert to UTC, otherwise we set it.
                     # We can't inspect the expression's dtype pre-execution, so we defensively apply replace_time_zone then convert.
                     cast_expr = (
-                        parsed.dt.replace_time_zone("UTC")
+                        parsed.dt
+                        .replace_time_zone("UTC")
                         .dt.convert_time_zone("UTC")
                         .alias(column_name)
                     )
@@ -503,7 +482,8 @@ async def cast_node(
                     if datetime_format:
                         # Use chrono-compatible formatting tokens
                         cast_expr = (
-                            pl.col(column_name)
+                            pl
+                            .col(column_name)
                             .dt.strftime(datetime_format)
                             .alias(column_name)
                         )
@@ -523,14 +503,16 @@ async def cast_node(
                 if "float" in orig_lower:
                     # Truncate decimals by casting directly (Polars truncates toward zero)
                     cast_expr = (
-                        col_expr.cast(pl.Float64, strict=False)
+                        col_expr
+                        .cast(pl.Float64, strict=False)
                         .cast(pl.Int64, strict=False)
                         .alias(column_name)
                     )
                 elif any(tok in orig_lower for tok in ["utf8", "string", "str"]):
                     # Attempt float parse (lenient) then truncate by casting to int
                     cast_expr = (
-                        col_expr.cast(pl.Float64, strict=False)
+                        col_expr
+                        .cast(pl.Float64, strict=False)
                         .cast(pl.Int64, strict=False)
                         .alias(column_name)
                     )
@@ -550,7 +532,8 @@ async def cast_node(
                     )
                 else:
                     cast_expr = (
-                        col_expr.cast(pl.Utf8, strict=False)
+                        col_expr
+                        .cast(pl.Utf8, strict=False)
                         .cast(pl.Categorical, strict=False)
                         .alias(column_name)
                     )
@@ -748,5 +731,6 @@ async def export_nodes(
 # ============================================================================
 
 
+# ============================================================================
 # ============================================================================
 # ============================================================================

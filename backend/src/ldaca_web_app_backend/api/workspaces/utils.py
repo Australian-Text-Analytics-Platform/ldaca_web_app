@@ -1,5 +1,6 @@
 """Shared utility helpers for workspace API modules."""
 
+import os
 import re
 from pathlib import Path
 from typing import Any, Optional, Tuple
@@ -88,7 +89,16 @@ def stage_dataframe_as_lazy(
         )
 
     try:
-        lazy_data: Any = pl.scan_parquet(parquet_path)
+        relative_path = parquet_path.relative_to(workspace_dir)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to compute relative parquet path: {exc}",
+        )
+
+    try:
+        os.chdir(workspace_dir)
+        lazy_data: Any = pl.scan_parquet(relative_path)
         if document_column:
             try:
                 lazy_data = DocLazyFrame(lazy_data, document_column=document_column)

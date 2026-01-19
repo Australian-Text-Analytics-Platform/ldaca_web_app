@@ -5,14 +5,12 @@ Maintains identical route and behavior for backward compatibility.
 
 from typing import Optional
 
-import polars as pl
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-
-from docframe import DocDataFrame, DocLazyFrame  # type: ignore
 
 from ...core.auth import get_current_user
 from ...core.utils import get_user_data_folder, load_data_file
 from ...core.workspace import workspace_manager
+from .utils import stage_dataframe_as_lazy
 
 router = APIRouter(prefix="/workspaces", tags=["files"])
 
@@ -38,28 +36,22 @@ async def upload_file_to_workspace(
 
         data_obj = load_data_file(file_path)
 
-        node_data = data_obj
+        workspace_dir = workspace_manager.get_workspace_dir(user_id, workspace_id)
+        if workspace_dir is None:
+            raise HTTPException(status_code=404, detail="Workspace not found")
 
-        if not isinstance(node_data, (DocDataFrame, DocLazyFrame)):
-            if (
-                hasattr(node_data, "iloc")
-                and hasattr(node_data, "dtypes")
-                and not isinstance(node_data, (pl.DataFrame, pl.LazyFrame))
-            ):
-                node_data = pl.DataFrame(node_data)
-
-            try:
-                if isinstance(node_data, pl.DataFrame):
-                    node_data = node_data.lazy()
-            except Exception:
-                pass
-
-            if not isinstance(node_data, (pl.DataFrame, pl.LazyFrame)):
-                raise HTTPException(
-                    status_code=400, detail="Unsupported uploaded data type"
-                )
+        document_column = getattr(data_obj, "document_column", None) or getattr(
+            data_obj, "active_document_name", None
+        )
 
         node_name = node_name or file.filename or "uploaded_file"
+
+        node_data = stage_dataframe_as_lazy(
+            data_obj,
+            workspace_dir,
+            node_name=node_name,
+            document_column=document_column,
+        )
 
         node = workspace_manager.add_node_to_workspace(
             user_id=user_id,
@@ -80,5 +72,7 @@ async def upload_file_to_workspace(
     except HTTPException:
         raise
     except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to upload file: {e}")
+        raise HTTPException(status_code=400, detail=f"Failed to upload file: {e}")
         raise HTTPException(status_code=400, detail=f"Failed to upload file: {e}")
         raise HTTPException(status_code=400, detail=f"Failed to upload file: {e}")

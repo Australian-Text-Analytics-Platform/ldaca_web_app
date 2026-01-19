@@ -8,6 +8,7 @@ Design Goals:
 * Backward compatibility deliberately dropped.
 """
 
+import os
 import shutil
 from datetime import datetime
 from pathlib import Path
@@ -75,6 +76,13 @@ class WorkspaceManager:
         except Exception:
             pass
 
+    def _set_working_dir(self, path: Path) -> None:
+        try:
+            path.mkdir(parents=True, exist_ok=True)
+            os.chdir(path)
+        except Exception as exc:  # pragma: no cover
+            print(f"Failed to set working directory to {path}: {exc}")
+
     def _resolve_workspace_dir(
         self, user_id: str, workspace_id: str, workspace_name: str
     ) -> Path:
@@ -120,6 +128,7 @@ class WorkspaceManager:
             # Ensure folder name mirrors current workspace name for discoverability
             updated_dir = ensure_display_folder_name(target_dir, ws.name)
             self._attach_workspace_dir(ws, updated_dir)
+            self._set_working_dir(updated_dir)
             self._set_cached_path(user_id, workspace_id, updated_dir)
             self._attach_analysis_manager(user_id, ws)
             return ws
@@ -139,6 +148,7 @@ class WorkspaceManager:
             #     self.drop_analysis_state(user_id, current_id)
         new_path = self._resolve_workspace_dir(user_id, new_id, new_ws.name)
         self._attach_workspace_dir(new_ws, new_path)
+        self._set_working_dir(new_path)
         self._current[user_id] = {"id": new_id, "ws": new_ws, "path": new_path}
         self._attach_analysis_manager(user_id, new_ws)
 
@@ -191,6 +201,7 @@ class WorkspaceManager:
         ws.set_metadata("modified_at", now)
         target_dir = self._resolve_workspace_dir(user_id, wid, ws.name)
         self._attach_workspace_dir(ws, target_dir)
+        self._set_working_dir(target_dir)
         write_workspace(ws, target_dir)
         self._set_cached_path(user_id, wid, target_dir)
         self._current[user_id] = {"id": wid, "ws": ws, "path": target_dir}
