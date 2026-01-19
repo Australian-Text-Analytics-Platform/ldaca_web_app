@@ -56,6 +56,34 @@ def sanitize_workspace_folder_name(name: str) -> str:
     return safe or "workspace"
 
 
+def validate_workspace_name(name: str) -> tuple[bool, str]:
+    """Validate workspace names for safe, portable folder usage.
+
+    Allows spaces and common punctuation but rejects path separators, control
+    characters, and traversal markers.
+    """
+
+    if name is None:
+        return False, "name is required"
+
+    trimmed = name.strip()
+    if not trimmed:
+        return False, "name cannot be empty"
+
+    if ".." in trimmed:
+        return False, "name cannot contain '..'"
+
+    if "/" in trimmed or "\\" in trimmed:
+        return False, "name cannot contain '/' or '\\'"
+
+    for ch in trimmed:
+        code = ord(ch)
+        if code < 32 or code == 127:
+            return False, "name cannot contain control characters"
+
+    return True, ""
+
+
 def allocate_workspace_folder(user_id: str, workspace_name: str) -> Path:
     """Create (and return) a unique folder for a workspace under the user's root."""
 

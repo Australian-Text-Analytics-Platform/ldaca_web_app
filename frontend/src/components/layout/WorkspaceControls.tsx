@@ -9,8 +9,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../ui/alert-dialog';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
+import { getInvalidWorkspaceNameMessage } from '../../lib/workspaceName';
 
 /**
  * Separated controls component focused only on workspace controls
@@ -24,6 +34,8 @@ export const WorkspaceControls: React.FC = memo(() => {
   const [nameInput, setNameInput] = useState(currentWorkspace?.name || '');
   const [saveAsOpen, setSaveAsOpen] = useState(false);
   const [saveAsName, setSaveAsName] = useState('');
+  const [nameAlertOpen, setNameAlertOpen] = useState(false);
+  const [nameAlertMessage, setNameAlertMessage] = useState('');
 
   useEffect(() => {
     setNameInput(currentWorkspace?.name || '');
@@ -37,6 +49,12 @@ export const WorkspaceControls: React.FC = memo(() => {
     }
     try {
       await renameWorkspace(trimmed);
+    } catch (error) {
+      const message = getInvalidWorkspaceNameMessage(error);
+      if (message) {
+        setNameAlertMessage(message);
+        setNameAlertOpen(true);
+      }
     } finally {
       setIsEditing(false);
     }
@@ -147,6 +165,20 @@ export const WorkspaceControls: React.FC = memo(() => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={nameAlertOpen} onOpenChange={setNameAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Invalid workspace name</AlertDialogTitle>
+            <AlertDialogDescription>
+              {nameAlertMessage || 'Workspace names cannot include path separators or traversal sequences.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setNameAlertOpen(false)}>Got it</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 });

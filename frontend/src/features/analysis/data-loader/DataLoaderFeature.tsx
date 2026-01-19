@@ -15,6 +15,7 @@ import { Label } from '../../../components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../../components/ui/table';
 import { Badge } from '../../../components/ui/badge';
 import { toast } from 'sonner';
+import { getInvalidWorkspaceNameMessage } from '../../../lib/workspaceName';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -91,6 +92,7 @@ export const DataLoaderFeature: React.FC = () => {
   const [deletingWorkspace, setDeletingWorkspace] = useState(false);
   const [saveAsOpen, setSaveAsOpen] = useState(false);
   const [saveAsName, setSaveAsName] = useState('');
+  const [workspaceNameAlert, setWorkspaceNameAlert] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const hasWorkspaceSelected = Boolean(currentWorkspaceId);
@@ -140,6 +142,11 @@ export const DataLoaderFeature: React.FC = () => {
       setNewWorkspaceDescription('');
       notify('success', `Workspace "${trimmed}" created.`);
     } catch (error) {
+      const message = getInvalidWorkspaceNameMessage(error);
+      if (message) {
+        setWorkspaceNameAlert(message);
+        return;
+      }
       notify('error', (error as Error).message || 'Failed to create workspace.');
     }
   }, [newWorkspaceDescription, newWorkspaceName, notify, workspaceActions]);
@@ -150,6 +157,11 @@ export const DataLoaderFeature: React.FC = () => {
       await workspaceActions.renameWorkspace(renameValue.trim());
       notify('success', 'Workspace renamed.');
     } catch (error) {
+      const message = getInvalidWorkspaceNameMessage(error);
+      if (message) {
+        setWorkspaceNameAlert(message);
+        return;
+      }
       notify('error', (error as Error).message || 'Failed to rename workspace.');
     }
   }, [hasWorkspaceSelected, notify, renameValue, workspaceActions]);
@@ -525,6 +537,20 @@ export const DataLoaderFeature: React.FC = () => {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogAction onClick={() => setWorkspaceAlertOpen(false)}>Got it</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={Boolean(workspaceNameAlert)} onOpenChange={(open: boolean) => !open && setWorkspaceNameAlert(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Invalid workspace name</AlertDialogTitle>
+            <AlertDialogDescription>
+              {workspaceNameAlert || 'Workspace names cannot include path separators or traversal sequences.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setWorkspaceNameAlert(null)}>Got it</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

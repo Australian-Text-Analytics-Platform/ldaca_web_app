@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
 from ...core.auth import get_current_user
 from ...core.json_utils import json_sanitize
-from ...core.utils import generate_workspace_id
+from ...core.utils import generate_workspace_id, validate_workspace_name
 from ...core.workspace import workspace_manager
 from ...models import WorkspaceCreateRequest, WorkspaceInfo
 
@@ -47,6 +47,9 @@ async def create_workspace(
     request: WorkspaceCreateRequest, current_user: dict = Depends(get_current_user)
 ):
     user_id = current_user["id"]
+    is_valid, reason = validate_workspace_name(request.name)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=f"Invalid workspace name: {reason}")
     try:
         workspace = workspace_manager.create_workspace(
             user_id=user_id, name=request.name, description=request.description or ""
@@ -132,6 +135,11 @@ async def rename_workspace(
     if not workspace:
         raise HTTPException(status_code=404, detail="Workspace not found")
     try:
+        is_valid, reason = validate_workspace_name(new_name)
+        if not is_valid:
+            raise HTTPException(
+                status_code=400, detail=f"Invalid workspace name: {reason}"
+            )
         workspace.name = new_name
         workspace_manager.persist(user_id, workspace_id)
         info = workspace_manager.get_workspace_info(user_id, workspace_id)
