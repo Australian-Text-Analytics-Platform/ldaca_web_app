@@ -11,10 +11,11 @@ interface CustomNodeData {
   isMultiSelected?: boolean;
   onDelete: (nodeId: string) => void;
   onRename?: (nodeId: string, newName: string) => void;
+  onCopy?: (nodeId: string) => void;
 }
 
 function CustomNode({ data, selected }: NodeProps<any>) {
-  const { node: initialNode, isMultiSelected = false, onDelete, onRename } = data as CustomNodeData;
+  const { node: initialNode, isMultiSelected = false, onDelete, onRename, onCopy } = data as CustomNodeData;
   // Keep a local state but always sync with props to prevent staleness after in-place updates
   const [node, setNode] = useState(initialNode);
   const [showMenu, setShowMenu] = useState(false);
@@ -99,6 +100,14 @@ function CustomNode({ data, selected }: NodeProps<any>) {
   const handleRenameKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
       handleRenameCancel();
+    }
+  };
+
+  const handleCopyNode = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowMenu(false);
+    if (onCopy && node?.node_id) {
+      onCopy(node.node_id);
     }
   };
 
@@ -214,6 +223,13 @@ function CustomNode({ data, selected }: NodeProps<any>) {
                   className="w-full text-left px-3 py-2 text-xs hover:bg-muted/60 border-t border-border/60"
                 >
                   Rename
+                </button>
+
+                <button
+                  onClick={handleCopyNode}
+                  className="w-full text-left px-3 py-2 text-xs hover:bg-muted/60 border-t border-border/60"
+                >
+                  Copy
                 </button>
                 
               </div>

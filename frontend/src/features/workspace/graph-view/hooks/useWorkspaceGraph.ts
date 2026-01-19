@@ -59,6 +59,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
   const { isLoading } = useWorkspaceStatus();
   const {
     deleteNode,
+    copyNode,
     renameNode,
     toggleNodeSelection,
     clearSelection,
@@ -90,6 +91,16 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
       renameNode(nodeId, newName.trim());
     },
     [renameNode]
+  );
+
+  const handleCopy = useCallback(
+    (nodeId: string) => {
+      if (!nodeId || !copyNode) {
+        return;
+      }
+      copyNode(nodeId);
+    },
+    [copyNode]
   );
 
 
@@ -153,6 +164,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
             (selectedNodeIds?.length || 0) > 1 && Boolean(selectedNodeIds?.includes?.(node.id)),
           onDelete: handleDelete,
           onRename: handleRename,
+          onCopy: handleCopy,
         },
         hidden: false,
         draggable: true,
@@ -161,7 +173,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
         connectable: false,
       } as Node;
     });
-  }, [workspaceGraph, selectedNodeIds, handleDelete, handleRename, dlog]);
+  }, [workspaceGraph, selectedNodeIds, handleDelete, handleRename, handleCopy, dlog]);
 
   const initialEdges = useMemo(() => {
     if (!workspaceGraph?.edges) {

@@ -201,6 +201,25 @@ export const useWorkspaceNodeMutations = ({
     },
   });
 
+  const copyNodeMutation = useMutation({
+    mutationFn: ({ workspaceId, nodeId }: { workspaceId: string; nodeId: string }) =>
+      nodesApi.copy(workspaceId, nodeId, authHeaders),
+    onMutate: () => {
+      startOperation('copyNode');
+    },
+    onSuccess: () => {
+      if (currentWorkspaceId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
+      }
+      invalidateWorkspaceSummaries();
+      endOperation('copyNode');
+    },
+    onError: (error: any) => {
+      setOperationError('copyNode', error.message);
+      endOperation('copyNode');
+    },
+  });
+
   const deleteNodeMutation = useMutation({
     mutationFn: ({ workspaceId, nodeId }: { workspaceId: string; nodeId: string }) =>
       nodesApi.delete(workspaceId, nodeId, authHeaders),
@@ -505,6 +524,8 @@ export const useWorkspaceNodeMutations = ({
     renameWorkspace: (newName: string) => updateWorkspaceNameMutation.mutateAsync(newName),
     renameNode: (nodeId: string, newName: string) =>
       renameNodeMutation.mutateAsync({ workspaceId: ensureWorkspaceSelected(), nodeId, newName }),
+    copyNode: (nodeId: string) =>
+      copyNodeMutation.mutateAsync({ workspaceId: ensureWorkspaceSelected(), nodeId }),
     deleteNode: (nodeId: string) =>
       deleteNodeMutation.mutateAsync({ workspaceId: ensureWorkspaceSelected(), nodeId }),
     createNodeFromFile: (filename: string) =>
@@ -581,6 +602,7 @@ export const useWorkspaceNodeMutations = ({
     authHeaders,
     castNodeMutation,
     concatNodesMutation,
+    copyNodeMutation,
     createNodeMutation,
     createWorkspaceMutation,
     currentWorkspaceId,

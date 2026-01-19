@@ -941,6 +941,51 @@ async def update_node_name(
         raise HTTPException(status_code=500, detail=f"Failed to rename node: {e}")
 
 
+@router.post("/{workspace_id}/nodes/{node_id}/copy")
+async def copy_node(
+    workspace_id: str,
+    node_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    user_id = current_user["id"]
+    node = get_node_or_404(user_id, workspace_id, node_id)
+    workspace = workspace_manager.get_workspace(user_id, workspace_id)
+    if workspace is None:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+
+    def _unique_copy_name(original: str) -> str:
+        base = original or node_id
+        candidate = f"{base}_copy"
+        existing = {getattr(n, "name", None) for n in workspace.nodes.values()}
+        if candidate not in existing:
+            return candidate
+        suffix = 2
+        while f"{base}_copy_{suffix}" in existing:
+            suffix += 1
+        return f"{base}_copy_{suffix}"
+
+    try:
+        new_name = _unique_copy_name(getattr(node, "name", node_id))
+        new_node = workspace_manager.add_node_to_workspace(
+            user_id=user_id,
+            workspace_id=workspace_id,
+            data=node.data,
+            node_name=new_name,
+            operation=f"copy({getattr(node, 'name', node_id)})",
+            parents=[node],
+        )
+        if not new_node:
+            raise HTTPException(status_code=500, detail="Failed to copy node")
+        try:
+            return DocWorkspaceAPIUtils.convert_node_info_for_api(new_node)  # type: ignore[call-arg]
+        except Exception:
+            return {"id": getattr(new_node, "id", None), "name": new_name}
+    except HTTPException:
+        raise
+    except Exception as e:  # pragma: no cover
+        raise HTTPException(status_code=500, detail=f"Failed to copy node: {e}")
+
+
 @router.post("/{workspace_id}/nodes/{node_id}/filter")
 async def filter_node(
     workspace_id: str,

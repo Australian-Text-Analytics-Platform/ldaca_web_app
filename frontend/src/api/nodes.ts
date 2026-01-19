@@ -78,6 +78,7 @@ export const nodesApi = {
   describeColumn: (ws: string, node: string, col: string, headers: Record<string,string> = {}) => get<ColumnDescribeResponse>(`/workspaces/${ws}/nodes/${node}/columns/${col}/describe`, headers),
   delete: (ws: string, node: string, headers: Record<string,string> = {}) => del(`/workspaces/${ws}/nodes/${node}`, headers),
   rename: (ws: string, node: string, newName: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/nodes/${node}/name`, { method: 'PUT', headers, params: { new_name: newName } }),
+  copy: (ws: string, node: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/nodes/${node}/copy`, { method: 'POST', headers }),
   renameColumn: (ws: string, node: string, column: string, newName: string, headers: Record<string,string> = {}) =>
     httpRequest(`/workspaces/${ws}/nodes/${node}/columns/${encodeURIComponent(column)}`, {
       method: 'PUT',
