@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import { nodesApi } from '../../../../api/nodes';
 import type { NodeColumnSelection, WorkspaceNodeLike } from '../../../../components/NodeSelectionPanel';
@@ -37,7 +37,7 @@ interface JoinSelectionPanelConfig {
   disabled: boolean;
   originalCount: number;
   statusMessage: string | null;
-  columnLabelFn: (node: WorkspaceNodeLike, index: number) => string;
+  columnLabelFn: (node: WorkspaceNodeLike, index: number) => ReactNode;
   onColumnChange: (nodeId: string, column: string) => void;
   onColorChange: (nodeId: string, color: string) => void;
   getNodeColumns: (node: WorkspaceNodeLike) => string[];

@@ -19,6 +19,7 @@ import { Input } from '../../../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../../../components/ui/dialog';
 import { Badge } from '../../../components/ui/badge';
+import HelpIcon from '../../../components/help/HelpIcon';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -1459,7 +1460,7 @@ const QuotationFeature: React.FC = () => {
                       Results per page
                     </label>
                     <Select value={pageSizeControlValue} onValueChange={(value) => handlePageSizeChange(Number(value))}>
-                      <SelectTrigger className="h-9 w-[130px] text-left" id="quotation-page-size">
+                      <SelectTrigger className="h-9 w-32.5 text-left" id="quotation-page-size">
                         <SelectValue placeholder="Rows" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1481,12 +1482,15 @@ const QuotationFeature: React.FC = () => {
                     <span>Show metadata</span>
                   </label>
                   <div className="flex flex-wrap items-center gap-2">
-                    <label
-                      htmlFor="quotation-context-length"
-                      className="text-sm font-medium text-foreground"
-                    >
-                      Context length (words per side)
-                    </label>
+                    <div className="flex items-center gap-2">
+                      <label
+                        htmlFor="quotation-context-length"
+                        className="text-sm font-medium text-foreground"
+                      >
+                        Context length (words per side)
+                      </label>
+                      <HelpIcon targetKey="analysis.quotation.context-length" label="Quotation context length" />
+                    </div>
                     <Input
                       id="quotation-context-length"
                       aria-label="Context length in words"
@@ -1762,7 +1766,7 @@ const QuotationFeature: React.FC = () => {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Quotation Error</AlertDialogTitle>
-            <AlertDialogDescription className="whitespace-pre-wrap break-words">
+            <AlertDialogDescription className="whitespace-pre-wrap wrap-break-word">
               {errorDialogMessage}
             </AlertDialogDescription>
           </AlertDialogHeader>

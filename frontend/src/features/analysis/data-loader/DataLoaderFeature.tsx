@@ -34,6 +34,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../../../components/ui/dialog';
+import HelpIcon from '../../../components/help/HelpIcon';
 
 const formatBytes = (bytes?: number | null): string => {
   if (!bytes || Number.isNaN(bytes)) return '—';
@@ -95,6 +96,8 @@ export const DataLoaderFeature: React.FC = () => {
   const [workspaceNameAlert, setWorkspaceNameAlert] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const activeCardRef = useRef<HTMLDivElement | null>(null);
+  const [activeCardHeight, setActiveCardHeight] = useState<number | null>(null);
   const hasWorkspaceSelected = Boolean(currentWorkspaceId);
 
   const notify = useCallback((type: 'success' | 'error' | 'info', message: string) => {
@@ -114,6 +117,21 @@ export const DataLoaderFeature: React.FC = () => {
       setRenameValue(active.name);
     }
   }, [currentWorkspaceId, workspaces]);
+
+  useEffect(() => {
+    const element = activeCardRef.current;
+    if (!element || typeof ResizeObserver === 'undefined') {
+      return;
+    }
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      const nextHeight = Math.round(entry.contentRect.height);
+      setActiveCardHeight((prev) => (nextHeight > 0 && prev !== nextHeight ? nextHeight : prev));
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
 
   const sortedWorkspaces = useMemo(() => {
     return [...workspaces].sort((a: any, b: any) => {
@@ -281,34 +299,39 @@ export const DataLoaderFeature: React.FC = () => {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card className="flex h-[480px] flex-col">
+        <Card ref={activeCardRef}>
           <CardHeader>
-            <CardTitle>Active workspace</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              Active workspace
+              <HelpIcon targetKey="data-loader.active-workspace.section" label="Active workspace overview" />
+            </CardTitle>
             <CardDescription>
               Choose or rename the workspace where new nodes will be added. Save regularly to persist your progress.
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex flex-1 flex-col overflow-hidden">
-            <div className="flex-1 space-y-4 overflow-y-auto pr-2">
-              {currentWorkspace ? (
-                <div className="rounded-md border border-border/60 bg-muted/30 px-4 py-3 text-sm">
-                  <div className="flex flex-wrap items-center gap-2 text-base font-semibold text-foreground">
-                    {currentWorkspace.name}
-                    <Badge>{nodeCount} nodes</Badge>
-                  </div>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    Updated {formatTimestamp(currentWorkspace.modified_at || currentWorkspace.updated_at)} · Created {formatTimestamp(currentWorkspace.created_at)}
-                  </div>
+          <CardContent className="space-y-4">
+            {currentWorkspace ? (
+              <div className="rounded-md border border-border/60 bg-muted/30 px-4 py-3 text-sm">
+                <div className="flex flex-wrap items-center gap-2 text-base font-semibold text-foreground">
+                  {currentWorkspace.name}
+                  <Badge>{nodeCount} nodes</Badge>
                 </div>
-              ) : (
-                <div className="rounded-md border border-dashed border-muted-foreground/50 px-4 py-3 text-sm text-muted-foreground">
-                  No workspace selected. Pick one below or create a new workspace.
+                <div className="mt-1 text-xs text-muted-foreground">
+                  Updated {formatTimestamp(currentWorkspace.modified_at || currentWorkspace.updated_at)} · Created {formatTimestamp(currentWorkspace.created_at)}
                 </div>
-              )}
+              </div>
+            ) : (
+              <div className="rounded-md border border-dashed border-muted-foreground/50 px-4 py-3 text-sm text-muted-foreground">
+                No workspace selected. Pick one below or create a new workspace.
+              </div>
+            )}
 
             {hasWorkspaceSelected && (
               <div className="space-y-2">
-                <Label htmlFor="rename-workspace">Rename workspace</Label>
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="rename-workspace">Rename workspace</Label>
+                  <HelpIcon targetKey="data-loader.rename-workspace.input" label="Rename workspace input" />
+                </div>
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <Input
                     id="rename-workspace"
@@ -324,25 +347,34 @@ export const DataLoaderFeature: React.FC = () => {
               </div>
             )}
 
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Button variant="outline" onClick={handleSaveWorkspace} disabled={!hasWorkspaceSelected}>
                 <RefreshCcw className="mr-2 h-4 w-4" /> Save
               </Button>
-              <Button variant="outline" onClick={handleSaveWorkspaceAs} disabled={!hasWorkspaceSelected}>
-                <FolderPlus className="mr-2 h-4 w-4" /> Save as…
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => workspaceActions.setCurrentWorkspace(null)}
-                disabled={!hasWorkspaceSelected || workspaceBusy}
-              >
-                <LogOut className="mr-2 h-4 w-4" /> Unload
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button variant="outline" onClick={handleSaveWorkspaceAs} disabled={!hasWorkspaceSelected}>
+                  <FolderPlus className="mr-2 h-4 w-4" /> Save as…
+                </Button>
+                <HelpIcon targetKey="data-loader.save-as.button" label="Save workspace as" />
+              </div>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  onClick={() => workspaceActions.setCurrentWorkspace(null)}
+                  disabled={!hasWorkspaceSelected || workspaceBusy}
+                >
+                  <LogOut className="mr-2 h-4 w-4" /> Unload
+                </Button>
+                <HelpIcon targetKey="data-loader.unload.button" label="Unload workspace" />
+              </div>
             </div>
 
             {!hasWorkspaceSelected && (
               <div className="space-y-2">
-                <Label htmlFor="new-workspace-name">Create workspace</Label>
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="new-workspace-name">Create workspace</Label>
+                  <HelpIcon targetKey="data-loader.create-workspace.name" label="Workspace name input" />
+                </div>
                 <Input
                   id="new-workspace-name"
                   value={newWorkspaceName}
@@ -354,21 +386,26 @@ export const DataLoaderFeature: React.FC = () => {
                   onChange={(event) => setNewWorkspaceDescription(event.target.value)}
                   placeholder="Optional description"
                 />
-                <Button onClick={handleCreateWorkspace} disabled={!newWorkspaceName.trim()}>
-                  <Plus className="mr-2 h-4 w-4" /> Create workspace
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button onClick={handleCreateWorkspace} disabled={!newWorkspaceName.trim()}>
+                    <Plus className="mr-2 h-4 w-4" /> Create workspace
+                  </Button>
+                  <HelpIcon targetKey="data-loader.create-workspace.button" label="Create workspace" />
+                </div>
               </div>
             )}
-            </div>
           </CardContent>
         </Card>
 
-        <Card className="flex h-[480px] flex-col">
+        <Card
+          className="flex flex-col overflow-hidden"
+          style={activeCardHeight ? { height: activeCardHeight } : undefined}
+        >
           <CardHeader>
             <CardTitle>Workspace manager</CardTitle>
             <CardDescription>Switch between saved workspaces or remove ones you no longer need.</CardDescription>
           </CardHeader>
-          <CardContent className="flex flex-1 flex-col overflow-hidden">
+          <CardContent className="flex flex-1 flex-col min-h-0 overflow-hidden">
             {workspaceBusy && !sortedWorkspaces.length ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" /> Loading workspaces…
@@ -424,19 +461,28 @@ export const DataLoaderFeature: React.FC = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle>Files & uploads</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            Files & uploads
+            <HelpIcon targetKey="data-loader.files.section" label="Files and uploads section" />
+          </CardTitle>
           <CardDescription>
             Upload CSV, TSV, Excel, or JSON files, preview them, and add them to the active workspace.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-wrap items-center gap-2">
-            <Button onClick={openFilePicker} disabled={uploading}>
-              <Upload className="mr-2 h-4 w-4" /> {uploading ? 'Uploading…' : 'Upload file'}
-            </Button>
-            <Button variant="outline" onClick={handleImportSampleData} disabled={importingSamples}>
-              <FolderPlus className="mr-2 h-4 w-4" /> {importingSamples ? 'Importing…' : 'Import sample data'}
-            </Button>
+            <div className="flex items-center gap-1">
+              <Button onClick={openFilePicker} disabled={uploading}>
+                <Upload className="mr-2 h-4 w-4" /> {uploading ? 'Uploading…' : 'Upload file'}
+              </Button>
+              <HelpIcon targetKey="data-loader.upload.button" label="Upload file" />
+            </div>
+            <div className="flex items-center gap-1">
+              <Button variant="outline" onClick={handleImportSampleData} disabled={importingSamples}>
+                <FolderPlus className="mr-2 h-4 w-4" /> {importingSamples ? 'Importing…' : 'Import sample data'}
+              </Button>
+              <HelpIcon targetKey="data-loader.import-sample.button" label="Import sample data" />
+            </div>
             <input
               ref={fileInputRef}
               type="file"
@@ -464,7 +510,12 @@ export const DataLoaderFeature: React.FC = () => {
                     <TableHead>Name</TableHead>
                     <TableHead className="hidden md:table-cell">Size</TableHead>
                     <TableHead className="hidden lg:table-cell">Updated</TableHead>
-                    <TableHead>Actions</TableHead>
+                    <TableHead>
+                      <span className="inline-flex items-center gap-1">
+                        Actions
+                        <HelpIcon targetKey="data-loader.add.button" label="Add file to workspace" />
+                      </span>
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

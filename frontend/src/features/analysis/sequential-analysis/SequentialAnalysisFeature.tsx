@@ -15,6 +15,7 @@ import { normalizeSchemaFromInfo } from '../../../hooks/useSchemaManagement';
 import { Button } from '../../../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Input } from '../../../components/ui/input';
+import HelpIcon from '../../../components/help/HelpIcon';
 import { toast } from 'sonner';
 import {
   Select,
@@ -578,7 +579,7 @@ const handleUpdateResults = async () => {
 
     return (
       <ChartContainer config={chartConfig} className="w-full">
-        <div className="aspect-auto h-[400px] w-full">
+        <div className="aspect-auto h-100 w-full">
           <ResponsiveContainer width="100%" height="100%">
             {chartType === 'bar' ? (
               <BarChart data={chartData} margin={margin}>
@@ -586,7 +587,7 @@ const handleUpdateResults = async () => {
                 <XAxis dataKey="time_period" {...axisTickProps} />
                 <YAxis />
                 <ChartTooltip
-                  content={<ChartTooltipContent className="min-w-[200px]" labelFormatter={formatTimeLabel} />}
+                  content={<ChartTooltipContent className="min-w-50" labelFormatter={formatTimeLabel} />}
                 />
                 {groupKeys.map((key, idx) => {
                   const color = chartConfig[key]?.color ?? getPaletteColor(idx);
@@ -601,7 +602,7 @@ const handleUpdateResults = async () => {
                 <XAxis dataKey="time_period" {...axisTickProps} />
                 <YAxis />
                 <ChartTooltip
-                  content={<ChartTooltipContent className="min-w-[200px]" labelFormatter={formatTimeLabel} />}
+                  content={<ChartTooltipContent className="min-w-50" labelFormatter={formatTimeLabel} />}
                 />
                 {groupKeys.map((key, idx) => {
                   const color = chartConfig[key]?.color ?? getPaletteColor(idx);
@@ -627,7 +628,7 @@ const handleUpdateResults = async () => {
                 <ChartTooltip
                   content={
                     <ChartTooltipContent
-                      className="min-w-[200px]"
+                      className="min-w-50"
                       indicator="line"
                       labelFormatter={formatTimeLabel}
                     />
@@ -889,7 +890,12 @@ const handleUpdateResults = async () => {
             disabled={!!isLocked}
             locked={!!isLocked}
             originalCount={displayNodeCount}
-            columnLabelFn={() => 'Time/Numeric Column *'}
+            columnLabelFn={() => (
+              <span className="inline-flex items-center gap-1">
+                Time/Numeric Column *
+                <HelpIcon targetKey="analysis.sequential-analysis.time-column" label="Time column selector" />
+              </span>
+            )}
             allowedDataTypes={Array.from(TIME_COMPATIBLE_TYPES)}
             lockedMessage={<AnalysisLockedNotice />}
           />
@@ -899,9 +905,12 @@ const handleUpdateResults = async () => {
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {derivedColumnType === 'datetime' ? (
               <div className="md:col-span-1">
-                <label className="mb-1 block text-sm font-medium text-gray-700">
-                  Frequency
-                </label>
+                <div className="mb-1 flex items-center gap-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Frequency
+                  </label>
+                  <HelpIcon targetKey="analysis.sequential-analysis.frequency" label="Frequency selector" />
+                </div>
                 <Select
                   value={frequency}
                   onValueChange={(value) => setFrequency(value as SequentialFrequency)}
@@ -1084,7 +1093,7 @@ const handleUpdateResults = async () => {
                 value={chartType}
                 onValueChange={(value) => handleChartTypeChange(value as ChartTypeOption)}
               >
-                <SelectTrigger className="w-[140px] text-sm">
+                <SelectTrigger className="w-35 text-sm">
                   <SelectValue placeholder="Select chart" />
                 </SelectTrigger>
                 <SelectContent>

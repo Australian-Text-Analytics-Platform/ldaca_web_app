@@ -19,6 +19,7 @@ import { Button } from '../../../components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Play, Loader2, Trash2, Link as LinkIcon, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
+import HelpIcon from '../../../components/help/HelpIcon';
 import {
   Table,
   TableBody,
@@ -1258,10 +1259,10 @@ const ConcordanceFeature: React.FC = () => {
             <ScrollArea
               type="hover"
               scrollbars="both"
-              className="h-[400px]"
+              className="h-100"
             >
               <div className="min-w-max">
-                <Table className="min-w-[720px]" disableContainer>
+                <Table className="min-w-180" disableContainer>
                 <TableHeader className="bg-gray-50 sticky top-0 z-10">
                   <TableRow>
                     {displayColumns.map((c: string) => {
@@ -1420,10 +1421,10 @@ const ConcordanceFeature: React.FC = () => {
           <ScrollArea
             type="hover"
             scrollbars="both"
-            className="h-[400px]"
+            className="h-100"
           >
             <div className="min-w-max">
-              <Table className="min-w-[720px]" disableContainer>
+              <Table className="min-w-180" disableContainer>
               <TableHeader className="bg-gray-50 sticky top-0 z-10">
                 <TableRow>
                   {displayColumns.map(key => {
@@ -1613,7 +1614,10 @@ const ConcordanceFeature: React.FC = () => {
           <div className="space-y-6">
             <div className="grid gap-4 lg:grid-cols-2">
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-foreground">Search word or phrase</label>
+                <div className="flex items-center gap-2">
+                  <label className="block text-sm font-medium text-foreground">Search word or phrase</label>
+                  <HelpIcon targetKey="analysis.concordance.search-term" label="Concordance search term" />
+                </div>
                 <input
                   type="text"
                   value={searchWord}
@@ -1652,16 +1656,19 @@ const ConcordanceFeature: React.FC = () => {
             </div>
 
             <div className="flex flex-wrap gap-4 text-sm">
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={regex}
-                  onChange={(e) => setRegex(e.target.checked)}
-                  className="h-4 w-4"
-                  disabled={!!isLocked}
-                />
-                <span className="text-sm text-foreground">Use regular expression</span>
-              </label>
+              <div className="flex items-center gap-2">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={regex}
+                    onChange={(e) => setRegex(e.target.checked)}
+                    className="h-4 w-4"
+                    disabled={!!isLocked}
+                  />
+                  <span className="text-sm text-foreground">Use regular expression</span>
+                </label>
+                <HelpIcon targetKey="analysis.concordance.regex-toggle" label="Regex mode toggle" />
+              </div>
               <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -1967,7 +1974,7 @@ const ConcordanceFeature: React.FC = () => {
                             <TableRow key={key}>
                               <TableCell className="font-medium">{key}</TableCell>
                               <TableCell>
-                                <div className="max-w-md break-words">
+                                <div className="max-w-md wrap-break-word">
                                   {typeof value === 'object' && value !== null ? (
                                     <pre className="text-xs bg-gray-100 p-2 rounded overflow-x-auto">
                                       {displayValue}

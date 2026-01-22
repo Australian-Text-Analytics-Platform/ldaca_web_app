@@ -1,0 +1,35 @@
+<!-- markdownlint-disable MD033 MD041 -->
+
+[← Back to tutorial index](./index.md)
+
+<h1>Topic modeling tutorial</h1>
+
+Topic modeling helps you discover themes in a large collection of documents. The app uses BERTopic under the hood.
+
+> **Placeholder (image):** Screenshot of topic modeling setup panel and results.
+
+<h2 id="help-topic-modeling-min-topic-size">Minimum topic size</h2>
+
+This setting controls the smallest number of documents that can form a topic.
+
+- Smaller values produce more, smaller topics.
+- Larger values produce fewer, broader topics.
+
+**Q: How do I choose a good value?**
+
+Start with a moderate value and adjust until the topics feel meaningful for your dataset size.
+
+<h2 id="help-topic-modeling-ctfidf-toggle">c-TF-IDF toggle</h2>
+
+This toggle controls how topic keywords are scored. When enabled, it highlights terms that are distinctive to each topic.
+
+- **On**: more distinctive topic keywords.
+- **Off**: more frequency-driven keywords.
+
+## Practice exercise
+
+1. Run topic modeling with the default minimum topic size.
+2. Toggle c-TF-IDF on and off to compare keyword lists.
+3. Record which setting gives clearer topic labels.
+
+[← Back to tutorial index](./index.md)

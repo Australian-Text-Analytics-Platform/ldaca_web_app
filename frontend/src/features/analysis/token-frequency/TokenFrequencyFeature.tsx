@@ -18,6 +18,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
+import HelpIcon from '../../../components/help/HelpIcon';
 import { Play, Loader2, Trash2, Table2, Download, X, ChevronLeft, ChevronRight, Lightbulb } from 'lucide-react';
 import { Text } from '@visx/text';
 import { toast } from 'sonner';
@@ -1361,7 +1362,7 @@ function TokenFrequencyFeature() {
     return (
       <div className="mb-6" data-node-id={nodeId || displayName}>
         <div className="h-16 mb-4 flex items-center">
-          <h3 className="text-lg font-semibold text-gray-800 break-words leading-tight w-full">{displayName}</h3>
+          <h3 className="text-lg font-semibold text-gray-800 wrap-break-word leading-tight w-full">{displayName}</h3>
         </div>
 
         <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
@@ -1461,23 +1462,26 @@ function TokenFrequencyFeature() {
           />
         </CardContent>
         <CardFooter className="flex flex-wrap items-center gap-3 pt-0">
-          <Button
-            onClick={handleAnalyze}
-            disabled={
-              selectedNodes.length === 0 ||
-              isAnalyzing ||
-              !currentWorkspaceId ||
-              effectiveNodeColumnSelections.some((sel) => !sel.column) ||
-              !!isLocked
-            }
-            className="w-full md:w-auto"
-          >
-            {isAnalyzing ? (
-              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Analyzing...</>
-            ) : (
-              <><Play className="mr-2 h-4 w-4" />Calculate Token Frequencies</>
-            )}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={handleAnalyze}
+              disabled={
+                selectedNodes.length === 0 ||
+                isAnalyzing ||
+                !currentWorkspaceId ||
+                effectiveNodeColumnSelections.some((sel) => !sel.column) ||
+                !!isLocked
+              }
+              className="w-full md:w-auto"
+            >
+              {isAnalyzing ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Analyzing...</>
+              ) : (
+                <><Play className="mr-2 h-4 w-4" />Calculate Token Frequencies</>
+              )}
+            </Button>
+            <HelpIcon targetKey="analysis.token-frequency.run" label="Run token frequency" />
+          </div>
           {results && (
             <Button
               onClick={handleClearResults}
@@ -1519,7 +1523,7 @@ function TokenFrequencyFeature() {
               <>
                 <div className="rounded-md border border-blue-200 bg-blue-50/80 p-3 text-sm text-blue-800 dark:border-blue-500/40 dark:bg-blue-500/10 dark:text-blue-100">
                   <div className="flex items-start gap-2">
-                    <Lightbulb className="h-5 w-5 flex-shrink-0" />
+                    <Lightbulb className="h-5 w-5 shrink-0" />
                     <div>
                       <strong>Tip:</strong> Click any token below to open the Concordance tab preloaded with the same node selections.
                     </div>
@@ -1555,7 +1559,10 @@ function TokenFrequencyFeature() {
                   </div>
                   <div className="flex flex-col gap-2">
                     <div className="flex items-center justify-between">
-                      <span className="uppercase tracking-wide text-[10px] font-semibold text-foreground/80">Stop words (comma-separated)</span>
+                      <div className="flex items-center gap-2">
+                        <span className="uppercase tracking-wide text-[10px] font-semibold text-foreground/80">Stop words (comma-separated)</span>
+                        <HelpIcon targetKey="analysis.token-frequency.stop-words" label="Stop words input" />
+                      </div>
                       <Button
                         onClick={handleFillDefaultStopWords}
                         disabled={isLoadingStopWords}
@@ -1720,11 +1727,11 @@ function TokenFrequencyFeature() {
                         <div className="flex items-center justify-between mb-3 flex-wrap gap-4">
                           <h3 className="text-lg font-semibold text-gray-800">Unified Word Cloud</h3>
                           <div className="flex items-center space-x-4 text-sm">
-                            <div className="flex items-center space-x-1"><span className="w-4 h-4 inline-block rounded" style={{ background: nodeAColor }}></span><span className="text-gray-700 truncate max-w-[140px]" title={nodeAName}>{nodeAName}</span></div>
-                            <div className="flex items-center space-x-1"><span className="w-4 h-4 inline-block rounded" style={{ background: nodeBColor }}></span><span className="text-gray-700 truncate max-w-[140px]" title={nodeBName}>{nodeBName}</span></div>
+                            <div className="flex items-center space-x-1"><span className="w-4 h-4 inline-block rounded" style={{ background: nodeAColor }}></span><span className="text-gray-700 truncate max-w-35" title={nodeAName}>{nodeAName}</span></div>
+                            <div className="flex items-center space-x-1"><span className="w-4 h-4 inline-block rounded" style={{ background: nodeBColor }}></span><span className="text-gray-700 truncate max-w-35" title={nodeBName}>{nodeBName}</span></div>
                             <div className="flex items-center space-x-2">
                               <span className="text-gray-500">Gradient:</span>
-                              <div className="h-3 w-32 rounded bg-gradient-to-r" style={{ background: `linear-gradient(to right, ${nodeAColor}, ${nodeBColor})` }}></div>
+                              <div className="h-3 w-32 rounded bg-linear-to-r" style={{ background: `linear-gradient(to right, ${nodeAColor}, ${nodeBColor})` }}></div>
                               <span className="text-gray-500">A → B</span>
                             </div>
                           </div>

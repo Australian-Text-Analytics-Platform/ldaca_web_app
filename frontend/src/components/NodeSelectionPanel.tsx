@@ -28,7 +28,7 @@ interface NodeSelectionPanelProps {
   showHeaderLabel?: boolean;
   showColorPicker?: boolean;
   showColumnPicker?: boolean;
-  columnLabelFn?: (node: WorkspaceNodeLike, idx: number) => string;
+  columnLabelFn?: (node: WorkspaceNodeLike, idx: number) => ReactNode;
   renderNodeMeta?: (node: WorkspaceNodeLike) => React.ReactNode;
   showShape?: boolean; // display shape if present on node metadata
   disabled?: boolean; // disables interactions but keeps UI fully visible
@@ -206,7 +206,7 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
       )}
       {(originalCount ?? selectedNodes.length) > maxCompare && (
         <div className="mt-1 flex items-center gap-1 text-sm text-amber-600">
-          <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+          <AlertTriangle className="h-4 w-4 shrink-0" />
           Maximum {maxCompare} node allowed here. Currently {(originalCount ?? selectedNodes.length)} selected in workspace; only the first {maxCompare} is used.
         </div>
       )}

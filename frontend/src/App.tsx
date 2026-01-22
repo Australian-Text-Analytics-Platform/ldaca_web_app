@@ -38,12 +38,14 @@ const WorkspaceShell: React.FC = () => {
     closeFeedbackModal,
     feedbackOpen,
     tutorialModal,
+    tutorialTarget,
     closeTutorialModal,
   } = useUIStore(useShallow((state) => ({
     currentView: state.currentView,
     closeFeedbackModal: state.closeFeedbackModal,
     feedbackOpen: state.modals.feedbackModal,
     tutorialModal: state.modals.tutorialModal,
+    tutorialTarget: state.tutorialTarget,
     closeTutorialModal: state.closeTutorialModal,
   })));
   const {
@@ -213,7 +215,7 @@ const WorkspaceShell: React.FC = () => {
                 <DialogTitle className="sr-only">Tutorial</DialogTitle>
                 <div className="flex-1 overflow-y-auto">
                   <Suspense fallback={<div className="p-8 flex items-center justify-center h-full"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>}>
-                    <TutorialView onClose={closeTutorialModal} />
+                    <TutorialView onClose={closeTutorialModal} target={tutorialTarget} />
                   </Suspense>
                 </div>
               </DialogContent>

@@ -22,6 +22,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { workspacesApi } from '@/api/workspaces';
 import { useAnalysisStore } from '@/stores/analysisStore';
 import { useUIStore } from '@/stores';
+import { tutorialIndexTarget } from '@/tutorials/tutorialRegistry';
 import { useQuotationEngineDialogStore } from '@/stores/quotationEngineStore';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { DataFolderDialog } from '@/components/dialogs/DataFolderDialog';
@@ -79,8 +80,8 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 const Sidebar: React.FC = () => {
-  const { currentView, setCurrentView, openFeedbackModal, openTutorialModal } = useUIStore(
-    useShallow(({ currentView, setCurrentView, openFeedbackModal, openTutorialModal }) => ({ currentView, setCurrentView, openFeedbackModal, openTutorialModal }))
+  const { currentView, setCurrentView, openFeedbackModal, openTutorialTarget } = useUIStore(
+    useShallow(({ currentView, setCurrentView, openFeedbackModal, openTutorialTarget }) => ({ currentView, setCurrentView, openFeedbackModal, openTutorialTarget }))
   );
   const { workspaceGraph, currentWorkspaceId } = useWorkspaceData();
   const { selectedNodeIds } = useWorkspaceSelection();
@@ -501,7 +502,7 @@ const Sidebar: React.FC = () => {
           <Button
             variant="ghost"
             className="flex-1 justify-center"
-            onClick={openTutorialModal}
+            onClick={() => openTutorialTarget(tutorialIndexTarget)}
           >
             <BookOpen className="h-4 w-4" />
             <span>Tutorial</span>

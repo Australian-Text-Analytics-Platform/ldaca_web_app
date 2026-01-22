@@ -10,6 +10,7 @@ import { Badge } from '../../../components/ui/badge';
 import { Label } from '../../../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
 import { toast } from 'sonner';
+import HelpIcon from '../../../components/help/HelpIcon';
 
 type DownloadStatus = 'idle' | 'downloading';
 
@@ -126,7 +127,7 @@ const ExportFeature: React.FC = () => {
 
           <div className="space-y-3">
             <Label className="text-sm font-medium">Selected Nodes</Label>
-            <div className="max-h-[26rem] space-y-2 overflow-y-auto rounded-lg border border-border/60 bg-background p-2 shadow-sm">
+            <div className="max-h-104 space-y-2 overflow-y-auto rounded-lg border border-border/60 bg-background p-2 shadow-sm">
               {selectedNodes.length === 0 && (
                 <div className="flex items-center justify-center rounded-md border border-dashed border-border/40 bg-muted/30 py-10 text-sm text-muted-foreground">
                   Choose nodes in the graph sidebar to enable exports.
@@ -164,7 +165,10 @@ const ExportFeature: React.FC = () => {
 
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
             <div className="w-full max-w-xs">
-              <Label className="mb-2 block text-sm font-medium text-foreground">Format</Label>
+              <div className="mb-2 flex items-center gap-2">
+                <Label className="block text-sm font-medium text-foreground">Format</Label>
+                <HelpIcon targetKey="analysis.export.format" label="Export format selector" />
+              </div>
               <Select value={format} onValueChange={(value) => setFormat(value)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Choose a format" />
@@ -178,16 +182,19 @@ const ExportFeature: React.FC = () => {
                 </SelectContent>
               </Select>
             </div>
-            <Button
-              onClick={handleExportAll}
-              disabled={exporting || nodeIds.length === 0 || !currentWorkspaceId}
-              className="gap-2"
-            >
-              {exporting && (
-                <span className="inline-flex h-4 w-4 animate-spin rounded-full border-[1.5px] border-current border-t-transparent" />
-              )}
-              {exporting ? 'Exporting…' : 'Export All (ZIP bundle)'}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={handleExportAll}
+                disabled={exporting || nodeIds.length === 0 || !currentWorkspaceId}
+                className="gap-2"
+              >
+                {exporting && (
+                  <span className="inline-flex h-4 w-4 animate-spin rounded-full border-[1.5px] border-current border-t-transparent" />
+                )}
+                {exporting ? 'Exporting…' : 'Export All (ZIP bundle)'}
+              </Button>
+              <HelpIcon targetKey="analysis.export.run" label="Export action" />
+            </div>
           </div>
         </CardContent>
       </Card>

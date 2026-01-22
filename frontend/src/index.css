@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@plugin "@tailwindcss/typography";
+
 @custom-variant dark (&:is(.dark *));
 
 @theme {
@@ -176,5 +178,24 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+.tutorial-highlight {
+  scroll-margin-top: 96px;
+  border-radius: 0.5rem;
+  background-color: rgba(59, 130, 246, 0.12);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+  animation: tutorial-highlight-fade 3.5s ease-out;
+}
+
+@keyframes tutorial-highlight-fade {
+  0% {
+    background-color: rgba(59, 130, 246, 0.3);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.35);
+  }
+  100% {
+    background-color: rgba(59, 130, 246, 0);
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
   }
 }

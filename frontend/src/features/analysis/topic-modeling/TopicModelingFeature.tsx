@@ -15,6 +15,7 @@ import { Button } from '../../../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Input } from '../../../components/ui/input';
 import { Checkbox } from '../../../components/ui/checkbox';
+import HelpIcon from '../../../components/help/HelpIcon';
 import { AlertTriangle, Loader2, Play, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { applySelectedColumnsToSnapshots } from '../../../hooks/useSchemaManagement';
@@ -620,9 +621,12 @@ const TopicModelingFeature: React.FC = () => {
 
             <div className="grid gap-4 md:grid-cols-2 md:items-end">
               <div className="space-y-2 md:max-w-xs">
-                <label htmlFor="minTopicSize" className="text-sm font-medium text-foreground">
-                  Min Topic Size
-                </label>
+                <div className="flex items-center gap-2">
+                  <label htmlFor="minTopicSize" className="text-sm font-medium text-foreground">
+                    Min Topic Size
+                  </label>
+                  <HelpIcon targetKey="analysis.topic-modeling.min-topic-size" label="Minimum topic size" />
+                </div>
                 <Input
                   id="minTopicSize"
                   type="number"
@@ -640,9 +644,12 @@ const TopicModelingFeature: React.FC = () => {
                   onCheckedChange={checked=>setUseCtTfidf(checked === true)}
                   disabled={!!isLocked}
                 />
-                <label htmlFor="useCtTfidf" className="text-sm leading-tight text-muted-foreground">
-                  Use c-TF-IDF embeddings
-                </label>
+                <div className="flex items-center gap-2">
+                  <label htmlFor="useCtTfidf" className="text-sm leading-tight text-muted-foreground">
+                    Use c-TF-IDF embeddings
+                  </label>
+                  <HelpIcon targetKey="analysis.topic-modeling.ctfidf-toggle" label="c-TF-IDF toggle" />
+                </div>
               </div>
             </div>
 
@@ -816,7 +823,7 @@ const TopicModelingFeature: React.FC = () => {
                     style={{ left: tooltip.x, top: tooltip.y }}
                   >
                     <div className="text-sm font-semibold">Topic {tooltip.topic.id}</div>
-                    <div className="mt-1 break-words text-[10px] leading-snug text-muted-foreground">{tooltip.topic.label}</div>
+                    <div className="mt-1 wrap-break-word text-[10px] leading-snug text-muted-foreground">{tooltip.topic.label}</div>
                     <div className="mt-2">{renderSizeComposition(tooltip.topic.size, tooltip.topic.total_size)}</div>
                   </div>
                 )}

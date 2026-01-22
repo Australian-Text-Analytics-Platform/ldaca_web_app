@@ -43,6 +43,12 @@ interface UIState {
     feedbackModal: boolean;
     tutorialModal: boolean;
   };
+
+  tutorialTarget?: {
+    file: string;
+    anchor: string;
+    label?: string;
+  } | null;
 }
 
 interface UIActions {
@@ -78,6 +84,7 @@ interface UIActions {
   closeFeedbackModal: () => void;
   openTutorialModal: () => void;
   closeTutorialModal: () => void;
+  openTutorialTarget: (target: { file: string; anchor: string; label?: string }) => void;
   closeAllModals: () => void;
 }
 
@@ -103,6 +110,7 @@ export const useUIStore = create<UIStore>()(
         feedbackModal: false,
         tutorialModal: false,
       },
+      tutorialTarget: null,
 
       // View management
       setCurrentView: (view) => set((state) => {
@@ -210,8 +218,14 @@ export const useUIStore = create<UIStore>()(
         state.modals.tutorialModal = true;
       }),
 
+      openTutorialTarget: (target) => set((state) => {
+        state.tutorialTarget = target;
+        state.modals.tutorialModal = true;
+      }),
+
       closeTutorialModal: () => set((state) => {
         state.modals.tutorialModal = false;
+        state.tutorialTarget = null;
       }),
       
       closeAllModals: () => set((state) => {

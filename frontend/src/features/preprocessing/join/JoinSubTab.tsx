@@ -2,6 +2,7 @@ import React from 'react';
 import { Loader2 } from 'lucide-react';
 
 import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
+import HelpIcon from '../../../components/help/HelpIcon';
 import { Button } from '../../../components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Input } from '../../../components/ui/input';
@@ -47,13 +48,23 @@ export const JoinSubTab: React.FC<JoinSubTabProps> = (props) => {
     <div className="space-y-6">
       <Card>
         <CardHeader className="space-y-1 pb-4">
-          <CardTitle>Configure join</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            Configure join
+            <HelpIcon targetKey="preprocessing.join.tab" label="Join sub-tab overview" />
+          </CardTitle>
           <CardDescription>Combine up to two nodes using matching columns.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6 pt-0">
           <p className="text-sm text-muted-foreground">
             Select up to two nodes in the workspace (Shift/⌘-click) to configure a join. Column pickers will appear below
             for the current selection.
+            <span className="ml-2 inline-flex items-center">
+              <HelpIcon
+                targetKey="preprocessing.join.column"
+                label="Join column picker"
+                className="h-5 w-5 text-muted-foreground"
+              />
+            </span>
           </p>
 
           <NodeSelectionPanel
@@ -81,7 +92,10 @@ export const JoinSubTab: React.FC<JoinSubTabProps> = (props) => {
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="join-type">Join type</Label>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="join-type">Join type</Label>
+                <HelpIcon targetKey="preprocessing.join.join-type" label="Join type selector" />
+              </div>
               <Select value={joinType} onValueChange={(value) => setJoinType(value as JoinType)}>
                 <SelectTrigger id="join-type">
                   <SelectValue placeholder="Select join type" />
@@ -99,7 +113,10 @@ export const JoinSubTab: React.FC<JoinSubTabProps> = (props) => {
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="join-new-node-name">New node name</Label>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="join-new-node-name">New node name</Label>
+                <HelpIcon targetKey="preprocessing.join.new-node-name" label="Join output name" />
+              </div>
               <Input
                 id="join-new-node-name"
                 value={joinNewNodeName}
@@ -113,16 +130,19 @@ export const JoinSubTab: React.FC<JoinSubTabProps> = (props) => {
         </CardContent>
         <CardFooter className="flex flex-col gap-3 border-t pt-4 md:flex-row md:items-center md:justify-between">
           <div className="text-sm text-muted-foreground">{joinStatusMessage}</div>
-          <Button type="button" onClick={apply.run} disabled={apply.disabled}>
-            {apply.isBusy ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Joining…
-              </>
-            ) : (
-              'Add to Workspace'
-            )}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button type="button" onClick={apply.run} disabled={apply.disabled}>
+              {apply.isBusy ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Joining…
+                </>
+              ) : (
+                'Add to Workspace'
+              )}
+            </Button>
+            <HelpIcon targetKey="preprocessing.join.apply-button" label="Apply join" />
+          </div>
         </CardFooter>
       </Card>
 
