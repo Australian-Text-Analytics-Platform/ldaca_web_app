@@ -41,6 +41,7 @@ import { ScrollArea } from '../../../components/ui/scroll-area';
 import { ArrowUpDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2, Search, Trash2, Unlink } from 'lucide-react';
 import useAnalysisTaskLifecycle, { type AnalysisTaskRefreshContext } from '../../../hooks/useAnalysisTaskLifecycle';
 import { queryKeys } from '../../../lib/queryKeys';
+import { getAnalysisActionState } from '../common/analysisActionState';
 
 interface QuotationResultState {
   rows: any[];
@@ -608,6 +609,16 @@ const QuotationFeature: React.FC = () => {
     currentRequestParams,
     lockedRequestParams
   );
+
+  const actionState = getAnalysisActionState({
+    hasWorkspace: Boolean(currentWorkspaceId),
+    hasSelection: displayedNodes.length > 0,
+    isLocked,
+    hasResults: hasLoaded,
+    isBusy: isLoadingQuotations,
+    hasActiveTask: false,
+    allowRunWhenLocked: hasParamsChanged,
+  });
 
     const resolveLockedNodeContext = useCallback((): { nodeId: string; column: string } | null => {
       const sourceNode = (isLocked && lockedNodesSnapshot.length ? lockedNodesSnapshot[0] : displayedNodes[0]) as any;
@@ -1321,7 +1332,10 @@ const QuotationFeature: React.FC = () => {
           <CardHeader className="space-y-0 pb-4">
             <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
               <div>
-                <CardTitle>Quotation Extraction</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  Quotation Extraction
+                  <HelpIcon targetKey="analysis.quotation.tab" label="Quotation extraction overview" />
+                </CardTitle>
                 <CardDescription>Load quotations for a single node and highlight speaker, quote, and verb spans.</CardDescription>
               </div>
               <div className="flex flex-col items-start gap-1 md:items-end md:text-right">
@@ -1368,7 +1382,7 @@ const QuotationFeature: React.FC = () => {
                   type="button"
                   className="w-full sm:w-auto"
                   onClick={handleSearchAll}
-                  disabled={!canRunQuotation || isLoadingQuotations}
+                  disabled={actionState.runDisabled || !canRunQuotation}
                 >
                   {isLoadingQuotations ? (
                     <>
@@ -1387,7 +1401,7 @@ const QuotationFeature: React.FC = () => {
                   type="button"
                   className="w-full sm:w-auto"
                   onClick={handleSearchAll}
-                  disabled={!canRunQuotation || isLoadingQuotations || !!isLocked}
+                  disabled={actionState.runDisabled || !canRunQuotation}
                 >
                   {isLoadingQuotations ? (
                     <>
@@ -1402,7 +1416,7 @@ const QuotationFeature: React.FC = () => {
                   )}
                 </Button>
               )}
-              {hasLoaded && (
+              <div className="flex items-center gap-2">
                 <Button
                   type="button"
                   variant="destructive"
@@ -1427,7 +1441,7 @@ const QuotationFeature: React.FC = () => {
                       recomputeAutoColumns();
                     }
                   }}
-                  disabled={isClearing}
+                    disabled={actionState.clearDisabled || isClearing}
                 >
                   {isClearing ? (
                     <>
@@ -1441,7 +1455,8 @@ const QuotationFeature: React.FC = () => {
                     </>
                   )}
                 </Button>
-              )}
+                <HelpIcon targetKey="analysis.quotation.clear-results" label="Clear results" />
+              </div>
             </div>
           </CardContent>
         </Card>

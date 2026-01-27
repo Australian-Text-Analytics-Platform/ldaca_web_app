@@ -2,7 +2,7 @@
 
 [← Back to tutorial index](./index.md)
 
-<h1>Export tutorial</h1>
+<h1 id="help-export-section">Export tutorial</h1>
 
 Export lets you download tables or results for reports, sharing, or additional analysis in other tools.
 

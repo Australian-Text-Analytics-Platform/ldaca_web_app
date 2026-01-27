@@ -3,7 +3,7 @@ name = "ldaca-web-app-backend"
 version = "0.1.2"
 description = "LDaCA Web App Backend - FastAPI backend for the Language Data Commons of Australia"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 license = { text = "MIT" }
 authors = [
     { name = "Australian Text Analytics Platform" }
@@ -14,7 +14,7 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering :: Information Analysis",
 ]
 dependencies = [

@@ -23,6 +23,7 @@ import AnalysisLockedNotice from '../../../components/tabs/AnalysisLockedNotice'
 import AnalysisTaskBanner from '../../../components/tabs/AnalysisTaskBanner';
 import type { AnalysisTaskStatus } from '../../../hooks/useAnalysisTaskStatus';
 import useAnalysisTaskLifecycle, { type AnalysisTaskRefreshContext } from '../../../hooks/useAnalysisTaskLifecycle';
+import { getAnalysisActionState } from '../common/analysisActionState';
 interface TopicModelingTopic { id: number; label: string; size: number[]; total_size: number; x: number; y: number; }
 interface TopicModelingResponse { state?: 'running' | 'successful' | 'failed' | 'cancelled'; message?: string; data?: { topics: TopicModelingTopic[]; corpus_sizes?: number[] }; metadata?: { task_id?: string; [k: string]: any } }
 
@@ -188,6 +189,21 @@ const TopicModelingFeature: React.FC = () => {
   const topicRunningTask = topicTaskStatus.runningTask;
   const topicSuccessfulTask = topicTaskStatus.successfulTask;
   const topicFailedTask = topicTaskStatus.failedTask;
+  const hasActiveTask = Boolean(
+    topicTaskStatus.activeTaskId ||
+    topicRunningTask?.task_id ||
+    topicTaskStatus.queuedTask?.task_id ||
+    topicTaskStatus.terminalTask?.task_id ||
+    topicTaskStatus.tasks.length > 0
+  );
+  const actionState = getAnalysisActionState({
+    hasWorkspace: Boolean(currentWorkspaceId),
+    hasSelection: panelNodeIds.length > 0,
+    isLocked,
+    hasResults: Boolean(result),
+    isBusy: isRunning,
+    hasActiveTask,
+  });
 
   // Observe container width for responsive sizing
   useEffect(()=>{
@@ -594,7 +610,10 @@ const TopicModelingFeature: React.FC = () => {
         <CardHeader className="space-y-0 pb-4">
           <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
             <div>
-              <CardTitle>Topic Modeling (BERTopic)</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                Topic Modeling (BERTopic)
+                <HelpIcon targetKey="analysis.topic-modeling.tab" label="Topic modeling overview" />
+              </CardTitle>
               <CardDescription>Compare up to two nodes to uncover shared topics.</CardDescription>
             </div>
           </div>
@@ -658,7 +677,7 @@ const TopicModelingFeature: React.FC = () => {
                 type="button"
                 className="w-full sm:w-auto"
                 onClick={handleRun}
-                disabled={isRunning || !!isLocked || !!result || panelNodeIds.length === 0 || panelHasMissingColumns}
+                disabled={actionState.runDisabled || panelHasMissingColumns}
               >
                 {isRunning ? (
                   <>
@@ -673,7 +692,7 @@ const TopicModelingFeature: React.FC = () => {
                 )}
               </Button>
 
-              {(result || isLocked || isRunning) && (
+              <div className="flex items-center gap-2">
                 <Button
                   type="button"
                   variant="destructive"
@@ -767,7 +786,7 @@ const TopicModelingFeature: React.FC = () => {
                       );
                     }
                   }}
-                  disabled={isClearing || !currentWorkspaceId}
+                  disabled={actionState.clearDisabled || isClearing}
                 >
                   {isClearing ? (
                     <>
@@ -781,7 +800,8 @@ const TopicModelingFeature: React.FC = () => {
                     </>
                   )}
                 </Button>
-              )}
+                <HelpIcon targetKey="analysis.topic-modeling.clear-results" label="Clear results" />
+              </div>
             </div>
 
             {error && result?.state !== 'failed' && (

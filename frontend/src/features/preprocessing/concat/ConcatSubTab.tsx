@@ -2,6 +2,7 @@ import React from 'react';
 import { Loader2 } from 'lucide-react';
 
 import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
+import HelpIcon from '../../../components/help/HelpIcon';
 import { Button } from '../../../components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Input } from '../../../components/ui/input';
@@ -30,7 +31,10 @@ export const ConcatSubTab: React.FC<ConcatSubTabProps> = (props) => {
         <CardHeader className="space-y-0 pb-4">
           <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
             <div>
-              <CardTitle>Concatenate datasets</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                Concatenate datasets
+                <HelpIcon targetKey="preprocessing.concat.tab" label="Concat sub-tab overview" />
+              </CardTitle>
               <CardDescription>Stack compatible nodes vertically into a single dataset.</CardDescription>
             </div>
             {showActivityTag && (
@@ -63,6 +67,13 @@ export const ConcatSubTab: React.FC<ConcatSubTabProps> = (props) => {
             originalCount={selectionPanel.originalCount}
             statusMessage={selectionPanel.statusMessage || undefined}
             statusVariant={selectionPanel.statusVariant || undefined}
+            headerAddon={
+              <HelpIcon
+                targetKey="preprocessing.common.node-selection"
+                label="Selected nodes"
+                className="h-4 w-4 text-muted-foreground"
+              />
+            }
           />
 
           {extraSelectionMessage && (
@@ -91,7 +102,10 @@ export const ConcatSubTab: React.FC<ConcatSubTabProps> = (props) => {
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="concat-new-node-name">New node name</Label>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="concat-new-node-name">New node name</Label>
+                <HelpIcon targetKey="preprocessing.concat.new-node-name" label="Concat output name" />
+              </div>
               <Input
                 id="concat-new-node-name"
                 value={form.value}
@@ -101,7 +115,10 @@ export const ConcatSubTab: React.FC<ConcatSubTabProps> = (props) => {
               <p className="text-xs text-muted-foreground">Leave blank to use the suggested name shown in gray.</p>
             </div>
             <div className="space-y-2">
-              <Label>Schema status</Label>
+              <div className="flex items-center gap-2">
+                <Label>Schema status</Label>
+                <HelpIcon targetKey="preprocessing.concat.schema-status" label="Schema status" />
+              </div>
               <div className="rounded-md border border-muted-foreground/40 bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
                 {statusMessage}
               </div>
@@ -110,21 +127,29 @@ export const ConcatSubTab: React.FC<ConcatSubTabProps> = (props) => {
         </CardContent>
         <CardFooter className="flex flex-col gap-3 border-t pt-4 md:flex-row md:items-center md:justify-between">
           <div className="text-sm text-muted-foreground">{statusMessage}</div>
-          <Button type="button" onClick={() => void apply.run()} disabled={apply.disabled}>
-            {apply.isBusy ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Concatenating…
-              </>
-            ) : (
-              'Add to Workspace'
-            )}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button type="button" onClick={() => void apply.run()} disabled={apply.disabled}>
+              {apply.isBusy ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Concatenating…
+                </>
+              ) : (
+                'Add to Workspace'
+              )}
+            </Button>
+            <HelpIcon targetKey="preprocessing.common.apply-button" label="Apply action" />
+          </div>
         </CardFooter>
       </Card>
 
       <PreviewTable
-        title="Preview concat output"
+        title={
+          <span className="flex items-center gap-2">
+            Preview concat output
+            <HelpIcon targetKey="preprocessing.common.preview" label="Preview table" />
+          </span>
+        }
         description="Inspect a sample of the stacked rows before creating the node."
         columns={preview.columns}
         data={preview.data}

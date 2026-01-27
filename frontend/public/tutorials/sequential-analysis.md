@@ -2,7 +2,7 @@
 
 [← Back to tutorial index](./index.md)
 
-<h1>Sequential analysis tutorial</h1>
+<h1 id="help-sequential-section">Sequential analysis tutorial</h1>
 
 Sequential analysis explores how events or terms evolve over time. It is useful when your data has timestamps.
 
@@ -22,6 +22,10 @@ Pick how to group time into intervals (daily, weekly, monthly, etc.).
 
 - Smaller intervals show more detail.
 - Larger intervals smooth the trend.
+
+<h2 id="help-sequential-clear-results">Clear results</h2>
+
+Sequential analysis results are saved in the backend so the tab can reload and keep persistent pages. **Clear Results** removes the cached result in the backend and resets the analysis.
 
 ## Practice exercise
 

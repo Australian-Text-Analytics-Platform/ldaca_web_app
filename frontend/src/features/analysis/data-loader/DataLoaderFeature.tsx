@@ -402,7 +402,10 @@ export const DataLoaderFeature: React.FC = () => {
           style={activeCardHeight ? { height: activeCardHeight } : undefined}
         >
           <CardHeader>
-            <CardTitle>Workspace manager</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              Workspace manager
+              <HelpIcon targetKey="data-loader.workspace-manager.section" label="Workspace manager overview" />
+            </CardTitle>
             <CardDescription>Switch between saved workspaces or remove ones you no longer need.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-1 flex-col min-h-0 overflow-hidden">

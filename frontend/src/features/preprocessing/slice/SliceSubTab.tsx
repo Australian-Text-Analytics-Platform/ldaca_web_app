@@ -2,6 +2,7 @@ import React from 'react';
 import { AlertCircle, Loader2 } from 'lucide-react';
 
 import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
+import HelpIcon from '../../../components/help/HelpIcon';
 import { Button } from '../../../components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Input } from '../../../components/ui/input';
@@ -32,7 +33,10 @@ export const SliceSubTab: React.FC<SliceSubTabProps> = (props) => {
         <CardHeader className="space-y-0 pb-4">
           <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
             <div>
-              <CardTitle>Slice rows</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                Slice rows
+                <HelpIcon targetKey="preprocessing.slice.tab" label="Slice sub-tab overview" />
+              </CardTitle>
               <CardDescription>Extract a contiguous range of rows from the selected node.</CardDescription>
             </div>
             {showActivityTag && (
@@ -59,11 +63,21 @@ export const SliceSubTab: React.FC<SliceSubTabProps> = (props) => {
             showShape
             disabled={selectionPanel.disabled}
             originalCount={selectionPanel.originalCount}
+            headerAddon={
+              <HelpIcon
+                targetKey="preprocessing.common.node-selection"
+                label="Selected nodes"
+                className="h-4 w-4 text-muted-foreground"
+              />
+            }
           />
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="slice-offset">Offset</Label>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="slice-offset">Offset</Label>
+                <HelpIcon targetKey="preprocessing.slice.offset" label="Slice offset" />
+              </div>
               <Input
                 id="slice-offset"
                 type="number"
@@ -75,7 +89,10 @@ export const SliceSubTab: React.FC<SliceSubTabProps> = (props) => {
               <p className="text-xs text-muted-foreground">Zero-based index of the first row to include.</p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="slice-length">Length (optional)</Label>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="slice-length">Length (optional)</Label>
+                <HelpIcon targetKey="preprocessing.slice.length" label="Slice length" />
+              </div>
               <Input
                 id="slice-length"
                 type="number"
@@ -90,7 +107,10 @@ export const SliceSubTab: React.FC<SliceSubTabProps> = (props) => {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="slice-new-node-name">New node name</Label>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="slice-new-node-name">New node name</Label>
+              <HelpIcon targetKey="preprocessing.slice.new-node-name" label="Slice output name" />
+            </div>
             <Input
               id="slice-new-node-name"
               type="text"
@@ -113,15 +133,23 @@ export const SliceSubTab: React.FC<SliceSubTabProps> = (props) => {
                 <span>{inlineError}</span>
               </div>
             )}
-            <Button onClick={applySlice} disabled={applyDisabled} className="w-full sm:w-auto">
-              {isBusy ? 'Adding to workspace…' : 'Add to Workspace'}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button onClick={applySlice} disabled={applyDisabled} className="w-full sm:w-auto">
+                {isBusy ? 'Adding to workspace…' : 'Add to Workspace'}
+              </Button>
+              <HelpIcon targetKey="preprocessing.common.apply-button" label="Apply action" />
+            </div>
           </div>
         </CardFooter>
       </Card>
 
       <PreviewTable
-        title="Preview sliced rows"
+        title={
+          <span className="flex items-center gap-2">
+            Preview sliced rows
+            <HelpIcon targetKey="preprocessing.common.preview" label="Preview table" />
+          </span>
+        }
         description="Review rows returned by the current slice configuration before adding to the workspace."
         columns={preview.columns}
         data={preview.data}

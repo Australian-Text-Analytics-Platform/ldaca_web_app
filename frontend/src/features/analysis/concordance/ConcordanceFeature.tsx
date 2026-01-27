@@ -35,6 +35,7 @@ import AnalysisTaskBanner from '../../../components/tabs/AnalysisTaskBanner';
 import type { AnalysisTaskStatus } from '../../../hooks/useAnalysisTaskStatus';
 import useAnalysisTaskLifecycle, { type AnalysisTaskRefreshContext } from '../../../hooks/useAnalysisTaskLifecycle';
 import { queryKeys } from '../../../lib/queryKeys';
+import { getAnalysisActionState } from '../common/analysisActionState';
 
 const sanitizeResultParams = (params?: Record<string, unknown>): Record<string, unknown> | undefined => {
   if (!params) return undefined;
@@ -279,6 +280,23 @@ const ConcordanceFeature: React.FC = () => {
     fallbackRunningBanner: concordanceFallbackBanner,
     pollWhileActive: true,
     onRefresh: handleTaskRefresh,
+  });
+
+  const hasActiveTask = Boolean(
+    localConcordanceTaskId ||
+    concordanceTaskStatus.activeTaskId ||
+    concordanceTaskStatus.runningTask?.task_id ||
+    concordanceTaskStatus.queuedTask?.task_id ||
+    concordanceTaskStatus.terminalTask?.task_id ||
+    concordanceTaskStatus.tasks.length > 0
+  );
+  const actionState = getAnalysisActionState({
+    hasWorkspace: Boolean(currentWorkspaceId),
+    hasSelection: panelSelectedNodes.length > 0,
+    isLocked,
+    hasResults: Boolean(results),
+    isBusy: isSearching,
+    hasActiveTask,
   });
 
   useAnalysisTaskLifecycle({
@@ -1586,7 +1604,10 @@ const ConcordanceFeature: React.FC = () => {
         <CardHeader className="space-y-0 pb-4">
           <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
             <div>
-              <CardTitle>Concordance Search</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                Concordance Search
+                <HelpIcon targetKey="analysis.concordance.tab" label="Concordance overview" />
+              </CardTitle>
               <CardDescription>Find keyword-in-context excerpts across up to two selected nodes.</CardDescription>
             </div>
           </div>
@@ -1686,12 +1707,9 @@ const ConcordanceFeature: React.FC = () => {
           <Button
             onClick={() => handleSearch(true)}
             disabled={
-              panelSelectedNodes.length === 0 ||
-              isSearching ||
-              !currentWorkspaceId ||
+              actionState.runDisabled ||
               !searchWord.trim() ||
-              effectiveNodeColumnSelections.some(sel => !sel.column) ||
-              !!isLocked
+              effectiveNodeColumnSelections.some(sel => !sel.column)
             }
             className="w-full md:w-auto"
           >
@@ -1702,15 +1720,17 @@ const ConcordanceFeature: React.FC = () => {
             )}
           </Button>
 
-          {results && (
+          <div className="flex items-center gap-2">
             <Button
               onClick={handleClearResults}
               variant="destructive"
+              disabled={actionState.clearDisabled}
             >
               <Trash2 className="mr-2 h-4 w-4" />
               Clear Results
             </Button>
-          )}
+            <HelpIcon targetKey="analysis.concordance.clear-results" label="Clear results" />
+          </div>
         </CardFooter>
       </Card>
 

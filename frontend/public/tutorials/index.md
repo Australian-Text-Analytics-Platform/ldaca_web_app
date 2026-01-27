@@ -2,7 +2,19 @@
 
 <h1 id="help-tutorial-index">LDaCA tutorial index</h1>
 
-Welcome! This tutorial set walks you through the LDaCA Corpus Analysis Platform from first upload to exporting results. Each section is focused and hands-on, so you can jump to what you need.
+Welcome! This tutorial set walks you through the LDaCA text analysis platform from first upload to exporting results. Each section is focused and hands-on, so you can jump to what you need.
+
+## Overview
+
+The LDaCA web app is a general text analytics workspace for exploring text data, managing projects, and producing shareable results. Use it to bring in datasets, clean and join them, run analyses, and export insights in a repeatable workflow.
+
+Key capabilities include:
+
+- **Workspaces** to organize projects, versions, and saved analyses.
+- **File ingestion** with upload, preview, and sample data helpers.
+- **Preprocessing** tools for cleaning, joining, and preparing data.
+- **Analyses** like token frequency, concordance, topic modeling, sequential analysis, and quotation extraction.
+- **Export** options for tables, summaries, and downstream reporting.
 
 ## How to use the help icons
 
@@ -23,7 +35,7 @@ Welcome! This tutorial set walks you through the LDaCA Corpus Analysis Platform 
 ## Tutorial sections
 
 - [Data loader](./data-loader.md) — create workspaces and upload data.
-- [Preprocessing: Join](./preprocessing-join.md) — join two datasets.
+- [Preprocessing](./preprocessing.md) — filter, slice, join, concat, and compute columns.
 - [Token frequency](./token-frequency.md) — count and explore common terms.
 - [Concordance](./concordance.md) — inspect terms in context.
 - [Topic modeling](./topic-modeling.md) — discover themes with BERTopic.

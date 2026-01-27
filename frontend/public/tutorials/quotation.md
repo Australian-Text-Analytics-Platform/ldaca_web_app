@@ -2,7 +2,7 @@
 
 [← Back to tutorial index](./index.md)
 
-<h1>Quotation extraction tutorial</h1>
+<h1 id="help-quotation-section">Quotation extraction tutorial</h1>
 
 Quotation extraction finds quoted segments in text and adds context around them. It is useful for analyzing reported speech or citations.
 
@@ -18,6 +18,10 @@ This setting controls how many words are captured before and after a quotation.
 **Q: How long should the context be?**
 
 Start with a modest length (e.g., 5–10 words on each side) and adjust based on readability.
+
+<h2 id="help-quotation-clear-results">Clear results</h2>
+
+Quotation results are saved in the backend so the tab can reload and keep persistent pages. **Clear Results** clears the cached result in the backend and resets the tab.
 
 ## Practice exercise
 

@@ -2,7 +2,7 @@
 
 [← Back to tutorial index](./index.md)
 
-<h1>Concordance tutorial</h1>
+<h1 id="help-concordance-section">Concordance tutorial</h1>
 
 Concordance helps you see how a word or phrase is used by showing it in context.
 
@@ -22,6 +22,10 @@ Regex mode lets you use patterns for advanced matching (e.g., word variants).
 
 - Use it when you need flexible matching.
 - Turn it off for exact, literal searches.
+
+<h2 id="help-concordance-clear-results">Clear results</h2>
+
+Concordance results are saved in the backend so the tab can reload and preserve your last results. **Clear Results** clears the cached result in the backend and resets the tab state.
 
 ## Practice exercise
 

@@ -110,7 +110,10 @@ const ExportFeature: React.FC = () => {
     <div className="space-y-6">
       <Card>
         <CardHeader className="space-y-1">
-          <CardTitle>Export Nodes</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            Export Nodes
+            <HelpIcon targetKey="analysis.export.tab" label="Export overview" />
+          </CardTitle>
           <CardDescription>
             Select one or more nodes in the workspace graph and download their data in the format you prefer.
           </CardDescription>

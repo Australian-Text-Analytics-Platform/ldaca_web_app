@@ -54,6 +54,14 @@ Unload closes the active workspace without deleting it.
 - Use this when you want to switch projects.
 - Your workspace remains available in the list.
 
+<h2 id="help-data-loader-workspace-manager">Workspace manager overview</h2>
+
+The workspace manager lists every saved workspace so you can switch projects and keep your workspace list tidy.
+
+- Click **Activate** to make a workspace current (the active one is highlighted).
+- Review the updated time and node count to confirm you are opening the right workspace.
+- Use **Delete** to permanently remove a workspace you no longer need.
+
 <h2 id="help-data-loader-files-section">Files and uploads section</h2>
 
 This panel is where you bring new data into your workspace. It includes upload, sample import, and add-to-workspace actions.

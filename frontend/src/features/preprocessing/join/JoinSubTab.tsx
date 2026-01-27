@@ -84,6 +84,13 @@ export const JoinSubTab: React.FC<JoinSubTabProps> = (props) => {
             showHeaderLabel
             showShape
             className="rounded-lg border border-border/60 bg-muted/40"
+            headerAddon={
+              <HelpIcon
+                targetKey="preprocessing.common.node-selection"
+                label="Selected nodes"
+                className="h-4 w-4 text-muted-foreground"
+              />
+            }
           />
 
           {needsColumns && sharedColumnsNotice && (
@@ -141,7 +148,7 @@ export const JoinSubTab: React.FC<JoinSubTabProps> = (props) => {
                 'Add to Workspace'
               )}
             </Button>
-            <HelpIcon targetKey="preprocessing.join.apply-button" label="Apply join" />
+            <HelpIcon targetKey="preprocessing.common.apply-button" label="Apply action" />
           </div>
         </CardFooter>
       </Card>
@@ -154,7 +161,12 @@ export const JoinSubTab: React.FC<JoinSubTabProps> = (props) => {
         )}
 
         <PreviewTable
-          title="Preview join output"
+          title={
+            <span className="flex items-center gap-2">
+              Preview join output
+              <HelpIcon targetKey="preprocessing.common.preview" label="Preview table" />
+            </span>
+          }
           description="Inspect a sample of the joined rows before creating the node."
           columns={preview.columns}
           data={preview.data}

@@ -40,6 +40,7 @@ import {
   Area,
 } from 'recharts';
 import { normalizeTypeName } from '../../../utils/columnTypes';
+import { getAnalysisActionState } from '../common/analysisActionState';
 
 // Component to display unique value count for a column
 interface UniqueValueCountProps {
@@ -239,6 +240,16 @@ const SequentialAnalysisFeature: React.FC = () => {
     },
     lockedParams
   );
+
+  const actionState = getAnalysisActionState({
+    hasWorkspace: Boolean(currentWorkspaceId),
+    hasSelection: Boolean(activeNodeId),
+    isLocked,
+    hasResults: Boolean(results),
+    isBusy: isAnalyzing,
+    hasActiveTask: false,
+    allowRunWhenLocked: hasParamsChanged,
+  });
 
   useEffect(() => {
     if (isLocked || hydratingSelection) return;
@@ -858,7 +869,10 @@ const handleUpdateResults = async () => {
         <CardHeader className="space-y-0 pb-4">
           <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
             <div>
-              <CardTitle>Sequential Analysis</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                Sequential Analysis
+                <HelpIcon targetKey="analysis.sequential-analysis.tab" label="Sequential analysis overview" />
+              </CardTitle>
               <CardDescription>Configure a time-series frequency view for the selected node.</CardDescription>
             </div>
           </div>
@@ -1025,7 +1039,7 @@ const handleUpdateResults = async () => {
           {hasParamsChanged ? (
             <Button
               onClick={handleUpdateResults}
-              disabled={isAnalyzing || isLoading.operations || !activeNodeId || !activeTimeColumn}
+              disabled={actionState.runDisabled || isLoading.operations || !activeTimeColumn}
               className="w-full md:w-auto"
             >
               {isAnalyzing ? (
@@ -1043,7 +1057,7 @@ const handleUpdateResults = async () => {
           ) : (
             <Button
               onClick={handleAnalyze}
-              disabled={isAnalyzing || isLoading.operations || !activeNodeId || !activeTimeColumn || !!isLocked}
+              disabled={actionState.runDisabled || isLoading.operations || !activeTimeColumn}
               className="w-full md:w-auto"
             >
               {isAnalyzing ? (
@@ -1060,15 +1074,17 @@ const handleUpdateResults = async () => {
             </Button>
           )}
 
-          {results && (
+          <div className="flex items-center gap-2">
             <Button
               onClick={handleClearResults}
               variant="destructive"
+              disabled={actionState.clearDisabled}
             >
               <Trash2 className="mr-2 h-4 w-4" />
               Clear Results
             </Button>
-          )}
+            <HelpIcon targetKey="analysis.sequential-analysis.clear-results" label="Clear results" />
+          </div>
         </div>
         </CardContent>
       </Card>

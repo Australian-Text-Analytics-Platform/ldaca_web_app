@@ -8,7 +8,7 @@ import { formatPreviewValue } from '../utils/typeUtils';
 import { PreviewRow, PreviewPagination, PREVIEW_PAGE_SIZE_OPTIONS } from '../types';
 
 interface PreviewTableProps {
-  title: string;
+  title: React.ReactNode;
   description: string;
   columns: string[];
   data: PreviewRow[];

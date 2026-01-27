@@ -2,7 +2,7 @@
 
 [← Back to tutorial index](./index.md)
 
-<h1>Token frequency tutorial</h1>
+<h1 id="help-token-frequency-section">Token frequency tutorial</h1>
 
 Token frequency counts how often words or tokens appear in your corpus. It is one of the quickest ways to spot themes and jargon.
 
@@ -22,6 +22,10 @@ This action runs the token frequency analysis on the selected dataset.
 
 - Results appear in a table and can be downloaded.
 - You can re-run after adjusting stop words.
+
+<h2 id="help-token-frequency-clear-results">Clear results</h2>
+
+Token frequency results are saved in the backend so this tab can reload and keep persistent pages of your last run. **Clear Results** removes that cached result from the backend and resets the tab.
 
 ## Practice exercise
 

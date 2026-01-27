@@ -10,6 +10,11 @@ const registry: Record<string, TutorialTarget> = {
     anchor: 'help-data-loader-active-workspace',
     label: 'Active workspace overview',
   },
+  'data-loader.workspace-manager.section': {
+    file: 'tutorials/data-loader.md',
+    anchor: 'help-data-loader-workspace-manager',
+    label: 'Workspace manager overview',
+  },
   'data-loader.create-workspace.name': {
     file: 'tutorials/data-loader.md',
     anchor: 'help-data-loader-create-workspace-name',
@@ -56,29 +61,119 @@ const registry: Record<string, TutorialTarget> = {
     label: 'Add file to workspace',
   },
   'preprocessing.join.tab': {
-    file: 'tutorials/preprocessing-join.md',
+    file: 'tutorials/preprocessing.md',
     anchor: 'help-preprocessing-join-section',
     label: 'Join sub-tab overview',
   },
   'preprocessing.join.column': {
-    file: 'tutorials/preprocessing-join.md',
+    file: 'tutorials/preprocessing.md',
     anchor: 'help-preprocessing-join-column-picker',
     label: 'Join column picker',
   },
   'preprocessing.join.join-type': {
-    file: 'tutorials/preprocessing-join.md',
+    file: 'tutorials/preprocessing.md',
     anchor: 'help-preprocessing-join-type',
     label: 'Join type selector',
   },
   'preprocessing.join.new-node-name': {
-    file: 'tutorials/preprocessing-join.md',
+    file: 'tutorials/preprocessing.md',
     anchor: 'help-preprocessing-join-node-name',
     label: 'Join output name',
   },
-  'preprocessing.join.apply-button': {
-    file: 'tutorials/preprocessing-join.md',
-    anchor: 'help-preprocessing-join-apply',
-    label: 'Apply join',
+  'preprocessing.common.node-selection': {
+    file: 'tutorials/preprocessing.md',
+    anchor: 'help-preprocessing-common-node-selection',
+    label: 'Node selection',
+  },
+  'preprocessing.common.apply-button': {
+    file: 'tutorials/preprocessing.md',
+    anchor: 'help-preprocessing-common-apply-button',
+    label: 'Apply action',
+  },
+  'preprocessing.common.preview': {
+    file: 'tutorials/preprocessing.md',
+    anchor: 'help-preprocessing-common-preview',
+    label: 'Preview table',
+  },
+  'preprocessing.filter.tab': {
+    file: 'tutorials/preprocessing.md',
+    anchor: 'help-preprocessing-filter-section',
+    label: 'Filter sub-tab overview',
+  },
+  'preprocessing.filter.conditions': {
+    file: 'tutorials/preprocessing.md',
+    anchor: 'help-preprocessing-filter-conditions',
+    label: 'Filter conditions',
+  },
+  'preprocessing.filter.new-node-name': {
+    file: 'tutorials/preprocessing.md',
+    anchor: 'help-preprocessing-filter-new-node-name',
+    label: 'Filter output name',
+  },
+  'preprocessing.slice.tab': {
+    file: 'tutorials/preprocessing.md',
+    anchor: 'help-preprocessing-slice-section',
+    label: 'Slice sub-tab overview',
+  },
+  'preprocessing.slice.offset': {
+    file: 'tutorials/preprocessing.md',
+    anchor: 'help-preprocessing-slice-offset',
+    label: 'Slice offset',
+  },
+  'preprocessing.slice.length': {
+    file: 'tutorials/preprocessing.md',
+    anchor: 'help-preprocessing-slice-length',
+    label: 'Slice length',
+  },
+  'preprocessing.slice.new-node-name': {
+    file: 'tutorials/preprocessing.md',
+    anchor: 'help-preprocessing-slice-new-node-name',
+    label: 'Slice output name',
+  },
+  'preprocessing.concat.tab': {
+    file: 'tutorials/preprocessing.md',
+    anchor: 'help-preprocessing-concat-section',
+    label: 'Concat sub-tab overview',
+  },
+  'preprocessing.concat.new-node-name': {
+    file: 'tutorials/preprocessing.md',
+    anchor: 'help-preprocessing-concat-new-node-name',
+    label: 'Concat output name',
+  },
+  'preprocessing.concat.schema-status': {
+    file: 'tutorials/preprocessing.md',
+    anchor: 'help-preprocessing-concat-schema-status',
+    label: 'Schema status',
+  },
+  'preprocessing.aggregate.tab': {
+    file: 'tutorials/preprocessing.md',
+    anchor: 'help-preprocessing-aggregate-section',
+    label: 'Aggregate sub-tab overview',
+  },
+  'preprocessing.aggregate.builder': {
+    file: 'tutorials/preprocessing.md',
+    anchor: 'help-preprocessing-aggregate-builder',
+    label: 'Expression builder',
+  },
+  'preprocessing.aggregate.expression': {
+    file: 'tutorials/preprocessing.md',
+    anchor: 'help-preprocessing-aggregate-expression',
+    label: 'Advanced expression',
+  },
+  'preprocessing.aggregate.column-name': {
+    file: 'tutorials/preprocessing.md',
+    anchor: 'help-preprocessing-aggregate-column-name',
+    label: 'Computed column name',
+  },
+  'analysis.token-frequency.tab': {
+    file: 'tutorials/token-frequency.md',
+    anchor: 'help-token-frequency-section',
+    label: 'Token frequency overview',
+  },
+  'analysis.token-frequency.clear-results': {
+    file: 'tutorials/token-frequency.md',
+    anchor: 'help-token-frequency-clear-results',
+    label: 'Clear results',
   },
   'analysis.token-frequency.stop-words': {
     file: 'tutorials/token-frequency.md',
@@ -90,6 +185,16 @@ const registry: Record<string, TutorialTarget> = {
     anchor: 'help-token-frequency-run',
     label: 'Run token frequency',
   },
+  'analysis.concordance.tab': {
+    file: 'tutorials/concordance.md',
+    anchor: 'help-concordance-section',
+    label: 'Concordance overview',
+  },
+  'analysis.concordance.clear-results': {
+    file: 'tutorials/concordance.md',
+    anchor: 'help-concordance-clear-results',
+    label: 'Clear results',
+  },
   'analysis.concordance.search-term': {
     file: 'tutorials/concordance.md',
     anchor: 'help-concordance-search-term',
@@ -99,6 +204,16 @@ const registry: Record<string, TutorialTarget> = {
     file: 'tutorials/concordance.md',
     anchor: 'help-concordance-regex-toggle',
     label: 'Regex mode toggle',
+  },
+  'analysis.topic-modeling.tab': {
+    file: 'tutorials/topic-modeling.md',
+    anchor: 'help-topic-modeling-section',
+    label: 'Topic modeling overview',
+  },
+  'analysis.topic-modeling.clear-results': {
+    file: 'tutorials/topic-modeling.md',
+    anchor: 'help-topic-modeling-clear-results',
+    label: 'Clear results',
   },
   'analysis.topic-modeling.min-topic-size': {
     file: 'tutorials/topic-modeling.md',
@@ -110,6 +225,16 @@ const registry: Record<string, TutorialTarget> = {
     anchor: 'help-topic-modeling-ctfidf-toggle',
     label: 'c-TF-IDF toggle',
   },
+  'analysis.sequential-analysis.tab': {
+    file: 'tutorials/sequential-analysis.md',
+    anchor: 'help-sequential-section',
+    label: 'Sequential analysis overview',
+  },
+  'analysis.sequential-analysis.clear-results': {
+    file: 'tutorials/sequential-analysis.md',
+    anchor: 'help-sequential-clear-results',
+    label: 'Clear results',
+  },
   'analysis.sequential-analysis.time-column': {
     file: 'tutorials/sequential-analysis.md',
     anchor: 'help-sequential-time-column',
@@ -120,10 +245,25 @@ const registry: Record<string, TutorialTarget> = {
     anchor: 'help-sequential-frequency',
     label: 'Frequency selector',
   },
+  'analysis.quotation.tab': {
+    file: 'tutorials/quotation.md',
+    anchor: 'help-quotation-section',
+    label: 'Quotation extraction overview',
+  },
+  'analysis.quotation.clear-results': {
+    file: 'tutorials/quotation.md',
+    anchor: 'help-quotation-clear-results',
+    label: 'Clear results',
+  },
   'analysis.quotation.context-length': {
     file: 'tutorials/quotation.md',
     anchor: 'help-quotation-context-length',
     label: 'Quotation context length',
+  },
+  'analysis.export.tab': {
+    file: 'tutorials/export.md',
+    anchor: 'help-export-section',
+    label: 'Export overview',
   },
   'analysis.export.format': {
     file: 'tutorials/export.md',

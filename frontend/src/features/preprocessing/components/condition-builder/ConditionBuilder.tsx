@@ -12,7 +12,7 @@ export interface ConditionBuilderItem {
 }
 
 export interface ConditionBuilderProps<Condition extends ConditionBuilderItem> {
-  title?: string;
+  title?: React.ReactNode;
   description?: string;
   conditions: Condition[];
   availableColumns: ConditionColumnOption[];

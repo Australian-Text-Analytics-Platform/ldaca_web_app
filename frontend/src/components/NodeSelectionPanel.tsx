@@ -43,6 +43,7 @@ interface NodeSelectionPanelProps {
   lockedMessage?: ReactNode; // optional message shown when locked
   statusMessage?: ReactNode; // optional inline status/warning rendered within the panel
   statusVariant?: 'info' | 'warning' | 'error';
+  headerAddon?: ReactNode; // optional element rendered next to the header label
 }
 
 /** Shared node + text-column + color selection panel reused across analysis tabs */
@@ -70,6 +71,7 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
   lockedMessage,
   statusMessage,
   statusVariant = 'warning',
+  headerAddon,
 }) => {
   const getColumnLabel = (node: WorkspaceNodeLike, idx: number) => (columnLabelFn ? columnLabelFn(node, idx) : 'Text Column:');
   // Compute stable list of selected node ids to avoid retriggering on object identity changes
@@ -163,9 +165,12 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
     <div className={cn('space-y-3', className)}>
       {showHeaderLabel && (
         <div className="flex items-center justify-between px-4 pt-2">
-          <label className="block text-sm font-medium text-muted-foreground">
-            Selected Nodes ({(originalCount ?? selectedNodes.length)}/{maxCompare})
-          </label>
+          <div className="flex items-center gap-2">
+            <label className="block text-sm font-medium text-muted-foreground">
+              Selected Nodes ({(originalCount ?? selectedNodes.length)}/{maxCompare})
+            </label>
+            {headerAddon}
+          </div>
           {locked && (
             <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-border bg-muted text-muted-foreground">
               <Lock className="h-3.5 w-3.5" aria-hidden="true" />

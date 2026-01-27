@@ -2,7 +2,7 @@
 
 [← Back to tutorial index](./index.md)
 
-<h1>Topic modeling tutorial</h1>
+<h1 id="help-topic-modeling-section">Topic modeling tutorial</h1>
 
 Topic modeling helps you discover themes in a large collection of documents. The app uses BERTopic under the hood.
 
@@ -25,6 +25,10 @@ This toggle controls how topic keywords are scored. When enabled, it highlights 
 
 - **On**: more distinctive topic keywords.
 - **Off**: more frequency-driven keywords.
+
+<h2 id="help-topic-modeling-clear-results">Clear results</h2>
+
+Topic modeling results are saved in the backend so this tab can reload and keep persistent pages of the last run. **Clear Results** clears the cached result in the backend and resets the tab.
 
 ## Practice exercise
 

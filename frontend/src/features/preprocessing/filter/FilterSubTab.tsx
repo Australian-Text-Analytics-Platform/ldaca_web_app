@@ -4,6 +4,7 @@ import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Tag } from '../../../components/ui/tag';
 import { Button } from '../../../components/ui/button';
+import HelpIcon from '../../../components/help/HelpIcon';
 import { ConditionBuilder } from '../components/condition-builder';
 import { PreviewTable } from '../components/PreviewTable';
 import { useFilterSubTabSections, type FilterSubTabProps } from './hooks/useFilterSubTabSections';
@@ -31,7 +32,10 @@ export const FilterSubTab: React.FC<FilterSubTabProps> = (props) => {
         <CardHeader className="space-y-0 pb-4">
           <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
             <div>
-              <CardTitle>Filter data</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                Filter data
+                <HelpIcon targetKey="preprocessing.filter.tab" label="Filter sub-tab overview" />
+              </CardTitle>
               <CardDescription>
                 Apply column-based filters to create a new node from the selected dataset.
               </CardDescription>
@@ -61,6 +65,13 @@ export const FilterSubTab: React.FC<FilterSubTabProps> = (props) => {
             showShape
             disabled={selectionPanel.disabled}
             originalCount={selectedNodesOriginalCount}
+            headerAddon={
+              <HelpIcon
+                targetKey="preprocessing.common.node-selection"
+                label="Selected nodes"
+                className="h-4 w-4 text-muted-foreground"
+              />
+            }
           />
 
           {hasSelection && isSchemaLoading && (
@@ -76,7 +87,12 @@ export const FilterSubTab: React.FC<FilterSubTabProps> = (props) => {
           )}
 
           <ConditionBuilder<FilterConditionWithId>
-            title="Filter conditions"
+            title={
+              <span className="flex items-center gap-2">
+                Filter conditions
+                <HelpIcon targetKey="preprocessing.filter.conditions" label="Filter conditions builder" />
+              </span>
+            }
             description="Apply column-based filters to create a new node from the selected dataset."
             conditions={conditionBuilder.conditions}
             availableColumns={conditionBuilder.availableColumns}
@@ -98,9 +114,12 @@ export const FilterSubTab: React.FC<FilterSubTabProps> = (props) => {
           />
 
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-muted-foreground" htmlFor="filter-new-node-name">
-              New node name
-            </label>
+            <div className="flex items-center gap-2">
+              <label className="block text-sm font-medium text-muted-foreground" htmlFor="filter-new-node-name">
+                New node name
+              </label>
+              <HelpIcon targetKey="preprocessing.filter.new-node-name" label="Filter output name" />
+            </div>
             <input
               id="filter-new-node-name"
               type="text"
@@ -115,14 +134,22 @@ export const FilterSubTab: React.FC<FilterSubTabProps> = (props) => {
 
         <CardFooter className="flex flex-col gap-3 border-t border-border bg-muted/20 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-sm text-muted-foreground">{summaryText}</div>
-          <Button onClick={applyFilter} disabled={applyButtonDisabled} className="w-full sm:w-auto">
-            {isFiltering ? 'Adding to workspace…' : 'Add to Workspace'}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button onClick={applyFilter} disabled={applyButtonDisabled} className="w-full sm:w-auto">
+              {isFiltering ? 'Adding to workspace…' : 'Add to Workspace'}
+            </Button>
+            <HelpIcon targetKey="preprocessing.common.apply-button" label="Apply action" />
+          </div>
         </CardFooter>
       </Card>
 
       <PreviewTable
-        title="Preview filtered rows"
+        title={
+          <span className="flex items-center gap-2">
+            Preview filtered rows
+            <HelpIcon targetKey="preprocessing.common.preview" label="Preview table" />
+          </span>
+        }
         description="Review rows that match the current filter configuration."
         columns={preview.columns}
         data={preview.data}

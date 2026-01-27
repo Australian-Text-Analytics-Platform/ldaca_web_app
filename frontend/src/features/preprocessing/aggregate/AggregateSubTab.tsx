@@ -2,6 +2,7 @@ import React from 'react';
 import { Calculator, Lightbulb, Loader2 } from 'lucide-react';
 
 import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
+import HelpIcon from '../../../components/help/HelpIcon';
 import { Button } from '../../../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Input } from '../../../components/ui/input';
@@ -105,6 +106,7 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
           <CardTitle className="flex items-center gap-2">
             <Calculator className="h-5 w-5" />
             Computed Column Builder
+            <HelpIcon targetKey="preprocessing.aggregate.tab" label="Aggregate sub-tab overview" />
           </CardTitle>
           <CardDescription>
             Combine existing columns with Polars-style expressions. The result is added to the selected node using
@@ -126,6 +128,13 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
             originalCount={nodeSelection.originalCount}
             disabled={isLoading.operations}
             showShape
+            headerAddon={
+              <HelpIcon
+                targetKey="preprocessing.common.node-selection"
+                label="Selected nodes"
+                className="h-4 w-4 text-muted-foreground"
+              />
+            }
           />
 
           <Separator />
@@ -198,7 +207,10 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
               </div>
 
               <div className="space-y-2">
-                <span className="text-sm font-medium text-foreground">Builder</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-foreground">Builder</span>
+                  <HelpIcon targetKey="preprocessing.aggregate.builder" label="Expression builder" />
+                </div>
                 <div
                   ref={dropZoneRef}
                   onDragEnter={basicBuilder.handlers.builderDragOver}
@@ -342,7 +354,10 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
               </div>
 
               <label className="flex flex-col gap-2">
-                <span className="text-sm font-medium text-foreground">Expression</span>
+                <span className="flex items-center gap-2 text-sm font-medium text-foreground">
+                  Expression
+                  <HelpIcon targetKey="preprocessing.aggregate.expression" label="Advanced expression" />
+                </span>
                 <textarea
                   value={expression.expression}
                   onChange={expression.onChange.expression}
@@ -366,7 +381,10 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
 
           <div className="space-y-4">
             <label className="flex flex-col gap-2">
-              <span className="text-sm font-medium text-foreground">New column name (optional)</span>
+              <span className="flex items-center gap-2 text-sm font-medium text-foreground">
+                New column name (optional)
+                <HelpIcon targetKey="preprocessing.aggregate.column-name" label="Computed column name" />
+              </span>
               <Input
                 value={expression.columnName}
                 onChange={expression.onChange.columnName}
@@ -383,16 +401,19 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <Button type="button" onClick={apply.handleApply} disabled={!apply.canApply}>
-              {apply.loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Adding…
-                </>
-              ) : (
-                'Add to Node'
-              )}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button type="button" onClick={apply.handleApply} disabled={!apply.canApply}>
+                {apply.loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Adding…
+                  </>
+                ) : (
+                  'Add to Node'
+                )}
+              </Button>
+              <HelpIcon targetKey="preprocessing.common.apply-button" label="Apply action" />
+            </div>
             {(preview.loading ||
               expression.focused.expression ||
               expression.focused.columnName ||
@@ -421,7 +442,10 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
 
       <Card>
         <CardHeader>
-          <CardTitle>Preview</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            Preview
+            <HelpIcon targetKey="preprocessing.common.preview" label="Preview table" />
+          </CardTitle>
           <CardDescription>
             Shows up to {preview.limit} rows with the computed column appended. Preview refreshes after each apply.
           </CardDescription>

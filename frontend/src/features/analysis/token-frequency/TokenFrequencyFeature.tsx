@@ -27,6 +27,7 @@ import { type NodeColumnSelection } from '../../../hooks/useAutoNodeColumns';
 import useNodeColumnInfos from '../../../hooks/useNodeColumnInfos';
 import { useUIStore } from '../../../stores';
 import { useAnalysisStore } from '../../../stores/analysisStore';
+import { getAnalysisActionState } from '../common/analysisActionState';
 import {
   clampDisplayTokenLimit,
   DEFAULT_TOKEN_LIMIT,
@@ -608,6 +609,23 @@ function TokenFrequencyFeature() {
     fallbackRunningBanner: tokenFrequencyFallbackBanner,
     pollWhileActive: true,
     onRefresh: handleTokenFrequencyTaskRefresh,
+  });
+
+  const hasActiveTask = Boolean(
+    localTokenFrequencyTaskId ||
+    tokenFrequencyTaskStatus.activeTaskId ||
+    tokenFrequencyTaskStatus.runningTask?.task_id ||
+    tokenFrequencyTaskStatus.queuedTask?.task_id ||
+    tokenFrequencyTaskStatus.terminalTask?.task_id ||
+    tokenFrequencyTaskStatus.tasks.length > 0
+  );
+  const actionState = getAnalysisActionState({
+    hasWorkspace: Boolean(currentWorkspaceId),
+    hasSelection: selectedNodes.length > 0,
+    isLocked,
+    hasResults: Boolean(results),
+    isBusy: isAnalyzing,
+    hasActiveTask,
   });
 
   const applyHydratedRequest = useCallback(
@@ -1436,7 +1454,10 @@ function TokenFrequencyFeature() {
         <CardHeader className="space-y-0 pb-4">
           <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
             <div>
-              <CardTitle>Token Frequency Analysis</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                Token Frequency Analysis
+                <HelpIcon targetKey="analysis.token-frequency.tab" label="Token frequency overview" />
+              </CardTitle>
               <CardDescription>Inspect token usage and comparative statistics for selected nodes.</CardDescription>
             </div>
           </div>
@@ -1466,11 +1487,8 @@ function TokenFrequencyFeature() {
             <Button
               onClick={handleAnalyze}
               disabled={
-                selectedNodes.length === 0 ||
-                isAnalyzing ||
-                !currentWorkspaceId ||
-                effectiveNodeColumnSelections.some((sel) => !sel.column) ||
-                !!isLocked
+                actionState.runDisabled ||
+                effectiveNodeColumnSelections.some((sel) => !sel.column)
               }
               className="w-full md:w-auto"
             >
@@ -1482,15 +1500,17 @@ function TokenFrequencyFeature() {
             </Button>
             <HelpIcon targetKey="analysis.token-frequency.run" label="Run token frequency" />
           </div>
-          {results && (
+          <div className="flex items-center gap-2">
             <Button
               onClick={handleClearResults}
               variant="destructive"
+              disabled={actionState.clearDisabled}
             >
               <Trash2 className="mr-2 h-4 w-4" />
               Clear Results
             </Button>
-          )}
+            <HelpIcon targetKey="analysis.token-frequency.clear-results" label="Clear results" />
+          </div>
           {appliedStopSet.size > 0 && (
             <span className="text-xs text-muted-foreground">Active filter: {appliedStopSet.size} word{appliedStopSet.size === 1 ? '' : 's'}</span>
           )}
