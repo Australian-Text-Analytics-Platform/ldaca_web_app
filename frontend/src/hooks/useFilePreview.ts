@@ -1,91 +1,65 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { filesApi } from '../api/files';
 import { useAuth } from './useAuth';
 
-export const useFilePreview = () => {
-  const [previewData, setPreviewData] = useState<any[]>([]);
-  const [columns, setColumns] = useState<string[]>([]);
-  const [totalRows, setTotalRows] = useState<number>(0);
+export const useFilePreview = (filename: string | null, isOpen: boolean) => {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(20);
-  const [fileType, setFileType] = useState<string | null>(null);
-  const [supportedTypes, setSupportedTypes] = useState<string[]>([]);
-  const [sheetNames, setSheetNames] = useState<string[] | null>(null);
   const [selectedSheet, setSelectedSheet] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const { getAuthHeaders } = useAuth();
 
-  const pageRef = useRef(page);
-  useEffect(() => { pageRef.current = page; }, [page]);
-
-  const fetchPreview = useCallback(async (fileName: string, nextPage?: number, opts?: { sheetName?: string }) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const headers = getAuthHeaders();
-      const effectivePage = typeof nextPage === 'number' ? nextPage : pageRef.current;
-  const response = await filesApi.preview({
-        filename: fileName,
-        page: effectivePage,
-        page_size: pageSize,
-        payload: opts?.sheetName ? { sheet_name: opts.sheetName } : undefined,
-      }, headers);
-      const data = response.preview || [];
-      setPreviewData(data);
-      setColumns(response.columns || Object.keys(data?.[0] || {}));
-      setTotalRows(response.total_rows ?? data.length);
-      setFileType(response.file_type || null);
-      setSupportedTypes(response.supported_types || []);
-      setSheetNames(response.sheet_names || null);
-      setSelectedSheet(response.selected_sheet || null);
-      if (typeof nextPage === 'number') setPage(nextPage);
-      return data;
-    } catch (_err) {
-      setError('Failed to load preview');
-      setPreviewData([]);
-      setColumns([]);
-      setTotalRows(0);
-      setFileType(null);
-      setSupportedTypes([]);
-      setSheetNames(null);
+  // Reset pagination and sheet selection when the dialog closes or filename changes
+  useEffect(() => {
+    if (!isOpen) {
+      setPage(0);
       setSelectedSheet(null);
-      return [];
-    } finally {
-      setLoading(false);
     }
-  }, [pageSize, getAuthHeaders]);
+  }, [isOpen, filename]);
 
-  const clearPreview = useCallback(() => {
-    setPreviewData([]);
-    setError(null);
-    setLoading(false);
-    setColumns([]);
-    setTotalRows(0);
+  const { data, isLoading, isError, error } = useQuery({
+    queryKey: ['file-preview', filename, page, pageSize, selectedSheet],
+    queryFn: async () => {
+      if (!filename) throw new Error('No filename provided');
+      const headers = getAuthHeaders();
+      const response = await filesApi.preview(
+        {
+          filename,
+          page,
+          page_size: pageSize,
+          payload: selectedSheet ? { sheet_name: selectedSheet } : undefined,
+        },
+        headers
+      );
+      return response;
+    },
+    enabled: !!filename && isOpen,
+    placeholderData: keepPreviousData,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  });
+
+  const reset = useCallback(() => {
     setPage(0);
-  setFileType(null);
-  setSupportedTypes([]);
-  setSheetNames(null);
-  setSelectedSheet(null);
+    setSelectedSheet(null);
   }, []);
 
   return {
-    previewData,
-    columns,
-    totalRows,
+    previewData: data?.preview || [],
+    columns: data?.columns || (data?.preview?.[0] ? Object.keys(data.preview[0]) : []),
+    totalRows: data?.total_rows ?? 0,
+    fileType: data?.file_type || null,
+    sheetNames: data?.sheet_names || null,
+    supportedTypes: data?.supported_types || [],
+    selectedSheet: selectedSheet ?? data?.selected_sheet ?? null,
+    setSelectedSheet,
     page,
-    pageSize,
-    loading,
-    error,
-    fetchPreview,
-    clearPreview,
     setPage,
-  setPageSize,
-  fileType,
-  supportedTypes,
-  sheetNames,
-  selectedSheet,
-  setSelectedSheet
+    pageSize,
+    setPageSize,
+    loading: isLoading,
+    error: isError ? (error instanceof Error ? error.message : 'Failed to load preview') : null,
+    reset,
   };
 };
+

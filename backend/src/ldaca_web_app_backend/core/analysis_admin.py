@@ -17,7 +17,7 @@ import importlib
 import logging
 from typing import Optional
 
-from ..analysis.manager import get_analysis_manager
+from ..analysis.manager import get_task_manager
 from .workspace import workspace_manager
 
 # Type alias for clarity
@@ -104,18 +104,19 @@ async def clear_analyses_and_cache(
     user_id: str, workspace_id: str, task: Optional[str]
 ) -> ClearedSummary:
     """Clear persisted analyses (optionally filtered by task), concordance cache,
-    and task manager records. Task clearing is routed through ProcessTaskManager
+    and task manager records. Task clearing is routed through WorkerTaskManager
     so callers can keep SSE task lists in sync with backend state.
     """
 
     cleared_task_ids: list[str] = []
-    analysis_manager = get_analysis_manager(user_id, workspace_id)
+    task_manager = get_task_manager(user_id, workspace_id)
 
     if task is None:
-        cleared_task_ids = analysis_manager.clear_all()
+        cleared_task_ids = task_manager.clear_all()
     else:
-        cleared = analysis_manager.delete_task(task)
-        cleared_task_ids = [cleared] if cleared is not None else []
+        if task_manager.get_task(task):
+            task_manager.clear_task(task)
+            cleared_task_ids = [task]
 
     cache_removed = clear_analysis_cache_for(user_id, workspace_id)
 

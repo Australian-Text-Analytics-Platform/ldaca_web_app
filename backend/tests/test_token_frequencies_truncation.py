@@ -2,7 +2,7 @@ import csv
 from types import SimpleNamespace
 
 import pytest
-from ldaca_web_app_backend.analysis.manager import get_analysis_manager
+from ldaca_web_app_backend.analysis.manager import get_task_manager
 from ldaca_web_app_backend.analysis.results import GenericAnalysisResult
 from ldaca_web_app_backend.api.workspaces.analyses.token_frequencies import (
     DEFAULT_TOKEN_LIMIT,
@@ -15,8 +15,10 @@ from ldaca_web_app_backend.core.workspace import workspace_manager
 
 
 def _simulate_token_frequency_completion(workspace_id: str):
-    manager = get_analysis_manager("test", workspace_id)
-    task = manager.get_current_task("token_frequencies")
+    task_manager = get_task_manager("test", workspace_id)
+    task_ids = task_manager.get_current_task_ids("token-frequencies")
+    assert task_ids
+    task = task_manager.get_task(task_ids[0])
     assert task is not None
     req = task.request.model_dump() if hasattr(task.request, "model_dump") else {}
     worker_result = token_frequencies_task(
@@ -28,7 +30,16 @@ def _simulate_token_frequency_completion(workspace_id: str):
         stop_words=req.get("stop_words") or [],
     )
     task.complete(GenericAnalysisResult(worker_result))
-    manager.update_task(task)
+    task_manager.save_task(task)
+
+
+async def _get_current_task_id(client, workspace_id: str, analysis: str):
+    response = await client.get(f"/api/workspaces/{workspace_id}/{analysis}/current")
+    if response.status_code != 200:
+        return None
+    payload = response.json()
+    task_ids = payload.get("task_ids") or []
+    return task_ids[0] if task_ids else None
 
 
 @pytest.fixture(autouse=True)
@@ -98,8 +109,12 @@ async def test_token_frequencies_full_table_and_metadata(
     assert start_payload.get("metadata", {}).get("task_id")
 
     _simulate_token_frequency_completion(workspace_id)
+    task_id = await _get_current_task_id(
+        authenticated_client, workspace_id, "token-frequencies"
+    )
+    assert task_id
     result_response = await authenticated_client.get(
-        f"/api/workspaces/{workspace_id}/token-frequencies/current-result"
+        f"/api/workspaces/{workspace_id}/token-frequencies/tasks/{task_id}/result"
     )
     assert result_response.status_code == 200
     data = result_response.json()

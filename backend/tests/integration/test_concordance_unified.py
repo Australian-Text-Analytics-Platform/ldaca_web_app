@@ -5,7 +5,7 @@ from uuid import uuid4
 
 import polars as pl
 import pytest
-from ldaca_web_app_backend.analysis.manager import get_analysis_manager
+from ldaca_web_app_backend.analysis.manager import get_task_manager
 from ldaca_web_app_backend.analysis.results import GenericAnalysisResult
 from ldaca_web_app_backend.api.workspaces.analyses.concordance import (
     DEFAULT_CONCORDANCE_PAGE_SIZE,
@@ -19,6 +19,7 @@ from docframe import DocDataFrame
 async def _wait_for_concordance_result(
     client,
     workspace_id: str,
+    task_id: str,
     *,
     timeout: float = 20.0,
     poll_interval: float = 0.25,
@@ -30,7 +31,7 @@ async def _wait_for_concordance_result(
 
     while time.monotonic() < deadline:
         resp = await client.get(
-            f"/api/workspaces/{workspace_id}/concordance/current-result"
+            f"/api/workspaces/{workspace_id}/concordance/tasks/{task_id}/result"
         )
         if resp.status_code != 200:
             await asyncio.sleep(poll_interval)
@@ -48,7 +49,9 @@ async def _wait_for_concordance_result(
     )
 
 
-def _simulate_concordance_completion(workspace_id: str, request_payload: dict):
+def _simulate_concordance_completion(
+    workspace_id: str, task_id: str, request_payload: dict
+):
     """Run concordance synchronously and persist the result like the worker would."""
 
     worker_result = concordance_task(
@@ -64,21 +67,18 @@ def _simulate_concordance_completion(workspace_id: str, request_payload: dict):
     )
 
     user_id = "test"
-    manager = get_analysis_manager(user_id, workspace_id)
-    task = manager.get_current_task("concordance")
-    if task is None:
-        task = manager.get_current_task("multi_concordance")
+    task_manager = get_task_manager(user_id, workspace_id)
+    task = task_manager.get_task(task_id)
     assert task is not None
 
     result = GenericAnalysisResult(worker_result)
     task.complete(result)
-    manager.update_task(task)
+    task_manager.save_task(task)
 
 
 def _clear_concordance_state(user_id: str, workspace_id: str):
-    manager = get_analysis_manager(user_id, workspace_id)
-    for task_type in ("concordance", "multi_concordance"):
-        manager.delete_task(task_type)
+    task_manager = get_task_manager(user_id, workspace_id)
+    task_manager.clear_all()
 
 
 @pytest.fixture(autouse=True)
@@ -90,8 +90,9 @@ def _stub_task_manager(monkeypatch):
             task_type = kwargs.get("task_type")
             if not user_id or not workspace_id or not task_type:
                 return False
-            manager = get_analysis_manager(user_id, workspace_id)
-            task = manager.get_current_task(task_type)
+            task_manager = get_task_manager(user_id, workspace_id)
+            task_ids = task_manager.get_current_task_ids(task_type)
+            task = task_manager.get_task(task_ids[0]) if task_ids else None
             if task is None:
                 return False
             stored = task.result.to_json() if task.result else None
@@ -102,8 +103,9 @@ def _stub_task_manager(monkeypatch):
             workspace_id = kwargs.get("workspace_id")
             if not user_id or not workspace_id:
                 return None
-            manager = get_analysis_manager(user_id, workspace_id)
-            task = manager.get_current_task(task_type)
+            task_manager = get_task_manager(user_id, workspace_id)
+            task_ids = task_manager.get_current_task_ids(task_type)
+            task = task_manager.get_task(task_ids[0]) if task_ids else None
             return SimpleNamespace(id=task.task_id) if task else None
 
         async def submit_task(self, **_kwargs):  # pragma: no cover
@@ -115,6 +117,15 @@ def _stub_task_manager(monkeypatch):
     monkeypatch.setattr(
         workspace_manager.__class__, "get_task_manager", fake_get_task_manager
     )
+
+
+async def _get_current_task_id(client, workspace_id: str, analysis: str):
+    response = await client.get(f"/api/workspaces/{workspace_id}/{analysis}/current")
+    if response.status_code != 200:
+        return None
+    payload = response.json()
+    task_ids = payload.get("task_ids") or []
+    return task_ids[0] if task_ids else None
 
 
 @pytest.mark.anyio
@@ -164,10 +175,14 @@ async def test_concordance_single_node_roundtrip(authenticated_client, workspace
     assert payload["state"] == "running"
     assert payload.get("metadata", {}).get("task_id")
 
-    _simulate_concordance_completion(workspace_id, request_payload)
+    task_id = await _get_current_task_id(
+        authenticated_client, workspace_id, "concordance"
+    )
+    assert task_id
+    _simulate_concordance_completion(workspace_id, task_id, request_payload)
 
     result_payload = await _wait_for_concordance_result(
-        authenticated_client, workspace_id
+        authenticated_client, workspace_id, task_id
     )
     assert result_payload["state"] == "successful"
     assert result_payload.get("combinable") is False
@@ -189,20 +204,20 @@ async def test_concordance_single_node_roundtrip(authenticated_client, workspace
 
     # Current request should surface the persisted request
     current_req = await authenticated_client.get(
-        f"/api/workspaces/{workspace_id}/concordance/current-request"
+        f"/api/workspaces/{workspace_id}/tasks/{task_id}/request"
     )
     assert current_req.status_code == 200
     current_req_payload = current_req.json()
-    assert current_req_payload["data"]["node_ids"] == [node.id]
-    assert current_req_payload["data"]["node_columns"][node.id] == "text"
-    assert "page" not in current_req_payload["data"]
-    assert "page_size" not in current_req_payload["data"]
-    assert "sort_by" not in current_req_payload["data"]
-    assert "sort_order" not in current_req_payload["data"]
-    assert "pagination" not in current_req_payload["data"]
+    assert current_req_payload["node_ids"] == [node.id]
+    assert current_req_payload["node_columns"][node.id] == "text"
+    assert "page" not in current_req_payload
+    assert "page_size" not in current_req_payload
+    assert "sort_by" not in current_req_payload
+    assert "sort_order" not in current_req_payload
+    assert "pagination" not in current_req_payload
 
-    manager = get_analysis_manager("test", workspace_id)
-    current_task = manager.get_current_task("concordance")
+    task_manager = get_task_manager("test", workspace_id)
+    current_task = task_manager.get_task(task_id)
     stored_request = (
         current_task.request.model_dump()
         if current_task and hasattr(current_task.request, "model_dump")
@@ -212,7 +227,7 @@ async def test_concordance_single_node_roundtrip(authenticated_client, workspace
     assert "page_size" not in stored_request
     assert "pagination" not in stored_request
 
-    task = manager.get_current_task("concordance")
+    task = task_manager.get_task(task_id)
     assert task is not None
     stored_result = task.result.to_json() if task.result else {}
     assert isinstance(stored_result, dict)
@@ -220,7 +235,7 @@ async def test_concordance_single_node_roundtrip(authenticated_client, workspace
 
     # Request a smaller page size via POST (non-persistent override)
     current_res_post = await authenticated_client.post(
-        f"/api/workspaces/{workspace_id}/concordance/current-result",
+        f"/api/workspaces/{workspace_id}/concordance/tasks/{task_id}/result",
         json={"node_id": node.id, "page_size": 1},
     )
     assert current_res_post.status_code == 200
@@ -234,7 +249,7 @@ async def test_concordance_single_node_roundtrip(authenticated_client, workspace
 
     # Request the second page explicitly using node_id and page_number alias
     page_two = await authenticated_client.post(
-        f"/api/workspaces/{workspace_id}/concordance/current-result",
+        f"/api/workspaces/{workspace_id}/concordance/tasks/{task_id}/result",
         json={"node_id": node.id, "page_number": 2, "page_size": 1},
     )
     assert page_two.status_code == 200
@@ -248,7 +263,7 @@ async def test_concordance_single_node_roundtrip(authenticated_client, workspace
 
     # GET again should return default pagination (no persisted overrides)
     refreshed_payload = await _wait_for_concordance_result(
-        authenticated_client, workspace_id
+        authenticated_client, workspace_id, task_id
     )
     assert (
         refreshed_payload["data"][node.id]["pagination"]["page_size"]
@@ -305,11 +320,14 @@ async def test_concordance_multi_node_combined(authenticated_client, workspace_i
     assert resp.status_code == 200, resp.text
     payload = resp.json()
     assert payload["state"] == "running"
-
-    _simulate_concordance_completion(workspace_id, request_payload)
+    task_id = await _get_current_task_id(
+        authenticated_client, workspace_id, "concordance"
+    )
+    assert task_id
+    _simulate_concordance_completion(workspace_id, task_id, request_payload)
 
     result_payload = await _wait_for_concordance_result(
-        authenticated_client, workspace_id
+        authenticated_client, workspace_id, task_id
     )
     assert result_payload["state"] == "successful"
     assert result_payload.get("combinable") is False
@@ -323,7 +341,7 @@ async def test_concordance_multi_node_combined(authenticated_client, workspace_i
 
     # Request both nodes with a smaller page size override
     narrowed = await authenticated_client.post(
-        f"/api/workspaces/{workspace_id}/concordance/current-result",
+        f"/api/workspaces/{workspace_id}/concordance/tasks/{task_id}/result",
         json={"page_size": 1, "page": 1},
     )
     assert narrowed.status_code == 200
@@ -334,7 +352,7 @@ async def test_concordance_multi_node_combined(authenticated_client, workspace_i
 
     # Second page request applies to both nodes equally
     paged = await authenticated_client.post(
-        f"/api/workspaces/{workspace_id}/concordance/current-result",
+        f"/api/workspaces/{workspace_id}/concordance/tasks/{task_id}/result",
         json={"page": 2, "page_size": 1},
     )
     assert paged.status_code == 200
@@ -394,17 +412,20 @@ async def test_concordance_combined_toggle_after_separated_request(
     assert resp.status_code == 200, resp.text
     payload = resp.json()
     assert payload["state"] == "running"
-
-    _simulate_concordance_completion(workspace_id, request_payload)
+    task_id = await _get_current_task_id(
+        authenticated_client, workspace_id, "concordance"
+    )
+    assert task_id
+    _simulate_concordance_completion(workspace_id, task_id, request_payload)
 
     result_payload = await _wait_for_concordance_result(
-        authenticated_client, workspace_id
+        authenticated_client, workspace_id, task_id
     )
     assert result_payload["state"] == "successful"
     assert result_payload.get("combinable") is False
 
     combined_toggle = await authenticated_client.post(
-        f"/api/workspaces/{workspace_id}/concordance/current-result",
+        f"/api/workspaces/{workspace_id}/concordance/tasks/{task_id}/result",
         json={"combined": True, "page": 1, "page_size": 2},
     )
     assert combined_toggle.status_code == 200
@@ -470,11 +491,14 @@ async def test_concordance_combined_handles_mismatched_columns(
     assert resp.status_code == 200, resp.text
     payload = resp.json()
     assert payload["state"] == "running"
-
-    _simulate_concordance_completion(workspace_id, request_payload)
+    task_id = await _get_current_task_id(
+        authenticated_client, workspace_id, "concordance"
+    )
+    assert task_id
+    _simulate_concordance_completion(workspace_id, task_id, request_payload)
 
     result_payload = await _wait_for_concordance_result(
-        authenticated_client, workspace_id
+        authenticated_client, workspace_id, task_id
     )
     assert result_payload["state"] == "successful"
     assert result_payload.get("combinable") is False
@@ -482,7 +506,7 @@ async def test_concordance_combined_handles_mismatched_columns(
     assert right_node.id in result_payload["data"]
 
     combined_attempt = await authenticated_client.post(
-        f"/api/workspaces/{workspace_id}/concordance/current-result",
+        f"/api/workspaces/{workspace_id}/concordance/tasks/{task_id}/result",
         json={"combined": True, "page": 1, "page_size": 1},
     )
     assert combined_attempt.status_code == 200

@@ -1,15 +1,17 @@
 """Frequency Analysis endpoints extracted from monolithic base module.
 
 Preserves original paths:
-  GET  /workspaces/{workspace_id}/frequency-analysis/current-request
-  GET  /workspaces/{workspace_id}/frequency-analysis/current-result
-  POST /workspaces/{workspace_id}/nodes/{node_id}/frequency-analysis
+    POST /workspaces/{workspace_id}/nodes/{node_id}/frequency-analysis
+    POST /workspaces/{workspace_id}/frequency-analysis/tasks/{task_id}/result
 """
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from ....analysis.implementations.frequency_analysis import \
-    FrequencyAnalysisRequest as AnalysisFrequencyAnalysisRequest
+from ....analysis.implementations.frequency_analysis import (
+    FrequencyAnalysisRequest as AnalysisFrequencyAnalysisRequest,
+)
+from ....analysis.manager import get_task_manager
+from ....analysis.models import AnalysisStatus, AnalysisTask
 from ....analysis.results import GenericAnalysisResult
 from ....core.auth import get_current_user
 from ....core.workspace import workspace_manager
@@ -21,59 +23,6 @@ router = APIRouter(prefix="/workspaces")
 
 VALID_CHART_TYPES = {"line", "bar", "area"}
 DEFAULT_CHART_TYPE = "line"
-
-
-@router.get("/{workspace_id}/frequency-analysis/current-request")
-async def frequency_analysis_current_request(
-    workspace_id: str, current_user: dict = Depends(get_current_user)
-):
-    user_id = current_user["id"]
-    ws = workspace_manager.get_workspace(user_id, workspace_id)
-    if not ws:
-        return None
-    
-    analysis_manager = getattr(ws, "analysis", None)
-    if not analysis_manager:
-        from ....analysis.manager import get_analysis_manager
-        analysis_manager = get_analysis_manager(user_id, workspace_id)
-        
-    task = analysis_manager.get_current_task("frequency_analysis")
-    if not task:
-        return None
-        
-    req = task.request.model_dump() if hasattr(task.request, "model_dump") else task.request.dict()
-    return {"state": "successful", "message": "ok", "data": req}
-
-
-@router.get("/{workspace_id}/frequency-analysis/current-result")
-async def frequency_analysis_current_result(
-    workspace_id: str, current_user: dict = Depends(get_current_user)
-):
-    user_id = current_user["id"]
-    ws = workspace_manager.get_workspace(user_id, workspace_id)
-    if not ws:
-        return None
-    
-    analysis_manager = getattr(ws, "analysis", None)
-    if not analysis_manager:
-        from ....analysis.manager import get_analysis_manager
-        analysis_manager = get_analysis_manager(user_id, workspace_id)
-        
-    task = analysis_manager.get_current_task("frequency_analysis")
-    if not task or not task.result:
-        return None
-        
-    stored_result = task.result.to_json()
-    stored_result = stored_result if isinstance(stored_result, dict) else {}
-    chart_type = (
-        stored_result.get("chart_type") if isinstance(stored_result, dict) else None
-    )
-    if not isinstance(chart_type, str) or chart_type not in VALID_CHART_TYPES:
-        stored_result = {
-            **(stored_result or {}),
-            "chart_type": DEFAULT_CHART_TYPE,
-        }
-    return {"state": "successful", "message": "ok", "data": stored_result}
 
 
 @router.post("/{workspace_id}/nodes/{node_id}/frequency-analysis")
@@ -88,11 +37,8 @@ async def get_frequency_analysis(
     ws = workspace_manager.get_workspace(user_id, workspace_id)
     if not ws:
         raise HTTPException(status_code=404, detail="Workspace not found")
-        
-    analysis_manager = getattr(ws, "analysis", None)
-    if not analysis_manager:
-        from ....analysis.manager import get_analysis_manager
-        analysis_manager = get_analysis_manager(user_id, workspace_id)
+
+    task_manager = get_task_manager(user_id, workspace_id)
 
     try:
         node, node_data = get_node_with_data_or_400(user_id, workspace_id, node_id)
@@ -144,7 +90,8 @@ async def get_frequency_analysis(
         )
 
         inherited_chart_type = DEFAULT_CHART_TYPE
-        prev_task = analysis_manager.get_current_task("frequency_analysis")
+        prev_task_ids = task_manager.get_current_task_ids("frequency-analysis")
+        prev_task = task_manager.get_task(prev_task_ids[0]) if prev_task_ids else None
         if prev_task and prev_task.result:
             previous_result = prev_task.result.to_json()
             if (
@@ -177,7 +124,7 @@ async def get_frequency_analysis(
             time_column=request.time_column,
             group_by_columns=request.group_by_columns,
             frequency=request.frequency,
-            sort_by_time=request.sort_by_time
+            sort_by_time=request.sort_by_time,
         )
 
         if prev_task:
@@ -185,27 +132,25 @@ async def get_frequency_analysis(
             prev_req = prev_task.request
             new_req_dict = analysis_request.model_dump()
             prev_req_dict = prev_req.model_dump()
-            
+
             if new_req_dict != prev_req_dict:
-                 raise HTTPException(
+                raise HTTPException(
                     status_code=409,
                     detail="Clear current frequency analysis results before starting a new run",
                 )
-            
+
             # Update existing task
             prev_task.request = analysis_request
             prev_task.complete(GenericAnalysisResult(result_payload))
-            analysis_manager.update_task(prev_task)
-            
+            task_manager.save_task(prev_task)
+
         else:
-            # Create new task
-            from uuid import uuid4
-            task_id = str(uuid4())
-            analysis_request.task_id = task_id
-            
-            task = analysis_manager.create_task("frequency_analysis", analysis_request)
+            task_id = task_manager.create_task(analysis_request)
+            task = task_manager.get_task(task_id)
+            task.request = analysis_request
             task.complete(GenericAnalysisResult(result_payload))
-            analysis_manager.update_task(task)
+            task_manager.save_task(task)
+            task_manager.set_current_task("frequency-analysis", task_id)
 
         return result_payload
 
@@ -219,40 +164,16 @@ async def get_frequency_analysis(
         raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
 
 
-@router.post("/{workspace_id}/frequency-analysis/clear")
-async def clear_frequency_analysis_results(
-    workspace_id: str, current_user: dict = Depends(get_current_user)
-):
-    user_id = current_user["id"]
-    ws = workspace_manager.get_workspace(user_id, workspace_id)
-    if ws:
-        analysis_manager = getattr(ws, "analysis", None)
-        if not analysis_manager:
-            from ....analysis.manager import get_analysis_manager
-            analysis_manager = get_analysis_manager(user_id, workspace_id)
-        
-        analysis_manager.clear_current_result("frequency_analysis")
-        
-    return {"state": "successful", "cleared": ["frequency_analysis"]}
-
-
-@router.post("/{workspace_id}/frequency-analysis/current-result")
-async def update_frequency_analysis_current_result(
+@router.post("/{workspace_id}/frequency-analysis/tasks/{task_id}/result")
+async def update_frequency_analysis_task_result(
     workspace_id: str,
+    task_id: str,
     updates: dict | None,
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    ws = workspace_manager.get_workspace(user_id, workspace_id)
-    if not ws:
-        raise HTTPException(status_code=404, detail="Workspace not found")
-        
-    analysis_manager = getattr(ws, "analysis", None)
-    if not analysis_manager:
-        from ....analysis.manager import get_analysis_manager
-        analysis_manager = get_analysis_manager(user_id, workspace_id)
-        
-    task = analysis_manager.get_current_task("frequency_analysis")
+    task_manager = get_task_manager(user_id, workspace_id)
+    task = task_manager.get_task(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="No frequency analysis found")
 
@@ -276,7 +197,7 @@ async def update_frequency_analysis_current_result(
 
     try:
         task.complete(GenericAnalysisResult(result_payload))
-        analysis_manager.update_task(task)
+        task_manager.save_task(task)
     except Exception as exc:  # pragma: no cover
         raise HTTPException(
             status_code=500,
@@ -286,7 +207,5 @@ async def update_frequency_analysis_current_result(
     return {
         "state": "successful",
         "message": "saved",
-        "data": {"chart_type": chart_type},
-    }
         "data": {"chart_type": chart_type},
     }

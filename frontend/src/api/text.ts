@@ -88,40 +88,31 @@ export interface TopicModelingResponse { state: 'running' | 'successful' | 'fail
 export const textApi = {
   concordance: (ws: string, req: ConcordanceAnalysisRequest, headers: Record<string,string> = {}) => post<ConcordanceAnalysisResponse>(`/workspaces/${ws}/concordance`, req, headers),
   concordanceDetach: (ws: string, node: string, req: ConcordanceDetachRequest, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/nodes/${node}/concordance/detach`, req, headers),
-  getConcordanceCurrentRequest: (ws: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/concordance/current-request`, { method: 'GET', headers }),
-  getConcordanceCurrentResult: (ws: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/concordance/current-result`, { method: 'GET', headers }),
-  postConcordanceCurrentResult: (ws: string, body: ConcordanceResultQuery, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/concordance/current-result`, body, headers),
-  clearConcordance: (ws: string, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/concordance/clear`, {}, headers),
-  clearConcordanceCache: (ws: string, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/concordance/cache/clear`, {}, headers),
+  getConcordanceTaskResult: (ws: string, taskId: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/concordance/tasks/${taskId}/result`, { method: 'GET', headers }),
+  postConcordanceTaskResult: (ws: string, taskId: string, body: ConcordanceResultQuery, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/concordance/tasks/${taskId}/result`, body, headers),
 
   // Quotation
   quotation: (ws: string, node: string, req: QuotationRequest, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/nodes/${node}/quotation`, req, headers),
   quotationDetach: (ws: string, node: string, req: QuotationDetachRequest, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/nodes/${node}/quotation/detach`, req, headers),
-  getQuotationCurrentRequest: (ws: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/quotation/current-request`, { method: 'GET', headers }),
-  getQuotationCurrentResult: (ws: string, headers: Record<string,string> = {}, params?: QuotationResultQuery) => httpRequest(`/workspaces/${ws}/quotation/current-result`, { method: 'GET', headers, params }),
-  postQuotationCurrentResult: (ws: string, body: QuotationResultQuery, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/quotation/current-result`, body, headers),
-  clearQuotation: (ws: string, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/quotation/clear`, {}, headers),
+  getQuotationTaskResult: (ws: string, taskId: string, headers: Record<string,string> = {}, params?: QuotationResultQuery) => httpRequest(`/workspaces/${ws}/quotation/tasks/${taskId}/result`, { method: 'GET', headers, params }),
+  postQuotationTaskResult: (ws: string, taskId: string, body: QuotationResultQuery, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/quotation/tasks/${taskId}/result`, body, headers),
 
   // Sequential analysis
   sequentialAnalysis: (ws: string, node: string, req: SequentialAnalysisRequest, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/nodes/${node}/sequential-analysis`, req, headers),
-  getSequentialAnalysisCurrentRequest: (ws: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/sequential-analysis/current-request`, { method: 'GET', headers }),
-  getSequentialAnalysisCurrentResult: (ws: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/sequential-analysis/current-result`, { method: 'GET', headers }),
-  postSequentialAnalysisCurrentResult: (ws: string, body: Record<string,unknown>, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/sequential-analysis/current-result`, body, headers),
-  clearSequentialAnalysis: (ws: string, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/sequential-analysis/clear`, {}, headers),
+  postSequentialAnalysisTaskResult: (ws: string, taskId: string, body: Record<string,unknown>, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/sequential-analysis/tasks/${taskId}/result`, body, headers),
 
   // Token Frequency
   tokenFrequencies: (ws: string, req: TokenFrequencyRequest, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/token-frequencies`, req, headers),
   defaultStopWords: (headers: Record<string,string> = {}) => get<{ stopwords?: string[]; error?: string }>('/text/default-stop-words', headers),
-  getTokenFrequenciesCurrentRequest: (ws: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/token-frequencies/current-request`, { method: 'GET', headers }),
-  postTokenFrequenciesCurrentRequest: (ws: string, reqUpdate: any, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/token-frequencies/current-request`, reqUpdate, headers),
-  getTokenFrequenciesCurrentResult: (ws: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/token-frequencies/current-result`, { method: 'GET', headers }),
-  postTokenFrequenciesCurrentResult: (ws: string, reqUpdate: any, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/token-frequencies/current-result`, reqUpdate, headers),
-  clearTokenFrequencies: (ws: string, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/token-frequencies/clear`, {}, headers),
+  getTokenFrequenciesTaskResult: (ws: string, taskId: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/token-frequencies/tasks/${taskId}/result`, { method: 'GET', headers }),
+  postTokenFrequenciesTaskResult: (ws: string, taskId: string, reqUpdate: any, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/token-frequencies/tasks/${taskId}/result`, reqUpdate, headers),
 
   // Topic Modeling
   topicModeling: (ws: string, req: TopicModelingRequest, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/topic-modeling`, req, headers),
-  getTopicModelingCurrentRequest: (ws: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/topic-modeling/current-request`, { method: 'GET', headers }),
-  getTopicModelingCurrentResult: (ws: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/topic-modeling/current-result`, { method: 'GET', headers }),
-  clearTopicModeling: (ws: string, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/topic-modeling/clear`, {}, headers),
+
+  getAnalysisCurrent: (ws: string, analysis: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/${analysis}/current`, { method: 'GET', headers }),
+  getTaskRequest: (ws: string, taskId: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/tasks/${taskId}/request`, { method: 'GET', headers }),
+  getTaskResult: (ws: string, taskId: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/tasks/${taskId}/result`, { method: 'GET', headers }),
+  clearTask: (ws: string, taskId: string, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/tasks/${taskId}/clear`, {}, headers),
 
 };

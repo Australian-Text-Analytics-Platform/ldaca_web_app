@@ -1,9 +1,8 @@
 """Sequential Analysis endpoints extracted from monolithic base module.
 
 Exposes updated paths:
-    GET  /workspaces/{workspace_id}/sequential-analysis/current-request
-    GET  /workspaces/{workspace_id}/sequential-analysis/current-result
     POST /workspaces/{workspace_id}/nodes/{node_id}/sequential-analysis
+    POST /workspaces/{workspace_id}/sequential-analysis/tasks/{task_id}/result
 """
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -11,6 +10,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from ....analysis.implementations.sequential_analysis import (
     SequentialAnalysisRequest as AnalysisSequentialAnalysisRequest,
 )
+from ....analysis.manager import get_task_manager
+from ....analysis.models import AnalysisStatus, AnalysisTask
 from ....analysis.results import GenericAnalysisResult
 from ....core.auth import get_current_user
 from ....core.workspace import workspace_manager
@@ -23,65 +24,6 @@ router = APIRouter(prefix="/workspaces")
 VALID_CHART_TYPES = {"line", "bar", "area"}
 DEFAULT_CHART_TYPE = "line"
 SEQUENTIAL_TASK = "sequential_analysis"
-
-
-@router.get("/{workspace_id}/sequential-analysis/current-request")
-async def sequential_analysis_current_request(
-    workspace_id: str, current_user: dict = Depends(get_current_user)
-):
-    user_id = current_user["id"]
-    ws = workspace_manager.get_workspace(user_id, workspace_id)
-    if not ws:
-        return None
-
-    analysis_manager = getattr(ws, "analysis", None)
-    if not analysis_manager:
-        from ....analysis.manager import get_analysis_manager
-
-        analysis_manager = get_analysis_manager(user_id, workspace_id)
-
-    task = analysis_manager.get_current_task(SEQUENTIAL_TASK)
-    if not task:
-        return None
-
-    req = (
-        task.request.model_dump()
-        if hasattr(task.request, "model_dump")
-        else task.request.dict()
-    )
-    return {"state": "successful", "message": "ok", "data": req}
-
-
-@router.get("/{workspace_id}/sequential-analysis/current-result")
-async def sequential_analysis_current_result(
-    workspace_id: str, current_user: dict = Depends(get_current_user)
-):
-    user_id = current_user["id"]
-    ws = workspace_manager.get_workspace(user_id, workspace_id)
-    if not ws:
-        return None
-
-    analysis_manager = getattr(ws, "analysis", None)
-    if not analysis_manager:
-        from ....analysis.manager import get_analysis_manager
-
-        analysis_manager = get_analysis_manager(user_id, workspace_id)
-
-    task = analysis_manager.get_current_task(SEQUENTIAL_TASK)
-    if not task or not task.result:
-        return None
-
-    stored_result = task.result.to_json()
-    stored_result = stored_result if isinstance(stored_result, dict) else {}
-    chart_type = (
-        stored_result.get("chart_type") if isinstance(stored_result, dict) else None
-    )
-    if not isinstance(chart_type, str) or chart_type not in VALID_CHART_TYPES:
-        stored_result = {
-            **(stored_result or {}),
-            "chart_type": DEFAULT_CHART_TYPE,
-        }
-    return {"state": "successful", "message": "ok", "data": stored_result}
 
 
 @router.post("/{workspace_id}/nodes/{node_id}/sequential-analysis")
@@ -97,13 +39,11 @@ async def run_sequential_analysis(
     if not ws:
         raise HTTPException(status_code=404, detail="Workspace not found")
 
-    analysis_manager = getattr(ws, "analysis", None)
-    if not analysis_manager:
-        from ....analysis.manager import get_analysis_manager
-
-        analysis_manager = get_analysis_manager(user_id, workspace_id)
-
-    existing_task = analysis_manager.get_current_task(SEQUENTIAL_TASK)
+    task_manager = get_task_manager(user_id, workspace_id)
+    existing_task_ids = task_manager.get_current_task_ids("sequential-analysis")
+    existing_task = (
+        task_manager.get_task(existing_task_ids[0]) if existing_task_ids else None
+    )
     if existing_task and existing_task.request:
         try:
             existing_req_dict = existing_task.request.model_dump()
@@ -298,11 +238,14 @@ async def run_sequential_analysis(
             task = existing_task
             task.request = req_model
             task.complete(GenericAnalysisResult(result_payload))
-            analysis_manager.update_task(task)
+            task_manager.save_task(task)
         else:
-            task = analysis_manager.create_task(SEQUENTIAL_TASK, req_model)
+            task_id = task_manager.create_task(req_model)
+            task = task_manager.get_task(task_id)
+            task.request = req_model
             task.complete(GenericAnalysisResult(result_payload))
-            analysis_manager.update_task(task)
+            task_manager.save_task(task)
+            task_manager.set_current_task("sequential-analysis", task_id)
 
         return result_payload
 
@@ -316,52 +259,16 @@ async def run_sequential_analysis(
         raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
 
 
-@router.post("/{workspace_id}/sequential-analysis/clear")
-async def clear_sequential_analysis_results(
-    workspace_id: str, current_user: dict = Depends(get_current_user)
-):
-    user_id = current_user["id"]
-    ws = workspace_manager.get_workspace(user_id, workspace_id)
-    if not ws:
-        return {"state": "successful", "cleared": {}}
-
-    analysis_manager = getattr(ws, "analysis", None)
-    if not analysis_manager:
-        from ....analysis.manager import get_analysis_manager
-
-        analysis_manager = get_analysis_manager(user_id, workspace_id)
-
-    analysis_manager.delete_task(SEQUENTIAL_TASK)
-
-    # Also clear cache using the old helper for now, as it handles in-memory caches
-    from ....core.analysis_admin import clear_analysis_cache_for
-
-    cache_removed = clear_analysis_cache_for(user_id, workspace_id)
-
-    return {
-        "state": "successful",
-        "cleared": {"analyses_removed": 1, "concordance_cache_removed": cache_removed},
-    }
-
-
-@router.post("/{workspace_id}/sequential-analysis/current-result")
-async def update_sequential_analysis_current_result(
+@router.post("/{workspace_id}/sequential-analysis/tasks/{task_id}/result")
+async def update_sequential_analysis_task_result(
     workspace_id: str,
+    task_id: str,
     updates: dict | None,
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    ws = workspace_manager.get_workspace(user_id, workspace_id)
-    if not ws:
-        raise HTTPException(status_code=404, detail="Workspace not found")
-
-    analysis_manager = getattr(ws, "analysis", None)
-    if not analysis_manager:
-        from ....analysis.manager import get_analysis_manager
-
-        analysis_manager = get_analysis_manager(user_id, workspace_id)
-
-    task = analysis_manager.get_current_task(SEQUENTIAL_TASK)
+    task_manager = get_task_manager(user_id, workspace_id)
+    task = task_manager.get_task(task_id)
     if not task or not task.result:
         raise HTTPException(status_code=404, detail="No sequential analysis found")
 
@@ -384,9 +291,9 @@ async def update_sequential_analysis_current_result(
 
     result_payload["chart_type"] = chart_type
 
-    # Update result
     task.result = GenericAnalysisResult(result_payload)
-    analysis_manager.update_task(task)
+    task.status = AnalysisStatus.COMPLETED
+    task_manager.save_task(task)
 
     return {
         "state": "successful",

@@ -10,10 +10,10 @@ import { SequentialAnalysisRequest, SequentialFrequency, textApi } from '../../.
 import { nodesApi } from '../../../api/index';
 import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
 import { getNodeInfo } from '../../../lib/nodeInfoCache';
-import AnalysisLockedNotice from '../../../components/tabs/AnalysisLockedNotice';
+import { ANALYSIS_LOCKED_MESSAGE } from '../../../components/tabs/AnalysisLockedNotice';
 import { normalizeSchemaFromInfo } from '../../../hooks/useSchemaManagement';
 import { Button } from '../../../components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Input } from '../../../components/ui/input';
 import HelpIcon from '../../../components/help/HelpIcon';
 import { toast } from 'sonner';
@@ -32,7 +32,6 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Legend,
   ResponsiveContainer,
   BarChart,
   Bar,
@@ -41,6 +40,7 @@ import {
 } from 'recharts';
 import { normalizeTypeName } from '../../../utils/columnTypes';
 import { getAnalysisActionState } from '../common/analysisActionState';
+import { useAnalysisHydration } from '../common';
 
 // Component to display unique value count for a column
 interface UniqueValueCountProps {
@@ -165,7 +165,16 @@ const SequentialAnalysisFeature: React.FC = () => {
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [results, setResults] = useState<any>(null);
+  const [localSequentialTaskId, setLocalSequentialTaskId] = useState<string | null>(null);
   const [hydratingSelection, setHydratingSelection] = useState(false);
+  const hydratedParamsRef = useRef<{
+    timeColumn: string;
+    groupByColumns: string[];
+    frequency: SequentialFrequency;
+    columnType: 'datetime' | 'numeric';
+    numericOrigin: number | null;
+    numericInterval: number | null;
+  } | null>(null);
   
   // Track locked parameters and detect changes
   const [lockedParams, setLockedParams] = useState<{
@@ -180,6 +189,45 @@ const SequentialAnalysisFeature: React.FC = () => {
   // Ref for hydration logic (needed to access latest values in async effect)
   const frequencyRef = useLatestRef(frequency);
   const chartTypeRef = useLatestRef(chartType);
+
+  useEffect(() => {
+    if (!currentWorkspaceId) {
+      setLocalSequentialTaskId(null);
+    }
+  }, [currentWorkspaceId]);
+
+  const resolveSequentialTaskId = useCallback(async (): Promise<string | null> => {
+    if (!currentWorkspaceId) {
+      return null;
+    }
+
+    if (localSequentialTaskId && localSequentialTaskId.trim().length > 0) {
+      return localSequentialTaskId;
+    }
+
+    const metadataTaskId =
+      (results as any)?.metadata?.task_id ??
+      (results as any)?.metadata?.taskId ??
+      null;
+    if (typeof metadataTaskId === 'string' && metadataTaskId.trim().length > 0) {
+      setLocalSequentialTaskId(metadataTaskId);
+      return metadataTaskId;
+    }
+
+    try {
+      const headers = getAuthHeaders();
+      const current = await textApi.getAnalysisCurrent(currentWorkspaceId, 'sequential-analysis', headers) as any;
+      const taskId = Array.isArray(current?.task_ids) ? current.task_ids[0] : null;
+      if (typeof taskId === 'string' && taskId.trim().length > 0) {
+        setLocalSequentialTaskId(taskId);
+        return taskId;
+      }
+    } catch {
+      return null;
+    }
+
+    return null;
+  }, [currentWorkspaceId, getAuthHeaders, localSequentialTaskId, results]);
 
   const timeCompatibleColumns = useMemo(
     () =>
@@ -201,31 +249,20 @@ const SequentialAnalysisFeature: React.FC = () => {
     [timeCompatibleColumns]
   );
 
-  const activeTimeColumn = useMemo(() => {
+  const activeTimeColumn = (() => {
     if (!activeNodeId) return '';
     const selection = nodeColumnSelections.find((s) => s.nodeId === activeNodeId);
     if (selection?.column) return selection.column;
     if (timeColumn) return timeColumn;
     const hydratedTime = (results?.analysis_params?.time_column as string | undefined) ?? '';
     return hydratedTime;
-  }, [activeNodeId, nodeColumnSelections, timeColumn, results, timeColumnOptions]);
+  })();
 
-  const activeColumnInfo = useMemo(
-    () => timeCompatibleColumns.find((column) => column.name === activeTimeColumn),
-    [timeCompatibleColumns, activeTimeColumn]
-  );
-
+  const activeColumnInfo = timeCompatibleColumns.find((column) => column.name === activeTimeColumn);
   const activeColumnType = normalizeTypeName(activeColumnInfo?.dataType || (timeCompatibleColumns[0]?.dataType ?? 'datetime'));
-  const isNumericColumn = useMemo(() => NUMERIC_TYPE_SET.has(activeColumnType), [activeColumnType]);
-  const derivedColumnType: 'datetime' | 'numeric' = isNumericColumn ? 'numeric' : 'datetime';
-  const numericOriginValue = useMemo(
-    () => (derivedColumnType === 'numeric' ? parseNumericInput(numericOriginInput) : null),
-    [derivedColumnType, numericOriginInput]
-  );
-  const numericIntervalValue = useMemo(
-    () => (derivedColumnType === 'numeric' ? parseNumericInput(numericIntervalInput) : null),
-    [derivedColumnType, numericIntervalInput]
-  );
+  const derivedColumnType: 'datetime' | 'numeric' = NUMERIC_TYPE_SET.has(activeColumnType) ? 'numeric' : 'datetime';
+  const numericOriginValue = derivedColumnType === 'numeric' ? parseNumericInput(numericOriginInput) : null;
+  const numericIntervalValue = derivedColumnType === 'numeric' ? parseNumericInput(numericIntervalInput) : null;
 
   // Use parameter change detection hook
   const hasParamsChanged = useParameterChangeDetection(
@@ -350,6 +387,13 @@ const handleAnalyze = async () => {
       const authHeaders = getAuthHeaders();
       const headers = Object.keys(authHeaders).length > 0 ? authHeaders as Record<string, string> : {};
       const result = await textApi.sequentialAnalysis(currentWorkspaceId, nodeIdForAnalysis, request, headers);
+      const taskIdFromResponse =
+        (result as any)?.metadata?.task_id ??
+        (result as any)?.metadata?.taskId ??
+        null;
+      if (typeof taskIdFromResponse === 'string' && taskIdFromResponse.trim().length > 0) {
+        setLocalSequentialTaskId(taskIdFromResponse);
+      }
       const enrichedResult = {
         ...result,
         analysis_params: {
@@ -406,7 +450,12 @@ const handleAnalyze = async () => {
 const handleUpdateResults = async () => {
     // Clear current results and rerun with new parameters
     try {
-      if (currentWorkspaceId) await textApi.clearSequentialAnalysis(currentWorkspaceId, getAuthHeaders());
+      if (currentWorkspaceId) {
+        const taskId = await resolveSequentialTaskId();
+        if (taskId) {
+          await textApi.clearTask(currentWorkspaceId, taskId, getAuthHeaders());
+        }
+      }
     } catch { /* ignore */ }
     setResults(null);
     // Keep locked state and nodes, just update the analysis with new params
@@ -415,8 +464,14 @@ const handleUpdateResults = async () => {
 
   const handleClearResults = async () => {
     try {
-      if (currentWorkspaceId) await textApi.clearSequentialAnalysis(currentWorkspaceId, getAuthHeaders());
+      if (currentWorkspaceId) {
+        const taskId = await resolveSequentialTaskId();
+        if (taskId) {
+          await textApi.clearTask(currentWorkspaceId, taskId, getAuthHeaders());
+        }
+      }
     } catch { /* ignore */ }
+    setLocalSequentialTaskId(null);
     setResults(null);
     setLockedNodesSnapshot([]);
     setLockedSchema(null);
@@ -427,26 +482,27 @@ const handleUpdateResults = async () => {
     setNumericIntervalInput('1');
   };
 
-  const handleChartTypeChange = useCallback(
-    async (value: ChartTypeOption) => {
-      setChartType(value);
-  setResults((prev: any) => (prev ? { ...prev, chart_type: value } : prev));
+  const handleChartTypeChange = async (value: ChartTypeOption) => {
+    setChartType(value);
+    setResults((prev: any) => (prev ? { ...prev, chart_type: value } : prev));
 
-      if (!currentWorkspaceId) {
+    if (!currentWorkspaceId) {
+      return;
+    }
+
+    const authHeaders = getAuthHeaders();
+    const headers = Object.keys(authHeaders).length > 0 ? (authHeaders as Record<string, string>) : {};
+
+    try {
+      const taskId = await resolveSequentialTaskId();
+      if (!taskId) {
         return;
       }
-
-      const authHeaders = getAuthHeaders();
-      const headers = Object.keys(authHeaders).length > 0 ? (authHeaders as Record<string, string>) : {};
-
-      try {
-        await textApi.postSequentialAnalysisCurrentResult(currentWorkspaceId, { chart_type: value }, headers);
-      } catch (error) {
-        console.error('Failed to update sequential analysis chart type:', error);
-      }
-    },
-    [currentWorkspaceId, getAuthHeaders]
-  );
+      await textApi.postSequentialAnalysisTaskResult(currentWorkspaceId, taskId, { chart_type: value }, headers);
+    } catch (error) {
+      console.error('Failed to update sequential analysis chart type:', error);
+    }
+  };
 
   // Prepare data for chart visualization
   const chartData = useMemo<SequentialAnalysisDatum[]>(() => {
@@ -537,7 +593,7 @@ const handleUpdateResults = async () => {
     }, {});
   }, [groupKeys]);
 
-  const formatTimeLabel = useCallback((value?: string | number) => {
+  const formatTimeLabel = (value?: string | number) => {
     if (!value) return '—';
     const str = String(value);
     const parsed = new Date(str);
@@ -552,7 +608,7 @@ const handleUpdateResults = async () => {
       return parsed.toLocaleString(undefined, options);
     }
     return str;
-  }, []);
+  };
 
   const groupPointCounts = useMemo(() => {
     if (!chartData.length) return {} as Record<string, number>;
@@ -570,7 +626,7 @@ const handleUpdateResults = async () => {
     return counts;
   }, [chartData, groupKeys]);
 
-  const renderChart = useCallback(() => {
+  const renderChart = () => {
     if (!chartData.length) {
       return (
         <div className="flex h-40 items-center justify-center rounded-md border border-dashed border-muted-foreground/30 text-sm text-muted-foreground">
@@ -687,7 +743,7 @@ const handleUpdateResults = async () => {
         </div>
       </ChartContainer>
     );
-  }, [chartData, chartConfig, chartType, groupKeys, groupPointCounts, formatTimeLabel]);
+  };
 
   const summaryTimeColumn = (results?.analysis_params?.time_column as string | undefined) ?? timeColumn;
   const summaryGroupBy = (results?.analysis_params?.group_by_columns as string[] | undefined) ?? groupByColumns;
@@ -701,8 +757,188 @@ const handleUpdateResults = async () => {
   const summaryFrequency = summaryColumnType === 'numeric'
     ? 'Numeric bins'
     : ((results?.analysis_params?.frequency as SequentialFrequency | undefined) ?? frequency);
+  const resultsSummary = summaryTimeColumn
+    ? (summaryColumnType === 'numeric'
+        ? `Numeric bin counts for ${summaryTimeColumn}`
+        : `Frequency of records grouped by ${summaryTimeColumn}`)
+    : 'Aggregated frequency over time';
 
-  // Hydration from backend once per mount
+  const applyHydratedRequest = useCallback(
+    async (requestPayload: unknown) => {
+      const req = (requestPayload as any)?.data ?? requestPayload;
+      if (!req) {
+        return;
+      }
+
+      setHydratingSelection(true);
+      const nodeIdStr = String(req.node_id || req.nodeId || '');
+      const reqTimeColumn = typeof req.time_column === 'string' ? req.time_column : '';
+      const reqColumnType = req.column_type === 'numeric' ? 'numeric' : 'datetime';
+      const lockedNumericOrigin = reqColumnType === 'numeric' && typeof req.numeric_origin === 'number'
+        ? req.numeric_origin
+        : null;
+      const lockedNumericInterval = reqColumnType === 'numeric' && typeof req.numeric_interval === 'number'
+        ? req.numeric_interval
+        : null;
+
+      if (reqColumnType === 'numeric') {
+        setNumericOriginInput(lockedNumericOrigin != null ? String(lockedNumericOrigin) : '');
+        setNumericIntervalInput(lockedNumericInterval != null ? String(lockedNumericInterval) : '1');
+      } else {
+        setNumericOriginInput('');
+        setNumericIntervalInput('1');
+      }
+
+      if (nodeIdStr && reqTimeColumn) {
+        setNodeColumnSelections([{ nodeId: nodeIdStr, column: reqTimeColumn }]);
+        setTimeColumn(reqTimeColumn);
+      }
+
+      const normalizedGroups = Array.isArray(req.group_by_columns)
+        ? req.group_by_columns.filter((col: unknown): col is string => typeof col === 'string' && col.trim() !== '')
+        : [];
+      setGroupByColumns(normalizedGroups.length ? [...normalizedGroups] : []);
+
+      const validFrequencies: SequentialFrequency[] = ['hourly', 'daily', 'weekly', 'monthly', 'quarterly', 'yearly'];
+      const reqFrequency = typeof req.frequency === 'string' ? (req.frequency as any) : undefined;
+      const lockedFrequency = reqFrequency && validFrequencies.includes(reqFrequency)
+        ? reqFrequency
+        : frequencyRef.current;
+      if (frequencyRef.current !== lockedFrequency) {
+        setFrequency(lockedFrequency);
+      }
+
+      hydratedParamsRef.current = {
+        timeColumn: reqTimeColumn,
+        groupByColumns: normalizedGroups.length ? [...normalizedGroups] : [],
+        frequency: lockedFrequency,
+        columnType: reqColumnType,
+        numericOrigin: lockedNumericOrigin,
+        numericInterval: lockedNumericInterval,
+      };
+
+      setLockedParams({
+        frequency: lockedFrequency,
+        groupByColumns: normalizedGroups.length ? [...normalizedGroups] : [],
+        columnType: reqColumnType,
+        numericOrigin: lockedNumericOrigin,
+        numericInterval: lockedNumericInterval,
+        sortByTime: typeof req.sort_by_time === 'boolean' ? req.sort_by_time : true,
+      });
+
+      if (nodeIdStr) {
+        setIsLocked(true);
+        try {
+          const info = await getNodeInfo({ workspaceId: currentWorkspaceId!, nodeId: nodeIdStr, getAuthHeaders });
+          const name = info?.name || info?.data?.name || nodeIdStr;
+          const columns = Array.isArray(info?.columns)
+            ? info.columns
+            : (Array.isArray(info?.data?.columns) ? info.data.columns : []);
+          const [normalizedSnapshot] = applySelectedColumnsToSnapshots(
+            [{ id: nodeIdStr, name: String(name), columns }],
+            { [nodeIdStr]: reqTimeColumn }
+          );
+          setLockedNodesSnapshot([{ id: normalizedSnapshot.id, name: normalizedSnapshot.name, columns: normalizedSnapshot.columns }]);
+          const normalizedSchema = normalizeSchemaFromInfo(info);
+          if (Object.keys(normalizedSchema).length > 0) {
+            setLockedSchema(normalizedSchema);
+          } else {
+            setLockedSchema((prev) => prev ?? currentSchemaRef.current);
+          }
+        } catch {
+          setLockedSchema((prev) => prev ?? currentSchemaRef.current);
+        }
+      }
+
+      setHydratingSelection(false);
+    },
+    [
+      currentSchemaRef,
+      frequencyRef,
+      getAuthHeaders,
+      setIsLocked,
+      setLockedNodesSnapshot,
+      setLockedSchema,
+      setNodeColumnSelections,
+    ]
+  );
+
+  const applyHydratedResult = useCallback(
+    async (resultPayload: unknown) => {
+      if (!resultPayload) {
+        return;
+      }
+
+      const metadataTaskId =
+        (resultPayload as any)?.metadata?.task_id ??
+        (resultPayload as any)?.metadata?.taskId ??
+        (resultPayload as any)?.data?.metadata?.task_id ??
+        (resultPayload as any)?.data?.metadata?.taskId ??
+        null;
+      if (typeof metadataTaskId === 'string' && metadataTaskId.trim().length > 0) {
+        setLocalSequentialTaskId(metadataTaskId);
+      }
+
+      const hydratedParams = hydratedParamsRef.current;
+      const enriched = {
+        ...(resultPayload as any),
+        analysis_params: {
+          ...((resultPayload as any)?.analysis_params ?? {}),
+          ...(hydratedParams
+            ? {
+                group_by_columns: hydratedParams.groupByColumns,
+                time_column: hydratedParams.timeColumn,
+                frequency: hydratedParams.frequency,
+                column_type: hydratedParams.columnType,
+                numeric_origin: hydratedParams.numericOrigin,
+                numeric_interval: hydratedParams.numericInterval,
+              }
+            : {}),
+        },
+      };
+
+      const resolvedChartType = isChartTypeOption((resultPayload as any)?.chart_type)
+        ? (resultPayload as any).chart_type
+        : chartTypeRef.current;
+      const normalizedResult = {
+        ...enriched,
+        chart_type: resolvedChartType,
+      };
+      setResults(normalizedResult);
+      setChartType(resolvedChartType);
+    },
+    [chartTypeRef]
+  );
+
+  const fetchSequentialRequest = useCallback(
+    async (taskId?: string | null) => {
+      if (!currentWorkspaceId || !taskId) return null;
+      return textApi.getTaskRequest(currentWorkspaceId, taskId, getAuthHeaders());
+    },
+    [currentWorkspaceId, getAuthHeaders]
+  );
+
+  const fetchSequentialResult = useCallback(
+    async (taskId?: string | null) => {
+      if (!currentWorkspaceId || !taskId) return null;
+      return textApi.getTaskResult(currentWorkspaceId, taskId, getAuthHeaders());
+    },
+    [currentWorkspaceId, getAuthHeaders]
+  );
+
+  const { hydrateFromServer } = useAnalysisHydration({
+    workspaceId: currentWorkspaceId,
+    analysisKey: 'sequential-analysis',
+    getAuthHeaders,
+    onTaskIdResolved: setLocalSequentialTaskId,
+    fetchRequest: fetchSequentialRequest,
+    fetchResult: fetchSequentialResult,
+    applyRequest: applyHydratedRequest,
+    applyResult: applyHydratedResult,
+    autoHydrateOnFocus: false,
+    autoHydrateOnVisibility: false,
+  });
+
   const hydratedOnceRef = useRef<boolean>(false);
   useEffect(() => {
     hydratedOnceRef.current = false;
@@ -712,156 +948,9 @@ const handleUpdateResults = async () => {
       return;
     }
 
-    let cancelled = false;
-    const frameId = requestAnimationFrame(() => {
-      void (async () => {
-        if (cancelled || hydratedOnceRef.current || !currentWorkspaceId) return;
-
-        hydratedOnceRef.current = true;
-        setHydratingSelection(true);
-        try {
-          const reqResp = await textApi.getSequentialAnalysisCurrentRequest(currentWorkspaceId, getAuthHeaders());
-          if (!reqResp || cancelled) return;
-
-          const req = (reqResp as any)?.data;
-          let lockedGroups: string[] = [];
-          let lockedFrequency: SequentialFrequency = frequencyRef.current;
-          let lockedColumnType: 'datetime' | 'numeric' = 'datetime';
-          let lockedNumericOrigin: number | null = null;
-          let lockedNumericInterval: number | null = null;
-          let reqTimeColumn = '';
-          let nodeIdStr = '';
-
-          if (req) {
-            nodeIdStr = String(req.node_id || req.nodeId || '');
-            reqTimeColumn = typeof req.time_column === 'string' ? req.time_column : '';
-            const reqColumnType = req.column_type === 'numeric' ? 'numeric' : 'datetime';
-            lockedColumnType = reqColumnType;
-            if (reqColumnType === 'numeric') {
-              lockedNumericOrigin = typeof req.numeric_origin === 'number' ? req.numeric_origin : null;
-              lockedNumericInterval = typeof req.numeric_interval === 'number' ? req.numeric_interval : null;
-              setNumericOriginInput(
-                typeof req.numeric_origin === 'number' ? String(req.numeric_origin) : ''
-              );
-              setNumericIntervalInput(
-                typeof req.numeric_interval === 'number' ? String(req.numeric_interval) : '1'
-              );
-            } else {
-              setNumericOriginInput('');
-              setNumericIntervalInput('1');
-            }
-            if (nodeIdStr && reqTimeColumn) {
-              setNodeColumnSelections([{ nodeId: nodeIdStr, column: reqTimeColumn }]);
-              setTimeColumn(reqTimeColumn);
-            }
-
-            const normalizedGroups = Array.isArray(req.group_by_columns)
-              ? req.group_by_columns.filter((col: unknown): col is string => typeof col === 'string' && col.trim() !== '')
-              : [];
-            setGroupByColumns(normalizedGroups.length ? [...normalizedGroups] : []);
-            lockedGroups = normalizedGroups.length ? [...normalizedGroups] : [];
-
-            const validFrequencies: SequentialFrequency[] = ['hourly', 'daily', 'weekly', 'monthly', 'quarterly', 'yearly'];
-            const reqFrequency = typeof req.frequency === 'string' ? (req.frequency as any) : undefined;
-            if (reqFrequency && validFrequencies.includes(reqFrequency)) {
-              lockedFrequency = reqFrequency;
-              if (frequencyRef.current !== lockedFrequency) {
-                setFrequency(lockedFrequency);
-              }
-            } else {
-              lockedFrequency = frequencyRef.current;
-            }
-
-            setLockedParams({
-              frequency: lockedFrequency,
-              groupByColumns: [...lockedGroups],
-              columnType: lockedColumnType,
-              numericOrigin: lockedNumericOrigin,
-              numericInterval: lockedNumericInterval,
-              sortByTime: typeof req.sort_by_time === 'boolean' ? req.sort_by_time : true,
-            });
-
-            if (nodeIdStr) {
-              setIsLocked(true);
-              try {
-                const info = await getNodeInfo({ workspaceId: currentWorkspaceId, nodeId: nodeIdStr, getAuthHeaders });
-                if (cancelled) return;
-                const name = info?.name || info?.data?.name || nodeIdStr;
-                const columns = Array.isArray(info?.columns)
-                  ? info.columns
-                  : (Array.isArray(info?.data?.columns) ? info.data.columns : []);
-                const [normalizedSnapshot] = applySelectedColumnsToSnapshots(
-                  [{ id: nodeIdStr, name: String(name), columns }],
-                  { [nodeIdStr]: reqTimeColumn }
-                );
-                setLockedNodesSnapshot([{ id: normalizedSnapshot.id, name: normalizedSnapshot.name, columns: normalizedSnapshot.columns }]);
-                const normalizedSchema = normalizeSchemaFromInfo(info);
-                if (Object.keys(normalizedSchema).length > 0) {
-                  setLockedSchema(normalizedSchema);
-                } else {
-                  setLockedSchema((prev) => prev ?? currentSchemaRef.current);
-                }
-              } catch {
-                if (!cancelled) {
-                  setLockedSchema((prev) => prev ?? currentSchemaRef.current);
-                }
-              }
-            } else {
-              setIsLocked(false);
-              setLockedNodesSnapshot([]);
-              setLockedSchema(null);
-            }
-          } else {
-            setNodeColumnSelections([]);
-            setTimeColumn('');
-            setGroupByColumns([]);
-            setLockedParams(null);
-            setNumericOriginInput('');
-            setNumericIntervalInput('1');
-            setIsLocked(false);
-            setLockedNodesSnapshot([]);
-            setLockedSchema(null);
-          }
-
-          const resResp = await textApi.getSequentialAnalysisCurrentResult(currentWorkspaceId, getAuthHeaders());
-          if (!resResp || cancelled) return;
-          const res = (resResp as any)?.data;
-          if (res) {
-            const enriched = {
-              ...resResp,
-              analysis_params: {
-                ...(resResp as any)?.analysis_params,
-                group_by_columns: lockedGroups,
-                time_column: reqTimeColumn,
-                frequency: lockedFrequency,
-                column_type: lockedColumnType,
-                numeric_origin: lockedNumericOrigin,
-                numeric_interval: lockedNumericInterval,
-              },
-            };
-            const resolvedChartType = isChartTypeOption((resResp as any)?.chart_type)
-              ? (resResp as any).chart_type
-              : chartTypeRef.current;
-            const normalizedResult = {
-              ...enriched,
-              chart_type: resolvedChartType,
-            };
-            setResults(normalizedResult);
-            setChartType(resolvedChartType);
-          }
-        } catch {
-          /* ignore */
-        } finally {
-          if (!cancelled) setHydratingSelection(false);
-        }
-      })();
-    });
-
-    return () => {
-      cancelled = true;
-      cancelAnimationFrame(frameId);
-    };
-  }, [currentWorkspaceId, getAuthHeaders, currentSchemaRef, frequencyRef, chartTypeRef, setIsLocked, setLockedNodesSnapshot, setLockedSchema, setNodeColumnSelections]);
+    hydratedOnceRef.current = true;
+    void hydrateFromServer();
+  }, [currentWorkspaceId, hydrateFromServer]);
 
   return (
     <div className="space-y-6">
@@ -871,9 +960,12 @@ const handleUpdateResults = async () => {
             <div>
               <CardTitle className="flex items-center gap-2">
                 Sequential Analysis
-                <HelpIcon targetKey="analysis.sequential-analysis.tab" label="Sequential analysis overview" />
+                <HelpIcon
+                  targetKey="analysis.sequential-analysis.parameters"
+                  label="Sequential analysis parameters"
+                  tooltip="Select a time column, choose frequency, and configure group-by options."
+                />
               </CardTitle>
-              <CardDescription>Configure a time-series frequency view for the selected node.</CardDescription>
             </div>
           </div>
         </CardHeader>
@@ -911,7 +1003,7 @@ const handleUpdateResults = async () => {
               </span>
             )}
             allowedDataTypes={Array.from(TIME_COMPATIBLE_TYPES)}
-            lockedMessage={<AnalysisLockedNotice />}
+            lockedMessage={ANALYSIS_LOCKED_MESSAGE}
           />
 
           {/* Analysis Configuration */}
@@ -1094,14 +1186,14 @@ const handleUpdateResults = async () => {
         <Card className="mt-6">
           <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
-              <CardTitle>Sequential Analysis Results</CardTitle>
-              <CardDescription>
-                {summaryTimeColumn
-                  ? (summaryColumnType === 'numeric'
-                      ? `Numeric bin counts for ${summaryTimeColumn}`
-                      : `Frequency of records grouped by ${summaryTimeColumn}`)
-                  : 'Aggregated frequency over time'}
-              </CardDescription>
+              <CardTitle className="flex items-center gap-2">
+                Sequential Analysis Results
+                <HelpIcon
+                  targetKey="analysis.sequential-analysis.results"
+                  label="Sequential analysis results"
+                  tooltip={`${resultsSummary}. Review the chart, summaries, and adjust chart type.`}
+                />
+              </CardTitle>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">Chart Type</span>

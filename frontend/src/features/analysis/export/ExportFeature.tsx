@@ -1,10 +1,10 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState } from 'react';
 import { Download } from 'lucide-react';
 import { useWorkspaceSelection } from '../../../hooks/useWorkspaceSelection';
 import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
 import { useAuth } from '../../../hooks/useAuth';
 import { getApiBase } from '../../../api/env';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Button } from '../../../components/ui/button';
 import { Badge } from '../../../components/ui/badge';
 import { Label } from '../../../components/ui/label';
@@ -26,16 +26,16 @@ const FORMATS = [
 const ExportFeature: React.FC = () => {
   const { selectedNodes: rawSelectedNodes } = useWorkspaceSelection();
   const { currentWorkspaceId } = useWorkspaceData();
-  const selectedNodes = useMemo(() => rawSelectedNodes ?? [], [rawSelectedNodes]);
+  const selectedNodes = rawSelectedNodes ?? [];
   const { getAuthHeaders } = useAuth();
   const [format, setFormat] = useState('csv');
   const [exporting, setExporting] = useState(false);
   const [downloadingIds, setDownloadingIds] = useState<Record<string, DownloadStatus>>({});
 
-  const nodeIds = useMemo(() => selectedNodes.map((n: any, idx: number) => n.id || n.node_id || n.data?.id || n.data?.node_id || n.unique_id || `node-${idx}`), [selectedNodes]);
+  const nodeIds = selectedNodes.map((n: any, idx: number) => n.id || n.node_id || n.data?.id || n.data?.node_id || n.unique_id || `node-${idx}`);
 
   // Best-effort helpers for node display
-  const toDisplay = useCallback((n: any) => {
+  const toDisplay = (n: any) => {
     const id = n.id || n.node_id || n.data?.id || n.data?.node_id || n.unique_id;
     const name = n?.data?.nodeName || n?.data?.label || n?.label || n?.name || id;
     const shapeArr = Array.isArray(n?.data?.shape) ? n.data.shape : null;
@@ -43,10 +43,10 @@ const ExportFeature: React.FC = () => {
       typeof value === 'number' || typeof value === 'string' ? value : '?';
     const shape = shapeArr ? `${formatDimension(shapeArr[0])} × ${formatDimension(shapeArr[1])}` : null;
     return { id, name, shape };
-  }, []);
+  };
 
   // Export all as CSV (zip when multiple)
-  const handleExportAll = useCallback(async () => {
+  const handleExportAll = async () => {
     if (!currentWorkspaceId || nodeIds.length === 0) return;
     setExporting(true);
     try {
@@ -73,10 +73,10 @@ const ExportFeature: React.FC = () => {
     } finally {
       setExporting(false);
     }
-  }, [currentWorkspaceId, nodeIds, getAuthHeaders, selectedNodes, toDisplay]);
+  };
 
   // Download a single node in the selected format
-  const handleDownloadOne = useCallback(async (node: any) => {
+  const handleDownloadOne = async (node: any) => {
     if (!currentWorkspaceId) return;
     const { id, name } = toDisplay(node);
     if (!id) return;
@@ -104,7 +104,7 @@ const ExportFeature: React.FC = () => {
     } finally {
       setDownloadingIds((s) => ({ ...s, [id]: 'idle' }));
     }
-  }, [currentWorkspaceId, format, getAuthHeaders, toDisplay]);
+  };
 
   return (
     <div className="space-y-6">
@@ -112,11 +112,12 @@ const ExportFeature: React.FC = () => {
         <CardHeader className="space-y-1">
           <CardTitle className="flex items-center gap-2">
             Export Nodes
-            <HelpIcon targetKey="analysis.export.tab" label="Export overview" />
+            <HelpIcon
+              targetKey="analysis.export.parameters"
+              label="Export parameters"
+              tooltip="Select nodes, choose a format, and export results for download."
+            />
           </CardTitle>
-          <CardDescription>
-            Select one or more nodes in the workspace graph and download their data in the format you prefer.
-          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed border-border/50 bg-muted/40 px-4 py-3">

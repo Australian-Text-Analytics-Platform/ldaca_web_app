@@ -1,0 +1,88 @@
+import type { TokenFrequencyResponse } from '@/api/text';
+import { isNonEmptyString } from '../common';
+
+export interface NodeNameEntry {
+  id: string;
+  name?: string | null;
+}
+
+export const buildSelectionNameById = (
+  selectedNodes: Array<NodeNameEntry | null | undefined>,
+  panelSelectedNodes?: Array<NodeNameEntry | null | undefined> | null
+): Record<string, string> => {
+  const mapping: Record<string, string> = {};
+
+  selectedNodes.forEach((node) => {
+    if (node && isNonEmptyString(node.id) && isNonEmptyString(node.name)) {
+      mapping[node.id] = node.name;
+    }
+  });
+
+  if (Array.isArray(panelSelectedNodes)) {
+    panelSelectedNodes.forEach((node) => {
+      if (node && isNonEmptyString(node.id) && isNonEmptyString(node.name)) {
+        mapping[node.id] = node.name;
+      }
+    });
+  }
+
+  return mapping;
+};
+
+export const buildSelectionNameKey = (
+  selectedNodes: Array<NodeNameEntry | null | undefined>,
+  panelSelectedNodes?: Array<NodeNameEntry | null | undefined> | null
+): string => {
+  const mapping = buildSelectionNameById(selectedNodes, panelSelectedNodes);
+  return Object.keys(mapping)
+    .sort()
+    .map((nodeId) => `${nodeId}:${mapping[nodeId]}`)
+    .join('|');
+};
+
+export const deriveBackendTokenLimit = (results?: TokenFrequencyResponse | null): number | null => {
+  if (!results) return null;
+  const params = results.analysis_params ?? {};
+  const metadata = results.metadata ?? {};
+  const candidates = [
+    results.token_limit,
+    (params as any).token_limit,
+    (metadata as any).token_limit,
+    (results as any).limit,
+    (params as any).limit,
+    (metadata as any).limit,
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === 'number' && Number.isFinite(candidate)) {
+      return candidate;
+    }
+  }
+  return null;
+};
+
+export const deriveBackendStopWords = (results?: TokenFrequencyResponse | null): string[] | null => {
+  if (!results) return null;
+  const candidates = [
+    Array.isArray(results.stop_words) ? results.stop_words : null,
+    Array.isArray(results.metadata?.stop_words) ? results.metadata.stop_words : null,
+    Array.isArray(results.analysis_params?.stop_words) ? results.analysis_params.stop_words : null,
+  ];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) {
+      return candidate.map((item) => String(item));
+    }
+  }
+
+  return null;
+};
+
+export const deriveBackendStopWordsKey = (results?: TokenFrequencyResponse | null): string => {
+  const stopWords = deriveBackendStopWords(results);
+  if (!Array.isArray(stopWords) || stopWords.length === 0) return '';
+  return stopWords
+    .map((item) => String(item).trim().toLowerCase())
+    .filter((item) => item.length > 0)
+    .join('|');
+};

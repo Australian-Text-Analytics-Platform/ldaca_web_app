@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { workspacesApi } from '../../api/workspaces';
 import { nodesApi } from '../../api/nodes';
@@ -95,40 +94,30 @@ export const useWorkspaceQueries = ({
     workspaces.find((workspace: any) => workspace.workspace_id === currentWorkspaceId) || null;
   const workspaceGraph = graphQuery.data || null;
 
-  const nodes = useMemo(() => workspaceGraph?.nodes || [], [workspaceGraph?.nodes]);
+  const nodes = workspaceGraph?.nodes || [];
   const selectedNode = nodes.find((node: any) => node.id === selectedNodeId) || null;
 
-  const selectedNodes = useMemo(
-    () =>
-      selectedNodeIds
-        .map((id: string) => nodes.find((node: any) => node.id === id))
-        .filter(Boolean),
-    [nodes, selectedNodeIds]
-  );
+  const selectedNodes = selectedNodeIds
+    .map((id: string) => nodes.find((node: any) => node.id === id))
+    .filter(Boolean);
 
   const nodeData = nodeDataQuery.data || { data: [], page: 0, total_pages: 0 };
 
-  const queryLoadingState = useMemo(
-    () => ({
-      workspaces: workspacesQuery.isLoading,
-      currentWorkspace: currentWorkspaceQuery.isLoading,
-      nodes: graphQuery.isLoading,
-      graph: graphQuery.isLoading,
-      nodeData: nodeDataQuery.isLoading,
-    }),
-    [currentWorkspaceQuery.isLoading, graphQuery.isLoading, nodeDataQuery.isLoading, workspacesQuery.isLoading]
-  );
+  const queryLoadingState = {
+    workspaces: workspacesQuery.isLoading,
+    currentWorkspace: currentWorkspaceQuery.isLoading,
+    nodes: graphQuery.isLoading,
+    graph: graphQuery.isLoading,
+    nodeData: nodeDataQuery.isLoading,
+  };
 
-  const queryErrorState = useMemo(
-    () => ({
-      workspaces: workspacesQuery.error?.message || null,
-      currentWorkspace: currentWorkspaceQuery.error?.message || null,
-      nodes: graphQuery.error?.message || null,
-      graph: graphQuery.error?.message || null,
-      nodeData: nodeDataQuery.error?.message || null,
-    }),
-    [currentWorkspaceQuery.error, graphQuery.error, nodeDataQuery.error, workspacesQuery.error]
-  );
+  const queryErrorState = {
+    workspaces: workspacesQuery.error?.message || null,
+    currentWorkspace: currentWorkspaceQuery.error?.message || null,
+    nodes: graphQuery.error?.message || null,
+    graph: graphQuery.error?.message || null,
+    nodeData: nodeDataQuery.error?.message || null,
+  };
 
   return {
     workspacesQuery,

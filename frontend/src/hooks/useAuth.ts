@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useSyncExternalStore } from 'react';
+import { useEffect, useSyncExternalStore, useCallback } from 'react';
 import { AuthInfoResponse } from '../types';
 import { authApi } from '../api/auth';
 import { configApi, ConfigResponse } from '../api/config';
@@ -214,12 +214,12 @@ export const useAuth = (options: UseAuthOptions = {}) => {
     ensureRefreshInterval();
   }, [autoStart]);
 
-  const refreshAuth = useCallback(async () => {
+  const refreshAuth = async () => {
     const reason: FetchReason = !globalAuthInfo || globalPhase.status === 'fatal' ? 'bootstrap' : 'manual';
     await runAuthFetch(reason);
-  }, []);
+  };
 
-  const loginWithGoogle = useCallback(async (idToken: string) => {
+  const loginWithGoogle = async (idToken: string) => {
     if (!globalConfig?.multi_user_mode) {
       throw new Error('Google login not available in single-user mode');
     }
@@ -232,9 +232,9 @@ export const useAuth = (options: UseAuthOptions = {}) => {
       const message = error instanceof Error ? error.message : 'Google login failed';
       throw new Error(message);
     }
-  }, []);
+  };
 
-  const logout = useCallback(async () => {
+  const logout = async () => {
     if (!globalConfig?.multi_user_mode) {
       return;
     }
@@ -251,7 +251,7 @@ export const useAuth = (options: UseAuthOptions = {}) => {
       setPhase({ status: 'bootstrapping', attempts: 0 });
       await runAuthFetch('bootstrap');
     }
-  }, []);
+  };
 
   const getAuthHeaders = useCallback((): Record<string, string> => {
     const token = readStoredToken();

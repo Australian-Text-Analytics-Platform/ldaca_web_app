@@ -7,8 +7,6 @@ export * from './ui';
 // Remaining components in root
 export { default as CustomNode } from './CustomNode';
 export { ErrorBoundary, WorkspaceErrorFallback } from './ErrorBoundary';
-export { default as FileList } from './FileList';
 export { default as GoogleLogin } from './GoogleLogin';
-export { default as JoinInterface } from './JoinInterface';
 export { default as NodeSelectionPanel } from './NodeSelectionPanel';
 export { default as TutorialView } from './TutorialView';

@@ -1,6 +1,5 @@
 import logging
-import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import polars as pl
 from fastapi import APIRouter, Depends, HTTPException
@@ -8,10 +7,11 @@ from pydantic import BaseModel
 
 from docframe import DocDataFrame, DocLazyFrame
 
+from ....analysis.manager import get_task_manager
+from ....analysis.models import AnalysisStatus, AnalysisTask
 from ....core.auth import get_current_user
 from ....core.workspace import workspace_manager
 from ....models import ConcordanceAnalysisRequest, ConcordanceDetachRequest
-from ..utils import stage_dataframe_as_lazy
 
 
 def _prepare_doclazy_frame(node, column_name: str, user_id: str, workspace_id: str):
@@ -53,14 +53,10 @@ def _prepare_doclazy_frame(node, column_name: str, user_id: str, workspace_id: s
 
 Includes:
     - POST /workspaces/{workspace_id}/concordance
-    - GET  /workspaces/{workspace_id}/concordance/current-request
-    - GET  /workspaces/{workspace_id}/concordance/current-result
-    - POST /workspaces/{workspace_id}/concordance/current-result
-        - POST /workspaces/{workspace_id}/concordance/clear
-  - POST /workspaces/{workspace_id}/concordance/cache/clear
-  - POST /workspaces/{workspace_id}/concordance/multi-node/clear
-  - GET  /workspaces/{workspace_id}/nodes/{node_id}/concordance/{document_idx}
-  - POST /workspaces/{workspace_id}/nodes/{node_id}/concordance/detach
+    - GET  /workspaces/{workspace_id}/concordance/tasks/{task_id}/result
+    - POST /workspaces/{workspace_id}/concordance/tasks/{task_id}/result
+    - GET  /workspaces/{workspace_id}/nodes/{node_id}/concordance/{document_idx}
+    - POST /workspaces/{workspace_id}/nodes/{node_id}/concordance/detach
 
 This module supports the worker-backed `data.node_results` schema stored in
 `analysis_store`.
@@ -187,13 +183,11 @@ async def run_concordance(
     if not ws:
         raise HTTPException(status_code=404, detail="Workspace not found")
 
-    analysis_manager = getattr(ws, "analysis", None)
-    if not analysis_manager:
-        from ....analysis.manager import get_analysis_manager
-
-        analysis_manager = get_analysis_manager(user_id, workspace_id)
-
-    existing_task = analysis_manager.get_current_task("concordance")
+    task_manager = get_task_manager(user_id, workspace_id)
+    existing_task_ids = task_manager.get_current_task_ids("concordance")
+    existing_task = (
+        task_manager.get_task(existing_task_ids[0]) if existing_task_ids else None
+    )
     if existing_task and existing_task.status == "running":
         if await tm.any_running(
             task_type="concordance", user_id=user_id, workspace_id=workspace_id
@@ -288,7 +282,6 @@ async def run_concordance(
         from ....analysis.implementations.concordance import ConcordanceRequest
 
         analysis_request = ConcordanceRequest(
-            task_id=task_info.id,
             node_ids=request.node_ids,
             node_columns=validated_columns,
             search_word=request.search_word,
@@ -298,7 +291,16 @@ async def run_concordance(
             case_sensitive=request.case_sensitive,
         )
 
-        analysis_manager.create_task("concordance", analysis_request)
+        task_manager.save_task(
+            AnalysisTask(
+                task_id=task_info.id,
+                user_id=user_id,
+                workspace_id=workspace_id,
+                request=analysis_request,
+                status=AnalysisStatus.PENDING,
+            )
+        )
+        task_manager.set_current_task("concordance", task_info.id)
 
         return {
             "state": "running",
@@ -308,37 +310,6 @@ async def run_concordance(
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to submit task: {e}")
-
-
-@router.get("/{workspace_id}/concordance/current-request")
-async def concordance_current_request(
-    workspace_id: str, current_user: dict = Depends(get_current_user)
-):
-    user_id = current_user["id"]
-    ws = workspace_manager.get_workspace(user_id, workspace_id)
-    if not ws:
-        return None
-
-    analysis_manager = getattr(ws, "analysis", None)
-    if not analysis_manager:
-        from ....analysis.manager import get_analysis_manager
-
-        analysis_manager = get_analysis_manager(user_id, workspace_id)
-
-    task = analysis_manager.get_current_task("concordance")
-    if not task:
-        return None
-
-    # Convert request model to dict for response
-    req_dict = (
-        task.request.model_dump()
-        if hasattr(task.request, "model_dump")
-        else task.request.dict()
-    )
-    normalized_request = _normalize_saved_request(req_dict)
-    if not normalized_request:
-        return None
-    return {"state": "successful", "message": "ok", "data": normalized_request}
 
 
 def _filter_concordance_rows(df: pl.DataFrame) -> pl.DataFrame:
@@ -478,24 +449,16 @@ def _process_dataframe_result(
     }
 
 
-@router.get("/{workspace_id}/concordance/current-result")
-async def concordance_current_result(
+@router.get("/{workspace_id}/concordance/tasks/{task_id}/result")
+async def concordance_task_result(
     workspace_id: str,
+    task_id: str,
     query: ConcordanceResultQuery = Depends(),
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    ws = workspace_manager.get_workspace(user_id, workspace_id)
-    if not ws:
-        return None
-
-    analysis_manager = getattr(ws, "analysis", None)
-    if not analysis_manager:
-        from ....analysis.manager import get_analysis_manager
-
-        analysis_manager = get_analysis_manager(user_id, workspace_id)
-
-    task = analysis_manager.get_current_task("concordance")
+    task_manager = get_task_manager(user_id, workspace_id)
+    task = task_manager.get_task(task_id)
     if not task:
         return None
 
@@ -512,11 +475,10 @@ async def concordance_current_result(
                 from ....analysis.results import GenericAnalysisResult
 
                 task.complete(GenericAnalysisResult(result_data))
-                analysis_manager.update_task(task)
-
+                task_manager.save_task(task)
             elif tm_task.status == "failed":
                 task.fail(tm_task.error or "Task failed")
-                analysis_manager.update_task(task)
+                task_manager.save_task(task)
                 return None  # Or return error info?
 
     if not task.result:
@@ -544,24 +506,16 @@ async def concordance_current_result(
     return _process_dataframe_result(result_data, normalized_request)
 
 
-@router.post("/{workspace_id}/concordance/current-result")
-async def concordance_current_result_post(
+@router.post("/{workspace_id}/concordance/tasks/{task_id}/result")
+async def concordance_task_result_post(
     workspace_id: str,
+    task_id: str,
     query: ConcordanceResultQuery,
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    ws = workspace_manager.get_workspace(user_id, workspace_id)
-    if not ws:
-        return None
-
-    analysis_manager = getattr(ws, "analysis", None)
-    if not analysis_manager:
-        from ....analysis.manager import get_analysis_manager
-
-        analysis_manager = get_analysis_manager(user_id, workspace_id)
-
-    task = analysis_manager.get_current_task("concordance")
+    task_manager = get_task_manager(user_id, workspace_id)
+    task = task_manager.get_task(task_id)
     if not task:
         return {
             "state": "failed",
@@ -579,10 +533,10 @@ async def concordance_current_result_post(
                 from ....analysis.results import GenericAnalysisResult
 
                 task.complete(GenericAnalysisResult(result_data))
-                analysis_manager.update_task(task)
+                task_manager.save_task(task)
             elif tm_task.status == "failed":
                 task.fail(tm_task.error or "Task failed")
-                analysis_manager.update_task(task)
+                task_manager.save_task(task)
                 return {
                     "state": "failed",
                     "message": f"Analysis failed: {task.error}",
@@ -611,47 +565,6 @@ async def concordance_current_result_post(
         pass
 
     return _process_dataframe_result(result_data, normalized_request)
-
-
-@router.post("/{workspace_id}/concordance/clear")
-async def clear_concordance_results(
-    workspace_id: str, current_user: dict = Depends(get_current_user)
-):
-    user_id = current_user["id"]
-    ws = workspace_manager.get_workspace(user_id, workspace_id)
-    if ws:
-        analysis_manager = getattr(ws, "analysis", None)
-        if not analysis_manager:
-            from ....analysis.manager import get_analysis_manager
-
-            analysis_manager = get_analysis_manager(user_id, workspace_id)
-
-        analysis_manager.clear_current_result("concordance")
-
-    return {"state": "successful", "cleared": ["concordance"]}
-
-
-@router.post("/{workspace_id}/concordance/cache/clear")
-async def clear_concordance_cache(
-    workspace_id: str, current_user: dict = Depends(get_current_user)
-):
-    # Cache is removed, so this is a no-op or alias to clear results
-    return await clear_concordance_results(workspace_id, current_user)
-    # Cache is removed, so this is a no-op or alias to clear results
-    return await clear_concordance_results(workspace_id, current_user)
-
-
-@router.post("/{workspace_id}/concordance/multi-node/clear")
-async def clear_multi_concordance_results(
-    workspace_id: str, current_user: dict = Depends(get_current_user)
-):
-    user_id = current_user["id"]
-    from ....core.analysis_admin import clear_analyses_and_cache
-
-    summary = await clear_analyses_and_cache(
-        user_id, workspace_id, task="multi_concordance"
-    )
-    return {"state": "successful", "cleared": summary}
 
 
 # ---------------------------------------------------------------------------

@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { useAnalysisTaskStatus } from './useAnalysisTaskStatus';
 import type { TaskItem } from '../stores/analysisStore';
 
 export interface AnalysisTaskRefreshContext {
-  reason: 'poll' | 'terminal';
+  reason: 'terminal';
   task: TaskItem | null;
   taskId: string | null;
   taskState: TaskItem['state'] | null;
@@ -27,12 +27,11 @@ type BannerFallbackInput =
 
 export interface UseAnalysisTaskLifecycleOptions {
   taskType: string;
+  isTabActive?: boolean;
   workspaceId?: string | null;
   manualActiveTaskId?: string | null;
   fallbackRunningBanner?: BannerFallbackInput;
   onRefresh?: (context: AnalysisTaskRefreshContext) => Promise<void> | void;
-  pollWhileActive?: boolean;
-  pollIntervalMs?: number;
 }
 
 export interface UseAnalysisTaskLifecycleResult {
@@ -42,38 +41,37 @@ export interface UseAnalysisTaskLifecycleResult {
   refreshNow: (reason?: AnalysisTaskRefreshContext['reason']) => Promise<void> | void;
 }
 
-const DEFAULT_POLL_INTERVAL_MS = 5000;
-
 export const useAnalysisTaskLifecycle = (
   options: UseAnalysisTaskLifecycleOptions
 ): UseAnalysisTaskLifecycleResult => {
   const {
     taskType,
+    isTabActive = true,
     workspaceId = null,
     manualActiveTaskId,
     fallbackRunningBanner,
     onRefresh,
-    pollWhileActive = false,
-    pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
   } = options;
 
   const status = useAnalysisTaskStatus(taskType);
-  const activeTask = status.runningTask ?? status.queuedTask ?? null;
   const effectiveActiveTaskId = manualActiveTaskId ?? status.activeTaskId ?? null;
-  const pollTimerRef = useRef<number | null>(null);
   const lastTerminalRef = useRef<{ taskId: string | null; state: TaskItem['state'] | null }>({
     taskId: null,
     state: null,
   });
+  const onRefreshRef = useRef<typeof onRefresh>(onRefresh);
+  useEffect(() => {
+    onRefreshRef.current = onRefresh;
+  }, [onRefresh]);
 
-  const resolveFallbackBanner = useMemo<BannerFallback | null>(() => {
+  const resolveFallbackBanner: BannerFallback | null = (() => {
     if (typeof fallbackRunningBanner === 'function') {
       return fallbackRunningBanner(status);
     }
     return fallbackRunningBanner ?? null;
-  }, [fallbackRunningBanner, status]);
+  })();
 
-  const banner = useMemo<AnalysisTaskBannerState | null>(() => {
+  const banner: AnalysisTaskBannerState | null = (() => {
     const trimmedMessage = status.bannerMessage?.trim() || undefined;
     if (status.bannerStatus) {
       return {
@@ -92,70 +90,33 @@ export const useAnalysisTaskLifecycle = (
     }
 
     return null;
-  }, [status.bannerStatus, status.bannerTaskId, status.bannerMessage, resolveFallbackBanner, effectiveActiveTaskId]);
+  })();
 
-  const clearPollTimer = useCallback(() => {
-    if (pollTimerRef.current !== null) {
-      window.clearInterval(pollTimerRef.current);
-      pollTimerRef.current = null;
+  const refreshNow = async (reason: AnalysisTaskRefreshContext['reason'] = 'terminal') => {
+    if (!workspaceId || !onRefreshRef.current) {
+      return;
     }
-  }, []);
 
-  const invokeRefresh = useCallback(
-    async (reason: AnalysisTaskRefreshContext['reason'] = 'poll') => {
-      if (!workspaceId || !onRefresh) {
-        return;
-      }
+    const context: AnalysisTaskRefreshContext = {
+      reason,
+      task: status.terminalTask ?? null,
+      taskId: status.terminalTask?.task_id ?? null,
+      taskState: status.terminalTask?.state ?? null,
+    };
 
-      const context: AnalysisTaskRefreshContext = {
-        reason,
-        task: reason === 'terminal' ? status.terminalTask : activeTask,
-        taskId:
-          reason === 'terminal'
-            ? status.terminalTask?.task_id ?? null
-            : effectiveActiveTaskId,
-        taskState:
-          reason === 'terminal'
-            ? status.terminalTask?.state ?? null
-            : activeTask?.state ?? null,
-      };
-
-      await onRefresh(context);
-    },
-    [workspaceId, onRefresh, status.terminalTask, activeTask, effectiveActiveTaskId]
-  );
+    await onRefreshRef.current(context);
+  };
 
   useEffect(() => {
     lastTerminalRef.current = { taskId: null, state: null };
-    clearPollTimer();
-  }, [workspaceId, clearPollTimer]);
+  }, [workspaceId]);
 
   useEffect(() => {
-    if (!workspaceId || !onRefresh) {
-      clearPollTimer();
+    if (!workspaceId || !onRefreshRef.current) {
       return;
     }
 
-    if (!pollWhileActive || !effectiveActiveTaskId) {
-      clearPollTimer();
-      return;
-    }
-
-    if (pollTimerRef.current !== null) {
-      return;
-    }
-
-    pollTimerRef.current = window.setInterval(() => {
-      void invokeRefresh('poll');
-    }, pollIntervalMs);
-
-    return () => {
-      clearPollTimer();
-    };
-  }, [workspaceId, pollWhileActive, effectiveActiveTaskId, pollIntervalMs, invokeRefresh, onRefresh, clearPollTimer]);
-
-  useEffect(() => {
-    if (!workspaceId || !onRefresh) {
+    if (!isTabActive) {
       return;
     }
 
@@ -173,16 +134,20 @@ export const useAnalysisTaskLifecycle = (
     }
 
     lastTerminalRef.current = { taskId, state: taskState };
-    void invokeRefresh('terminal');
-  }, [workspaceId, status.terminalTask, invokeRefresh, onRefresh]);
-
-  useEffect(() => () => clearPollTimer(), [clearPollTimer]);
+    const context: AnalysisTaskRefreshContext = {
+      reason: 'terminal',
+      task: status.terminalTask ?? null,
+      taskId,
+      taskState,
+    };
+    void onRefreshRef.current(context);
+  }, [workspaceId, status.terminalTask, isTabActive]);
 
   return {
     status,
     banner,
     activeTaskId: effectiveActiveTaskId,
-    refreshNow: invokeRefresh,
+    refreshNow,
   };
 };
 

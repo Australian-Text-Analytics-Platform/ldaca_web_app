@@ -18,21 +18,12 @@ import polars as pl
 from docworkspace import Node, Workspace  # type: ignore
 from docworkspace.workspace.io import read_workspace  # type: ignore
 from docworkspace.workspace.io import write_workspace
-from ldaca_web_app_backend.analysis.manager import get_analysis_manager
 
-from .docworkspace_api import (
-    DocWorkspaceAPIUtils,
-    create_operation_result,
-    handle_api_error,
-)
-from .utils import (
-    allocate_workspace_folder,
-    ensure_display_folder_name,
-    find_workspace_folder_by_id,
-    generate_workspace_id,
-    get_user_workspace_folder,
-    load_workspace_metadata,
-)
+from .docworkspace_api import (DocWorkspaceAPIUtils, create_operation_result,
+                               handle_api_error)
+from .utils import (allocate_workspace_folder, ensure_display_folder_name,
+                    find_workspace_folder_by_id, generate_workspace_id,
+                    get_user_workspace_folder, load_workspace_metadata)
 
 
 class WorkspaceManager:
@@ -66,13 +57,6 @@ class WorkspaceManager:
     def _attach_workspace_dir(self, workspace: Workspace, path: Path) -> None:
         try:
             setattr(workspace, "_workspace_dir", path)
-        except Exception:
-            pass
-
-    def _attach_analysis_manager(self, user_id: str, workspace: Workspace) -> None:
-        """Attach analysis manager to workspace instance."""
-        try:
-            workspace.analysis = get_analysis_manager(user_id, workspace.id)
         except Exception:
             pass
 
@@ -130,7 +114,6 @@ class WorkspaceManager:
             self._attach_workspace_dir(ws, updated_dir)
             self._set_working_dir(updated_dir)
             self._set_cached_path(user_id, workspace_id, updated_dir)
-            self._attach_analysis_manager(user_id, ws)
             return ws
         except Exception as e:  # pragma: no cover
             print(
@@ -150,7 +133,6 @@ class WorkspaceManager:
         self._attach_workspace_dir(new_ws, new_path)
         self._set_working_dir(new_path)
         self._current[user_id] = {"id": new_id, "ws": new_ws, "path": new_path}
-        self._attach_analysis_manager(user_id, new_ws)
 
     # ---------------- Public API ----------------
     def get_current_workspace_id(self, user_id: str) -> Optional[str]:
@@ -166,14 +148,10 @@ class WorkspaceManager:
             cid, cws, _ = self._get_current_entry(user_id)
             if cid and cws:
                 self._save(user_id, cid, cws)
-                # Analysis state is now managed by AnalysisManager attached to workspace
             self._current.pop(user_id, None)
             return True
         cid, cws, _ = self._get_current_entry(user_id)
         if cid == workspace_id and cws is not None:
-            # Ensure analysis manager is attached if it was somehow lost (e.g. reload)
-            if not getattr(cws, "analysis", None):
-                self._attach_analysis_manager(user_id, cws)
             return True
         new_ws = self._load(user_id, workspace_id)
         if not new_ws:
@@ -205,7 +183,6 @@ class WorkspaceManager:
         write_workspace(ws, target_dir)
         self._set_cached_path(user_id, wid, target_dir)
         self._current[user_id] = {"id": wid, "ws": ws, "path": target_dir}
-        self._attach_analysis_manager(user_id, ws)
         return ws
 
     def get_workspace(self, user_id: str, workspace_id: str) -> Optional[Any]:
@@ -215,7 +192,6 @@ class WorkspaceManager:
                 cached = self._get_cached_path(user_id, workspace_id)
                 if cached:
                     self._attach_workspace_dir(cws, cached)
-                self._attach_analysis_manager(user_id, cws)
             return cws
         ws = self._load(user_id, workspace_id)
         if not ws:
@@ -292,12 +268,13 @@ class WorkspaceManager:
         return False
 
     def get_task_manager(self, user_id: str, workspace_id: str):
-        from ldaca_web_app_backend.core.process_task_manager import ProcessTaskManager
+        from ldaca_web_app_backend.core.worker_task_manager import \
+            WorkerTaskManager
 
         key = (user_id, workspace_id)
         tm = self._task_managers.get(key)
         if tm is None:
-            tm = ProcessTaskManager()
+            tm = WorkerTaskManager()
             self._task_managers[key] = tm
         return tm
 
@@ -473,5 +450,9 @@ workspace_manager = WorkspaceManager()
 # Global singleton
 workspace_manager = WorkspaceManager()
 
+# Global singleton
+workspace_manager = WorkspaceManager()
+# Global singleton
+workspace_manager = WorkspaceManager()
 # Global singleton
 workspace_manager = WorkspaceManager()

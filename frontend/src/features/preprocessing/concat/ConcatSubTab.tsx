@@ -4,7 +4,7 @@ import { Loader2 } from 'lucide-react';
 import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
 import HelpIcon from '../../../components/help/HelpIcon';
 import { Button } from '../../../components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Input } from '../../../components/ui/input';
 import { Label } from '../../../components/ui/label';
 import { Tag } from '../../../components/ui/tag';
@@ -33,9 +33,12 @@ export const ConcatSubTab: React.FC<ConcatSubTabProps> = (props) => {
             <div>
               <CardTitle className="flex items-center gap-2">
                 Concatenate datasets
-                <HelpIcon targetKey="preprocessing.concat.tab" label="Concat sub-tab overview" />
+                <HelpIcon
+                  targetKey="preprocessing.concat.tab"
+                  label="Concat sub-tab overview"
+                  tooltip="Stack compatible nodes vertically into a single dataset."
+                />
               </CardTitle>
-              <CardDescription>Stack compatible nodes vertically into a single dataset.</CardDescription>
             </div>
             {showActivityTag && (
               <Tag tone="muted">

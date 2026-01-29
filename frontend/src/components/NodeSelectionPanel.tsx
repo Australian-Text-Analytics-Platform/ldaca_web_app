@@ -1,5 +1,6 @@
-import React, { useCallback, useMemo, type ReactNode } from 'react';
+import React, { type ReactNode } from 'react';
 import { AlertTriangle, Lock } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '../lib/utils';
 import type { NodeColumnSelection, NodeColumnSource, WorkspaceNodeLike } from '@/features/analysis/common/nodeSelectionTypes';
 import { getNodeIdentifier } from '@/features/analysis/common/nodeSelectionTypes';
@@ -75,10 +76,8 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
 }) => {
   const getColumnLabel = (node: WorkspaceNodeLike, idx: number) => (columnLabelFn ? columnLabelFn(node, idx) : 'Text Column:');
   // Compute stable list of selected node ids to avoid retriggering on object identity changes
-  const selectedNodeIds = useMemo(() => (
-    selectedNodes.map((node, idx) => getNodeIdentifier(node, idx))
-  ), [selectedNodes]);
-  const columnSelectionsByNode = useMemo(() => {
+  const selectedNodeIds = selectedNodes.map((node, idx) => getNodeIdentifier(node, idx));
+  const columnSelectionsByNode = (() => {
     const map = new Map<string, NodeColumnSelection>();
     nodeColumnSelections.forEach((selection) => {
       if (selection?.nodeId) {
@@ -86,7 +85,7 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
       }
     });
     return map;
-  }, [nodeColumnSelections]);
+  })();
 
   const columnOptions = useNodeColumnOptions({
     nodes: selectedNodes,
@@ -95,7 +94,7 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
     fallbackToAllColumns,
   });
 
-  const formatShape = useCallback((node: WorkspaceNodeLike): string => {
+  const formatShape = (node: WorkspaceNodeLike): string => {
     const rawShape =
       (node.data?.shape as [number | null, number | null] | undefined) ||
       ((node as { shape?: [number | null, number | null] }).shape ?? null);
@@ -106,65 +105,56 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
     const formatPart = (value: number | null | undefined) =>
       typeof value === 'number' && Number.isFinite(value) ? value.toLocaleString() : '?';
     return `${formatPart(rows)} × ${formatPart(cols)}`;
-  }, []);
+  };
 
-  const renderMetaContent = useCallback(
-    ({ node }: NodeSelectionRenderArgs) => {
-      if (renderNodeMeta) {
-        return renderNodeMeta(node);
-      }
-      if (showShape) {
-        return `Shape: ${formatShape(node)}`;
-      }
-      return null;
-    },
-    [formatShape, renderNodeMeta, showShape]
-  );
+  const renderMetaContent = ({ node }: NodeSelectionRenderArgs) => {
+    if (renderNodeMeta) {
+      return renderNodeMeta(node);
+    }
+    if (showShape) {
+      return `Shape: ${formatShape(node)}`;
+    }
+    return null;
+  };
 
-  const renderColumnSelector = useCallback(
-    ({ node, nodeId, index }: NodeSelectionRenderArgs) => {
-      if (!showColumnPicker) return null;
-      const options = columnOptions[nodeId];
-      const columns = options?.columns ?? [];
-      const selection = columnSelectionsByNode.get(nodeId);
-      const selectValue = selection?.column && selection.column.length > 0 ? selection.column : CLEAR_SELECTION_VALUE;
-      return (
-        <NodeColumnSelector
-          columns={columns}
-          value={selectValue}
-          preserveValue={selection?.column}
-          clearOptionValue={CLEAR_SELECTION_VALUE}
-          label={getColumnLabel(node, index)}
-          disabled={disabled}
-          noColumnsMessage={
-            options?.filteredOutByType
-              ? 'No columns match the allowed data types for this node'
-              : 'No columns available for this node'
-          }
-          onChange={(value) => {
-            const nextValue = value === CLEAR_SELECTION_VALUE ? '' : value;
-            onColumnChange(nodeId, nextValue ?? '');
-          }}
-        />
-      );
-    },
-    [showColumnPicker, columnOptions, columnSelectionsByNode, getColumnLabel, disabled, onColumnChange]
-  );
+  const renderColumnSelector = ({ node, nodeId, index }: NodeSelectionRenderArgs) => {
+    if (!showColumnPicker) return null;
+    const options = columnOptions[nodeId];
+    const columns = options?.columns ?? [];
+    const selection = columnSelectionsByNode.get(nodeId);
+    const selectValue = selection?.column && selection.column.length > 0 ? selection.column : CLEAR_SELECTION_VALUE;
+    return (
+      <NodeColumnSelector
+        columns={columns}
+        value={selectValue}
+        preserveValue={selection?.column}
+        clearOptionValue={CLEAR_SELECTION_VALUE}
+        label={getColumnLabel(node, index)}
+        disabled={disabled}
+        noColumnsMessage={
+          options?.filteredOutByType
+            ? 'No columns match the allowed data types for this node'
+            : 'No columns available for this node'
+        }
+        onChange={(value) => {
+          const nextValue = value === CLEAR_SELECTION_VALUE ? '' : value;
+          onColumnChange(nodeId, nextValue ?? '');
+        }}
+      />
+    );
+  };
 
-  const handleNodeColorChange = useCallback(
-    (nodeId: string, color: string) => {
-      if (disabled) return;
-      onColorChange(nodeId, color);
-    },
-    [disabled, onColorChange]
-  );
+  const handleNodeColorChange = (nodeId: string, color: string) => {
+    if (disabled) return;
+    onColorChange(nodeId, color);
+  };
 
   const shouldRenderMeta = renderNodeMeta != null || showShape;
 
   return (
-    <div className={cn('space-y-3', className)}>
+    <div className={cn('space-y-2', className)}>
       {showHeaderLabel && (
-        <div className="flex items-center justify-between px-4 pt-2">
+        <div className="flex items-center justify-between px-3 pt-1.5">
           <div className="flex items-center gap-2">
             <label className="block text-sm font-medium text-muted-foreground">
               Selected Nodes ({(originalCount ?? selectedNodes.length)}/{maxCompare})
@@ -172,9 +162,16 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
             {headerAddon}
           </div>
           {locked && (
-            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-border bg-muted text-muted-foreground">
-              <Lock className="h-3.5 w-3.5" aria-hidden="true" />
-            </span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-border bg-muted text-muted-foreground">
+                  <Lock className="h-3.5 w-3.5" aria-hidden="true" />
+                </span>
+              </TooltipTrigger>
+              {lockedMessage && (
+                <TooltipContent side="top">{lockedMessage}</TooltipContent>
+              )}
+            </Tooltip>
           )}
         </div>
       )}
@@ -213,17 +210,6 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
         <div className="mt-1 flex items-center gap-1 text-sm text-amber-600">
           <AlertTriangle className="h-4 w-4 shrink-0" />
           Maximum {maxCompare} node allowed here. Currently {(originalCount ?? selectedNodes.length)} selected in workspace; only the first {maxCompare} is used.
-        </div>
-      )}
-      {locked && lockedMessage && (
-        <div className="pt-0">
-          {typeof lockedMessage === 'string' ? (
-            <div className="rounded-md border border-dashed border-muted-foreground/50 bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-              {lockedMessage}
-            </div>
-          ) : (
-            lockedMessage
-          )}
         </div>
       )}
     </div>

@@ -1,4 +1,4 @@
-import { Dispatch, SetStateAction, useCallback, useMemo } from 'react';
+import { Dispatch, SetStateAction } from 'react';
 import { QueryClient, useMutation } from '@tanstack/react-query';
 import { workspacesApi } from '../../api/workspaces';
 import {
@@ -37,17 +37,17 @@ export const useWorkspaceNodeMutations = ({
   endOperation,
   setOperationError,
 }: WorkspaceNodeMutationsParams) => {
-  const ensureWorkspaceSelected = useCallback(() => {
+  const ensureWorkspaceSelected = () => {
     if (!currentWorkspaceId) {
       throw new Error('No workspace selected');
     }
     return currentWorkspaceId;
-  }, [currentWorkspaceId]);
+  };
 
-  const invalidateWorkspaceSummaries = useCallback(() => {
+  const invalidateWorkspaceSummaries = () => {
     queryClient.invalidateQueries({ queryKey: queryKeys.workspaces });
     queryClient.invalidateQueries({ queryKey: queryKeys.currentWorkspace });
-  }, [queryClient]);
+  };
 
   const setCurrentWorkspaceMutation = useMutation<any, unknown, string | null, { previousId: string | null }>({
     mutationFn: (workspaceId: string | null) => workspacesApi.current.set(workspaceId, authHeaders),
@@ -515,7 +515,7 @@ export const useWorkspaceNodeMutations = ({
     },
   });
 
-  const actions = useMemo(() => ({
+  const actions = {
     setCurrentWorkspace: (workspaceId: string | null) => setCurrentWorkspaceMutation.mutate(workspaceId),
     createWorkspace: (name: string, description?: string) => createWorkspaceMutation.mutateAsync({ name, description }),
     deleteWorkspace: (workspaceId: string) => deleteWorkspaceMutation.mutateAsync(workspaceId),
@@ -598,30 +598,7 @@ export const useWorkspaceNodeMutations = ({
         return null;
       }
     },
-  }), [
-    authHeaders,
-    castNodeMutation,
-    concatNodesMutation,
-    copyNodeMutation,
-    createNodeMutation,
-    createWorkspaceMutation,
-    currentWorkspaceId,
-    deleteColumnMutation,
-    deleteNodeMutation,
-    deleteWorkspaceMutation,
-    filterNodeMutation,
-    joinNodesMutation,
-    queryClient,
-    renameColumnMutation,
-    renameNodeMutation,
-    saveWorkspaceAsMutation,
-    saveWorkspaceMutation,
-    setCurrentWorkspaceMutation,
-    sliceNodeMutation,
-    updateWorkspaceNameMutation,
-    computeColumnMutation,
-    ensureWorkspaceSelected,
-  ]);
+  } as const;
 
   return { actions } as const;
 };

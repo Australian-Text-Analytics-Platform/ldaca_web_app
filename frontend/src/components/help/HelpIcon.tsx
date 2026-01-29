@@ -10,11 +10,14 @@ import { getTutorialTarget } from '@/tutorials/tutorialRegistry';
 export interface HelpIconProps {
   targetKey: string;
   label?: string;
+  tooltip?: string;
   className?: string;
 }
 
-const HelpIcon: React.FC<HelpIconProps> = ({ targetKey, label = 'Learn more', className }) => {
+const HelpIcon: React.FC<HelpIconProps> = ({ targetKey, label = 'Learn more', tooltip, className }) => {
   const openTutorialTarget = useUIStore((state) => state.openTutorialTarget);
+  const tooltipText = tooltip ?? label;
+  const ariaLabel = label ?? tooltipText;
 
   const handleClick = () => {
     const target = getTutorialTarget(targetKey);
@@ -33,13 +36,13 @@ const HelpIcon: React.FC<HelpIconProps> = ({ targetKey, label = 'Learn more', cl
           variant="ghost"
           size="icon"
           className={className ?? 'h-6 w-6 text-muted-foreground'}
-          aria-label={label}
+          aria-label={ariaLabel}
           onClick={handleClick}
         >
           <CircleHelp className="h-4 w-4" />
         </Button>
       </TooltipTrigger>
-      <TooltipContent side="top">{label}</TooltipContent>
+      <TooltipContent side="top">{tooltipText}</TooltipContent>
     </Tooltip>
   );
 };

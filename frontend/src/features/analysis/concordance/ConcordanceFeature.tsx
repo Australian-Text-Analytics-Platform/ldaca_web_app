@@ -1,6 +1,5 @@
 // NodeSelectionPanel now handles color selection UI inline
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import React, { useState, useEffect, useRef } from 'react';
 import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
 import { Tabs, TabsList, TabsTrigger } from '../../../components/ui/tabs';
 import { useWorkspaceSelection } from '../../../hooks/useWorkspaceSelection';
@@ -13,6 +12,7 @@ import { httpRequest } from '../../../api/http';
 import { workspacesApi } from '../../../api/workspaces';
 import { getNodeInfo } from '../../../lib/nodeInfoCache';
 import { useAnalysisStore } from '../../../stores/analysisStore';
+import { useUIStore } from '../../../stores';
 import { useAnalysisLockState } from '../../../hooks/useAnalysisLockState';
 import useNodeColumnInfos from '../../../hooks/useNodeColumnInfos';
 import { Button } from '../../../components/ui/button';
@@ -30,12 +30,12 @@ import {
 } from '../../../components/ui/table';
 import { ScrollArea } from '../../../components/ui/scroll-area';
 import { applySelectedColumnsToSnapshots } from '../../../hooks/useSchemaManagement';
-import AnalysisLockedNotice from '../../../components/tabs/AnalysisLockedNotice';
+import { ANALYSIS_LOCKED_MESSAGE } from '../../../components/tabs/AnalysisLockedNotice';
 import AnalysisTaskBanner from '../../../components/tabs/AnalysisTaskBanner';
 import type { AnalysisTaskStatus } from '../../../hooks/useAnalysisTaskStatus';
 import useAnalysisTaskLifecycle, { type AnalysisTaskRefreshContext } from '../../../hooks/useAnalysisTaskLifecycle';
-import { queryKeys } from '../../../lib/queryKeys';
 import { getAnalysisActionState } from '../common/analysisActionState';
+import { useAnalysisHydration } from '../common';
 
 const sanitizeResultParams = (params?: Record<string, unknown>): Record<string, unknown> | undefined => {
   if (!params) return undefined;
@@ -52,14 +52,95 @@ const sanitizeResultParams = (params?: Record<string, unknown>): Record<string, 
   return Object.keys(cleaned).length ? cleaned : undefined;
 };
 
+const DEFAULT_PALETTE = [
+  '#2563eb', '#dc2626', '#16a34a', '#9333ea', '#d97706', '#0d9488',
+  '#db2777', '#4f46e5', '#65a30d', '#0891b2', '#92400e', '#6b7280',
+];
+
+const CORE_COLS = [
+  'document_idx', 'left_context', 'matched_text', 'right_context', 'start_idx',
+  'end_idx', 'l1', 'r1', 'l1_freq', 'r1_freq',
+];
+
+const dedupeColumns = (cols: string[]): string[] => {
+  const seen = new Set<string>();
+  return cols.filter((col) => {
+    if (seen.has(col)) {
+      return false;
+    }
+    seen.add(col);
+    return true;
+  });
+};
+
+const highlightMatchInText = (
+  textValue: string,
+  startValue: unknown,
+  endValue: unknown,
+  fallbackMatch?: string,
+  fallbackCaseSensitive?: boolean
+): React.ReactNode => {
+  if (typeof textValue !== 'string' || textValue.length === 0) {
+    return textValue;
+  }
+
+  const parseIndex = (value: unknown): number | null => {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return Math.floor(value);
+    }
+    if (typeof value === 'string' && value.trim() !== '') {
+      const parsed = Number.parseInt(value, 10);
+      return Number.isNaN(parsed) ? null : parsed;
+    }
+    return null;
+  };
+
+  let startIdx = parseIndex(startValue);
+  let endIdx = parseIndex(endValue);
+
+  if (startIdx === null || endIdx === null || endIdx <= startIdx) {
+    if (fallbackMatch && fallbackMatch.length > 0) {
+      const source = fallbackCaseSensitive ? textValue : textValue.toLowerCase();
+      const needle = fallbackCaseSensitive ? fallbackMatch : fallbackMatch.toLowerCase();
+      const fallbackIdx = source.indexOf(needle);
+      if (fallbackIdx !== -1) {
+        startIdx = fallbackIdx;
+        endIdx = fallbackIdx + needle.length;
+      }
+    }
+  }
+
+  if (startIdx === null || endIdx === null || endIdx <= startIdx) {
+    return textValue;
+  }
+
+  const safeStart = Math.max(0, Math.min(startIdx, textValue.length));
+  const safeEnd = Math.max(safeStart, Math.min(endIdx, textValue.length));
+
+  if (safeEnd <= safeStart) {
+    return textValue;
+  }
+
+  return (
+    <>
+      {textValue.slice(0, safeStart)}
+      <mark className="bg-yellow-200 text-gray-900 rounded px-1">
+        {textValue.slice(safeStart, safeEnd)}
+      </mark>
+      {textValue.slice(safeEnd)}
+    </>
+  );
+};
+
 const ConcordanceFeature: React.FC = () => {
   // Anchor ref for results container to stabilize scroll on view mode toggle
   const resultsRef = useRef<HTMLDivElement | null>(null);
-  const queryClient = useQueryClient();
   const { selectedNodes } = useWorkspaceSelection();
   const { isLoading } = useWorkspaceStatus();
   const { currentWorkspaceId } = useWorkspaceData();
   const { detachConcordance, selectNodes } = useWorkspaceActions();
+  const currentView = useUIStore((state) => state.currentView);
+  const isActiveTab = currentView === 'concordance';
 
   const { getColumnInfos } = useNodeColumnInfos({
     workspaceId: currentWorkspaceId,
@@ -97,7 +178,7 @@ const ConcordanceFeature: React.FC = () => {
   const [showMetadata, setShowMetadata] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [results, setResults] = useState<ConcordanceAnalysisResponse | null>(null);
-  const labelToNodeId = useMemo(() => {
+  const labelToNodeId = (() => {
     const params = (results as any)?.analysis_params;
     const mapping = params?.label_to_node_map;
     if (mapping && typeof mapping === 'object') {
@@ -110,13 +191,11 @@ const ConcordanceFeature: React.FC = () => {
       return normalized;
     }
     return null;
-  }, [results]);
+  })();
 
   // Color management & view mode
   const [nodeColors, setNodeColors] = useState<Record<string,string>>({});
-  const defaultPalette = useMemo(() => [
-    '#2563eb', '#dc2626', '#16a34a', '#9333ea', '#d97706', '#0d9488', '#db2777', '#4f46e5', '#65a30d', '#0891b2', '#92400e', '#6b7280'
-  ], []);
+  const defaultPalette = DEFAULT_PALETTE;
   const [viewMode, setViewMode] = useState<'separated'|'combined'>('separated');
   const [combinedPage, setCombinedPage] = useState(1);
   const [combinedPageSize] = useState(20);
@@ -124,7 +203,7 @@ const ConcordanceFeature: React.FC = () => {
   const [combinedPageInput, setCombinedPageInput] = useState('1');
 
   // Map any node's id/name variants to its assigned color (used in combined table)
-  const sourceColorMap = useMemo(() => {
+  const sourceColorMap = (() => {
     const map: Record<string, string> = {};
     panelSelectedNodes.forEach((node, idx) => {
       const candidateIds = [
@@ -154,9 +233,10 @@ const ConcordanceFeature: React.FC = () => {
       });
     });
     return map;
-  }, [panelSelectedNodes, nodeColors, defaultPalette]);
+  })();
   
   const lastPendingConcordanceRef = useRef<number | null>(null);
+  const lastTerminalFetchRef = useRef<string | null>(null);
 
   // Pagination and sorting state - separate for each node
   const [nodePagination, setNodePagination] = useState<Record<string, {
@@ -183,20 +263,57 @@ const ConcordanceFeature: React.FC = () => {
   // State for auto-triggering search from TokenFrequencyTab
   const [shouldAutoSearch, setShouldAutoSearch] = useState(false);
   const [localConcordanceTaskId, setLocalConcordanceTaskId] = useState<string | null>(null);
+  const concordanceTaskStatusRef = useRef<AnalysisTaskStatus | null>(null);
 
-  const effectiveNodeColumnSelections = useMemo(() => (
-    isLocked ? activeNodeColumnSelections : nodeColumnSelections
-  ), [isLocked, activeNodeColumnSelections, nodeColumnSelections]);
+  const resolveConcordanceTaskId = async (): Promise<string | null> => {
+    if (!currentWorkspaceId) {
+      return null;
+    }
 
-  const refreshCurrentConcordanceResult = useCallback(async (queryOverrides?: Record<string, unknown>) => {
+    const status = concordanceTaskStatusRef.current;
+    const candidateIds = [
+      localConcordanceTaskId,
+      (results as any)?.metadata?.task_id,
+      status?.activeTaskId,
+      status?.runningTask?.task_id,
+      status?.queuedTask?.task_id,
+      status?.terminalTask?.task_id,
+    ];
+    const known = candidateIds.find((candidate) => typeof candidate === 'string' && candidate.trim().length > 0);
+    if (known) {
+      return known;
+    }
+
+    try {
+      const headers = getAuthHeaders();
+      const current = await textApi.getAnalysisCurrent(currentWorkspaceId, 'concordance', headers) as any;
+      const taskId = Array.isArray(current?.task_ids) ? current.task_ids[0] : null;
+      if (typeof taskId === 'string' && taskId.trim().length > 0) {
+        setLocalConcordanceTaskId(taskId);
+        return taskId;
+      }
+    } catch {
+      return null;
+    }
+
+    return null;
+  };
+
+  const effectiveNodeColumnSelections = isLocked ? activeNodeColumnSelections : nodeColumnSelections;
+
+  const refreshCurrentConcordanceResult = async (queryOverrides?: Record<string, unknown>) => {
     if (!currentWorkspaceId) {
       return null;
     }
 
     try {
       const headers = getAuthHeaders();
+      const taskId = await resolveConcordanceTaskId();
+      if (!taskId) {
+        return null;
+      }
       const response = await httpRequest<ConcordanceAnalysisResponse>(
-        `/workspaces/${currentWorkspaceId}/concordance/current-result`,
+        `/workspaces/${currentWorkspaceId}/concordance/tasks/${taskId}/result`,
         { method: 'GET', headers, params: sanitizeResultParams(queryOverrides) }
       );
       const typedResponse = response as ConcordanceAnalysisResponse | null;
@@ -208,9 +325,9 @@ const ConcordanceFeature: React.FC = () => {
       console.error('Failed to refresh concordance results automatically', error);
       return null;
     }
-  }, [currentWorkspaceId, getAuthHeaders, setResults]);
+  };
 
-  const updateStoredResult = useCallback(async (
+  const updateStoredResult = async (
     body: ConcordanceResultQuery
   ): Promise<ConcordanceAnalysisResponse | null> => {
     if (!currentWorkspaceId) {
@@ -218,69 +335,70 @@ const ConcordanceFeature: React.FC = () => {
     }
 
     const headers = getAuthHeaders();
-    const response = await textApi.postConcordanceCurrentResult(currentWorkspaceId, body, headers) as ConcordanceAnalysisResponse;
+    const taskId = await resolveConcordanceTaskId();
+    if (!taskId) {
+      return null;
+    }
+    const response = await textApi.postConcordanceTaskResult(currentWorkspaceId, taskId, body, headers) as ConcordanceAnalysisResponse;
     if (response) {
       setResults(response);
     }
     return response;
-  }, [currentWorkspaceId, getAuthHeaders, setResults]);
+  };
 
-  const concordanceFallbackBanner = useCallback(
-    (status: AnalysisTaskStatus) => {
-      if (results?.state !== 'running') {
-        return null;
-      }
-      return {
-        taskId:
-          (results as any)?.metadata?.task_id ??
-          localConcordanceTaskId ??
-          status.activeTaskId ??
-          null,
-        message: status.bannerMessage?.trim() || undefined,
-      };
-    },
-    [results, localConcordanceTaskId]
-  );
+  const concordanceFallbackBanner = (status: AnalysisTaskStatus) => {
+    if (results?.state !== 'running') {
+      return null;
+    }
+    return {
+      taskId:
+        (results as any)?.metadata?.task_id ??
+        localConcordanceTaskId ??
+        status.activeTaskId ??
+        null,
+      message: status.bannerMessage?.trim() || undefined,
+    };
+  };
 
-  const handleTaskRefresh = useCallback(
-    async (context: AnalysisTaskRefreshContext) => {
-      const refreshed = await refreshCurrentConcordanceResult();
-      if (!refreshed && context.reason === 'terminal' && context.taskState === 'failed') {
-        setResults({
-          state: 'failed',
-          message: context.task?.message || 'Concordance analysis failed',
-          data: {},
-        } as ConcordanceAnalysisResponse);
-      }
+  const handleTaskRefresh = async (context: AnalysisTaskRefreshContext) => {
+    if (context.reason !== 'terminal') {
+      return;
+    }
 
-      if (context.reason === 'terminal' && context.taskId) {
-        setLocalConcordanceTaskId((prev) => (prev === context.taskId ? null : prev));
-      }
-    },
-    [refreshCurrentConcordanceResult, setResults, setLocalConcordanceTaskId]
-  );
+    if (context.taskId && lastTerminalFetchRef.current === context.taskId && results) {
+      return;
+    }
 
-  const handleDetachTaskRefresh = useCallback(
-    async (context: AnalysisTaskRefreshContext) => {
-      if (!currentWorkspaceId) return;
-      if (context.reason === 'terminal' && context.taskState === 'successful') {
-        await queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
-      }
-    },
-    [currentWorkspaceId, queryClient]
-  );
+    const refreshed = await refreshCurrentConcordanceResult();
+    if (!refreshed && context.reason === 'terminal' && context.taskState === 'failed') {
+      setResults({
+        state: 'failed',
+        message: context.task?.message || 'Concordance analysis failed',
+        data: {},
+      } as ConcordanceAnalysisResponse);
+    }
+
+    if (context.reason === 'terminal' && context.taskId) {
+      setLocalConcordanceTaskId((prev) => (prev === context.taskId ? null : prev));
+      lastTerminalFetchRef.current = context.taskId;
+    }
+  };
 
   const {
     status: concordanceTaskStatus,
     banner: concordanceWaitingBanner,
   } = useAnalysisTaskLifecycle({
     taskType: 'concordance',
+    isTabActive: isActiveTab,
     workspaceId: currentWorkspaceId,
     manualActiveTaskId: localConcordanceTaskId,
     fallbackRunningBanner: concordanceFallbackBanner,
-    pollWhileActive: true,
     onRefresh: handleTaskRefresh,
   });
+
+  useEffect(() => {
+    concordanceTaskStatusRef.current = concordanceTaskStatus;
+  }, [concordanceTaskStatus]);
 
   const hasActiveTask = Boolean(
     localConcordanceTaskId ||
@@ -297,12 +415,6 @@ const ConcordanceFeature: React.FC = () => {
     hasResults: Boolean(results),
     isBusy: isSearching,
     hasActiveTask,
-  });
-
-  useAnalysisTaskLifecycle({
-    taskType: 'concordance_detach',
-    workspaceId: currentWorkspaceId,
-    onRefresh: handleDetachTaskRefresh,
   });
 
   useEffect(() => {
@@ -341,7 +453,8 @@ const ConcordanceFeature: React.FC = () => {
   }, [results, globalPageSize, showMetadata, setNodePagination]);
 
   // Preserve results across transient graph refetches: only clear when the actual set of selected IDs changes
-  const selectedNodeIds = useMemo(() => selectedNodes.map(node => node.id).sort(), [selectedNodes]);
+  const selectedNodeIds = selectedNodes.map((node) => node.id).sort();
+  const selectedNodeIdsKey = selectedNodeIds.join('|');
   const prevSelectedNodeIdsRef = React.useRef<string[] | null>(null);
   useEffect(() => {
     const prev = prevSelectedNodeIdsRef.current;
@@ -351,11 +464,12 @@ const ConcordanceFeature: React.FC = () => {
       setResults(null);
     }
     prevSelectedNodeIdsRef.current = curr;
-  }, [selectedNodeIds, isLocked]);
+  }, [selectedNodeIdsKey, isLocked]);
 
   useEffect(() => {
     if (!currentWorkspaceId) {
       setLocalConcordanceTaskId(null);
+      lastTerminalFetchRef.current = null;
     }
   }, [currentWorkspaceId]);
 
@@ -461,7 +575,7 @@ const ConcordanceFeature: React.FC = () => {
 
   const handleColumnChange = (nodeId: string, column: string) => setNodeColumnSelection(nodeId, column);
 
-  const handleSearch = useCallback(async (
+  const handleSearch = async (
     resetPage = true,
     targetNodeId?: string,
     forceMode?: 'separated' | 'combined',
@@ -622,30 +736,7 @@ const ConcordanceFeature: React.FC = () => {
     } finally {
       setIsSearching(false);
     }
-  }, [
-    currentWorkspaceId,
-    isLocked,
-    searchWord,
-    activeNodeIds,
-  effectiveNodeColumnSelections,
-    nodePagination,
-    globalPageSize,
-    numLeftTokens,
-    numRightTokens,
-    regex,
-    caseSensitive,
-    getAuthHeaders,
-    viewMode,
-    combinedPage,
-    combinedPageSize,
-    lockWithSnapshots,
-    updateStoredResult,
-    setNodePagination,
-    setViewMode,
-    setCombinedPage,
-    setIsSearching,
-    setResults,
-  ]);
+  };
 
   useEffect(() => {
     if (!shouldAutoSearch) {
@@ -655,74 +746,89 @@ const ConcordanceFeature: React.FC = () => {
     void handleSearch(true);
   }, [shouldAutoSearch, handleSearch]);
 
-  // Hydrate from backend current-request/result once per mount
+  const applyHydratedRequest = async (requestPayload: unknown) => {
+    const req = (requestPayload as any)?.data ?? requestPayload;
+    if (!req) {
+      return;
+    }
+
+    const nodeIds: string[] = Array.isArray(req.node_ids) ? req.node_ids.slice(0,2) : [];
+    const node_columns: Record<string,string> = req.node_columns || {};
+    const sels = nodeIds.map((id: string) => ({ nodeId: id, column: node_columns[id] || '' }));
+    setNodeColumnSelections(sels, { replace: true });
+    setSearchWord(String(req.search_word || ''));
+    setNumLeftTokens(Number(req.num_left_tokens ?? 10));
+    setNumRightTokens(Number(req.num_right_tokens ?? 10));
+    setRegex(!!req.regex);
+    setCaseSensitive(!!req.case_sensitive);
+    const hydratedMode: 'separated' | 'combined' = req.combined && req.combinable !== false ? 'combined' : 'separated';
+    setViewMode(hydratedMode);
+
+    try {
+      const snaps: Array<{ id: string; name: string; columns: string[] }> = [];
+      for (const id of nodeIds) {
+        try {
+          const info = await getNodeInfo({ workspaceId: currentWorkspaceId!, nodeId: id, getAuthHeaders });
+          const name = info?.name || info?.data?.name || id;
+          const columns = Array.isArray(info?.columns)
+            ? info.columns
+            : (Array.isArray(info?.data?.columns) ? info.data.columns : []);
+          snaps.push({ id, name: String(name), columns });
+        } catch {
+          snaps.push({ id, name: id, columns: [] });
+        }
+      }
+      const normalizedSnapshots = applySelectedColumnsToSnapshots(snaps, node_columns);
+      lockWithSnapshots(normalizedSnapshots);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const applyHydratedResult = async (resultPayload: unknown) => {
+    const res = (resultPayload as any)?.data ?? resultPayload;
+    if (res) {
+      setResults(resultPayload as any);
+    }
+  };
+
+  const fetchConcordanceRequest = async (taskId?: string | null) => {
+    if (!currentWorkspaceId || !taskId) return null;
+    return textApi.getTaskRequest(currentWorkspaceId, taskId, getAuthHeaders());
+  };
+
+  const fetchConcordanceResult = async (taskId?: string | null) => {
+    if (!currentWorkspaceId || !taskId) return null;
+    return textApi.getConcordanceTaskResult(currentWorkspaceId, taskId, getAuthHeaders());
+  };
+
+  const { hydrateFromServer } = useAnalysisHydration({
+    workspaceId: currentWorkspaceId,
+    analysisKey: 'concordance',
+    getAuthHeaders,
+    onTaskIdResolved: setLocalConcordanceTaskId,
+    fetchRequest: fetchConcordanceRequest,
+    fetchResult: fetchConcordanceResult,
+    applyRequest: applyHydratedRequest,
+    applyResult: applyHydratedResult,
+    autoHydrateOnFocus: false,
+    autoHydrateOnVisibility: false,
+  });
+
   const hydratedOnceRef = useRef<boolean>(false);
   useEffect(() => {
-    (async () => {
-      if (hydratedOnceRef.current) return;
-      hydratedOnceRef.current = true;
-      if (!currentWorkspaceId) return;
-      try {
-        // First check current-request; if null, don't request current-result
-  const reqResp = await textApi.getConcordanceCurrentRequest(currentWorkspaceId, getAuthHeaders());
-        if (!reqResp) {
-          // No current request - fresh state
-          return;
-        }
-        
-        const req = (reqResp as any)?.data;
-        if (req) {
-          const nodeIds: string[] = Array.isArray(req.node_ids) ? req.node_ids.slice(0,2) : [];
-          const node_columns: Record<string,string> = req.node_columns || {};
-          const sels = nodeIds.map((id: string) => ({ nodeId: id, column: node_columns[id] || '' }));
-          setNodeColumnSelections(sels, { replace: true });
-          setSearchWord(String(req.search_word || ''));
-          setNumLeftTokens(Number(req.num_left_tokens ?? 10));
-          setNumRightTokens(Number(req.num_right_tokens ?? 10));
-          setRegex(!!req.regex);
-          setCaseSensitive(!!req.case_sensitive);
-          const hydratedMode: 'separated' | 'combined' = req.combined && req.combinable !== false ? 'combined' : 'separated';
-          setViewMode(hydratedMode);
-          
-          // Build snapshot and lock
-          try {
-            const snaps: Array<{ id: string; name: string; columns: string[] }> = [];
-            for (const id of nodeIds) {
-              try {
-                const info = await getNodeInfo({ workspaceId: currentWorkspaceId!, nodeId: id, getAuthHeaders });
-                const name = info?.name || info?.data?.name || id;
-                const columns = Array.isArray(info?.columns)
-                  ? info.columns
-                  : (Array.isArray(info?.data?.columns) ? info.data.columns : []);
-                snaps.push({ id, name: String(name), columns });
-              } catch {
-                snaps.push({ id, name: id, columns: [] });
-              }
-            }
-            const normalizedSnapshots = applySelectedColumnsToSnapshots(
-              snaps,
-              node_columns
-            );
-            lockWithSnapshots(normalizedSnapshots);
-          } catch { /* ignore */ }
-        }
-        
-  // If no request data, don't attempt to fetch current-result
-  if (!req) return;
-  // Now get current-result
-  const resResp = await textApi.getConcordanceCurrentResult(currentWorkspaceId, getAuthHeaders());
-        if (!resResp) {
-          // No result yet
-          return;
-        }
-        
-        const res = (resResp as any)?.data;
-        if (res) {
-          setResults(resResp as any);
-        }
-      } catch { /* ignore */ }
-    })();
-  }, [currentWorkspaceId, getAuthHeaders, setNodeColumnSelections, lockWithSnapshots, setViewMode]);
+    hydratedOnceRef.current = false;
+  }, [currentWorkspaceId]);
+  useEffect(() => {
+    if (!currentWorkspaceId || !isActiveTab) {
+      return;
+    }
+    if (hydratedOnceRef.current) {
+      return;
+    }
+    hydratedOnceRef.current = true;
+    void hydrateFromServer();
+  }, [currentWorkspaceId, hydrateFromServer, isActiveTab]);
 
   const handleClearResults = async () => {
     if (currentWorkspaceId) {
@@ -774,7 +880,11 @@ const ConcordanceFeature: React.FC = () => {
         console.warn('Failed to clear concordance tasks from task manager', error);
       }
       try {
-        await textApi.clearConcordance(currentWorkspaceId, headers);
+        if (taskIds.size > 0) {
+          await Promise.all(
+            Array.from(taskIds).map((taskId) => textApi.clearTask(currentWorkspaceId, taskId, headers))
+          );
+        }
       } catch (error) {
         console.error('Failed to clear backend analyses/cache:', error);
       }
@@ -878,10 +988,21 @@ const ConcordanceFeature: React.FC = () => {
   };
 
   // Refetch combined results when combined page changes
+  const lastCombinedQueryRef = useRef<string | null>(null);
   useEffect(() => {
-    if (viewMode === 'combined' && results) {
-      void updateStoredResult({ combined: true, page: combinedPage, page_size: combinedPageSize });
+    if (viewMode !== 'combined' || !results) {
+      return;
     }
+    const taskId =
+      (results as any)?.metadata?.task_id ??
+      (results as any)?.metadata?.taskId ??
+      '';
+    const key = `${taskId}|${combinedPage}|${combinedPageSize}`;
+    if (lastCombinedQueryRef.current === key) {
+      return;
+    }
+    lastCombinedQueryRef.current = key;
+    void updateStoredResult({ combined: true, page: combinedPage, page_size: combinedPageSize });
   }, [viewMode, results, combinedPage, combinedPageSize, updateStoredResult]);
 
   useEffect(() => {
@@ -987,7 +1108,7 @@ const ConcordanceFeature: React.FC = () => {
     })();
   };
 
-  const persistResultPreferences = useCallback(async (partial: { pageSize?: number; showMetadata?: boolean }) => {
+  const persistResultPreferences = async (partial: { pageSize?: number; showMetadata?: boolean }) => {
     if (!currentWorkspaceId) {
       return;
     }
@@ -1025,7 +1146,7 @@ const ConcordanceFeature: React.FC = () => {
       console.error('Failed to persist concordance preferences', error);
       throw error;
     }
-  }, [combinedPage, combinedPageSize, currentWorkspaceId, globalPageSize, updateStoredResult, viewMode]);
+  };
 
   const handleRowClick = (row: any, nodeId: string, column: string) => {
     if (!currentWorkspaceId) return;
@@ -1049,69 +1170,7 @@ const ConcordanceFeature: React.FC = () => {
     setShowDetailModal(true);
   };
 
-  const highlightMatchInText = useCallback(
-    (
-      textValue: string,
-      startValue: unknown,
-      endValue: unknown,
-      fallbackMatch?: string,
-      fallbackCaseSensitive?: boolean
-    ): React.ReactNode => {
-      if (typeof textValue !== 'string' || textValue.length === 0) {
-        return textValue;
-      }
-
-      const parseIndex = (value: unknown): number | null => {
-        if (typeof value === 'number' && Number.isFinite(value)) {
-          return Math.floor(value);
-        }
-        if (typeof value === 'string' && value.trim() !== '') {
-          const parsed = Number.parseInt(value, 10);
-          return Number.isNaN(parsed) ? null : parsed;
-        }
-        return null;
-      };
-
-      let startIdx = parseIndex(startValue);
-      let endIdx = parseIndex(endValue);
-
-      if (startIdx === null || endIdx === null || endIdx <= startIdx) {
-        if (fallbackMatch && fallbackMatch.length > 0) {
-          const source = fallbackCaseSensitive ? textValue : textValue.toLowerCase();
-          const needle = fallbackCaseSensitive ? fallbackMatch : fallbackMatch.toLowerCase();
-          const fallbackIdx = source.indexOf(needle);
-          if (fallbackIdx !== -1) {
-            startIdx = fallbackIdx;
-            endIdx = fallbackIdx + needle.length;
-          }
-        }
-      }
-
-      if (startIdx === null || endIdx === null || endIdx <= startIdx) {
-        return textValue;
-      }
-
-      const safeStart = Math.max(0, Math.min(startIdx, textValue.length));
-      const safeEnd = Math.max(safeStart, Math.min(endIdx, textValue.length));
-
-      if (safeEnd <= safeStart) {
-        return textValue;
-      }
-
-      return (
-        <>
-          {textValue.slice(0, safeStart)}
-          <mark className="bg-yellow-200 text-gray-900 rounded px-1">
-            {textValue.slice(safeStart, safeEnd)}
-          </mark>
-          {textValue.slice(safeEnd)}
-        </>
-      );
-    },
-    []
-  );
-
-  const detailFullTextInfo = useMemo(() => {
+  const detailFullTextInfo = (() => {
     if (!selectedDetail) {
       return { text: null as string | null, highlighted: null as React.ReactNode };
     }
@@ -1138,7 +1197,7 @@ const ConcordanceFeature: React.FC = () => {
     );
 
     return { text: textCandidate, highlighted };
-  }, [selectedDetail, highlightMatchInText, searchWord, caseSensitive]);
+  })();
 
   const handleDetach = async (nodeId: string, column: string) => {
     if (!currentWorkspaceId || !searchWord.trim()) {
@@ -1193,23 +1252,6 @@ const ConcordanceFeature: React.FC = () => {
     );
   };
 
-  const coreCols = useMemo(() => (
-    [
-      'document_idx','left_context','matched_text','right_context','start_idx','end_idx','l1','r1','l1_freq','r1_freq'
-    ]
-  ), []);
-
-  const dedupeColumns = useCallback((cols: string[]): string[] => {
-    const seen = new Set<string>();
-    return cols.filter(col => {
-      if (seen.has(col)) {
-        return false;
-      }
-      seen.add(col);
-      return true;
-    });
-  }, []);
-
   const renderConcordanceTable = (
     nodeKey: string,
     nodeData: any,
@@ -1236,11 +1278,11 @@ const ConcordanceFeature: React.FC = () => {
         void updateStoredResult({ combined: true, sort_by: col, sort_order: nextOrder, page: 1, page_size: combinedPageSize });
       };
       // Derive display columns: core first, then metadata (columns minus core and internal)
-      const coreSet = new Set(coreCols);
+      const coreSet = new Set(CORE_COLS);
       const metaCols = columns.filter(c => !coreSet.has(c) && c !== '__source_node');
       const rawDisplayColumns = showMetadata
-        ? [...coreCols.filter(c => columns.includes(c)), ...metaCols]
-        : coreCols.filter(c => columns.includes(c));
+        ? [...CORE_COLS.filter(c => columns.includes(c)), ...metaCols]
+        : CORE_COLS.filter(c => columns.includes(c));
       const displayColumns = dedupeColumns(rawDisplayColumns);
 
       return (
@@ -1403,10 +1445,10 @@ const ConcordanceFeature: React.FC = () => {
     // Build per-node display columns using metadata
     const rows = nodeData.data || [];
     const allCols: string[] = (nodeData.columns || (rows.length ? Object.keys(rows[0]) : [])) as string[];
-    const metaCols: string[] = (nodeData.metadata?.metadata_columns as string[] | undefined) ?? allCols.filter(c => !coreCols.includes(c));
+    const metaCols: string[] = (nodeData.metadata?.metadata_columns as string[] | undefined) ?? allCols.filter(c => !CORE_COLS.includes(c));
     const rawDisplayColumns = showMetadata
-      ? [...coreCols.filter(c => allCols.includes(c)), ...metaCols.filter(c => allCols.includes(c))]
-      : coreCols.filter(c => allCols.includes(c));
+      ? [...CORE_COLS.filter(c => allCols.includes(c)), ...metaCols.filter(c => allCols.includes(c))]
+      : CORE_COLS.filter(c => allCols.includes(c));
     const displayColumns = dedupeColumns(rawDisplayColumns);
 
     if (!nodeData.data || nodeData.data.length === 0) {
@@ -1606,9 +1648,12 @@ const ConcordanceFeature: React.FC = () => {
             <div>
               <CardTitle className="flex items-center gap-2">
                 Concordance Search
-                <HelpIcon targetKey="analysis.concordance.tab" label="Concordance overview" />
+                <HelpIcon
+                  targetKey="analysis.concordance.parameters"
+                  label="Concordance parameters"
+                  tooltip="Select nodes, choose the search term, and set context options before running."
+                />
               </CardTitle>
-              <CardDescription>Find keyword-in-context excerpts across up to two selected nodes.</CardDescription>
             </div>
           </div>
         </CardHeader>
@@ -1629,7 +1674,7 @@ const ConcordanceFeature: React.FC = () => {
             getNodeColumns={getColumnInfos}
             allowedDataTypes={['string']}
             originalCount={displayNodeCount}
-            lockedMessage={<AnalysisLockedNotice />}
+            lockedMessage={ANALYSIS_LOCKED_MESSAGE}
           />
 
           <div className="space-y-6">
@@ -1751,7 +1796,14 @@ const ConcordanceFeature: React.FC = () => {
               <CardHeader className="space-y-4">
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                   <div className="space-y-1">
-                    <CardTitle>Search Results</CardTitle>
+                    <CardTitle className="flex items-center gap-2">
+                      Search Results
+                      <HelpIcon
+                        targetKey="analysis.concordance.results"
+                        label="Concordance results"
+                        tooltip="Browse keyword-in-context hits, switch between separated/combined views, and adjust pagination."
+                      />
+                    </CardTitle>
                     {results.message && (
                       <CardDescription className="max-w-2xl text-sm text-muted-foreground">
                         {results.message}

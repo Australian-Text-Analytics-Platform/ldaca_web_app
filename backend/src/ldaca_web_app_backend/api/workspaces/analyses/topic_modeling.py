@@ -1,9 +1,7 @@
 """Topic modeling (BERTopic) analysis endpoints extracted from base.py.
 
 Provides:
-  - GET  /workspaces/{workspace_id}/topic-modeling/current-request
-  - GET  /workspaces/{workspace_id}/topic-modeling/current-result
-  - POST /workspaces/{workspace_id}/topic-modeling
+    - POST /workspaces/{workspace_id}/topic-modeling
 
 Behavior preserved verbatim; only relocation for modular clarity.
 """
@@ -19,109 +17,14 @@ from docframe import DocDataFrame, DocLazyFrame
 from ....analysis.implementations.topic_modeling import (
     TopicModelingRequest as AnalysisTopicModelingRequest,
 )
-from ....analysis.models import AnalysisStatus
+from ....analysis.manager import get_task_manager
+from ....analysis.models import AnalysisStatus, AnalysisTask
 from ....core.auth import get_current_user
 from ....core.json_utils import json_sanitize
 from ....core.workspace import workspace_manager
 from ....models import TopicModelingRequest, TopicModelingResponse
 
 router = APIRouter(prefix="/workspaces", tags=["topic-modeling"])
-
-
-@router.get("/{workspace_id}/topic-modeling/current-request")
-async def topic_modeling_current_request(
-    workspace_id: str, current_user: dict = Depends(get_current_user)
-):
-    user_id = current_user["id"]
-    ws = workspace_manager.get_workspace(user_id, workspace_id)
-    if not ws:
-        return None
-
-    analysis_manager = getattr(ws, "analysis", None)
-    if not analysis_manager:
-        from ....analysis.manager import get_analysis_manager
-
-        analysis_manager = get_analysis_manager(user_id, workspace_id)
-
-    task = analysis_manager.get_current_task("topic_modeling")
-    if not task:
-        return None
-
-    req = (
-        task.request.model_dump()
-        if hasattr(task.request, "model_dump")
-        else task.request.dict()
-    )
-    return {
-        "state": "successful",
-        "message": "ok",
-        "data": json_sanitize(req),
-    }
-
-
-@router.get("/{workspace_id}/topic-modeling/current-result")
-async def topic_modeling_current_result(
-    workspace_id: str, current_user: dict = Depends(get_current_user)
-):
-    """Get current topic modeling result - read-only endpoint."""
-    user_id = current_user["id"]
-    ws = workspace_manager.get_workspace(user_id, workspace_id)
-    if not ws:
-        return None
-
-    analysis_manager = getattr(ws, "analysis", None)
-    if not analysis_manager:
-        from ....analysis.manager import get_analysis_manager
-
-        analysis_manager = get_analysis_manager(user_id, workspace_id)
-
-    task = analysis_manager.get_current_task("topic_modeling")
-    if not task:
-        return None
-
-    if task.result:
-        result = task.result.to_json()
-        if isinstance(result, dict) and "data" in result:
-            return {
-                "state": result.get("state", result.get("status", "successful")),
-                "message": result.get("message", "ok"),
-                "data": json_sanitize(result["data"]),
-            }
-        return {"state": "successful", "message": "ok", "data": json_sanitize(result)}
-
-    # If task exists but no result, check status
-    if task.status == AnalysisStatus.RUNNING:
-        return {"state": "running", "message": "Task is still running", "data": None}
-    if task.status == AnalysisStatus.FAILED:
-        return {
-            "state": "failed",
-            "message": "Task failed",
-            "data": None,
-        }
-    return {
-        "state": "running",
-        "message": "Task completed, result being processed",
-        "data": None,
-    }
-
-
-@router.post("/{workspace_id}/topic-modeling/clear")
-async def clear_topic_modeling_results(
-    workspace_id: str, current_user: dict = Depends(get_current_user)
-):
-    """Clear persisted topic modeling analyses for the workspace."""
-    user_id = current_user["id"]
-    ws = workspace_manager.get_workspace(user_id, workspace_id)
-    if ws:
-        analysis_manager = getattr(ws, "analysis", None)
-        if not analysis_manager:
-            from ....analysis.manager import get_analysis_manager
-
-            analysis_manager = get_analysis_manager(user_id, workspace_id)
-
-        analysis_manager.clear_current_result("topic_modeling")
-
-    return {"state": "successful", "cleared": ["topic_modeling"]}
 
 
 @router.post(
@@ -150,13 +53,11 @@ async def run_topic_modeling(
     if not ws:
         raise HTTPException(status_code=404, detail="Workspace not found")
 
-    analysis_manager = getattr(ws, "analysis", None)
-    if not analysis_manager:
-        from ....analysis.manager import get_analysis_manager
-
-        analysis_manager = get_analysis_manager(user_id, workspace_id)
-
-    existing_task = analysis_manager.get_current_task("topic_modeling")
+    task_manager = get_task_manager(user_id, workspace_id)
+    existing_task_ids = task_manager.get_current_task_ids("topic-modeling")
+    existing_task = (
+        task_manager.get_task(existing_task_ids[0]) if existing_task_ids else None
+    )
     if existing_task:
         # Check if running
         if existing_task.status == AnalysisStatus.RUNNING:
@@ -250,14 +151,22 @@ async def run_topic_modeling(
 
         # Create AnalysisTask
         analysis_request = AnalysisTopicModelingRequest(
-            task_id=task_info.id,
             node_ids=request.node_ids,
             node_columns=validated_columns,
             min_topic_size=request.min_topic_size,
             use_ctfidf=request.use_ctfidf,
         )
 
-        analysis_manager.create_task("topic_modeling", analysis_request)
+        task_manager.save_task(
+            AnalysisTask(
+                task_id=task_info.id,
+                user_id=user_id,
+                workspace_id=workspace_id,
+                request=analysis_request,
+                status=AnalysisStatus.PENDING,
+            )
+        )
+        task_manager.set_current_task("topic-modeling", task_info.id)
 
     except HTTPException:
         raise
@@ -270,10 +179,5 @@ async def run_topic_modeling(
         "metadata": {"task_id": task_info.id},
     }
 
-
-__all__ = ["router"]
-
-
-__all__ = ["router"]
 
 __all__ = ["router"]

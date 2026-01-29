@@ -1,7 +1,7 @@
 import React from 'react';
 import { Loader2 } from 'lucide-react';
 import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Tag } from '../../../components/ui/tag';
 import { Button } from '../../../components/ui/button';
 import HelpIcon from '../../../components/help/HelpIcon';
@@ -34,11 +34,12 @@ export const FilterSubTab: React.FC<FilterSubTabProps> = (props) => {
             <div>
               <CardTitle className="flex items-center gap-2">
                 Filter data
-                <HelpIcon targetKey="preprocessing.filter.tab" label="Filter sub-tab overview" />
+                <HelpIcon
+                  targetKey="preprocessing.filter.tab"
+                  label="Filter sub-tab overview"
+                  tooltip="Apply column-based filters to create a new node from the selected dataset."
+                />
               </CardTitle>
-              <CardDescription>
-                Apply column-based filters to create a new node from the selected dataset.
-              </CardDescription>
             </div>
             {isFiltering && (
               <Tag tone="muted">

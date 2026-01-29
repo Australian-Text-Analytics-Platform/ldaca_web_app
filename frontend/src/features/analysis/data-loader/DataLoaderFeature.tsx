@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Loader2, FolderPlus, Upload, Trash2, Eye, Download as DownloadIcon, Plus, RefreshCcw, LogOut } from 'lucide-react';
 import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
 import { useWorkspaceActions } from '../../../hooks/useWorkspaceActions';
@@ -8,7 +8,7 @@ import { useFiles } from '../../../hooks/useFiles';
 import { filesApi } from '../../../api/files';
 import { FileInfo } from '../../../types';
 import { AddFilePanel, FilePreviewPanel } from '../../../components/panels';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 import { Label } from '../../../components/ui/label';
@@ -66,7 +66,7 @@ export const DataLoaderFeature: React.FC = () => {
   const workspaceActions = useWorkspaceActions();
   const { isLoading } = useWorkspaceStatus();
   const { dataFolder, getAuthHeaders } = useAuth({ autoStart: true, debugLabel: 'DataLoaderFeature' });
-  const authHeaders = useMemo(() => getAuthHeaders(), [getAuthHeaders]);
+  const authHeaders = getAuthHeaders();
 
   const {
     files,
@@ -100,7 +100,7 @@ export const DataLoaderFeature: React.FC = () => {
   const [activeCardHeight, setActiveCardHeight] = useState<number | null>(null);
   const hasWorkspaceSelected = Boolean(currentWorkspaceId);
 
-  const notify = useCallback((type: 'success' | 'error' | 'info', message: string) => {
+  const notify = (type: 'success' | 'error' | 'info', message: string) => {
     const duration = type === 'error' ? 6000 : 3500;
     if (type === 'success') {
       toast.success(message, { duration });
@@ -109,7 +109,7 @@ export const DataLoaderFeature: React.FC = () => {
     } else {
       toast(message, { duration });
     }
-  }, []);
+  };
 
   useEffect(() => {
     const active = workspaces.find((ws: any) => getWorkspaceId(ws) === currentWorkspaceId);
@@ -127,31 +127,25 @@ export const DataLoaderFeature: React.FC = () => {
       const entry = entries[0];
       if (!entry) return;
       const nextHeight = Math.round(entry.contentRect.height);
-      setActiveCardHeight((prev) => (nextHeight > 0 && prev !== nextHeight ? nextHeight : prev));
+      setActiveCardHeight((prev) => (prev === nextHeight ? prev : nextHeight));
     });
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
 
-  const sortedWorkspaces = useMemo(() => {
-    return [...workspaces].sort((a: any, b: any) => {
-      const aTime = Date.parse(a?.modified_at || a?.updated_at || a?.created_at || '');
-      const bTime = Date.parse(b?.modified_at || b?.updated_at || b?.created_at || '');
-      return (bTime || 0) - (aTime || 0);
-    });
-  }, [workspaces]);
+  const sortedWorkspaces = [...workspaces].sort((a: any, b: any) => {
+    const aTime = Date.parse(a?.modified_at || a?.updated_at || a?.created_at || '');
+    const bTime = Date.parse(b?.modified_at || b?.updated_at || b?.created_at || '');
+    return (bTime || 0) - (aTime || 0);
+  });
 
-  const sortedFiles = useMemo(() => (
-    [...files].sort((a: FileInfo, b: FileInfo) => (b.created_at || 0) - (a.created_at || 0))
-  ), [files]);
+  const sortedFiles = [...files].sort((a: FileInfo, b: FileInfo) => (b.created_at || 0) - (a.created_at || 0));
 
-  const currentWorkspace = useMemo(() => (
-    workspaces.find((ws: any) => getWorkspaceId(ws) === currentWorkspaceId) || null
-  ), [workspaces, currentWorkspaceId]);
+  const currentWorkspace = workspaces.find((ws: any) => getWorkspaceId(ws) === currentWorkspaceId) || null;
 
   const nodeCount = workspaceGraph?.nodes?.length ?? currentWorkspace?.dataframe_count ?? currentWorkspace?.node_count ?? 0;
 
-  const handleCreateWorkspace = useCallback(async () => {
+  const handleCreateWorkspace = async () => {
     const trimmed = newWorkspaceName.trim();
     if (!trimmed) return;
     try {
@@ -167,9 +161,9 @@ export const DataLoaderFeature: React.FC = () => {
       }
       notify('error', (error as Error).message || 'Failed to create workspace.');
     }
-  }, [newWorkspaceDescription, newWorkspaceName, notify, workspaceActions]);
+  };
 
-  const handleRenameWorkspace = useCallback(async () => {
+  const handleRenameWorkspace = async () => {
     if (!hasWorkspaceSelected || !renameValue.trim()) return;
     try {
       await workspaceActions.renameWorkspace(renameValue.trim());
@@ -182,9 +176,9 @@ export const DataLoaderFeature: React.FC = () => {
       }
       notify('error', (error as Error).message || 'Failed to rename workspace.');
     }
-  }, [hasWorkspaceSelected, notify, renameValue, workspaceActions]);
+  };
 
-  const handleSaveWorkspace = useCallback(async () => {
+  const handleSaveWorkspace = async () => {
     if (!hasWorkspaceSelected) return;
     try {
       await workspaceActions.saveWorkspace();
@@ -192,14 +186,14 @@ export const DataLoaderFeature: React.FC = () => {
     } catch (error) {
       notify('error', (error as Error).message || 'Failed to save workspace.');
     }
-  }, [hasWorkspaceSelected, notify, workspaceActions]);
+  };
 
-  const handleSaveWorkspaceAs = useCallback(async () => {
+  const handleSaveWorkspaceAs = async () => {
     if (!hasWorkspaceSelected) return;
     setSaveAsOpen(true);
-  }, [hasWorkspaceSelected]);
+  };
 
-  const confirmSaveAs = useCallback(async () => {
+  const confirmSaveAs = async () => {
     if (!saveAsName.trim()) return;
     try {
       await workspaceActions.saveWorkspaceAs(saveAsName.trim());
@@ -209,17 +203,14 @@ export const DataLoaderFeature: React.FC = () => {
     } catch (error) {
       notify('error', (error as Error).message || 'Failed to save workspace copy.');
     }
-  }, [notify, saveAsName, workspaceActions]);
+  };
 
-  const openDeleteWorkspaceDialog = useCallback(
-    (workspaceId: string) => {
-      const target = workspaces.find((ws: any) => getWorkspaceId(ws) === workspaceId);
-      setWorkspaceToDelete({ id: workspaceId, name: target?.name });
-    },
-    [workspaces],
-  );
+  const openDeleteWorkspaceDialog = (workspaceId: string) => {
+    const target = workspaces.find((ws: any) => getWorkspaceId(ws) === workspaceId);
+    setWorkspaceToDelete({ id: workspaceId, name: target?.name });
+  };
 
-  const handleConfirmDeleteWorkspace = useCallback(async () => {
+  const handleConfirmDeleteWorkspace = async () => {
     if (!workspaceToDelete) return;
     setDeletingWorkspace(true);
     try {
@@ -231,9 +222,9 @@ export const DataLoaderFeature: React.FC = () => {
       setDeletingWorkspace(false);
       setWorkspaceToDelete(null);
     }
-  }, [notify, workspaceActions, workspaceToDelete]);
+  };
 
-  const handleImportSampleData = useCallback(async () => {
+  const handleImportSampleData = async () => {
     setImportingSamples(true);
     try {
       await toast.promise(
@@ -251,13 +242,13 @@ export const DataLoaderFeature: React.FC = () => {
     } finally {
       setImportingSamples(false);
     }
-  }, [authHeaders, refetchFiles]);
+  };
 
-  const openFilePicker = useCallback(() => {
+  const openFilePicker = () => {
     fileInputRef.current?.click();
-  }, []);
+  };
 
-  const handleFileInputChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileInputChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
     try {
@@ -272,9 +263,9 @@ export const DataLoaderFeature: React.FC = () => {
     } finally {
       event.target.value = '';
     }
-  }, [handleUploadFile, notify]);
+  };
 
-  const handleAddToWorkspace = useCallback(async () => {
+  const handleAddToWorkspace = async () => {
     if (!addFileName) return;
     try {
       await workspaceActions.createNodeFromFile(addFileName);
@@ -284,7 +275,7 @@ export const DataLoaderFeature: React.FC = () => {
     } finally {
       setAddFileName(null);
     }
-  }, [addFileName, notify, workspaceActions]);
+  };
 
   const workspaceFolder = fileListResponse?.user_folder || dataFolder || 'data/';
   const workspaceBusy = isLoading.workspaces || isLoading.currentWorkspace;
@@ -292,10 +283,14 @@ export const DataLoaderFeature: React.FC = () => {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold text-foreground">Data Loader</h1>
-        <p className="text-sm text-muted-foreground">
-          Manage workspaces, upload corpora, and add files to the active workspace. Use this tab before running downstream analyses.
-        </p>
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-semibold text-foreground">Data Loader</h1>
+          <HelpIcon
+            targetKey="data-loader.tab"
+            label="Data loader overview"
+            tooltip="Manage workspaces, upload text data, and add files to the active workspace. Use this tab before running downstream analyses."
+          />
+        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -303,11 +298,12 @@ export const DataLoaderFeature: React.FC = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               Active workspace
-              <HelpIcon targetKey="data-loader.active-workspace.section" label="Active workspace overview" />
+              <HelpIcon
+                targetKey="data-loader.active-workspace.section"
+                label="Active workspace overview"
+                tooltip="Choose or rename the workspace where new nodes will be added. Save regularly to persist your progress."
+              />
             </CardTitle>
-            <CardDescription>
-              Choose or rename the workspace where new nodes will be added. Save regularly to persist your progress.
-            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {currentWorkspace ? (
@@ -404,9 +400,12 @@ export const DataLoaderFeature: React.FC = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               Workspace manager
-              <HelpIcon targetKey="data-loader.workspace-manager.section" label="Workspace manager overview" />
+              <HelpIcon
+                targetKey="data-loader.workspace-manager.section"
+                label="Workspace manager overview"
+                tooltip="Switch between saved workspaces or remove ones you no longer need."
+              />
             </CardTitle>
-            <CardDescription>Switch between saved workspaces or remove ones you no longer need.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-1 flex-col min-h-0 overflow-hidden">
             {workspaceBusy && !sortedWorkspaces.length ? (
@@ -466,11 +465,12 @@ export const DataLoaderFeature: React.FC = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             Files & uploads
-            <HelpIcon targetKey="data-loader.files.section" label="Files and uploads section" />
+            <HelpIcon
+              targetKey="data-loader.files.section"
+              label="Files and uploads section"
+              tooltip="Upload CSV, TSV, Excel, or JSON files, preview them, and add them to the active workspace."
+            />
           </CardTitle>
-          <CardDescription>
-            Upload CSV, TSV, Excel, or JSON files, preview them, and add them to the active workspace.
-          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-wrap items-center gap-2">
@@ -569,9 +569,9 @@ export const DataLoaderFeature: React.FC = () => {
             </div>
           )}
         </CardContent>
-        <CardFooter className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
+        <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
           <div>Total files: {sortedFiles.length}</div>
-        </CardFooter>
+        </div>
       </Card>
 
       <FilePreviewPanel filename={previewFile} open={Boolean(previewFile)} onClose={() => setPreviewFile(null)} />

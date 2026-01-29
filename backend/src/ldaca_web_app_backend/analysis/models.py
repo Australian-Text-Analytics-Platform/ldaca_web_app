@@ -5,7 +5,6 @@ from __future__ import annotations
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, Generic, Optional, TypeVar
-from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -23,7 +22,7 @@ class AnalysisStatus(str, Enum):
 class BaseAnalysisRequest(BaseModel):
     """Base request model for all analyses."""
 
-    task_id: str = Field(default_factory=lambda: str(uuid4()))
+    model_config = ConfigDict(extra="allow")
     # Additional common fields can go here
 
 
@@ -37,7 +36,6 @@ class AnalysisTask(BaseModel, Generic[TRequest, TResult]):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     task_id: str
-    analysis_type: str
     user_id: str
     workspace_id: str
     status: AnalysisStatus = AnalysisStatus.PENDING

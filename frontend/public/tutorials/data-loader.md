@@ -2,7 +2,7 @@
 
 [← Back to tutorial index](./index.md)
 
-<h1>Data loader tutorial</h1>
+<h1 id="help-data-loader-section">Data loader tutorial</h1>
 
 Use this page to create or load a workspace and bring files into the system. If you are brand new, start here.
 

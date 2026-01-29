@@ -3,16 +3,12 @@ from types import SimpleNamespace
 import polars as pl
 import pytest
 from ldaca_web_app_backend.api.workspaces.analyses.quotation import (
-    _build_joined_quotation_frames,
-    _compute_quote_dataframe,
-    _prepare_documents_payload,
-)
+    _compute_quote_dataframe, _prepare_documents_payload)
 from ldaca_web_app_backend.core.services.quotation_client import (
-    QuotationServiceError,
-    extract_remote_quotations,
-    normalise_engine_base_url,
-)
-from ldaca_web_app_backend.models import QuotationEngineConfig, QuotationEngineType
+    QuotationServiceError, extract_remote_quotations,
+    normalise_engine_base_url)
+from ldaca_web_app_backend.models import (QuotationEngineConfig,
+                                          QuotationEngineType)
 from ldaca_web_app_backend.settings import settings
 
 
@@ -103,8 +99,8 @@ async def test_remote_compute_chunks_based_on_settings(monkeypatch):
         ["2", "3"],
         ["4"],
     ]
-    assert set(result.columns) >= {"document_idx", "quote"}
-    assert sorted(result["document_idx"].to_list()) == [0, 1, 2, 3, 4]
+    assert "document_idx" not in result.columns
+    assert set(result.columns) >= {"quote"}
     assert sorted(result["quote"].to_list()) == [
         "quote-0",
         "quote-1",
@@ -114,41 +110,3 @@ async def test_remote_compute_chunks_based_on_settings(monkeypatch):
     ]
 
 
-@pytest.mark.asyncio
-async def test_joined_frame_matches_base_layout(monkeypatch):
-    base_df = pl.DataFrame({
-        "text": ["Alpha beta.", "Gamma delta."],
-        "meta": ["a", "b"],
-    })
-    node = SimpleNamespace(data=base_df)
-    engine = QuotationEngineConfig(type=QuotationEngineType.REMOTE, url="http://engine")
-
-    quote_rows = pl.DataFrame({
-        "document_idx": [0, 1],
-        "quote": ["Alpha", "delta"],
-        "quote_start_idx": [0, 6],
-        "quote_end_idx": [5, 11],
-        "quote_row_idx": [0, 0],
-    })
-
-    async def fake_compute(node_arg, base_arg, column_arg, engine_arg, **kwargs):
-        assert column_arg == "text"
-        return quote_rows
-
-    monkeypatch.setattr(
-        "ldaca_web_app_backend.api.workspaces.analyses.quotation._compute_quote_dataframe",
-        fake_compute,
-    )
-
-    joined, _ = await _build_joined_quotation_frames(node, "text", engine)
-
-    assert joined.columns[:3] == ["document_idx", "text", "meta"]
-    assert set(joined.columns) >= {
-        "quote",
-        "quote_start_idx",
-        "quote_end_idx",
-        "quote_row_idx",
-    }
-    # Only rows with quotations should remain
-    assert joined.height == 2
-    assert joined["text"].to_list() == ["Alpha beta.", "Gamma delta."]

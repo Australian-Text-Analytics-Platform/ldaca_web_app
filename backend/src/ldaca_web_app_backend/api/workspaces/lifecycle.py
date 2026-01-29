@@ -266,10 +266,10 @@ async def get_workspace_graph(
     if not graph_data:
         raise HTTPException(status_code=404, detail="Workspace not found")
     try:  # enrichment with latest analyses
-        from ....analysis.manager import get_analysis_manager
+        from ....analysis.manager import get_task_manager
 
         def _unwrap_task_manager_result(result: Any) -> Any:
-            """Unwrap ProcessTaskManager's persisted wrapper.
+            """Unwrap WorkerTaskManager's persisted wrapper.
 
             The process task manager persists results as:
               {"status": "successful", "message": "...", "data": <analysis_payload>}
@@ -283,20 +283,21 @@ async def get_workspace_graph(
                 return unwrapped if unwrapped is not None else result
             return result
 
-        analysis_manager = get_analysis_manager(user_id, workspace_id)
-        records = analysis_manager.get_all_tasks()
+        task_manager = get_task_manager(user_id, workspace_id)
         latest: Dict[str, Any] = {}
-        for r in records:
-            raw_result = getattr(r, "result", None)
-            # If result is a GenericAnalysisResult, convert to dict
+        for analysis, task_id in task_manager.store.current_task_ids.items():
+            task = task_manager.get_task(task_id)
+            if task is None:
+                continue
+            raw_result = getattr(task, "result", None)
             if hasattr(raw_result, "to_json"):
                 raw_result = raw_result.to_json()
 
             unwrapped_result = _unwrap_task_manager_result(raw_result)
-            latest[str(r.analysis_type)] = {
-                "task": str(r.analysis_type),
-                "saved_at": json_sanitize(getattr(r, "updated_at", None)),
-                "request": json_sanitize(getattr(r, "request", None)),
+            latest[str(analysis)] = {
+                "task": str(analysis),
+                "saved_at": json_sanitize(getattr(task, "updated_at", None)),
+                "request": json_sanitize(getattr(task, "request", None)),
                 "result": json_sanitize(unwrapped_result),
             }
         graph_data["latest_analysis"] = latest

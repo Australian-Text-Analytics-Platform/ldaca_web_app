@@ -4,7 +4,7 @@ import { Calculator, Lightbulb, Loader2 } from 'lucide-react';
 import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
 import HelpIcon from '../../../components/help/HelpIcon';
 import { Button } from '../../../components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Input } from '../../../components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../../components/ui/table';
 import { Separator } from '../../../components/ui/separator';
@@ -106,12 +106,12 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
           <CardTitle className="flex items-center gap-2">
             <Calculator className="h-5 w-5" />
             Computed Column Builder
-            <HelpIcon targetKey="preprocessing.aggregate.tab" label="Aggregate sub-tab overview" />
+            <HelpIcon
+              targetKey="preprocessing.aggregate.tab"
+              label="Aggregate sub-tab overview"
+              tooltip="Combine existing columns with Polars-style expressions. The result is added to the selected node using with_columns."
+            />
           </CardTitle>
-          <CardDescription>
-            Combine existing columns with Polars-style expressions. The result is added to the selected node using
-            `with_columns`.
-          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <NodeSelectionPanel
@@ -148,7 +148,7 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
             <TabsContent value="basic" className="space-y-4">
               <div className="rounded-md border border-blue-200 bg-blue-50/80 p-4 text-sm text-blue-800 dark:border-blue-500/40 dark:bg-blue-500/10 dark:text-blue-100">
                 <div className="flex items-start gap-2">
-                  <Lightbulb className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                  <Lightbulb className="mt-0.5 h-4 w-4 shrink-0" />
                   <div className="space-y-1">
                     <p className="font-medium">How it works</p>
                     <ul className="list-disc space-y-1 pl-5">
@@ -218,7 +218,7 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
                   onDragLeave={basicBuilder.handlers.builderDragLeave}
                   onDrop={basicBuilder.handlers.builderDrop}
                   className={cn(
-                    'min-h-[92px] rounded-md border border-dashed border-muted-foreground/50 bg-muted/30 p-4 transition',
+                    'min-h-23 rounded-md border border-dashed border-muted-foreground/50 bg-muted/30 p-4 transition',
                     basicBuilder.dragActive && 'border-primary bg-primary/5',
                     basicBuilder.disabled && 'pointer-events-none opacity-60',
                   )}
@@ -259,7 +259,7 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
                             >
                               <div
                                 className={cn(
-                                  'flex min-h-[34px] items-center gap-2 rounded-full border border-border bg-foreground px-3 py-1 text-sm text-background shadow-sm transition',
+                                  'flex min-h-8.5 items-center gap-2 rounded-full border border-border bg-foreground px-3 py-1 text-sm text-background shadow-sm transition',
                                   !basicBuilder.disabled && !isEditing && 'cursor-grab active:cursor-grabbing',
                                 )}
                               >
@@ -336,7 +336,7 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
             <TabsContent value="advanced" className="space-y-4">
               <div className="rounded-md border border-blue-200 bg-blue-50/80 p-4 text-sm text-blue-800 dark:border-blue-500/40 dark:bg-blue-500/10 dark:text-blue-100">
                 <div className="flex items-start gap-2">
-                  <Lightbulb className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                  <Lightbulb className="mt-0.5 h-4 w-4 shrink-0" />
                   <div className="space-y-1">
                     <p className="font-medium">Expression tips</p>
                     <ul className="list-disc space-y-1 pl-5">
@@ -444,11 +444,12 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             Preview
-            <HelpIcon targetKey="preprocessing.common.preview" label="Preview table" />
+            <HelpIcon
+              targetKey="preprocessing.common.preview"
+              label="Preview table"
+              tooltip={`Shows up to ${preview.limit} rows with the computed column appended. Preview refreshes after each apply.`}
+            />
           </CardTitle>
-          <CardDescription>
-            Shows up to {preview.limit} rows with the computed column appended. Preview refreshes after each apply.
-          </CardDescription>
         </CardHeader>
         <CardContent>{renderPreview()}</CardContent>
       </Card>

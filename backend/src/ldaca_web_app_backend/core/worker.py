@@ -120,7 +120,6 @@ def topic_modeling_task(
     try:
         # Import heavy libraries after environment is configured
         import polars as pl
-
         # Import workspace manager (this should be lightweight)
         from ldaca_web_app_backend.core.workspace import workspace_manager
 
@@ -707,10 +706,8 @@ def quotation_detach_task(
 
         import polars as pl
         from ldaca_web_app_backend.core.workspace import workspace_manager
-        from ldaca_web_app_backend.models import (
-            QuotationEngineConfig,
-            QuotationEngineType,
-        )
+        from ldaca_web_app_backend.models import (QuotationEngineConfig,
+                                                  QuotationEngineType)
 
         from docframe import DocDataFrame, DocLazyFrame
 
@@ -789,11 +786,8 @@ def quotation_detach_task(
                 base_df = pl.DataFrame(base_df)
 
             from ldaca_web_app_backend.api.workspaces.analyses.quotation import (
-                _ensure_quote_dataframe,
-                _extract_remote_paginated,
-                _prepare_documents_payload,
-                _remote_payload_to_dataframe,
-            )
+                _ensure_quote_dataframe, _extract_remote_paginated,
+                _prepare_documents_payload, _remote_payload_to_dataframe)
 
             documents = _prepare_documents_payload(base_df, column)
             if not documents:
@@ -803,21 +797,6 @@ def quotation_detach_task(
                     _extract_remote_paginated(engine, documents)
                 )
                 quote_df = _remote_payload_to_dataframe(payload)
-                if "document_idx" in quote_df.columns:
-                    base_with_idx = base_df.with_row_index("__row__")
-                    quote_df = quote_df.join(
-                        base_with_idx.select(
-                            pl.col("__row__"),
-                            pl.col(column).alias(column),
-                        ),
-                        left_on="document_idx",
-                        right_on="__row__",
-                        how="left",
-                    ).drop([
-                        col
-                        for col in ("document_idx", "__row__")
-                        if col in quote_df.columns
-                    ])
                 quote_df = _ensure_quote_dataframe(quote_df, text_column=column)
         else:
             # Local Engine - use docframe directly
@@ -864,9 +843,8 @@ def quotation_detach_task(
             if "quote" in quote_df.columns:
                 quote_df = quote_df.filter(pl.col("quote").is_not_null())
 
-            from ldaca_web_app_backend.api.workspaces.analyses.quotation import (
-                _ensure_quote_dataframe as _ensure_df,
-            )
+            from ldaca_web_app_backend.api.workspaces.analyses.quotation import \
+                _ensure_quote_dataframe as _ensure_df
 
             quote_df = _ensure_df(quote_df, text_column=column)
 

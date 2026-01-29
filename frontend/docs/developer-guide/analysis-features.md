@@ -12,13 +12,13 @@
 
 **Question:** *How should tabs handle background tasks?*
 
-**Answer:** Store `task_id` from the backend response, subscribe to the task stream, and refresh results when a task reaches a terminal state.
+**Answer:** Store `task_id` from the backend response, subscribe to the task stream (SSE), and refresh results **only when a task reaches a terminal state and the tab is active**. Polling is intentionally disabled; the task stream is the source of truth.
 
 ## 3) Results persistence
 
 **Question:** *How do I keep results after refresh?*
 
-**Answer:** Use the backend’s `current-request` and `current-result` endpoints and hydrate state on mount.
+**Answer:** Use the backend’s `current-request` and `current-result` endpoints and hydrate state when the tab becomes active.
 
 ## Recap
 

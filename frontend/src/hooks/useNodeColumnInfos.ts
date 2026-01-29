@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from './useAuth';
 import { ColumnInfo, mapColumnsToInfo } from '../utils/columnTypes';
 import { getNodeInfo } from '../lib/nodeInfoCache';
@@ -55,9 +55,8 @@ export const useNodeColumnInfos = (
   const pendingRef = useRef<Set<string>>(new Set());
   const [, forceTick] = useState(0); // triggers rerender when pending set changes
 
-  const nodeIds = useMemo(() => (
-    nodes.map((node, idx) => resolveNodeId(node, idx)).filter((id): id is string => !!id)
-  ), [nodes]);
+  const nodeIds = nodes.map((node, idx) => resolveNodeId(node, idx)).filter((id): id is string => !!id);
+  const nodeIdsKey = nodeIds.join('|');
 
   useEffect(() => {
     if (!enabled || !workspaceId) return;
@@ -108,9 +107,9 @@ export const useNodeColumnInfos = (
       idsToFetch.forEach((id) => pendingSet.delete(id));
       forceTick((tick) => tick + 1);
     };
-  }, [enabled, workspaceId, getAuthHeaders, nodeIds.join('|'), cache]);
+  }, [enabled, workspaceId, getAuthHeaders, nodeIdsKey, cache]);
 
-  const getColumnInfos = useCallback((node: NodeLike | null | undefined, idx = 0): ColumnInfo[] => {
+  const getColumnInfos = (node: NodeLike | null | undefined, idx = 0): ColumnInfo[] => {
     const nodeId = resolveNodeId(node, idx);
     if (!nodeId) return [];
     const cached = cache[nodeId];
@@ -118,7 +117,7 @@ export const useNodeColumnInfos = (
       return cached;
     }
     return mapColumnsToInfo(node);
-  }, [cache]);
+  };
 
   const isLoading = pendingRef.current.size > 0;
 

@@ -1,4 +1,4 @@
-import { memo, useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { NodeProps, Handle, Position } from '@xyflow/react';
 import { Settings2, Trash2, Copy, Check } from 'lucide-react';
 import { WorkspaceNode } from '../types';
@@ -27,9 +27,9 @@ function CustomNode({ data, selected }: NodeProps<any>) {
 
   const debugWindow: DebugWindow | null = typeof window !== 'undefined' ? (window as DebugWindow) : null;
   const DEBUG_GRAPH = Boolean(debugWindow?.__LDACA_DEBUG_GRAPH) || (typeof window !== 'undefined' && localStorage.getItem('debugGraph') === '1');
-  const dlog = useCallback((...args: unknown[]) => {
+  const dlog = (...args: unknown[]) => {
     if (DEBUG_GRAPH) console.debug(...args);
-  }, [DEBUG_GRAPH]);
+  };
 
   useEffect(() => {
     dlog('CustomNode: node updated', {
@@ -282,4 +282,4 @@ function CustomNode({ data, selected }: NodeProps<any>) {
   );
 };
 
-export default memo(CustomNode);
+export default CustomNode;

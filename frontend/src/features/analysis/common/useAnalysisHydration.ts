@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { clampDisplayTokenLimit } from './utils';
+import { textApi } from '@/api/text';
 
 export type HydrationStatus = 'idle' | 'loading' | 'error';
 
@@ -15,8 +16,12 @@ type Nullable<T> = T | null | undefined;
 
 export interface UseAnalysisHydrationConfig<TRequest, TResult, TPreferences> {
   workspaceId?: string | null;
-  fetchRequest?: () => MaybePromise<Nullable<TRequest>>;
-  fetchResult?: () => MaybePromise<Nullable<TResult>>;
+  analysisKey?: string;
+  getAuthHeaders?: () => Record<string, string>;
+  resolveTaskId?: () => MaybePromise<string | null>;
+  onTaskIdResolved?: (taskId: string | null) => void;
+  fetchRequest?: (taskId?: string | null) => MaybePromise<Nullable<TRequest>>;
+  fetchResult?: (taskId?: string | null) => MaybePromise<Nullable<TResult>>;
   applyRequest?: (request: Nullable<TRequest>) => MaybePromise<void>;
   applyResult?: (result: Nullable<TResult>) => MaybePromise<void>;
   persistPreferences?: (partial: TPreferences) => MaybePromise<void>;
@@ -59,6 +64,10 @@ export function useAnalysisHydration<TRequest = unknown, TResult = unknown, TPre
 ): UseAnalysisHydrationReturn<TPreferences> {
   const {
     workspaceId,
+    analysisKey,
+    getAuthHeaders,
+    resolveTaskId,
+    onTaskIdResolved,
     fetchRequest,
     fetchResult,
     applyRequest,
@@ -85,14 +94,48 @@ export function useAnalysisHydration<TRequest = unknown, TResult = unknown, TPre
     const inflight = (async () => {
       setHydrationState((prev) => ({ ...prev, status: 'loading', error: undefined }));
       try {
-        if (fetchRequest && applyRequest) {
-          const requestPayload = await fetchRequest();
-          await applyRequest(requestPayload ?? null);
+        let taskId: string | null = null;
+        if (resolveTaskId) {
+          taskId = await resolveTaskId();
+        } else if (analysisKey && getAuthHeaders && workspaceId) {
+          try {
+            const current = await textApi.getAnalysisCurrent(workspaceId, analysisKey, getAuthHeaders()) as any;
+            const currentTaskId = Array.isArray(current?.task_ids) ? current.task_ids[0] : null;
+            taskId = typeof currentTaskId === 'string' && currentTaskId.trim().length > 0 ? currentTaskId : null;
+          } catch {
+            taskId = null;
+          }
         }
-        if (fetchResult && applyResult) {
-          const resultPayload = await fetchResult();
-          await applyResult(resultPayload ?? null);
+
+        onTaskIdResolved?.(taskId ?? null);
+
+        if (!taskId) {
+          setHydrationState({ status: 'idle', lastHydratedAt: Date.now() });
+          return;
         }
+
+        const requestPromise = fetchRequest
+          ? Promise.resolve(fetchRequest(taskId)).catch((error) => {
+              console.error('Analysis hydration request fetch failed', error);
+              return null;
+            })
+          : Promise.resolve(null);
+        const resultPromise = fetchResult
+          ? Promise.resolve(fetchResult(taskId)).catch((error) => {
+              console.error('Analysis hydration result fetch failed', error);
+              return null;
+            })
+          : Promise.resolve(null);
+
+        const applyRequestPromise = applyRequest
+          ? requestPromise.then((payload) => applyRequest(payload ?? null))
+          : Promise.resolve();
+        const applyResultPromise = applyResult
+          ? resultPromise.then((payload) => applyResult(payload ?? null))
+          : Promise.resolve();
+
+        await Promise.allSettled([applyRequestPromise, applyResultPromise]);
+
         setHydrationState({ status: 'idle', lastHydratedAt: Date.now() });
       } catch (error) {
         console.error('Analysis hydration failed', error);
@@ -105,7 +148,7 @@ export function useAnalysisHydration<TRequest = unknown, TResult = unknown, TPre
 
     inflightRef.current = inflight;
     await inflight;
-  }, [workspaceId, fetchRequest, fetchResult, applyRequest, applyResult, onHydrationError]);
+  }, [workspaceId, analysisKey, getAuthHeaders, resolveTaskId, onTaskIdResolved, fetchRequest, fetchResult, applyRequest, applyResult, onHydrationError]);
 
   useEffect(() => {
     if (!isBrowser || !workspaceId) return;

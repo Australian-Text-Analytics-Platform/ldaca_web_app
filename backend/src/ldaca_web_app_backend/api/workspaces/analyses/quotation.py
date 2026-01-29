@@ -7,22 +7,18 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 import polars as pl
 from fastapi import APIRouter, Depends, HTTPException
 
-from ....analysis.implementations.quotation import (
-    QuotationRequest as AnalysisQuotationRequest,
-)
+from ....analysis.implementations.quotation import \
+    QuotationRequest as AnalysisQuotationRequest
+from ....analysis.manager import get_task_manager
+from ....analysis.models import AnalysisStatus, AnalysisTask
+from ....analysis.results import GenericAnalysisResult
 from ....core.auth import get_current_user
-from ....core.services.quotation_client import (
-    QuotationServiceError,
-    extract_remote_quotations,
-)
+from ....core.services.quotation_client import (QuotationServiceError,
+                                                extract_remote_quotations)
 from ....core.workspace import workspace_manager
-from ....models import (
-    QuotationDetachRequest,
-    QuotationEngineConfig,
-    QuotationEngineType,
-    QuotationRequest,
-    QuotationResultQuery,
-)
+from ....models import (QuotationDetachRequest, QuotationEngineConfig,
+                        QuotationEngineType, QuotationRequest,
+                        QuotationResultQuery)
 from ....settings import settings
 from ..utils import get_node_with_data_or_400
 
@@ -38,7 +34,7 @@ def _normalize_context_length(value: Any) -> int:
     """Clamp user-provided context length to the allowed range."""
     try:
         numeric = int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return DEFAULT_CONTEXT_LENGTH
     if numeric < 0:
         return 0
@@ -61,7 +57,7 @@ def _normalize_pagination(
     normalized_page = max(1, int(page)) if isinstance(page, int) else 1
     try:
         normalized_size = int(page_size) if page_size is not None else DEFAULT_PAGE_SIZE
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         normalized_size = DEFAULT_PAGE_SIZE
     if normalized_size <= 0:
         normalized_size = DEFAULT_PAGE_SIZE
@@ -137,7 +133,7 @@ def _to_polars_dataframe(data: Any) -> pl.DataFrame:
 
 
 def _empty_quote_dataframe(text_column: Optional[str] = None) -> pl.DataFrame:
-    """Return a typed empty DataFrame shaped like a quotation result (no document_idx)."""
+    """Return a typed empty DataFrame shaped like a quotation result."""
 
     columns: Dict[str, pl.Series] = {
         "speaker": pl.Series("speaker", [], dtype=pl.Utf8),
@@ -172,12 +168,16 @@ def _materialise_base_dataframe(node_data: Any) -> pl.DataFrame:
 def _ensure_quote_dataframe(
     df: pl.DataFrame, *, text_column: Optional[str] = None
 ) -> pl.DataFrame:
-    """Guarantee required quotation columns and dtypes exist (without document_idx)."""
+    """Guarantee required quotation columns and dtypes exist."""
 
     result = df
+    if "document_idx" in result.columns:
+        result = result.drop("document_idx")
+
     if "quote_row_idx" not in result.columns:
         result = result.with_columns(
-            pl.arange(0, result.height, eager=True)
+            pl
+            .arange(0, result.height, eager=True)
             .cast(pl.Int64)
             .alias("quote_row_idx")
         )
@@ -237,16 +237,6 @@ def _remote_payload_to_dataframe(payload: Dict[str, Any]) -> pl.DataFrame:
     results = payload.get("results", []) if isinstance(payload, dict) else []
     rows = []
     for entry in results:
-        identifier = entry.get("identifier") if isinstance(entry, dict) else None
-        if identifier is None:
-            continue
-        try:
-            document_idx = int(identifier)
-        except (TypeError, ValueError):
-            logger.debug(
-                "Skipping quotation entry with non-integer identifier: %s", identifier
-            )
-            continue
         quotes = entry.get("quotes") if isinstance(entry, dict) else None
         if not quotes:
             continue
@@ -254,7 +244,6 @@ def _remote_payload_to_dataframe(payload: Dict[str, Any]) -> pl.DataFrame:
             if not isinstance(quote, dict):
                 continue
             rows.append({
-                "document_idx": document_idx,
                 "quote_row_idx": quote_idx,
                 "speaker": quote.get("speaker"),
                 "speaker_start_idx": quote.get("speaker_start_idx"),
@@ -354,7 +343,7 @@ def _stable_document_items(
         identifier = pair[0]
         try:
             return (0, int(identifier))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return (1, identifier)
 
     items.sort(key=_key)
@@ -443,21 +432,6 @@ async def _compute_quote_dataframe(
         payload = await _extract_remote_paginated(engine, documents)
         quote_df = _remote_payload_to_dataframe(payload)
 
-        # Attach the source text column using the remote identifier, then drop it
-        if "document_idx" in quote_df.columns:
-            base_with_idx = base_df.with_row_index("__row__")
-            quote_df = quote_df.join(
-                base_with_idx.select(
-                    pl.col("__row__"),
-                    pl.col(column).alias(column),
-                ),
-                left_on="document_idx",
-                right_on="__row__",
-                how="left",
-            ).drop([
-                col for col in ("document_idx", "__row__") if col in quote_df.columns
-            ])
-
         return _ensure_quote_dataframe(quote_df, text_column=column)
 
     # Local engine: rely on docframe's Polars text namespace.
@@ -488,36 +462,10 @@ async def _compute_quote_dataframe(
 router = APIRouter(prefix="/workspaces", tags=["quotation"])  # maintain path parity
 
 
-@router.get("/{workspace_id}/quotation/current-request")
-async def quotation_current_request(
-    workspace_id: str, current_user: dict = Depends(get_current_user)
-):
-    user_id = current_user["id"]
-    ws = workspace_manager.get_workspace(user_id, workspace_id)
-    if not ws:
-        return None
-
-    analysis_manager = getattr(ws, "analysis", None)
-    if not analysis_manager:
-        from ....analysis.manager import get_analysis_manager
-
-        analysis_manager = get_analysis_manager(user_id, workspace_id)
-
-    task = analysis_manager.get_current_task("quotation")
-    if not task:
-        return None
-
-    req_dict = (
-        task.request.model_dump()
-        if hasattr(task.request, "model_dump")
-        else task.request.dict()
-    )
-    return {"state": "successful", "message": "ok", "data": req_dict}
-
-
-@router.get("/{workspace_id}/quotation/current-result")
-async def quotation_current_result(
+@router.get("/{workspace_id}/quotation/tasks/{task_id}/result")
+async def quotation_task_result(
     workspace_id: str,
+    task_id: str,
     page: Optional[int] = None,
     page_size: Optional[int] = None,
     sort_by: Optional[str] = None,
@@ -525,17 +473,8 @@ async def quotation_current_result(
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    ws = workspace_manager.get_workspace(user_id, workspace_id)
-    if not ws:
-        return None
-
-    analysis_manager = getattr(ws, "analysis", None)
-    if not analysis_manager:
-        from ....analysis.manager import get_analysis_manager
-
-        analysis_manager = get_analysis_manager(user_id, workspace_id)
-
-    task = analysis_manager.get_current_task("quotation")
+    task_manager = get_task_manager(user_id, workspace_id)
+    task = task_manager.get_task(task_id)
     if not task or not task.result:
         return None
 
@@ -546,7 +485,6 @@ async def quotation_current_result(
         else task.request.dict()
     )
 
-    # If pagination params are provided, recompute on-demand using stored request metadata
     if any(v is not None for v in (page, page_size, sort_by, sort_order)):
         node_id = req_dict.get("node_id")
         column = req_dict.get("column")
@@ -554,7 +492,6 @@ async def quotation_current_result(
             return base_result
 
         engine_dict = req_dict.get("engine") or {}
-        # Filter out internal fields that are not in public model
         engine_dict = {
             k: v for k, v in engine_dict.items() if k not in ("api_key", "model")
         }
@@ -587,24 +524,16 @@ async def quotation_current_result(
     return base_result
 
 
-@router.post("/{workspace_id}/quotation/current-result")
-async def update_quotation_current_result(
+@router.post("/{workspace_id}/quotation/tasks/{task_id}/result")
+async def update_quotation_task_result(
     workspace_id: str,
+    task_id: str,
     query: QuotationResultQuery,
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    ws = workspace_manager.get_workspace(user_id, workspace_id)
-    if not ws:
-        raise HTTPException(status_code=404, detail="Workspace not found")
-
-    analysis_manager = getattr(ws, "analysis", None)
-    if not analysis_manager:
-        from ....analysis.manager import get_analysis_manager
-
-        analysis_manager = get_analysis_manager(user_id, workspace_id)
-
-    task = analysis_manager.get_current_task("quotation")
+    task_manager = get_task_manager(user_id, workspace_id)
+    task = task_manager.get_task(task_id)
     if not task or not task.result:
         raise HTTPException(status_code=404, detail="No quotation analysis found")
 
@@ -655,10 +584,8 @@ async def update_quotation_current_result(
             # But here needs_pagination is False.
 
             # So just update result.
-            from ....analysis.results import GenericAnalysisResult
-
             task.complete(GenericAnalysisResult(base_result))
-            analysis_manager.update_task(task)
+            task_manager.save_task(task)
         except Exception as exc:  # pragma: no cover
             raise HTTPException(
                 status_code=500,
@@ -713,8 +640,6 @@ async def update_quotation_current_result(
     updated_result = {**page_payload, "preferences": preferences}
 
     try:
-        from ....analysis.results import GenericAnalysisResult
-
         task.complete(GenericAnalysisResult(updated_result))
 
         # Also update request params in task?
@@ -729,7 +654,7 @@ async def update_quotation_current_result(
             task.request.sort_by = sort_by
             task.request.sort_order = sort_order
 
-        analysis_manager.update_task(task)
+        task_manager.save_task(task)
     except Exception as exc:  # pragma: no cover
         raise HTTPException(
             status_code=500,
@@ -737,24 +662,6 @@ async def update_quotation_current_result(
         )
 
     return updated_result
-
-
-@router.post("/{workspace_id}/quotation/clear")
-async def clear_quotation_results(
-    workspace_id: str, current_user: dict = Depends(get_current_user)
-):
-    user_id = current_user["id"]
-    ws = workspace_manager.get_workspace(user_id, workspace_id)
-    if ws:
-        analysis_manager = getattr(ws, "analysis", None)
-        if not analysis_manager:
-            from ....analysis.manager import get_analysis_manager
-
-            analysis_manager = get_analysis_manager(user_id, workspace_id)
-
-        analysis_manager.clear_current_result("quotation")
-
-    return {"state": "successful", "cleared": ["quotation"]}
 
 
 @router.post("/{workspace_id}/nodes/{node_id}/quotation")
@@ -770,11 +677,7 @@ async def get_quotation(
     if not ws:
         raise HTTPException(status_code=404, detail="Workspace not found")
 
-    analysis_manager = getattr(ws, "analysis", None)
-    if not analysis_manager:
-        from ....analysis.manager import get_analysis_manager
-
-        analysis_manager = get_analysis_manager(user_id, workspace_id)
+    task_manager = get_task_manager(user_id, workspace_id)
 
     try:
         node, node_data = get_node_with_data_or_400(user_id, workspace_id, node_id)
@@ -803,7 +706,10 @@ async def get_quotation(
 
         context_length_pref = DEFAULT_CONTEXT_LENGTH
         try:
-            prev_task = analysis_manager.get_current_task("quotation")
+            prev_task_ids = task_manager.get_current_task_ids("quotation")
+            prev_task = (
+                task_manager.get_task(prev_task_ids[0]) if prev_task_ids else None
+            )
             if prev_task and prev_task.result:
                 prev_result = prev_task.result.to_json()
                 context_length_pref = _extract_context_preference(prev_result)
@@ -835,7 +741,10 @@ async def get_quotation(
             context_length=context_length_pref,
         )
 
-        existing_task = analysis_manager.get_current_task("quotation")
+        existing_task_ids = task_manager.get_current_task_ids("quotation")
+        existing_task = (
+            task_manager.get_task(existing_task_ids[0]) if existing_task_ids else None
+        )
 
         if existing_task:
             # Disallow changing the base request without an explicit clear.
@@ -851,24 +760,16 @@ async def get_quotation(
 
             # Update existing task
             existing_task.request = analysis_request
-            from ....analysis.results import GenericAnalysisResult
-
             existing_task.complete(GenericAnalysisResult(result_payload))
-            analysis_manager.update_task(existing_task)
+            task_manager.save_task(existing_task)
 
         else:
-            # Create new task
-            from uuid import uuid4
-
-            task_id = str(uuid4())
-            analysis_request.task_id = task_id
-
-            task = analysis_manager.create_task("quotation", analysis_request)
-
-            from ....analysis.results import GenericAnalysisResult
-
+            task_id = task_manager.create_task(analysis_request)
+            task = task_manager.get_task(task_id)
+            task.request = analysis_request
             task.complete(GenericAnalysisResult(result_payload))
-            analysis_manager.update_task(task)
+            task_manager.save_task(task)
+            task_manager.set_current_task("quotation", task_id)
 
         return result_payload
     except HTTPException:

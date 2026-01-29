@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import type { AnalysisLockConfig } from '@/features/analysis/common/useAnalysisLockMachine';
 import { useAnalysisLockCore } from '@/features/analysis/common/useAnalysisLockMachine';
 
@@ -26,31 +25,29 @@ export function useParameterChangeDetection<T extends Record<string, unknown>>(
   lockedParams: T | null,
   compareFn?: (current: T, locked: T) => boolean
 ): boolean {
-  return useMemo(() => {
-    if (!isLocked || !lockedParams) return false;
+  if (!isLocked || !lockedParams) return false;
 
-    if (compareFn) {
-      return compareFn(currentParams, lockedParams);
+  if (compareFn) {
+    return compareFn(currentParams, lockedParams);
+  }
+
+  // Default shallow comparison
+  const currentKeys = Object.keys(currentParams);
+  const lockedKeys = Object.keys(lockedParams);
+
+  if (currentKeys.length !== lockedKeys.length) return true;
+
+  return currentKeys.some((key) => {
+    const current = currentParams[key];
+    const locked = lockedParams[key];
+
+    // Handle arrays
+    if (Array.isArray(current) && Array.isArray(locked)) {
+      if (current.length !== locked.length) return true;
+      return current.some((val, idx) => val !== locked[idx]);
     }
 
-    // Default shallow comparison
-    const currentKeys = Object.keys(currentParams);
-    const lockedKeys = Object.keys(lockedParams);
-
-    if (currentKeys.length !== lockedKeys.length) return true;
-
-    return currentKeys.some((key) => {
-      const current = currentParams[key];
-      const locked = lockedParams[key];
-
-      // Handle arrays
-      if (Array.isArray(current) && Array.isArray(locked)) {
-        if (current.length !== locked.length) return true;
-        return current.some((val, idx) => val !== locked[idx]);
-      }
-
-      // Handle primitives
-      return current !== locked;
-    });
-  }, [isLocked, currentParams, lockedParams, compareFn]);
+    // Handle primitives
+    return current !== locked;
+  });
 }

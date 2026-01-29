@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAuth } from '../useAuth';
 import { useSelectionStore } from '../../stores/selectionStore';
@@ -73,50 +73,38 @@ export const useWorkspaceCore = () => {
   const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string | null>(null);
   const [pagination, setPaginationState] = useState<PaginationMap>({});
 
-  const updatePagination = useCallback(
-    (nodeId: string, updater: (existing: PaginationState) => PaginationState) => {
-      setPaginationState((prev) => {
-        const existing = prev[nodeId] || createDefaultPagination();
-        const next = updater(existing);
-        if (next === existing) {
-          return prev;
-        }
-        return { ...prev, [nodeId]: next };
-      });
-    },
-    []
-  );
-
-  const updateCurrentPage = useCallback(
-    (nodeId: string, page: number) => {
-      updatePagination(nodeId, (existing) =>
-        existing.currentPage === page ? existing : { ...existing, currentPage: page }
-      );
-    },
-    [updatePagination]
-  );
-
-  const updatePageSize = useCallback(
-    (nodeId: string, pageSize: number) => {
-      updatePagination(nodeId, (existing) => {
-        if (existing.pageSize === pageSize && existing.currentPage === 1) {
-          return existing;
-        }
-        return { ...existing, pageSize, currentPage: 1 };
-      });
-    },
-    [updatePagination]
-  );
-
-  const getPaginationForNode = useCallback(
-    (nodeId?: string | null) => {
-      if (!nodeId) {
-        return createDefaultPagination();
+  const updatePagination = (nodeId: string, updater: (existing: PaginationState) => PaginationState) => {
+    setPaginationState((prev) => {
+      const existing = prev[nodeId] || createDefaultPagination();
+      const next = updater(existing);
+      if (next === existing) {
+        return prev;
       }
-      return pagination[nodeId] || createDefaultPagination();
-    },
-    [pagination]
-  );
+      return { ...prev, [nodeId]: next };
+    });
+  };
+
+  const updateCurrentPage = (nodeId: string, page: number) => {
+    updatePagination(nodeId, (existing) =>
+      existing.currentPage === page ? existing : { ...existing, currentPage: page }
+    );
+  };
+
+  const updatePageSize = (nodeId: string, pageSize: number) => {
+    updatePagination(nodeId, (existing) => {
+      if (existing.pageSize === pageSize && existing.currentPage === 1) {
+        return existing;
+      }
+      return { ...existing, pageSize, currentPage: 1 };
+    });
+  };
+
+  const getPaginationForNode = (nodeId?: string | null) => {
+    if (!nodeId) {
+      return createDefaultPagination();
+    }
+    return pagination[nodeId] || createDefaultPagination();
+  };
 
   const previousWorkspaceIdRef = useRef<string | null>(null);
   useEffect(() => {
@@ -145,39 +133,30 @@ export const useWorkspaceCore = () => {
     }
   }, [pagination, selectedNodeId]);
 
-  const handlePageChange = useCallback(
-    (page: number) => {
-      if (!selectedNodeId) return;
-      updateCurrentPage(selectedNodeId, page);
-    },
-    [selectedNodeId, updateCurrentPage]
-  );
+  const handlePageChange = (page: number) => {
+    if (!selectedNodeId) return;
+    updateCurrentPage(selectedNodeId, page);
+  };
 
-  const handlePageSizeChange = useCallback(
-    (pageSize: number) => {
-      if (!selectedNodeId) return;
-      updatePageSize(selectedNodeId, pageSize);
-    },
-    [selectedNodeId, updatePageSize]
-  );
+  const handlePageSizeChange = (pageSize: number) => {
+    if (!selectedNodeId) return;
+    updatePageSize(selectedNodeId, pageSize);
+  };
 
-  const authHeaders = useMemo(() => {
+  const authHeaders = (() => {
     if (!isAuthenticated) return {};
     const headers = getAuthHeaders();
     return headers.Authorization ? headers : {};
-  }, [getAuthHeaders, isAuthenticated]);
+  })();
 
-  const loadingOperationCount = useMemo(() => {
+  const loadingOperationCount = (() => {
     if (ui.loadingOperations instanceof Set) {
       return ui.loadingOperations.size;
     }
     return 0;
-  }, [ui.loadingOperations]);
+  })();
 
-  const operationErrorsRecord = useMemo(
-    () => normalizeOperationErrors(ui.operationErrors),
-    [ui.operationErrors]
-  );
+  const operationErrorsRecord = normalizeOperationErrors(ui.operationErrors);
 
   return {
     // Auth

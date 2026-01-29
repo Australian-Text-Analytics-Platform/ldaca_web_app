@@ -37,7 +37,7 @@ interface ChartContainerProps
 
 const ChartContainer = React.forwardRef<HTMLDivElement, ChartContainerProps>(
   ({ className, children, config, style, ...props }, ref) => {
-    const cssVars = React.useMemo<React.CSSProperties>(() => {
+    const cssVars: React.CSSProperties = (() => {
       const entries = Object.entries(config).filter(([, value]) => value?.color)
       if (!entries.length) return style ?? {}
       const vars = entries.reduce<Record<string, string>>((acc, [key, value]) => {
@@ -49,9 +49,9 @@ const ChartContainer = React.forwardRef<HTMLDivElement, ChartContainerProps>(
         ...style,
         ...vars,
       }
-    }, [config, style])
+    })()
 
-    const contextValue = React.useMemo(() => ({ config }), [config])
+    const contextValue = { config }
 
     return (
       <ChartContext.Provider value={contextValue}>

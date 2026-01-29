@@ -1,10 +1,13 @@
-import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
 import rehypeRaw from 'rehype-raw';
 import logo from '../logo.png';
 import type { TutorialTarget } from '@/tutorials/tutorialRegistry';
 import { toast } from 'sonner';
+import 'katex/dist/katex.min.css';
 
 const normalizeTutorialPath = (input: string): string => {
   const segments = input.split('/');
@@ -25,6 +28,28 @@ const isExternalLink = (href?: string | null): boolean => {
   return /^(https?:)?\/\//i.test(href) || href.startsWith('mailto:') || href.startsWith('tel:');
 };
 
+const resolveTutorialUrl = (requestedFile: string): string => {
+  if (typeof window === 'undefined') {
+    return requestedFile;
+  }
+
+  const baseHref = document.querySelector('base')?.href;
+  if (baseHref) {
+    try {
+      return new URL(requestedFile, baseHref).toString();
+    } catch {
+      // ignore invalid base href and fall back to location-based resolution
+    }
+  }
+
+  try {
+    const base = window.location.href.split('#')[0];
+    return new URL(requestedFile, base).toString();
+  } catch {
+    return requestedFile;
+  }
+};
+
 /**
  * TutorialView: renders the markdown from public/tutorial.md.
  * This page is shown when opening the app with location.hash === '#/tutorial'.
@@ -38,33 +63,10 @@ const TutorialView: React.FC<{ onClose?: () => void; target?: TutorialTarget | n
   const [activeAnchor, setActiveAnchor] = useState<string | null>(target?.anchor ?? null);
   const missingAnchorRef = useRef<string | null>(null);
 
-  const resolveTutorialUrl = useCallback((): string => {
-    const requestedFile = currentTarget?.file ?? 'tutorials/index.md';
-    if (typeof window === 'undefined') {
-      return requestedFile;
-    }
-
-    const baseHref = document.querySelector('base')?.href;
-    if (baseHref) {
-      try {
-        return new URL(requestedFile, baseHref).toString();
-      } catch {
-        // ignore invalid base href and fall back to location-based resolution
-      }
-    }
-
-    try {
-      const base = window.location.href.split('#')[0];
-      return new URL(requestedFile, base).toString();
-    } catch {
-      return requestedFile;
-    }
-  }, [currentTarget?.file]);
-
   const clamp = (v: number) => Math.min(2, Math.max(0.5, v));
-  const zoomIn = useCallback(() => setZoom((z) => clamp(parseFloat((z + 0.1).toFixed(2)))), []);
-  const zoomOut = useCallback(() => setZoom((z) => clamp(parseFloat((z - 0.1).toFixed(2)))), []);
-  const zoomReset = useCallback(() => setZoom(1), []);
+  const zoomIn = () => setZoom((z) => clamp(parseFloat((z + 0.1).toFixed(2))));
+  const zoomOut = () => setZoom((z) => clamp(parseFloat((z - 0.1).toFixed(2))));
+  const zoomReset = () => setZoom(1);
 
   useEffect(() => {
     let cancelled = false;
@@ -72,7 +74,8 @@ const TutorialView: React.FC<{ onClose?: () => void; target?: TutorialTarget | n
       setLoading(true);
       setError(null);
       try {
-        const url = resolveTutorialUrl();
+        const requestedFile = currentTarget?.file ?? 'tutorials/index.md';
+        const url = resolveTutorialUrl(requestedFile);
         const resp = await fetch(url, { cache: 'no-store' });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const text = await resp.text();
@@ -88,7 +91,7 @@ const TutorialView: React.FC<{ onClose?: () => void; target?: TutorialTarget | n
     };
     load();
     return () => { cancelled = true; };
-  }, [resolveTutorialUrl]);
+  }, [currentTarget?.file]);
 
   useEffect(() => {
     setActiveAnchor(currentTarget?.anchor ?? null);
@@ -122,7 +125,7 @@ const TutorialView: React.FC<{ onClose?: () => void; target?: TutorialTarget | n
     return () => window.clearTimeout(timeoutId);
   }, [activeAnchor, error, loading, onClose]);
 
-  const markdownComponents: Components = useMemo(() => ({
+  const markdownComponents: Components = {
     img: ({ node: _node, className, alt, ...props }) => {
       const mergedClassName = ['max-w-full h-auto', className].filter(Boolean).join(' ');
       const resolvedAlt = typeof alt === 'string' ? alt : '';
@@ -148,7 +151,7 @@ const TutorialView: React.FC<{ onClose?: () => void; target?: TutorialTarget | n
         }
         if (!nextFile.endsWith('.md')) return;
         event.preventDefault();
-        setCurrentTarget({ file: nextFile, anchor: nextAnchor || undefined });
+        setCurrentTarget({ file: nextFile, anchor: nextAnchor });
       };
 
       if (isExternalLink(href)) {
@@ -165,7 +168,7 @@ const TutorialView: React.FC<{ onClose?: () => void; target?: TutorialTarget | n
         </a>
       );
     },
-  }), [currentTarget?.file]);
+  };
 
   // Keyboard shortcuts: Cmd/Ctrl +/- and 0 to reset
   useEffect(() => {
@@ -249,7 +252,11 @@ const TutorialView: React.FC<{ onClose?: () => void; target?: TutorialTarget | n
           <div className="text-red-600">{error}</div>
         )}
         {!loading && !error && (
-          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]} components={markdownComponents}>
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm, remarkMath]}
+            rehypePlugins={[rehypeRaw, rehypeKatex]}
+            components={markdownComponents}
+          >
             {content}
           </ReactMarkdown>
         )}

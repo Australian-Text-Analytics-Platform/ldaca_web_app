@@ -10,9 +10,10 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from docframe import DocDataFrame, DocLazyFrame
 
-from ....analysis.implementations.token_frequency import (
-    TokenFrequencyRequest as AnalysisTokenFrequencyRequest,
-)
+from ....analysis.implementations.token_frequency import \
+    TokenFrequencyRequest as AnalysisTokenFrequencyRequest
+from ....analysis.manager import get_task_manager
+from ....analysis.models import AnalysisStatus, AnalysisTask
 from ....analysis.results import GenericAnalysisResult
 from ....core.auth import get_current_user
 from ....core.workspace import workspace_manager
@@ -31,7 +32,7 @@ _STOP_WORDS_UNSET = object()
 def _coerce_limit_value(value) -> int:
     try:
         candidate = int(value)  # type: ignore[arg-type]
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return DEFAULT_TOKEN_LIMIT
     return candidate if candidate > 0 else DEFAULT_TOKEN_LIMIT
 
@@ -104,7 +105,7 @@ def _prepare_doclazy_frame(node, column_name: str, user_id: str, workspace_id: s
 def _safe_float(value, *, default: float | None = 0.0) -> float | None:
     try:
         number = float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return default
     if math.isnan(number) or math.isinf(number):
         return default
@@ -209,7 +210,7 @@ def _prepare_result_blob(
 
 
 def _unwrap_task_manager_result(result_dict: dict) -> dict:
-    """Handle the ProcessTaskManager result wrapper.
+    """Handle the WorkerTaskManager result wrapper.
 
     For worker-backed tasks, analysis_store may contain a wrapper like:
       {"status": "successful", "message": "...", "data": <worker_result>}
@@ -223,103 +224,27 @@ def _unwrap_task_manager_result(result_dict: dict) -> dict:
     # If it's already the final response blob, keep it.
     if "state" in result_dict and "message" in result_dict:
         return result_dict
-    # If it's wrapped (ProcessTaskManager convention), unwrap the inner payload.
+    # If it's wrapped (WorkerTaskManager convention), unwrap the inner payload.
     inner = result_dict.get("data")
     if isinstance(inner, dict):
         return inner
     return result_dict
 
 
-@router.get("/{workspace_id}/token-frequencies/current-request")
-async def token_frequencies_current_request(
-    workspace_id: str, current_user: dict = Depends(get_current_user)
-):
-    user_id = current_user["id"]
-    ws = workspace_manager.get_workspace(user_id, workspace_id)
-    if not ws:
-        return None
-
-    analysis_manager = getattr(ws, "analysis", None)
-    if not analysis_manager:
-        from ....analysis.manager import get_analysis_manager
-
-        analysis_manager = get_analysis_manager(user_id, workspace_id)
-
-    task = analysis_manager.get_current_task("token_frequencies")
-    if not task:
-        return None
-
-    stored_request = (
-        task.request.model_dump()
-        if hasattr(task.request, "model_dump")
-        else task.request.dict()
-    )
-    normalized_request = _normalize_limit_payload(stored_request)
-    return {
-        "state": "successful",
-        "message": "ok",
-        "data": normalized_request,
-    }
-
-
-@router.post("/{workspace_id}/token-frequencies/current-request")
-async def update_token_frequencies_current_request(
+@router.get("/{workspace_id}/token-frequencies/tasks/{task_id}/result")
+async def token_frequencies_task_result(
     workspace_id: str,
-    request_update: dict,
+    task_id: str,
     current_user: dict = Depends(get_current_user),
 ):
-    """Update the last saved token_frequencies request (e.g., stop_words) without recomputing results."""
+    """Return a normalized token frequency result for a task id."""
     user_id = current_user["id"]
-    ws = workspace_manager.get_workspace(user_id, workspace_id)
-    if not ws:
-        raise HTTPException(status_code=404, detail="Workspace not found")
-
-    analysis_manager = getattr(ws, "analysis", None)
-    if not analysis_manager:
-        from ....analysis.manager import get_analysis_manager
-
-        analysis_manager = get_analysis_manager(user_id, workspace_id)
-
-    task = analysis_manager.get_current_task("token_frequencies")
-    if not task:
-        raise HTTPException(
-            status_code=404, detail="No active token frequency analysis found to update"
-        )
-
-    current_req_dict = task.request.model_dump()
-    current_req_dict.update(request_update or {})
-
-    try:
-        new_request = AnalysisTokenFrequencyRequest(**current_req_dict)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid request update: {e}")
-
-    task.request = new_request
-    analysis_manager.update_task(task)
-
-    return {"state": "successful", "message": "saved", "data": new_request.model_dump()}
-
-
-@router.get("/{workspace_id}/token-frequencies/current-result")
-async def token_frequencies_current_result(
-    workspace_id: str, current_user: dict = Depends(get_current_user)
-):
-    user_id = current_user["id"]
-    ws = workspace_manager.get_workspace(user_id, workspace_id)
-    if not ws:
-        return None
-
-    analysis_manager = getattr(ws, "analysis", None)
-    if not analysis_manager:
-        from ....analysis.manager import get_analysis_manager
-
-        analysis_manager = get_analysis_manager(user_id, workspace_id)
-
-    task = analysis_manager.get_current_task("token_frequencies")
+    task_manager = get_task_manager(user_id, workspace_id)
+    task = task_manager.get_task(task_id)
     if not task or not task.result:
         return None
 
-    stored = task.result.to_json()
+    stored = task.result.to_json() if hasattr(task.result, "to_json") else task.result
     if not isinstance(stored, dict):
         return None
 
@@ -339,26 +264,19 @@ async def token_frequencies_current_result(
     return result_blob
 
 
-@router.post("/{workspace_id}/token-frequencies/current-result")
-async def update_token_frequencies_current_result(
+@router.post("/{workspace_id}/token-frequencies/tasks/{task_id}/result")
+async def update_token_frequencies_task_result(
     workspace_id: str,
+    task_id: str,
     updates: dict | None,
     current_user: dict = Depends(get_current_user),
 ):
+    """Update stored token frequency preferences for a task id."""
     user_id = current_user["id"]
-    ws = workspace_manager.get_workspace(user_id, workspace_id)
-    if not ws:
-        raise HTTPException(status_code=404, detail="Workspace not found")
-
-    analysis_manager = getattr(ws, "analysis", None)
-    if not analysis_manager:
-        from ....analysis.manager import get_analysis_manager
-
-        analysis_manager = get_analysis_manager(user_id, workspace_id)
-
-    task = analysis_manager.get_current_task("token_frequencies")
+    task_manager = get_task_manager(user_id, workspace_id)
+    task = task_manager.get_task(task_id)
     if not task:
-        raise HTTPException(status_code=404, detail="No token frequency analysis found")
+        raise HTTPException(status_code=404, detail="No token frequency task found")
 
     request_payload = task.request.model_dump()
     result_payload_raw = task.result.to_json() if task.result else {}
@@ -383,14 +301,12 @@ async def update_token_frequencies_current_result(
         stop_words_override=stop_words_override,
     )
 
-    # Merge the normalized request back with any untouched fields (e.g., node selections)
     request_payload.update(normalized_request)
 
-    # Update task
     try:
         task.request = AnalysisTokenFrequencyRequest(**request_payload)
         task.complete(GenericAnalysisResult(result_blob))
-        analysis_manager.update_task(task)
+        task_manager.save_task(task)
     except Exception as exc:  # pragma: no cover
         raise HTTPException(
             status_code=500,
@@ -398,24 +314,6 @@ async def update_token_frequencies_current_result(
         )
 
     return {"state": "successful", "message": "saved"}
-
-
-@router.post("/{workspace_id}/token-frequencies/clear")
-async def clear_token_frequencies_results(
-    workspace_id: str, current_user: dict = Depends(get_current_user)
-):
-    user_id = current_user["id"]
-    ws = workspace_manager.get_workspace(user_id, workspace_id)
-    if ws:
-        analysis_manager = getattr(ws, "analysis", None)
-        if not analysis_manager:
-            from ....analysis.manager import get_analysis_manager
-
-            analysis_manager = get_analysis_manager(user_id, workspace_id)
-
-        analysis_manager.clear_current_result("token_frequencies")
-
-    return {"state": "successful", "cleared": ["token_frequencies"]}
 
 
 @router.post(
@@ -550,22 +448,24 @@ async def calculate_token_frequencies(
         },
     )
 
-    # Create AnalysisTask in AnalysisManager
-    analysis_manager = getattr(workspace, "analysis", None)
-    if not analysis_manager:
-        from ....analysis.manager import get_analysis_manager
-
-        analysis_manager = get_analysis_manager(user_id, workspace_id)
-
     analysis_request = AnalysisTokenFrequencyRequest(
-        task_id=task_info.id,
         node_ids=request.node_ids,
         node_columns=validated_columns,
         token_limit=effective_limit,
         stop_words=requested_stop_words,
     )
 
-    analysis_manager.create_task("token_frequencies", analysis_request)
+    task_manager = get_task_manager(user_id, workspace_id)
+    task_manager.save_task(
+        AnalysisTask(
+            task_id=task_info.id,
+            user_id=user_id,
+            workspace_id=workspace_id,
+            request=analysis_request,
+            status=AnalysisStatus.PENDING,
+        )
+    )
+    task_manager.set_current_task("token-frequencies", task_info.id)
 
     return {
         "state": "running",

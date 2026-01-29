@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { normalizeTypeName } from '../utils/columnTypes';
 import { getNodeInfo } from '../lib/nodeInfoCache';
 
@@ -185,15 +185,13 @@ export function useSchemaManagement(config: SchemaManagementConfig) {
   /**
    * Get the effective schema (locked if locked, otherwise current)
    */
-  const effectiveSchema = useMemo(() => {
-    return isLocked ? (lockedSchema || currentSchema) : currentSchema;
-  }, [isLocked, lockedSchema, currentSchema]);
+  const effectiveSchema = isLocked ? (lockedSchema || currentSchema) : currentSchema;
 
   /**
    * Get available columns with type information from schema.
    * Falls back to nodeData/selectedNode if schema not yet available.
    */
-  const availableColumns = useMemo(() => {
+  const availableColumns = (() => {
     // Primary: use schema if available
     if (effectiveSchema && Object.keys(effectiveSchema).length > 0) {
       return Object.entries(effectiveSchema).map(([name, jsType]) => ({
@@ -240,35 +238,29 @@ export function useSchemaManagement(config: SchemaManagementConfig) {
     }
 
     return columns;
-  }, [effectiveSchema, nodeData, selectedNode]);
+  })();
 
   /**
    * Helper to filter columns by data type
    */
-  const getColumnsByType = useCallback(
-    (dataType: string | string[]) => {
-      const types = Array.isArray(dataType) ? dataType : [dataType];
-      return availableColumns.filter((col) => types.includes(col.dataType));
-    },
-    [availableColumns]
-  );
+  const getColumnsByType = (dataType: string | string[]) => {
+    const types = Array.isArray(dataType) ? dataType : [dataType];
+    return availableColumns.filter((col) => types.includes(col.dataType));
+  };
 
   /**
    * Lock the current schema (or provide a specific schema to lock)
    */
-  const lockCurrentSchema = useCallback(
-    (schemaToLock?: Record<string, string>) => {
-      setLockedSchema(schemaToLock || currentSchema);
-    },
-    [currentSchema]
-  );
+  const lockCurrentSchema = (schemaToLock?: Record<string, string>) => {
+    setLockedSchema(schemaToLock || currentSchema);
+  };
 
   /**
    * Clear the locked schema
    */
-  const clearLockedSchema = useCallback(() => {
+  const clearLockedSchema = () => {
     setLockedSchema(null);
-  }, []);
+  };
 
   return {
     // Schema state

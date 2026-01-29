@@ -66,6 +66,25 @@ const mergeTaskUpdates = (
   return sortTasksByTime(Array.from(nextMap.values()));
 };
 
+const TAB_ASSOCIATED_TASK_TYPES = new Set([
+  'token_frequencies',
+  'concordance',
+  'topic_modeling',
+  'quotation',
+]);
+
+const TERMINAL_TASK_STATES = new Set(['successful', 'failed', 'cancelled']);
+
+const shouldRefreshGraphFallback = (task?: TaskItem | null) => {
+  if (!task?.task_type || !task?.state) {
+    return false;
+  }
+  if (TAB_ASSOCIATED_TASK_TYPES.has(task.task_type)) {
+    return false;
+  }
+  return TERMINAL_TASK_STATES.has(task.state);
+};
+
 export const useWorkspaceTaskInbox = (
   workspaceId: string | null
 ): WorkspaceTaskStreamClientState => {
@@ -135,6 +154,15 @@ export const useWorkspaceTaskInbox = (
                 markTopicModelingReady(payload.task.task_id, payload.timestamp);
               }
             }
+
+            if (workspaceId && shouldRefreshGraphFallback(payload.task as TaskItem)) {
+              queryClient.invalidateQueries({
+                queryKey: queryKeys.workspaceGraph(workspaceId),
+              });
+              queryClient.refetchQueries({
+                queryKey: queryKeys.workspaceGraph(workspaceId),
+              });
+            }
           }
           break;
         }
@@ -182,7 +210,7 @@ export const useWorkspaceTaskInbox = (
         }
       }
     },
-    [setTasks, markTopicModelingReady, resetTopicModelingReady, setTransientError]
+    [setTasks, markTopicModelingReady, resetTopicModelingReady, setTransientError, queryClient, workspaceId]
   );
 
   const clientState = useWorkspaceTaskStreamClient(workspaceId, {

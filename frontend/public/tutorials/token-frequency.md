@@ -4,11 +4,15 @@
 
 <h1 id="help-token-frequency-section">Token frequency tutorial</h1>
 
-Token frequency counts how often words or tokens appear in your corpus. It is one of the quickest ways to spot themes and jargon.
+Token frequency counts how often words or tokens appear in your text data. It is one of the quickest ways to spot themes and jargon.
 
 > **Placeholder (GIF):** Run token frequency and scroll through the top tokens.
 
-<h2 id="help-token-frequency-stop-words">Stop words input</h2>
+<h2 id="help-token-frequency-parameters">Parameter panel</h2>
+
+Use the parameter panel to choose what text to analyze, how many tokens to display, and which stop words should be filtered from the view.
+
+<h3 id="help-token-frequency-stop-words">Stop words input</h3>
 
 Stop words are words you want to ignore (like “the”, “and”, or domain-specific filler). Add them here to clean your results.
 
@@ -16,14 +20,43 @@ Stop words are words you want to ignore (like “the”, “and”, or domain-sp
 
 High-frequency filler terms can hide the meaningful terms you want to study.
 
-<h2 id="help-token-frequency-run">Run token frequency</h2>
+<h3 id="help-token-frequency-run">Run token frequency</h3>
 
 This action runs the token frequency analysis on the selected dataset.
 
 - Results appear in a table and can be downloaded.
 - You can re-run after adjusting stop words.
 
-<h2 id="help-token-frequency-clear-results">Clear results</h2>
+<h2 id="help-token-frequency-results">Result panel</h2>
+
+Use the result panel to inspect token lists, compare two nodes, and review the statistical summary. Click any token to jump to concordance.
+
+<h3 id="help-token-frequency-unified-word-cloud">Unified word cloud</h3>
+
+The unified word cloud blends the two selected nodes into one comparison view.
+
+- **Selection:** tokens are ranked by $\log_{10}(O_1 + O_2) \times \text{LogRatio}$ and the view includes the lowest and highest scores (up to twice the token limit).
+- **Size:** token size reflects $O_1 + O_2$ (combined frequency across both datasets).
+- **Color:** color shifts toward the side where the token has a higher percentage share, so different dataset sizes do not dominate the palette.
+
+<h3 id="help-token-frequency-statistical-measures">Statistical measures</h3>
+
+The statistical table summarizes token differences between the two datasets.
+
+- **Head/Tail Rows (N):** shows the first $N$ and last $N$ rows of the sorted table; sorting always applies to the full set before trimming.
+- **Key definitions:**
+  - **O1/O2:** observed frequencies in each dataset.
+  - **%1/%2:** percentage of total tokens in each dataset.
+  - **LL:** log-likelihood $G^2$ statistic (higher = more significant difference).
+  - **%DIFF:** percentage point difference between datasets.
+  - **Bayes:** Bayes factor (BIC).
+  - **ELL:** effect size for log likelihood.
+  - **RRisk:** relative risk ratio.
+  - **LogRatio:** log of relative frequencies.
+  - **OddsRatio:** odds ratio between datasets.
+  - **Significance:** **** $p < 0.0001$, *** $p < 0.001$, ** $p < 0.01$, * $p < 0.05$.
+
+<h3 id="help-token-frequency-clear-results">Clear results</h3>
 
 Token frequency results are saved in the backend so this tab can reload and keep persistent pages of your last run. **Clear Results** removes that cached result from the backend and resets the tab.
 

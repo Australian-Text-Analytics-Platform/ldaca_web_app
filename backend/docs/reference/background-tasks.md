@@ -1,4 +1,4 @@
-# Background Tasks (ProcessTaskManager)
+# Background Tasks (WorkerTaskManager)
 
 **Scope statement:** This page explains how long‑running analyses are executed and tracked.
 
@@ -14,7 +14,7 @@
 
 **Answer:**
 
-1. Submit task via `ProcessTaskManager`.
+1. Submit task via `WorkerTaskManager`.
 2. Receive `task_id` in the API response.
 3. Stream or poll task status.
 4. Persist results to the in‑memory analysis store.

@@ -21,38 +21,35 @@ const SidebarNodesSection: React.FC<SidebarNodesSectionProps> = ({
   const copyTimeoutRef = React.useRef<number | null>(null);
   const [hoveredNodeId, setHoveredNodeId] = React.useState<string | null>(null);
 
-  const handleCopy = React.useCallback(
-    async (value: string | undefined | null, nodeId: string, field: 'name' | 'id') => {
-      if (!value || typeof value !== 'string') return;
-      if (typeof window === 'undefined') return;
+  const handleCopy = async (value: string | undefined | null, nodeId: string, field: 'name' | 'id') => {
+    if (!value || typeof value !== 'string') return;
+    if (typeof window === 'undefined') return;
 
-      try {
-        if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-          await navigator.clipboard.writeText(value);
-        } else if (typeof document !== 'undefined') {
-          const textarea = document.createElement('textarea');
-          textarea.value = value;
-          textarea.style.position = 'fixed';
-          textarea.style.opacity = '0';
-          document.body.appendChild(textarea);
-          textarea.select();
-          document.execCommand('copy');
-          document.body.removeChild(textarea);
-        }
-
-        setCopiedField({ nodeId, field });
-        if (copyTimeoutRef.current) {
-          window.clearTimeout(copyTimeoutRef.current);
-        }
-        copyTimeoutRef.current = window.setTimeout(() => {
-          setCopiedField(null);
-        }, 1600);
-      } catch (error) {
-        console.error('SidebarNodesSection: failed to copy value', error);
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value);
+      } else if (typeof document !== 'undefined') {
+        const textarea = document.createElement('textarea');
+        textarea.value = value;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
       }
-    },
-    []
-  );
+
+      setCopiedField({ nodeId, field });
+      if (copyTimeoutRef.current) {
+        window.clearTimeout(copyTimeoutRef.current);
+      }
+      copyTimeoutRef.current = window.setTimeout(() => {
+        setCopiedField(null);
+      }, 1600);
+    } catch (error) {
+      console.error('SidebarNodesSection: failed to copy value', error);
+    }
+  };
 
   React.useEffect(() => () => {
     if (copyTimeoutRef.current) {
@@ -60,7 +57,7 @@ const SidebarNodesSection: React.FC<SidebarNodesSectionProps> = ({
     }
   }, []);
 
-  const formatShapeLabel = React.useCallback((node: SidebarWorkspaceNode): string => {
+  const formatShapeLabel = (node: SidebarWorkspaceNode): string => {
     const rawShape = node.data?.shape || (node as { shape?: [number | null, number | null] }).shape;
     if (!rawShape) {
       return '—';
@@ -69,7 +66,7 @@ const SidebarNodesSection: React.FC<SidebarNodesSectionProps> = ({
     const formatPart = (value: number | null | undefined) =>
       typeof value === 'number' && Number.isFinite(value) ? value.toLocaleString() : '?';
     return `${formatPart(rows)} × ${formatPart(cols)}`;
-  }, []);
+  };
 
   const nodeCount = nodes.length;
   const selectedCount = selectedNodeIds?.length ?? 0;
@@ -145,7 +142,7 @@ const SidebarNodesSection: React.FC<SidebarNodesSectionProps> = ({
                 </div>
                 <div
                   className={cn(
-                    'ml-[1.75rem] mt-0 flex max-h-0 flex-wrap items-center gap-x-4 gap-y-1 overflow-hidden text-xs text-muted-foreground opacity-0 transition-all duration-200 ease-out',
+                    'ml-7 mt-0 flex max-h-0 flex-wrap items-center gap-x-4 gap-y-1 overflow-hidden text-xs text-muted-foreground opacity-0 transition-all duration-200 ease-out',
                     isExpanded && 'mt-2 max-h-40 opacity-100'
                   )}
                 >

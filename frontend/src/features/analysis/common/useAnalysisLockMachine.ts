@@ -47,22 +47,18 @@ export const useAnalysisLockCore = (config: AnalysisLockConfig) => {
     selections: nodeColumnSelections,
     setSelection: setNodeColumnSelection,
     setSelections: setNodeColumnSelections,
-    recompute: recomputeAutoColumns,
-  } = useAutoNodeColumns(
-    {
-      selectedNodes,
-      getNodeColumns: getColumnInfos,
-      allowedDataTypes,
-    },
-    {
-      workspaceId: currentWorkspaceId,
-      maxNodes,
-      isLocked,
-      docTypeOnly,
-      enableHeuristicGuess,
-      storageScope,
-    }
-  );
+    recomputeAutoColumns,
+  } = useAutoNodeColumns({
+    selectedNodes,
+    getNodeColumns: getColumnInfos,
+    allowedDataTypes,
+    workspaceId: currentWorkspaceId,
+    maxNodes,
+    isLocked,
+    docTypeOnly,
+    enableHeuristicGuess,
+    storageScope,
+  });
 
   const nodeIdToName = useMemo(() => {
     const map: Record<string, string> = {};

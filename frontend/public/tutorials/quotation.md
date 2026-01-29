@@ -8,7 +8,11 @@ Quotation extraction finds quoted segments in text and adds context around them.
 
 > **Placeholder (image):** Example of quotation extraction results with context columns.
 
-<h2 id="help-quotation-context-length">Quotation context length</h2>
+<h2 id="help-quotation-parameters">Parameter panel</h2>
+
+Use the parameter panel to select the text column and configure the context window.
+
+<h3 id="help-quotation-context-length">Quotation context length</h3>
 
 This setting controls how many words are captured before and after a quotation.
 
@@ -19,7 +23,11 @@ This setting controls how many words are captured before and after a quotation.
 
 Start with a modest length (e.g., 5–10 words on each side) and adjust based on readability.
 
-<h2 id="help-quotation-clear-results">Clear results</h2>
+<h2 id="help-quotation-results">Result panel</h2>
+
+Use the result panel to review extracted quotations and metadata.
+
+<h3 id="help-quotation-clear-results">Clear results</h3>
 
 Quotation results are saved in the backend so the tab can reload and keep persistent pages. **Clear Results** clears the cached result in the backend and resets the tab.
 

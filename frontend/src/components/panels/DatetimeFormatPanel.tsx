@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
@@ -22,18 +22,18 @@ export const DatetimeFormatPanel: React.FC<DatetimeFormatPanelProps> = ({
   const [autoFillTried, setAutoFillTried] = useState(false);
   const [autoFillError, setAutoFillError] = useState<string | null>(null);
 
-  const resetForm = useCallback(() => {
+  const resetForm = () => {
     setCustomFormat('');
     setAutoFillTried(false);
     setAutoFillError(null);
-  }, []);
+  };
 
-  const handleCancel = useCallback(() => {
+  const handleCancel = () => {
     resetForm();
     onClose();
-  }, [onClose, resetForm]);
+  };
 
-  const handleAutoFill = useCallback(async () => {
+  const handleAutoFill = async () => {
     setAutoFillTried(true);
     setAutoFillError(null);
     try {
@@ -47,18 +47,23 @@ export const DatetimeFormatPanel: React.FC<DatetimeFormatPanelProps> = ({
     } catch {
       setAutoFillError('Inference error');
     }
-  }, [sampleValues]);
+  };
 
   useEffect(() => {
-    if (open && sampleValues.length > 0 && !autoFillTried) {
-      handleAutoFill();
+    if (open && sampleValues.length && !autoFillTried) {
+      void handleAutoFill();
     }
-  }, [open, sampleValues, autoFillTried, handleAutoFill]);
+    if (!open) {
+      resetForm();
+    }
+  }, [open, sampleValues, autoFillTried]);
 
-  const handleConfirm = useCallback(() => {
-    onConfirm(customFormat || undefined);
+  const handleConfirm = () => {
+    const trimmed = customFormat.trim();
+    onConfirm(trimmed.length ? trimmed : undefined);
     resetForm();
-  }, [customFormat, onConfirm, resetForm]);
+    onClose();
+  };
 
   return (
     <Dialog

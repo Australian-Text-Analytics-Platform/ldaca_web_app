@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useFilePreview } from '../../hooks/useFilePreview';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../ui/card';
@@ -16,40 +16,28 @@ export const AddFilePanel: React.FC<AddFilePanelProps> = ({ filename, open, onCl
   const {
     previewData,
     columns,
-    fetchPreview,
-    clearPreview,
     loading,
     error,
     fileType,
     sheetNames,
     selectedSheet,
-    setSelectedSheet
-  } = useFilePreview();
+    setSelectedSheet,
+  } = useFilePreview(filename, open);
 
   const [submitting, setSubmitting] = useState(false);
 
-  const resetState = useCallback(() => {
-    setSubmitting(false);
-    if (selectedSheet) {
-      setSelectedSheet(null);
-    }
-    clearPreview();
-  }, [clearPreview, selectedSheet, setSelectedSheet]);
-
   useEffect(() => {
-    if (open && filename) {
-      fetchPreview(filename, 0);
-    } else if (!open) {
-      resetState();
+    if (!open) {
+      setSubmitting(false);
     }
-  }, [open, filename, fetchPreview, resetState]);
+  }, [open]);
 
 
-  const handleClose = useCallback(() => {
+  const handleClose = () => {
     onClose();
-  }, [onClose]);
+  };
 
-  const handleConfirm = useCallback(async () => {
+  const handleConfirm = async () => {
     if (!filename) return;
     try {
       setSubmitting(true);
@@ -58,7 +46,7 @@ export const AddFilePanel: React.FC<AddFilePanelProps> = ({ filename, open, onCl
     } finally {
       setSubmitting(false);
     }
-  }, [filename, onConfirm, handleClose]);
+  };
 
   return (
     <Dialog
@@ -69,7 +57,7 @@ export const AddFilePanel: React.FC<AddFilePanelProps> = ({ filename, open, onCl
         }
       }}
     >
-      <DialogContent className="w-full max-w-[min(80vw,_960px)] border-none bg-transparent p-0 shadow-none">
+      <DialogContent className="w-full max-w-[min(80vw,960px)] border-none bg-transparent p-0 shadow-none">
         <DialogHeader className="sr-only">
           <DialogTitle>{filename ? `Add file: ${filename}` : 'Add file to workspace'}</DialogTitle>
           <DialogDescription>Files are staged as DocLazyFrames automatically. Choose an optional sheet, inspect the preview, and confirm.</DialogDescription>
@@ -91,9 +79,6 @@ export const AddFilePanel: React.FC<AddFilePanelProps> = ({ filename, open, onCl
                   onValueChange={(value) => {
                     const next = value || null;
                     setSelectedSheet(next);
-                    if (filename) {
-                      fetchPreview(filename, 0, { sheetName: next || undefined });
-                    }
                   }}
                 >
                   <SelectTrigger>
@@ -136,7 +121,7 @@ export const AddFilePanel: React.FC<AddFilePanelProps> = ({ filename, open, onCl
                           {columns.map((column) => (
                             <td
                               key={column}
-                              className="max-w-[12rem] truncate px-2 py-1"
+                              className="max-w-48 truncate px-2 py-1"
                               title={String(row[column] ?? '')}
                             >
                               {String(row[column] ?? '')}

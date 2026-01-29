@@ -1,5 +1,4 @@
-/* eslint-disable react/no-unescaped-entities */
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
 import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '../../../hooks/useWorkspaceSelection';
@@ -9,7 +8,7 @@ import { useAuth } from '../../../hooks/useAuth';
 import { workspacesApi } from '../../../api/workspaces';
 import { TokenFrequencyRequest, TokenFrequencyResponse, textApi } from '../../../api/text';
 import { resolveTokenFrequencyNodeContext, type TokenFrequencyAnalysisParams } from '../../../components/tabs/tokenFrequencyHelpers';
-import AnalysisLockedNotice from '../../../components/tabs/AnalysisLockedNotice';
+import { ANALYSIS_LOCKED_MESSAGE } from '../../../components/tabs/AnalysisLockedNotice';
 import AnalysisTaskBanner from '../../../components/tabs/AnalysisTaskBanner';
 import type { AnalysisTaskStatus } from '../../../hooks/useAnalysisTaskStatus';
 import useAnalysisTaskLifecycle, { type AnalysisTaskRefreshContext } from '../../../hooks/useAnalysisTaskLifecycle';
@@ -19,7 +18,7 @@ import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
 import HelpIcon from '../../../components/help/HelpIcon';
-import { Play, Loader2, Trash2, Table2, Download, X, ChevronLeft, ChevronRight, Lightbulb } from 'lucide-react';
+import { Play, Loader2, Trash2, Table2, Download, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Text } from '@visx/text';
 import { toast } from 'sonner';
 import { createNodeSnapshots, applySelectedColumnsToSnapshots } from '../../../hooks/useSchemaManagement';
@@ -38,6 +37,12 @@ import {
   useAnalysisLockMachine,
   useNodeColorPalette,
 } from '../common';
+import {
+  buildSelectionNameKey,
+  buildSelectionNameById,
+  deriveBackendTokenLimit,
+  deriveBackendStopWordsKey,
+} from './tokenFrequencyUtils';
 
 /**
  * Normalized node result structure for token frequency analysis
@@ -120,9 +125,26 @@ const maxBy = <T,>(items: T[], selector: (item: T) => number, fallback: number):
   return max;
 };
 
+const STATS_SORT_ACCESSORS: Record<string, (stat: any) => unknown> = {
+  token: (stat) => stat.token,
+  freq_corpus_0: (stat) => stat.freq_corpus_0,
+  percent_corpus_0: (stat) => stat.percent_corpus_0,
+  freq_corpus_1: (stat) => stat.freq_corpus_1,
+  percent_corpus_1: (stat) => stat.percent_corpus_1,
+  log_likelihood_llv: (stat) => stat.log_likelihood_llv,
+  percent_diff: (stat) => stat.percent_diff,
+  bayes_factor_bic: (stat) => stat.bayes_factor_bic,
+  effect_size_ell: (stat) => stat.effect_size_ell,
+  relative_risk: (stat) => stat.relative_risk,
+  log_ratio: (stat) => stat.log_ratio,
+  odds_ratio: (stat) => stat.odds_ratio,
+};
+
 // Token limit is a UI preference only. We keep a hard max of 100 for the input
 // as a sanity check, but we still store the full backend result in `results`.
 const MAX_TOKEN_LIMIT_INPUT = 100;
+const UNIFIED_WORDCLOUD_MAX_WIDTH = 860;
+const UNIFIED_WORDCLOUD_HEIGHT = 260;
 
 function TokenFrequencyFeature() {
   const { selectedNodes } = useWorkspaceSelection();
@@ -136,9 +158,12 @@ function TokenFrequencyFeature() {
   });
 
   const { getAuthHeaders } = useAuth();
+  const currentView = useUIStore((state) => state.currentView);
   const setCurrentView = useUIStore((state) => state.setCurrentView);
   const setPendingConcordance = useAnalysisStore((state) => state.setPendingConcordance);
   const setTasks = useAnalysisStore((state) => state.setTasks);
+
+  const isActiveTab = currentView === 'token-frequency';
 
   const {
     isLocked,
@@ -192,8 +217,70 @@ function TokenFrequencyFeature() {
   const wordCloudExportScale = 3;
   const fallbackStopWordsRef = useRef<string[]>([]);
   const hydratedRequestAvailableRef = useRef(false);
+  const unifiedCloudContainerRef = useRef<HTMLDivElement | null>(null);
+  const [unifiedCloudWidth, setUnifiedCloudWidth] = useState<number>(UNIFIED_WORDCLOUD_MAX_WIDTH);
+  const resolvedTokenTaskIdRef = useRef<{ workspaceId: string | null; taskId: string | null }>({
+    workspaceId: null,
+    taskId: null,
+  });
+  const resolveTokenTaskInflightRef = useRef<Promise<string | null> | null>(null);
+  const hydratedOnceRef = useRef(false);
+  const previousWorkspaceIdRef = useRef<string | null>(null);
 
-  const selectedNodeIds = useMemo(() => selectedNodes.map((node) => node.id).sort(), [selectedNodes]);
+  const resolveTokenFrequencyTaskId = useCallback(async (): Promise<string | null> => {
+    if (!currentWorkspaceId) {
+      return null;
+    }
+
+    if (resolvedTokenTaskIdRef.current.workspaceId !== currentWorkspaceId) {
+      resolvedTokenTaskIdRef.current = { workspaceId: currentWorkspaceId, taskId: null };
+      resolveTokenTaskInflightRef.current = null;
+    }
+
+    const cachedTaskId = resolvedTokenTaskIdRef.current.taskId;
+    if (cachedTaskId) {
+      return cachedTaskId;
+    }
+
+    const candidateIds = [
+      localTokenFrequencyTaskId,
+      (results as any)?.metadata?.task_id,
+    ];
+    const known = candidateIds.find((candidate) => typeof candidate === 'string' && candidate.trim().length > 0);
+    if (known) {
+      resolvedTokenTaskIdRef.current = { workspaceId: currentWorkspaceId, taskId: known };
+      return known;
+    }
+
+    if (resolveTokenTaskInflightRef.current) {
+      return resolveTokenTaskInflightRef.current;
+    }
+
+    const inflight = (async () => {
+      try {
+        const headers = getAuthHeaders();
+        const current = await textApi.getAnalysisCurrent(currentWorkspaceId, 'token-frequencies', headers) as any;
+        const taskId = Array.isArray(current?.task_ids) ? current.task_ids[0] : null;
+        if (typeof taskId === 'string' && taskId.trim().length > 0) {
+          setLocalTokenFrequencyTaskId(taskId);
+          resolvedTokenTaskIdRef.current = { workspaceId: currentWorkspaceId, taskId };
+          return taskId;
+        }
+      } catch {
+        return null;
+      } finally {
+        resolveTokenTaskInflightRef.current = null;
+      }
+
+      return null;
+    })();
+
+    resolveTokenTaskInflightRef.current = inflight;
+    return inflight;
+  }, [currentWorkspaceId, getAuthHeaders, localTokenFrequencyTaskId, results]);
+
+  const selectedNodeIds = selectedNodes.map((node) => node.id).sort();
+  const selectedNodeIdsKey = selectedNodeIds.join('|');
 
   const applyTokenLimitState = useCallback((rawLimit: number | null | undefined) => {
     const target = typeof rawLimit === 'number' && Number.isFinite(rawLimit) && rawLimit > 0
@@ -208,32 +295,27 @@ function TokenFrequencyFeature() {
     tokenLimitInputChangedRef.current = false;
   }, [setTokenLimitOverride, setTokenLimitInput, setTokenLimitError]);
 
-  const selectionNameById = useMemo(() => {
-    const mapping: Record<string, string> = {};
-    selectedNodes.forEach((node) => {
-      if (isNonEmptyString(node?.id) && isNonEmptyString((node as any)?.name)) {
-        mapping[node.id] = (node as any).name as string;
-      }
-    });
-    if (Array.isArray(panelSelectedNodes)) {
-      panelSelectedNodes.forEach((node) => {
-        if (isNonEmptyString(node?.id) && isNonEmptyString((node as any)?.name)) {
-          mapping[node.id] = (node as any).name as string;
-        }
-      });
-    }
-    return mapping;
-  }, [selectedNodes, panelSelectedNodes]);
+  const selectionNameById = buildSelectionNameById(
+    selectedNodes as Array<{ id: string; name?: string | null }>,
+    panelSelectedNodes as Array<{ id: string; name?: string | null }> | null | undefined
+  );
+  const selectionNameKey = buildSelectionNameKey(
+    selectedNodes as Array<{ id: string; name?: string | null }>,
+    panelSelectedNodes as Array<{ id: string; name?: string | null }> | null | undefined
+  );
 
   const paletteNodes = useMemo(() => {
-    const pool = Array.isArray(panelSelectedNodes) && panelSelectedNodes.length > 0 ? panelSelectedNodes : selectedNodes;
-    return pool.map((node) => ({
+    const sourceNodes =
+      Array.isArray(panelSelectedNodes) && panelSelectedNodes.length > 0
+        ? panelSelectedNodes
+        : selectedNodes;
+    return sourceNodes.map((node) => ({
       id: node.id,
       label: (node as any)?.name ?? node.id,
     }));
   }, [panelSelectedNodes, selectedNodes]);
 
-  const responseDisplayNameHints = useMemo(() => {
+  const responseDisplayNameHints: Record<string, string> = useMemo(() => {
     const mapping: Record<string, string> = {};
     const metadataNodeNames = ((results?.metadata as Record<string, unknown> | null | undefined)?.node_display_names ?? {}) as Record<string, unknown>;
     if (metadataNodeNames && typeof metadataNodeNames === 'object') {
@@ -258,27 +340,24 @@ function TokenFrequencyFeature() {
     return mapping;
   }, [results]);
 
-  const computeDisplayName = useCallback(
-    (nodeId: string, fallbackKey?: string) => {
-      if (isNonEmptyString(responseDisplayNameHints[nodeId])) {
-        return responseDisplayNameHints[nodeId];
-      }
-      if (isNonEmptyString(lockedNodeNameMap[nodeId])) {
-        return lockedNodeNameMap[nodeId];
-      }
-      if (isNonEmptyString(nodeIdToName[nodeId])) {
-        return nodeIdToName[nodeId];
-      }
-      if (isNonEmptyString(selectionNameById[nodeId])) {
-        return selectionNameById[nodeId];
-      }
-      if (isNonEmptyString(fallbackKey)) {
-        return fallbackKey;
-      }
-      return nodeId;
-    },
-    [responseDisplayNameHints, lockedNodeNameMap, nodeIdToName, selectionNameById]
-  );
+  const computeDisplayName = (nodeId: string, fallbackKey?: string) => {
+    if (isNonEmptyString(responseDisplayNameHints[nodeId])) {
+      return responseDisplayNameHints[nodeId];
+    }
+    if (isNonEmptyString(lockedNodeNameMap[nodeId])) {
+      return lockedNodeNameMap[nodeId];
+    }
+    if (isNonEmptyString(nodeIdToName[nodeId])) {
+      return nodeIdToName[nodeId];
+    }
+    if (isNonEmptyString(selectionNameById[nodeId])) {
+      return selectionNameById[nodeId];
+    }
+    if (isNonEmptyString(fallbackKey)) {
+      return fallbackKey;
+    }
+    return nodeId;
+  };
 
   const analysisNodeIds = useMemo(() => {
     const combined: Array<string | null | undefined> = [];
@@ -297,7 +376,7 @@ function TokenFrequencyFeature() {
       }
     });
     return deduped;
-  }, [results, lastCompareNodeIds, effectiveNodeColumnSelections]);
+  }, [effectiveNodeColumnSelections, lastCompareNodeIds, results]);
 
   const {
     nodeColors,
@@ -309,7 +388,7 @@ function TokenFrequencyFeature() {
     nodes: paletteNodes,
   });
 
-  const normalizedNodeResults = useMemo<NormalizedNodeResult[]>(() => {
+  const normalizedNodeResults: NormalizedNodeResult[] = useMemo(() => {
     if (!results?.data || typeof results.data !== 'object') {
       return [];
     }
@@ -379,29 +458,10 @@ function TokenFrequencyFeature() {
     // Only include entries from analysisNodeIds - do NOT add extra unmatched entries
     // This ensures the results panel only shows nodes that were actually locked/analyzed
     return normalized;
-  }, [results, analysisNodeIds, computeDisplayName]);
+  }, [analysisNodeIds, nodeIdToName, lockedNodeNameMap, responseDisplayNameHints, results?.data, selectionNameKey]);
 
 
-  const backendTokenLimit = useMemo(() => {
-    if (!results) return null;
-    const r = results as any;
-    const params = r?.analysis_params ?? {};
-    const metadata = r?.metadata ?? {};
-    const candidates = [
-      r?.token_limit,
-      params?.token_limit,
-      metadata?.token_limit,
-      r?.limit,
-      params?.limit,
-      metadata?.limit,
-    ];
-    for (const candidate of candidates) {
-      if (typeof candidate === 'number' && Number.isFinite(candidate)) {
-        return candidate;
-      }
-    }
-    return null;
-  }, [results]);
+  const backendTokenLimit = deriveBackendTokenLimit(results);
   useEffect(() => {
     const backendLimit =
       typeof backendTokenLimit === 'number' && Number.isFinite(backendTokenLimit)
@@ -420,21 +480,7 @@ function TokenFrequencyFeature() {
     }
   }, [backendTokenLimit, tokenLimitOverride, applyTokenLimitState]);
 
-  const backendStopWords = useMemo(() => {
-    if (!results) return null;
-    const payload = results as any;
-    const candidates = [
-      Array.isArray(payload?.stop_words) ? payload.stop_words : null,
-      Array.isArray(payload?.metadata?.stop_words) ? payload.metadata.stop_words : null,
-      Array.isArray(payload?.analysis_params?.stop_words) ? payload.analysis_params.stop_words : null,
-    ];
-    for (const candidate of candidates) {
-      if (Array.isArray(candidate)) {
-        return candidate.map((item: any) => String(item));
-      }
-    }
-    return null;
-  }, [results]);
+  const backendStopWordsKey = deriveBackendStopWordsKey(results);
 
   useEffect(() => {
     if (!results) {
@@ -442,16 +488,15 @@ function TokenFrequencyFeature() {
       setAppliedStopSet(new Set());
       return;
     }
-    const stops = Array.isArray(backendStopWords) ? backendStopWords : [];
-    const normalized = stops
-      .map((w) => String(w).trim().toLowerCase())
-      .filter((w) => w.length > 0);
+    const normalized = backendStopWordsKey
+      ? backendStopWordsKey.split('|').filter((w) => w.length > 0)
+      : [];
     const joined = normalized.join(', ');
     setStopWords(joined);
     setAppliedStopSet(new Set(normalized));
-  }, [backendStopWords, results]);
+  }, [backendStopWordsKey, results]);
 
-  const effectiveTokenLimit = useMemo(() => {
+  const effectiveTokenLimit = (() => {
     if (typeof tokenLimitOverride === 'number' && Number.isFinite(tokenLimitOverride)) {
       return Math.min(tokenLimitOverride, MAX_TOKEN_LIMIT_INPUT);
     }
@@ -459,10 +504,10 @@ function TokenFrequencyFeature() {
       return Math.min(clampDisplayTokenLimit(backendTokenLimit).limit, MAX_TOKEN_LIMIT_INPUT);
     }
     return DEFAULT_TOKEN_LIMIT;
-  }, [tokenLimitOverride, backendTokenLimit]);
+  })();
 
   // Memoized helper describing filtered + backfilled rows for each node
-  const nodeDisplayResults = useMemo<NodeResultView[]>(() => {
+  const nodeDisplayResults: NodeResultView[] = useMemo(() => {
     const normalizedLimit =
       typeof effectiveTokenLimit === 'number' && Number.isFinite(effectiveTokenLimit)
         ? Math.max(0, Math.floor(effectiveTokenLimit))
@@ -507,11 +552,60 @@ function TokenFrequencyFeature() {
         maxFrequency,
       };
     });
-  }, [normalizedNodeResults, appliedStopSet, effectiveTokenLimit]);
+  }, [appliedStopSet, effectiveTokenLimit, normalizedNodeResults]);
+
+  const filteredStatistics = useMemo(() => {
+    if (!Array.isArray(results?.statistics)) {
+      return [];
+    }
+    return results.statistics
+      .filter((stat: any) => !appliedStopSet.has(String(stat.token || '').toLowerCase()))
+      .filter((stat: any) => Number(stat.log_likelihood_llv) > 0);
+  }, [appliedStopSet, results?.statistics]);
+
+  const sortedStatistics = useMemo(() => {
+    if (filteredStatistics.length === 0) {
+      return [];
+    }
+    const columnKey = statsSortColumn || 'log_likelihood_llv';
+    const direction = statsSortDirection === 'asc' ? 1 : -1;
+    return [...filteredStatistics].sort((a, b) => {
+      if (columnKey === 'significance') {
+        const rank = (stat: any) => (stat.significance || '').length;
+        const va = rank(a);
+        const vb = rank(b);
+        return direction * (va - vb);
+      }
+
+      const accessor = STATS_SORT_ACCESSORS[columnKey];
+      if (!accessor) {
+        return 0;
+      }
+
+      const va = accessor(a);
+      const vb = accessor(b);
+      if (typeof va === 'string' || typeof vb === 'string') {
+        const sa = (va ?? '').toString();
+        const sb = (vb ?? '').toString();
+        if (sa === sb) return 0;
+        return direction * (sa < sb ? -1 : 1);
+      }
+
+      const numA = Number(va);
+      const numB = Number(vb);
+      const na = Number.isFinite(numA) ? numA : -Infinity;
+      const nb = Number.isFinite(numB) ? numB : -Infinity;
+      return direction * (na - nb);
+    });
+  }, [filteredStatistics, statsSortColumn, statsSortDirection]);
+
+  const shouldRenderUnifiedWordCloud = normalizedNodeResults.length === 2 && lastCompareNodeIds.length === 2;
 
   const persistTokenPreferences = useCallback(
     async (partial: { token_limit?: number; stop_words?: string[] }) => {
       if (!currentWorkspaceId) return;
+      const taskId = await resolveTokenFrequencyTaskId();
+      if (!taskId) return;
       const payload: Record<string, any> = {};
       if (partial.token_limit !== undefined) {
         payload.token_limit = Math.min(
@@ -523,23 +617,19 @@ function TokenFrequencyFeature() {
         payload.stop_words = partial.stop_words;
       }
       if (Object.keys(payload).length === 0) return;
-      await textApi.postTokenFrequenciesCurrentResult(
-        currentWorkspaceId,
-        payload,
-        getAuthHeaders()
-      );
+      await textApi.postTokenFrequenciesTaskResult(currentWorkspaceId, taskId, payload, getAuthHeaders());
     },
-    [currentWorkspaceId, getAuthHeaders]
+    [currentWorkspaceId, getAuthHeaders, resolveTokenFrequencyTaskId]
   );
 
-  const fetchCurrentRequest = useCallback(async () => {
-    if (!currentWorkspaceId) return null;
-    return textApi.getTokenFrequenciesCurrentRequest(currentWorkspaceId, getAuthHeaders());
+  const fetchCurrentRequest = useCallback(async (taskId?: string | null) => {
+    if (!currentWorkspaceId || !taskId) return null;
+    return textApi.getTaskRequest(currentWorkspaceId, taskId, getAuthHeaders());
   }, [currentWorkspaceId, getAuthHeaders]);
 
-  const fetchCurrentResult = useCallback(async () => {
-    if (!currentWorkspaceId) return null;
-    return textApi.getTokenFrequenciesCurrentResult(currentWorkspaceId, getAuthHeaders());
+  const fetchCurrentResult = useCallback(async (taskId?: string | null) => {
+    if (!currentWorkspaceId || !taskId) return null;
+    return textApi.getTokenFrequenciesTaskResult(currentWorkspaceId, taskId, getAuthHeaders());
   }, [currentWorkspaceId, getAuthHeaders]);
 
   const refreshCurrentTokenFrequencyResult = useCallback(async () => {
@@ -548,7 +638,11 @@ function TokenFrequencyFeature() {
     }
 
     try {
-      const response = await textApi.getTokenFrequenciesCurrentResult(currentWorkspaceId, getAuthHeaders());
+      const taskId = await resolveTokenFrequencyTaskId();
+      if (!taskId) {
+        return null;
+      }
+      const response = await textApi.getTokenFrequenciesTaskResult(currentWorkspaceId, taskId, getAuthHeaders());
       const typedResponse = response as TokenFrequencyResponse | null;
       if (typedResponse) {
         setResults(typedResponse);
@@ -558,7 +652,7 @@ function TokenFrequencyFeature() {
       console.error('Failed to refresh token frequency results automatically', error);
       return null;
     }
-  }, [currentWorkspaceId, getAuthHeaders, setResults]);
+  }, [currentWorkspaceId, getAuthHeaders, resolveTokenFrequencyTaskId, setResults]);
 
   const tokenFrequencyFallbackBanner = useCallback(
     (status: AnalysisTaskStatus) => {
@@ -583,6 +677,20 @@ function TokenFrequencyFeature() {
 
   const handleTokenFrequencyTaskRefresh = useCallback(
     async (context: AnalysisTaskRefreshContext) => {
+      if (context.reason !== 'terminal') {
+        return;
+      }
+
+      const currentState = results?.state;
+      const isTerminalState =
+        currentState === 'successful' ||
+        currentState === 'failed' ||
+        currentState === 'cancelled';
+      const resultTaskId = (results as any)?.metadata?.task_id ?? null;
+      if (isTerminalState && context.taskId && resultTaskId === context.taskId) {
+        return;
+      }
+
       const refreshed = await refreshCurrentTokenFrequencyResult();
       if (!refreshed && context.reason === 'terminal' && context.taskState === 'failed') {
         setResults({
@@ -596,7 +704,7 @@ function TokenFrequencyFeature() {
         setLocalTokenFrequencyTaskId((prev) => (prev === context.taskId ? null : prev));
       }
     },
-    [refreshCurrentTokenFrequencyResult, setResults]
+    [refreshCurrentTokenFrequencyResult, results, setResults]
   );
 
   const {
@@ -604,10 +712,10 @@ function TokenFrequencyFeature() {
     banner: tokenFrequencyWaitingBanner,
   } = useAnalysisTaskLifecycle({
     taskType: 'token_frequencies',
+    isTabActive: isActiveTab,
     workspaceId: currentWorkspaceId,
-    manualActiveTaskId: localTokenFrequencyTaskId,
+    manualActiveTaskId: results?.state === 'running' ? localTokenFrequencyTaskId : null,
     fallbackRunningBanner: tokenFrequencyFallbackBanner,
-    pollWhileActive: true,
     onRefresh: handleTokenFrequencyTaskRefresh,
   });
 
@@ -727,6 +835,9 @@ function TokenFrequencyFeature() {
   const { hydrateFromServer } = useAnalysisHydration<any, TokenFrequencyResponse | null, { token_limit?: number; stop_words?: string[] }>(
     {
       workspaceId: currentWorkspaceId,
+      analysisKey: 'token-frequencies',
+      getAuthHeaders,
+      onTaskIdResolved: setLocalTokenFrequencyTaskId,
       fetchRequest: fetchCurrentRequest,
       fetchResult: fetchCurrentResult,
       applyRequest: applyHydratedRequest,
@@ -736,6 +847,11 @@ function TokenFrequencyFeature() {
       autoHydrateOnVisibility: false,
     }
   );
+
+  const hydrateRef = useRef(hydrateFromServer);
+  useEffect(() => {
+    hydrateRef.current = hydrateFromServer;
+  }, [hydrateFromServer]);
 
   const updateResultsPreferencesLocally = useCallback(
     (prefs: { tokenLimit?: number; stopWords?: string[] }) => {
@@ -902,42 +1018,70 @@ function TokenFrequencyFeature() {
   };
 
   useEffect(() => {
-    if (!currentWorkspaceId) return;
-    void hydrateFromServer();
-  }, [currentWorkspaceId, hydrateFromServer]);
+    if (!currentWorkspaceId || !isActiveTab) return;
+    if (previousWorkspaceIdRef.current !== currentWorkspaceId) {
+      hydratedOnceRef.current = false;
+      previousWorkspaceIdRef.current = currentWorkspaceId;
+    }
+    void (async () => {
+      if (hydratedOnceRef.current) return;
+      hydratedOnceRef.current = true;
+      await hydrateRef.current();
+    })();
+  }, [currentWorkspaceId, isActiveTab]);
+
+  useEffect(() => {
+    if (!shouldRenderUnifiedWordCloud) return;
+
+    const element = unifiedCloudContainerRef.current;
+    if (!element) return;
+
+    const updateWidth = (value: number) => {
+      if (!Number.isFinite(value) || value <= 0) return;
+      const next = Math.min(UNIFIED_WORDCLOUD_MAX_WIDTH, Math.floor(value));
+      setUnifiedCloudWidth((prev) => (prev === next ? prev : next));
+    };
+
+    const initialWidth = element.getBoundingClientRect().width;
+    if (initialWidth) {
+      updateWidth(initialWidth);
+    }
+
+    if (typeof ResizeObserver === 'undefined') {
+      return;
+    }
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      updateWidth(entry.contentRect.width);
+    });
+
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [shouldRenderUnifiedWordCloud]);
 
   useEffect(() => {
     if (!currentWorkspaceId) {
       setLocalTokenFrequencyTaskId(null);
+      resolvedTokenTaskIdRef.current = { workspaceId: null, taskId: null };
+      resolveTokenTaskInflightRef.current = null;
     }
   }, [currentWorkspaceId]);
+
+  useEffect(() => {
+    if (currentWorkspaceId && !results && !localTokenFrequencyTaskId) {
+      if (resolvedTokenTaskIdRef.current.workspaceId === currentWorkspaceId) {
+        resolvedTokenTaskIdRef.current = { workspaceId: currentWorkspaceId, taskId: null };
+      }
+    }
+  }, [currentWorkspaceId, results, localTokenFrequencyTaskId]);
 
   useEffect(() => {
     if (tokenFrequencyTaskStatus.tasks.length === 0) {
       setLocalTokenFrequencyTaskId(null);
     }
   }, [tokenFrequencyTaskStatus.tasks.length]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || typeof document === 'undefined') return;
-    const maybeHydrate = () => {
-      if (document.visibilityState !== 'visible' || !currentWorkspaceId) return;
-      const needsHydration =
-        !results ||
-        (Array.isArray(results?.statistics) &&
-          results.statistics.length === 0 &&
-          lastCompareNodeIds.length === 2);
-      if (needsHydration) {
-        void hydrateFromServer();
-      }
-    };
-    window.addEventListener('focus', maybeHydrate);
-    document.addEventListener('visibilitychange', maybeHydrate);
-    return () => {
-      window.removeEventListener('focus', maybeHydrate);
-      document.removeEventListener('visibilitychange', maybeHydrate);
-    };
-  }, [hydrateFromServer, results, currentWorkspaceId, lastCompareNodeIds]);
 
   // Reset modal page when sort/filter state changes or modal opens
   useEffect(() => {
@@ -950,7 +1094,7 @@ function TokenFrequencyFeature() {
   // Use a more stable dependency by checking the actual node IDs
   useEffect(() => {
     if (!isLocked) setResults(null);
-  }, [selectedNodeIds, isLocked]);
+  }, [selectedNodeIdsKey, isLocked]);
 
   // Recompute auto columns if we become unlocked and selections empty while nodes exist
   useEffect(() => {
@@ -1091,7 +1235,11 @@ function TokenFrequencyFeature() {
       }
 
       try {
-        await textApi.clearTokenFrequencies(currentWorkspaceId, headers);
+        if (taskIds.size > 0) {
+          await Promise.all(
+            Array.from(taskIds).map((taskId) => textApi.clearTask(currentWorkspaceId, taskId, headers))
+          );
+        }
       } catch (error) {
         console.error('Failed to clear backend analyses/cache:', error);
       }
@@ -1322,7 +1470,7 @@ function TokenFrequencyFeature() {
     const fontSizeSetter = (datum: any) => fontScale(datum);
 
     return (
-      <div className="flex justify-center mb-4">
+      <div className="mb-4 flex w-full justify-center overflow-visible">
         <svg
           ref={(el) => {
             if (!el) {
@@ -1333,6 +1481,8 @@ function TokenFrequencyFeature() {
           }}
           width={width}
           height={height}
+          className="overflow-visible"
+          style={{ overflow: 'visible' }}
           xmlns="http://www.w3.org/2000/svg"
         >
           <Wordcloud
@@ -1456,9 +1606,12 @@ function TokenFrequencyFeature() {
             <div>
               <CardTitle className="flex items-center gap-2">
                 Token Frequency Analysis
-                <HelpIcon targetKey="analysis.token-frequency.tab" label="Token frequency overview" />
+                <HelpIcon
+                  targetKey="analysis.token-frequency.parameters"
+                  label="Token frequency parameters"
+                  tooltip="Choose nodes, text columns, token limits, and stop words before running the analysis."
+                />
               </CardTitle>
-              <CardDescription>Inspect token usage and comparative statistics for selected nodes.</CardDescription>
             </div>
           </div>
         </CardHeader>
@@ -1479,7 +1632,7 @@ function TokenFrequencyFeature() {
             getNodeColumns={getColumnInfos}
             allowedDataTypes={['string']}
             originalCount={displayNodeCount}
-            lockedMessage={<AnalysisLockedNotice />}
+            lockedMessage={ANALYSIS_LOCKED_MESSAGE}
           />
         </CardContent>
         <CardFooter className="flex flex-wrap items-center gap-3 pt-0">
@@ -1532,7 +1685,14 @@ function TokenFrequencyFeature() {
       {results?.state === 'successful' && (
         <Card>
           <CardHeader className="space-y-1">
-            <CardTitle>Token Frequency Results</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              Token Frequency Results
+              <HelpIcon
+                targetKey="analysis.token-frequency.results"
+                label="Token frequency results"
+                tooltip="Review token lists, word clouds, and statistical comparisons. Tip: click any token to open Concordance with the same node selections."
+              />
+            </CardTitle>
             {results.message && (
               <CardDescription className="text-sm text-muted-foreground">
                 {results.message}
@@ -1541,14 +1701,6 @@ function TokenFrequencyFeature() {
           </CardHeader>
           <CardContent className="space-y-6">
               <>
-                <div className="rounded-md border border-blue-200 bg-blue-50/80 p-3 text-sm text-blue-800 dark:border-blue-500/40 dark:bg-blue-500/10 dark:text-blue-100">
-                  <div className="flex items-start gap-2">
-                    <Lightbulb className="h-5 w-5 shrink-0" />
-                    <div>
-                      <strong>Tip:</strong> Click any token below to open the Concordance tab preloaded with the same node selections.
-                    </div>
-                  </div>
-                </div>
                 <div className="rounded-md border border-border/60 bg-muted/20 p-3 space-y-4">
                   <div className="flex flex-col gap-2">
                     <span className="uppercase tracking-wide text-[10px] font-semibold text-foreground/80">Number of tokens to show</span>
@@ -1745,7 +1897,10 @@ function TokenFrequencyFeature() {
                     return (
                       <div className="mb-10">
                         <div className="flex items-center justify-between mb-3 flex-wrap gap-4">
-                          <h3 className="text-lg font-semibold text-gray-800">Unified Word Cloud</h3>
+                          <h3 className="flex items-center gap-2 text-lg font-semibold text-gray-800">
+                            Unified Word Cloud
+                            <HelpIcon targetKey="analysis.token-frequency.unified-word-cloud" label="Unified word cloud" />
+                          </h3>
                           <div className="flex items-center space-x-4 text-sm">
                             <div className="flex items-center space-x-1"><span className="w-4 h-4 inline-block rounded" style={{ background: nodeAColor }}></span><span className="text-gray-700 truncate max-w-35" title={nodeAName}>{nodeAName}</span></div>
                             <div className="flex items-center space-x-1"><span className="w-4 h-4 inline-block rounded" style={{ background: nodeBColor }}></span><span className="text-gray-700 truncate max-w-35" title={nodeBName}>{nodeBName}</span></div>
@@ -1766,8 +1921,9 @@ function TokenFrequencyFeature() {
                             Save Word Cloud (PNG)
                           </Button>
                         </div>
-                        <div className="flex justify-center">
+                        <div ref={unifiedCloudContainerRef} className="mx-auto w-full max-w-215">
                           <svg
+                            data-testid="unified-wordcloud-svg"
                             ref={(el) => {
                               if (!el) {
                                 delete wordCloudRefs.current[unifiedKey];
@@ -1775,14 +1931,14 @@ function TokenFrequencyFeature() {
                                 wordCloudRefs.current[unifiedKey] = el;
                               }
                             }}
-                            width={860}
-                            height={260}
+                            width={unifiedCloudWidth}
+                            height={UNIFIED_WORDCLOUD_HEIGHT}
                             xmlns="http://www.w3.org/2000/svg"
                           >
                             <Wordcloud
                               words={words}
-                              width={860}
-                              height={260}
+                              width={unifiedCloudWidth}
+                              height={UNIFIED_WORDCLOUD_HEIGHT}
                               fontSize={fontSizeSetter}
                               font="Segoe UI, Roboto, sans-serif"
                               padding={2}
@@ -1811,7 +1967,6 @@ function TokenFrequencyFeature() {
                             </Wordcloud>
                           </svg>
                         </div>
-                        <p className="mt-2 text-center text-xs text-muted-foreground">Selection uses juxRank = log10(O1+O2) × LogRatio: 50% lowest and 50% highest by juxRank (2× token limit = {2 * limitForCloudBase} tokens). Size = (O1+O2). Color uses relative percentage share (%1 vs %2) so differing corpus sizes don't bias color; shifts toward {nodeAName} (left) or {nodeBName} (right).</p>
                         {/* {debugOn && (
                           <div className="mt-2 rounded border border-border bg-muted/40 p-2">
                             <div className="whitespace-pre-wrap font-mono text-[11px] text-muted-foreground">
@@ -1830,7 +1985,10 @@ function TokenFrequencyFeature() {
                   {/* Statistical Measures Table */}
                   {results.statistics && results.statistics.length > 0 && (
                     <div className="mt-8">
-                      <h3 className="mb-4 text-lg font-semibold text-foreground">Statistical Measures</h3>
+                      <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold text-foreground">
+                        Statistical Measures
+                        <HelpIcon targetKey="analysis.token-frequency.statistical-measures" label="Statistical measures" />
+                      </h3>
                       <div className="mb-4 flex flex-wrap items-center gap-4">
                         <div>
                           <label className="mb-1 block text-xs font-medium text-muted-foreground">Head/Tail Rows (N)</label>
@@ -1842,29 +2000,6 @@ function TokenFrequencyFeature() {
                             onChange={e => setHeadTailN(Math.max(1, Math.min(200, parseInt(e.target.value) || 1)))}
                             className="w-28 rounded-md border border-input px-2 py-1 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                           />
-                        </div>
-                        <div className="max-w-xl text-xs text-muted-foreground">
-                          Showing first N and last N rows of the sorted table (with ellipsis if truncated). Sorting always applies to the full set before trimming.
-                        </div>
-                      </div>
-                      <div className="mb-4 rounded-lg border border-border bg-muted/40 p-3">
-                        <div className="text-sm text-muted-foreground">
-                          <strong>Statistical Analysis Key:</strong>
-                          <br />
-                          <strong>O1/O2:</strong> Observed frequencies in each dataset &nbsp;&nbsp;
-                          <strong>%1/%2:</strong> Percentage of total tokens in each dataset
-                          <br />
-                          <strong>LL:</strong> Log Likelihood G2 statistic (higher = more significant difference) &nbsp;&nbsp;
-                          <strong>%DIFF:</strong> Percentage point difference between datasets
-                          <br />
-                          <strong>Bayes:</strong> Bayes Factor (BIC) &nbsp;&nbsp;
-                          <strong>ELL:</strong> Effect Size for Log Likelihood &nbsp;&nbsp;
-                          <strong>RRisk:</strong> Relative Risk ratio
-                          <br />
-                          <strong>LogRatio:</strong> Log of relative frequencies &nbsp;&nbsp;
-                          <strong>OddsRatio:</strong> Odds ratio between datasets
-                          <br />
-                          <strong>Significance:</strong> **** p&lt;0.0001, *** p&lt;0.001, ** p&lt;0.01, * p&lt;0.05
                         </div>
                       </div>
                       
@@ -1904,46 +2039,16 @@ function TokenFrequencyFeature() {
                           }
                         };
 
-                        const raw = results.statistics
-                          .filter((stat: any) => !appliedStopSet.has(String(stat.token || '').toLowerCase()))
-                          .filter((stat: any) => stat.log_likelihood_llv > 0);
-
-                        const sorted = (() => {
-                          const colActive = statsSortColumn || 'log_likelihood_llv';
-                          return [...raw].sort((a, b) => {
-                            const col = statsSortColumn;
-                            if (col === 'significance') {
-                              const rank = (s: any) => (s.significance || '').length; // more * = higher
-                              const va = rank(a); const vb = rank(b);
-                              return statsSortDirection === 'asc' ? va - vb : vb - va;
-                            }
-                            const def = columns.find(c => c.key === colActive);
-                            if (!def) return 0;
-                            const va = def.accessor(a);
-                            const vb = def.accessor(b);
-                            if (typeof va === 'string' || typeof vb === 'string') {
-                              const sa = (va ?? '').toString();
-                              const sb = (vb ?? '').toString();
-                              if (sa < sb) return statsSortDirection === 'asc' ? -1 : 1;
-                              if (sa > sb) return statsSortDirection === 'asc' ? 1 : -1;
-                              return 0;
-                            }
-                            const na = (va === null || va === undefined || Number.isNaN(va)) ? -Infinity : va;
-                            const nb = (vb === null || vb === undefined || Number.isNaN(vb)) ? -Infinity : vb;
-                            return statsSortDirection === 'asc' ? na - nb : nb - na;
-                          });
-                        })();
-
-                        const total = sorted.length;
+                        const total = sortedStatistics.length;
                         const n = headTailN;
                         let display: any[] = [];
                         let truncated = false;
                         if (total <= n * 2) {
-                          display = sorted; // no truncation
+                          display = sortedStatistics; // no truncation
                         } else {
                           truncated = true;
-                          const head = sorted.slice(0, n);
-                          const tail = sorted.slice(total - n);
+                          const head = sortedStatistics.slice(0, n);
+                          const tail = sortedStatistics.slice(total - n);
                           // Insert placeholder object to render a middle button instead of ellipsis
                           display = [...head, { __showAllButton: true, key: '__showAllButton' }, ...tail];
                         }
@@ -2019,10 +2124,6 @@ function TokenFrequencyFeature() {
                         );
                       })()}
                       {showFullStatsModal && (() => {
-                        // Reuse same filtering + sorting to show full table live
-                        const modalRaw = results.statistics
-                          .filter((stat: any) => !appliedStopSet.has(String(stat.token || '').toLowerCase()))
-                          .filter((stat: any) => stat.log_likelihood_llv > 0);
                         // Rebuild columns with labels & formatters (duplicate of earlier definition to keep scope simple)
                         const columns = [
                           { key: 'token', label: 'Token', accessor: (s: any) => s.token },
@@ -2048,47 +2149,7 @@ function TokenFrequencyFeature() {
                               {s.significance || 'n.s.'}
                             </span>) }
                         ];
-                        // Re-create columns definition to access inside this closure
-                        const modalColumns = [
-                          { key: 'token', accessor: (s: any) => s.token },
-                          { key: 'freq_corpus_0', accessor: (s: any) => s.freq_corpus_0 },
-                          { key: 'percent_corpus_0', accessor: (s: any) => s.percent_corpus_0 },
-                          { key: 'freq_corpus_1', accessor: (s: any) => s.freq_corpus_1 },
-                          { key: 'percent_corpus_1', accessor: (s: any) => s.percent_corpus_1 },
-                          { key: 'log_likelihood_llv', accessor: (s: any) => s.log_likelihood_llv },
-                          { key: 'percent_diff', accessor: (s: any) => s.percent_diff },
-                          { key: 'bayes_factor_bic', accessor: (s: any) => s.bayes_factor_bic },
-                          { key: 'effect_size_ell', accessor: (s: any) => s.effect_size_ell },
-                          { key: 'relative_risk', accessor: (s: any) => s.relative_risk },
-                          { key: 'log_ratio', accessor: (s: any) => s.log_ratio },
-                          { key: 'odds_ratio', accessor: (s: any) => s.odds_ratio },
-                          { key: 'significance', accessor: (s: any) => s.significance || '' }
-                        ];
-                        const modalSorted = (() => {
-                          const colActive = statsSortColumn || 'log_likelihood_llv';
-                          return [...modalRaw].sort((a, b) => {
-                            const col = statsSortColumn;
-                            if (col === 'significance') {
-                              const rank = (s: any) => (s.significance || '').length;
-                              const va = rank(a); const vb = rank(b);
-                              return statsSortDirection === 'asc' ? va - vb : vb - va;
-                            }
-                            const def = modalColumns.find(c => c.key === colActive);
-                            if (!def) return 0;
-                            const va = def.accessor(a);
-                            const vb = def.accessor(b);
-                            if (typeof va === 'string' || typeof vb === 'string') {
-                              const sa = (va ?? '').toString();
-                              const sb = (vb ?? '').toString();
-                              if (sa < sb) return statsSortDirection === 'asc' ? -1 : 1;
-                              if (sa > sb) return statsSortDirection === 'asc' ? 1 : -1;
-                              return 0;
-                            }
-                            const na = (va === null || va === undefined || Number.isNaN(va)) ? -Infinity : va;
-                            const nb = (vb === null || vb === undefined || Number.isNaN(vb)) ? -Infinity : vb;
-                            return statsSortDirection === 'asc' ? na - nb : nb - na;
-                          });
-                        })();
+                        const modalSorted = sortedStatistics;
 
                         // Pagination over sorted rows (number_of_columns)
                         const totalRows = modalSorted.length;
@@ -2260,9 +2321,7 @@ function TokenFrequencyFeature() {
                         );
                       })()}
                       
-                      {(results.statistics
-                        .filter((stat: any) => !appliedStopSet.has(String(stat.token || '').toLowerCase()))
-                        .filter((stat: any) => stat.log_likelihood_llv > 0).length === 0) && (
+                      {(filteredStatistics.length === 0) && (
                         <div className="text-center py-8 text-gray-500">
                           No significant differences found between the selected datasets.
                         </div>

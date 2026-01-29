@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { filesApi } from '../api/files';
 import { FileInfo, FileListResponse } from '../types';
@@ -11,8 +11,8 @@ interface UseFilesProps {
 
 export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {}) => {
   const queryClient = useQueryClient();
-  const normalizedHeaders = useMemo(() => authHeaders ?? {}, [authHeaders]);
-  const headerSignature = useMemo(() => JSON.stringify(normalizedHeaders), [normalizedHeaders]);
+  const normalizedHeaders = authHeaders ?? {};
+  const headerSignature = JSON.stringify(normalizedHeaders);
   const filesQuery = useQuery<FileListResponse>({
     queryKey: [...queryKeys.files, headerSignature],
     queryFn: () => filesApi.list(normalizedHeaders),
@@ -39,12 +39,12 @@ export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {
 
   const files = (filesQuery.data?.files || []) as FileInfo[];
   const fileListResponse = filesQuery.data ?? null;
-  const refetchFiles = useCallback(async () => {
+  const refetchFiles = async () => {
     const result = await filesQuery.refetch();
     return result.data ?? null;
-  }, [filesQuery]);
+  };
 
-  const handleLoadFile = useCallback(async (filename: string) => {
+  const handleLoadFile = async (filename: string) => {
     setLoading(true);
     try {
   // Loading a file into a workspace context isn't part of filesApi; retaining placeholder if backend adds it.
@@ -57,9 +57,9 @@ export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {
     } finally {
       setLoading(false);
     }
-  }, [authHeaders]);
+  };
 
-  const handleUploadFile = useCallback(async (file: File) => {
+  const handleUploadFile = async (file: File) => {
     try {
       await uploadMutation.mutateAsync(file);
       await refetchFiles();
@@ -68,9 +68,9 @@ export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {
       console.error('Failed to upload file:', error);
       return false;
     }
-  }, [uploadMutation, refetchFiles]);
+  };
 
-  const handleDeleteFile = useCallback(async (filename: string) => {
+  const handleDeleteFile = async (filename: string) => {
     try {
       await deleteMutation.mutateAsync(filename);
       await refetchFiles();
@@ -85,9 +85,9 @@ export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {
       console.error('Failed to delete file:', error);
       return false;
     }
-  }, [deleteMutation, refetchFiles, selectedFile, loadedFile]);
+  };
 
-  const handleDownloadFile = useCallback(async (filename: string) => {
+  const handleDownloadFile = async (filename: string) => {
     try {
       const blob = await filesApi.download(filename, normalizedHeaders);
       const url = window.URL.createObjectURL(new Blob([blob]));
@@ -103,7 +103,7 @@ export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {
       console.error('Failed to download file:', error);
       return false;
     }
-  }, [normalizedHeaders]);
+  };
 
   return {
     files,

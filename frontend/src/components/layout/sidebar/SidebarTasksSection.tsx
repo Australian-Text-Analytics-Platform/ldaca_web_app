@@ -35,21 +35,17 @@ const SidebarTasksSection: React.FC<SidebarTasksSectionProps> = ({
   onCancelTask,
   onClearTask,
 }) => {
-  const sortedTasks = React.useMemo(() => {
-    if (!Array.isArray(tasks)) return [];
-    return tasks
-      .slice()
-      .sort((a, b) => {
-        const kb = b.finished_at ?? b.started_at ?? b.created_at ?? 0;
-        const ka = a.finished_at ?? a.started_at ?? a.created_at ?? 0;
-        return kb - ka;
-      });
-  }, [tasks]);
+  const sortedTasks = Array.isArray(tasks)
+    ? tasks
+        .slice()
+        .sort((a, b) => {
+          const kb = b.finished_at ?? b.started_at ?? b.created_at ?? 0;
+          const ka = a.finished_at ?? a.started_at ?? a.created_at ?? 0;
+          return kb - ka;
+        })
+    : [];
 
-  const statusMeta = React.useCallback(
-    (status?: string) => STATUS_META[status ?? ''] ?? STATUS_META.default,
-    []
-  );
+  const statusMeta = (status?: string) => STATUS_META[status ?? ''] ?? STATUS_META.default;
 
   const connectionLabel = connectionError
     ? connectionError
@@ -141,7 +137,7 @@ const SidebarTasksSection: React.FC<SidebarTasksSectionProps> = ({
                     <Progress
                       value={progressPercent}
                       className={cn('h-1.5', {
-                        'bg-emerald-500/20 [&_[data-slot=progress-indicator]]:bg-emerald-500':
+                        'bg-emerald-500/20 **:data-[slot=progress-indicator]:bg-emerald-500':
                           task.state === 'successful',
                       })}
                     />

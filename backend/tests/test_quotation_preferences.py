@@ -4,8 +4,9 @@ from unittest.mock import MagicMock
 
 import polars as pl
 import pytest
-from ldaca_web_app_backend.analysis.implementations.quotation import QuotationRequest
-from ldaca_web_app_backend.analysis.manager import get_analysis_manager
+from ldaca_web_app_backend.analysis.implementations.quotation import \
+    QuotationRequest
+from ldaca_web_app_backend.analysis.manager import get_task_manager
 from ldaca_web_app_backend.analysis.results import GenericAnalysisResult
 from ldaca_web_app_backend.core.workspace import workspace_manager
 from ldaca_web_app_backend.models import QuotationEngineConfig
@@ -16,7 +17,7 @@ TASK = "quotation"
 
 
 def _prime_workspace_state():
-    """Prime workspace state for AnalysisManager-backed tests."""
+    """Prime workspace state for TaskManager-backed tests."""
     base_df = pl.DataFrame({"text": ["alpha doc", "beta doc"]})
 
     class DummyWorkspace:
@@ -39,19 +40,20 @@ def _prime_workspace_state():
 
 def _cleanup_workspace_state():
     workspace_manager._current.pop(USER_ID, None)  # type: ignore[attr-defined]
-    manager = get_analysis_manager(USER_ID, WORKSPACE_ID)
-    manager.clear_all()
+    task_manager = get_task_manager(USER_ID, WORKSPACE_ID)
+    task_manager.clear_all()
 
 
 def _seed_paginated_analysis(rows: List[Dict[str, Any]], context_length: int = 15):
     _prime_workspace_state()
-    manager = get_analysis_manager(USER_ID, WORKSPACE_ID)
+    task_manager = get_task_manager(USER_ID, WORKSPACE_ID)
     request = QuotationRequest(node_id="node-1", column="text")
-    task = manager.create_task(TASK, request)
+    task_id = task_manager.create_task(request)
+    task = task_manager.get_task(task_id)
 
     result_dict = {
         "data": [rows[0]] if rows else [],
-        "columns": list(rows[0].keys()) if rows else ["document_idx"],
+        "columns": list(rows[0].keys()) if rows else [],
         "total_rows": len(rows),
         "pagination": {
             "page": 1,
@@ -60,32 +62,35 @@ def _seed_paginated_analysis(rows: List[Dict[str, Any]], context_length: int = 1
             "has_next": len(rows) > 1,
             "has_prev": False,
         },
-        "sorting": {"sort_by": "document_idx", "sort_order": "asc"},
+        "sorting": {"sort_by": None, "sort_order": "asc"},
         "preferences": {"context_length": context_length},
     }
 
     result = GenericAnalysisResult(result_dict)
     task.complete(result)
-    manager.update_task(task)
+    task_manager.save_task(task)
+    task_manager.set_current_task("quotation", task_id)
+    return task_id
 
 
 @pytest.fixture
 def seeded_paginated_quotation():
     rows = [
-        {"document_idx": 0, "quote": "alpha"},
-        {"document_idx": 1, "quote": "beta"},
+        {"quote": "alpha"},
+        {"quote": "beta"},
     ]
-    _seed_paginated_analysis(rows)
-    yield
+    task_id = _seed_paginated_analysis(rows)
+    yield task_id
     _cleanup_workspace_state()
 
 
 @pytest.fixture
 def seeded_quotation_analysis():
     _prime_workspace_state()
-    manager = get_analysis_manager(USER_ID, WORKSPACE_ID)
+    task_manager = get_task_manager(USER_ID, WORKSPACE_ID)
     request = QuotationRequest(node_id="node-1", column="text")
-    task = manager.create_task(TASK, request)
+    task_id = task_manager.create_task(request)
+    task = task_manager.get_task(task_id)
 
     result = GenericAnalysisResult({
         "data": [],
@@ -93,9 +98,10 @@ def seeded_quotation_analysis():
         "preferences": {"context_length": 15},
     })
     task.complete(result)
-    manager.update_task(task)
+    task_manager.save_task(task)
+    task_manager.set_current_task("quotation", task_id)
 
-    yield
+    yield task_id
     _cleanup_workspace_state()
 
 
@@ -103,16 +109,17 @@ def seeded_quotation_analysis():
 async def test_update_context_length_persists_preference(
     authenticated_client, seeded_quotation_analysis
 ):
+    task_id = seeded_quotation_analysis
     response = await authenticated_client.post(
-        f"/api/workspaces/{WORKSPACE_ID}/quotation/current-result",
+        f"/api/workspaces/{WORKSPACE_ID}/quotation/tasks/{task_id}/result",
         json={"context_length": 42},
     )
     assert response.status_code == 200
     payload = response.json()
     assert payload["data"]["context_length"] == 42
 
-    manager = get_analysis_manager(USER_ID, WORKSPACE_ID)
-    task = manager.get_current_task(TASK)
+    task_manager = get_task_manager(USER_ID, WORKSPACE_ID)
+    task = task_manager.get_task(task_id)
     assert task is not None
     assert task.result.data["preferences"]["context_length"] == 42
 
@@ -121,31 +128,32 @@ async def test_update_context_length_persists_preference(
 async def test_update_context_length_clamps_bounds(authenticated_client):
     _prime_workspace_state()
 
-    manager = get_analysis_manager(USER_ID, WORKSPACE_ID)
+    task_manager = get_task_manager(USER_ID, WORKSPACE_ID)
     request = QuotationRequest(node_id="node-1", column="text")
-    task = manager.create_task(TASK, request)
+    task_id = task_manager.create_task(request)
+    task = task_manager.get_task(task_id)
 
     result = GenericAnalysisResult({"data": [], "columns": []})
     task.complete(result)
-    manager.update_task(task)
+    task_manager.save_task(task)
+    task_manager.set_current_task("quotation", task_id)
 
     try:
         high_response = await authenticated_client.post(
-            f"/api/workspaces/{WORKSPACE_ID}/quotation/current-result",
+            f"/api/workspaces/{WORKSPACE_ID}/quotation/tasks/{task_id}/result",
             json={"context_length": 99999},
         )
         assert high_response.status_code == 200
         assert high_response.json()["data"]["context_length"] == 2000
 
         low_response = await authenticated_client.post(
-            f"/api/workspaces/{WORKSPACE_ID}/quotation/current-result",
+            f"/api/workspaces/{WORKSPACE_ID}/quotation/tasks/{task_id}/result",
             json={"context_length": -5},
         )
         assert low_response.status_code == 200
         assert low_response.json()["data"]["context_length"] == 0
 
-        manager = get_analysis_manager(USER_ID, WORKSPACE_ID)
-        task = manager.get_current_task(TASK)
+        task = task_manager.get_task(task_id)
         assert task is not None
         assert task.result is not None
         result = task.result.to_json()
@@ -159,14 +167,16 @@ async def test_update_context_length_clamps_bounds(authenticated_client):
 async def test_quotation_current_result_respects_page_params(
     authenticated_client, seeded_paginated_quotation, monkeypatch
 ):
+    task_id = seeded_paginated_quotation
+
     async def fake_compute(node, base_df, column, engine, *, use_base_only=False):
-        doc_ids = base_df.get_column("document_idx").to_list()
+        doc_texts = base_df.get_column(column).to_list()
         rows = []
-        for idx in doc_ids:
-            if idx == 0:
-                rows.append({"document_idx": 0, "quote": "alpha"})
-            elif idx == 1:
-                rows.append({"document_idx": 1, "quote": "beta"})
+        for text in doc_texts:
+            if "alpha" in text:
+                rows.append({"quote": "alpha"})
+            elif "beta" in text:
+                rows.append({"quote": "beta"})
         return pl.DataFrame(rows)
 
     monkeypatch.setattr(
@@ -174,7 +184,7 @@ async def test_quotation_current_result_respects_page_params(
         fake_compute,
     )
     response = await authenticated_client.get(
-        f"/api/workspaces/{WORKSPACE_ID}/quotation/current-result",
+        f"/api/workspaces/{WORKSPACE_ID}/quotation/tasks/{task_id}/result",
         params={"page": 2, "page_size": 1},
     )
     assert response.status_code == 200
@@ -187,14 +197,16 @@ async def test_quotation_current_result_respects_page_params(
 async def test_update_quotation_current_result_returns_page_payload(
     authenticated_client, seeded_paginated_quotation, monkeypatch
 ):
+    task_id = seeded_paginated_quotation
+
     async def fake_compute(node, base_df, column, engine, *, use_base_only=False):
-        doc_ids = base_df.get_column("document_idx").to_list()
+        doc_texts = base_df.get_column(column).to_list()
         rows = []
-        for idx in doc_ids:
-            if idx == 0:
-                rows.append({"document_idx": 0, "quote": "alpha"})
-            elif idx == 1:
-                rows.append({"document_idx": 1, "quote": "beta"})
+        for text in doc_texts:
+            if "alpha" in text:
+                rows.append({"quote": "alpha"})
+            elif "beta" in text:
+                rows.append({"quote": "beta"})
         return pl.DataFrame(rows)
 
     monkeypatch.setattr(
@@ -202,7 +214,7 @@ async def test_update_quotation_current_result_returns_page_payload(
         fake_compute,
     )
     response = await authenticated_client.post(
-        f"/api/workspaces/{WORKSPACE_ID}/quotation/current-result",
+        f"/api/workspaces/{WORKSPACE_ID}/quotation/tasks/{task_id}/result",
         json={"page": 2, "page_size": 1},
     )
     assert response.status_code == 200
@@ -215,17 +227,18 @@ async def test_update_quotation_current_result_returns_page_payload(
 async def test_quotation_current_result_returns_all_quotes_for_document_page(
     authenticated_client, seeded_paginated_quotation, monkeypatch
 ):
+    task_id = seeded_paginated_quotation
     """Page size is in documents; all quotes within the selected docs should be returned."""
 
     async def fake_compute(node, base_df, column, engine, *, use_base_only=False):
-        doc_ids = base_df.get_column("document_idx").to_list()
+        doc_texts = base_df.get_column(column).to_list()
         rows = []
-        for idx in doc_ids:
-            if idx == 0:
-                rows.append({"document_idx": 0, "quote": "alpha-1", "quote_row_idx": 0})
-                rows.append({"document_idx": 0, "quote": "alpha-2", "quote_row_idx": 1})
-            elif idx == 1:
-                rows.append({"document_idx": 1, "quote": "beta-1", "quote_row_idx": 0})
+        for text in doc_texts:
+            if "alpha" in text:
+                rows.append({"quote": "alpha-1", "quote_row_idx": 0})
+                rows.append({"quote": "alpha-2", "quote_row_idx": 1})
+            elif "beta" in text:
+                rows.append({"quote": "beta-1", "quote_row_idx": 0})
         return pl.DataFrame(rows)
 
     monkeypatch.setattr(
@@ -234,7 +247,7 @@ async def test_quotation_current_result_returns_all_quotes_for_document_page(
     )
 
     response = await authenticated_client.get(
-        f"/api/workspaces/{WORKSPACE_ID}/quotation/current-result",
+        f"/api/workspaces/{WORKSPACE_ID}/quotation/tasks/{task_id}/result",
         params={"page": 1, "page_size": 1},
     )
     assert response.status_code == 200
@@ -261,20 +274,20 @@ async def test_quotation_endpoint_recomputes_on_demand(
         "ws": DummyWorkspace(base_df),
         "path": None,
     }
-    # No workspace-level analysis bucket; AnalysisManager holds in-memory state.
+    # No workspace-level analysis bucket; TaskManager holds in-memory state.
 
     recompute_called = False
 
     async def fake_compute(node, base_df_slice, column, engine, *, use_base_only=False):
         nonlocal recompute_called
         recompute_called = True
-        doc_ids = base_df_slice.get_column("document_idx").to_list()
+        doc_texts = base_df_slice.get_column(column).to_list()
         rows = []
-        for idx in doc_ids:
-            if idx == 0:
-                rows.append({"document_idx": 0, "quote": "alpha"})
-            elif idx == 1:
-                rows.append({"document_idx": 1, "quote": "beta"})
+        for text in doc_texts:
+            if "alpha" in text:
+                rows.append({"quote": "alpha"})
+            elif "beta" in text:
+                rows.append({"quote": "beta"})
         return pl.DataFrame(rows)
 
     monkeypatch.setattr(

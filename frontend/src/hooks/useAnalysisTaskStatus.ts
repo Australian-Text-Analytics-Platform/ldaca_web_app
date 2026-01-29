@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { useAnalysisStore } from '../stores/analysisStore';
 import type { TaskItem } from '../stores/analysisStore';
 
@@ -25,17 +24,11 @@ export interface AnalysisTaskStatus {
 export const useAnalysisTaskStatus = (taskType: string): AnalysisTaskStatus => {
   const tasks = useAnalysisStore((state) => state.tasks);
 
-  const filteredTasks = useMemo(() => {
-    if (!Array.isArray(tasks)) {
-      return [] as TaskItem[];
-    }
-    return tasks.filter((task) => task?.task_type === taskType);
-  }, [tasks, taskType]);
+  const filteredTasks = Array.isArray(tasks)
+    ? tasks.filter((task) => task?.task_type === taskType)
+    : ([] as TaskItem[]);
 
-  const sortedTasks = useMemo(
-    () => filteredTasks.slice().sort((a, b) => getTaskTimestamp(b) - getTaskTimestamp(a)),
-    [filteredTasks]
-  );
+  const sortedTasks = filteredTasks.slice().sort((a, b) => getTaskTimestamp(b) - getTaskTimestamp(a));
 
   const runningTask = sortedTasks.find((task) => task?.state === 'running') ?? null;
   const queuedTask =
@@ -47,7 +40,15 @@ export const useAnalysisTaskStatus = (taskType: string): AnalysisTaskStatus => {
   const successfulTask = persistedTask ?? sortedTasks.find((task) => task?.state === 'successful') ?? null;
   const failedTask = sortedTasks.find((task) => task?.state === 'failed') ?? null;
   const cancelledTask = sortedTasks.find((task) => task?.state === 'cancelled') ?? null;
-  const terminalTask = successfulTask ?? failedTask ?? cancelledTask ?? null;
+  const terminalTask =
+    sortedTasks.find((task) =>
+      Boolean(
+        task?.result_persisted ||
+          task?.state === 'successful' ||
+          task?.state === 'failed' ||
+          task?.state === 'cancelled'
+      )
+    ) ?? null;
 
   const activeCandidate = runningTask ?? queuedTask;
   const activeTaskId = activeCandidate?.task_id ?? null;

@@ -1,93 +1,111 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ColumnInfo, filterColumnsByType, mapColumnsToInfo, normalizeTypeName } from '../utils/columnTypes';
 import columnPersistence from '../utils/columnPersistence';
 
-/** Represents a chosen text column for a node */
 export interface NodeColumnSelection {
   nodeId: string;
-  column: string; // empty string means 'not chosen yet'
+  column: string;
 }
 
 export interface UseAutoNodeColumnsOptions {
-  /** Workspace id to namespace persistence. If absent, persistence is disabled. */
-  workspaceId?: string | null;
-  /** Max nodes considered (e.g. 2 for pairwise comparisons) */
+  selectedNodes: any[];
   maxNodes?: number;
-  /** Whether the panel is locked (do not mutate selections automatically) */
-  isLocked?: boolean;
-  /** Additional storage key suffix (tab identifier) so different tabs can share or separate.  If omitted both TokenFrequency + Concordance intentionally share. */
-  storageScope?: string; // if undefined both tabs share; pass distinct value to isolate
-  /** If true we only auto-pick a default column when nodeType contains 'Doc' (current behaviour in existing tabs). */
+  allowedDataTypes?: string[];
   docTypeOnly?: boolean;
-  /** Enable heuristic guessing for non DocType nodes (currently off to preserve prior behaviour). */
   enableHeuristicGuess?: boolean;
-  /** Heuristic candidate column names (case-insensitive) used when guessing. */
   heuristicCandidates?: string[];
-  /** If true selections are persisted in sessionStorage (default true). */
   persist?: boolean;
+  workspaceId?: string | null;
+  storageScope?: string;
+  isLocked?: boolean;
+  getNodeColumns?: (node: any) => string[] | ColumnInfo[] | undefined;
+  fallbackToAllColumns?: boolean;
 }
 
-interface AutoNodeColumnsHookReturn {
-  selections: NodeColumnSelection[];
-  /** Update a single node selection */
-  setSelection: (nodeId: string, column: string) => void;
-  /** Replace or merge multiple selections (used by hydration). */
-  setSelections: (next: NodeColumnSelection[], opts?: { replace?: boolean; persist?: boolean }) => void;
-  /** Force a recomputation of auto selections for currently selected nodes (ignores locked). */
-  recompute: () => void;
+interface ColumnOptionInfo {
+  columns: ColumnInfo[];
+  filteredOutByType: boolean;
 }
 
-/**
- * Shared hook that:
- * 1. Maintains node -> text column selections.
- * 2. Auto-selects a default column for Doc* nodes (document field) or heuristic fallback if enabled.
- * 3. Persists selections per workspace (sessionStorage) so switching tabs retains user choices.
- * 4. Never overwrites an explicit user choice or a hydrated backend request unless replace=true.
- * 5. Designed to be tab-agnostic; by default Concordance & Token Frequency share the same persisted mapping.
- *
- * Persistence Strategy:
- *  - sessionStorage over localStorage so a fresh browser session starts clean while intra-session tab switches retain state.
- *  - Key pattern: autoNodeCols:<workspaceId>[:<scope>]
- *
- * Future Enhancements:
- *  - Optional per-node last-used multi-column memory.
- *  - Support for explicit reset/clear action.
- *
- * Testing Notes:
- *  - Frontend test harness not yet established for hooks; a TODO marker is placed below for future jest/react-testing-library coverage.
- */
 type NodeColumnSource = string[] | ColumnInfo[];
 
-export function useAutoNodeColumns(
-  params: {
-    selectedNodes: any[];
-    getNodeColumns?: (node: any) => NodeColumnSource;
-    allowedDataTypes?: string[];
-    fallbackToAllColumns?: boolean;
-  },
-  options: UseAutoNodeColumnsOptions = {}
-): AutoNodeColumnsHookReturn {
-  const {
-    selectedNodes,
-    getNodeColumns,
-    allowedDataTypes = [],
-    fallbackToAllColumns = false,
-  } = params;
-  const {
-    workspaceId,
-    maxNodes = 2,
-    isLocked = false,
-    storageScope, // intentionally undefined so TokenFrequency + Concordance share by default
-    docTypeOnly = true,
-    enableHeuristicGuess = false,
-    heuristicCandidates = ['text','body','content','document','transcript','message','utterance'],
-    persist = true,
-  } = options;
+const DEFAULT_HEURISTIC_CANDIDATES = ['document', 'text', 'content', 'body', 'transcript'];
 
+const extractDocumentColumn = (node: any): string => {
+  const dataColumn = (node?.data as { documentColumn?: string } | undefined)?.documentColumn;
+  if (typeof dataColumn === 'string' && dataColumn.length) return dataColumn;
+  const nodeColumn = (node as { documentColumn?: string } | undefined)?.documentColumn;
+  if (typeof nodeColumn === 'string' && nodeColumn.length) return nodeColumn;
+  return '';
+};
+
+const resolveNodeId = (node: any, idx: number): string => {
+  return (
+    node?.id ||
+    node?.node_id ||
+    node?.data?.id ||
+    node?.data?.node_id ||
+    node?.unique_id ||
+    `node-${idx}`
+  );
+};
+
+const normalizeColumns = (columns: ColumnInfo[]): ColumnInfo[] => {
+  return columns.map((col) => ({
+    name: col.name,
+    dataType: normalizeTypeName(col.dataType),
+  }));
+};
+
+export const useAutoNodeColumns = ({
+  selectedNodes,
+  maxNodes = 2,
+  allowedDataTypes,
+  docTypeOnly = false,
+  enableHeuristicGuess = true,
+  heuristicCandidates = DEFAULT_HEURISTIC_CANDIDATES,
+  persist = true,
+  workspaceId,
+  storageScope = 'analysis',
+  isLocked = false,
+  getNodeColumns,
+  fallbackToAllColumns = true,
+}: UseAutoNodeColumnsOptions) => {
   const [selections, setSelectionsState] = useState<NodeColumnSelection[]>([]);
   const lastSelectedIdsRef = useRef<string[]>([]);
+  const selectedNodesRef = useRef(selectedNodes);
+  const maxNodesRef = useRef(maxNodes);
+  const allowedDataTypesRef = useRef(allowedDataTypes);
+  const docTypeOnlyRef = useRef(docTypeOnly);
+  const enableHeuristicGuessRef = useRef(enableHeuristicGuess);
+  const heuristicCandidatesRef = useRef(heuristicCandidates);
+  const isLockedRef = useRef(isLocked);
+  const getNodeColumnsRef = useRef(getNodeColumns);
+  const fallbackToAllColumnsRef = useRef(fallbackToAllColumns);
 
-  const persistenceCtx = useMemo(() => {
+  useEffect(() => {
+    selectedNodesRef.current = selectedNodes;
+    maxNodesRef.current = maxNodes;
+    allowedDataTypesRef.current = allowedDataTypes;
+    docTypeOnlyRef.current = docTypeOnly;
+    enableHeuristicGuessRef.current = enableHeuristicGuess;
+    heuristicCandidatesRef.current = heuristicCandidates;
+    isLockedRef.current = isLocked;
+    getNodeColumnsRef.current = getNodeColumns;
+    fallbackToAllColumnsRef.current = fallbackToAllColumns;
+  }, [
+    selectedNodes,
+    maxNodes,
+    allowedDataTypes,
+    docTypeOnly,
+    enableHeuristicGuess,
+    heuristicCandidates,
+    isLocked,
+    getNodeColumns,
+    fallbackToAllColumns,
+  ]);
+
+  const resolvePersistenceContext = () => {
     if (!persist || !workspaceId) {
       return null;
     }
@@ -96,22 +114,26 @@ export function useAutoNodeColumns(
       scope: storageScope,
       storage: 'session' as const,
     };
-  }, [persist, workspaceId, storageScope]);
+  };
 
   useEffect(() => {
+    const persistenceCtx = resolvePersistenceContext();
     if (!persistenceCtx) {
       if (!workspaceId) {
         setSelectionsState([]);
       }
       return;
     }
-
     const persisted = columnPersistence.readAll(persistenceCtx);
-    const hydrated = Object.entries(persisted).map(([nodeId, column]) => ({ nodeId, column }));
-    setSelectionsState(hydrated);
-  }, [persistenceCtx, workspaceId]);
+    if (persisted) {
+      const hydrated = Object.entries(persisted).map(([nodeId, column]) => ({ nodeId, column }));
+      setSelectionsState(hydrated);
+      lastSelectedIdsRef.current = hydrated.map(({ nodeId }) => nodeId);
+    }
+  }, [persist, storageScope, workspaceId]);
 
-  const persistSelections = useCallback((next: NodeColumnSelection[]) => {
+  const persistSelections = (next: NodeColumnSelection[]) => {
+    const persistenceCtx = resolvePersistenceContext();
     if (!persistenceCtx) return;
     const map: Record<string, string> = {};
     next.forEach(({ nodeId, column }) => {
@@ -120,117 +142,145 @@ export function useAutoNodeColumns(
       }
     });
     columnPersistence.storeAll(persistenceCtx, map);
-  }, [persistenceCtx]);
+  };
 
-  const setSelections = useCallback((next: NodeColumnSelection[], opts?: { replace?: boolean; persist?: boolean }) => {
-    setSelectionsState(prev => {
+  const setSelections = (next: NodeColumnSelection[], opts?: { replace?: boolean; persist?: boolean }) => {
+    setSelectionsState((prev) => {
       let updated: NodeColumnSelection[];
       if (opts?.replace) {
-        updated = [...next];
+        updated = next;
       } else {
-        // merge by nodeId
-        const map = new Map<string,string>();
-        prev.forEach(p => map.set(p.nodeId, p.column));
-        next.forEach(n => { map.set(n.nodeId, n.column); });
-        updated = Array.from(map.entries()).map(([nodeId, column]) => ({ nodeId, column }));
+        const map = new Map<string, NodeColumnSelection>();
+        prev.forEach((sel) => map.set(sel.nodeId, sel));
+        next.forEach((sel) => map.set(sel.nodeId, sel));
+        updated = Array.from(map.values());
       }
       if (opts?.persist !== false) persistSelections(updated);
       return updated;
     });
-  }, [persistSelections]);
+  };
 
-  const setSelection = useCallback((nodeId: string, column: string) => {
+  const setSelection = (nodeId: string, column: string) => {
     setSelections([{ nodeId, column }], { replace: false });
-  }, [setSelections]);
+  };
 
-  // Auto-update selections when selectedNodes changes (unless locked)
-  const normalizeColumnInfos = useCallback((source: NodeColumnSource | undefined): ColumnInfo[] => {
-    if (!source) return [];
-    if (!Array.isArray(source) || source.length === 0) return [];
+  const normalizeColumnInfos = (source: NodeColumnSource | undefined): ColumnInfo[] => {
+    if (!source || !Array.isArray(source) || source.length === 0) return [];
     const first = source[0];
     if (typeof first === 'string') {
       return (source as string[]).map((name) => ({ name, dataType: 'string' }));
     }
-    return (source as ColumnInfo[]).map((col) => ({ name: col.name, dataType: normalizeTypeName(col.dataType) }));
-  }, []);
+    return (source as ColumnInfo[]).map((col) => ({
+      name: col.name,
+      dataType: normalizeTypeName(col.dataType),
+    }));
+  };
 
-  const deriveColumnInfos = useCallback((node: any): ColumnInfo[] => {
+  const deriveColumnInfos = (node: any): ColumnInfo[] => {
+    let infos: ColumnInfo[] = [];
+    if (getNodeColumnsRef.current) {
+      infos = normalizeColumnInfos(getNodeColumnsRef.current(node));
+    }
+    if (!infos.length) {
+      infos = mapColumnsToInfo(node);
+    }
+    if (!infos.length && fallbackToAllColumnsRef.current && Array.isArray(node?.columns)) {
+      infos = normalizeColumnInfos(node.columns as NodeColumnSource);
+    }
+
+    if (allowedDataTypesRef.current?.length) {
+      const filtered = filterColumnsByType(infos, allowedDataTypesRef.current);
+      if (filtered.length > 0) {
+        return filtered;
+      }
+    }
+
+    return infos;
+  };
+
+  const deriveColumnInfosForRender = (node: any): ColumnInfo[] => {
     let infos: ColumnInfo[] = [];
     if (getNodeColumns) {
       infos = normalizeColumnInfos(getNodeColumns(node));
-    } else {
+    }
+    if (!infos.length) {
       infos = mapColumnsToInfo(node);
     }
-    if (allowedDataTypes.length) {
+    if (!infos.length && fallbackToAllColumns && Array.isArray(node?.columns)) {
+      infos = normalizeColumnInfos(node.columns as NodeColumnSource);
+    }
+
+    if (allowedDataTypes?.length) {
       const filtered = filterColumnsByType(infos, allowedDataTypes);
       if (filtered.length > 0) {
         return filtered;
       }
-      if (!fallbackToAllColumns) {
-        return filtered;
-      }
     }
-    return infos;
-  }, [allowedDataTypes, fallbackToAllColumns, getNodeColumns, normalizeColumnInfos]);
 
-  const recompute = useCallback(() => {
-    if (isLocked) return;
-    const ids = selectedNodes.slice(0, maxNodes).map(n => n.id).filter(Boolean);
+    return infos;
+  };
+
+  const recomputeAutoColumns = useCallback(() => {
+    if (isLockedRef.current) return;
+    const nodes = selectedNodesRef.current;
+    const ids = nodes.slice(0, maxNodesRef.current).map((n, idx) => resolveNodeId(n, idx)).filter(Boolean);
     lastSelectedIdsRef.current = ids;
-    setSelectionsState(prev => {
-      // Build map for quick lookup
-      const prevMap = new Map(prev.map(p => [p.nodeId, p.column]));
-      const next: NodeColumnSelection[] = [];
-      ids.forEach(id => {
-        const node = selectedNodes.find(n => n.id === id);
-        const existing = prevMap.get(id);
-        if (existing) {
-          next.push({ nodeId: id, column: existing });
-          return;
+    setSelectionsState((prev) => {
+      const prevMap = new Map(prev.map((s) => [s.nodeId, s.column]));
+      const nextSelections = ids.map((nodeId, idx) => {
+        const node = nodes[idx];
+        const columnInfos = deriveColumnInfos(node);
+        const columns = columnInfos.map((col) => col.name);
+        let column = prevMap.get(nodeId) || '';
+
+        if (!column) {
+          const documentColumn = extractDocumentColumn(node);
+          if (documentColumn && columns.includes(documentColumn)) {
+            column = documentColumn;
+          } else if (enableHeuristicGuessRef.current && (!docTypeOnlyRef.current || documentColumn)) {
+            const candidate = columns.find((name) =>
+              (heuristicCandidatesRef.current ?? []).some((needle) =>
+                name.toLowerCase().includes(needle.toLowerCase())
+              )
+            );
+            column = candidate || '';
+          } else if (!docTypeOnlyRef.current && columns.length > 0) {
+            column = columns[0] || '';
+          }
         }
-        // Auto select logic
-        let column = '';
-        if (node) {
-          const cols = deriveColumnInfos(node).map((info) => info.name);
-            const documentColumn =
-              node.data?.document ??
-              node.data?.document_column ??
-              node.data?.documentColumn ??
-              node.data?.node?.document ??
-              node.data?.node?.document_column ??
-              node.data?.node?.documentColumn;
-            const isDocType = !!(node.data?.nodeType && node.data.nodeType.includes('Doc'));
-            if (documentColumn && cols.includes(documentColumn)) {
-              column = documentColumn;
-            } else if ((!docTypeOnly || (isDocType && !documentColumn)) && enableHeuristicGuess) {
-              // attempt heuristic guess
-              const lowerCols = cols.map(c => c.toLowerCase());
-              const found = heuristicCandidates.find(cand => lowerCols.includes(cand.toLowerCase()));
-              if (found) {
-                const idx = lowerCols.indexOf(found.toLowerCase());
-                column = cols[idx];
-              }
-            }
-        }
-        next.push({ nodeId: id, column });
+
+        return { nodeId, column };
       });
-      // retain previous persisted selections for nodes no longer selected without altering them (not included in next state intentionally)
-      persistSelections(next);
-      return next;
+      persistSelections(nextSelections);
+      return nextSelections;
     });
-  }, [deriveColumnInfos, enableHeuristicGuess, docTypeOnly, heuristicCandidates, isLocked, maxNodes, persistSelections, selectedNodes]);
+  }, [persistSelections]);
 
   useEffect(() => {
-    const currIds = selectedNodes.slice(0, maxNodes).map(n => n.id).filter(Boolean);
+    const currIds = selectedNodes.slice(0, maxNodes).map((n, idx) => resolveNodeId(n, idx)).filter(Boolean);
     const last = lastSelectedIdsRef.current;
     if (currIds.length !== last.length || currIds.some((id, i) => id !== last[i])) {
-      recompute();
+      recomputeAutoColumns();
     }
-  }, [selectedNodes, maxNodes, recompute]);
+  }, [selectedNodes, maxNodes, recomputeAutoColumns]);
 
-  return { selections, setSelection, setSelections, recompute };
-}
+  const columnOptions = selectedNodes.slice(0, maxNodes).reduce<Record<string, ColumnOptionInfo>>((acc, node, idx) => {
+    const nodeId = resolveNodeId(node, idx);
+    const infos = normalizeColumns(deriveColumnInfosForRender(node));
+    const filtered = allowedDataTypes?.length ? filterColumnsByType(infos, allowedDataTypes) : infos;
+    const filteredOutByType = Boolean(allowedDataTypes?.length && infos.length && filtered.length === 0);
+    acc[nodeId] = {
+      columns: filtered.length ? filtered : infos,
+      filteredOutByType,
+    };
+    return acc;
+  }, {});
 
-export default useAutoNodeColumns;
-
-// TODO: Add unit test verifying heuristicCandidates ordering + docTypeOnly behaviour once frontend test harness is in place.
+  return {
+    selections,
+    setSelection,
+    setSelections,
+    recomputeAutoColumns,
+    columnOptions,
+  };
+};

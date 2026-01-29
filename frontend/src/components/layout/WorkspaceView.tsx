@@ -1,4 +1,4 @@
-import React, { memo, useCallback, useMemo, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { WorkspaceGraphView } from './WorkspaceGraphView';
 import { WorkspaceDataView } from './WorkspaceDataView';
 import { WorkspaceControls } from './WorkspaceControls';
@@ -7,7 +7,7 @@ import { WorkspaceControls } from './WorkspaceControls';
  * Improved WorkspaceView with vertical layout showing both graph and data views
  * This replaces the tab-based layout with stacked views
  */
-const WorkspaceView: React.FC = memo(() => {
+const WorkspaceView: React.FC = () => {
   // Collapsing is managed by App.tsx (entire right panel). This view is always expanded.
   // Resizable split between Graph (top) and Data (bottom)
   const containerRef = useRef<HTMLDivElement>(null);
@@ -15,7 +15,7 @@ const WorkspaceView: React.FC = memo(() => {
   const bottomRef = useRef<HTMLDivElement>(null);
   const [split, setSplit] = useState<number>(50); // percentage for top panel height
   const isDraggingRef = useRef(false);
-  const onStartDrag = useCallback((e: React.MouseEvent) => {
+  const onStartDrag = (e: React.MouseEvent) => {
     e.preventDefault();
     isDraggingRef.current = true;
     // Add listeners on window to capture outside the bar
@@ -51,10 +51,10 @@ const WorkspaceView: React.FC = memo(() => {
     };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
-  }, [split]);
+  };
 
-  const topStyle = useMemo(() => ({ height: `${split}%` }), [split]);
-  const bottomStyle = useMemo(() => ({ height: `${100 - split}%` }), [split]);
+  const topStyle = { height: `${split}%` };
+  const bottomStyle = { height: `${100 - split}%` };
 
   return (
     <div className="flex flex-col h-full bg-white" ref={containerRef}>
@@ -91,8 +91,6 @@ const WorkspaceView: React.FC = memo(() => {
       </>
     </div>
   );
-});
-
-WorkspaceView.displayName = 'WorkspaceView';
+};
 
 export default WorkspaceView;

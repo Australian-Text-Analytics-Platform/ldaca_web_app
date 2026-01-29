@@ -57,7 +57,7 @@ export const NodeSelectionList: React.FC<NodeSelectionListProps> = ({
   return (
     <div
       className={cn(
-        'flex gap-3 px-4 pb-3 pt-0',
+        'flex gap-2.5 px-3 pb-2 pt-0',
         nodes.length > maxCompare ? 'overflow-x-auto' : 'overflow-x-hidden',
         className
       )}
@@ -85,9 +85,9 @@ export const NodeSelectionList: React.FC<NodeSelectionListProps> = ({
                 />
               </div>
             )}
-            <CardHeader className={cn('space-y-1.5 px-4 pb-2', showColorPicker ? 'pt-4' : 'pt-3')}>
+            <CardHeader className={cn('space-y-1 px-3 pb-1.5', showColorPicker ? 'pt-3' : 'pt-2.5')}>
               <div
-                className="max-w-full break-words pr-2 text-sm font-semibold leading-snug text-foreground"
+                className="max-w-full wrap-break-word pr-2 text-sm font-semibold leading-snug text-foreground"
                 style={showColorPicker ? { color } : undefined}
                 title={title}
               >
@@ -99,7 +99,11 @@ export const NodeSelectionList: React.FC<NodeSelectionListProps> = ({
                 </div>
               )}
             </CardHeader>
-            {renderNodeBody && <CardContent className="space-y-2 px-4 pb-4 pt-0">{renderNodeBody({ node, nodeId, index, color })}</CardContent>}
+            {renderNodeBody && (
+              <CardContent className="space-y-2 px-3 pb-3 pt-0">
+                {renderNodeBody({ node, nodeId, index, color })}
+              </CardContent>
+            )}
           </Card>
         );
       })}

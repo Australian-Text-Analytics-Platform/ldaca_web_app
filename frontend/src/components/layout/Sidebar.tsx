@@ -100,21 +100,21 @@ const Sidebar: React.FC = () => {
     reconnect: reconnectTaskStream,
   } = useWorkspaceTaskStream(currentWorkspaceId ?? null);
 
-  const nodes = React.useMemo<SidebarWorkspaceNode[]>(() => {
+  const nodes = (() => {
     const rawNodes = (workspaceGraph as { nodes?: unknown } | undefined)?.nodes;
     return Array.isArray(rawNodes) ? (rawNodes as SidebarWorkspaceNode[]) : [];
-  }, [workspaceGraph]);
+  })();
 
-  const openQuotationEngineDialog = React.useCallback(() => {
+  const openQuotationEngineDialog = () => {
     setCurrentView('quotation');
     openEngineDialog();
-  }, [setCurrentView, openEngineDialog]);
+  };
 
   const [isDataFolderDialogOpen, setIsDataFolderDialogOpen] = React.useState(false);
 
-  const handleEditDataFolder = React.useCallback(() => {
+  const handleEditDataFolder = () => {
     setIsDataFolderDialogOpen(true);
-  }, []);
+  };
 
   const nodeCount = nodes.length;
   const isConnected = taskStreamStatus === 'open';
@@ -138,13 +138,10 @@ const Sidebar: React.FC = () => {
     tasks: null,
   });
   const [sectionsContainerHeight, setSectionsContainerHeight] = React.useState(0);
-  const assignSectionScrollRef = React.useCallback(
-    (key: SectionKey, node: HTMLDivElement | null) => {
-      sectionScrollRefs.current[key] = node;
-    },
-    []
-  );
-  const scrollSection = React.useCallback((key: SectionKey, deltaPixels: number) => {
+  const assignSectionScrollRef = (key: SectionKey, node: HTMLDivElement | null) => {
+    sectionScrollRefs.current[key] = node;
+  };
+  const scrollSection = (key: SectionKey, deltaPixels: number) => {
     if (deltaPixels === 0) {
       return;
     }
@@ -153,7 +150,7 @@ const Sidebar: React.FC = () => {
       return;
     }
     target.scrollTop += deltaPixels;
-  }, []);
+  };
 
   React.useLayoutEffect(() => {
     const container = sectionsContainerRef.current;
@@ -173,7 +170,7 @@ const Sidebar: React.FC = () => {
     return () => observer.disconnect();
   }, []);
 
-  const activeSectionTotal = React.useMemo(() => {
+  const activeSectionTotal = (() => {
     const total = SECTION_KEYS.reduce((sum, key) => {
       if (collapsedSections[key]) {
         return sum;
@@ -181,7 +178,7 @@ const Sidebar: React.FC = () => {
       return sum + (sectionHeights[key] ?? 0);
     }, 0);
     return total || 1;
-  }, [collapsedSections, sectionHeights]);
+  })();
 
   const isWorkspaceLoaded = Boolean(currentWorkspaceId);
 
@@ -191,86 +188,80 @@ const Sidebar: React.FC = () => {
     }
   }, [currentView, isWorkspaceLoaded, setCurrentView]);
 
-  const getSectionFlexStyle = React.useCallback(
-    (key: SectionKey) => {
-      if (collapsedSections[key]) {
-        return { flex: '0 0 auto' } as React.CSSProperties;
-      }
-      const ratio = (sectionHeights[key] ?? 0) / activeSectionTotal;
-      return { flexGrow: ratio, flexShrink: 0, flexBasis: 0 } as React.CSSProperties;
-    },
-    [collapsedSections, sectionHeights, activeSectionTotal]
-  );
+  const getSectionFlexStyle = (key: SectionKey) => {
+    if (collapsedSections[key]) {
+      return { flex: '0 0 auto' } as React.CSSProperties;
+    }
+    const ratio = (sectionHeights[key] ?? 0) / activeSectionTotal;
+    return { flexGrow: ratio, flexShrink: 0, flexBasis: 0 } as React.CSSProperties;
+  };
 
-  const toggleSection = React.useCallback((key: SectionKey) => {
+  const toggleSection = (key: SectionKey) => {
     setCollapsedSections((prev) => ({ ...prev, [key]: !prev[key] }));
-  }, []);
+  };
 
-  const handleResizeStart = React.useCallback(
-    (upperKey: SectionKey, lowerKey: SectionKey, event: React.MouseEvent<HTMLDivElement>) => {
-      if (event.button !== 0) return;
-      if (collapsedSections[upperKey] || collapsedSections[lowerKey]) return;
-      const containerHeight = sectionsContainerHeight || 1;
-      if (containerHeight <= 0) return;
+  const handleResizeStart = (upperKey: SectionKey, lowerKey: SectionKey, event: React.MouseEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    if (collapsedSections[upperKey] || collapsedSections[lowerKey]) return;
+    const containerHeight = sectionsContainerHeight || 1;
+    if (containerHeight <= 0) return;
 
-      event.preventDefault();
-      const startY = event.clientY;
-      const startUpper = sectionHeights[upperKey] ?? 0;
-      const startLower = sectionHeights[lowerKey] ?? 0;
-      const pairTotal = startUpper + startLower;
-      if (pairTotal <= 0) {
-        return;
+    event.preventDefault();
+    const startY = event.clientY;
+    const startUpper = sectionHeights[upperKey] ?? 0;
+    const startLower = sectionHeights[lowerKey] ?? 0;
+    const pairTotal = startUpper + startLower;
+    if (pairTotal <= 0) {
+      return;
+    }
+
+    const rawMinRatio = MIN_SECTION_HEIGHT / containerHeight;
+    const safeMinCandidate = Math.min(Math.max(rawMinRatio, 0.02), pairTotal / 2 - 0.01);
+    if (!Number.isFinite(safeMinCandidate) || safeMinCandidate <= 0 || pairTotal - safeMinCandidate <= safeMinCandidate) {
+      return;
+    }
+
+    const minUpper = safeMinCandidate;
+    const maxUpper = pairTotal - safeMinCandidate;
+
+    const onMove = (moveEvent: MouseEvent) => {
+      const deltaY = moveEvent.clientY - startY;
+      const deltaRatio = deltaY / containerHeight;
+      const candidateUpper = startUpper + deltaRatio;
+      let nextUpper = candidateUpper;
+      let overflowTarget: SectionKey | null = null;
+      let overflowRatio = 0;
+
+      if (candidateUpper < minUpper) {
+        nextUpper = minUpper;
+        overflowTarget = upperKey;
+        overflowRatio = candidateUpper - minUpper;
+      } else if (candidateUpper > maxUpper) {
+        nextUpper = maxUpper;
+        overflowTarget = lowerKey;
+        overflowRatio = candidateUpper - maxUpper;
       }
 
-      const rawMinRatio = MIN_SECTION_HEIGHT / containerHeight;
-      const safeMinCandidate = Math.min(Math.max(rawMinRatio, 0.02), pairTotal / 2 - 0.01);
-      if (!Number.isFinite(safeMinCandidate) || safeMinCandidate <= 0 || pairTotal - safeMinCandidate <= safeMinCandidate) {
-        return;
+      const nextLower = pairTotal - nextUpper;
+      setSectionHeights((prev) => ({
+        ...prev,
+        [upperKey]: nextUpper,
+        [lowerKey]: nextLower,
+      }));
+
+      if (overflowTarget && overflowRatio !== 0) {
+        scrollSection(overflowTarget, overflowRatio * containerHeight);
       }
+    };
 
-      const minUpper = safeMinCandidate;
-      const maxUpper = pairTotal - safeMinCandidate;
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
 
-      const onMove = (moveEvent: MouseEvent) => {
-        const deltaY = moveEvent.clientY - startY;
-        const deltaRatio = deltaY / containerHeight;
-        const candidateUpper = startUpper + deltaRatio;
-        let nextUpper = candidateUpper;
-        let overflowTarget: SectionKey | null = null;
-        let overflowRatio = 0;
-
-        if (candidateUpper < minUpper) {
-          nextUpper = minUpper;
-          overflowTarget = upperKey;
-          overflowRatio = candidateUpper - minUpper;
-        } else if (candidateUpper > maxUpper) {
-          nextUpper = maxUpper;
-          overflowTarget = lowerKey;
-          overflowRatio = candidateUpper - maxUpper;
-        }
-
-        const nextLower = pairTotal - nextUpper;
-        setSectionHeights((prev) => ({
-          ...prev,
-          [upperKey]: nextUpper,
-          [lowerKey]: nextLower,
-        }));
-
-        if (overflowTarget && overflowRatio !== 0) {
-          scrollSection(overflowTarget, overflowRatio * containerHeight);
-        }
-      };
-
-      const onUp = () => {
-        window.removeEventListener('mousemove', onMove);
-        window.removeEventListener('mouseup', onUp);
-      };
-
-      window.addEventListener('mousemove', onMove);
-      window.addEventListener('mouseup', onUp);
-    },
-    [collapsedSections, sectionHeights, sectionsContainerHeight, scrollSection]
-  );
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
 
   const renderViewsBody = () => (
     <SidebarMenu>
@@ -318,35 +309,29 @@ const Sidebar: React.FC = () => {
       })}
     </SidebarMenu>
   );
-  const handleCancelTask = React.useCallback(
-    async (task: SidebarTaskRecord) => {
-      if (!currentWorkspaceId) return;
-      try {
-        await workspacesApi.cancelTasks(currentWorkspaceId, { task_id: task.task_id }, getAuthHeaders());
-        setTasks((prev) =>
-          prev.map((item) =>
-            item.task_id === task.task_id ? { ...item, state: 'cancelled' } : item
-          )
-        );
-      } catch (error) {
-        console.error('Failed to cancel task', error);
-      }
-    },
-    [currentWorkspaceId, getAuthHeaders, setTasks]
-  );
+  const handleCancelTask = async (task: SidebarTaskRecord) => {
+    if (!currentWorkspaceId) return;
+    try {
+      await workspacesApi.cancelTasks(currentWorkspaceId, { task_id: task.task_id }, getAuthHeaders());
+      setTasks((prev) =>
+        prev.map((item) =>
+          item.task_id === task.task_id ? { ...item, state: 'cancelled' } : item
+        )
+      );
+    } catch (error) {
+      console.error('Failed to cancel task', error);
+    }
+  };
 
-  const handleClearTask = React.useCallback(
-    async (task: SidebarTaskRecord) => {
-      if (!currentWorkspaceId) return;
-      try {
-        await workspacesApi.clearTasks(currentWorkspaceId, { task_id: task.task_id }, getAuthHeaders());
-        setTasks((prev) => prev.filter((item) => item.task_id !== task.task_id));
-      } catch (error) {
-        console.error('Failed to clear task', error);
-      }
-    },
-    [currentWorkspaceId, getAuthHeaders, setTasks]
-  );
+  const handleClearTask = async (task: SidebarTaskRecord) => {
+    if (!currentWorkspaceId) return;
+    try {
+      await workspacesApi.clearTasks(currentWorkspaceId, { task_id: task.task_id }, getAuthHeaders());
+      setTasks((prev) => prev.filter((item) => item.task_id !== task.task_id));
+    } catch (error) {
+      console.error('Failed to clear task', error);
+    }
+  };
 
   return (
     <SidebarRoot>
@@ -432,7 +417,7 @@ const Sidebar: React.FC = () => {
                 <div
                   className={cn(
                     'flex-1 overflow-hidden transition-[max-height] duration-200',
-                    isCollapsed ? 'max-h-0' : 'max-h-[999px]'
+                    isCollapsed ? 'max-h-0' : 'max-h-full'
                   )}
                 >
                   {!isCollapsed && (

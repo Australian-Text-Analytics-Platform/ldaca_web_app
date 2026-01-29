@@ -10,6 +10,11 @@ const registry: Record<string, TutorialTarget> = {
     anchor: 'help-data-loader-active-workspace',
     label: 'Active workspace overview',
   },
+  'data-loader.tab': {
+    file: 'tutorials/data-loader.md',
+    anchor: 'help-data-loader-section',
+    label: 'Data loader overview',
+  },
   'data-loader.workspace-manager.section': {
     file: 'tutorials/data-loader.md',
     anchor: 'help-data-loader-workspace-manager',
@@ -170,10 +175,30 @@ const registry: Record<string, TutorialTarget> = {
     anchor: 'help-token-frequency-section',
     label: 'Token frequency overview',
   },
+  'analysis.token-frequency.parameters': {
+    file: 'tutorials/token-frequency.md',
+    anchor: 'help-token-frequency-parameters',
+    label: 'Token frequency parameters',
+  },
+  'analysis.token-frequency.results': {
+    file: 'tutorials/token-frequency.md',
+    anchor: 'help-token-frequency-results',
+    label: 'Token frequency results',
+  },
   'analysis.token-frequency.clear-results': {
     file: 'tutorials/token-frequency.md',
     anchor: 'help-token-frequency-clear-results',
     label: 'Clear results',
+  },
+  'analysis.token-frequency.unified-word-cloud': {
+    file: 'tutorials/token-frequency.md',
+    anchor: 'help-token-frequency-unified-word-cloud',
+    label: 'Unified word cloud',
+  },
+  'analysis.token-frequency.statistical-measures': {
+    file: 'tutorials/token-frequency.md',
+    anchor: 'help-token-frequency-statistical-measures',
+    label: 'Statistical measures',
   },
   'analysis.token-frequency.stop-words': {
     file: 'tutorials/token-frequency.md',
@@ -189,6 +214,16 @@ const registry: Record<string, TutorialTarget> = {
     file: 'tutorials/concordance.md',
     anchor: 'help-concordance-section',
     label: 'Concordance overview',
+  },
+  'analysis.concordance.parameters': {
+    file: 'tutorials/concordance.md',
+    anchor: 'help-concordance-parameters',
+    label: 'Concordance parameters',
+  },
+  'analysis.concordance.results': {
+    file: 'tutorials/concordance.md',
+    anchor: 'help-concordance-results',
+    label: 'Concordance results',
   },
   'analysis.concordance.clear-results': {
     file: 'tutorials/concordance.md',
@@ -210,10 +245,20 @@ const registry: Record<string, TutorialTarget> = {
     anchor: 'help-topic-modeling-section',
     label: 'Topic modeling overview',
   },
+  'analysis.topic-modeling.parameters': {
+    file: 'tutorials/topic-modeling.md',
+    anchor: 'help-topic-modeling-parameters',
+    label: 'Topic modeling parameters',
+  },
   'analysis.topic-modeling.clear-results': {
     file: 'tutorials/topic-modeling.md',
     anchor: 'help-topic-modeling-clear-results',
     label: 'Clear results',
+  },
+  'analysis.topic-modeling.results': {
+    file: 'tutorials/topic-modeling.md',
+    anchor: 'help-topic-modeling-results',
+    label: 'Topic modeling results',
   },
   'analysis.topic-modeling.min-topic-size': {
     file: 'tutorials/topic-modeling.md',
@@ -229,6 +274,16 @@ const registry: Record<string, TutorialTarget> = {
     file: 'tutorials/sequential-analysis.md',
     anchor: 'help-sequential-section',
     label: 'Sequential analysis overview',
+  },
+  'analysis.sequential-analysis.parameters': {
+    file: 'tutorials/sequential-analysis.md',
+    anchor: 'help-sequential-parameters',
+    label: 'Sequential analysis parameters',
+  },
+  'analysis.sequential-analysis.results': {
+    file: 'tutorials/sequential-analysis.md',
+    anchor: 'help-sequential-results',
+    label: 'Sequential analysis results',
   },
   'analysis.sequential-analysis.clear-results': {
     file: 'tutorials/sequential-analysis.md',
@@ -250,6 +305,16 @@ const registry: Record<string, TutorialTarget> = {
     anchor: 'help-quotation-section',
     label: 'Quotation extraction overview',
   },
+  'analysis.quotation.parameters': {
+    file: 'tutorials/quotation.md',
+    anchor: 'help-quotation-parameters',
+    label: 'Quotation parameters',
+  },
+  'analysis.quotation.results': {
+    file: 'tutorials/quotation.md',
+    anchor: 'help-quotation-results',
+    label: 'Quotation results',
+  },
   'analysis.quotation.clear-results': {
     file: 'tutorials/quotation.md',
     anchor: 'help-quotation-clear-results',
@@ -264,6 +329,16 @@ const registry: Record<string, TutorialTarget> = {
     file: 'tutorials/export.md',
     anchor: 'help-export-section',
     label: 'Export overview',
+  },
+  'analysis.export.parameters': {
+    file: 'tutorials/export.md',
+    anchor: 'help-export-parameters',
+    label: 'Export parameters',
+  },
+  'analysis.export.results': {
+    file: 'tutorials/export.md',
+    anchor: 'help-export-results',
+    label: 'Export results',
   },
   'analysis.export.format': {
     file: 'tutorials/export.md',

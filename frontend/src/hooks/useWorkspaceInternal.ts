@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useCallback } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   textApi,
@@ -193,76 +193,55 @@ export const useWorkspaceInternal = () => {
     },
   });
 
-  const selectionActions = useMemo(
-    () => ({
-      selectNode,
-      selectNodes: setSelectedNodes,
-      toggleNodeSelection,
-      clearSelection,
-    }),
-    [clearSelection, selectNode, setSelectedNodes, toggleNodeSelection]
-  );
+  const selectionActions = useMemo(() => ({
+    selectNode,
+    selectNodes: setSelectedNodes,
+    toggleNodeSelection,
+    clearSelection,
+  }), [selectNode, setSelectedNodes, toggleNodeSelection, clearSelection]);
 
-  const textActions = useMemo(
-    () => ({
-      concordanceSearch: (nodeId: string, request: ConcordanceRequest) =>
-        concordanceMutation.mutateAsync({
-          workspaceId: ensureWorkspaceSelected(),
-          nodeId,
-          request,
-        }),
-      detachConcordance: (nodeId: string, request: ConcordanceDetachRequest) =>
-        detachConcordanceMutation.mutateAsync({
-          workspaceId: ensureWorkspaceSelected(),
-          nodeId,
-          request,
-        }),
-      quotationSearch: (nodeId: string, request: QuotationRequest) =>
-        quotationMutation.mutateAsync({
-          workspaceId: ensureWorkspaceSelected(),
-          nodeId,
-          request,
-        }),
-      detachQuotation: (nodeId: string, request: QuotationDetachRequest) =>
-        detachQuotationMutation.mutateAsync({
-          workspaceId: ensureWorkspaceSelected(),
-          nodeId,
-          request,
-        }),
-    }),
-    [
-      concordanceMutation,
-      detachConcordanceMutation,
-      detachQuotationMutation,
-      ensureWorkspaceSelected,
-      quotationMutation,
-    ]
-  );
+  const textActions = useMemo(() => ({
+    concordanceSearch: (nodeId: string, request: ConcordanceRequest) =>
+      concordanceMutation.mutateAsync({
+        workspaceId: ensureWorkspaceSelected(),
+        nodeId,
+        request,
+      }),
+    detachConcordance: (nodeId: string, request: ConcordanceDetachRequest) =>
+      detachConcordanceMutation.mutateAsync({
+        workspaceId: ensureWorkspaceSelected(),
+        nodeId,
+        request,
+      }),
+    quotationSearch: (nodeId: string, request: QuotationRequest) =>
+      quotationMutation.mutateAsync({
+        workspaceId: ensureWorkspaceSelected(),
+        nodeId,
+        request,
+      }),
+    detachQuotation: (nodeId: string, request: QuotationDetachRequest) =>
+      detachQuotationMutation.mutateAsync({
+        workspaceId: ensureWorkspaceSelected(),
+        nodeId,
+        request,
+      }),
+  }), [concordanceMutation, detachConcordanceMutation, quotationMutation, detachQuotationMutation, ensureWorkspaceSelected]);
 
-  const actions = useMemo(
-    () => ({
-      ...selectionActions,
-      ...nodeActions,
-      ...textActions,
-    }),
-    [nodeActions, selectionActions, textActions]
-  );
+  const actions = useMemo(() => ({
+    ...selectionActions,
+    ...nodeActions,
+    ...textActions,
+  }), [selectionActions, nodeActions, textActions]);
 
-  const isLoading = useMemo(
-    () => ({
-      ...queryLoadingState,
-      operations: loadingOperationCount > 0,
-    }),
-    [loadingOperationCount, queryLoadingState]
-  );
+  const isLoading = useMemo(() => ({
+    ...queryLoadingState,
+    operations: loadingOperationCount > 0,
+  }), [queryLoadingState, loadingOperationCount]);
 
-  const errors = useMemo(
-    () => ({
-      ...queryErrorState,
-      operations: Object.values(operationErrorsRecord)[0] || null,
-    }),
-    [operationErrorsRecord, queryErrorState]
-  );
+  const errors = useMemo(() => ({
+    ...queryErrorState,
+    operations: Object.values(operationErrorsRecord)[0] || null,
+  }), [queryErrorState, operationErrorsRecord]);
 
   return {
     workspaces,

@@ -1,5 +1,5 @@
 """
-Process-based Task Manager for managing background jobs using ProcessPoolExecutor.
+Worker-based Task Manager for managing background jobs using ProcessPoolExecutor.
 
 This replaces the original thread-based TaskManager with a more robust solution
 that uses separate processes for heavy computational tasks.
@@ -107,7 +107,7 @@ class TaskInfo:
                 self.started_at = time.time()
 
 
-class ProcessTaskManager:
+class WorkerTaskManager:
     """Task manager that uses ProcessPoolExecutor for background jobs."""
 
     def __init__(self):
@@ -149,6 +149,7 @@ class ProcessTaskManager:
         logger.debug(
             f"Unsubscribed from events for user {user_id}, workspace {workspace_id}"
         )
+        return queue
 
     async def emit(self, user_id: str, workspace_id: str, event: Dict[str, Any]):
         """Emit an event to all subscribers for a user/workspace."""
@@ -366,7 +367,7 @@ class ProcessTaskManager:
                             },
                         )
 
-                # Handle ANALYSIS tasks (save to AnalysisManager)
+                # Handle ANALYSIS tasks (save to TaskManager)
                 elif task_type in TASK_REGISTRY:
                     try:
                         # Save the analysis result
@@ -442,23 +443,19 @@ class ProcessTaskManager:
     ):
         """Save analysis result to analysis store."""
         try:
-            from ..analysis.manager import get_analysis_manager
+            from ..analysis.manager import get_task_manager
             from ..analysis.results import GenericAnalysisResult
 
-            analysis_manager = get_analysis_manager(user_id, workspace_id)
-            if analysis_manager:
-                task = analysis_manager.get_task(task_info.id)
-                if task:
-                    # Update the task with result
-                    task.complete(GenericAnalysisResult(result))
-                    analysis_manager.update_task(task)
-                    logger.info(
-                        f"{task_type} result saved for task {task_info.id} via AnalysisManager"
-                    )
-                else:
-                    logger.warning(f"Task {task_info.id} not found in AnalysisManager")
+            task_manager = get_task_manager(user_id, workspace_id)
+            task = task_manager.get_task(task_info.id)
+            if task:
+                task.complete(GenericAnalysisResult(result))
+                task_manager.save_task(task)
+                logger.info(
+                    f"{task_type} result saved for task {task_info.id} via TaskManager"
+                )
             else:
-                logger.error("AnalysisManager not available")
+                logger.warning(f"Task {task_info.id} not found in TaskManager")
 
         except Exception as e:
             logger.error(

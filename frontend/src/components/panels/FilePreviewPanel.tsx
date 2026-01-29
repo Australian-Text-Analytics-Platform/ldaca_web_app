@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo } from 'react';
+import React from 'react';
 import { useFilePreview } from '../../hooks/useFilePreview';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../ui/card';
@@ -12,30 +12,32 @@ interface FilePreviewPanelProps {
 }
 
 export const FilePreviewPanel: React.FC<FilePreviewPanelProps> = ({ filename, open, onClose }) => {
-  const { previewData, columns, totalRows, page, pageSize, loading, error, fetchPreview, clearPreview, setPageSize } = useFilePreview();
+  const {
+    previewData,
+    columns,
+    totalRows,
+    page,
+    pageSize,
+    loading,
+    error,
+    setPage,
+    setPageSize,
+  } = useFilePreview(filename, open);
 
-  const rows = useMemo(() => previewData as ReadonlyArray<Record<string, unknown>>, [previewData]);
-
-  useEffect(() => {
-    if (open && filename) {
-      fetchPreview(filename, 0);
-    } else if (!open) {
-      clearPreview();
-    }
-  }, [open, filename, fetchPreview, clearPreview]);
+  const rows = previewData as ReadonlyArray<Record<string, unknown>>;
 
   const canPrev = page > 0;
   const canNext = totalRows ? (page + 1) * pageSize < totalRows : rows.length > 0;
 
-  const handlePrev = useCallback(() => {
+  const handlePrev = () => {
     if (!filename || !canPrev) return;
-    fetchPreview(filename, page - 1);
-  }, [filename, canPrev, fetchPreview, page]);
+    setPage((p) => p - 1);
+  };
 
-  const handleNext = useCallback(() => {
+  const handleNext = () => {
     if (!filename || !canNext) return;
-    fetchPreview(filename, page + 1);
-  }, [filename, canNext, fetchPreview, page]);
+    setPage((p) => p + 1);
+  };
 
   return (
     <Dialog
@@ -46,7 +48,7 @@ export const FilePreviewPanel: React.FC<FilePreviewPanelProps> = ({ filename, op
         }
       }}
     >
-      <DialogContent className="w-full max-w-[min(80vw,_1000px)] border-none bg-transparent p-0 shadow-none">
+      <DialogContent className="w-full max-w-[min(80vw,1000px)] border-none bg-transparent p-0 shadow-none">
         <DialogHeader className="sr-only">
           <DialogTitle>{filename ? `Preview: ${filename}` : 'File preview'}</DialogTitle>
           <DialogDescription>Inspect the first rows of the uploaded file before adding it to a workspace.</DialogDescription>

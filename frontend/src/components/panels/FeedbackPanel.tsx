@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useState } from 'react';
 import { submitFeedback } from '../../api/feedback';
 import { useAuth } from '../../hooks/useAuth';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
@@ -19,53 +19,50 @@ export const FeedbackPanel: React.FC<FeedbackPanelProps> = ({ open, onClose }) =
   const [submitting, setSubmitting] = useState(false);
   const [resultMsg, setResultMsg] = useState<string | null>(null);
 
-  const reset = useCallback(() => {
+  const reset = () => {
     setSubject('');
     setEmail('');
     setComments('');
     setResultMsg(null);
-  }, []);
+  };
 
-  const handleCancel = useCallback(() => {
+  const handleCancel = () => {
     reset();
     onClose();
-  }, [onClose, reset]);
+  };
 
-  const handleSubmit = useCallback(
-    async (event: React.FormEvent) => {
-      event.preventDefault();
-      if (!subject.trim() || !comments.trim()) {
-        setResultMsg('Subject and comments are required.');
-        return;
-      }
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!subject.trim() || !comments.trim()) {
+      setResultMsg('Subject and comments are required.');
+      return;
+    }
 
-      setSubmitting(true);
-      try {
-        const response = await submitFeedback(
-          { subject, comments, email: email.trim() || undefined },
-          isAuthenticated ? getAuthHeaders() : {}
-        );
-        setResultMsg(response.message || 'Submitted.');
-        if (response.success) {
-          setTimeout(() => {
-            reset();
-            onClose();
-          }, 1200);
-        }
-      } catch (error: unknown) {
-        const fallback = 'Failed to submit feedback';
-        if (typeof error === 'object' && error && 'response' in error) {
-          const maybeResponse = (error as { response?: { data?: { detail?: string } } }).response;
-          setResultMsg(maybeResponse?.data?.detail || fallback);
-        } else {
-          setResultMsg(fallback);
-        }
-      } finally {
-        setSubmitting(false);
+    setSubmitting(true);
+    try {
+      const response = await submitFeedback(
+        { subject, comments, email: email.trim() || undefined },
+        isAuthenticated ? getAuthHeaders() : {}
+      );
+      setResultMsg(response.message || 'Submitted.');
+      if (response.success) {
+        setTimeout(() => {
+          reset();
+          onClose();
+        }, 1200);
       }
-    },
-    [subject, comments, email, isAuthenticated, getAuthHeaders, reset, onClose]
-  );
+    } catch (error: unknown) {
+      const fallback = 'Failed to submit feedback';
+      if (typeof error === 'object' && error && 'response' in error) {
+        const maybeResponse = (error as { response?: { data?: { detail?: string } } }).response;
+        setResultMsg(maybeResponse?.data?.detail || fallback);
+      } else {
+        setResultMsg(fallback);
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <Dialog
@@ -124,7 +121,9 @@ export const FeedbackPanel: React.FC<FeedbackPanelProps> = ({ open, onClose }) =
                 />
               </div>
               {resultMsg && (
-                <div className="rounded-md border border-border bg-muted/50 px-3 py-2 text-sm text-foreground">{resultMsg}</div>
+                <div className="rounded-md border border-border bg-muted/50 px-3 py-2 text-sm text-foreground">
+                  {resultMsg}
+                </div>
               )}
             </CardContent>
 

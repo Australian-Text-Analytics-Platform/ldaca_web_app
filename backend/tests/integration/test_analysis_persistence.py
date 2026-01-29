@@ -9,7 +9,7 @@ from types import SimpleNamespace
 
 import pytest
 from httpx import AsyncClient
-from ldaca_web_app_backend.analysis.manager import get_analysis_manager
+from ldaca_web_app_backend.analysis.manager import get_task_manager
 from ldaca_web_app_backend.analysis.results import GenericAnalysisResult
 from ldaca_web_app_backend.api.workspaces.analyses.token_frequencies import (
     DEFAULT_TOKEN_LIMIT,
@@ -29,6 +29,16 @@ async def post_json(client: AsyncClient, path: str, payload: dict):
 async def get_json(client: AsyncClient, path: str):
     """Helper to GET JSON data and return response."""
     return await client.get(path)
+
+
+async def get_current_task_id(client: AsyncClient, workspace_id: str, analysis: str):
+    """Fetch the current task id for a given analysis tab."""
+    response = await client.get(f"/api/workspaces/{workspace_id}/{analysis}/current")
+    if response.status_code != 200:
+        return None
+    payload = response.json()
+    task_ids = payload.get("task_ids") or []
+    return task_ids[0] if task_ids else None
 
 
 def assert_analysis_record_structure(record_dict: dict, expected_task: str):
@@ -54,10 +64,12 @@ def assert_successful_result(result_dict: dict):
 
 
 def _simulate_token_frequency_completion(workspace_id: str):
-    """Run token frequencies synchronously and persist the result via AnalysisManager."""
+    """Run token frequencies synchronously and persist the result via TaskManager."""
 
-    manager = get_analysis_manager("test", workspace_id)
-    task = manager.get_current_task("token_frequencies")
+    task_manager = get_task_manager("test", workspace_id)
+    task_ids = task_manager.get_current_task_ids("token-frequencies")
+    assert task_ids
+    task = task_manager.get_task(task_ids[0])
     assert task is not None
 
     req = task.request.model_dump() if hasattr(task.request, "model_dump") else {}
@@ -71,21 +83,31 @@ def _simulate_token_frequency_completion(workspace_id: str):
     )
 
     task.complete(GenericAnalysisResult(worker_result))
-    manager.update_task(task)
+    task_manager.save_task(task)
 
 
 def _list_analysis_records(user_id: str, workspace_id: str, task: str | None = None):
-    manager = get_analysis_manager(user_id, workspace_id)
-    tasks = manager.get_all_tasks()
+    task_manager = get_task_manager(user_id, workspace_id)
+    tasks = task_manager.get_all_tasks()
     if task:
-        tasks = [t for t in tasks if t.analysis_type == task]
+        key_map = {
+            "token_frequencies": "token-frequencies",
+            "sequential_analysis": "sequential-analysis",
+            "frequency_analysis": "frequency-analysis",
+            "topic_modeling": "topic-modeling",
+            "quotation": "quotation",
+            "concordance": "concordance",
+        }
+        tab_key = key_map.get(task, task)
+        task_ids = set(task_manager.get_current_task_ids(tab_key))
+        tasks = [t for t in tasks if t.task_id in task_ids]
     tasks.sort(key=lambda t: t.updated_at or t.created_at)
 
     def _to_record(t):
         req = t.request.model_dump() if hasattr(t.request, "model_dump") else t.request
         res = t.result.to_json() if hasattr(t.result, "to_json") else t.result
         return SimpleNamespace(
-            task=t.analysis_type,
+            task=task,
             saved_at=(t.updated_at or t.created_at).isoformat(),
             request=req,
             result=res,
@@ -146,9 +168,13 @@ class TestTokenFrequencyPersistence:
         # Simulate worker completion and fetch persisted result
         _simulate_token_frequency_completion(workspace_id)
 
+        task_id = await get_current_task_id(
+            authenticated_client, workspace_id, "token-frequencies"
+        )
+        assert task_id
         result_resp = await get_json(
             authenticated_client,
-            f"/api/workspaces/{workspace_id}/token-frequencies/current-result",
+            f"/api/workspaces/{workspace_id}/token-frequencies/tasks/{task_id}/result",
         )
         assert result_resp.status_code == 200
         final_result = result_resp.json()
@@ -201,9 +227,13 @@ class TestTokenFrequencyPersistence:
         assert result_data.get("state") == "running"
 
         _simulate_token_frequency_completion(workspace_id)
+        task_id = await get_current_task_id(
+            authenticated_client, workspace_id, "token-frequencies"
+        )
+        assert task_id
         result_resp = await get_json(
             authenticated_client,
-            f"/api/workspaces/{workspace_id}/token-frequencies/current-result",
+            f"/api/workspaces/{workspace_id}/token-frequencies/tasks/{task_id}/result",
         )
         final_result = result_resp.json()
         assert final_result.get("token_limit") == DEFAULT_TOKEN_LIMIT
@@ -314,9 +344,13 @@ class TestTokenFrequencyPersistence:
         assert result_data.get("metadata", {}).get("task_id")
 
         _simulate_token_frequency_completion(workspace_id)
+        task_id = await get_current_task_id(
+            authenticated_client, workspace_id, "token-frequencies"
+        )
+        assert task_id
         result_resp = await get_json(
             authenticated_client,
-            f"/api/workspaces/{workspace_id}/token-frequencies/current-result",
+            f"/api/workspaces/{workspace_id}/token-frequencies/tasks/{task_id}/result",
         )
         final_result = result_resp.json()
         assert_successful_result(final_result)
@@ -354,11 +388,15 @@ class TestTokenFrequencyPersistence:
         )
         assert initial_response.status_code == 200
         assert initial_response.json().get("state") == "running"
+        task_id = await get_current_task_id(
+            authenticated_client, workspace_id, "token-frequencies"
+        )
+        assert task_id
 
         update_payload = {"token_limit": 30, "stop_words": ["alpha", "beta"]}
         update_response = await post_json(
             authenticated_client,
-            f"/api/workspaces/{workspace_id}/token-frequencies/current-result",
+            f"/api/workspaces/{workspace_id}/token-frequencies/tasks/{task_id}/result",
             update_payload,
         )
         assert update_response.status_code == 200
@@ -367,7 +405,7 @@ class TestTokenFrequencyPersistence:
 
         current_result_response = await get_json(
             authenticated_client,
-            f"/api/workspaces/{workspace_id}/token-frequencies/current-result",
+            f"/api/workspaces/{workspace_id}/token-frequencies/tasks/{task_id}/result",
         )
         assert current_result_response.status_code == 200
         updated_result = current_result_response.json()
@@ -409,7 +447,7 @@ class TestTokenFrequencyPersistence:
 
         clear_response = await post_json(
             authenticated_client,
-            f"/api/workspaces/{workspace_id}/token-frequencies/current-result",
+            f"/api/workspaces/{workspace_id}/token-frequencies/tasks/{task_id}/result",
             {"stop_words": []},
         )
         assert clear_response.status_code == 200
@@ -428,7 +466,7 @@ class TestTokenFrequencyPersistence:
         current_result = (
             await get_json(
                 authenticated_client,
-                f"/api/workspaces/{workspace_id}/token-frequencies/current-result",
+                f"/api/workspaces/{workspace_id}/token-frequencies/tasks/{task_id}/result",
             )
         ).json()
         assert current_result.get("token_limit") == 30
@@ -538,9 +576,13 @@ class TestSequentialAnalysisPersistence:
         assert record.task == "sequential_analysis"
         assert record.result.get("chart_type") == "line"
 
+        task_id = await get_current_task_id(
+            authenticated_client, workspace_id, "sequential-analysis"
+        )
+        assert task_id
         current_result_response = await get_json(
             authenticated_client,
-            f"/api/workspaces/{workspace_id}/sequential-analysis/current-result",
+            f"/api/workspaces/{workspace_id}/sequential-analysis/tasks/{task_id}/result",
         )
         assert current_result_response.status_code == 200
         current_payload = current_result_response.json()
@@ -560,9 +602,13 @@ class TestSequentialAnalysisPersistence:
             authenticated_client, workspace_id, timeline_node_id, monkeypatch
         )
 
+        task_id = await get_current_task_id(
+            authenticated_client, workspace_id, "sequential-analysis"
+        )
+        assert task_id
         update_response = await post_json(
             authenticated_client,
-            f"/api/workspaces/{workspace_id}/sequential-analysis/current-result",
+            f"/api/workspaces/{workspace_id}/sequential-analysis/tasks/{task_id}/result",
             {"chart_type": "bar"},
         )
         assert update_response.status_code == 200
@@ -575,7 +621,7 @@ class TestSequentialAnalysisPersistence:
 
         current_result_response = await get_json(
             authenticated_client,
-            f"/api/workspaces/{workspace_id}/sequential-analysis/current-result",
+            f"/api/workspaces/{workspace_id}/sequential-analysis/tasks/{task_id}/result",
         )
         assert current_result_response.status_code == 200
         current_payload = current_result_response.json()
@@ -599,9 +645,13 @@ class TestSequentialAnalysisPersistence:
             authenticated_client, workspace_id, timeline_node_id, monkeypatch
         )
 
+        task_id = await get_current_task_id(
+            authenticated_client, workspace_id, "sequential-analysis"
+        )
+        assert task_id
         invalid_response = await post_json(
             authenticated_client,
-            f"/api/workspaces/{workspace_id}/sequential-analysis/current-result",
+            f"/api/workspaces/{workspace_id}/sequential-analysis/tasks/{task_id}/result",
             {"chart_type": "scatter"},
         )
         assert invalid_response.status_code == 400
@@ -792,7 +842,7 @@ class TestWorkspaceGraphEnrichment:
         graph_data = response.json()
         assert "edges" in graph_data and "nodes" in graph_data
         assert "workspace_info" in graph_data
-        # Graph no longer surfaces latest_analysis; rely on AnalysisManager queries instead
+        # Graph no longer surfaces latest_analysis; rely on TaskManager queries instead
 
     async def test_graph_includes_multiple_analyses(
         self, authenticated_client, workspace_id, sample_node_id, test_user
