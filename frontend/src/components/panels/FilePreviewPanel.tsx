@@ -25,6 +25,7 @@ export const FilePreviewPanel: React.FC<FilePreviewPanelProps> = ({ filename, op
   } = useFilePreview(filename, open);
 
   const rows = previewData as ReadonlyArray<Record<string, unknown>>;
+  const columnNames = columns as ReadonlyArray<string>;
 
   const canPrev = page > 0;
   const canNext = totalRows ? (page + 1) * pageSize < totalRows : rows.length > 0;
@@ -72,7 +73,7 @@ export const FilePreviewPanel: React.FC<FilePreviewPanelProps> = ({ filename, op
                   <table className="min-w-max max-w-full text-sm">
                     <thead>
                       <tr className="bg-muted">
-                        {columns.map((column) => (
+                        {columnNames.map((column) => (
                           <th key={column} className="whitespace-nowrap px-3 py-2 text-left font-medium">
                             {column}
                           </th>
@@ -82,7 +83,7 @@ export const FilePreviewPanel: React.FC<FilePreviewPanelProps> = ({ filename, op
                     <tbody>
                       {rows.map((row, rowIndex) => (
                         <tr key={rowIndex} className={rowIndex % 2 ? 'bg-muted/40' : 'bg-background'}>
-                          {columns.map((column) => (
+                          {columnNames.map((column) => (
                             <td key={`${column}-${rowIndex}`} className="whitespace-nowrap px-3 py-2">
                               {String(row[column] ?? '')}
                             </td>

@@ -117,7 +117,7 @@ jobs:
 
       - name: Build Tauri desktop application
         shell: bash
-        run: npm run tauri:build
+        run: npm run desktop:build:mac
 
       - name: Label DMG output for Apple Silicon
         id: label-dmg
@@ -125,13 +125,13 @@ jobs:
         run: |
           set -Eeuo pipefail
           shopt -s nullglob
-          dmg_files=(src-tauri/target/release/bundle/dmg/*.dmg)
+          dmg_files=(src-tauri/target/release/bundle/macos/*.dmg)
           if [ ${#dmg_files[@]} -eq 0 ]; then
             echo "No DMG output found" >&2
             exit 1
           fi
           primary_dmg="${dmg_files[0]}"
-          labeled_dmg="src-tauri/target/release/bundle/dmg/ldaca-desktop-apple-silicon.dmg"
+          labeled_dmg="src-tauri/target/release/bundle/macos/ldaca-desktop-apple-silicon.dmg"
           cp "$primary_dmg" "$labeled_dmg"
           echo "path=$labeled_dmg" >> "$GITHUB_OUTPUT"
           echo "Primary DMG: $primary_dmg"

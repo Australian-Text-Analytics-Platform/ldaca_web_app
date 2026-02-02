@@ -135,7 +135,7 @@ jobs:
           $env:UV_PYTHON = "3.12"
           $env:UV_PYTHON_PREFER_MANAGED = "1"
           $env:UV_LINK_MODE = "copy"
-          npm run tauri:build
+          npm run desktop:build:windows
 
       - name: Gather Windows bundles
         id: gather-bundles

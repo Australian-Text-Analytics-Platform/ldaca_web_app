@@ -1,7 +1,8 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.css';
-import App from './App';
+import { RouterProvider } from '@tanstack/react-router';
+import { router } from './router';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 
 // Get Google Client ID from environment
@@ -22,7 +23,7 @@ const root = createRoot(container);
 root.render(
   <React.StrictMode>
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-      <App />
+      <RouterProvider router={router} />
     </GoogleOAuthProvider>
   </React.StrictMode>
 );

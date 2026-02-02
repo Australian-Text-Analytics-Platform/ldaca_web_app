@@ -52,7 +52,7 @@ const resolveTutorialUrl = (requestedFile: string): string => {
 
 /**
  * TutorialView: renders the markdown from public/tutorial.md.
- * This page is shown when opening the app with location.hash === '#/tutorial'.
+ * This view is intended to be rendered inside the tutorial modal.
  */
 const TutorialView: React.FC<{ onClose?: () => void; target?: TutorialTarget | null }> = ({ onClose, target }) => {
   const [content, setContent] = useState<string>('');
@@ -198,8 +198,7 @@ const TutorialView: React.FC<{ onClose?: () => void; target?: TutorialTarget | n
                 if (onClose) {
                   onClose();
                 } else {
-                  window.location.hash = '';
-                  window.location.reload();
+                  window.location.assign('/');
                 }
               }}
             >

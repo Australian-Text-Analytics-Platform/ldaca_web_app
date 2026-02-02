@@ -11,10 +11,9 @@
     "dev": "npm run -w frontend dev",
     "build": "npm run -w frontend build",
     "tauri": "tauri",
-    "tauri:dev": "npm run prepare:frontend && tauri dev",
-    "tauri:build": "npm run prepare:backend && tauri build",
     "desktop:dev": "npm run prepare:frontend && tauri dev",
-    "desktop:build": "npm run prepare:all && tauri build",
+    "desktop:build:mac": "npm run prepare:backend && tauri build && npx create-dmg \"src-tauri/target/release/bundle/macos/LDaCA Text Analytics.app\" \"src-tauri/target/release/bundle/macos/\" --overwrite --no-code-sign",
+    "desktop:build:windows": "echo 'Run this on Windows to build .msi' && npm run prepare:backend && tauri build",
     "prepare:backend": "cd backend && uv run python scripts/package_backend_runtime.py --clean",
     "prepare:frontend": "npm run -w frontend build",
     "prepare:all": "npm run prepare:backend && npm run prepare:frontend",
@@ -22,9 +21,9 @@
     "test": "npm run -w frontend test"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.0.0"
+    "@tauri-apps/cli": "^2.0.0",
+    "create-dmg": "^8.0.0"
   },
-  "dependencies": {},
   "engines": {
     "node": ">=24.0.0",
     "npm": ">=11.0.0"

@@ -2,6 +2,10 @@
 
 <h1 id="help-tutorial-index">LDaCA tutorial index</h1>
 
+<p align="center">
+  <img src="/logo.png" alt="LDaCA" width="360" />
+</p>
+
 Welcome! This tutorial set walks you through the LDaCA text analysis platform from first upload to exporting results. Each section is focused and hands-on, so you can jump to what you need.
 
 ## Overview
