@@ -93,9 +93,6 @@ packages = ["src/ldaca_web_app_backend"]
 [tool.hatch.build.targets.wheel.sources]
 "src" = ""
 
-[tool.uv.workspace]
-members = ["docworkspace", "docframe"]
-
 [tool.uv.sources]
 docworkspace = { workspace = true }
 docframe = { workspace = true }

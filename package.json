@@ -1,0 +1,17 @@
+{
+  "name": "ldaca-web-app-root",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Root workspace for LDaCA Web App",
+  "workspaces": [
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w frontend",
+    "build": "npm run build -w frontend",
+    "desktop:dev": "npm run desktop:dev -w frontend",
+    "desktop:build:mac": "npm run desktop:build:mac -w frontend",
+    "desktop:build:windows": "npm run desktop:build:windows -w frontend",
+    "prepare:backend": "npm run prepare:backend -w frontend"
+  }
+}

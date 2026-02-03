@@ -14,6 +14,7 @@ from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent
+WORKSPACE_ROOT = PROJECT_ROOT.parent
 
 
 def parse_args() -> argparse.Namespace:
@@ -212,11 +213,11 @@ def download_nltk_data(destination_dir: Path) -> None:
     print("   [SUCCESS] NLTK resources downloaded")
 
 
-def get_workspace_packages(project_root: Path) -> list[tuple[str, Path]]:
+def get_workspace_packages(workspace_root: Path) -> list[tuple[str, Path]]:
     """Parse pyproject.toml to find workspace members."""
-    pyproject = project_root / "pyproject.toml"
+    pyproject = workspace_root / "pyproject.toml"
     if not pyproject.exists():
-        print("[WARNING] No pyproject.toml found.")
+        print(f"[WARNING] No pyproject.toml found at {workspace_root}.")
         return []
 
     try:
@@ -235,7 +236,10 @@ def get_workspace_packages(project_root: Path) -> list[tuple[str, Path]]:
 
     for member_pattern in members:
         # Glob handles both direct paths and wildcards
-        for path in project_root.glob(member_pattern):
+        for path in workspace_root.glob(member_pattern):
+            # Skip if it is the backend itself, as we handle it separately
+            if path.resolve() == PROJECT_ROOT.resolve():
+                continue
             if path.is_dir() and (path / "pyproject.toml").exists():
                 packages.append((path.name, path))
 
@@ -344,7 +348,7 @@ def main() -> None:
         )
 
     # DYNAMIC PACKAGE DISCOVERY
-    workspace_packages = get_workspace_packages(PROJECT_ROOT)
+    workspace_packages = get_workspace_packages(WORKSPACE_ROOT)
 
     # Also build the root package (backend)
     # We infer the name from pyproject.toml or just use the dir name/hardcoded fallback

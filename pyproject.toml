@@ -1,0 +1,17 @@
+[project]
+name = "ldaca-web-app-workspace"
+version = "0.0.1"
+description = "LDaCA Web App Workspace"
+requires-python = ">=3.14"
+
+[tool.uv.workspace]
+members = [
+    "backend",
+    "backend/docworkspace",
+    "backend/docframe"
+]
+
+[tool.uv.sources]
+docworkspace = { workspace = true }
+docframe = { workspace = true }
+ldaca-web-app-backend = { workspace = true }
