@@ -9,14 +9,11 @@ import platform
 import shutil
 import subprocess
 import sys
-import textwrap
+import tomllib
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent
-REPO_ROOT = PROJECT_ROOT.parent.parent
-DOCFRAME_DIR = REPO_ROOT / "docframe"
-DOCWORKSPACE_DIR = REPO_ROOT / "ldaca_web_app" / "docworkspace"
 
 
 def parse_args() -> argparse.Namespace:
@@ -75,50 +72,12 @@ def sanitize_lockfile(lockfile: Path, sanitized: Path) -> None:
             dest.write(line)
 
 
-def resolve_python_bin(python_bin: Path) -> Path:
-    python_bin = python_bin.expanduser()
-    try:
-        python_bin = python_bin.resolve()
-    except FileNotFoundError:
-        pass
-
-    venv_cfg = python_bin.parent.parent / "pyvenv.cfg"
-    if venv_cfg.exists():
-        home_value: str | None = None
-        for raw_line in venv_cfg.read_text(encoding="utf-8").splitlines():
-            line = raw_line.strip()
-            if line.startswith("home"):
-                _, value = line.split("=", 1)
-                home_value = value.strip()
-                break
-
-        if home_value:
-            home_path = Path(home_value)
-            candidates: list[Path]
-            if home_path.is_file():
-                candidates = [home_path]
-            else:
-                candidates = [
-                    home_path / "python3",
-                    home_path / "python3.14",
-                    home_path / "python.exe",
-                    home_path / "python",
-                ]
-
-            for candidate in candidates:
-                if candidate.exists():
-                    try:
-                        return candidate.resolve()
-                    except FileNotFoundError:
-                        return candidate
-
-    return python_bin
-
-
 def copy_python_installation(source_root: Path, destination_root: Path) -> None:
     if destination_root.exists():
         shutil.rmtree(destination_root)
-    print(f"📦 Copying Python installation from {source_root} to {destination_root}")
+    print(
+        f"[INFO] Copying Python installation from {source_root} to {destination_root}"
+    )
     shutil.copytree(
         source_root,
         destination_root,
@@ -132,12 +91,12 @@ def fix_macos_python_linking(python_root: Path) -> None:
     if platform.system() != "Darwin":
         return
 
-    print("🔧 Fixing macOS Python dynamic library linking for relocatability")
+    print("[INFO] Fixing macOS Python dynamic library linking for relocatability")
 
     # Find the Python binary
     python_bin = python_root / "bin" / "python3"
     if not python_bin.exists():
-        print("   ⚠️  Python binary not found, skipping relinking")
+        print("   [WARNING] Python binary not found, skipping relinking")
         return
 
     # Find the Python dynamic library
@@ -145,7 +104,7 @@ def fix_macos_python_linking(python_root: Path) -> None:
     dylib_candidates = list(lib_dir.glob("libpython3*.dylib"))
 
     if not dylib_candidates:
-        print("   ⚠️  Python dylib not found, skipping relinking")
+        print("   [WARNING] Python dylib not found, skipping relinking")
         return
 
     dylib = dylib_candidates[0]
@@ -193,9 +152,9 @@ def fix_macos_python_linking(python_root: Path) -> None:
             check=True,
         )
 
-        print("   ✅ Python linking fixed for bundle relocatability")
+        print("   [SUCCESS] Python linking fixed for bundle relocatability")
     else:
-        print("   ℹ️  No absolute Framework references found, already relocatable")
+        print("   [INFO] No absolute Framework references found, already relocatable")
 
 
 def remove_externally_managed_markers(root: Path) -> None:
@@ -206,7 +165,7 @@ def remove_externally_managed_markers(root: Path) -> None:
 def build_local_wheel(package_path: Path, wheel_dir: Path, label: str) -> None:
     if not package_path.exists():
         raise RuntimeError(f"Source directory for {label} not found at {package_path}")
-    print(f"🛞 Building wheel for {label}")
+    print(f"[INFO] Building wheel for {label}")
     run(
         ["uv", "build", str(package_path), "--wheel", "--out-dir", str(wheel_dir)],
         cwd=package_path,
@@ -214,212 +173,73 @@ def build_local_wheel(package_path: Path, wheel_dir: Path, label: str) -> None:
 
 
 def find_latest_wheel(wheel_dir: Path, prefix: str) -> Path:
+    # Note: prefix should be the normalized package name (e.g. underscores instead of dashes for filenames)
+    # But usually uv build outputs predictable names.
+    # We'll use glob.
     matches = sorted(wheel_dir.glob(f"{prefix}-*.whl"))
     if not matches:
         raise RuntimeError(f"Expected wheel starting with {prefix}- in {wheel_dir}")
     return matches[-1]
 
 
-def write_file(path: Path, contents: str, *, mode: int | None = None) -> None:
-    path.write_text(contents, encoding="utf-8")
-    if mode is not None:
-        os.chmod(path, mode)
-
-
-def create_launcher_scripts(runtime_dir: Path) -> None:
-    runner_path = runtime_dir / "run_backend.sh"
-    runner_contents = (
-        textwrap.dedent(
-            """
-        #!/usr/bin/env bash
-        set -Eeuo pipefail
-        
-        SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-        
-        # Debug logging
-        echo "[Backend] Launcher starting. SCRIPT_DIR=$SCRIPT_DIR" >&2
-        
-        # Locate the runtime directory (containing python and .env files)
-        # 1. Default to SCRIPT_DIR (local development or side-by-side deployment)
-        RUNTIME_DIR="$SCRIPT_DIR"
-        
-        # 2. If running from macOS bundle (Contents/MacOS), look in Contents/Resources
-        if [[ "$SCRIPT_DIR" == *"/Contents/MacOS" ]]; then
-            BUNDLE_RESOURCES="$SCRIPT_DIR/../Resources"
-            echo "[Backend] Running in bundle. Checking Resources at $BUNDLE_RESOURCES" >&2
-            
-            # Check possible resource paths based on Tauri bundling behavior
-            if [[ -d "$BUNDLE_RESOURCES/backend-runtime" ]]; then
-                RUNTIME_DIR="$BUNDLE_RESOURCES/backend-runtime"
-            elif [[ -d "$BUNDLE_RESOURCES/backend/dist-tauri/backend-runtime" ]]; then
-                RUNTIME_DIR="$BUNDLE_RESOURCES/backend/dist-tauri/backend-runtime"
-            elif [[ -d "$BUNDLE_RESOURCES/_up_/backend/dist-tauri/backend-runtime" ]]; then
-                RUNTIME_DIR="$BUNDLE_RESOURCES/_up_/backend/dist-tauri/backend-runtime"
-            fi
-        fi
-        
-        echo "[Backend] Resolved RUNTIME_DIR=$RUNTIME_DIR" >&2
-        
-        PYTHON_BIN="$RUNTIME_DIR/python/bin/python3"
-        if [[ ! -x "$PYTHON_BIN" ]]; then
-            # Windows fallback
-            PYTHON_BIN="$RUNTIME_DIR/python/python.exe"
-        fi
-        
-        if [[ ! -x "$PYTHON_BIN" ]]; then
-            echo "[Backend] Python executable missing at $PYTHON_BIN" >&2
-            echo "[Backend] Search path was: $RUNTIME_DIR" >&2
-            
-            # Fallback check for legacy venv (if user didn't clean build)
-            if [[ -d "$RUNTIME_DIR/venv/bin" ]]; then
-                 echo "[Backend] Found legacy venv, trying that..." >&2
-                 PYTHON_BIN="$RUNTIME_DIR/venv/bin/python"
-            else
-                 exit 1
-            fi
-        fi
-        
-        if [[ -f "$RUNTIME_DIR/.env" ]]; then
-            set -a
-            source "$RUNTIME_DIR/.env"
-            set +a
-        fi
-        
-        if [[ -f "$RUNTIME_DIR/.env.desktop" ]]; then
-            set -a
-            source "$RUNTIME_DIR/.env.desktop"
-            set +a
-        fi
-        
-        PORT_VALUE="${BACKEND_PORT:-${LDACA_BACKEND_PORT:-8001}}"
-        HOST_VALUE="${SERVER_HOST:-${LDACA_SERVER_HOST:-127.0.0.1}}"
-        
-        export BACKEND_PORT="$PORT_VALUE"
-        export LDACA_BACKEND_PORT="$PORT_VALUE"
-        export SERVER_HOST="$HOST_VALUE"
-        export LDACA_SERVER_HOST="$HOST_VALUE"
-        export PYTHONUNBUFFERED=1
-        export LDACA_CONFIG_PROFILE="${LDACA_CONFIG_PROFILE:-desktop}"
-        
-        exec "$PYTHON_BIN" -m ldaca_web_app_backend.cli
-        """
-        ).strip()
-        + "\n"
-    )
-    write_file(runner_path, runner_contents, mode=0o755)
-
-    if platform.system() == "Darwin":
-        print("🔧 Creating macOS sidecar aliases")
-        for target in ("aarch64-apple-darwin", "x86_64-apple-darwin"):
-            alias_path = runtime_dir / f"run_backend.sh-{target}"
-            shutil.copy2(runner_path, alias_path)
-            os.chmod(alias_path, 0o755)
-
-    env_template = textwrap.dedent(
-        """
-        # Desktop-specific overrides for the bundled backend
-        # Copy this file to .env.desktop and adjust values if needed.
-        #
-        #BACKEND_PORT=8001
-        #SERVER_HOST=127.0.0.1
-        #LDACA_DATA_ROOT=$HOME/Documents/ldaca
-        """
-    ).lstrip()
-    write_file(runtime_dir / ".env.desktop.example", env_template)
-
-    docs_contents = (
-        textwrap.dedent(
-            """
-        # LDaCA Backend Runtime
-        
-        This folder is generated by `scripts/package_backend_runtime.py` and contains:
-        
-        - `python/` – a standalone Python interpreter with all dependencies preinstalled
-            (third-party wheels resolved via `uv pip compile` plus local docframe,
-            docworkspace, and backend wheels)
-        - `run_backend.sh` – optional launcher for local debugging and CI smoke tests
-        - `run_backend.sh-*` – architecture-specific copies kept for legacy sidecar flows
-        - `.env.desktop.example` – optional overrides for runtime configuration
-        
-        The launcher expects the following environment variables (all optional):
-        
-        | Variable | Purpose |
-        |----------|---------|
-        | `BACKEND_PORT` / `LDACA_BACKEND_PORT` | Port to bind the FastAPI server (defaults to 8001) |
-        | `SERVER_HOST` / `LDACA_SERVER_HOST` | Network interface to bind (defaults to 127.0.0.1) |
-        | `LDACA_DATA_ROOT` | Location for workspace + user data (default `~/Documents/ldaca`) |
-        | `LDACA_CONFIG_PROFILE` | Arbitrary label for downstream logging (defaults to `desktop`) |
-        
-        On macOS the script also creates `run_backend.sh-aarch64-apple-darwin` and
-        `run_backend.sh-x86_64-apple-darwin`. Even though the desktop app now launches
-        the bundled interpreter directly (`python/bin/python3` or `python/python.exe`),
-        these aliases remain helpful when running the backend manually from the
-        terminal or within older CI scripts.
-
-        The Tauri host locates this runtime via `LDACA_BACKEND_RUNTIME` (or the
-        bundled resource path) and spawns the interpreter with
-        `python -m ldaca_web_app_backend.cli`. Before spawning it parses `.env` and
-        `.env.desktop`, exporting the values alongside `BACKEND_PORT`,
-        `LDACA_BACKEND_PORT`, `SERVER_HOST`, `LDACA_SERVER_HOST`, and
-        `LDACA_CONFIG_PROFILE`. The optional shell launcher mirrors that behavior for
-        engineers who prefer to start the backend outside the desktop app.
-        """
-        ).strip()
-        + "\n"
-    )
-    write_file(runtime_dir / "README_RUNTIME.md", docs_contents)
-
-
-def download_nltk_data(python_bin: Path, destination_dir: Path) -> None:
-    print(f"📚 Downloading NLTK data to {destination_dir}")
+def download_nltk_data(destination_dir: Path) -> None:
+    print(f"[INFO] Downloading NLTK data to {destination_dir}")
     destination_dir.mkdir(parents=True, exist_ok=True)
 
-    # Resources to download
-    # punkt_tab is required for newer NLTK versions
-    # punkt is the classic tokenizer models
-    # averaged_perceptron_tagger_eng is standard for POS tagging
-    # stopwords is used by the text analysis API
-    resources = ["punkt_tab", "punkt", "averaged_perceptron_tagger_eng", "stopwords"]
-
-    # Use the packaged Python to download data to ensure compatibility
-    # and because it definitely has NLTK installed (via docframe dependency)
-    # We use a robust script to ensure failures are reported
-    download_script = textwrap.dedent(f"""
+    try:
         import nltk
-        import sys
-        import os
-        
-        resources = {resources}
-        destination = r"{str(destination_dir).replace(os.sep, "/")}"
-        
-        print(f"   Target directory: {{destination}}")
-        
-        failed = []
-        for res in resources:
-            print(f"   Downloading {{res}}...")
-            try:
-                if not nltk.download(res, download_dir=destination, quiet=False):
-                    print(f"   ⚠️  nltk.download returned False for {{res}}")
-                    failed.append(res)
-            except Exception as e:
-                print(f"   ❌ Error downloading {{res}}: {{e}}")
-                failed.append(res)
-        
-        if failed:
-            print(f"   ❌ Failed to download: {{failed}}")
-            sys.exit(1)
-        
-        print("   ✅ All NLTK resources downloaded")
-    """)
+    except ImportError:
+        print("[ERROR] NLTK is not installed in the environment running this script.")
+        print("[INFO] Please run this script with 'uv run ...' or install nltk.")
+        sys.exit(1)
 
-    cmd = [str(python_bin), "-c", download_script]
+    resources = ["punkt_tab", "punkt", "averaged_perceptron_tagger_eng", "stopwords"]
+    failed = []
+
+    for res in resources:
+        print(f"   Downloading {res}...")
+        try:
+            if not nltk.download(res, download_dir=str(destination_dir), quiet=True):
+                failed.append(res)
+        except Exception as e:
+            print(f"   [ERROR] {res}: {e}")
+            failed.append(res)
+
+    if failed:
+        print(f"   [ERROR] Failed: {failed}")
+        sys.exit(1)
+
+    print("   [SUCCESS] NLTK resources downloaded")
+
+
+def get_workspace_packages(project_root: Path) -> list[tuple[str, Path]]:
+    """Parse pyproject.toml to find workspace members."""
+    pyproject = project_root / "pyproject.toml"
+    if not pyproject.exists():
+        print("[WARNING] No pyproject.toml found.")
+        return []
 
     try:
-        run(cmd)
-        print("   ✅ NLTK data setup complete")
-    except subprocess.CalledProcessError as e:
-        print(f"   ❌ Failed to download NLTK data: {e}")
-        raise
+        data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+    except Exception as e:
+        print(f"[WARNING] Failed to parse pyproject.toml: {e}")
+        return []
+
+    members = data.get("tool", {}).get("uv", {}).get("workspace", {}).get("members", [])
+    if not members:
+        print("[INFO] No workspace members found.")
+        return []
+
+    print(f"[INFO] Found workspace members: {members}")
+    packages: list[tuple[str, Path]] = []
+
+    for member_pattern in members:
+        # Glob handles both direct paths and wildcards
+        for path in project_root.glob(member_pattern):
+            if path.is_dir() and (path / "pyproject.toml").exists():
+                packages.append((path.name, path))
+
+    return packages
 
 
 def main() -> None:
@@ -433,24 +253,23 @@ def main() -> None:
     sanitized_lockfile = dist_root / f"{runtime_name}-thirdparty.txt"
     wheel_dir = dist_root / "wheels"
 
-    print("📦 Packaging backend runtime")
-    print(f"   Output directory: {output_dir}")
-    print(f"   Python version:   {args.python_version}\n")
+    print("[INFO] Packaging backend runtime")
+    print(f"   Output dir:     {output_dir}")
+    print(f"   Python version: {args.python_version}\n")
 
     if args.clean and dist_root.exists():
-        print(f"🧹 Removing previous dist at {dist_root}")
+        print(f"[INFO] Removing previous dist at {dist_root}")
         shutil.rmtree(dist_root)
 
-    output_dir.mkdir(parents=True, exist_ok=True)
-    dist_root.mkdir(parents=True, exist_ok=True)
-    wheel_dir.mkdir(parents=True, exist_ok=True)
+    for d in (output_dir, dist_root, wheel_dir):
+        d.mkdir(parents=True, exist_ok=True)
 
     if lockfile.exists():
         lockfile.unlink()
     if sanitized_lockfile.exists():
         sanitized_lockfile.unlink()
 
-    print("🔒 Resolving dependencies via uv pip compile")
+    print("[INFO] Resolving dependencies...")
     run(
         [
             "uv",
@@ -465,11 +284,10 @@ def main() -> None:
         cwd=PROJECT_ROOT,
     )
 
-    print("🧹 Filtering editable workspace entries")
     sanitize_lockfile(lockfile, sanitized_lockfile)
-    print(f"📁 Third-party lock written to {sanitized_lockfile}")
+    print(f"[INFO] Lockfile written to {sanitized_lockfile}")
 
-    print("🧰 Ensuring requested Python version via uv")
+    print("[INFO] Setting up Python...")
 
     # Prefer UV_PYTHON_INSTALL_DIR if set (CI/managed environments)
     uv_install_dir = os.environ.get("UV_PYTHON_INSTALL_DIR")
@@ -502,14 +320,15 @@ def main() -> None:
             ["uv", "python", "find", "--managed-python", args.python_version],
             capture_output=True,
         )
-        base_python_bin = Path(find_result.stdout.strip().splitlines()[-1])
-        resolved_python_bin = resolve_python_bin(base_python_bin)
+        # The detected path might be inside a venv (symlink). Resolve it to the actual interpreter.
+        raw_python_bin = Path(find_result.stdout.strip().splitlines()[-1])
+        base_python_bin = raw_python_bin.resolve()
 
         print(f"   Base Python found at: {base_python_bin}")
-        if resolved_python_bin != base_python_bin:
-            print(f"   Resolved interpreter: {resolved_python_bin}")
+        if base_python_bin != raw_python_bin:
+            print(f"   Resolved from: {raw_python_bin}")
 
-        python_install_root = resolved_python_bin.parent.parent
+        python_install_root = base_python_bin.parent.parent
 
     runtime_python_dir = output_dir / "python"
     copy_python_installation(python_install_root, runtime_python_dir)
@@ -524,11 +343,32 @@ def main() -> None:
             f"Unable to locate python executable inside {runtime_python_dir}"
         )
 
-    build_local_wheel(DOCFRAME_DIR, wheel_dir, "docframe")
-    build_local_wheel(DOCWORKSPACE_DIR, wheel_dir, "docworkspace")
-    build_local_wheel(PROJECT_ROOT, wheel_dir, "ldaca-web-app-backend")
+    # DYNAMIC PACKAGE DISCOVERY
+    workspace_packages = get_workspace_packages(PROJECT_ROOT)
 
-    print("📥 Installing third-party dependencies")
+    # Also build the root package (backend)
+    # We infer the name from pyproject.toml or just use the dir name/hardcoded fallback
+    # The original script used "ldaca-web-app-backend"
+    workspace_packages.append(("ldaca-web-app-backend", PROJECT_ROOT))
+
+    built_wheels = []
+    for pkg_name, pkg_path in workspace_packages:
+        build_local_wheel(pkg_path, wheel_dir, pkg_name)
+        # We need to find the filename that was just built
+        # For simplicity, we find generic wheel match for the package name
+        # Package names in wheels are normalized (dashes -> underscores)
+        normalized_name = pkg_name.replace("-", "_")
+        try:
+            wheel = find_latest_wheel(wheel_dir, normalized_name)
+            built_wheels.append(wheel)
+        except RuntimeError:
+            # Fallback for when glob fails (e.g. name mismatch)
+            print(
+                f"   [WARNING] Could not find wheel for {pkg_name} using prefix {normalized_name}, trying glob *"
+            )
+            pass
+
+    print("[INFO] Installing third-party dependencies")
     run(
         [
             "uv",
@@ -542,12 +382,9 @@ def main() -> None:
         cwd=PROJECT_ROOT,
     )
 
-    docframe_wheel = find_latest_wheel(wheel_dir, "docframe")
-    docworkspace_wheel = find_latest_wheel(wheel_dir, "docworkspace")
-    backend_wheel = find_latest_wheel(wheel_dir, "ldaca_web_app_backend")
-
-    print("📦 Installing bundled workspace packages")
-    for wheel_path in (docframe_wheel, docworkspace_wheel, backend_wheel):
+    print("[INFO] Installing bundled workspace packages")
+    for wheel_path in built_wheels:
+        print(f"   Installing {wheel_path.name}")
         run(
             [
                 "uv",
@@ -565,29 +402,22 @@ def main() -> None:
         lockfile.unlink()
     if sanitized_lockfile.exists():
         sanitized_lockfile.unlink()
-        print("🧽 Removed temporary lockfiles")
+        print("[INFO] Removed temporary lockfiles")
 
-    download_nltk_data(python_bin, runtime_python_dir / "nltk_data")
+    download_nltk_data(runtime_python_dir / "nltk_data")
 
-    create_launcher_scripts(output_dir)
-
-    print("✅ Backend runtime created")
+    print("[SUCCESS] Backend runtime created")
     print(f"   Runtime folder: {output_dir}")
     print(f"   Python entry:   {python_bin}")
-    print(f"   Optional launcher: {output_dir / 'run_backend.sh'}")
     print(f"   Wheels staged:  {wheel_dir}")
 
 
-def entrypoint() -> None:
+if __name__ == "__main__":
     try:
         main()
     except subprocess.CalledProcessError as exc:
-        print(f"❌ Command failed: {' '.join(exc.cmd)}", file=sys.stderr)
+        print(f"[ERROR] Command failed: {' '.join(exc.cmd)}", file=sys.stderr)
         sys.exit(exc.returncode)
-    except Exception as exc:  # noqa: BLE001
-        print(f"❌ {exc}", file=sys.stderr)
+    except Exception as exc:
+        print(f"[ERROR] {exc}", file=sys.stderr)
         sys.exit(1)
-
-
-if __name__ == "__main__":
-    entrypoint()

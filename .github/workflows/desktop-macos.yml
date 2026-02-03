@@ -18,24 +18,10 @@ jobs:
       CI: "true"
 
     steps:
-      - name: Checkout repository
+      - name: Checkout repository with submodules
         uses: actions/checkout@v4
-        
-      - name: Fetch docframe dependency
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          if [ ! -d ../docframe ]; then
-            git clone --depth 1 https://github.com/Australian-Text-Analytics-Platform/docframe.git ../docframe
-          fi
-
-      - name: Fetch docframe dependency
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          if [ ! -d ../docframe ]; then
-            git clone --depth 1 https://github.com/Australian-Text-Analytics-Platform/docframe.git ../docframe
-          fi
+        with:
+          submodules: recursive
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -43,7 +29,6 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: |
-            package-lock.json
             frontend/package-lock.json
 
       - name: Set up Rust toolchain
@@ -66,7 +51,7 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('src-tauri/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-${{ hashFiles('frontend/src-tauri/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
 
@@ -74,7 +59,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.rustup
-          key: ${{ runner.os }}-rustup-${{ hashFiles('src-tauri/Cargo.lock') }}
+          key: ${{ runner.os }}-rustup-${{ hashFiles('frontend/src-tauri/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-rustup-
 
@@ -111,17 +96,15 @@ jobs:
         working-directory: frontend
         run: npm run build
 
-      - name: Install root dependencies
-        shell: bash
-        run: npm install
-
       - name: Build Tauri desktop application
         shell: bash
+        working-directory: frontend
         run: npm run desktop:build:mac
 
       - name: Label DMG output for Apple Silicon
         id: label-dmg
         shell: bash
+        working-directory: frontend
         run: |
           set -Eeuo pipefail
           shopt -s nullglob
@@ -141,6 +124,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ldaca-desktop-macos-apple-silicon
-          path: ${{ steps.label-dmg.outputs.path }}
+          path: frontend/${{ steps.label-dmg.outputs.path }}
           if-no-files-found: error
           retention-days: 14

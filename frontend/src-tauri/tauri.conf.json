@@ -6,7 +6,7 @@
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:3001",
     "beforeBuildCommand": "npm run build",
-    "frontendDist": "../frontend/build"
+    "frontendDist": "../build"
   },
   "app": {
     "withGlobalTauri": true,
@@ -39,7 +39,7 @@
       "signingIdentity": "-"
     },
     "resources": [
-      "../backend/dist-tauri/backend-runtime"
+      "../../backend/dist-tauri/backend-runtime"
     ],
     "copyright": "Copyright © 2025 Australian Text Analytics Platform",
     "category": "Education",

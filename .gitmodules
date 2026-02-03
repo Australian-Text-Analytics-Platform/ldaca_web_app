@@ -1,0 +1,3 @@
+[submodule "backend/docframe"]
+	path = backend/docframe
+	url = https://github.com/Australian-Text-Analytics-Platform/docframe.git
