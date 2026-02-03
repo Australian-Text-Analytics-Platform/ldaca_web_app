@@ -79,7 +79,6 @@ frontend.log
 .temp/
 
 # Frontend - IDE/Editor specific
-.vscode/
 .idea/
 *.swp
 *.swo
