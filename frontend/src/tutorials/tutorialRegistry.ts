@@ -60,6 +60,11 @@ const registry: Record<string, TutorialTarget> = {
     anchor: 'help-data-loader-import-sample-button',
     label: 'Import sample data',
   },
+  'data-loader.import-ldaca.button': {
+    file: 'tutorials/data-loader.md',
+    anchor: 'help-data-loader-import-ldaca-button',
+    label: 'Import from LDaCA',
+  },
   'data-loader.add.button': {
     file: 'tutorials/data-loader.md',
     anchor: 'help-data-loader-add-button',

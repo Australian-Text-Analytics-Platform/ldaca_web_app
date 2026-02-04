@@ -84,6 +84,14 @@ Use this to load curated sample datasets for quick experimentation.
 - Great for first-time users.
 - Sample data is safe to explore and delete.
 
+<h2 id="help-data-loader-import-ldaca-button">Import from LDaCA</h2>
+
+Click this to import a dataset directly from the Language Data Commons of Australia (LDaCA).
+
+- Paste the full URL to an LDaCA Zip download (e.g., from an LDaCA repository page).
+- The import runs in the background.
+- Files will appear in your files list once the download and extraction are complete.
+
 <h2 id="help-data-loader-add-button">Add file to workspace</h2>
 
 This action adds the selected file into the workspace graph as a node.

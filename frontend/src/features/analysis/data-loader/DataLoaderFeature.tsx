@@ -142,7 +142,7 @@ export const DataLoaderFeature: React.FC = () => {
     return (bTime || 0) - (aTime || 0);
   });
 
-  const sortedFiles = [...files].sort((a: FileInfo, b: FileInfo) => (b.created_at || 0) - (a.created_at || 0));
+  const sortedFiles = [...files].sort((a: FileInfo, b: FileInfo) => a.filename.localeCompare(b.filename));
 
   const currentWorkspace = workspaces.find((ws: any) => getWorkspaceId(ws) === currentWorkspaceId) || null;
 
@@ -513,6 +513,7 @@ export const DataLoaderFeature: React.FC = () => {
               <Button variant="outline" onClick={() => setLdacaImportOpen(true)} disabled={ldacaImporting || !hasWorkspaceSelected}>
                 <DownloadIcon className="mr-2 h-4 w-4" /> Import from LDaCA
               </Button>
+              <HelpIcon targetKey="data-loader.import-ldaca.button" label="Import from LDaCA" />
             </div>
             <input
               ref={fileInputRef}
