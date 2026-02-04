@@ -36,4 +36,5 @@ export const filesApi = {
   info: (fileName: string, headers: Record<string,string> = {}) => get(`/files/${encodeURIComponent(fileName)}/info`, headers),
   delete: (fileName: string, headers: Record<string,string> = {}) => del(`/files/${encodeURIComponent(fileName)}`, headers),
   importSampleData: (headers: Record<string,string> = {}) => post('/files/import-sample-data', {}, headers),
+  importLdaca: (workspaceId: string, url: string, headers: Record<string,string> = {}) => post(`/workspaces/${workspaceId}/import-ldaca`, { url }, headers),
 };

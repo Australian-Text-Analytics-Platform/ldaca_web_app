@@ -27,6 +27,7 @@ dependencies = [
     "psutil>=6.1.0", # Process management for proper cleanup of child processes
     "docframe", # Includes nltk, polars, spacy, bertopic
     "docworkspace",
+    "ldaca-loader",
     "pyarrow>=16.0.0",
 ]
 
@@ -96,3 +97,4 @@ packages = ["src/ldaca_web_app_backend"]
 [tool.uv.sources]
 docworkspace = { workspace = true }
 docframe = { workspace = true }
+ldaca-loader = { workspace = true }

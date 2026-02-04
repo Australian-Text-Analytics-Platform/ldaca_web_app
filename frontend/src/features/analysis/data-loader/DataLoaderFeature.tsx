@@ -94,6 +94,9 @@ export const DataLoaderFeature: React.FC = () => {
   const [saveAsOpen, setSaveAsOpen] = useState(false);
   const [saveAsName, setSaveAsName] = useState('');
   const [workspaceNameAlert, setWorkspaceNameAlert] = useState<string | null>(null);
+  const [ldacaImportOpen, setLdacaImportOpen] = useState(false);
+  const [ldacaUrl, setLdacaUrl] = useState('');
+  const [ldacaImporting, setLdacaImporting] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const activeCardRef = useRef<HTMLDivElement | null>(null);
@@ -241,6 +244,26 @@ export const DataLoaderFeature: React.FC = () => {
       console.error('[DataLoaderFeature] import sample data failed', error);
     } finally {
       setImportingSamples(false);
+    }
+  };
+
+  const handleLdacaImport = async () => {
+    if (!currentWorkspaceId) {
+      setWorkspaceAlertOpen(true);
+      return;
+    }
+    if (!ldacaUrl.trim()) return;
+    
+    setLdacaImporting(true);
+    try {
+      await filesApi.importLdaca(currentWorkspaceId, ldacaUrl, authHeaders);
+      notify('success', 'LDaCA import started in background.');
+      setLdacaUrl('');
+      setLdacaImportOpen(false);
+    } catch (error) {
+      notify('error', (error as Error).message || 'Failed to start LDaCA import.');
+    } finally {
+      setLdacaImporting(false);
     }
   };
 
@@ -486,6 +509,11 @@ export const DataLoaderFeature: React.FC = () => {
               </Button>
               <HelpIcon targetKey="data-loader.import-sample.button" label="Import sample data" />
             </div>
+            <div className="flex items-center gap-1">
+              <Button variant="outline" onClick={() => setLdacaImportOpen(true)} disabled={ldacaImporting || !hasWorkspaceSelected}>
+                <DownloadIcon className="mr-2 h-4 w-4" /> Import from LDaCA
+              </Button>
+            </div>
             <input
               ref={fileInputRef}
               type="file"
@@ -657,6 +685,36 @@ export const DataLoaderFeature: React.FC = () => {
               Cancel
             </Button>
             <Button onClick={confirmSaveAs}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      <Dialog open={ldacaImportOpen} onOpenChange={setLdacaImportOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Import from LDaCA</DialogTitle>
+            <DialogDescription>
+              Enter the LDaCA Zip URL to download and convert the dataset. This will run as a background task.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>LDaCA URL</Label>
+              <Input
+                value={ldacaUrl}
+                onChange={(e) => setLdacaUrl(e.target.value)}
+                placeholder="https://data.ldaca.edu.au/..."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLdacaImportOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleLdacaImport} disabled={ldacaImporting || !ldacaUrl.trim()}>
+              {ldacaImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Import
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

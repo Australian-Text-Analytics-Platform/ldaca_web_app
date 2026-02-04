@@ -155,6 +155,10 @@ export const useWorkspaceTaskInbox = (
               }
             }
 
+            if (payload.task?.task_type === 'ldaca_import' && payload.task.state === 'successful') {
+              queryClient.invalidateQueries({ queryKey: queryKeys.files });
+            }
+
             if (workspaceId && shouldRefreshGraphFallback(payload.task as TaskItem)) {
               queryClient.invalidateQueries({
                 queryKey: queryKeys.workspaceGraph(workspaceId),

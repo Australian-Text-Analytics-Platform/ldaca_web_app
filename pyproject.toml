@@ -3,15 +3,20 @@ name = "ldaca-web-app-workspace"
 version = "0.0.1"
 description = "LDaCA Web App Workspace"
 requires-python = ">=3.14"
+dependencies = [
+    "ldaca-web-app-backend",
+]
 
 [tool.uv.workspace]
 members = [
     "backend",
     "backend/docworkspace",
-    "backend/docframe"
+    "backend/docframe",
+    "backend/ldaca-tabulator"
 ]
 
 [tool.uv.sources]
 docworkspace = { workspace = true }
 docframe = { workspace = true }
 ldaca-web-app-backend = { workspace = true }
+ldaca-loader = { workspace = true }

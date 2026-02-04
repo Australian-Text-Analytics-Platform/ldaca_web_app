@@ -6,6 +6,7 @@ Maintains identical route and behavior for backward compatibility.
 from typing import Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from pydantic import BaseModel
 
 from ...core.auth import get_current_user
 from ...core.utils import get_user_data_folder, load_data_file
@@ -13,6 +14,11 @@ from ...core.workspace import workspace_manager
 from .utils import stage_dataframe_as_lazy
 
 router = APIRouter(prefix="/workspaces", tags=["files"])
+
+
+class LDaCAImportRequest(BaseModel):
+    url: str
+    filename: Optional[str] = None
 
 
 @router.post("/{workspace_id}/upload")
@@ -73,6 +79,39 @@ async def upload_file_to_workspace(
         raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to upload file: {e}")
-        raise HTTPException(status_code=400, detail=f"Failed to upload file: {e}")
-        raise HTTPException(status_code=400, detail=f"Failed to upload file: {e}")
-        raise HTTPException(status_code=400, detail=f"Failed to upload file: {e}")
+
+
+@router.post("/{workspace_id}/import-ldaca")
+async def import_ldaca_to_workspace(
+    workspace_id: str,
+    request: LDaCAImportRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Import a dataset from LDaCA using a zip URL as a background task."""
+    user_id = current_user["id"]
+    try:
+        # Verify workspace exists
+        workspace_dir = workspace_manager.get_workspace_dir(user_id, workspace_id)
+        if workspace_dir is None:
+            raise HTTPException(status_code=404, detail="Workspace not found")
+
+        # Get task manager
+        tm = workspace_manager.get_task_manager(user_id, workspace_id)
+
+        # Submit background task
+        task_info = await tm.submit_task(
+            user_id=user_id,
+            workspace_id=workspace_id,
+            task_type="ldaca_import",
+            task_args={"url": request.url, "filename": request.filename},
+        )
+
+        return {
+            "state": "running",
+            "message": "LDaCA import started",
+            "metadata": {"task_id": task_info.id},
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to start import: {e}")

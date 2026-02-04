@@ -120,11 +120,11 @@ def topic_modeling_task(
     try:
         # Import heavy libraries after environment is configured
         import polars as pl
-        # Import workspace manager (this should be lightweight)
-        from ldaca_web_app_backend.core.workspace import workspace_manager
-
         from docframe import DocDataFrame, DocLazyFrame
         from docframe.core.text_utils import topic_visualization
+
+        # Import workspace manager (this should be lightweight)
+        from ldaca_web_app_backend.core.workspace import workspace_manager
 
         print(
             f"[Worker {os.getpid()}] Starting topic modeling task for workspace {workspace_id}"
@@ -457,7 +457,8 @@ def _filter_concordance_rows(df: "pl.DataFrame") -> "pl.DataFrame":
     try:
         non_empty_checks = [
             (
-                pl.col(col)
+                pl
+                .col(col)
                 .cast(pl.Utf8, strict=False)
                 .str.strip_chars()
                 .str.len_chars()
@@ -496,9 +497,8 @@ def concordance_detach_task(
         from pathlib import Path
 
         import polars as pl
-        from ldaca_web_app_backend.core.workspace import workspace_manager
-
         from docframe import DocDataFrame, DocLazyFrame
+        from ldaca_web_app_backend.core.workspace import workspace_manager
 
         print(
             f"[Worker {os.getpid()}] Starting concordance detach task for workspace {workspace_id}"
@@ -705,11 +705,12 @@ def quotation_detach_task(
         from pathlib import Path
 
         import polars as pl
-        from ldaca_web_app_backend.core.workspace import workspace_manager
-        from ldaca_web_app_backend.models import (QuotationEngineConfig,
-                                                  QuotationEngineType)
-
         from docframe import DocDataFrame, DocLazyFrame
+        from ldaca_web_app_backend.core.workspace import workspace_manager
+        from ldaca_web_app_backend.models import (
+            QuotationEngineConfig,
+            QuotationEngineType,
+        )
 
         # Helper to convert to polars and ensure quote dataframe
         # We need to replicate _to_polars_dataframe, _ensure_quote_dataframe, _join_quotes_with_base logic here
@@ -786,8 +787,11 @@ def quotation_detach_task(
                 base_df = pl.DataFrame(base_df)
 
             from ldaca_web_app_backend.api.workspaces.analyses.quotation import (
-                _ensure_quote_dataframe, _extract_remote_paginated,
-                _prepare_documents_payload, _remote_payload_to_dataframe)
+                _ensure_quote_dataframe,
+                _extract_remote_paginated,
+                _prepare_documents_payload,
+                _remote_payload_to_dataframe,
+            )
 
             documents = _prepare_documents_payload(base_df, column)
             if not documents:
@@ -843,8 +847,9 @@ def quotation_detach_task(
             if "quote" in quote_df.columns:
                 quote_df = quote_df.filter(pl.col("quote").is_not_null())
 
-            from ldaca_web_app_backend.api.workspaces.analyses.quotation import \
-                _ensure_quote_dataframe as _ensure_df
+            from ldaca_web_app_backend.api.workspaces.analyses.quotation import (
+                _ensure_quote_dataframe as _ensure_df,
+            )
 
             quote_df = _ensure_df(quote_df, text_column=column)
 
@@ -924,7 +929,7 @@ def quotation_detach_task(
 def _safe_float(value, *, default: float | None = 0.0) -> float | None:
     try:
         number = float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return default
     # Avoid propagating NaN/Inf into JSON payloads
     if number != number:  # NaN check
@@ -983,10 +988,9 @@ def token_frequencies_task(
         import math
 
         import polars as pl
-        from ldaca_web_app_backend.core.workspace import workspace_manager
-
         from docframe import DocDataFrame, DocLazyFrame
         from docframe.core.text_utils import compute_token_frequencies
+        from ldaca_web_app_backend.core.workspace import workspace_manager
 
         print(
             f"[Worker {os.getpid()}] Starting token frequencies task for workspace {workspace_id}"
@@ -1194,6 +1198,144 @@ def token_frequencies_task(
         raise
 
 
+def ldaca_import_task(
+    user_id: str,
+    workspace_id: str,
+    url: str,
+    filename: Optional[str] = None,
+    progress_callback: Optional[callable] = None,
+) -> Dict[str, Any]:
+    """Execute LDaCA import in a worker process."""
+    _configure_worker_environment()
+
+    try:
+        import re
+        import urllib.parse
+        from pathlib import Path
+
+        from ldaca_web_app_backend.core.utils import get_user_data_folder
+        from ldacatabulator.tabulator import LDaCATabulator
+
+        print(f"[Worker {os.getpid()}] Starting LDaCA import task for user {user_id}")
+
+        if progress_callback:
+            progress_callback(0.1, "Connecting to LDaCA...")
+
+        # Determine filename if not provided
+        if not filename:
+            # Parse filename from URL
+            try:
+                parsed = urllib.parse.urlparse(url)
+                path_parts = parsed.path.split("/")
+                candidate = path_parts[-1] if path_parts else "ldaca_import"
+                # Decode URL encoding (e.g. %2F -> /)
+                candidate = urllib.parse.unquote(candidate)
+
+                # Sanitize filename: remove URL schemes and safe characters
+                # User requested saving under LDaCA folder with clean name
+                # remove arcp prefix if present to clean up name a bit
+                if candidate.startswith("arcp://"):
+                    candidate = candidate[7:]
+
+                # Replace invalid FS characters with underscore
+                candidate = re.sub(r"[^a-zA-Z0-9._~-]", "_", candidate)
+
+                # Collapse multiple underscores
+                candidate = re.sub(r"_+", "_", candidate)
+
+                # Fallback sanitation
+                if not candidate or candidate == ".":
+                    candidate = "ldaca_import"
+
+                # If zip, replace with parquet
+                if candidate.lower().endswith(".zip"):
+                    candidate = candidate[:-4] + ".parquet"
+                elif not candidate.lower().endswith(".parquet"):
+                    candidate += ".parquet"
+
+                filename = candidate
+            except Exception:
+                filename = "ldaca_import.parquet"
+
+        if progress_callback:
+            progress_callback(0.3, "Downloading and extracting...")
+
+        # Initialize Tabulator
+        # Note: LDaCATabulator does download in __init__ or get_text calls?
+        # Based on example: ldac_tb = LDaCATabulator(zip_url) -> downloads
+        try:
+            ldac_tb = LDaCATabulator(url)
+        except Exception as e:
+            raise ValueError(f"Failed to download/init LDaCATabulator: {e}")
+
+        if progress_callback:
+            progress_callback(0.6, "Converting to DataFrame...")
+
+        try:
+            df = ldac_tb.get_text()
+        except Exception as e:
+            raise ValueError(f"Failed to extract text DataFrame: {e}")
+
+        if progress_callback:
+            progress_callback(0.8, "Saving to user data...")
+
+        # Get user data folder
+        user_data_folder = get_user_data_folder(user_id)
+
+        # Create LDaCA specific subdirectory
+        ldaca_folder = user_data_folder / "LDaCA"
+        ldaca_folder.mkdir(parents=True, exist_ok=True)
+
+        file_path = ldaca_folder / filename
+
+        # Ensure unique name
+        stem = file_path.stem
+        suffix = file_path.suffix
+        counter = 1
+        while file_path.exists():
+            file_path = ldaca_folder / f"{stem}_{counter}{suffix}"
+            counter += 1
+
+        # Save to parquet
+        try:
+            # Check if dataframe is pandas or polars?
+            # The notebook says "pandas table".
+            import pandas as pd
+
+            if isinstance(df, pd.DataFrame):
+                df.to_parquet(str(file_path))
+            else:
+                # Assume polars or other
+                # Try to convert to polars if it has write_parquet, else try pandas
+                if hasattr(df, "write_parquet"):
+                    df.write_parquet(file_path)
+                else:
+                    # Final fallback, try converting to pandas
+                    pd.DataFrame(df).to_parquet(str(file_path))
+
+        except Exception as e:
+            raise RuntimeError(f"Failed to save parquet file: {e}")
+
+        if progress_callback:
+            progress_callback(1.0, "Import completed successfully")
+
+        print(f"[Worker {os.getpid()}] LDaCA import completed: {file_path.name}")
+
+        return {
+            "success": True,
+            "filename": file_path.name,
+            "path": str(file_path),
+            "size": file_path.stat().st_size,
+            "message": f"Successfully imported {filename}",
+        }
+
+    except Exception as e:
+        print(f"[Worker {os.getpid()}] LDaCA import failed: {str(e)}")
+        if progress_callback:
+            progress_callback(-1, f"Failed: {str(e)}")
+        raise
+
+
 class WorkerPool:
     """Manages the ProcessPoolExecutor for background tasks."""
 
@@ -1263,7 +1405,7 @@ class WorkerPool:
                             try:
                                 print(f"Force terminating worker process {child.pid}")
                                 child.terminate()
-                            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                            except psutil.NoSuchProcess, psutil.AccessDenied:
                                 pass
 
                     # Wait briefly then force kill
@@ -1274,7 +1416,7 @@ class WorkerPool:
                         if child.is_running():
                             try:
                                 child.kill()
-                            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                            except psutil.NoSuchProcess, psutil.AccessDenied:
                                 pass
                 except ImportError:
                     print("Warning: psutil not available for force termination")
@@ -1329,4 +1471,13 @@ TASK_REGISTRY = {
     "concordance_detach": concordance_detach_task,
     "quotation_detach": quotation_detach_task,
     "token_frequencies": token_frequencies_task,
+    "ldaca_import": ldaca_import_task,
+}
+TASK_REGISTRY = {
+    "topic_modeling": topic_modeling_task,
+    "concordance": concordance_task,
+    "concordance_detach": concordance_detach_task,
+    "quotation_detach": quotation_detach_task,
+    "token_frequencies": token_frequencies_task,
+    "ldaca_import": ldaca_import_task,
 }

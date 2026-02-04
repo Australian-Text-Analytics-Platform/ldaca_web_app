@@ -19,11 +19,19 @@ from docworkspace import Node, Workspace  # type: ignore
 from docworkspace.workspace.io import read_workspace  # type: ignore
 from docworkspace.workspace.io import write_workspace
 
-from .docworkspace_api import (DocWorkspaceAPIUtils, create_operation_result,
-                               handle_api_error)
-from .utils import (allocate_workspace_folder, ensure_display_folder_name,
-                    find_workspace_folder_by_id, generate_workspace_id,
-                    get_user_workspace_folder, load_workspace_metadata)
+from .docworkspace_api import (
+    DocWorkspaceAPIUtils,
+    create_operation_result,
+    handle_api_error,
+)
+from .utils import (
+    allocate_workspace_folder,
+    ensure_display_folder_name,
+    find_workspace_folder_by_id,
+    generate_workspace_id,
+    get_user_workspace_folder,
+    load_workspace_metadata,
+)
 
 
 class WorkspaceManager:
@@ -192,6 +200,7 @@ class WorkspaceManager:
                 cached = self._get_cached_path(user_id, workspace_id)
                 if cached:
                     self._attach_workspace_dir(cws, cached)
+                    self._set_working_dir(cached)
             return cws
         ws = self._load(user_id, workspace_id)
         if not ws:
@@ -268,8 +277,7 @@ class WorkspaceManager:
         return False
 
     def get_task_manager(self, user_id: str, workspace_id: str):
-        from ldaca_web_app_backend.core.worker_task_manager import \
-            WorkerTaskManager
+        from ldaca_web_app_backend.core.worker_task_manager import WorkerTaskManager
 
         key = (user_id, workspace_id)
         tm = self._task_managers.get(key)
@@ -444,15 +452,5 @@ class WorkspaceManager:
             self._save(user_id, workspace_id, ws)
 
 
-# Global singleton
-workspace_manager = WorkspaceManager()
-
-# Global singleton
-workspace_manager = WorkspaceManager()
-
-# Global singleton
-workspace_manager = WorkspaceManager()
-# Global singleton
-workspace_manager = WorkspaceManager()
 # Global singleton
 workspace_manager = WorkspaceManager()

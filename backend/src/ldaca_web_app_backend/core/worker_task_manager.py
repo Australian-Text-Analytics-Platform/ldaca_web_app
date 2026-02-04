@@ -50,6 +50,12 @@ TASK_PROGRESS_MESSAGES = {
         "generating": "Structuring results...",
         "finalizing": "Creating new workspace node...",
     },
+    "ldaca_import": {
+        "loading": "Connecting to LDaCA...",
+        "processing": "Downloading and extracting...",
+        "generating": "Converting to DataFrame...",
+        "finalizing": "Saving to user data...",
+    },
     "default": {
         "loading": "Loading data...",
         "processing": "Processing...",
@@ -299,7 +305,6 @@ class WorkerTaskManager:
                 if task_type in ["concordance_detach", "quotation_detach"]:
                     try:
                         import polars as pl
-
                         from docframe import DocLazyFrame
 
                         from .workspace import workspace_manager
