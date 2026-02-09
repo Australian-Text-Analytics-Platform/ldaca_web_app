@@ -6,18 +6,19 @@ Paths preserved exactly as /workspaces/{workspace_id}/token-frequencies*.
 import math
 
 import polars as pl
+from docframe import DocDataFrame, DocLazyFrame
 from fastapi import APIRouter, Depends, HTTPException
 
-from docframe import DocDataFrame, DocLazyFrame
-
-from ....analysis.implementations.token_frequency import \
-    TokenFrequencyRequest as AnalysisTokenFrequencyRequest
+from ....analysis.implementations.token_frequency import (
+    TokenFrequencyRequest as AnalysisTokenFrequencyRequest,
+)
 from ....analysis.manager import get_task_manager
 from ....analysis.models import AnalysisStatus, AnalysisTask
 from ....analysis.results import GenericAnalysisResult
 from ....core.auth import get_current_user
 from ....core.workspace import workspace_manager
 from ....models import TokenFrequencyRequest, TokenFrequencyResponse
+from ..utils import ensure_task_synced
 
 # This router uses the same '/workspaces' prefix as the base router so paths are identical
 # to their original definitions when included at top level.
@@ -240,7 +241,9 @@ async def token_frequencies_task_result(
     """Return a normalized token frequency result for a task id."""
     user_id = current_user["id"]
     task_manager = get_task_manager(user_id, workspace_id)
-    task = task_manager.get_task(task_id)
+
+    # Sync with worker if running using shared utility
+    task = await ensure_task_synced(user_id, workspace_id, task_id, task_manager)
     if not task or not task.result:
         return None
 

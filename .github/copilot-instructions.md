@@ -20,3 +20,5 @@
 - `.github/instructions/security-and-owasp.instructions.md`
 - `.github/instructions/performance-optimization.instructions.md`
 - `.github/instructions/ai-prompt-engineering-safety-best-practices.instructions.md`
+- `.github/instructions/rust-python.instructions.md`
+- `.github/instructions/rust.instructions.md`

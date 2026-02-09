@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from ...analysis.manager import get_task_manager
 from ...core.auth import get_current_user
+from .utils import ensure_task_synced
 
 router = APIRouter(prefix="/workspaces", tags=["analysis-task-manager"])
 
@@ -49,13 +50,28 @@ async def get_task_result(
     """Return the stored result for a task id."""
     user_id = current_user["id"]
     manager = get_task_manager(user_id, workspace_id)
-    task = manager.get_task(task_id)
-    if task is None:
+
+    # Sync with worker if running using shared utility
+    task = await ensure_task_synced(user_id, workspace_id, task_id, manager)
+    if not task:
         raise HTTPException(status_code=404, detail="Task not found")
+
     result = task.result
     if result is None:
-        return {"state": "pending"}
-    return result.to_json() if hasattr(result, "to_json") else result
+        return {"state": "pending", "metadata": {"task_id": task_id}}
+
+    ret = result.to_json() if hasattr(result, "to_json") else result
+
+    # Standardize response envelope if missing
+    if isinstance(ret, dict) and "state" not in ret:
+        return {
+            "state": "successful",
+            "message": "Task complete",
+            "data": ret,
+            "metadata": {"task_id": task_id},
+        }
+
+    return ret
 
 
 @router.post("/{workspace_id}/tasks/{task_id}/clear")

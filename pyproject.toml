@@ -12,7 +12,8 @@ members = [
     "backend",
     "backend/docworkspace",
     "backend/docframe",
-    "backend/ldaca-tabulator"
+    "backend/ldaca-tabulator",
+    "backend/polars-text"
 ]
 
 [tool.uv.sources]
@@ -20,3 +21,4 @@ docworkspace = { workspace = true }
 docframe = { workspace = true }
 ldaca-web-app-backend = { workspace = true }
 ldaca-loader = { workspace = true }
+polars-text = { workspace = true }

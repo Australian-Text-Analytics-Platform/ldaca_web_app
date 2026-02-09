@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import NodeSelectionPanel, { WorkspaceNodeLike } from '../../../components/NodeSelectionPanel';
 import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '../../../hooks/useWorkspaceSelection';
@@ -88,6 +88,7 @@ const TopicModelingFeature: React.FC = () => {
     enableHeuristicGuess: false,
   });
   const runningRef = useRef<boolean>(false);
+  const fetchingTaskIdRef = useRef<string | null>(null); // Prevent duplicate inflight requests
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<TopicModelingResponse | null>(null);
   const resultRef = useRef<TopicModelingResponse | null>(null); // Track result to prevent downgrades
@@ -120,12 +121,12 @@ const TopicModelingFeature: React.FC = () => {
     setLocalTopicModelingTaskId(null);
   }, [currentWorkspaceId, resetTopicModelingReady]);
 
-  const resolveTopicModelingTaskId = async (): Promise<string | null> => {
+  const resolveTopicModelingTaskId = useCallback(async (): Promise<string | null> => {
     if (!currentWorkspaceId) return null;
 
     const candidateIds = [
       localTopicModelingTaskId,
-      (result as any)?.metadata?.task_id,
+      (resultRef.current as any)?.metadata?.task_id,
       topicModelingReadyTaskId,
     ];
     const known = candidateIds.find((candidate) => typeof candidate === 'string' && candidate.trim().length > 0);
@@ -146,13 +147,19 @@ const TopicModelingFeature: React.FC = () => {
     }
 
     return null;
-  };
+  }, [currentWorkspaceId, localTopicModelingTaskId, topicModelingReadyTaskId, getAuthHeaders]);
 
-  const fetchTopicModelingResult = async (taskId: string | null, expectedState: 'successful' | 'failed') => {
+  const fetchTopicModelingResult = useCallback(async (taskId: string | null, expectedState: 'successful' | 'failed') => {
     if (!isActiveTab) return;
     if (!currentWorkspaceId) return;
     const resolvedTaskId = taskId ?? await resolveTopicModelingTaskId();
     if (!resolvedTaskId) return;
+    
+    // Prevent duplicate fetching if already executing for this ID
+    if (fetchingTaskIdRef.current === resolvedTaskId) {
+      return;
+    }
+
     if (
       lastFetchedRef.current.taskId === resolvedTaskId &&
       lastFetchedRef.current.state === expectedState
@@ -161,28 +168,33 @@ const TopicModelingFeature: React.FC = () => {
     }
 
     try {
-      const rr = await textApi.getTaskResult(currentWorkspaceId, resolvedTaskId, getAuthHeaders());
+      fetchingTaskIdRef.current = resolvedTaskId;
+      const rr = await textApi.getTopicModelingTaskResult(currentWorkspaceId, resolvedTaskId, getAuthHeaders());
       if (!rr) return;
 
-      setResultSafely(rr as any);
+      const processedResult = rr as TopicModelingResponse;
 
-      if (rr.state === 'successful') {
+      setResultSafely(processedResult);
+
+      if (processedResult.state === 'successful') {
         setIsLocked(true);
         setIsRunning(false);
         runningRef.current = false;
         setError(null);
         lastFetchedRef.current = { taskId: resolvedTaskId ?? null, state: 'successful' };
-      } else if (rr.state === 'failed') {
+      } else if (processedResult.state === 'failed') {
         setIsLocked(true);
         setIsRunning(false);
         runningRef.current = false;
-        setError(rr.message || 'Topic modeling failed');
+        setError(processedResult.message || 'Topic modeling failed');
         lastFetchedRef.current = { taskId: resolvedTaskId ?? null, state: 'failed' };
       }
     } catch (error) {
       console.warn('Failed to fetch topic modeling result', error);
+    } finally {
+      fetchingTaskIdRef.current = null;
     }
-  };
+  }, [isActiveTab, currentWorkspaceId, resolveTopicModelingTaskId, getAuthHeaders, setIsLocked]);
 
   const topicFallbackBanner = (status: AnalysisTaskStatus) => {
     if (result?.state !== 'running') {
@@ -194,7 +206,7 @@ const TopicModelingFeature: React.FC = () => {
     };
   };
 
-  const handleTopicTaskRefresh = async (context: AnalysisTaskRefreshContext) => {
+  const handleTopicTaskRefresh = useCallback(async (context: AnalysisTaskRefreshContext) => {
     if (context.reason !== 'terminal') {
       return;
     }
@@ -205,7 +217,7 @@ const TopicModelingFeature: React.FC = () => {
       return;
     }
     await fetchTopicModelingResult(context.taskId ?? null, context.taskState);
-  };
+  }, [isActiveTab, fetchTopicModelingResult]);
 
   const {
     status: topicTaskStatus,

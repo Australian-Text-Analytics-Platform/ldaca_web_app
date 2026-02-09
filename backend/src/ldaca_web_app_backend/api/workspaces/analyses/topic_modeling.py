@@ -1,4 +1,4 @@
-"""Topic modeling (BERTopic) analysis endpoints extracted from base.py.
+"""Topic modeling (rust-bert + DBSCAN) analysis endpoints extracted from base.py.
 
 Provides:
     - POST /workspaces/{workspace_id}/topic-modeling
@@ -10,9 +10,8 @@ from __future__ import annotations
 
 from typing import Dict
 
-from fastapi import APIRouter, Depends, HTTPException
-
 from docframe import DocDataFrame, DocLazyFrame
+from fastapi import APIRouter, Depends, HTTPException
 
 from ....analysis.implementations.topic_modeling import (
     TopicModelingRequest as AnalysisTopicModelingRequest,
@@ -30,7 +29,7 @@ router = APIRouter(prefix="/workspaces", tags=["topic-modeling"])
 @router.post(
     "/{workspace_id}/topic-modeling",
     response_model=TopicModelingResponse,
-    summary="Run topic modeling (BERTopic) across one or two nodes",
+    summary="Run topic modeling (rust-bert + DBSCAN) across one or two nodes",
     description="Starts a background topic modeling task over up to two nodes and returns a running task id.",
 )
 async def run_topic_modeling(

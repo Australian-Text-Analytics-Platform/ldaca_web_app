@@ -648,8 +648,8 @@ class TokenFrequencyResponse(BaseModel):
 class TopicModelingRequest(BaseModel):
     node_ids: List[str]  # 1 or 2 node IDs
     node_columns: Optional[Dict[str, str]] = None  # Maps node_id -> column_name
-    min_topic_size: Optional[int] = 5
-    use_ctfidf: Optional[bool] = False
+    min_topic_size: Optional[int] = 5  # DBSCAN min_points
+    use_ctfidf: Optional[bool] = False  # Unused (kept for compatibility)
 
     # Pydantic v2 model config
     model_config = ConfigDict(

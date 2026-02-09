@@ -2,16 +2,16 @@ import logging
 from typing import Any, Dict, List, Optional
 
 import polars as pl
+from docframe import DocDataFrame, DocLazyFrame
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-
-from docframe import DocDataFrame, DocLazyFrame
 
 from ....analysis.manager import get_task_manager
 from ....analysis.models import AnalysisStatus, AnalysisTask
 from ....core.auth import get_current_user
 from ....core.workspace import workspace_manager
 from ....models import ConcordanceAnalysisRequest, ConcordanceDetachRequest
+from ..utils import ensure_task_synced
 
 
 def _prepare_doclazy_frame(node, column_name: str, user_id: str, workspace_id: str):
@@ -458,28 +458,11 @@ async def concordance_task_result(
 ):
     user_id = current_user["id"]
     task_manager = get_task_manager(user_id, workspace_id)
-    task = task_manager.get_task(task_id)
+
+    # Sync with worker if running using shared utility
+    task = await ensure_task_synced(user_id, workspace_id, task_id, task_manager)
     if not task:
         return None
-
-    # If task is running, check if it finished in TM
-    if task.status == "running":
-        tm = workspace_manager.get_task_manager(user_id, workspace_id)
-        tm_task = await tm.get_task(task.task_id)
-        if tm_task:
-            if tm_task.status == "successful":
-                # Task finished, update result
-                # Result from TM is likely a dict with node_results
-                result_data = tm_task.result
-
-                from ....analysis.results import GenericAnalysisResult
-
-                task.complete(GenericAnalysisResult(result_data))
-                task_manager.save_task(task)
-            elif tm_task.status == "failed":
-                task.fail(tm_task.error or "Task failed")
-                task_manager.save_task(task)
-                return None  # Or return error info?
 
     if not task.result:
         return None

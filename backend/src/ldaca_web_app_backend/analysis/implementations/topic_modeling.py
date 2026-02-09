@@ -14,5 +14,9 @@ class TopicModelingRequest(BaseAnalysisRequest):
     node_columns: Optional[Dict[str, str]] = Field(
         None, description="Map of node_id to column name"
     )
-    min_topic_size: Optional[int] = Field(5, description="Minimum topic size")
-    use_ctfidf: Optional[bool] = Field(False, description="Whether to use c-TF-IDF")
+    min_topic_size: Optional[int] = Field(
+        5, description="DBSCAN min_points (minimum cluster size)"
+    )
+    use_ctfidf: Optional[bool] = Field(
+        False, description="Unused (kept for compatibility)"
+    )

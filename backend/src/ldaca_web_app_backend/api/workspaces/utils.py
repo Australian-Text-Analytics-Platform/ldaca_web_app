@@ -6,12 +6,48 @@ from pathlib import Path
 from typing import Any, Optional, Tuple
 
 import polars as pl
+from docframe import DocLazyFrame
 from fastapi import HTTPException
 
-from docframe import DocLazyFrame
-
+from ...analysis.models import AnalysisStatus
 from ...core.json_utils import json_sanitize  # type: ignore
 from ...core.workspace import workspace_manager
+
+
+async def ensure_task_synced(
+    user_id: str,
+    workspace_id: str,
+    task_id: str,
+    memory_task_manager,
+):
+    """Sync the in-memory task status with the backend worker task manager.
+
+    If the in-memory task is 'running', this checks the worker (Redis/Celery)
+    status and updates the in-memory task if the worker has completed (success/fail).
+    """
+    task = memory_task_manager.get_task(task_id)
+    if not task:
+        return None
+
+    # Check against string or Enum to be safe
+    is_running = task.status == "running" or task.status == AnalysisStatus.RUNNING
+
+    if is_running:
+        worker_tm = workspace_manager.get_task_manager(user_id, workspace_id)
+        try:
+            tm_task = await worker_tm.get_task(task.task_id)
+            if tm_task:
+                from ...analysis.results import GenericAnalysisResult
+
+                if tm_task.status == "successful":
+                    task.complete(GenericAnalysisResult(tm_task.result))
+                    memory_task_manager.save_task(task)
+                elif tm_task.status == "failed":
+                    task.fail(tm_task.error or "Task failed")
+                    memory_task_manager.save_task(task)
+        except Exception:
+            pass
+    return task
 
 
 def success(data=None, message: str = "ok", state: str = "successful", **extra):

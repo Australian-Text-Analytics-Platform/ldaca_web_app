@@ -108,9 +108,10 @@ export const textApi = {
   postTokenFrequenciesTaskResult: (ws: string, taskId: string, reqUpdate: any, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/token-frequencies/tasks/${taskId}/result`, reqUpdate, headers),
 
   // Topic Modeling
-  topicModeling: (ws: string, req: TopicModelingRequest, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/topic-modeling`, req, headers),
+  topicModeling: (ws: string, req: TopicModelingRequest, headers: Record<string, string> = {}) => post(`/workspaces/${ws}/topic-modeling`, req, headers),
+  getTopicModelingTaskResult: (ws: string, taskId: string, headers: Record<string, string> = {}) => httpRequest<TopicModelingResponse>(`/workspaces/${ws}/tasks/${taskId}/result`, { method: 'GET', headers }),
 
-  getAnalysisCurrent: (ws: string, analysis: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/${analysis}/current`, { method: 'GET', headers }),
+  getAnalysisCurrent: (ws: string, analysis: string, headers: Record<string, string> = {}) => httpRequest(`/workspaces/${ws}/${analysis}/current`, { method: 'GET', headers }),
   getTaskRequest: (ws: string, taskId: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/tasks/${taskId}/request`, { method: 'GET', headers }),
   getTaskResult: (ws: string, taskId: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/tasks/${taskId}/result`, { method: 'GET', headers }),
   clearTask: (ws: string, taskId: string, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/tasks/${taskId}/clear`, {}, headers),

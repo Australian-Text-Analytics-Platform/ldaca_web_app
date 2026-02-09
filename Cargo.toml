@@ -1,0 +1,7 @@
+[workspace]
+members = [
+    "backend/docframe",
+    "backend/polars-text",
+    "frontend/src-tauri",
+]
+resolver = "2"
