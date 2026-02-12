@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from typing import Dict
 
-from docframe import DocDataFrame, DocLazyFrame
 from fastapi import APIRouter, Depends, HTTPException
 
 from ....analysis.implementations.topic_modeling import (
@@ -108,10 +107,9 @@ async def run_topic_modeling(
                 available_columns = []
             column_name = node_columns.get(node_id)
             if not column_name:
-                if isinstance(node_data, (DocDataFrame, DocLazyFrame)):
-                    doc_col = getattr(node_data, "document_column", None)
-                    if doc_col:
-                        column_name = doc_col
+                metadata = getattr(node, "metadata", {}) or {}
+                if isinstance(metadata, dict):
+                    column_name = metadata.get("text_column")
                 if not column_name:
                     common = [
                         c
@@ -176,6 +174,52 @@ async def run_topic_modeling(
         "message": "Topic modeling started",
         "data": None,
         "metadata": {"task_id": task_info.id},
+    }
+
+
+@router.get(
+    "/{workspace_id}/topic-modeling/tasks/{task_id}/result",
+    summary="Get topic modeling task result",
+)
+async def topic_modeling_task_result(
+    workspace_id: str,
+    task_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    user_id = current_user["id"]
+    task_manager = get_task_manager(user_id, workspace_id)
+    task = task_manager.get_task(task_id)
+    if not task:
+        return None
+
+    if task.result:
+        payload = (
+            task.result.to_json() if hasattr(task.result, "to_json") else task.result
+        )
+        payload = json_sanitize(payload)
+        return payload
+
+    if task.status in (AnalysisStatus.PENDING, AnalysisStatus.RUNNING):
+        return {
+            "state": "running",
+            "message": "Topic modeling running",
+            "data": None,
+            "metadata": {"task_id": task_id},
+        }
+
+    if task.status == AnalysisStatus.FAILED:
+        return {
+            "state": "failed",
+            "message": task.error or "Topic modeling failed",
+            "data": None,
+            "metadata": {"task_id": task_id},
+        }
+
+    return {
+        "state": "failed",
+        "message": "Topic modeling result unavailable",
+        "data": None,
+        "metadata": {"task_id": task_id},
     }
 
 

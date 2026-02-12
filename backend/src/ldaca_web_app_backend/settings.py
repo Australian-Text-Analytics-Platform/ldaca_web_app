@@ -9,8 +9,6 @@ from pathlib import Path
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-PACKAGE_ROOT = Path(__file__).parent
-
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables with defaults."""
@@ -38,8 +36,9 @@ class Settings(BaseSettings):
     user_data_folder: str = Field(
         default="users", description="User data folder (relative to data_root)"
     )
-    sample_data: str = Field(
-        default=str(PACKAGE_ROOT / "sample_data"), description="Sample data folder"
+    sample_data: str | Path | None = Field(
+        default=None,
+        description="Optional sample data folder override (filesystem path)",
     )
 
     # Server Configuration
@@ -113,8 +112,10 @@ class Settings(BaseSettings):
         """Get user data folder absolute path (DATA_ROOT/user_data_folder)."""
         return self.get_data_root() / self.user_data_folder
 
-    def get_sample_data_folder(self) -> Path:
-        """Get sample data folder."""
+    def get_sample_data_folder(self) -> Path | None:
+        """Get optional sample data folder override as a Path."""
+        if not self.sample_data:
+            return None
         return Path(self.sample_data)
 
     def get_database_backup_folder(self) -> Path:
@@ -131,4 +132,6 @@ class Settings(BaseSettings):
 
 
 # Global settings instance
+settings = Settings()  # type: ignore[arg-type]
+settings = Settings()  # type: ignore[arg-type]
 settings = Settings()  # type: ignore[arg-type]

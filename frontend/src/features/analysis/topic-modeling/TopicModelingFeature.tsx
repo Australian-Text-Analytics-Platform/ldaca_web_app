@@ -569,7 +569,7 @@ const TopicModelingFeature: React.FC = () => {
 
   const fetchTopicResult = async (taskId?: string | null) => {
     if (!currentWorkspaceId || !taskId) return null;
-    return textApi.getTaskResult(currentWorkspaceId, taskId, getAuthHeaders());
+    return textApi.getTopicModelingTaskResult(currentWorkspaceId, taskId, getAuthHeaders());
   };
 
   const { hydrateFromServer } = useAnalysisHydration({

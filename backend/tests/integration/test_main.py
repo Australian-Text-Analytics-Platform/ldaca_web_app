@@ -136,13 +136,11 @@ class TestApplicationConfiguration:
     def test_feature_availability(self):
         """Test that required features are properly imported and available"""
         # These imports should work with proper package installation
+        import polars_text
         from docworkspace import Node, Workspace
 
-        import docframe
-        from docframe import DocDataFrame
-
         # Basic validation that classes exist
-        assert DocDataFrame is not None
+        assert polars_text is not None
         assert Node is not None
         assert Workspace is not None
 

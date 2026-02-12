@@ -13,8 +13,6 @@ from typing import Any, List, Optional
 import polars as pl
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from docframe import DocLazyFrame  # type: ignore
-
 from ...core.auth import get_current_user
 from ...core.docworkspace_api import DocWorkspaceAPIUtils
 from ...core.expression_parser import ExpressionParseError, build_polars_expression
@@ -204,12 +202,34 @@ def _build_filter_expression(request: FilterRequest) -> pl.Expr:
 def _unwrap_lazyframe(data: Any, *, purpose: str) -> pl.LazyFrame:
     if isinstance(data, pl.LazyFrame):
         return data
-    if isinstance(data, DocLazyFrame):  # type: ignore[arg-type]
-        return data.lazyframe  # type: ignore[return-value]
     raise HTTPException(
         status_code=500,
         detail=f"{purpose} requires lazy node data but received {type(data).__name__}",
     )
+
+
+def _set_text_column(node: Any, text_column: Optional[str]) -> None:
+    if text_column is None:
+        return
+    if hasattr(node, "document"):
+        try:
+            node.document = text_column
+        except Exception:
+            pass
+    if hasattr(node, "set_metadata"):
+        try:
+            node.set_metadata("text_column", text_column)
+            return
+        except Exception:
+            pass
+    metadata = getattr(node, "metadata", None)
+    if not isinstance(metadata, dict):
+        metadata = {}
+    metadata["text_column"] = text_column
+    try:
+        setattr(node, "metadata", metadata)
+    except Exception:
+        pass
 
 
 def _get_node_display_name(node: Any) -> str:
@@ -568,9 +588,7 @@ async def get_column_unique_values(
     _, data_obj = get_node_with_data_or_400(user_id, workspace_id, node_id)
     try:
         lazyframe: Optional[pl.LazyFrame] = None
-        if isinstance(data_obj, DocLazyFrame):  # type: ignore[arg-type]
-            lazyframe = data_obj.lazyframe
-        elif isinstance(data_obj, pl.LazyFrame):
+        if isinstance(data_obj, pl.LazyFrame):
             lazyframe = data_obj
 
         if lazyframe is not None:
@@ -690,12 +708,12 @@ async def describe_column(
 
                             dt = dt.replace(tzinfo=timezone.utc)
                         return dt.isoformat()
-                    except (ValueError, AttributeError):
+                    except ValueError, AttributeError:
                         return val
                 # For numeric columns, convert to float
                 try:
                     return float(val)
-                except (TypeError, ValueError):
+                except TypeError, ValueError:
                     return val
 
             response = ColumnDescribeResponse(
@@ -749,16 +767,16 @@ async def convert_node(
     node_id: str,
     target: str = Query(
         ...,
-        description="Target type: doclazyframe or lazyframe",
+        description="Target type: lazyframe",
     ),
     document_column: Optional[str] = Query(
         None,
-        description="Document column for Doc* types (auto-detected if not specified)",
+        description="Document column (auto-detected if not specified)",
     ),
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    valid_targets = {"doclazyframe", "lazyframe"}
+    valid_targets = {"lazyframe"}
     if target not in valid_targets:
         raise HTTPException(
             status_code=400,
@@ -767,29 +785,12 @@ async def convert_node(
     src_node, data = get_node_with_data_or_400(user_id, workspace_id, node_id)
     try:
         new_data = None
+        doc_col: Optional[str] = None
         operation_name = f"convert_to_{target}"
-        if target == "doclazyframe":
-            if isinstance(data, DocLazyFrame):  # type: ignore[arg-type]
-                if document_column and document_column != data.document_column:
-                    schema = data.lazyframe.collect_schema()
-                    if document_column not in schema:
-                        raise HTTPException(
-                            status_code=400,
-                            detail=f"Document column '{document_column}' not found in node.",
-                        )
-                    new_data = data.with_document_column(document_column)
-                else:
-                    new_data = data
-            else:
-                lazyframe = _unwrap_lazyframe(data, purpose="Convert to DocLazyFrame")
-                doc_col = document_column or _guess_doc_column(lazyframe)
-                if not doc_col:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=(
-                            "Unable to auto-detect a document column. Please specify document_column."
-                        ),
-                    )
+        if target == "lazyframe":
+            lazyframe = _unwrap_lazyframe(data, purpose="Convert to LazyFrame")
+            doc_col = document_column or _guess_doc_column(lazyframe)
+            if doc_col:
                 schema = lazyframe.collect_schema()
                 if doc_col not in schema:
                     raise HTTPException(
@@ -801,15 +802,14 @@ async def convert_node(
                         status_code=400,
                         detail=f"Column '{doc_col}' is not a string column",
                     )
-                new_data = DocLazyFrame(lazyframe, document_column=doc_col)  # type: ignore[misc]
-        elif target == "lazyframe":
-            new_data = _unwrap_lazyframe(data, purpose="Convert to LazyFrame")
+            new_data = lazyframe
         if new_data is None:
             raise HTTPException(
                 status_code=400,
                 detail=f"Unsupported data type for conversion: {type(data).__name__}",
             )
         src_node.data = new_data  # type: ignore[assignment]
+        _set_text_column(src_node, doc_col if target == "lazyframe" else None)
         try:
             src_node.operation += "\n" + operation_name
         except Exception:
@@ -827,10 +827,6 @@ async def convert_node(
 
 
 def _guess_doc_column(data) -> Optional[str]:
-    try:
-        return DocLazyFrame.guess_document_column(data)  # type: ignore[attr-defined]
-    except Exception:
-        pass
     candidates = ["document", "text", "content", "body", "message"]
     try:
         cols = (
@@ -857,49 +853,27 @@ async def reset_node_document_column(
     src_node, data = get_node_with_data_or_400(user_id, workspace_id, node_id)
     try:
         new_data = None
-        if isinstance(data, DocLazyFrame):  # type: ignore[arg-type]
-            current_col = data.document_column  # type: ignore[attr-defined]
-            target_col = document_column or _guess_doc_column(data.lazyframe)
-            if not target_col:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Unable to auto-detect document column; please provide document_column",
-                )
-            schema = data.lazyframe.collect_schema()
-            if target_col not in schema:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Document column '{target_col}' not found in schema",
-                )
-            if schema[target_col] not in (pl.Utf8, pl.String):
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Column '{target_col}' is not a string column",
-                )
-            if target_col == current_col:
-                return DocWorkspaceAPIUtils.convert_node_info_for_api(src_node)
-            new_data = DocLazyFrame(data.lazyframe, document_column=target_col)  # type: ignore[misc]
-        else:
-            lazyframe = _unwrap_lazyframe(data, purpose="Reset document column")
-            target_col = document_column or _guess_doc_column(lazyframe)
-            if not target_col:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Unable to auto-detect document column; please provide document_column",
-                )
-            schema = lazyframe.collect_schema()
-            if target_col not in schema:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Document column '{target_col}' not found in schema",
-                )
-            if schema[target_col] not in (pl.Utf8, pl.String):
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Column '{target_col}' is not a string column",
-                )
-            new_data = DocLazyFrame(lazyframe, document_column=target_col)  # type: ignore[misc]
+        lazyframe = _unwrap_lazyframe(data, purpose="Reset document column")
+        target_col = document_column or _guess_doc_column(lazyframe)
+        if not target_col:
+            raise HTTPException(
+                status_code=400,
+                detail="Unable to auto-detect document column; please provide document_column",
+            )
+        schema = lazyframe.collect_schema()
+        if target_col not in schema:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Document column '{target_col}' not found in schema",
+            )
+        if schema[target_col] not in (pl.Utf8, pl.String):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Column '{target_col}' is not a string column",
+            )
+        new_data = lazyframe
         src_node.data = new_data  # type: ignore[assignment]
+        _set_text_column(src_node, target_col)
         try:
             src_node.operation = "reset_document"
         except Exception:

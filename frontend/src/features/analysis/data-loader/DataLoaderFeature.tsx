@@ -248,16 +248,12 @@ export const DataLoaderFeature: React.FC = () => {
   };
 
   const handleLdacaImport = async () => {
-    if (!currentWorkspaceId) {
-      setWorkspaceAlertOpen(true);
-      return;
-    }
     if (!ldacaUrl.trim()) return;
     
     setLdacaImporting(true);
     try {
-      await filesApi.importLdaca(currentWorkspaceId, ldacaUrl, authHeaders);
-      notify('success', 'LDaCA import started in background.');
+      await filesApi.importLdaca(ldacaUrl, authHeaders);
+      notify('success', 'LDaCA import completed.');
       setLdacaUrl('');
       setLdacaImportOpen(false);
     } catch (error) {

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Enhanced LDaCA Web App API",
-    "description": "Multi-user text analysis platform with workspace management and DocFrame integration",
+    "description": "Multi-user text analysis platform with workspace management and polars-text integration",
     "version": "3.0.0"
   },
   "paths": {
@@ -1726,7 +1726,7 @@
           "workspace"
         ],
         "summary": "Add Node To Workspace",
-        "description": "Add a data file as a new node to workspace.\n\nFiles are eagerly loaded into a Polars DataFrame, persisted as parquet under the workspace's `data/` folder,\nand then reloaded as a LazyFrame (or DocLazyFrame). This separates bulk data from `metadata.json` while keeping\nlazy processing semantics.",
+        "description": "Add a data file as a new node to workspace.\n\nFiles are eagerly loaded into a Polars DataFrame, persisted as parquet under the workspace's `data/` folder,\nand then reloaded as a LazyFrame. This separates bulk data from `metadata.json` while keeping\nlazy processing semantics.",
         "operationId": "add_node_to_workspace_api_workspaces__workspace_id__nodes_post",
         "parameters": [
           {
@@ -2420,10 +2420,10 @@
             "required": true,
             "schema": {
               "type": "string",
-              "description": "Target type: docdataframe, dataframe, doclazyframe, or lazyframe",
+              "description": "Target type: lazyframe",
               "title": "Target"
             },
-            "description": "Target type: docdataframe, dataframe, doclazyframe, or lazyframe"
+            "description": "Target type: lazyframe"
           },
           {
             "name": "document_column",
@@ -2438,10 +2438,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Document column for Doc* types (auto-detected if not specified)",
+              "description": "Document column (auto-detected if not specified)",
               "title": "Document Column"
             },
-            "description": "Document column for Doc* types (auto-detected if not specified)"
+            "description": "Document column (auto-detected if not specified)"
           },
           {
             "name": "authorization",
@@ -4421,7 +4421,7 @@
           "workspace_management"
         ],
         "summary": "Calculate token frequencies for selected nodes",
-        "description": "Calculate and compare token frequencies across one or two nodes using the docframe library",
+        "description": "Calculate and compare token frequencies across one or two nodes using polars-text",
         "operationId": "calculate_token_frequencies_api_workspaces__workspace_id__token_frequencies_post",
         "parameters": [
           {
@@ -4675,7 +4675,7 @@
           "workspace_management"
         ],
         "summary": "Run Sequential Analysis",
-        "description": "Run sequential analysis on a node with DocFrame integration.",
+        "description": "Run sequential analysis on a node with polars-text integration.",
         "operationId": "run_sequential_analysis_api_workspaces__workspace_id__nodes__node_id__sequential_analysis_post",
         "parameters": [
           {

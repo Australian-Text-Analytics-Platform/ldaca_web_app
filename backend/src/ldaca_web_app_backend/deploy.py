@@ -2,12 +2,13 @@
 import asyncio
 import os
 import subprocess
+from importlib import resources
 from pathlib import Path
 
 import uvicorn
 
 from .main import app
-from .settings import PACKAGE_ROOT, settings
+from .settings import settings
 
 # Add Colab detection
 try:
@@ -114,13 +115,15 @@ def start_frontend(
         if build_dir is not None:
             DIST_DIR = Path(build_dir).absolute()
 
-    NGINX_CONF_TEMPLATE = PACKAGE_ROOT / "configs" / "nginx.conf.template"
-
-    subprocess.run(
-        f"FRONTEND_DIR={DIST_DIR} FRONTEND_PORT={port} BACKEND_PORT={settings.backend_port} envsubst '$FRONTEND_DIR $FRONTEND_PORT $BACKEND_PORT' < {NGINX_CONF_TEMPLATE} > {NGINX_DIR / 'nginx.conf'}",
-        check=True,
-        shell=True,
+    nginx_template = resources.files("ldaca_web_app_backend.resources").joinpath(
+        "configs/nginx.conf.template"
     )
+    with resources.as_file(nginx_template) as nginx_conf_template:
+        subprocess.run(
+            f"FRONTEND_DIR={DIST_DIR} FRONTEND_PORT={port} BACKEND_PORT={settings.backend_port} envsubst '$FRONTEND_DIR $FRONTEND_PORT $BACKEND_PORT' < {nginx_conf_template} > {NGINX_DIR / 'nginx.conf'}",
+            check=True,
+            shell=True,
+        )
     print(f"Using nginx config file: {NGINX_DIR / 'nginx.conf'}")
     proc = subprocess.Popen(
         f"nginx -p {NGINX_DIR} -c 'nginx.conf' -g 'daemon off;'", shell=True

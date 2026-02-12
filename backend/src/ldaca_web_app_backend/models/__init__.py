@@ -182,7 +182,7 @@ class DataFrameInfo(BaseModel):
     columns: List[str]
     dtypes: Dict[str, str]
     memory_usage: str
-    is_text_data: bool  # Whether it's a DocPolars DocDataFrame
+    is_text_data: bool  # Whether it's a text-oriented node
     document: Optional[str] = None  # Enhanced: document column for text data
     column_schema: Optional[Dict[str, str]] = (
         None  # Enhanced: column schema information
@@ -305,6 +305,7 @@ class ConcordanceAnalysisRequest(BaseModel):
     combined: bool = False  # if true, backend builds a combined view across nodes
     # Sorting parameters
     sort_by: Optional[str] = None  # column name to sort by
+    sort_order: Optional[str] = None  # "asc" or "desc"
 
     model_config = ConfigDict(extra="forbid")
 
@@ -504,9 +505,7 @@ class FilePreviewRequest(BaseModel):
 class FilePreviewResponse(BaseModel):
     filename: str
     file_type: str
-    supported_types: List[
-        str
-    ]  # ["DocLazyFrame", "LazyFrame", "DocDataFrame", "DataFrame"]
+    supported_types: List[str]  # ["LazyFrame", "DataFrame"]
     columns: List[str]
     preview: List[Dict[str, Any]]
     total_rows: int

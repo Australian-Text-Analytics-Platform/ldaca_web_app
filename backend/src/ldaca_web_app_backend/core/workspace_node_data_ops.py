@@ -1,6 +1,6 @@
 """Node-level data manipulation helpers used by workspace APIs.
 
-These utilities operate purely on data objects (Polars/DataFrame/DocFrame) and
+These utilities operate purely on data objects (Polars DataFrame/LazyFrame) and
 raise ``NodeDataError`` when a requested operation cannot be applied. Keeping
 this logic outside of the FastAPI modules makes it easier to reuse in other
 contexts (CLI, task workers) and keeps the HTTP layer thin.
@@ -13,42 +13,15 @@ from typing import Any, Iterable, Optional, Sequence
 
 import polars as pl
 
-from docframe import DocDataFrame, DocLazyFrame
-
 
 @dataclass(slots=True)
 class _NormalizedLazy:
     lazyframe: pl.LazyFrame
-    is_doc: bool
-    document_column: Optional[str]
-
-    def wrap(self, lf: pl.LazyFrame, *, document_column: Optional[str] = None) -> Any:
-        if not self.is_doc:
-            return lf
-        doc_col = (
-            document_column if document_column is not None else self.document_column
-        )
-        if not doc_col:
-            raise NodeDataError(
-                message="Missing document column metadata for DocLazyFrame.",
-                status_code=500,
-            )
-        return DocLazyFrame(lf, document_column=doc_col)  # type: ignore[misc]
 
 
 def _normalize_lazy_data(data: Any) -> _NormalizedLazy:
-    if isinstance(data, DocLazyFrame):  # type: ignore[arg-type]
-        return _NormalizedLazy(data.lazyframe, True, data.document_column)
-
-    if isinstance(data, DocDataFrame):  # type: ignore[arg-type]
-        raise NodeDataError(
-            message=(
-                "DocDataFrame inputs are no longer supported. Convert to DocLazyFrame before applying workspace operations."
-            )
-        )
-
     if isinstance(data, pl.LazyFrame):
-        return _NormalizedLazy(data, False, None)
+        return _NormalizedLazy(data)
 
     if isinstance(data, pl.DataFrame):
         raise NodeDataError(
@@ -103,13 +76,8 @@ def drop_column(data: Any, column_name: str) -> Any:
     schema_names = tuple(_schema_names(normalized.lazyframe))
     _ensure_column_present(schema_names, column_name)
 
-    if normalized.is_doc and column_name == normalized.document_column:
-        raise NodeDataError(
-            message="Cannot delete the active document column from a DocLazyFrame.",
-        )
-
     result_lazy = normalized.lazyframe.drop([column_name])
-    return normalized.wrap(result_lazy)
+    return result_lazy
 
 
 def rename_column(data: Any, column_name: str, new_name: str) -> Any:
@@ -127,12 +95,7 @@ def rename_column(data: Any, column_name: str, new_name: str) -> Any:
     _ensure_unique_target(schema, trimmed_name, column_name)
 
     renamed_lazy = normalized.lazyframe.rename({column_name: trimmed_name})
-    updated_doc_col = normalized.document_column
-    if normalized.is_doc and column_name == normalized.document_column:
-        updated_doc_col = trimmed_name
-
-    return normalized.wrap(renamed_lazy, document_column=updated_doc_col)
+    return renamed_lazy
 
 
-__all__ = ["NodeDataError", "drop_column", "rename_column"]
 __all__ = ["NodeDataError", "drop_column", "rename_column"]

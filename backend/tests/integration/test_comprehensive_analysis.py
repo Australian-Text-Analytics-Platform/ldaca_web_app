@@ -42,7 +42,6 @@ def _list_analysis_records(user_id: str, workspace_id: str, task: str | None = N
         key_map = {
             "token_frequencies": "token-frequencies",
             "sequential_analysis": "sequential-analysis",
-            "frequency_analysis": "frequency-analysis",
             "topic_modeling": "topic-modeling",
             "quotation": "quotation",
             "concordance": "concordance",
@@ -57,6 +56,7 @@ def _list_analysis_records(user_id: str, workspace_id: str, task: str | None = N
         res = t.result.to_json() if hasattr(t.result, "to_json") else t.result
         return SimpleNamespace(
             task=task,
+            task_id=t.task_id,
             saved_at=(t.updated_at or t.created_at).isoformat(),
             request=req,
             result=res,
@@ -187,7 +187,16 @@ class TestParametrizedAnalysisPersistence:
         assert len(analyses) == 1
 
         record = analyses[0]
-        assert record.task == analysis_config["task"]
+        if analysis_config["task"] == "token_frequencies":
+            assert record.task_id == task_id
+        else:
+            current_task_id = await _get_current_task_id(
+                authenticated_client, workspace_id, analysis_config["endpoint"]
+            )
+            if current_task_id:
+                assert record.task_id == current_task_id
+            else:
+                assert record.task_id
         if analysis_config["task"] == "token_frequencies":
             expected_limit = request_payload.get("token_limit", DEFAULT_TOKEN_LIMIT)
             expected_stop_words = [

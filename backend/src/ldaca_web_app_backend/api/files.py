@@ -8,9 +8,7 @@ from typing import Any, Dict, List, Optional
 import polars as pl
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
-
-import docframe
-from docframe import DocDataFrame
+from pydantic import BaseModel
 
 from ..core.auth import get_current_user
 from ..core.utils import (
@@ -18,6 +16,8 @@ from ..core.utils import (
     get_user_data_folder,
     import_sample_data_for_user,
     load_data_file,
+    read_text_file,
+    read_zip_file,
     serialize_dataframe_for_json,
     validate_file_path,
 )
@@ -29,6 +29,11 @@ from ..models import (
 )
 
 router = APIRouter(prefix="/files", tags=["file_management"])
+
+
+class LDaCAImportRequest(BaseModel):
+    url: str
+    filename: Optional[str] = None
 
 
 def _lazy_scan(file_path, file_type: str) -> pl.LazyFrame:
@@ -72,39 +77,54 @@ def _get_supported_types_by_extension(file_type: str) -> List[str]:
 
     ft = (file_type or "").lower()
     mapping: Dict[str, List[str]] = {
-        "csv": ["DocLazyFrame", "LazyFrame"],
-        "tsv": ["DocLazyFrame", "LazyFrame"],
-        "jsonl": ["DocLazyFrame", "LazyFrame"],
-        "ndjson": ["DocLazyFrame", "LazyFrame"],
-        "json": ["DocLazyFrame", "LazyFrame"],
-        "parquet": ["DocLazyFrame", "LazyFrame"],
-        "excel": ["DocLazyFrame", "LazyFrame"],
-        "text": ["DocLazyFrame", "LazyFrame"],
-        "zip": ["DocLazyFrame", "LazyFrame"],
+        "csv": ["LazyFrame"],
+        "tsv": ["LazyFrame"],
+        "jsonl": ["LazyFrame"],
+        "ndjson": ["LazyFrame"],
+        "json": ["LazyFrame"],
+        "parquet": ["LazyFrame"],
+        "excel": ["LazyFrame"],
+        "text": ["LazyFrame"],
+        "zip": ["LazyFrame"],
         "unknown": [],
     }
     return mapping.get(ft, [])
 
 
-def _coerce_polars_dataframe(obj: Any) -> pl.DataFrame:
-    """Ensure the returned object is a Polars DataFrame."""
-
-    if isinstance(obj, pl.DataFrame):
-        return obj
-    if isinstance(obj, DocDataFrame):
-        return obj.dataframe
-    raise RuntimeError(
-        "DocFrame returned an unsupported object when loading an Excel sheet"
-    )
-
-
 def _read_excel_sheet(file_path: Path, sheet_name: str) -> pl.DataFrame:
-    df = docframe.read_excel(
-        file_path,
-        sheet_name=sheet_name,
-        document_column=False,
-    )
-    return _coerce_polars_dataframe(df)
+    return pl.read_excel(file_path, sheet_name=sheet_name)
+
+
+def _sanitize_ldaca_filename(url: str, filename: Optional[str]) -> str:
+    import re
+    import urllib.parse
+
+    if filename:
+        candidate = filename
+    else:
+        try:
+            parsed = urllib.parse.urlparse(url)
+            path_parts = parsed.path.split("/")
+            candidate = path_parts[-1] if path_parts else "ldaca_import"
+            candidate = urllib.parse.unquote(candidate)
+        except Exception:
+            candidate = "ldaca_import"
+
+    if candidate.startswith("arcp://"):
+        candidate = candidate[7:]
+
+    candidate = re.sub(r"[^a-zA-Z0-9._~-]", "_", candidate)
+    candidate = re.sub(r"_+", "_", candidate)
+
+    if not candidate or candidate == ".":
+        candidate = "ldaca_import"
+
+    if candidate.lower().endswith(".zip"):
+        candidate = candidate[:-4] + ".parquet"
+    elif not candidate.lower().endswith(".parquet"):
+        candidate += ".parquet"
+
+    return candidate
 
 
 @router.get("/")
@@ -224,6 +244,58 @@ async def import_sample_data(current_user: dict = Depends(get_current_user)):
         )
 
 
+@router.post("/import-ldaca")
+async def import_ldaca_dataset(
+    request: LDaCAImportRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Import a dataset from LDaCA using a zip URL.
+
+    Downloads and converts the LDaCA zip into a parquet file stored under the
+    user's data folder (LDaCA/...). This operation is user-scoped and does not
+    create workspace nodes.
+    """
+    user_id = current_user["id"]
+    try:
+        from ldacatabulator.tabulator import LDaCATabulator
+
+        user_data_folder = get_user_data_folder(user_id)
+        ldaca_folder = user_data_folder / "LDaCA"
+        ldaca_folder.mkdir(parents=True, exist_ok=True)
+
+        safe_filename = _sanitize_ldaca_filename(request.url, request.filename)
+        file_path = ldaca_folder / safe_filename
+
+        stem = file_path.stem
+        suffix = file_path.suffix
+        counter = 1
+        while file_path.exists():
+            file_path = ldaca_folder / f"{stem}_{counter}{suffix}"
+            counter += 1
+
+        ldac_tb = LDaCATabulator(request.url)
+        df = ldac_tb.get_text()
+
+        import pandas as pd
+
+        if isinstance(df, pd.DataFrame):
+            df.to_parquet(str(file_path))
+        elif hasattr(df, "write_parquet"):
+            df.write_parquet(file_path)
+        else:
+            pd.DataFrame(df).to_parquet(str(file_path))
+
+        return {
+            "state": "successful",
+            "filename": file_path.name,
+            "path": str(file_path),
+            "size": file_path.stat().st_size,
+            "message": f"Successfully imported {file_path.name}",
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to import LDaCA: {e}")
+
+
 @router.post("/preview", response_model=FilePreviewResponse)
 async def unified_file_preview(
     req: FilePreviewRequest, current_user: dict = Depends(get_current_user)
@@ -262,8 +334,9 @@ async def unified_file_preview(
     try:
         if file_type == "excel":
             try:
-                sheet_names = docframe.excel_sheet_names(file_path)
-            except ImportError as exc:
+                sheet_names = pl.read_excel(file_path, sheet_id=None).keys()
+                sheet_names = list(sheet_names) if sheet_names else []
+            except Exception as exc:
                 raise HTTPException(status_code=500, detail=str(exc)) from exc
 
             # Choose sheet: payload.sheet_name or first sheet
@@ -287,10 +360,8 @@ async def unified_file_preview(
 
             try:
                 base_df = _read_excel_sheet(file_path, selected_sheet)
-            except ImportError as exc:
+            except Exception as exc:
                 raise HTTPException(status_code=500, detail=str(exc)) from exc
-            except RuntimeError as exc:
-                raise HTTPException(status_code=500, detail=str(exc))
 
             total_rows = int(base_df.height)
             df = base_df.slice(offset, page_size)
@@ -299,16 +370,14 @@ async def unified_file_preview(
             preview = df.fill_null("None").to_dicts() if hasattr(df, "to_dicts") else []
 
         elif file_type == "zip":
-            doc_df = docframe.read_zip(file_path)
-            df = doc_df.dataframe
+            df = read_zip_file(file_path)
             total_rows = int(df.height)
             if offset or page_size:
                 df = df.slice(offset, page_size)
             columns = list(df.columns)
             preview = df.fill_null("None").to_dicts()
         elif file_type == "text":
-            doc_df = docframe.read_text(file_path)
-            df = doc_df.dataframe
+            df = read_text_file(file_path)
             total_rows = int(df.height)
             if offset or page_size:
                 df = df.slice(offset, page_size)

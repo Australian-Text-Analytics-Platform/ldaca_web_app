@@ -18,8 +18,11 @@ block_cipher = None
 
 # Collect all data files and resources
 datas = [
-    # Sample data files
-    (str(src_path / 'ldaca_web_app_backend' / 'sample_data'), 'ldaca_web_app_backend/sample_data'),
+    # Packaged resources (sample data, configs, stopwords)
+    (
+        str(src_path / 'ldaca_web_app_backend' / 'resources'),
+        'ldaca_web_app_backend/resources',
+    ),
 ]
 
 # Hidden imports that PyInstaller might miss
@@ -43,9 +46,7 @@ base_hiddenimports = [
     'google.auth.transport.requests',
     'google.oauth2.id_token',
 
-    # DocFrame/docworkspace integration
-    'docframe',
-    'docframe.core',
+    # Docworkspace integration
     'docworkspace',
     'docworkspace.workspace',
     'docworkspace.node',
@@ -72,7 +73,7 @@ a = Analysis(
     binaries=[],
     datas=datas,
     hiddenimports=hiddenimports,
-    hookspath=[str(backend_root / 'hooks')],
+    hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
     excludes=[

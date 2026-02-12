@@ -37,9 +37,10 @@ import {
   TableRow,
 } from '../../../components/ui/table';
 import { ScrollArea } from '../../../components/ui/scroll-area';
-import { ArrowUpDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2, Search, Trash2, Unlink } from 'lucide-react';
+import { ArrowUpDown, Loader2, Search, Trash2, Unlink } from 'lucide-react';
 import { getAnalysisActionState } from '../common/analysisActionState';
 import { useAnalysisHydration } from '../common';
+import { AnalysisPagination } from '../../../components/AnalysisPagination';
 
 interface QuotationResultState {
   rows: any[];
@@ -47,8 +48,9 @@ interface QuotationResultState {
   pagination: {
     page: number;
     page_size: number;
-    total_rows: number;
-    total_pages: number;
+    total_source_rows?: number;
+    total_source_pages?: number;
+    result_count?: number;
     has_next: boolean;
     has_prev: boolean;
   };
@@ -540,6 +542,7 @@ const QuotationFeature: React.FC = () => {
   // Deprecated per-node loading indicator; rely on DataView-like UX
   const [nodeDetaching, setNodeDetaching] = useState<Record<string, boolean>>({});
   const [resultsByNode, setResultsByNode] = useState<Record<string, QuotationResultState>>({});
+  const [pageInputByNode, setPageInputByNode] = useState<Record<string, string>>({}); // kept for fetchQuotations sync
 
   const primaryResultInfo = (() => {
     const firstNode = displayedNodes[0];
@@ -553,24 +556,12 @@ const QuotationFeature: React.FC = () => {
     }
     const pagination = state.pagination || {};
     const pageSize = Number(pagination.page_size) || DEFAULT_PAGE_SIZE;
-    const totalRows =
-      typeof pagination.total_rows === 'number'
-        ? pagination.total_rows
-        : state.rows?.length ?? 0;
-    const totalPages =
-      typeof pagination.total_pages === 'number' && pagination.total_pages > 0
-        ? pagination.total_pages
-        : pageSize > 0
-        ? Math.max(1, Math.ceil(Math.max(totalRows, state.rows?.length ?? 0) / pageSize))
-        : 1;
     return {
       pageSize,
-      totalRows,
-      totalPages,
     };
   })();
 
-  const pageSizeControlValue = String(primaryResultInfo?.pageSize ?? DEFAULT_PAGE_SIZE);
+  // Derived state from primary result
 
   const currentRequestParams = (() => {
     const targetNode = (isLocked && lockedNodesSnapshot.length ? lockedNodesSnapshot[0] : displayedNodes[0]) as any;
@@ -831,12 +822,12 @@ const QuotationFeature: React.FC = () => {
 
     const rawPagination = (result?.pagination || {}) as Record<string, unknown>;
     const pageSize = Math.max(1, toNumber(rawPagination.page_size, rows.length || DEFAULT_PAGE_SIZE));
-    const totalRows = Math.max(0, toNumber(rawPagination.total_rows, rows.length));
     const pagination = {
       page: Math.max(1, toNumber(rawPagination.page, 1)),
       page_size: pageSize,
-      total_rows: totalRows,
-      total_pages: Math.max(1, toNumber(rawPagination.total_pages, pageSize > 0 ? Math.ceil((totalRows || 1) / pageSize) : 1)),
+      total_source_rows: rawPagination.total_source_rows != null ? toNumber(rawPagination.total_source_rows, 0) : undefined,
+      total_source_pages: rawPagination.total_source_pages != null ? toNumber(rawPagination.total_source_pages, 1) : undefined,
+      result_count: rawPagination.result_count != null ? toNumber(rawPagination.result_count, 0) : undefined,
       has_next: Boolean(rawPagination.has_next ?? false),
       has_prev: Boolean(rawPagination.has_prev ?? false),
     };
@@ -868,6 +859,10 @@ const QuotationFeature: React.FC = () => {
         sortBy: normalized.sorting.sort_by ?? undefined,
         sortOrder: normalized.sorting.sort_order,
       },
+    }));
+    setPageInputByNode((prev) => ({
+      ...prev,
+      [nodeId]: String(normalized.pagination.page),
     }));
     return normalized;
   };
@@ -1491,23 +1486,6 @@ const QuotationFeature: React.FC = () => {
               </div>
               <div className="space-y-2 text-sm">
                 <div className="flex flex-wrap items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <label htmlFor="quotation-page-size" className="text-sm font-medium text-foreground">
-                      Results per page
-                    </label>
-                    <Select value={pageSizeControlValue} onValueChange={(value) => handlePageSizeChange(Number(value))}>
-                      <SelectTrigger className="h-9 w-32.5 text-left" id="quotation-page-size">
-                        <SelectValue placeholder="Rows" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {[50, 100, 200, 400].map((sz) => (
-                          <SelectItem key={sz} value={String(sz)}>
-                            {sz}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
                   <label className="flex items-center gap-2 text-sm text-foreground">
                     <input
                       type="checkbox"
@@ -1689,107 +1667,36 @@ const QuotationFeature: React.FC = () => {
                       </ScrollArea>
                     </div>
 
-                    {(() => {
-                      const pag = resultState?.pagination || ((nodeData as any)?.pagination ?? {});
-                      const page = Number(pag.page) || 1;
-                      const page_size = Number(pag.page_size) || DEFAULT_PAGE_SIZE;
-                      const total_rows = Number(pag.total_rows) || rowsWithQuotes.length;
-                      const total_pages =
-                        Number(pag.total_pages) ||
-                        (page_size > 0 ? Math.max(1, Math.ceil((total_rows || 1) / page_size)) : 1);
-                      const has_prev = typeof pag.has_prev === 'boolean' ? pag.has_prev : page > 1;
-                      const has_next = typeof pag.has_next === 'boolean' ? pag.has_next : page < total_pages;
-                      return (
-                        <div className="flex flex-col gap-4 rounded-lg border border-border bg-muted/20 px-4 py-3 md:flex-row md:items-center md:justify-between">
-                          <div className="text-sm text-muted-foreground">
-                            Showing {Math.min((page - 1) * page_size + 1, total_rows)} to {Math.min(page * page_size, total_rows)} of {total_rows} rows
-                          </div>
-
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="icon"
-                              className="h-9 w-9"
-                              onClick={() => handlePageChange(1)}
-                              disabled={!has_prev}
-                              title="First page"
-                            >
-                              <ChevronsLeft className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="icon"
-                              className="h-9 w-9"
-                              onClick={() => handlePageChange(page - 1)}
-                              disabled={!has_prev}
-                              title="Previous page"
-                            >
-                              <ChevronLeft className="h-4 w-4" />
-                            </Button>
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                              <span>Page</span>
-                              <Input
-                                type="number"
-                                value={page}
-                                onChange={(e) => {
-                                  const newPage = Number(e.target.value);
-                                  if (Number.isFinite(newPage) && newPage >= 1 && newPage <= total_pages) {
-                                    handlePageChange(newPage);
-                                  }
-                                }}
-                                className="h-9 w-20 text-center"
-                                min={1}
-                                max={total_pages}
-                              />
-                              <span>of {total_pages}</span>
-                            </div>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="icon"
-                              className="h-9 w-9"
-                              onClick={() => handlePageChange(page + 1)}
-                              disabled={!has_next}
-                              title="Next page"
-                            >
-                              <ChevronRight className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="icon"
-                              className="h-9 w-9"
-                              onClick={() => handlePageChange(total_pages)}
-                              disabled={!has_next}
-                              title="Last page"
-                            >
-                              <ChevronsRight className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              type="button"
-                              size="sm"
-                              onClick={() => handleDetach(nodeId)}
-                              disabled={Boolean(nodeDetaching[nodeId])}
-                              className="bg-green-600 text-white hover:bg-green-700"
-                            >
-                              {nodeDetaching[nodeId] ? (
-                                <>
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                  Detaching…
-                                </>
-                              ) : (
-                                <>
-                                  <Unlink className="mr-2 h-4 w-4" />
-                                  Detach
-                                </>
-                              )}
-                            </Button>
-                          </div>
-                        </div>
-                      );
-                    })()}
+                    <AnalysisPagination
+                      page={resultState?.pagination?.page ?? 1}
+                      pageSize={resultState?.pagination?.page_size ?? DEFAULT_PAGE_SIZE}
+                      hasNext={resultState?.pagination?.has_next ?? false}
+                      hasPrev={resultState?.pagination?.has_prev ?? ((resultState?.pagination?.page ?? 1) > 1)}
+                      totalPages={resultState?.pagination?.total_source_pages}
+                      onPageChange={(newPage) => handlePageChange(newPage)}
+                      onPageSizeChange={(newSize) => handlePageSizeChange(newSize)}
+                      pageSizeOptions={[50, 100, 200, 400]}
+                    >
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => handleDetach(nodeId)}
+                        disabled={Boolean(nodeDetaching[nodeId])}
+                        className="bg-green-600 text-white hover:bg-green-700"
+                      >
+                        {nodeDetaching[nodeId] ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Detaching…
+                          </>
+                        ) : (
+                          <>
+                            <Unlink className="mr-2 h-4 w-4" />
+                            Detach
+                          </>
+                        )}
+                      </Button>
+                    </AnalysisPagination>
                   </section>
                 );
               })}

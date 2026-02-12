@@ -8,8 +8,6 @@ import polars as pl
 import pytest
 from docworkspace import Node, Workspace
 
-from docframe import DocDataFrame, DocLazyFrame
-
 
 class TestWorkspace:
     """Test cases for the Workspace class."""
@@ -86,17 +84,6 @@ class TestWorkspace:
             assert isinstance(node.data, pl.LazyFrame)
         finally:
             os.unlink(temp_path)
-
-    def test_load_doc_dataframe(self, workspace, sample_df):
-        """Test loading a DocDataFrame into a Workspace."""
-        doc_df = DocDataFrame(sample_df, document_column="text")
-        node = workspace.add_node(
-            Node(data=doc_df, name="doc_data", workspace=workspace)
-        )
-
-        assert len(workspace.nodes) == 1
-        assert node.name == "doc_data"
-        assert isinstance(node.data, DocLazyFrame)
 
     def test_get_node_by_name(self, workspace, sample_df):
         """Test getting a node by name."""

@@ -6,7 +6,6 @@ Paths preserved exactly as /workspaces/{workspace_id}/token-frequencies*.
 import math
 
 import polars as pl
-from docframe import DocDataFrame, DocLazyFrame
 from fastapi import APIRouter, Depends, HTTPException
 
 from ....analysis.implementations.token_frequency import (
@@ -64,43 +63,20 @@ def _sanitize_stop_words(value) -> list[str]:
     return sanitized
 
 
-def _prepare_doclazy_frame(node, column_name: str, user_id: str, workspace_id: str):
-    """Convert node data to a DocLazyFrame with the requested document column.
-
-    This avoids workspace cwd juggling and simply records the chosen column on
-    the node for future reference.
-    """
-
-    data = getattr(node, "data", None)
-    if data is None:
-        raise HTTPException(status_code=400, detail="Node has no data")
-
-    if isinstance(data, DocLazyFrame):
-        processed = (
-            data
-            if data.document_column == column_name
-            else data.with_document_column(column_name)
-        )
-    elif isinstance(data, DocDataFrame):
-        processed = DocLazyFrame(data.dataframe.lazy(), document_column=column_name)  # type: ignore[misc]
-    elif isinstance(data, pl.LazyFrame):
-        processed = DocLazyFrame(data, document_column=column_name)  # type: ignore[misc]
-    elif isinstance(data, pl.DataFrame):
-        processed = DocLazyFrame(data.lazy(), document_column=column_name)  # type: ignore[misc]
-    else:  # pragma: no cover - unsupported runtime type
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported node data type for text analysis: {type(data).__name__}",
-        )
-
+def _persist_text_column(node, column_name: str, user_id: str, workspace_id: str):
+    """Persist the chosen text column on node metadata for future analyses."""
     try:
-        node.document = column_name
-        node.data = processed
+        if hasattr(node, "set_metadata"):
+            node.set_metadata("text_column", column_name)
+        else:
+            metadata = getattr(node, "metadata", None)
+            if not isinstance(metadata, dict):
+                metadata = {}
+            metadata["text_column"] = column_name
+            setattr(node, "metadata", metadata)
         workspace_manager.persist(user_id, workspace_id)
     except Exception:
         pass
-
-    return processed
 
 
 def _safe_float(value, *, default: float | None = 0.0) -> float | None:
@@ -116,7 +92,10 @@ def _safe_float(value, *, default: float | None = 0.0) -> float | None:
 def _normalize_limit_payload(payload: dict | None) -> dict:
     if not isinstance(payload, dict):
         limit = DEFAULT_TOKEN_LIMIT
-        return {"token_limit": limit, "stop_words": []}
+        return {
+            "token_limit": limit,
+            "stop_words": [],
+        }
 
     merged = {**payload}
     candidate = merged.get("token_limit")
@@ -323,7 +302,7 @@ async def update_token_frequencies_task_result(
     "/{workspace_id}/token-frequencies",
     response_model=TokenFrequencyResponse,
     summary="Calculate token frequencies for selected nodes",
-    description="Calculate and compare token frequencies across one or two nodes using the docframe library",
+    description="Calculate and compare token frequencies across one or two nodes using polars-text",
 )
 async def calculate_token_frequencies(
     workspace_id: str,
@@ -399,8 +378,6 @@ async def calculate_token_frequencies(
         node_name = node.name if hasattr(node, "name") and node.name else node_id
         node_display_names[node_id] = node_name
 
-        is_doc_frame = isinstance(node_data, (DocDataFrame, DocLazyFrame))
-
         if hasattr(node_data, "columns"):
             available_columns = node_data.columns
         elif hasattr(node_data, "collect_schema"):
@@ -412,13 +389,14 @@ async def calculate_token_frequencies(
 
         column_name = request.node_columns.get(node_id)
         if not column_name:
-            if is_doc_frame and getattr(node_data, "document_column", None):
-                column_name = node_data.document_column
-            else:
-                for col in ["document", "text", "content", "body", "message"]:
-                    if col in available_columns:
-                        column_name = col
-                        break
+            metadata = getattr(node, "metadata", {}) or {}
+            if isinstance(metadata, dict):
+                column_name = metadata.get("text_column")
+        if not column_name:
+            for col in ["document", "text", "content", "body", "message"]:
+                if col in available_columns:
+                    column_name = col
+                    break
         if not column_name:
             raise HTTPException(
                 status_code=400,
@@ -433,7 +411,7 @@ async def calculate_token_frequencies(
             )
 
         # Persist chosen document column for future analyses (lightweight)
-        _prepare_doclazy_frame(node, column_name, user_id, workspace_id)
+        _persist_text_column(node, column_name, user_id, workspace_id)
         validated_columns[node_id] = column_name
 
     # Stop words are UI-only preferences; persist them but do not apply to compute.

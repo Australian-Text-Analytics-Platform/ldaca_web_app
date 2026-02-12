@@ -99,16 +99,11 @@ def _serialize_node_data_to_file(node: Node, root_dir: Path) -> str:
     data_dir = root_dir / "data"
     data_dir.mkdir(parents=True, exist_ok=True)
 
-    # Always serialize the underlying Polars LazyFrame. DocLazyFrame can be
-    # reconstructed from `node.document` on load.
+    # Always serialize the underlying Polars LazyFrame. The document metadata
+    # is reconstructed from `node.document` on load.
     lf = node.data
-    if hasattr(lf, "to_lazyframe"):
-        try:
-            lf = lf.to_lazyframe()  # type: ignore[assignment]
-        except Exception:
-            pass
     if not isinstance(lf, pl.LazyFrame):
-        # Defensive: Node inputs are normalized to LazyFrame/DocLazyFrame,
+        # Defensive: Node inputs are normalized to LazyFrame,
         # but keep a clear error if something unexpected slips through.
         raise TypeError(
             f"Unsupported node.data type for binary persistence: {type(node.data).__name__}"

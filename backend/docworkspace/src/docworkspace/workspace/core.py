@@ -18,8 +18,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional, Union
 
 import polars as pl
-
-import docframe  # noqa: F401  (register text namespace side-effects)
+import polars_text  # noqa: F401  (register text namespace side-effects)
 
 from ..node import Node
 

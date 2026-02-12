@@ -602,19 +602,19 @@ function TokenFrequencyFeature() {
   const shouldRenderUnifiedWordCloud = normalizedNodeResults.length === 2 && lastCompareNodeIds.length === 2;
 
   const persistTokenPreferences = useCallback(
-    async (partial: { token_limit?: number; stop_words?: string[] }) => {
+    async (prefs: { token_limit?: number; stop_words?: string[] }) => {
       if (!currentWorkspaceId) return;
       const taskId = await resolveTokenFrequencyTaskId();
       if (!taskId) return;
       const payload: Record<string, any> = {};
-      if (partial.token_limit !== undefined) {
+      if (prefs.token_limit !== undefined) {
         payload.token_limit = Math.min(
-          clampDisplayTokenLimit(partial.token_limit).limit,
+          clampDisplayTokenLimit(prefs.token_limit).limit,
           MAX_TOKEN_LIMIT_INPUT
         );
       }
-      if (partial.stop_words !== undefined) {
-        payload.stop_words = partial.stop_words;
+      if (prefs.stop_words !== undefined) {
+        payload.stop_words = prefs.stop_words;
       }
       if (Object.keys(payload).length === 0) return;
       await textApi.postTokenFrequenciesTaskResult(currentWorkspaceId, taskId, payload, getAuthHeaders());
@@ -781,7 +781,6 @@ function TokenFrequencyFeature() {
 
       const limitFromRequest = toFiniteNumber(requestData.token_limit ?? requestData.limit);
       applyTokenLimitState(limitFromRequest ?? undefined);
-
       if (nodeIds.length && currentWorkspaceId) {
         try {
           const snapshots = await createNodeSnapshots(currentWorkspaceId, nodeIds, getAuthHeaders);
@@ -832,7 +831,11 @@ function TokenFrequencyFeature() {
     [setAppliedStopSet, setResults, setStopWords]
   );
 
-  const { hydrateFromServer } = useAnalysisHydration<any, TokenFrequencyResponse | null, { token_limit?: number; stop_words?: string[] }>(
+  const { hydrateFromServer } = useAnalysisHydration<
+    any,
+    TokenFrequencyResponse | null,
+    { token_limit?: number; stop_words?: string[] }
+  >(
     {
       workspaceId: currentWorkspaceId,
       analysisKey: 'token-frequencies',
@@ -897,6 +900,7 @@ function TokenFrequencyFeature() {
 
         metadata.stop_words = stopWordsArray;
         analysisParams.stop_words = stopWordsArray;
+
 
         return {
           ...prev,
@@ -974,6 +978,7 @@ function TokenFrequencyFeature() {
     },
     [results, persistTokenPreferences, updateResultsPreferencesLocally]
   );
+
   const applyStopSetFromText = (text: string) => {
     const words = text
       .split(',')

@@ -17,7 +17,7 @@ import { useAnalysisLockState } from '../../../hooks/useAnalysisLockState';
 import useNodeColumnInfos from '../../../hooks/useNodeColumnInfos';
 import { Button } from '../../../components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
-import { Play, Loader2, Trash2, Link as LinkIcon, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Play, Loader2, Trash2, Link as LinkIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import HelpIcon from '../../../components/help/HelpIcon';
 import {
@@ -36,6 +36,8 @@ import type { AnalysisTaskStatus } from '../../../hooks/useAnalysisTaskStatus';
 import useAnalysisTaskLifecycle, { type AnalysisTaskRefreshContext } from '../../../hooks/useAnalysisTaskLifecycle';
 import { getAnalysisActionState } from '../common/analysisActionState';
 import { useAnalysisHydration } from '../common';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../../components/ui/dialog';
+import { AnalysisPagination } from '../../../components/AnalysisPagination';
 
 const sanitizeResultParams = (params?: Record<string, unknown>): Record<string, unknown> | undefined => {
   if (!params) return undefined;
@@ -58,8 +60,8 @@ const DEFAULT_PALETTE = [
 ];
 
 const CORE_COLS = [
-  'document_idx', 'left_context', 'matched_text', 'right_context', 'start_idx',
-  'end_idx', 'l1', 'r1', 'l1_freq', 'r1_freq',
+  'left_context', 'matched_text', 'right_context', 'start_idx',
+  'end_idx', 'l1', 'r1',
 ];
 
 const dedupeColumns = (cols: string[]): string[] => {
@@ -200,7 +202,6 @@ const ConcordanceFeature: React.FC = () => {
   const [combinedPage, setCombinedPage] = useState(1);
   const [combinedPageSize] = useState(20);
   const [combinedLoading, setCombinedLoading] = useState(false);
-  const [combinedPageInput, setCombinedPageInput] = useState('1');
 
   // Map any node's id/name variants to its assigned color (used in combined table)
   const sourceColorMap = (() => {
@@ -245,7 +246,6 @@ const ConcordanceFeature: React.FC = () => {
     sortBy: string;
     sortOrder: 'asc' | 'desc';
   }>>({});
-  const [nodePageInputs, setNodePageInputs] = useState<Record<string, string>>({});
   
   // Individual node loading states for pagination/sorting (separate from main search)
   const [nodeLoading, setNodeLoading] = useState<Record<string, boolean>>({});
@@ -1005,26 +1005,6 @@ const ConcordanceFeature: React.FC = () => {
     void updateStoredResult({ combined: true, page: combinedPage, page_size: combinedPageSize });
   }, [viewMode, results, combinedPage, combinedPageSize, updateStoredResult]);
 
-  useEffect(() => {
-    setCombinedPageInput(String(combinedPage));
-  }, [combinedPage]);
-
-  useEffect(() => {
-    setNodePageInputs((prev) => {
-      const next: Record<string, string> = {};
-      Object.entries(nodePagination).forEach(([key, value]) => {
-        next[key] = String(value.currentPage ?? 1);
-      });
-
-      const prevKeys = Object.keys(prev);
-      const nextKeys = Object.keys(next);
-      const changed =
-        prevKeys.length !== nextKeys.length ||
-        nextKeys.some((key) => prev[key] !== next[key]);
-
-      return changed ? next : prev;
-    });
-  }, [nodePagination]);
 
   const handleSort = (columnName: string, nodeKey: string, requestNodeId?: string) => {
     const currentNodePagination = nodePagination[nodeKey] || {
@@ -1264,19 +1244,8 @@ const ConcordanceFeature: React.FC = () => {
     if (nodeKey === '__COMBINED__') {
       const rows = nodeData.data || [];
       const columns: string[] = nodeData.columns || [];
-      const combinedSorting = nodeData.sorting || { sort_by: '', sort_order: 'asc' };
-      const combinedTotalPages = nodeData.pagination?.total_pages ?? 1;
-      const parsedCombinedInput = parseInt(combinedPageInput, 10);
-      const combinedTargetPage = Number.isFinite(parsedCombinedInput)
-        ? Math.min(Math.max(parsedCombinedInput, 1), combinedTotalPages)
-        : null;
-      const handleCombinedSort = (col: string) => {
-        const isSame = combinedSorting.sort_by === col;
-        const nextOrder: 'asc'|'desc' = isSame && combinedSorting.sort_order === 'asc' ? 'desc' : 'asc';
-        setCombinedPage(1);
-        // Backend combined sorting via current-result POST
-        void updateStoredResult({ combined: true, sort_by: col, sort_order: nextOrder, page: 1, page_size: combinedPageSize });
-      };
+      const combinedHasPrev = Boolean(nodeData.pagination?.has_prev);
+      const combinedHasNext = Boolean(nodeData.pagination?.has_next);
       // Derive display columns: core first, then metadata (columns minus core and internal)
       const coreSet = new Set(CORE_COLS);
       const metaCols = columns.filter(c => !coreSet.has(c) && c !== '__source_node');
@@ -1325,27 +1294,14 @@ const ConcordanceFeature: React.FC = () => {
                 <Table className="min-w-180" disableContainer>
                 <TableHeader className="bg-gray-50 sticky top-0 z-10">
                   <TableRow>
-                    {displayColumns.map((c: string) => {
-                      const lower = c.toLowerCase();
-                      const neverSortable = ['left_context','matched_text','right_context'];
-                      const sortable = !neverSortable.includes(lower);
-                      const isSorted = sortable && combinedSorting.sort_by === c;
-                      const icon = isSorted ? (combinedSorting.sort_order === 'asc' ? '▲' : '▼') : '▲▼';
-                      return sortable ? (
-                        <TableHead
-                          key={c}
-                          className={`px-3 py-2 text-left text-xs font-medium uppercase tracking-wider cursor-pointer hover:bg-gray-100 ${isSorted ? 'text-blue-600' : 'text-gray-500'}`}
-                          onClick={() => handleCombinedSort(c)}
-                        >
-                          <div className="flex items-center space-x-1">
-                            <span>{c}</span>
-                            <span className={`text-xs ${isSorted ? 'text-blue-600' : 'text-gray-400'}`}>{icon}</span>
-                          </div>
-                        </TableHead>
-                      ) : (
-                        <TableHead key={c} className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">{c}</TableHead>
-                      );
-                    })}
+                    {displayColumns.map((c: string) => (
+                      <TableHead
+                        key={c}
+                        className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+                      >
+                        {c}
+                      </TableHead>
+                    ))}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1389,55 +1345,15 @@ const ConcordanceFeature: React.FC = () => {
                 </Table>
               </div>
             </ScrollArea>
-            {nodeData.pagination && (
-              <div className="mt-2 text-sm text-gray-600 text-center p-2">{nodeData.pagination.total_matches} total matches</div>
-            )}
-            {nodeData.pagination && nodeData.pagination.total_pages > 1 && (
-              <div className="mt-4 flex justify-center items-center space-x-2 p-4 pt-0">
-                <Button
-                  onClick={() => combinedPage > 1 && setCombinedPage(p => p-1)}
-                  disabled={combinedPage <= 1}
-                  variant="outline"
-                  size="sm"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <div className="text-sm text-gray-600">Page {combinedPage} of {nodeData.pagination.total_pages}</div>
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="number"
-                    min={1}
-                    max={nodeData.pagination.total_pages}
-                    value={combinedPageInput}
-                    onChange={(e) => setCombinedPageInput(e.target.value)}
-                    className="w-20 rounded-md border border-input bg-background px-2 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    aria-label="Go to combined page"
-                  />
-                  <Button
-                    onClick={() => {
-                      if (combinedTargetPage === null) {
-                        setCombinedPageInput('');
-                        return;
-                      }
-                      setCombinedPage(combinedTargetPage);
-                    }}
-                    disabled={!combinedPageInput.trim() || combinedTargetPage === null || combinedTargetPage === combinedPage}
-                    variant="outline"
-                    size="sm"
-                  >
-                    Go
-                  </Button>
-                </div>
-                <Button
-                  onClick={() => combinedPage < nodeData.pagination.total_pages && setCombinedPage(p => p+1)}
-                  disabled={combinedPage >= nodeData.pagination.total_pages}
-                  variant="outline"
-                  size="sm"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            )}
+            <AnalysisPagination
+              page={combinedPage}
+              pageSize={combinedPageSize}
+              hasNext={combinedHasNext}
+              hasPrev={combinedHasPrev}
+              totalPages={nodeData.pagination?.total_source_pages}
+              onPageChange={(newPage) => setCombinedPage(newPage)}
+              loading={combinedLoading}
+            />
           </div>
         </div>
       );
@@ -1450,6 +1366,7 @@ const ConcordanceFeature: React.FC = () => {
       ? [...CORE_COLS.filter(c => allCols.includes(c)), ...metaCols.filter(c => allCols.includes(c))]
       : CORE_COLS.filter(c => allCols.includes(c));
     const displayColumns = dedupeColumns(rawDisplayColumns);
+    const sortableColumns = new Set(metaCols);
 
     if (!nodeData.data || nodeData.data.length === 0) {
       return (
@@ -1466,12 +1383,8 @@ const ConcordanceFeature: React.FC = () => {
     const currentNodePagination = nodePagination[paginationKey];
     const currentPage = currentNodePagination?.currentPage ?? 1;
     const nodeIsLoading = Boolean(nodeLoading[paginationKey]);
-    const nodePageInput = nodePageInputs[paginationKey] ?? String(currentPage);
-    const totalPages = nodeData.pagination?.total_pages ?? 1;
-    const parsedNodeInput = parseInt(nodePageInput, 10);
-    const targetNodePage = Number.isFinite(parsedNodeInput)
-      ? Math.min(Math.max(parsedNodeInput, 1), totalPages)
-      : null;
+    const hasPrev = Boolean(nodeData.pagination?.has_prev);
+    const hasNext = Boolean(nodeData.pagination?.has_next);
     const detachingKey = detachNodeId ?? "";
     const isDetaching = detachingKey ? Boolean(nodeDetaching[detachingKey]) : false;
 
@@ -1488,18 +1401,7 @@ const ConcordanceFeature: React.FC = () => {
               <TableHeader className="bg-gray-50 sticky top-0 z-10">
                 <TableRow>
                   {displayColumns.map(key => {
-                    const neverSortable = ['left_context','matched_text','right_context'];
-                    const keyLower = key.toLowerCase();
-                    let isSortable: boolean;
-                    if (neverSortable.includes(keyLower)) {
-                      isSortable = false;
-                    } else if (showMetadata) {
-                      isSortable = true;
-                    } else {
-                      // When metadata is hidden, keep sorting available for core numeric/index columns.
-                      const allowed = ['document_idx', 'start_idx', 'end_idx', 'l1', 'r1', 'l1_freq', 'r1_freq'];
-                      isSortable = allowed.includes(keyLower);
-                    }
+                    const isSortable = showMetadata && sortableColumns.has(key);
                     return isSortable ? (
                       <SortableHeader key={key} columnKey={key} label={key} paginationKey={paginationKey} requestNodeId={requestNodeId} />
                     ) : (
@@ -1532,110 +1434,64 @@ const ConcordanceFeature: React.FC = () => {
           </ScrollArea>
         </div>
 
-        {/* Pagination info for this node */}
-        {nodeData.pagination && (
-          <div className="mt-2 text-center text-sm text-muted-foreground">
-            {nodeData.pagination.total_matches} total matches
-          </div>
-        )}
+        <AnalysisPagination
+          page={currentPage}
+          pageSize={nodePagination[paginationKey]?.pageSize ?? globalPageSize}
+          hasNext={hasNext}
+          hasPrev={hasPrev}
+          totalPages={nodeData.pagination?.total_source_pages}
+          onPageChange={(newPage) => handlePageChange(newPage, paginationKey, requestNodeId)}
+          onPageSizeChange={(newSize) => {
+            const previousPageSize = globalPageSize;
+            const previousPagination = Object.fromEntries(
+              Object.entries(nodePagination).map(([key, value]) => [key, { ...value }])
+            ) as typeof nodePagination;
 
-        {/* Individual pagination controls for this node */}
-        {nodeData.pagination && nodeData.pagination.total_pages > 1 && (
-          <div className="mt-4 flex justify-center items-center space-x-2">
-            <Button
-              onClick={() => handlePageChange(Math.max(1, currentPage - 1), paginationKey, requestNodeId)}
-              disabled={currentPage <= 1 || nodeIsLoading}
-              variant="outline"
-              size="sm"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            
-            <div className="flex items-center text-sm text-muted-foreground">
-              {nodeIsLoading && (
-                <div className="mr-2 inline-block h-3 w-3 animate-spin rounded-full border-b border-muted-foreground"></div>
-              )}
-              Page {currentPage} of {nodeData.pagination.total_pages}
-            </div>
+            setGlobalPageSize(newSize);
+            setNodePagination((prev) => {
+              const updated = { ...prev };
+              Object.keys(updated).forEach((nid) => {
+                updated[nid] = {
+                  ...updated[nid],
+                  pageSize: newSize,
+                  currentPage: 1,
+                };
+              });
+              return updated;
+            });
 
-            <div className="flex items-center space-x-2">
-              <input
-                type="number"
-                min={1}
-                max={nodeData.pagination.total_pages}
-                value={nodePageInput}
-                onChange={(e) => setNodePageInputs((prev) => ({ ...prev, [paginationKey]: e.target.value }))}
-                className="w-20 rounded-md border border-input bg-background px-2 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                aria-label={`Go to page for ${nodeKey}`}
-              />
-              <Button
-                onClick={() => {
-                  if (targetNodePage === null) {
-                    setNodePageInputs((prev) => ({ ...prev, [paginationKey]: '' }));
-                    return;
-                  }
-                  handlePageChange(targetNodePage, paginationKey, requestNodeId);
-                }}
-                disabled={!nodePageInput.trim() || targetNodePage === null || targetNodePage === currentPage || nodeIsLoading}
-                variant="outline"
-                size="sm"
-              >
-                Go
-              </Button>
-            </div>
-            
-            <Button
-              onClick={() => handlePageChange(Math.min(nodeData.pagination.total_pages, currentPage + 1), paginationKey, requestNodeId)}
-              disabled={currentPage >= nodeData.pagination.total_pages || nodeIsLoading}
-              variant="outline"
-              size="sm"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-
-            {/* Detach button */}
-            <Button
-              onClick={() => {
-                if (detachNodeId) {
-                  handleDetach(detachNodeId, column);
-                }
-              }}
-              disabled={nodeIsLoading || isDetaching || !searchWord.trim() || !canDetach || !detachNodeId}
-              size="sm"
-              className="bg-green-600 hover:bg-green-700 ml-2"
-              title="Create a new node with concordance results joined to the original table"
-            >
-              {isDetaching ? (
-                <><Loader2 className="mr-2 h-3 w-3 animate-spin" />Detaching...</>
-              ) : (
-                <><LinkIcon className="mr-2 h-3 w-3" />Detach</>
-              )}
-            </Button>
-          </div>
-        )}
-
-        {/* Pagination controls when only one page OR detach button for nodes without pagination */}
-        {(!nodeData.pagination || nodeData.pagination.total_pages <= 1) && searchWord.trim() && (
-          <div className="mt-4 flex justify-center">
-            <Button
-              onClick={() => {
-                if (detachNodeId) {
-                  handleDetach(detachNodeId, column);
-                }
-              }}
-              disabled={nodeIsLoading || isDetaching || !canDetach || !detachNodeId}
-              size="sm"
-              className="bg-green-600 hover:bg-green-700"
-              title="Create a new node with concordance results joined to the original table"
-            >
-              {isDetaching ? (
-                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Detaching...</>
-              ) : (
-                <><LinkIcon className="mr-2 h-4 w-4" />Detach Concordance</>
-              )}
-            </Button>
-          </div>
-        )}
+            void (async () => {
+              try {
+                await persistResultPreferences({ pageSize: newSize });
+              } catch (error) {
+                console.error('Failed to persist concordance page size preference', error);
+                setGlobalPageSize(previousPageSize);
+                setNodePagination(previousPagination);
+              }
+            })();
+          }}
+          pageSizeOptions={[10, 20, 50, 100]}
+          loading={nodeIsLoading}
+        >
+          {/* Detach button */}
+          <Button
+            onClick={() => {
+              if (detachNodeId) {
+                handleDetach(detachNodeId, column);
+              }
+            }}
+            disabled={nodeIsLoading || isDetaching || !searchWord.trim() || !canDetach || !detachNodeId}
+            size="sm"
+            className="bg-green-600 hover:bg-green-700"
+            title="Create a new node with concordance results joined to the original table"
+          >
+            {isDetaching ? (
+              <><Loader2 className="mr-2 h-3 w-3 animate-spin" />Detaching...</>
+            ) : (
+              <><LinkIcon className="mr-2 h-3 w-3" />Detach</>
+            )}
+          </Button>
+        </AnalysisPagination>
       </div>
     );
   };
@@ -1835,55 +1691,6 @@ const ConcordanceFeature: React.FC = () => {
                   )}
                 </div>
                 <div className="flex flex-wrap items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <label htmlFor="concordance-page-size" className="text-sm font-medium text-foreground">
-                      Results per page
-                    </label>
-                    <select
-                      id="concordance-page-size"
-                      value={globalPageSize}
-                      onChange={(e) => {
-                        const parsed = parseInt(e.target.value, 10);
-                        if (!Number.isFinite(parsed) || parsed <= 0) {
-                          return;
-                        }
-                        const newPageSize = parsed;
-                        const previousPageSize = globalPageSize;
-                        const previousPagination = Object.fromEntries(
-                          Object.entries(nodePagination).map(([key, value]) => [key, { ...value }])
-                        ) as typeof nodePagination;
-
-                        setGlobalPageSize(newPageSize);
-                        setNodePagination((prev) => {
-                          const updated = { ...prev };
-                          Object.keys(updated).forEach((nodeId) => {
-                            updated[nodeId] = {
-                              ...updated[nodeId],
-                              pageSize: newPageSize,
-                              currentPage: 1,
-                            };
-                          });
-                          return updated;
-                        });
-
-                        void (async () => {
-                          try {
-                            await persistResultPreferences({ pageSize: newPageSize });
-                          } catch (error) {
-                            console.error('Failed to persist concordance page size preference', error);
-                            setGlobalPageSize(previousPageSize);
-                            setNodePagination(previousPagination);
-                          }
-                        })();
-                      }}
-                      className="w-32 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      <option value={10}>10</option>
-                      <option value={20}>20</option>
-                      <option value={50}>50</option>
-                      <option value={100}>100</option>
-                    </select>
-                  </div>
                   <label className="flex items-center gap-2 text-sm text-foreground">
                     <input
                       type="checkbox"
@@ -1962,111 +1769,92 @@ const ConcordanceFeature: React.FC = () => {
       )}
 
       {/* Detail Modal */}
-      {showDetailModal && selectedDetail && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-          onClick={() => setShowDetailModal(false)}
-        >
-          <div 
-            className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[80vh] overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="px-6 py-4 border-b border-border flex justify-between items-center">
-              <h3 className="text-lg font-medium text-gray-900">Concordance Detail</h3>
-              <Button
-                onClick={() => setShowDetailModal(false)}
-                variant="ghost"
-                size="icon"
-              >
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
-            
-            <div className="p-6 overflow-y-auto max-h-[calc(80vh-120px)]">
-              <>
-                {/* Metadata */}
-                <div className="mb-6 grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="font-medium text-gray-700">Document Index:</span>
-                    <span className="ml-2">{selectedDetail.document_idx}</span>
-                  </div>
-                  <div>
-                    <span className="font-medium text-gray-700">Search Word:</span>
-                    <span className="ml-2 font-mono bg-yellow-100 px-1 rounded">{searchWord}</span>
-                  </div>
-                  <div>
-                    <span className="font-medium text-gray-700">L1 Word:</span>
-                    <span className="ml-2">{selectedDetail.l1} (freq: {selectedDetail.l1_freq})</span>
-                  </div>
-                  <div>
-                    <span className="font-medium text-gray-700">R1 Word:</span>
-                    <span className="ml-2">{selectedDetail.r1} (freq: {selectedDetail.r1_freq})</span>
-                  </div>
-                </div>
-                
-                {/* Full Text */}
-                <div className="mb-6">
-                  <h4 className="font-medium text-gray-700 mb-2">Full Text from Column: {selectedDetail.column}</h4>
-                  <div className="bg-gray-50 p-4 rounded-lg border">
-                    <div className="font-mono text-sm whitespace-pre-wrap max-h-96 overflow-y-auto">
-                      {detailFullTextInfo.text
-                        ? detailFullTextInfo.highlighted ?? detailFullTextInfo.text
-                        : 'Text not available'}
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Document Metadata Table */}
+      {selectedDetail && (
+        <Dialog open={showDetailModal} onOpenChange={setShowDetailModal}>
+          <DialogContent className="max-w-4xl w-full max-h-[80vh] overflow-hidden">
+            <DialogHeader>
+              <DialogTitle>Concordance Detail</DialogTitle>
+            </DialogHeader>
+
+            <div className="overflow-y-auto max-h-[calc(80vh-120px)] pr-1">
+              {/* Metadata */}
+              <div className="mb-6 grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <h4 className="font-medium text-gray-700 mb-2">Document Metadata</h4>
-                  <div className="bg-white border border-border rounded-lg overflow-hidden">
-                    <Table>
-                      <TableHeader className="bg-gray-50">
-                        <TableRow>
-                          <TableHead className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Field</TableHead>
-                          <TableHead className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Value</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {selectedDetail.record && Object.entries(selectedDetail.record).map(([key, value]) => {
-                          if (key === selectedDetail.column) {
-                            return null;
-                          }
+                  <span className="font-medium text-gray-700">Search Word:</span>
+                  <span className="ml-2 font-mono bg-yellow-100 px-1 rounded">{searchWord}</span>
+                </div>
+                <div>
+                  <span className="font-medium text-gray-700">L1 Word:</span>
+                  <span className="ml-2">{selectedDetail.l1}</span>
+                </div>
+                <div>
+                  <span className="font-medium text-gray-700">R1 Word:</span>
+                  <span className="ml-2">{selectedDetail.r1}</span>
+                </div>
+              </div>
 
-                          let displayValue: string;
-                          if (value === null || value === undefined) {
-                            displayValue = 'null';
-                          } else if (typeof value === 'object') {
-                            displayValue = JSON.stringify(value, null, 2);
-                          } else {
-                            displayValue = String(value);
-                          }
-
-                          return (
-                            <TableRow key={key}>
-                              <TableCell className="font-medium">{key}</TableCell>
-                              <TableCell>
-                                <div className="max-w-md wrap-break-word">
-                                  {typeof value === 'object' && value !== null ? (
-                                    <pre className="text-xs bg-gray-100 p-2 rounded overflow-x-auto">
-                                      {displayValue}
-                                    </pre>
-                                  ) : (
-                                    displayValue
-                                  )}
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
+              {/* Full Text */}
+              <div className="mb-6">
+                <h4 className="font-medium text-gray-700 mb-2">Full Text from Column: {selectedDetail.column}</h4>
+                <div className="bg-gray-50 p-4 rounded-lg border">
+                  <div className="font-mono text-sm whitespace-pre-wrap max-h-96 overflow-y-auto">
+                    {detailFullTextInfo.text
+                      ? detailFullTextInfo.highlighted ?? detailFullTextInfo.text
+                      : 'Text not available'}
                   </div>
                 </div>
-              </>
+              </div>
+
+              {/* Document Metadata Table */}
+              <div>
+                <h4 className="font-medium text-gray-700 mb-2">Document Metadata</h4>
+                <div className="bg-white border border-border rounded-lg overflow-hidden">
+                  <Table>
+                    <TableHeader className="bg-gray-50">
+                      <TableRow>
+                        <TableHead className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Field</TableHead>
+                        <TableHead className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Value</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {selectedDetail.record && Object.entries(selectedDetail.record).map(([key, value]) => {
+                        if (key === selectedDetail.column) {
+                          return null;
+                        }
+
+                        let displayValue: string;
+                        if (value === null || value === undefined) {
+                          displayValue = 'null';
+                        } else if (typeof value === 'object') {
+                          displayValue = JSON.stringify(value, null, 2);
+                        } else {
+                          displayValue = String(value);
+                        }
+
+                        return (
+                          <TableRow key={key}>
+                            <TableCell className="font-medium">{key}</TableCell>
+                            <TableCell>
+                              <div className="max-w-md wrap-break-word">
+                                {typeof value === 'object' && value !== null ? (
+                                  <pre className="text-xs bg-gray-100 p-2 rounded overflow-x-auto">
+                                    {displayValue}
+                                  </pre>
+                                ) : (
+                                  displayValue
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
+          </DialogContent>
+        </Dialog>
       )}
 
       {/* Loading State */}

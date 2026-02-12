@@ -28,7 +28,7 @@
 
 **Question:** *Where does sample data live?*
 
-**Answer:** Use `SAMPLE_DATA_FOLDER` for the canonical dataset and `USER_DATA_FOLDER` for user‑specific copies.
+**Answer:** Sample data ships inside the backend package under `resources/sample_data`. You can override this with `SAMPLE_DATA_FOLDER` if you want a filesystem path instead, while `USER_DATA_FOLDER` controls user‑specific copies.
 
 ## User data layout
 
@@ -40,7 +40,7 @@
 
 **Question:** *Is the old JSON config still supported?*
 
-**Answer:** No. The backend now expects environment variables (typically via `.env`). Update any code that still imports legacy JSON configuration.
+**Answer:** No. The backend now expects environment variables, which can be provided by your shell/IDE or any external tooling that loads `.env`. Update any code that still imports legacy JSON configuration.
 
 ## Recap
 

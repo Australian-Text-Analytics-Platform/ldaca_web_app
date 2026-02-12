@@ -6,8 +6,6 @@ Migrated from test_cast_functionality.py with proper pytest structure.
 import polars as pl
 import pytest
 
-import docframe as dc
-
 
 class TestBasicCasting:
     """Test basic casting functionality"""
@@ -43,7 +41,8 @@ class TestBasicCasting:
     def test_string_to_datetime_cast(self, sample_dataframe):
         """Test casting string column to datetime"""
         casted_df = sample_dataframe.with_columns(
-            pl.col("date_str")
+            pl
+            .col("date_str")
             .str.to_datetime(format="%Y-%m-%d")
             .dt.replace_time_zone("UTC")
             .dt.convert_time_zone("UTC")
@@ -64,42 +63,6 @@ class TestBasicCasting:
         assert casted_df.schema["id"] == pl.Categorical
         categories = casted_df["id"].to_list()
         assert categories == ["1", "2", "3"]
-
-
-class TestDocDataFrameCasting:
-    """Test casting functionality with DocDataFrame"""
-
-    @pytest.fixture
-    def sample_doc_dataframe(self):
-        """Sample DocDataFrame for casting tests"""
-        if dc is None:
-            pytest.skip("docframe not available")
-
-        df = pl.DataFrame({
-            "text": ["Hello world", "Good morning", "How are you"],
-            "score": ["0.85", "0.92", "0.78"],
-        })
-        return dc.DocDataFrame(df, document_column="text")  # type: ignore
-
-    def test_cast_in_doc_dataframe(self, sample_doc_dataframe):
-        """Test casting columns within a DocDataFrame"""
-        if dc is None:
-            pytest.skip("docframe not available")
-
-        # Cast score to float - already a DataFrame
-        casted_polars = sample_doc_dataframe.dataframe.with_columns(
-            pl.col("score").cast(pl.Float64).alias("score")
-        )
-
-        # Create new DocDataFrame with casted data
-        document_column = getattr(sample_doc_dataframe, "_document_column_name", "text")
-        new_doc_df = dc.DocDataFrame(casted_polars, document_column=document_column)  # type: ignore
-
-        assert new_doc_df.dataframe.schema["score"] == pl.Float64
-        # Get score values using proper DataFrame syntax
-        score_values = new_doc_df.dataframe.get_column("score").to_list()
-        assert score_values == pytest.approx([0.85, 0.92, 0.78])
-        assert getattr(new_doc_df, "_document_column_name", None) == "text"
 
 
 class TestTypeMappings:

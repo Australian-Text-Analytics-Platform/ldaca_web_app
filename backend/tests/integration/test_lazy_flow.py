@@ -7,9 +7,6 @@ import polars as pl
 import pytest
 from docworkspace import Node, Workspace
 
-import docframe as dc
-from docframe import DocDataFrame
-
 
 class TestLazyFlowIntegration:
     """Test that lazy evaluation information flows through the complete system"""
@@ -117,23 +114,3 @@ class TestLazyFlowIntegration:
 
         # Nodes wrap collected data back into lazy form, so flag remains True
         assert collected_info["lazy"] is True
-
-    def test_lazy_with_doc_dataframe(self):
-        """Test lazy state with DocDataFrame integration"""
-        # Create a lazy DataFrame
-        lazy_df = pl.DataFrame({
-            "text": ["Document 1", "Document 2", "Document 3"],
-            "score": [0.8, 0.9, 0.7],
-        }).lazy()
-
-        # Create DocDataFrame (this will likely collect the lazy frame)
-        doc_df = DocDataFrame(lazy_df.collect(), document_column="text")  # type: ignore
-
-        # Create node with DocDataFrame
-        doc_node = Node(doc_df, name="doc_test")
-        doc_info = doc_node.info()
-
-        # Check lazy state handling with DocDataFrame
-        assert "lazy" in doc_info
-        # DocDataFrame inputs are normalized to DocLazyFrame internally
-        assert doc_info["lazy"] is True

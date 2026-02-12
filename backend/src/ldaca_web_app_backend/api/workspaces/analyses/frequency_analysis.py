@@ -17,6 +17,7 @@ from ....core.auth import get_current_user
 from ....core.workspace import workspace_manager
 from ....models import FrequencyAnalysisRequest
 from ..utils import get_node_with_data_or_400
+from .sequential_analysis import _run_sequential_analysis
 
 router = APIRouter(prefix="/workspaces")
 
@@ -32,7 +33,7 @@ async def get_frequency_analysis(
     request: FrequencyAnalysisRequest,
     current_user: dict = Depends(get_current_user),
 ):
-    """Run frequency analysis on a node with DocFrame integration."""
+    """Run frequency analysis on a node with polars-text integration."""
     user_id = current_user["id"]
     ws = workspace_manager.get_workspace(user_id, workspace_id)
     if not ws:
@@ -76,17 +77,13 @@ async def get_frequency_analysis(
                 detail=f"Invalid frequency '{request.frequency}'. Valid options: {valid_frequencies}",
             )
 
-        if not hasattr(node_data, "text"):
-            raise HTTPException(
-                status_code=400,
-                detail="Node data does not support text analysis. Ensure it contains text data.",
-            )
-
-        frequency_result = node_data.text.frequency_analysis(  # type: ignore[attr-defined]
+        frequency_result = _run_sequential_analysis(
+            node_data,
             time_column=request.time_column,
             group_by_columns=request.group_by_columns,
             frequency=request.frequency,
             sort_by_time=request.sort_by_time,
+            column_type="datetime",
         )
 
         inherited_chart_type = DEFAULT_CHART_TYPE

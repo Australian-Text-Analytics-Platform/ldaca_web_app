@@ -11,8 +11,6 @@ from typing import Any, Dict, List, Optional, Tuple
 import polars as pl
 from docworkspace import Node, Workspace
 
-from docframe import DocLazyFrame
-
 # Import API models
 from .api_models import (
     ColumnSchema,
@@ -125,6 +123,13 @@ class DocWorkspaceAPIUtils:
         document_value = info.pop("document", None)
         if document_value is None:
             document_value = info.pop("document_column", None)
+        if document_value is None:
+            try:
+                metadata = getattr(node, "metadata", None)
+                if isinstance(metadata, dict):
+                    document_value = metadata.get("text_column")
+            except Exception:
+                document_value = None
         if document_value is not None:
             info["document"] = document_value
 
@@ -133,9 +138,6 @@ class DocWorkspaceAPIUtils:
             cols = []
             try:
                 data_obj = getattr(node, "data", node)
-                if isinstance(data_obj, DocLazyFrame):
-                    data_obj = data_obj.lazyframe
-
                 if hasattr(data_obj, "collect_schema"):
                     cols = data_obj.collect_schema().names()
                 elif hasattr(data_obj, "columns"):
@@ -165,10 +167,6 @@ class DocWorkspaceAPIUtils:
 
         try:
             data_obj = getattr(node, "data", node)
-
-            # Unwrap DocLazyFrame
-            if isinstance(data_obj, DocLazyFrame):
-                data_obj = data_obj.lazyframe
 
             # Get schema efficiently
             data_schema = None
@@ -205,11 +203,7 @@ class DocWorkspaceAPIUtils:
         """Determine the DataType enum value for a node."""
         data_type_name = type(node.data).__name__
 
-        if "DocDataFrame" in data_type_name:
-            return DataType.DOC_DATAFRAME
-        elif "DocLazyFrame" in data_type_name:
-            return DataType.DOC_LAZYFRAME
-        elif "LazyFrame" in data_type_name:
+        if "LazyFrame" in data_type_name:
             return DataType.POLARS_LAZYFRAME
         else:
             return DataType.POLARS_DATAFRAME
@@ -231,11 +225,8 @@ class DocWorkspaceAPIUtils:
             except Exception:
                 pass
 
-        # 2. Handle LazyFrame (Polars or DocLazyFrame)
-        # Unwrap DocLazyFrame if needed to get to the Polars LazyFrame
+        # 2. Handle LazyFrame (Polars)
         inner_obj = data_obj
-        if isinstance(data_obj, DocLazyFrame):
-            inner_obj = data_obj.lazyframe
 
         rows = 0
         cols = 0
@@ -277,7 +268,12 @@ class DocWorkspaceAPIUtils:
                 shape=shape,
                 columns=columns,
                 schema=DocWorkspaceAPIUtils.get_node_schema(node),  # alias
-                document=getattr(node, "document", None),
+                document=getattr(node, "document", None)
+                or (
+                    (getattr(node, "metadata", {}) or {}).get("text_column")
+                    if hasattr(node, "metadata")
+                    else None
+                ),
                 parent_ids=[parent.id for parent in getattr(node, "parents", [])],
                 child_ids=[child.id for child in getattr(node, "children", [])],
             )
@@ -383,7 +379,8 @@ class DocWorkspaceAPIUtils:
                     "nodeType": DocWorkspaceAPIUtils.get_data_type(node).value,
                     "shape": shape,
                     "columns": getattr(node, "columns", []),
-                    "document": getattr(node, "document", None),
+                    "document": getattr(node, "document", None)
+                    or (getattr(node, "metadata", {}) or {}).get("text_column"),
                 },
                 connectable=True,
             )

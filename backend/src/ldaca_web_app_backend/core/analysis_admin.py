@@ -31,9 +31,7 @@ logger = logging.getLogger(__name__)
 # We intentionally clear ALL known caches for a workspace whenever analyses are
 # cleared. This avoids task-specific cache-clearing rules and keeps semantics
 # simple: "clear results" also means "drop any related in-memory caches".
-_CACHE_SPECS: set[tuple[str, str]] = {
-    ("ldaca_web_app_backend.api.workspaces.analyses.concordance", "CONCORDANCE_CACHE"),
-}
+_CACHE_SPECS: set[tuple[str, str]] = set()
 
 
 def _clear_tuple_prefix_cache_for(
@@ -88,7 +86,8 @@ def clear_analysis_cache_for(user_id: str, workspace_id: str) -> int:
 
     Clears all known analysis caches for the workspace.
     """
-
+    if not _CACHE_SPECS:
+        return 0
     return sum(
         _clear_tuple_prefix_cache_for(
             user_id,

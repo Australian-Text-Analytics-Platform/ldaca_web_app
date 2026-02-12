@@ -305,7 +305,6 @@ class WorkerTaskManager:
                 if task_type in ["concordance_detach", "quotation_detach"]:
                     try:
                         import polars as pl
-                        from docframe import DocLazyFrame
 
                         from .workspace import workspace_manager
 
@@ -320,11 +319,6 @@ class WorkerTaskManager:
                             raise ValueError("Task result missing parquet_path")
 
                         lazy_df = pl.scan_parquet(parquet_path)
-                        if doc_col:
-                            try:
-                                lazy_df = DocLazyFrame(lazy_df, document_column=doc_col)
-                            except Exception:
-                                pass
 
                         parent_node = workspace_manager.get_node_from_workspace(
                             user_id, workspace_id, parent_id
@@ -338,6 +332,12 @@ class WorkerTaskManager:
                             operation=task_type,
                             parents=[parent_node] if parent_node else [],
                         )
+
+                        if new_node and doc_col and hasattr(new_node, "set_metadata"):
+                            try:
+                                new_node.set_metadata("text_column", doc_col)
+                            except Exception:
+                                pass
 
                         if new_node:
                             result_persisted = True
@@ -454,7 +454,24 @@ class WorkerTaskManager:
             task_manager = get_task_manager(user_id, workspace_id)
             task = task_manager.get_task(task_info.id)
             if task:
-                task.complete(GenericAnalysisResult(result))
+                if task_type == "topic_modeling":
+                    try:
+                        from ..api.workspaces.analyses.topic_modeling import (
+                            TOPIC_MODELING_CACHE,
+                            _cache_key,
+                        )
+
+                        TOPIC_MODELING_CACHE[
+                            _cache_key(user_id, workspace_id, task_info.id)
+                        ] = result
+                    except Exception:
+                        logger.debug(
+                            "Failed to cache topic modeling result for task %s",
+                            task_info.id,
+                        )
+                    task.complete(GenericAnalysisResult({"ready": True}))
+                else:
+                    task.complete(GenericAnalysisResult(result))
                 task_manager.save_task(task)
                 logger.info(
                     f"{task_type} result saved for task {task_info.id} via TaskManager"

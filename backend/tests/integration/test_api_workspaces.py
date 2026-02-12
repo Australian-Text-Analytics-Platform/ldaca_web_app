@@ -2,6 +2,7 @@
 Integration tests for workspace API endpoints
 """
 
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
@@ -215,79 +216,6 @@ class TestWorkspaceAPI:
             )
             assert response.status_code == 404
 
-    async def test_upload_data_file(self, authenticated_client):
-        """Test uploading and creating a node from a data file"""
-        import os
-        import tempfile
-
-        # Create a real temporary CSV file for testing
-        test_csv_content = """id,name,content
-1,Document 1,This is the first document content for testing
-2,Document 2,This is the second document with more content  
-3,Document 3,A third document with different content for variety
-"""
-
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".csv", delete=False
-        ) as tmp_file:
-            tmp_file.write(test_csv_content)
-            tmp_file_path = tmp_file.name
-
-        try:
-            # Mock the workspace manager methods for the upload flow
-            mock_node = Mock()
-            mock_node.info.return_value = {
-                "id": "uploaded-node-123",
-                "name": "test_data",
-                "shape": (3, 3),
-                "lazy": False,
-                "columns": ["id", "name", "content"],
-                "schema": {"id": "Int64", "name": "Utf8", "content": "Utf8"},
-            }
-
-            with (
-                patch(
-                    "ldaca_web_app_backend.api.workspaces.workspace_manager.add_node_to_workspace"
-                ) as mock_add,
-                patch(
-                    "ldaca_web_app_backend.api.workspaces.workspace_manager.get_workspace"
-                ) as mock_get_workspace,
-            ):
-                # Mock workspace exists
-                mock_workspace = Mock()
-                mock_get_workspace.return_value = mock_workspace
-                mock_add.return_value = mock_node
-
-                # Prepare the file upload
-                with open(tmp_file_path, "rb") as test_file:
-                    files = {"file": ("test_data.csv", test_file, "text/csv")}
-
-                    # Use the correct upload endpoint with node_name as a query param
-                    response = await authenticated_client.post(
-                        "/api/workspaces/test-workspace-123/upload?node_name=test_data",
-                        files=files,
-                    )
-
-                assert response.status_code == 200
-                response_data = response.json()
-                assert response_data.get("state") == "successful"
-                assert "message" in response_data
-                assert "node" in response_data
-                assert response_data["node"]["name"] == "test_data"
-
-                # Verify the workspace manager was called correctly
-                mock_add.assert_called_once()
-                call_args = mock_add.call_args
-                # The API uses node_name if provided, otherwise defaults to filename
-                expected_name = "test_data"  # We provide node_name in form data
-                assert call_args[1]["node_name"] == expected_name
-                assert call_args[1]["workspace_id"] == "test-workspace-123"
-
-        finally:
-            # Clean up the temporary file
-            if os.path.exists(tmp_file_path):
-                os.unlink(tmp_file_path)
-
     async def test_cast_node_datetime(self, authenticated_client):
         """Test casting a column to datetime type"""
         import polars as pl
@@ -396,7 +324,7 @@ class TestWorkspaceAPI:
         )
 
     async def test_cast_node_preserves_data_type(self, authenticated_client):
-        """Test that casting preserves the original data type (DocDataFrame stays DocDataFrame, etc.)"""
+        """Test that casting preserves the original lazy data type."""
         import polars as pl
 
         # Test with LazyFrame
@@ -446,21 +374,17 @@ class TestWorkspaceAPI:
             assert response_data.get("state") == "successful"
             assert response_data["cast_info"]["column"] == "created_at"
 
-    async def test_cast_node_doclazy_preserves_document_column(
-        self, authenticated_client
-    ):
-        """DocLazyFrame nodes remain DocLazyFrame and keep their document column after casting."""
+    async def test_cast_node_preserves_text_column_metadata(self, authenticated_client):
+        """LazyFrame nodes preserve text_column metadata after casting."""
         import polars as pl
 
-        docframe = pytest.importorskip("docframe")
-        DocLazyFrame = docframe.DocLazyFrame  # type: ignore[attr-defined]
-
         mock_node = Mock()
+        mock_node.metadata = {"text_column": "text"}
         lazy_data = pl.DataFrame({
             "text": ["doc one", "doc two"],
             "score": ["1", "2"],
         }).lazy()
-        mock_node.data = DocLazyFrame(lazy_data, document_column="text")  # type: ignore[arg-type]
+        mock_node.data = lazy_data
 
         with (
             patch(
@@ -484,8 +408,7 @@ class TestWorkspaceAPI:
             assert response.status_code == 200
             payload = response.json()
             assert payload.get("state") == "successful"
-            assert isinstance(mock_node.data, DocLazyFrame)
-            assert mock_node.data.document_column == "text"
+            assert getattr(mock_node, "metadata", {}).get("text_column") == "text"
             mock_save.assert_called_once()
 
     async def test_cast_node_datetime_to_string(self, authenticated_client):

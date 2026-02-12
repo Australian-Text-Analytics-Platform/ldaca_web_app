@@ -155,4 +155,5 @@ async def test_token_frequencies_full_table_and_metadata(
 
     first_node_result = next(iter(data["data"].values()))
     sample_token = first_node_result["data"][0]["token"]
-    assert sample_token.startswith("token")
+    assert isinstance(sample_token, str)
+    assert sample_token

@@ -16,8 +16,8 @@ export interface ConcordanceResultEntry {
   data: any[];
   columns: string[];
   metadata?: ConcordanceMetadata;
-  total_matches: number;
-  pagination: { page: number; page_size: number; total_pages: number; has_next: boolean; has_prev: boolean; };
+  total_matches?: number;
+  pagination: { page: number; page_size: number; total_pages?: number; has_next: boolean; has_prev: boolean; };
   sorting: { sort_by?: string; sort_order: 'asc' | 'desc'; };
 }
 export interface ConcordanceAnalysisResponse {
@@ -51,7 +51,12 @@ export interface SequentialAnalysisRequest {
   numeric_interval?: number | null;
 }
 
-export interface TokenFrequencyRequest { node_ids: string[]; node_columns: Record<string,string>; stop_words?: string[] | null; }
+export interface TokenFrequencyRequest {
+  node_ids: string[];
+  node_columns: Record<string, string>;
+  stop_words?: string[] | null;
+  token_limit?: number | null;
+}
 export interface TokenFrequencyNodeResult {
   data: { token: string; frequency: number }[];
   columns: string[];
@@ -109,7 +114,7 @@ export const textApi = {
 
   // Topic Modeling
   topicModeling: (ws: string, req: TopicModelingRequest, headers: Record<string, string> = {}) => post(`/workspaces/${ws}/topic-modeling`, req, headers),
-  getTopicModelingTaskResult: (ws: string, taskId: string, headers: Record<string, string> = {}) => httpRequest<TopicModelingResponse>(`/workspaces/${ws}/tasks/${taskId}/result`, { method: 'GET', headers }),
+  getTopicModelingTaskResult: (ws: string, taskId: string, headers: Record<string, string> = {}) => httpRequest<TopicModelingResponse>(`/workspaces/${ws}/topic-modeling/tasks/${taskId}/result`, { method: 'GET', headers }),
 
   getAnalysisCurrent: (ws: string, analysis: string, headers: Record<string, string> = {}) => httpRequest(`/workspaces/${ws}/${analysis}/current`, { method: 'GET', headers }),
   getTaskRequest: (ws: string, taskId: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/tasks/${taskId}/request`, { method: 'GET', headers }),

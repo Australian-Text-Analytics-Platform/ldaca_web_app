@@ -28,117 +28,6 @@ from .db import cleanup_expired_sessions, init_db
 from .settings import settings
 
 
-def _configure_nltk_data_path() -> None:
-    """Configure NLTK data path for bundled runtime, with proper Windows path handling."""
-    print("[main] Starting NLTK data path configuration...", flush=True)
-    try:
-        import nltk
-
-        print("[main] NLTK imported successfully", flush=True)
-
-        # Check if running in bundled desktop app
-        backend_runtime = os.environ.get("LDACA_BACKEND_RUNTIME")
-        print(f"[main] LDACA_BACKEND_RUNTIME={backend_runtime}", flush=True)
-        if not backend_runtime:
-            print(
-                "[main] Not running in bundled app, skipping NLTK path config",
-                flush=True,
-            )
-            return
-
-        try:
-            runtime_path = Path(backend_runtime)
-            print(f"[main] Runtime path: {runtime_path}", flush=True)
-
-            # Look for nltk_data in the bundled Python directory
-            possible_locations = [
-                runtime_path / "python" / "nltk_data",
-                runtime_path / "nltk_data",
-            ]
-            print(
-                f"[main] Checking {len(possible_locations)} possible NLTK data locations",
-                flush=True,
-            )
-
-            for nltk_data_dir in possible_locations:
-                try:
-                    print(f"[main] Checking: {nltk_data_dir}", flush=True)
-                    if not nltk_data_dir.exists():
-                        print(f"[main] Does not exist: {nltk_data_dir}", flush=True)
-                        continue
-                    print(f"[main] Found: {nltk_data_dir}", flush=True)
-
-                    # Convert to string path - avoid absolute() on Windows as it can be slow
-                    abs_path = str(nltk_data_dir)
-
-                    # On Windows, normalize the path and remove UNC prefix
-                    if sys.platform == "win32":
-                        print(
-                            f"[main] Normalizing path for Windows: {abs_path}",
-                            flush=True,
-                        )
-                        # Remove UNC prefix (\\?\) which causes issues with NLTK
-                        if abs_path.startswith("\\\\?\\"):
-                            abs_path = abs_path[4:]
-                            print(f"[main] Removed UNC prefix: {abs_path}", flush=True)
-                        abs_path = os.path.normpath(abs_path)
-                        print(f"[main] Normalized to: {abs_path}", flush=True)
-
-                    # Prepend to NLTK data path (highest priority)
-                    if abs_path not in nltk.data.path:
-                        print(
-                            f"[main] Adding to nltk.data.path: {abs_path}", flush=True
-                        )
-                        nltk.data.path.insert(0, abs_path)
-                        print(
-                            f"[main] SUCCESS: Configured NLTK data path: {abs_path}",
-                            flush=True,
-                        )
-                    else:
-                        print(
-                            f"[main] Path already in nltk.data.path: {abs_path}",
-                            flush=True,
-                        )
-                    break
-                except Exception as e:
-                    # If this location fails, try the next one
-                    import traceback
-
-                    print(
-                        f"[main] WARNING: Failed to configure {nltk_data_dir}: {e}",
-                        flush=True,
-                    )
-                    print(f"[main] Traceback: {traceback.format_exc()}", flush=True)
-                    continue
-            else:
-                print(
-                    "[main] WARNING: No bundled nltk_data found, will use system defaults",
-                    flush=True,
-                )
-
-        except Exception as e:
-            import traceback
-
-            print(f"[main] WARNING: Error accessing runtime path: {e}", flush=True)
-            print(f"[main] Traceback: {traceback.format_exc()}", flush=True)
-
-    except ImportError as e:
-        # NLTK not available, skip configuration
-        print(f"[main] NLTK not available: {e}", flush=True)
-        pass
-    except Exception as e:
-        # Catch any other errors to prevent startup failure
-        import traceback
-
-        print(
-            f"[main] WARNING: Unexpected error configuring NLTK data path: {e}",
-            flush=True,
-        )
-        print(f"[main] Traceback: {traceback.format_exc()}", flush=True)
-
-    print("[main] NLTK data path configuration complete", flush=True)
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager"""
@@ -198,17 +87,19 @@ async def lifespan(app: FastAPI):
     print(f"[main] Python version: {sys.version}", flush=True)
     print("=" * 70, flush=True)
 
-    # Configure NLTK data path for bundled runtime
-    print("[main] Step 1: Configuring NLTK data path", flush=True)
-    _configure_nltk_data_path()
+    print("[main] Step 1: Preparing runtime", flush=True)
     print("[main] Step 1 complete", flush=True)
 
     # Ensure DATA_ROOT and data folders exist before DB init
     print("[main] Step 2: Creating data folders", flush=True)
     settings.get_data_root().mkdir(parents=True, exist_ok=True)
     settings.get_user_data_folder().mkdir(parents=True, exist_ok=True)
-    settings.get_sample_data_folder().mkdir(parents=True, exist_ok=True)
-    print(f"[main] Sample data folder: {settings.get_sample_data_folder()}", flush=True)
+    sample_override = settings.get_sample_data_folder()
+    if sample_override:
+        sample_override.mkdir(parents=True, exist_ok=True)
+        print(f"[main] Sample data folder: {sample_override}", flush=True)
+    else:
+        print("[main] Sample data folder: packaged resources", flush=True)
     settings.get_database_backup_folder().mkdir(parents=True, exist_ok=True)
     print("[main] Step 2 complete", flush=True)
 
@@ -268,7 +159,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Enhanced LDaCA Web App API",
     version="3.0.0",
-    description="Multi-user text analysis platform with workspace management and DocFrame integration",
+    description="Multi-user text analysis platform with workspace management and polars-text integration",
     lifespan=lifespan,
     docs_url="/api/docs",
     redoc_url="/api/redoc",
@@ -315,7 +206,7 @@ async def root():
             "authentication": "Google OAuth 2.0",
             "workspaces": "Multi-user workspace management with node operations",
             "file_management": "Upload, preview, download with type detection",
-            "text_analysis": "DocFrame integration",
+            "text_analysis": "polars-text integration",
             "data_operations": "Filter, slice, transform, aggregate operations",
             "user_isolation": "Per-user data folders and workspace separation",
         },
@@ -362,7 +253,7 @@ async def health_check():
         "system": "Enhanced LDaCA Web App API",
         "database": "connected",
         "features": {
-            "docframe": True,
+            "polars-text": True,
             "docworkspace": True,
         },
         "config": {
@@ -397,8 +288,8 @@ async def status():
                 "description": "Filter, slice, transform, aggregate, join operations",
             },
             "text_analysis": {
-                "status": "[OK] DocFrame ready",
-                "description": "Advanced text analysis with DocFrame integration",
+                "status": "[OK] polars-text ready",
+                "description": "Advanced text analysis with polars-text integration",
             },
             "database": {
                 "status": "[OK] SQLAlchemy async",

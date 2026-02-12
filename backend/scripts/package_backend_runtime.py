@@ -183,36 +183,6 @@ def find_latest_wheel(wheel_dir: Path, prefix: str) -> Path:
     return matches[-1]
 
 
-def download_nltk_data(destination_dir: Path) -> None:
-    print(f"[INFO] Downloading NLTK data to {destination_dir}")
-    destination_dir.mkdir(parents=True, exist_ok=True)
-
-    try:
-        import nltk
-    except ImportError:
-        print("[ERROR] NLTK is not installed in the environment running this script.")
-        print("[INFO] Please run this script with 'uv run ...' or install nltk.")
-        sys.exit(1)
-
-    resources = ["punkt_tab", "punkt", "averaged_perceptron_tagger_eng", "stopwords"]
-    failed = []
-
-    for res in resources:
-        print(f"   Downloading {res}...")
-        try:
-            if not nltk.download(res, download_dir=str(destination_dir), quiet=True):
-                failed.append(res)
-        except Exception as e:
-            print(f"   [ERROR] {res}: {e}")
-            failed.append(res)
-
-    if failed:
-        print(f"   [ERROR] Failed: {failed}")
-        sys.exit(1)
-
-    print("   [SUCCESS] NLTK resources downloaded")
-
-
 def get_workspace_packages(workspace_root: Path) -> list[tuple[str, Path]]:
     """Parse pyproject.toml to find workspace members."""
     pyproject = workspace_root / "pyproject.toml"
@@ -407,8 +377,6 @@ def main() -> None:
     if sanitized_lockfile.exists():
         sanitized_lockfile.unlink()
         print("[INFO] Removed temporary lockfiles")
-
-    download_nltk_data(runtime_python_dir / "nltk_data")
 
     print("[SUCCESS] Backend runtime created")
     print(f"   Runtime folder: {output_dir}")

@@ -7,9 +7,6 @@ import polars as pl
 import pytest
 from ldaca_web_app_backend.core.utils import serialize_dataframe_for_json
 
-import docframe as dc
-from docframe import DocDataFrame
-
 
 class TestDataTypeDetection:
     """Test data type detection and serialization functionality"""
@@ -24,19 +21,6 @@ class TestDataTypeDetection:
             "bool_col": [True, False, True],
             "null_col": [None, None, None],
         })
-
-    @pytest.fixture
-    def doc_dataframe(self):
-        """Create a DocDataFrame for testing"""
-        if dc is None:
-            pytest.skip("docframe not available")
-
-        data = pl.DataFrame({
-            "text": ["Document 1", "Document 2", "Document 3"],
-            "score": [0.8, 0.9, 0.7],
-            "category": ["news", "blog", "research"],
-        })
-        return DocDataFrame(data, document_column="text")  # type: ignore
 
     def test_regular_dataframe_serialization(self, sample_dataframe):
         """Test serialization of regular polars DataFrame"""
@@ -70,24 +54,6 @@ class TestDataTypeDetection:
         assert dtypes["int_col"] == "Int64"
         assert dtypes["float_col"] == "Float64"
         assert dtypes["bool_col"] == "Boolean"
-
-    def test_doc_dataframe_serialization(self, doc_dataframe):
-        """Test serialization of DocDataFrame"""
-        result = serialize_dataframe_for_json(doc_dataframe)
-
-        # Should handle DocDataFrame properly
-        assert isinstance(result, dict)
-        assert "columns" in result
-        assert "preview" in result  # preview replaces data field
-
-        # Check that text column (document column) is detected
-        columns = result["columns"]
-
-        # Columns should be a list of strings
-        assert isinstance(columns, list)
-        assert "text" in columns
-        assert "score" in columns
-        assert "category" in columns
 
     def test_empty_dataframe_serialization(self):
         """Test serialization of empty DataFrame"""
@@ -187,9 +153,11 @@ class TestDocWorkspaceTypeMapping:
 
     def test_polars_type_to_js_type_categorical(self):
         """Categorical dtypes map to categorical JS type"""
-        from ldaca_web_app_backend.core.docworkspace_api import DocWorkspaceAPIUtils
+        from ldaca_web_app_backend.core.docworkspace_api import \
+            DocWorkspaceAPIUtils
 
         # Test with Polars type object
         assert (
             DocWorkspaceAPIUtils.polars_type_to_js_type(pl.Categorical) == "categorical"
+        )
         )

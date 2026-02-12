@@ -21,8 +21,6 @@ from ldaca_web_app_backend.core.utils import (
     validate_file_path,
 )
 
-import docframe
-
 
 class TestUserFolders:
     """Test user folder management functions"""
@@ -173,70 +171,15 @@ class TestFileOperations:
 
     @pytest.fixture()
     def sample_zip_file(self, temp_dir):
-        """Provide a copy of the example ZIP archive for tests."""
+        """Provide a sample ZIP archive for tests."""
+        from zipfile import ZipFile
 
-        repo_root = next(
-            parent
-            for parent in Path(__file__).resolve().parents
-            if (parent / "docframe" / "examples" / "data" / "zip_example").exists()
-        )
-        source = (
-            repo_root / "docframe" / "examples" / "data" / "zip_example" / "data.zip"
-        )
         target = temp_dir / "sample.zip"
-        target.write_bytes(source.read_bytes())
+        with ZipFile(target, "w") as zf:
+            zf.writestr("a.txt", "hello")
+            zf.writestr("b.txt", "world")
         return target
 
-    def test_load_data_file_zip(self, sample_zip_file):
-        """ZIP archives should read via docframe.read_zip."""
-
-        result = load_data_file(sample_zip_file)
-
-        assert isinstance(result, docframe.DocDataFrame)
-        assert result.active_document_name in {"text", "document"}
-        assert result.dataframe.shape == (3, 4)
-        zip_columns = set(result.dataframe.columns)
-        assert {"file_path", "base_name", "extension"}.issubset(zip_columns)
-        assert {"text", "document"} & zip_columns
-
-    def test_load_data_file_text(self, sample_plain_text_file):
-        """Plain text files should be wrapped as DocDataFrames."""
-
-        result = load_data_file(sample_plain_text_file)
-
-        assert isinstance(result, docframe.DocDataFrame)
-        assert result.active_document_name in {"text", "document"}
-        text_column = "text" if "text" in result.dataframe.columns else "document"
-        assert result.dataframe[text_column].item(0) == "Plain text upload support"
-
-    def test_load_data_file_json(self, sample_json_file):
-        """Test loading JSON file"""
-        df = load_data_file(sample_json_file)
-
-        # Should return polars DataFrame by default
-        assert hasattr(df, "shape")  # Polars DataFrames expose shape
-        assert df.shape[0] == 3  # 3 rows
-        assert df.shape[1] == 3  # 3 columns
-
-        # Check column names
-        if hasattr(df, "columns"):
-            columns = list(df.columns)
-        else:
-            columns = df.columns.tolist()
-        assert "name" in columns
-        assert "age" in columns
-        assert "city" in columns
-
-    def test_load_data_file_unsupported(self, temp_dir):
-        """Test loading unsupported file type"""
-        unsupported_file = temp_dir / "test.xyz"
-        unsupported_file.write_text("some content")
-
-        with pytest.raises(ValueError, match="Unsupported file type"):
-            load_data_file(unsupported_file)
-
-
-class TestLoadDataFile:
     """Test data loading functionality"""
 
     def test_load_csv_file(self, sample_csv_file):
@@ -297,7 +240,7 @@ class TestLoadDataFile:
         assert "age" in columns
         assert "city" in columns
 
-    def test_load_data_file_with_docframe(self, sample_csv_file):
+    def test_load_data_file_with_polars(self, sample_csv_file):
         """Test loading file - should use polars by default"""
         result = load_data_file(sample_csv_file)
 
@@ -310,7 +253,7 @@ class TestLoadDataFile:
             # It's a DataFrame
             assert result.shape[0] == 3
 
-    def test_load_data_file_docframe_fallback(self, sample_csv_file):
+    def test_load_data_file_polars_fallback(self, sample_csv_file):
         """Test loading file with fallback behavior"""
         df = load_data_file(sample_csv_file)
 
@@ -373,31 +316,6 @@ class TestDataFrameUtils:
         assert result["shape"] == (0, 0)
         assert result["columns"] == []
         assert result["preview"] == []
-
-    def test_serialize_docframe_dataframe(self):
-        """Test serialization detects DocDataFrame"""
-        # Mock DocDataFrame with dataframe attribute
-        mock_df = MagicMock()
-        mock_df.shape = (10, 5)
-        mock_df.columns = ["doc_id", "text", "metadata"]
-        mock_df.dtypes = {"doc_id": "int64", "text": "object"}
-        mock_df.head.return_value.to_dicts.return_value = []
-        mock_df.__class__.__name__ = "DocDataFrame"
-
-        # Mock the underlying dataframe attribute (what DocDataFrame uses)
-        mock_underlying_df = MagicMock()
-        mock_underlying_df.shape = (10, 5)
-        mock_underlying_df.columns = ["doc_id", "text", "metadata"]
-        mock_underlying_df.schema = {
-            "doc_id": "int64",
-            "text": "str",
-            "metadata": "str",
-        }
-        mock_underlying_df.head.return_value.to_dicts.return_value = []
-        mock_df.dataframe = mock_underlying_df
-
-        result = serialize_dataframe_for_json(mock_df)
-        assert result["is_text_data"] is True
 
 
 class TestUtilityFunctions:

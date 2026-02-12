@@ -1,27 +1,17 @@
-"""
-Tests for join behavior with DocDataFrames and regular DataFrames.
-Migrated from test_join_behavior.py with proper pytest structure.
-"""
+"""Tests for join behavior with Polars DataFrames."""
 
 import polars as pl
 import pytest
 from docworkspace import Node
 
-import docframe as dc
-from docframe import DocDataFrame
-
 
 def _materialize_to_dataframe(data):
-    """Return a plain polars DataFrame regardless of lazy/doc wrappers."""
+    """Return a plain polars DataFrame regardless of lazy wrappers."""
 
     if hasattr(data, "collect"):
         collected = data.collect()
     else:
         collected = data
-
-    # DocDataFrame exposes .dataframe for underlying Polars object
-    if hasattr(collected, "dataframe"):
-        return collected.dataframe  # type: ignore[attr-defined]
 
     return collected
 
@@ -39,26 +29,20 @@ class TestJoinBehavior:
         })
 
     @pytest.fixture
-    def doc_dataframe(self):
-        """Create a DocDataFrame for testing"""
-        if dc is None:
-            pytest.skip("docframe not available")
-
-        data = pl.DataFrame({
+    def secondary_dataframe(self):
+        """Create a secondary DataFrame for join tests."""
+        return pl.DataFrame({
             "id": [1, 2, 3],
             "text": ["Document 1", "Document 2", "Document 3"],
             "score": [0.8, 0.9, 0.7],
         })
-        return DocDataFrame(data, document_column="text")  # type: ignore
 
-    def test_join_returns_regular_dataframe(self, regular_dataframe, doc_dataframe):
-        """Test that joins between regular and DocDataFrame return regular DataFrame"""
-        if dc is None:
-            pytest.skip("Required dependencies not available")
-
-        # Create nodes
+    def test_join_returns_regular_dataframe(
+        self, regular_dataframe, secondary_dataframe
+    ):
+        """Test that joins between regular DataFrames return regular DataFrame"""
         node1 = Node(regular_dataframe, name="regular_data")
-        node2 = Node(doc_dataframe, name="doc_data")
+        node2 = Node(secondary_dataframe, name="secondary_data")
 
         # Perform join
         joined_node = node1.join(node2, on="id", how="inner")
@@ -70,16 +54,15 @@ class TestJoinBehavior:
         # Verify join worked correctly
         assert joined_data.shape[0] == 3  # All rows should match
         assert "name" in joined_data.columns  # From regular_dataframe
-        assert "text" in joined_data.columns  # From doc_dataframe
-        assert "score" in joined_data.columns  # From doc_dataframe
+        assert "text" in joined_data.columns  # From secondary_dataframe
+        assert "score" in joined_data.columns  # From secondary_dataframe
 
-    def test_join_preserves_data_integrity(self, regular_dataframe, doc_dataframe):
+    def test_join_preserves_data_integrity(
+        self, regular_dataframe, secondary_dataframe
+    ):
         """Test that data integrity is preserved in joins"""
-        if dc is None:
-            pytest.skip("Required dependencies not available")
-
         node1 = Node(regular_dataframe, name="regular_data")
-        node2 = Node(doc_dataframe, name="doc_data")
+        node2 = Node(secondary_dataframe, name="secondary_data")
 
         joined_node = node1.join(node2, on="id", how="inner")
         joined_data = _materialize_to_dataframe(joined_node.data)
@@ -91,19 +74,15 @@ class TestJoinBehavior:
         assert first_row["score"] == pytest.approx(0.8)
 
     def test_left_join_behavior(self, regular_dataframe):
-        """Test left join behavior with different DataFrame types"""
-        if dc is None:
-            pytest.skip("Required dependencies not available")
+        """Test left join behavior with different DataFrame sizes"""
 
-        # Create a smaller DocDataFrame for left join testing
-        small_doc_data = pl.DataFrame({
+        # Create a smaller DataFrame for left join testing
+        small_data = pl.DataFrame({
             "id": [1, 2],  # Missing id=3
             "category": ["A", "B"],
         })
-        small_doc_df = DocDataFrame(small_doc_data, document_column="category")  # type: ignore
-
         node1 = Node(regular_dataframe, name="regular_data")
-        node2 = Node(small_doc_df, name="small_doc_data")
+        node2 = Node(small_data, name="small_data")
 
         # Left join should keep all rows from regular_dataframe
         left_joined = node1.join(node2, on="id", how="left")

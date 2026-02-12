@@ -46,17 +46,13 @@ async def upload_file_to_workspace(
         if workspace_dir is None:
             raise HTTPException(status_code=404, detail="Workspace not found")
 
-        document_column = getattr(data_obj, "document_column", None) or getattr(
-            data_obj, "active_document_name", None
-        )
-
         node_name = node_name or file.filename or "uploaded_file"
 
         node_data = stage_dataframe_as_lazy(
             data_obj,
             workspace_dir,
             node_name=node_name,
-            document_column=document_column,
+            document_column=None,
         )
 
         node = workspace_manager.add_node_to_workspace(

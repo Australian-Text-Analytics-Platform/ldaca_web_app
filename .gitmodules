@@ -1,6 +1,3 @@
-[submodule "backend/docframe"]
-	path = backend/docframe
-	url = https://github.com/Australian-Text-Analytics-Platform/docframe.git
 [submodule "backend/ldaca-tabulator"]
 	path = backend/ldaca-tabulator
 	url = https://github.com/Australian-Text-Analytics-Platform/ldaca-tabulator

@@ -1,6 +1,6 @@
 # DocWorkspace
 
-A powerful Python library for managing DataFrames and DocDataFrames with parent-child relationships, lazy evaluation, and FastAPI integration. Part of the LDaCA (Language Data Commons of Australia) ecosystem.
+A powerful Python library for managing Polars DataFrames and LazyFrames with parent-child relationships, lazy evaluation, and FastAPI integration. Part of the LDaCA (Language Data Commons of Australia) ecosystem.
 
 ## Overview
 
@@ -8,7 +8,7 @@ DocWorkspace provides a workspace-based approach to data analysis, where data tr
 
 - **Relationship Tracking**: Understand data lineage and transformation history
 - **Lazy Evaluation**: Optimize performance with Polars LazyFrames
-- **Multiple Data Types**: Support for Polars DataFrames, LazyFrames, DocDataFrames, and DocLazyFrames
+- **Multiple Data Types**: Support for Polars DataFrames and LazyFrames
 - **FastAPI Integration**: Ready-to-use models and utilities for web APIs
 - **Serialization**: Save and restore entire workspaces with their relationships
 
@@ -22,11 +22,12 @@ pip install docworkspace
 
 - Python ≥ 3.12
 - polars ≥ 0.20.0
-- docframe
+- polars-text
 - pandas ≥ 2.0.0
 - typing-extensions
 
 For FastAPI integration:
+
 ```bash
 pip install pydantic
 ```
@@ -36,8 +37,6 @@ pip install pydantic
 ```python
 import polars as pl
 from docworkspace import Node, Workspace
-from docframe import DocDataFrame
-
 # Create a workspace
 workspace = Workspace("my_analysis")
 
@@ -68,7 +67,7 @@ print(workspace.visualize_graph())
 
 ### Node
 
-A `Node` wraps your data (DataFrames, LazyFrames, DocDataFrames) and tracks relationships with other nodes. Nodes support:
+A `Node` wraps your data (DataFrames, LazyFrames) and tracks relationships with other nodes. Nodes support:
 
 - **Transparent Data Access**: All DataFrame methods work directly on nodes
 - **Automatic Relationship Tracking**: Operations create child nodes
@@ -114,21 +113,17 @@ leaves = workspace.get_leaf_nodes()
 
 ## Supported Data Types
 
-DocWorkspace supports multiple data types from the Polars and DocFrame ecosystems:
+DocWorkspace supports multiple data types from the Polars ecosystem:
 
 ### Polars Types
+
 - **`pl.DataFrame`**: Materialized, in-memory data
 - **`pl.LazyFrame`**: Lazy evaluation for performance optimization
-
-### DocFrame Types  
-- **`DocDataFrame`**: Enhanced DataFrame for text analysis with document tracking
-- **`DocLazyFrame`**: Lazy version of DocDataFrame
 
 ### Example with Different Types
 
 ```python
 import polars as pl
-from docframe import DocDataFrame, DocLazyFrame
 
 # Polars DataFrame (eager)
 df = pl.DataFrame({"text": ["hello", "world"], "id": [1, 2]})
@@ -138,17 +133,9 @@ node1 = Node(df, "eager_data")
 lazy_df = pl.LazyFrame({"text": ["foo", "bar"], "id": [3, 4]})
 node2 = Node(lazy_df, "lazy_data")
 
-# DocDataFrame (eager, with document column)
-doc_df = DocDataFrame(df, document_column="text")
-node3 = Node(doc_df, "doc_data")
-
-# DocLazyFrame (lazy, with document column)
-doc_lazy = DocLazyFrame(lazy_df, document_column="text") 
-node4 = Node(doc_lazy, "doc_lazy_data")
-
 # All work seamlessly in the same workspace
 workspace = Workspace("mixed_types")
-for node in [node1, node2, node3, node4]:
+for node in [node1, node2]:
     workspace.add_node(node)
 ```
 
@@ -267,26 +254,24 @@ ordered_nodes = workspace.get_topological_order()
 has_cycles = workspace.has_cycles()
 ```
 
-### Working with DocDataFrames
+### Working with Document Columns
 
-Enhanced text analysis capabilities:
+DocWorkspace tracks the text/document column via node metadata:
 
 ```python
-from docframe import DocDataFrame
-
-# Create DocDataFrame with document column
+# Create a DataFrame with a text column
 df = pl.DataFrame({
     "doc_id": ["d1", "d2", "d3"],
     "text": ["Hello world", "Data science", "Python rocks"],
     "metadata": ["type1", "type2", "type1"]
 })
 
-doc_df = DocDataFrame(df, document_column="text")
-node = Node(doc_df, "corpus")
+node = Node(df, "corpus")
+node.document = "text"
 
-# DocDataFrame operations work seamlessly
+# Document metadata is preserved across operations
 filtered = node.filter(pl.col("metadata") == "type1")
-print(f"Document column preserved: {filtered.data.document_column}")
+print(f"Document column preserved: {filtered.document}")
 ```
 
 ## API Reference
@@ -294,16 +279,18 @@ print(f"Document column preserved: {filtered.data.document_column}")
 ### Node Class
 
 #### Constructor
+
 ```python
 Node(data, name=None, workspace=None, parents=None, operation=None)
 ```
 
 #### Properties
 
-- `document_column: Optional[str]` - Document column for DocDataFrames
-- `data: DataFrame | LazyFrame | DocDataFrame | DocLazyFrame` - Underlying frame-like object
+- `document: Optional[str]` - Document column tracked in node metadata
+- `data: DataFrame | LazyFrame` - Underlying frame-like object
 
 #### Methods
+
 - `collect() -> Node` - Materialize lazy data (creates new node)
 - `materialize() -> Node` - Alias for collect()
 - `info(json=False) -> Dict` - Get node information
@@ -397,7 +384,6 @@ FastAPIUtils.workspace_to_react_flow(workspace) -> WorkspaceGraph
 ```python
 import polars as pl
 from docworkspace import Node, Workspace
-from docframe import DocDataFrame
 
 # Sample text data
 df = pl.DataFrame({
@@ -410,9 +396,9 @@ df = pl.DataFrame({
 # Create workspace
 workspace = Workspace("text_analysis")
 
-# Load as DocDataFrame for text analysis
-doc_df = DocDataFrame(df, document_column="text")
-corpus = workspace.add_node(Node(doc_df, "full_corpus"))
+# Track the document column for text analysis
+corpus = workspace.add_node(Node(df, "full_corpus"))
+corpus.document = "text"
 
 # Filter by category
 news_docs = corpus.filter(pl.col("category") == "news")
@@ -573,7 +559,7 @@ Part of the LDaCA (Language Data Commons of Australia) ecosystem.
 
 - Initial release
 - Core Node and Workspace functionality
-- Support for Polars and DocFrame data types
+- Support for Polars data types
 - Lazy evaluation support
 - FastAPI integration
 - Serialization capabilities
@@ -581,6 +567,5 @@ Part of the LDaCA (Language Data Commons of Australia) ecosystem.
 
 ## Related Projects
 
-- **[DocFrame](https://github.com/ldaca/docframe)**: Enhanced DataFrames for text analysis
 - **[LDaCA Web App](https://github.com/ldaca/ldaca_web_app)**: Full-stack web application using DocWorkspace
 - **[Polars](https://pola.rs/)**: Fast DataFrame library with lazy evaluation

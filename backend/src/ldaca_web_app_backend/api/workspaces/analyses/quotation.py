@@ -64,27 +64,6 @@ def _normalize_pagination(
     return normalized_page, normalized_size
 
 
-def _apply_sort(
-    df: pl.DataFrame,
-    *,
-    sort_by: Optional[str],
-    sort_order: str,
-    allowed_columns: Optional[Iterable[str]] = None,
-) -> Tuple[pl.DataFrame, Optional[str], str]:
-    """Apply optional sorting constrained to allowed columns."""
-
-    permitted = set(allowed_columns or df.columns)
-    effective_sort_by = sort_by if sort_by and sort_by in permitted else None
-    normalized_sort_order = _normalize_sort_order(sort_order)
-
-    if effective_sort_by:
-        df = df.sort(
-            pl.col(effective_sort_by), descending=normalized_sort_order == "desc"
-        )
-
-    return df, effective_sort_by, normalized_sort_order
-
-
 def _extract_context_preference(record_result: Optional[Dict[str, Any]]) -> int:
     """Pull the persisted context length preference from a stored result."""
     if not record_result:
@@ -96,20 +75,12 @@ def _extract_context_preference(record_result: Optional[Dict[str, Any]]) -> int:
 
 
 def _to_polars_dataframe(data: Any) -> pl.DataFrame:
-    """Best-effort conversion of docframe/Polars-like objects into a Polars DataFrame."""
+    """Best-effort conversion of Polars-like objects into a Polars DataFrame."""
 
     if isinstance(data, pl.DataFrame):
         return data
     if isinstance(data, pl.LazyFrame):
         return data.collect()
-
-    if hasattr(data, "to_lazyframe"):
-        try:
-            lazy = data.to_lazyframe()
-            if isinstance(lazy, pl.LazyFrame):
-                return lazy.collect()
-        except Exception:  # pragma: no cover - docframe specific types
-            pass
 
     if hasattr(data, "collect"):
         try:
@@ -118,14 +89,6 @@ def _to_polars_dataframe(data: Any) -> pl.DataFrame:
                 return collected.collect()
             if isinstance(collected, pl.DataFrame):
                 return collected
-        except Exception:  # pragma: no cover
-            pass
-
-    if hasattr(data, "_df"):
-        try:
-            df = data._df
-            if isinstance(df, pl.DataFrame):
-                return df
         except Exception:  # pragma: no cover
             pass
 
@@ -157,12 +120,12 @@ def _empty_quote_dataframe(text_column: Optional[str] = None) -> pl.DataFrame:
     return pl.DataFrame(columns)
 
 
-def _materialise_base_dataframe(node_data: Any) -> pl.DataFrame:
-    """Coerce node data into an eager Polars DataFrame for quotation work."""
-    base_df = _to_polars_dataframe(node_data)
-    if not isinstance(base_df, pl.DataFrame):
-        base_df = pl.DataFrame(base_df)
-    return base_df
+def _ensure_lazyframe(node_data: Any) -> pl.LazyFrame:
+    if isinstance(node_data, pl.LazyFrame):
+        return node_data
+    if isinstance(node_data, pl.DataFrame):
+        return node_data.lazy()
+    return pl.DataFrame(node_data).lazy()
 
 
 def _ensure_quote_dataframe(
@@ -171,8 +134,6 @@ def _ensure_quote_dataframe(
     """Guarantee required quotation columns and dtypes exist."""
 
     result = df
-    if "document_idx" in result.columns:
-        result = result.drop("document_idx")
 
     if "quote_row_idx" not in result.columns:
         result = result.with_columns(
@@ -275,36 +236,40 @@ async def _compute_on_demand_page(
     sort_by: Optional[str],
     sort_order: str,
 ) -> Dict[str, Any]:
-    """Compute quotations only for the requested document page (explode & unnest).
+    """Compute quotations only for the requested source-row page.
 
-    Pagination metadata counts documents; returned rows are exploded quotations for
-    those documents. Sorting is applied to the base documents only, never on
-    quotation metadata columns.
+    Pagination is based on *source rows* (documents).  The pipeline is:
+        lf.sort().slice((page-1)*page_size, page_size).quotation().explode().collect()
+    The returned ``result_count`` is the number of exploded quotation rows.
     """
 
-    base_df = _materialise_base_dataframe(node.data)
-    if column not in base_df.columns:
+    lazy_df = _ensure_lazyframe(node.data)
+    try:
+        schema = lazy_df.collect_schema()
+        available_columns = set(schema.keys())
+    except Exception:
+        available_columns = set()
+
+    if column not in available_columns:
         raise ValueError(
-            f"Column '{column}' not found. Available columns: {list(base_df.columns)}"
+            f"Column '{column}' not found. Available columns: {list(available_columns)}"
         )
 
-    sortable_columns = set(base_df.columns)
-    sorted_base, effective_sort_by, normalized_sort_order = _apply_sort(
-        base_df,
-        sort_by=sort_by,
-        sort_order=sort_order,
-        allowed_columns=sortable_columns,
-    )
+    effective_sort_by = sort_by if sort_by and sort_by in available_columns else None
+    normalized_sort_order = _normalize_sort_order(sort_order)
 
-    total_docs = sorted_base.height
-    total_pages = max(1, math.ceil(total_docs / page_size)) if total_docs else 1
-    if page > total_pages:
-        page = total_pages
-    if page < 1:
-        page = 1
+    if effective_sort_by:
+        lazy_df = lazy_df.sort(
+            pl.col(effective_sort_by),
+            descending=normalized_sort_order == "desc",
+        )
+
+    # Compute total source rows for pagination metadata
+    total_source_rows = lazy_df.select(pl.len()).collect().item()
+    total_source_pages = max(1, math.ceil(total_source_rows / page_size))
 
     start_doc = (page - 1) * page_size
-    slice_df = sorted_base.slice(start_doc, page_size)
+    slice_df = lazy_df.slice(start_doc, page_size).collect()
 
     quote_df = await _compute_quote_dataframe(
         node, slice_df, column, engine, use_base_only=True
@@ -314,15 +279,18 @@ async def _compute_on_demand_page(
     if "quote" in quote_df.columns:
         quote_df = quote_df.filter(pl.col("quote").is_not_null())
 
+    result_count = quote_df.height
+
     return {
         "data": quote_df.to_dicts(),
         "columns": list(quote_df.columns),
-        "total_rows": total_docs,
         "pagination": {
             "page": page,
             "page_size": page_size,
-            "total_pages": total_pages,
-            "has_next": (start_doc + page_size) < total_docs,
+            "total_source_rows": total_source_rows,
+            "total_source_pages": total_source_pages,
+            "result_count": result_count,
+            "has_next": page < total_source_pages,
             "has_prev": page > 1,
         },
         "sorting": {
@@ -411,6 +379,21 @@ async def _extract_remote_paginated(
     return combined_payload
 
 
+def _quotation_via_polars_text(df: pl.DataFrame, column: str) -> pl.DataFrame:
+    """Run quotation extraction using polars-text expression-level namespace.
+
+    Equivalent to the former docframe frame-level:
+        ``df.text.quotation(column, explode=True, unnest=True)``
+
+    Uses ``pl.col(column).text.quotation()`` (registered by polars-text).
+    """
+    tmp = df.with_columns(
+        pl.col(column).text.quotation().alias("__quotation__")
+    )
+    exploded = tmp.explode("__quotation__")
+    return exploded.unnest("__quotation__")
+
+
 async def _compute_quote_dataframe(
     node: Any,
     base_df: pl.DataFrame,
@@ -422,7 +405,7 @@ async def _compute_quote_dataframe(
     """
     Compute quotations for the provided DataFrame slice. When use_base_only=True, the
     provided base_df is used directly (avoiding full-node recomputation) and relies on
-    the docframe text namespace being registered on the slice.
+    the polars-text namespace being registered on the slice.
     """
 
     if engine.type is QuotationEngineType.REMOTE:
@@ -434,29 +417,18 @@ async def _compute_quote_dataframe(
 
         return _ensure_quote_dataframe(quote_df, text_column=column)
 
-    # Local engine: rely on docframe's Polars text namespace.
+    # Local engine: rely on polars-text's expression-level Polars namespace.
     if not use_base_only:
         node_data = getattr(node, "data", None)
         if node_data is None:
             raise ValueError("Node has no data")
 
-        if not hasattr(node_data, "text"):
-            raise ValueError(
-                "This node does not support quotation extraction (docframe text namespace not available)"
-            )
+        source_df = _to_polars_dataframe(node_data)
+        quote_raw = _quotation_via_polars_text(source_df, column)
+        return _ensure_quote_dataframe(quote_raw, text_column=column)
 
-        quote_raw = node_data.text.quotation(column, explode=True, unnest=True)
-        return _ensure_quote_dataframe(
-            _to_polars_dataframe(quote_raw), text_column=column
-        )
-
-    if not hasattr(base_df, "text"):
-        raise ValueError(
-            "This slice does not support quotation extraction (docframe text namespace not available)"
-        )
-
-    quote_raw = base_df.text.quotation(column, explode=True, unnest=True)
-    return _ensure_quote_dataframe(_to_polars_dataframe(quote_raw), text_column=column)
+    quote_raw = _quotation_via_polars_text(base_df, column)
+    return _ensure_quote_dataframe(quote_raw, text_column=column)
 
 
 router = APIRouter(prefix="/workspaces", tags=["quotation"])  # maintain path parity
@@ -682,12 +654,6 @@ async def get_quotation(
     try:
         node, node_data = get_node_with_data_or_400(user_id, workspace_id, node_id)
         engine = request.engine or QuotationEngineConfig()
-
-        if engine.type is QuotationEngineType.LOCAL and not hasattr(node_data, "text"):
-            raise HTTPException(
-                status_code=400,
-                detail="This node does not support text analysis (DocFrame text namespace not available)",
-            )
 
         page, page_size = _normalize_pagination(request.page, request.page_size)
         sort_by = request.sort_by or None

@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any, Optional, Tuple
 
 import polars as pl
-from docframe import DocLazyFrame
 from fastapi import HTTPException
 
 from ...analysis.models import AnalysisStatus
@@ -135,24 +134,10 @@ def stage_dataframe_as_lazy(
     try:
         os.chdir(workspace_dir)
         lazy_data: Any = pl.scan_parquet(relative_path)
-        if document_column:
-            try:
-                lazy_data = DocLazyFrame(lazy_data, document_column=document_column)
-            except Exception:
-                # If wrapping fails due to schema resolution, fall back for now
-                pass
     except Exception as exc:
         raise HTTPException(
             status_code=500, detail=f"Failed to reload parquet as LazyFrame: {exc}"
         )
-
-    if document_column:
-        try:
-            if not isinstance(lazy_data, DocLazyFrame):
-                lazy_data = DocLazyFrame(lazy_data, document_column=document_column)
-        except Exception:
-            # If wrapping fails due to schema issues, fall back to plain LazyFrame
-            pass
 
     return lazy_data
 

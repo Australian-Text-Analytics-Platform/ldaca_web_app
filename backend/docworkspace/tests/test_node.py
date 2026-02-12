@@ -4,8 +4,6 @@ import polars as pl
 import pytest
 from docworkspace import Node, Workspace
 
-from docframe import DocDataFrame, DocLazyFrame
-
 
 class TestNode:
     """Test cases for the Node class."""
@@ -19,16 +17,6 @@ class TestNode:
     def sample_lazy_df(self):
         """Create a sample polars LazyFrame."""
         return pl.LazyFrame({"text": ["Hello", "World", "Test"], "value": [1, 2, 3]})
-
-    @pytest.fixture
-    def sample_doc_df(self, sample_df):
-        """Create a sample DocDataFrame."""
-        return DocDataFrame(sample_df, document_column="text")
-
-    @pytest.fixture
-    def sample_doc_lazy_df(self, sample_lazy_df):
-        """Create a sample DocLazyFrame."""
-        return DocLazyFrame(sample_lazy_df, document_column="text")
 
     def test_node_creation_with_workspace(self, sample_df):
         """Test creating a Node with explicit workspace."""
@@ -60,16 +48,6 @@ class TestNode:
         """Test lazy status for polars LazyFrame."""
         node = Node(sample_lazy_df, "test_node")
         assert isinstance(node.data, pl.LazyFrame)
-
-    def test_node_lazy_status_doc_dataframe(self, sample_doc_df):
-        """Test lazy status for DocDataFrame with DataFrame."""
-        node = Node(sample_doc_df, "test_node")
-        assert isinstance(node.data, DocLazyFrame)
-
-    def test_node_lazy_status_doc_lazyframe(self, sample_doc_lazy_df):
-        """Test lazy status for DocLazyFrame."""
-        node = Node(sample_doc_lazy_df, "test_node")
-        assert isinstance(node.data, DocLazyFrame)
 
     def test_node_filter(self, sample_df):
         """Test filtering a Node."""

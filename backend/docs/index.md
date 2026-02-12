@@ -1,6 +1,6 @@
 # LDaCA Backend Documentation
 
-**Scope statement:** This doc set covers the FastAPI backend and its workspace orchestration. It does not describe frontend UI behavior or DocFrame internals.
+**Scope statement:** This doc set covers the FastAPI backend and its workspace orchestration. It does not describe frontend UI behavior.
 
 ## Start here
 

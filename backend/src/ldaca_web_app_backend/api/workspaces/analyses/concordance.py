@@ -1,53 +1,18 @@
 import logging
-from typing import Any, Dict, List, Optional
+import math
+from typing import Any, Dict, Optional
+from uuid import uuid4
 
 import polars as pl
-from docframe import DocDataFrame, DocLazyFrame
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from ....analysis.manager import get_task_manager
 from ....analysis.models import AnalysisStatus, AnalysisTask
+from ....analysis.results import GenericAnalysisResult
 from ....core.auth import get_current_user
 from ....core.workspace import workspace_manager
 from ....models import ConcordanceAnalysisRequest, ConcordanceDetachRequest
-from ..utils import ensure_task_synced
-
-
-def _prepare_doclazy_frame(node, column_name: str, user_id: str, workspace_id: str):
-    """Convert node data to a DocLazyFrame with the provided document column."""
-
-    data = getattr(node, "data", None)
-    if data is None:
-        raise HTTPException(status_code=400, detail="Node has no data")
-
-    if isinstance(data, DocLazyFrame):
-        processed = (
-            data
-            if data.document_column == column_name
-            else data.with_document_column(column_name)
-        )
-    elif isinstance(data, DocDataFrame):
-        processed = DocLazyFrame(data.dataframe.lazy(), document_column=column_name)  # type: ignore[misc]
-    elif isinstance(data, pl.LazyFrame):
-        processed = DocLazyFrame(data, document_column=column_name)  # type: ignore[misc]
-    elif isinstance(data, pl.DataFrame):
-        processed = DocLazyFrame(data.lazy(), document_column=column_name)  # type: ignore[misc]
-    else:  # pragma: no cover
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported node data type for text analysis: {type(data).__name__}",
-        )
-
-    try:
-        node.document = column_name
-        node.data = processed
-        workspace_manager.persist(user_id, workspace_id)
-    except Exception:
-        pass
-
-    return processed
-
 
 """Concordance analysis endpoints.
 
@@ -55,11 +20,12 @@ Includes:
     - POST /workspaces/{workspace_id}/concordance
     - GET  /workspaces/{workspace_id}/concordance/tasks/{task_id}/result
     - POST /workspaces/{workspace_id}/concordance/tasks/{task_id}/result
-    - GET  /workspaces/{workspace_id}/nodes/{node_id}/concordance/{document_idx}
     - POST /workspaces/{workspace_id}/nodes/{node_id}/concordance/detach
 
-This module supports the worker-backed `data.node_results` schema stored in
-`analysis_store`.
+Pagination is source-row based: a page of N source rows is sliced from the
+sorted table, then concordance is computed only on those rows and exploded.
+The result count per page may vary but source-row pagination is deterministic
+and enables total-page reporting.
 """
 
 logger = logging.getLogger(__name__)
@@ -71,7 +37,6 @@ router = APIRouter(prefix="/workspaces", tags=["concordance"])
 # Unified concordance helpers and endpoints
 # ---------------------------------------------------------------------------
 CORE_CONCORDANCE_COLUMNS = {
-    "document_idx",
     "left_context",
     "matched_text",
     "right_context",
@@ -79,8 +44,6 @@ CORE_CONCORDANCE_COLUMNS = {
     "end_idx",
     "l1",
     "r1",
-    "l1_freq",
-    "r1_freq",
 }
 
 
@@ -135,6 +98,11 @@ def _apply_result_query_overrides(
         normalized_request["sort_by"] = query.sort_by
     if query.sort_order is not None:
         normalized_request["sort_order"] = query.sort_order
+    if query.combined is not None:
+        if query.combined:
+            normalized_request["combined"] = True
+        else:
+            normalized_request.pop("combined", None)
     return normalized_request
 
 
@@ -171,6 +139,455 @@ def _sanitize_request_for_storage(request_dict: Dict[str, Any]) -> Dict[str, Any
     return normalized or {}
 
 
+def _ensure_lazyframe(node_data: Any) -> pl.LazyFrame:
+    if isinstance(node_data, pl.LazyFrame):
+        return node_data
+    if isinstance(node_data, pl.DataFrame):
+        return node_data.lazy()
+    return pl.DataFrame(node_data).lazy()
+
+
+def _concordance_non_empty_expr() -> pl.Expr:
+    return pl.any_horizontal([
+        pl
+        .col("matched_text")
+        .cast(pl.Utf8, strict=False)
+        .str.strip_chars()
+        .str.len_chars()
+        .fill_null(0)
+        > 0,
+        pl
+        .col("left_context")
+        .cast(pl.Utf8, strict=False)
+        .str.strip_chars()
+        .str.len_chars()
+        .fill_null(0)
+        > 0,
+        pl
+        .col("right_context")
+        .cast(pl.Utf8, strict=False)
+        .str.strip_chars()
+        .str.len_chars()
+        .fill_null(0)
+        > 0,
+    ])
+
+
+def _is_metadata_sort_column(lf: pl.LazyFrame, sort_by: Optional[str]) -> bool:
+    if not sort_by:
+        return False
+    try:
+        schema = lf.collect_schema()
+    except Exception:
+        return False
+    return sort_by in schema and sort_by not in CORE_CONCORDANCE_COLUMNS
+
+
+def _build_concordance_lazyframe(
+    node_data: Any,
+    column: str,
+    request: Dict[str, Any],
+) -> pl.LazyFrame:
+    import polars_text as pt
+
+    lf = _ensure_lazyframe(node_data)
+    expr = pt.concordance(
+        pl.col(column),
+        request["search_word"],
+        num_left_tokens=request["num_left_tokens"],
+        num_right_tokens=request["num_right_tokens"],
+        regex=request["regex"],
+        case_sensitive=request["case_sensitive"],
+    )
+    return (
+        lf
+        .select([pl.all(), expr.alias("concordance")])
+        .explode("concordance")
+        .unnest("concordance")
+        .filter(_concordance_non_empty_expr())
+    )
+
+
+def _resolve_node_sources(
+    user_id: str,
+    workspace_id: str,
+    request: Dict[str, Any],
+) -> tuple[dict[str, dict[str, Any]], dict[str, str], dict[str, str]]:
+    """Resolve node LazyFrames and labels from the workspace graph.
+
+    Returns (node_sources, label_to_node_map, node_labels).
+    """
+    node_ids = request.get("node_ids") or []
+    node_columns = request.get("node_columns") or {}
+
+    node_sources: dict[str, dict[str, Any]] = {}
+    label_to_node_map: dict[str, str] = {}
+    node_labels: dict[str, str] = {}
+
+    for node_id in node_ids:
+        node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
+        if not node:
+            continue
+        node_label = getattr(node, "name", None) or node_id
+        label_to_node_map[node_label] = node_id
+        node_labels[node_id] = node_label
+        node_data = getattr(node, "data", node)
+        column = node_columns.get(node_id)
+        if not column:
+            continue
+        node_sources[node_id] = {
+            "lf": _ensure_lazyframe(node_data),
+            "column": column,
+            "label": node_label,
+        }
+
+    return node_sources, label_to_node_map, node_labels
+
+
+def _compute_concordance_page(
+    base_lf: pl.LazyFrame,
+    column: str,
+    request: Dict[str, Any],
+    *,
+    page: int,
+    page_size: int,
+    sort_by: Optional[str],
+    sort_order: Optional[str],
+    node_label: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Compute concordance results for one page of source rows.
+
+    The logic is: ``lf.sort().slice((page-1)*page_size, page_size).concordance().explode().collect()``.
+    Pagination boundaries are defined by source rows, so the result count per
+    page may vary but total pages are deterministic.
+    """
+
+    # 1. Compute total source rows for pagination metadata
+    total_source_rows = base_lf.select(pl.len()).collect().item()
+
+    # 2. Apply metadata sort to the source LazyFrame (before concordance)
+    effective_sort_by: Optional[str] = None
+    if sort_by:
+        try:
+            schema = base_lf.collect_schema()
+            if sort_by in schema and sort_by not in CORE_CONCORDANCE_COLUMNS:
+                base_lf = base_lf.sort(sort_by, descending=(sort_order == "desc"))
+                effective_sort_by = sort_by
+        except Exception:
+            pass
+
+    # 3. Slice source rows for the requested page
+    start = max(page - 1, 0) * page_size
+    page_lf = base_lf.slice(start, page_size)
+
+    # 4. Run concordance on the sliced source rows → explode → filter
+    concordance_lf = _build_concordance_lazyframe(page_lf, column, request)
+    if node_label:
+        concordance_lf = concordance_lf.with_columns(
+            pl.lit(node_label).alias("__source_node")
+        )
+    result_df = concordance_lf.collect()
+
+    columns = result_df.columns if result_df.height > 0 else []
+    page_rows = result_df.to_dicts()
+
+    total_source_pages = max(1, math.ceil(total_source_rows / page_size))
+    has_next = page < total_source_pages
+    has_prev = page > 1
+
+    metadata = {
+        "concordance_columns": [c for c in columns if c in CORE_CONCORDANCE_COLUMNS],
+        "metadata_columns": [c for c in columns if c not in CORE_CONCORDANCE_COLUMNS],
+        "all_columns": columns,
+    }
+
+    return {
+        "data": page_rows,
+        "columns": columns,
+        "metadata": metadata,
+        "pagination": {
+            "page": page,
+            "page_size": page_size,
+            "total_source_rows": total_source_rows,
+            "total_source_pages": total_source_pages,
+            "result_count": len(page_rows),
+            "has_next": has_next,
+            "has_prev": has_prev,
+        },
+        "sorting": {
+            "sort_by": effective_sort_by,
+            "sort_order": sort_order or DEFAULT_CONCORDANCE_SORT_ORDER,
+        },
+    }
+
+
+def _empty_concordance_page(page: int, page_size: int) -> Dict[str, Any]:
+    """Return an empty concordance result page."""
+    return {
+        "data": [],
+        "columns": [],
+        "metadata": {
+            "concordance_columns": [],
+            "metadata_columns": [],
+            "all_columns": [],
+        },
+        "pagination": {
+            "page": page,
+            "page_size": page_size,
+            "total_source_rows": 0,
+            "total_source_pages": 0,
+            "result_count": 0,
+            "has_next": False,
+            "has_prev": page > 1,
+        },
+        "sorting": {"sort_by": None, "sort_order": DEFAULT_CONCORDANCE_SORT_ORDER},
+    }
+
+
+def _collect_interleaved_combined(
+    left_base_lf: pl.LazyFrame,
+    left_column: str,
+    right_base_lf: pl.LazyFrame,
+    right_column: str,
+    request: Dict[str, Any],
+    *,
+    page: int,
+    page_size: int,
+    sort_by: Optional[str],
+    sort_order: Optional[str],
+    left_label: Optional[str] = None,
+    right_label: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Interleave concordance results from two nodes using source-row slicing.
+
+    Each node contributes its own page-slice of source rows independently.
+    Results are then interleaved alternating left/right.
+    """
+
+    left_result = _compute_concordance_page(
+        left_base_lf,
+        left_column,
+        request,
+        page=page,
+        page_size=page_size,
+        sort_by=sort_by,
+        sort_order=sort_order,
+        node_label=left_label,
+    )
+    right_result = _compute_concordance_page(
+        right_base_lf,
+        right_column,
+        request,
+        page=page,
+        page_size=page_size,
+        sort_by=sort_by,
+        sort_order=sort_order,
+        node_label=right_label,
+    )
+
+    left_all_rows = left_result["data"]
+    right_all_rows = right_result["data"]
+
+    # Interleave rows alternating left/right
+    all_interleaved: list[dict[str, Any]] = []
+    li, ri = 0, 0
+    use_left = True
+    while li < len(left_all_rows) or ri < len(right_all_rows):
+        if use_left:
+            if li < len(left_all_rows):
+                all_interleaved.append(left_all_rows[li])
+                li += 1
+            elif ri < len(right_all_rows):
+                all_interleaved.append(right_all_rows[ri])
+                ri += 1
+                use_left = not use_left
+                continue
+            else:
+                break
+        else:
+            if ri < len(right_all_rows):
+                all_interleaved.append(right_all_rows[ri])
+                ri += 1
+            elif li < len(left_all_rows):
+                all_interleaved.append(left_all_rows[li])
+                li += 1
+                use_left = not use_left
+                continue
+            else:
+                break
+        use_left = not use_left
+
+    columns = left_result.get("columns") or right_result.get("columns") or []
+    if left_result.get("columns") and right_result.get("columns"):
+        columns = list(dict.fromkeys(left_result["columns"] + right_result["columns"]))
+
+    metadata = {
+        "concordance_columns": [c for c in columns if c in CORE_CONCORDANCE_COLUMNS],
+        "metadata_columns": [c for c in columns if c not in CORE_CONCORDANCE_COLUMNS],
+        "all_columns": columns,
+    }
+
+    effective_sort_by = left_result["sorting"].get("sort_by") or right_result[
+        "sorting"
+    ].get("sort_by")
+
+    # Use max total source pages from either side for pagination
+    left_pag = left_result["pagination"]
+    right_pag = right_result["pagination"]
+    total_source_rows = max(
+        left_pag.get("total_source_rows", 0),
+        right_pag.get("total_source_rows", 0),
+    )
+    total_source_pages = max(
+        left_pag.get("total_source_pages", 0),
+        right_pag.get("total_source_pages", 0),
+    )
+
+    return {
+        "data": all_interleaved,
+        "columns": columns,
+        "metadata": metadata,
+        "pagination": {
+            "page": page,
+            "page_size": page_size,
+            "total_source_rows": total_source_rows,
+            "total_source_pages": total_source_pages,
+            "result_count": len(all_interleaved),
+            "has_next": page < total_source_pages,
+            "has_prev": page > 1,
+        },
+        "sorting": {
+            "sort_by": effective_sort_by,
+            "sort_order": sort_order or DEFAULT_CONCORDANCE_SORT_ORDER,
+        },
+    }
+
+
+def _build_concordance_response(
+    user_id: str,
+    workspace_id: str,
+    request: Dict[str, Any],
+) -> Dict[str, Any]:
+    page = int(request.get("page") or DEFAULT_CONCORDANCE_PAGE)
+    page_size = int(request.get("page_size") or DEFAULT_CONCORDANCE_PAGE_SIZE)
+    sort_by = request.get("sort_by")
+    sort_order = _normalize_sort_order(request.get("sort_order"))
+    combined = bool(request.get("combined"))
+
+    node_ids = request.get("node_ids") or []
+
+    node_sources, label_to_node_map, _node_labels = _resolve_node_sources(
+        user_id, workspace_id, request
+    )
+    data: Dict[str, Any] = {}
+
+    if combined and node_ids:
+        if len(node_ids) == 2:
+            left_id, right_id = node_ids
+            left_src = node_sources.get(left_id)
+            right_src = node_sources.get(right_id)
+            if left_src and right_src:
+                data["__COMBINED__"] = _collect_interleaved_combined(
+                    left_src["lf"],
+                    left_src["column"],
+                    right_src["lf"],
+                    right_src["column"],
+                    request,
+                    page=page,
+                    page_size=page_size,
+                    sort_by=sort_by,
+                    sort_order=sort_order,
+                    left_label=left_src.get("label"),
+                    right_label=right_src.get("label"),
+                )
+            else:
+                data["__COMBINED__"] = _empty_concordance_page(page, page_size)
+        else:
+            # 3+ nodes: each node contributes its own page-slice, then concatenate
+            all_rows: list[dict[str, Any]] = []
+            columns: list[str] = []
+            max_total_source_rows = 0
+            max_total_source_pages = 0
+            for node_id in node_ids:
+                src = node_sources.get(node_id)
+                if not src:
+                    continue
+                node_result = _compute_concordance_page(
+                    src["lf"],
+                    src["column"],
+                    request,
+                    page=page,
+                    page_size=page_size,
+                    sort_by=sort_by,
+                    sort_order=sort_order,
+                    node_label=src.get("label"),
+                )
+                all_rows.extend(node_result["data"])
+                if not columns and node_result["columns"]:
+                    columns = node_result["columns"]
+                pag = node_result["pagination"]
+                max_total_source_rows = max(
+                    max_total_source_rows, pag.get("total_source_rows", 0)
+                )
+                max_total_source_pages = max(
+                    max_total_source_pages, pag.get("total_source_pages", 0)
+                )
+
+            metadata = {
+                "concordance_columns": [
+                    c for c in columns if c in CORE_CONCORDANCE_COLUMNS
+                ],
+                "metadata_columns": [
+                    c for c in columns if c not in CORE_CONCORDANCE_COLUMNS
+                ],
+                "all_columns": columns,
+            }
+            data["__COMBINED__"] = {
+                "data": all_rows,
+                "columns": columns,
+                "metadata": metadata,
+                "pagination": {
+                    "page": page,
+                    "page_size": page_size,
+                    "total_source_rows": max_total_source_rows,
+                    "total_source_pages": max_total_source_pages,
+                    "result_count": len(all_rows),
+                    "has_next": page < max_total_source_pages,
+                    "has_prev": page > 1,
+                },
+                "sorting": {"sort_by": sort_by, "sort_order": sort_order},
+            }
+        combinable = len(node_ids) > 1
+    else:
+        for node_id in node_ids:
+            src = node_sources.get(node_id)
+            if not src:
+                continue
+            data[node_id] = _compute_concordance_page(
+                src["lf"],
+                src["column"],
+                request,
+                page=page,
+                page_size=page_size,
+                sort_by=sort_by,
+                sort_order=sort_order,
+                node_label=src.get("label"),
+            )
+        combinable = len(node_ids) > 1
+
+    analysis_params = dict(request)
+    if label_to_node_map:
+        analysis_params["label_to_node_map"] = label_to_node_map
+
+    return {
+        "state": "successful",
+        "message": "Concordance analysis complete",
+        "data": data,
+        "analysis_params": analysis_params,
+        "combinable": combinable,
+    }
+
+
 @router.post("/{workspace_id}/concordance")
 async def run_concordance(
     workspace_id: str,
@@ -178,40 +595,11 @@ async def run_concordance(
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    tm = workspace_manager.get_task_manager(user_id, workspace_id)
     ws = workspace_manager.get_workspace(user_id, workspace_id)
     if not ws:
         raise HTTPException(status_code=404, detail="Workspace not found")
 
     task_manager = get_task_manager(user_id, workspace_id)
-    existing_task_ids = task_manager.get_current_task_ids("concordance")
-    existing_task = (
-        task_manager.get_task(existing_task_ids[0]) if existing_task_ids else None
-    )
-    if existing_task and existing_task.status == "running":
-        if await tm.any_running(
-            task_type="concordance", user_id=user_id, workspace_id=workspace_id
-        ):
-            return {
-                "state": "running",
-                "message": "Concordance analysis already running",
-                "data": None,
-                "metadata": {"task_id": existing_task.task_id},
-            }
-
-    # Safety net: if the task manager thinks something is running, return it.
-    if await tm.any_running(
-        task_type="concordance", user_id=user_id, workspace_id=workspace_id
-    ):
-        latest = await tm.latest_by_type(
-            "concordance", user_id=user_id, workspace_id=workspace_id
-        )
-        return {
-            "state": "running",
-            "message": "Concordance analysis already running",
-            "data": None,
-            "metadata": {"task_id": latest.id if latest else None},
-        }
 
     if not request.node_ids:
         raise HTTPException(
@@ -228,10 +616,10 @@ async def run_concordance(
             raise HTTPException(status_code=404, detail=f"Node {node_id} not found")
 
         node_data = getattr(node, "data", node)
-        if hasattr(node_data, "columns"):
+        if hasattr(node_data, "collect_schema"):
+            available_columns = list(node_data.collect_schema().names())
+        elif hasattr(node_data, "columns"):
             available_columns = node_data.columns
-        elif hasattr(node_data, "collect_schema"):
-            available_columns = list(node_data.collect_schema().keys())
         elif hasattr(node_data, "schema"):
             available_columns = list(node_data.schema.keys())
         else:
@@ -263,22 +651,6 @@ async def run_concordance(
         validated_columns[node_id] = column_name
 
     try:
-        task_info = await tm.submit_task(
-            user_id=user_id,
-            workspace_id=workspace_id,
-            task_type="concordance",
-            task_args={
-                "node_ids": request.node_ids,
-                "node_columns": validated_columns,
-                "search_word": request.search_word,
-                "num_left_tokens": request.num_left_tokens,
-                "num_right_tokens": request.num_right_tokens,
-                "regex": request.regex,
-                "case_sensitive": request.case_sensitive,
-            },
-        )
-
-        # Persist request as the single "current" run for this analysis.
         from ....analysis.implementations.concordance import ConcordanceRequest
 
         analysis_request = ConcordanceRequest(
@@ -289,164 +661,43 @@ async def run_concordance(
             num_right_tokens=request.num_right_tokens,
             regex=request.regex,
             case_sensitive=request.case_sensitive,
+            combined=bool(request.combined),
         )
 
+        task_id = str(uuid4())
         task_manager.save_task(
             AnalysisTask(
-                task_id=task_info.id,
+                task_id=task_id,
                 user_id=user_id,
                 workspace_id=workspace_id,
                 request=analysis_request,
-                status=AnalysisStatus.PENDING,
+                status=AnalysisStatus.COMPLETED,
+                result=GenericAnalysisResult({"ready": True}),
             )
         )
-        task_manager.set_current_task("concordance", task_info.id)
+        task_manager.set_current_task("concordance", task_id)
 
-        return {
-            "state": "running",
-            "message": "Concordance analysis started",
-            "data": None,
-            "metadata": {"task_id": task_info.id},
-        }
+        normalized_request = (
+            _normalize_saved_request(analysis_request.model_dump()) or {}
+        )
+        normalized_request.setdefault("page", DEFAULT_CONCORDANCE_PAGE)
+        normalized_request.setdefault("page_size", DEFAULT_CONCORDANCE_PAGE_SIZE)
+        if request.sort_by:
+            normalized_request["sort_by"] = request.sort_by
+        if request.sort_order:
+            normalized_request["sort_order"] = request.sort_order
+        if request.combined:
+            normalized_request["combined"] = True
+
+        response = _build_concordance_response(
+            user_id,
+            workspace_id,
+            normalized_request,
+        )
+        response["metadata"] = {"task_id": task_id}
+        return response
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to submit task: {e}")
-
-
-def _filter_concordance_rows(df: pl.DataFrame) -> pl.DataFrame:
-    if not isinstance(df, pl.DataFrame) or df.height == 0:
-        return df
-
-    candidate_columns = [
-        col
-        for col in ("matched_text", "left_context", "right_context")
-        if col in df.columns
-    ]
-    if not candidate_columns:
-        return df
-
-    try:
-        non_empty_checks = [
-            (
-                pl
-                .col(col)
-                .cast(pl.Utf8, strict=False)
-                .str.strip_chars()
-                .str.len_chars()
-                .fill_null(0)
-                > 0
-            )
-            for col in candidate_columns
-        ]
-        mask = pl.any_horizontal(non_empty_checks)
-        return df.filter(mask)
-    except Exception:
-        fallback_mask = pl.any_horizontal([
-            pl.col(col).is_not_null() for col in candidate_columns
-        ])
-        return df.filter(fallback_mask)
-
-
-def _paginate_dataframe(
-    df: pl.DataFrame,
-    page: int,
-    page_size: int,
-    sort_by: Optional[str],
-    sort_order: Optional[str],
-) -> Dict[str, Any]:
-    df = _filter_concordance_rows(df)
-    total_matches = df.height
-
-    if sort_by and sort_by in df.columns:
-        df = df.sort(sort_by, descending=(sort_order == "desc"))
-
-    start_idx = (page - 1) * page_size
-    paginated_df = df.slice(start_idx, page_size)
-
-    columns = df.columns
-    metadata = {
-        "concordance_columns": [c for c in columns if c in CORE_CONCORDANCE_COLUMNS],
-        "metadata_columns": [c for c in columns if c not in CORE_CONCORDANCE_COLUMNS],
-        "all_columns": columns,
-    }
-
-    return {
-        "data": paginated_df.to_dicts(),
-        "columns": columns,
-        "metadata": metadata,
-        "total_matches": total_matches,
-        "pagination": {
-            "page": page,
-            "page_size": page_size,
-            "total_pages": (total_matches + page_size - 1) // page_size,
-            "has_next": (start_idx + page_size) < total_matches,
-            "has_prev": page > 1,
-        },
-        "sorting": {
-            "sort_by": sort_by,
-            "sort_order": sort_order,
-        },
-    }
-
-
-def _reorder_dataframe_columns(
-    df: pl.DataFrame, preferred_order: List[str]
-) -> pl.DataFrame:
-    if not preferred_order:
-        return df
-    ordered = [col for col in preferred_order if col in df.columns]
-    remaining = [col for col in df.columns if col not in ordered]
-    if not ordered:
-        return df
-    return df.select([pl.col(col) for col in ordered + remaining])
-
-
-def _coerce_result_to_dataframe(entry: Any) -> pl.DataFrame:
-    if isinstance(entry, pl.DataFrame):
-        return entry
-    if isinstance(entry, pl.LazyFrame):
-        return entry.collect()
-    if isinstance(entry, list):
-        return pl.DataFrame(entry)
-    if isinstance(entry, dict):
-        if "rows" in entry:
-            df = pl.DataFrame(entry.get("rows") or [])
-            columns = entry.get("columns") or []
-            return _reorder_dataframe_columns(df, columns)
-        if "data" in entry:
-            df = pl.DataFrame(entry.get("data") or [])
-            columns = entry.get("columns") or []
-            return _reorder_dataframe_columns(df, columns)
-        try:
-            return pl.DataFrame(entry)
-        except Exception:
-            pass
-    raise ValueError("Unsupported concordance result payload")
-
-
-def _process_dataframe_result(
-    result: Dict[str, Any],
-    request: Dict[str, Any],
-) -> Dict[str, Any]:
-    node_results = result.get("node_results", {})
-    page = request.get("page", DEFAULT_CONCORDANCE_PAGE)
-    page_size = request.get("page_size", DEFAULT_CONCORDANCE_PAGE_SIZE)
-    sort_by = request.get("sort_by")
-    sort_order = request.get("sort_order", DEFAULT_CONCORDANCE_SORT_ORDER)
-
-    data = {}
-    for node_id, df in node_results.items():
-        df_obj = _coerce_result_to_dataframe(df)
-        data[node_id] = _paginate_dataframe(
-            df_obj, page, page_size, sort_by, sort_order
-        )
-
-    return {
-        "state": "successful",
-        "message": "Concordance analysis complete",
-        "data": data,
-        "analysis_params": request,
-        "combinable": False,
-    }
+        raise HTTPException(status_code=500, detail=f"Failed to run concordance: {e}")
 
 
 @router.get("/{workspace_id}/concordance/tasks/{task_id}/result")
@@ -459,19 +710,12 @@ async def concordance_task_result(
     user_id = current_user["id"]
     task_manager = get_task_manager(user_id, workspace_id)
 
-    # Sync with worker if running using shared utility
-    task = await ensure_task_synced(user_id, workspace_id, task_id, task_manager)
+    task = task_manager.get_task(task_id)
     if not task:
         return None
-
-    if not task.result:
+    if not task.request:
         return None
 
-    # Process result for response
-    # The result data is in task.result.data (if GenericAnalysisResult)
-    result_data = task.result.to_json()
-
-    # Need request for pagination params
     req_dict = (
         task.request.model_dump()
         if hasattr(task.request, "model_dump")
@@ -479,14 +723,7 @@ async def concordance_task_result(
     )
     normalized_request = _normalize_saved_request(req_dict) or {}
     _apply_result_query_overrides(normalized_request, query)
-
-    # result_data should be the dict with "node_results"
-    if not isinstance(result_data, dict) or "node_results" not in result_data:
-        # Maybe it's the old format or something else?
-        # If it's GenericAnalysisResult, it returns self.data.
-        pass
-
-    return _process_dataframe_result(result_data, normalized_request)
+    return _build_concordance_response(user_id, workspace_id, normalized_request)
 
 
 @router.post("/{workspace_id}/concordance/tasks/{task_id}/result")
@@ -505,35 +742,12 @@ async def concordance_task_result_post(
             "message": "No analysis found for concordance",
             "data": None,
         }
-
-    # If task is running, check if it finished in TM (same logic as GET)
-    if task.status == "running":
-        tm = workspace_manager.get_task_manager(user_id, workspace_id)
-        tm_task = await tm.get_task(task.task_id)
-        if tm_task:
-            if tm_task.status == "successful":
-                result_data = tm_task.result
-                from ....analysis.results import GenericAnalysisResult
-
-                task.complete(GenericAnalysisResult(result_data))
-                task_manager.save_task(task)
-            elif tm_task.status == "failed":
-                task.fail(tm_task.error or "Task failed")
-                task_manager.save_task(task)
-                return {
-                    "state": "failed",
-                    "message": f"Analysis failed: {task.error}",
-                    "data": None,
-                }
-
-    if not task.result:
+    if not task.request:
         return {
             "state": "failed",
-            "message": "No concordance results available",
+            "message": "No concordance request available",
             "data": None,
         }
-
-    result_data = task.result.to_json()
 
     req_dict = (
         task.request.model_dump()
@@ -542,12 +756,7 @@ async def concordance_task_result_post(
     )
     normalized_request = _normalize_saved_request(req_dict) or {}
     _apply_result_query_overrides(normalized_request, query)
-
-    if not isinstance(result_data, dict) or "node_results" not in result_data:
-        # Handle unexpected result format
-        pass
-
-    return _process_dataframe_result(result_data, normalized_request)
+    return _build_concordance_response(user_id, workspace_id, normalized_request)
 
 
 # ---------------------------------------------------------------------------

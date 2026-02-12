@@ -3,7 +3,6 @@ Tests for unified file preview endpoint
 """
 
 from pathlib import Path
-from typing import Any
 from unittest.mock import patch
 
 import polars as pl
@@ -81,101 +80,21 @@ def test_csv_preview_supported_types_and_preview(client, tmp_path):
     assert resp.status_code == 200
     data = resp.json()
     assert data["file_type"] == "csv"
-    assert "DocLazyFrame" in data["supported_types"]
     assert "LazyFrame" in data["supported_types"]
     assert data["columns"] == ["a", "b"]
     assert len(data["preview"]) == 2
 
 
-def test_excel_preview_sheet_names_and_selection(client, tmp_path):
-    """Test Excel file preview with sheet selection"""
-    pytest.importorskip("fastexcel")
-    pytest.importorskip("xlsxwriter")
+def test_zip_preview_returns_file_listing(client, tmp_path):
+    """ZIP archives should return a file listing when multiple entries exist."""
 
     user_root = tmp_path / "users" / "user_test_user" / "user_data"
-    xlsx_path = user_root / "book.xlsx"
+    zip_path = user_root / "archive.zip"
+    from zipfile import ZipFile
 
-    # Create Excel file with multiple sheets using Polars
-    # Write first sheet and get the workbook object
-    df_a = pl.DataFrame({"t": ["a", "b"]})
-    workbook = df_a.write_excel(xlsx_path, worksheet="SheetA")
-
-    # Add second sheet to the same workbook
-    df_b = pl.DataFrame({"t": ["c", "d"]})
-    df_b.write_excel(workbook=workbook, worksheet="SheetB")
-
-    # Close the workbook to ensure data is written
-    workbook.close()
-
-    # Test 1: No payload -> should pick first sheet and return sheet_names
-    resp1 = client.post("/api/files/preview", json={"filename": "book.xlsx"})
-    assert resp1.status_code == 200
-    j1 = resp1.json()
-    assert j1["file_type"] == "excel"
-    assert "DocLazyFrame" in j1["supported_types"]
-    assert isinstance(j1.get("sheet_names"), list)
-    assert j1.get("selected_sheet")
-    assert len(j1["preview"]) >= 1
-
-    # Test 2: Select SheetB explicitly
-    resp2 = client.post(
-        "/api/files/preview",
-        json={"filename": "book.xlsx", "payload": {"sheet_name": "SheetB"}},
-    )
-    assert resp2.status_code == 200
-    j2 = resp2.json()
-    assert j2["selected_sheet"] == "SheetB"
-    assert len(j2["preview"]) >= 1
-
-
-def test_excel_preview_uses_docframe_helpers(client, tmp_path, monkeypatch):
-    """The backend should rely on docframe for sheet names and reading."""
-
-    user_root = tmp_path / "users" / "user_test_user" / "user_data"
-    xlsx_path = user_root / "fallback.xlsx"
-    xlsx_path.write_text("placeholder", encoding="utf-8")
-
-    from ldaca_web_app_backend.api import files as files_api
-
-    sheet_calls: list[str] = []
-    read_kwargs: list[dict[str, Any]] = []
-
-    def fake_sheet_names(path: Path) -> list[str]:
-        sheet_calls.append(str(path))
-        return ["Sheet1", "Sheet2"]
-
-    def fake_read_excel(path: Path, *_, **kwargs):
-        read_kwargs.append(kwargs.copy())
-        assert kwargs.get("sheet_name") == "Sheet1"
-        assert kwargs.get("document_column") is False
-        return pl.DataFrame({"value": [1, 2, 3]})
-
-    monkeypatch.setattr(files_api.docframe, "excel_sheet_names", fake_sheet_names)
-    monkeypatch.setattr(files_api.docframe, "read_excel", fake_read_excel)
-
-    resp = client.post("/api/files/preview", json={"filename": "fallback.xlsx"})
-
-    assert resp.status_code == 200
-    payload = resp.json()
-    assert payload["selected_sheet"] == "Sheet1"
-    assert payload["sheet_names"] == ["Sheet1", "Sheet2"]
-    assert payload["preview"]
-    assert sheet_calls == [str(xlsx_path)]
-    assert read_kwargs == [{"sheet_name": "Sheet1", "document_column": False}]
-
-
-def test_zip_preview_uses_docframe(client, tmp_path):
-    """Ensure ZIP archives are parsed with docframe.read_zip."""
-
-    user_root = tmp_path / "users" / "user_test_user" / "user_data"
-    repo_root = next(
-        parent
-        for parent in Path(__file__).resolve().parents
-        if (parent / "docframe" / "examples" / "data" / "zip_example").exists()
-    )
-    source = repo_root / "docframe" / "examples" / "data" / "zip_example" / "data.zip"
-    target = user_root / "archive.zip"
-    target.write_bytes(source.read_bytes())
+    with ZipFile(zip_path, "w") as zf:
+        zf.writestr("a.txt", "hello")
+        zf.writestr("b.txt", "world")
 
     resp = client.post(
         "/api/files/preview",
@@ -185,10 +104,9 @@ def test_zip_preview_uses_docframe(client, tmp_path):
     assert resp.status_code == 200
     payload = resp.json()
     assert payload["file_type"] == "zip"
-    assert payload["columns"][:3] == ["file_path", "base_name", "extension"]
-    assert payload["columns"][3] in {"text", "document"}
-    assert "DocLazyFrame" in payload["supported_types"]
-    assert any(row["base_name"] == "1" for row in payload["preview"])
+    assert payload["columns"] == ["filename", "size"]
+    assert "LazyFrame" in payload["supported_types"]
+    assert any(row["filename"] == "a.txt" for row in payload["preview"])
 
 
 def test_text_preview_returns_single_cell(client, tmp_path):
@@ -206,7 +124,6 @@ def test_text_preview_returns_single_cell(client, tmp_path):
     assert resp.status_code == 200
     payload = resp.json()
     assert payload["file_type"] == "text"
-    assert payload["columns"] in (["text"], ["document"])
-    text_key = payload["columns"][0]
-    assert payload["preview"] == [{text_key: "Plain text document."}]
+    assert payload["columns"] == ["text"]
+    assert payload["preview"] == [{"text": "Plain text document."}]
     assert payload["total_rows"] == 1

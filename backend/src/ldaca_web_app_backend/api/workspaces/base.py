@@ -12,8 +12,6 @@ from typing import Any, Optional, cast
 import polars as pl
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 
-from docframe import DocLazyFrame
-
 from ...core.auth import get_current_user
 from ...core.docworkspace_api import DocWorkspaceAPIUtils
 
@@ -137,7 +135,7 @@ def _configure_numba_threading():
                 if tbb_spec:
                     tbb_available = True
 
-        except (ImportError, AttributeError):
+        except ImportError, AttributeError:
             # Numba not available, fall back to safe mode
             pass
 
@@ -211,7 +209,7 @@ async def add_node_to_workspace(
     """Add a data file as a new node to workspace.
 
     Files are eagerly loaded into a Polars DataFrame, persisted as parquet under the workspace's `data/` folder,
-    and then reloaded as a LazyFrame (or DocLazyFrame). This separates bulk data from `metadata.json` while keeping
+    and then reloaded as a LazyFrame. This separates bulk data from `metadata.json` while keeping
     lazy processing semantics.
     """
     user_id = current_user["id"]
@@ -239,8 +237,6 @@ async def add_node_to_workspace(
 
         # Normalize to an eager Polars DataFrame
         try:
-            if hasattr(data, "lazyframe"):
-                data = data.lazyframe  # type: ignore[attr-defined]
             if isinstance(data, pl.LazyFrame):
                 data = data.collect()
             elif hasattr(data, "dataframe"):
@@ -276,15 +272,11 @@ async def add_node_to_workspace(
                 node_name = node_name[: -len(ext)]
                 break
 
-        document_column = getattr(data, "document_column", None) or getattr(
-            data, "active_document_name", None
-        )
-
         lazy_data = stage_dataframe_as_lazy(
             data,
             workspace_dir,
             node_name=node_name,
-            document_column=document_column,
+            document_column=None,
         )
 
         # Create node name from filename
@@ -336,7 +328,7 @@ async def add_node_to_workspace(
 
 
 # ============================================================================
-# TEXT ANALYSIS - Using DocFrame integration if available
+# TEXT ANALYSIS - Using polars-text integration
 # ============================================================================
 
 
@@ -399,18 +391,19 @@ async def cast_node(
         # Get node using shared helper (guarantees data presence)
         node, current_df = get_node_with_data_or_400(user_id, workspace_id, node_id)
 
-        is_doc_lazy = isinstance(current_df, DocLazyFrame)
         document_column: Optional[str] = None
-        if is_doc_lazy:
-            document_column = current_df.document_column
-            lazyframe = current_df.lazyframe
-        elif isinstance(current_df, pl.LazyFrame):
+        if hasattr(node, "metadata"):
+            metadata = getattr(node, "metadata", None)
+            if isinstance(metadata, dict):
+                document_column = metadata.get("text_column")
+
+        if isinstance(current_df, pl.LazyFrame):
             lazyframe = current_df
         else:
             raise HTTPException(
                 status_code=400,
                 detail=(
-                    "Node data must be lazy (DocLazyFrame or LazyFrame). "
+                    "Node data must be lazy (LazyFrame). "
                     "Workspaces no longer support eager node payloads."
                 ),
             )
@@ -557,17 +550,7 @@ async def cast_node(
 
             # Apply the casting with .with_columns(); preserve original frame type after validation
             casted_lazy = lazyframe.with_columns(cast_expr)
-            if is_doc_lazy:
-                if not document_column:
-                    raise HTTPException(
-                        status_code=500,
-                        detail="DocLazyFrame node is missing document column metadata.",
-                    )
-                node.data = DocLazyFrame(  # type: ignore[misc]
-                    casted_lazy, document_column=document_column
-                )
-            else:
-                node.data = casted_lazy
+            node.data = casted_lazy
 
             # Save workspace to disk
             # Ensure current workspace is persisted after casting
@@ -658,7 +641,7 @@ async def export_nodes(
                 status_code=500, detail=f"Failed to materialize node data: {e}"
             )
 
-        # If it's a docframe wrapper unwrap _df attribute
+        # Unwrap custom wrappers if needed
         if hasattr(collected, "_df") and not isinstance(collected, pl.DataFrame):
             try:
                 collected = collected._df  # type: ignore[attr-defined]
@@ -731,6 +714,9 @@ async def export_nodes(
 # ============================================================================
 
 
+# ============================================================================
+# ============================================================================
+# ============================================================================
 # ============================================================================
 # ============================================================================
 # ============================================================================

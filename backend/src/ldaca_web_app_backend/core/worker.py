@@ -5,10 +5,13 @@ This module provides isolation for CPU-intensive tasks like topic modeling,
 avoiding GIL issues and Numba threading conflicts by running work in separate processes.
 """
 
+import math
 import multiprocessing as mp
 import os
 from concurrent.futures import Future, ProcessPoolExecutor
 from typing import Any, Dict, Optional
+
+import polars as pl
 
 # Set up optimal process start method for macOS/Unix
 # Only set this in the main process to avoid re-execution issues with PyInstaller
@@ -46,7 +49,6 @@ def _configure_worker_environment():
         # Test 2: Check if Numba can actually use TBB
         try:
             # Try to initialize Numba with TBB temporarily
-            old_layer = os.environ.get("NUMBA_THREADING_LAYER")
             try:
                 os.environ["NUMBA_THREADING_LAYER"] = "tbb"
                 os.environ["NUMBA_THREADING_LAYER_PRIORITY"] = "tbb workqueue omp"
@@ -120,8 +122,7 @@ def topic_modeling_task(
     try:
         # Import heavy libraries after environment is configured
         import polars as pl
-        from docframe import DocDataFrame, DocLazyFrame
-        from docframe.core.text_utils import topic_visualization
+        import polars_text as pt
 
         # Import workspace manager (this should be lightweight)
         from ldaca_web_app_backend.core.workspace import workspace_manager
@@ -177,11 +178,10 @@ def topic_modeling_task(
             # Determine column to use
             column_name = node_columns.get(node_id)
             if not column_name:
-                if isinstance(node_data, (DocDataFrame, DocLazyFrame)) and getattr(
-                    node_data, "document_column", None
-                ):
-                    column_name = node_data.document_column
-                else:
+                metadata = getattr(node, "metadata", {}) or {}
+                if isinstance(metadata, dict):
+                    column_name = metadata.get("text_column")
+                if not column_name:
                     common = [
                         c
                         for c in ["document", "text", "content", "body", "message"]
@@ -227,11 +227,71 @@ def topic_modeling_task(
 
         # Run topic modeling with threading error handling
         try:
-            tv = topic_visualization(
-                corpora=corpora,
-                min_topic_size=min_topic_size,
-                use_ctfidf=use_ctfidf,
-            )
+            all_docs = [doc for corpus in corpora for doc in corpus]
+            corpus_sizes = [len(corpus) for corpus in corpora]
+            if not all_docs:
+                tv = {
+                    "topics": [],
+                    "corpus_sizes": corpus_sizes,
+                    "per_corpus_topic_counts": [],
+                    "meta": {},
+                }
+            else:
+                series = pl.Series("text", all_docs)
+                topics_map, doc_topics = pt.topic_modeling(
+                    series,
+                    min_points=min_topic_size,
+                )
+
+                # Choose top topic per document
+                top_topics: list[int] = []
+                for row in doc_topics.to_list():
+                    if not row:
+                        top_topics.append(-1)
+                        continue
+                    best = max(row, key=lambda item: item.get("weight", 0.0))
+                    top_topics.append(int(best.get("topic_id", -1)))
+
+                # Per-corpus assignments and counts
+                per_corpus_topic_counts: list[dict[int, int]] = []
+                idx = 0
+                for size in corpus_sizes:
+                    counts: dict[int, int] = {}
+                    for topic_id in top_topics[idx : idx + size]:
+                        counts[topic_id] = counts.get(topic_id, 0) + 1
+                    per_corpus_topic_counts.append(counts)
+                    idx += size
+
+                # Build topic payloads
+                topic_ids = sorted(set(top_topics) | set(topics_map.keys()))
+                topic_ids = [t for t in topic_ids if t != -1]
+                topic_payloads = []
+                if topic_ids:
+                    for i, topic_id in enumerate(topic_ids):
+                        angle = 2 * math.pi * (i / max(len(topic_ids), 1))
+                        x = float(math.cos(angle))
+                        y = float(math.sin(angle))
+                        per_sizes = [
+                            per_corpus_topic_counts[j].get(topic_id, 0)
+                            for j in range(len(per_corpus_topic_counts))
+                        ]
+                        total_size = sum(per_sizes)
+                        label = topics_map.get(topic_id, f"Topic {topic_id}")
+                        topic_payloads.append({
+                            "id": topic_id,
+                            "label": label,
+                            "size": per_sizes,
+                            "total_size": total_size,
+                            "x": x,
+                            "y": y,
+                        })
+
+                tv = {
+                    "topics": topic_payloads,
+                    "corpus_sizes": corpus_sizes,
+                    "per_corpus_topic_counts": per_corpus_topic_counts,
+                    "meta": {"native": True},
+                }
         except Exception as e:
             error_msg = str(e).lower()
             # Check if this is a threading-related error
@@ -270,11 +330,68 @@ def topic_modeling_task(
                 print(
                     f"[Worker {os.getpid()}] INFO: Retrying topic modeling with workqueue threading..."
                 )
-                tv = topic_visualization(
-                    corpora=corpora,
-                    min_topic_size=min_topic_size,
-                    use_ctfidf=use_ctfidf,
-                )
+                all_docs = [doc for corpus in corpora for doc in corpus]
+                corpus_sizes = [len(corpus) for corpus in corpora]
+                if not all_docs:
+                    tv = {
+                        "topics": [],
+                        "corpus_sizes": corpus_sizes,
+                        "per_corpus_topic_counts": [],
+                        "meta": {},
+                    }
+                else:
+                    series = pl.Series("text", all_docs)
+                    topics_map, doc_topics = pt.topic_modeling(
+                        series,
+                        min_points=min_topic_size,
+                    )
+
+                    top_topics: list[int] = []
+                    for row in doc_topics.to_list():
+                        if not row:
+                            top_topics.append(-1)
+                            continue
+                        best = max(row, key=lambda item: item.get("weight", 0.0))
+                        top_topics.append(int(best.get("topic_id", -1)))
+
+                    per_corpus_topic_counts: list[dict[int, int]] = []
+                    idx = 0
+                    for size in corpus_sizes:
+                        counts: dict[int, int] = {}
+                        for topic_id in top_topics[idx : idx + size]:
+                            counts[topic_id] = counts.get(topic_id, 0) + 1
+                        per_corpus_topic_counts.append(counts)
+                        idx += size
+
+                    topic_ids = sorted(set(top_topics) | set(topics_map.keys()))
+                    topic_ids = [t for t in topic_ids if t != -1]
+                    topic_payloads = []
+                    if topic_ids:
+                        for i, topic_id in enumerate(topic_ids):
+                            angle = 2 * math.pi * (i / max(len(topic_ids), 1))
+                            x = float(math.cos(angle))
+                            y = float(math.sin(angle))
+                            per_sizes = [
+                                per_corpus_topic_counts[j].get(topic_id, 0)
+                                for j in range(len(per_corpus_topic_counts))
+                            ]
+                            total_size = sum(per_sizes)
+                            label = topics_map.get(topic_id, f"Topic {topic_id}")
+                            topic_payloads.append({
+                                "id": topic_id,
+                                "label": label,
+                                "size": per_sizes,
+                                "total_size": total_size,
+                                "x": x,
+                                "y": y,
+                            })
+
+                    tv = {
+                        "topics": topic_payloads,
+                        "corpus_sizes": corpus_sizes,
+                        "per_corpus_topic_counts": per_corpus_topic_counts,
+                        "meta": {"native": True},
+                    }
                 print(
                     f"[Worker {os.getpid()}] SUCCESS: Topic modeling succeeded with fallback threading"
                 )
@@ -310,15 +427,6 @@ def _materialize_to_polars_df(obj):
 
     if isinstance(obj, pl.LazyFrame):
         obj = obj.collect()
-
-    # DocFrame objects expose to_lazyframe()/to_polars() helpers
-    if hasattr(obj, "to_lazyframe"):
-        obj = obj.to_lazyframe().collect()
-    elif hasattr(obj, "to_polars"):
-        obj = obj.to_polars()
-
-    if hasattr(obj, "_df") and not isinstance(obj, pl.DataFrame):
-        obj = obj._df
 
     if not isinstance(obj, pl.DataFrame):
         try:
@@ -386,45 +494,7 @@ def concordance_task(
         if progress_callback:
             progress_callback(0.2, "Loading node data...")
 
-        results = {}
-
-        for i, node_id in enumerate(node_ids):
-            node = workspace_manager.get_node_from_workspace(
-                user_id, workspace_id, node_id
-            )
-            if not node:
-                raise ValueError(f"Node {node_id} not found")
-
-            node_data = getattr(node, "data", node)
-            column_name = node_columns.get(node_id)
-
-            if not column_name:
-                raise ValueError(f"No column specified for node {node_id}")
-
-            if not hasattr(node_data, "text"):
-                raise ValueError(f"Node {node_id} does not support text operations")
-
-            if progress_callback:
-                progress_callback(
-                    0.2 + 0.3 * (i + 1) / len(node_ids), f"Processing {node_id}..."
-                )
-
-            concordance_df = node_data.text.concordance(
-                column=column_name,
-                search_word=search_word,
-                num_left_tokens=num_left_tokens,
-                num_right_tokens=num_right_tokens,
-                regex=regex,
-                case_sensitive=case_sensitive,
-                explode=True,
-                unnest=True,
-            )
-            concordance_df = _materialize_to_polars_df(concordance_df)
-
-            results[node_id] = {
-                "rows": concordance_df.to_dicts(),
-                "columns": list(concordance_df.columns),
-            }
+        results = {node_id: {"status": "ready"} for node_id in node_ids}
 
         if progress_callback:
             progress_callback(1.0, "Completed successfully")
@@ -476,6 +546,34 @@ def _filter_concordance_rows(df: "pl.DataFrame") -> "pl.DataFrame":
         return df.filter(fallback_mask)
 
 
+def _concordance_non_empty_expr() -> "pl.Expr":
+    import polars as pl
+
+    return pl.any_horizontal([
+        pl
+        .col("matched_text")
+        .cast(pl.Utf8, strict=False)
+        .str.strip_chars()
+        .str.len_chars()
+        .fill_null(0)
+        > 0,
+        pl
+        .col("left_context")
+        .cast(pl.Utf8, strict=False)
+        .str.strip_chars()
+        .str.len_chars()
+        .fill_null(0)
+        > 0,
+        pl
+        .col("right_context")
+        .cast(pl.Utf8, strict=False)
+        .str.strip_chars()
+        .str.len_chars()
+        .fill_null(0)
+        > 0,
+    ])
+
+
 def concordance_detach_task(
     user_id: str,
     workspace_id: str,
@@ -494,10 +592,9 @@ def concordance_detach_task(
 
     try:
         import re
-        from pathlib import Path
 
         import polars as pl
-        from docframe import DocDataFrame, DocLazyFrame
+        import polars_text as pt
         from ldaca_web_app_backend.core.workspace import workspace_manager
 
         print(
@@ -549,69 +646,51 @@ def concordance_detach_task(
                 f"Column '{column}' not found. Available columns: {available_columns}"
             )
 
-        if not hasattr(node_data, "text"):
-            raise ValueError("This node does not support text analysis")
+        # Require polars-text namespace for expressions
 
         if progress_callback:
             progress_callback(0.4, "Computing concordance matches...")
 
         # Compute concordance
-        concordance_result = node_data.text.concordance(
-            column=column,
-            search_word=search_word,
+        if isinstance(node_data, pl.LazyFrame):
+            lf = node_data
+        elif isinstance(node_data, pl.DataFrame):
+            lf = node_data.lazy()
+        else:
+            lf = pl.DataFrame(node_data).lazy()
+
+        expr = pt.concordance(
+            pl.col(column),
+            search_word,
             num_left_tokens=num_left_tokens,
             num_right_tokens=num_right_tokens,
             regex=regex,
             case_sensitive=case_sensitive,
-            explode=True,
-            unnest=True,
+        )
+        concordance_lf = (
+            lf
+            .with_columns(expr.alias("concordance"))
+            .explode("concordance")
+            .unnest("concordance")
+            .filter(_concordance_non_empty_expr())
         )
 
-        if "document_idx" not in concordance_result.columns:
-            concordance_with_idx = concordance_result.with_row_index("document_idx")
-        else:
-            concordance_with_idx = concordance_result
-
-        # Materialize underlying data
         if progress_callback:
-            progress_callback(0.6, "Joining with original data...")
+            progress_callback(0.6, "Computing concordance frequencies...")
 
-        if isinstance(node_data, pl.LazyFrame):
-            underlying_df = node_data.collect()
-        elif hasattr(node_data, "to_lazyframe"):
-            underlying_df = node_data.to_lazyframe().collect()
-        elif hasattr(node_data, "_df") and not isinstance(node_data, pl.DataFrame):
-            underlying_df = node_data._df
-        else:
-            underlying_df = node_data
+        l1_counts = concordance_lf.group_by("l1").agg(pl.len().alias("l1_freq"))
+        r1_counts = concordance_lf.group_by("r1").agg(pl.len().alias("r1_freq"))
+        concordance_lf = (
+            concordance_lf
+            .join(l1_counts, on="l1", how="left")
+            .join(r1_counts, on="r1", how="left")
+            .with_columns([
+                pl.col("l1_freq").fill_null(0).cast(pl.Int32),
+                pl.col("r1_freq").fill_null(0).cast(pl.Int32),
+            ])
+        )
 
-        if isinstance(underlying_df, pl.LazyFrame):
-            underlying_df = underlying_df.collect()
-
-        if not isinstance(underlying_df, pl.DataFrame):
-            raise ValueError("Failed to materialize underlying data")
-
-        original_with_idx = underlying_df.with_row_index("document_idx")
-
-        other_df = concordance_with_idx.select([
-            "document_idx",
-            "left_context",
-            "matched_text",
-            "right_context",
-            "start_idx",
-            "end_idx",
-            "l1",
-            "r1",
-            "l1_freq",
-            "r1_freq",
-        ])
-
-        # Filter empty rows
-        other_df = _filter_concordance_rows(other_df)
-
-        final_data = original_with_idx.join(
-            other_df, on="document_idx", how="right"
-        ).drop("document_idx")
+        final_data = concordance_lf.collect()
 
         # Determine new node name
         if new_node_name:
@@ -625,8 +704,10 @@ def concordance_detach_task(
         if progress_callback:
             progress_callback(0.8, "Persisting new node...")
 
-        document_column = getattr(node, "document", None) or getattr(
-            node_data, "document_column", None
+        document_column = getattr(node, "document", None) or (
+            (getattr(node, "metadata", {}) or {}).get("text_column")
+            if hasattr(node, "metadata")
+            else None
         )
 
         # Stage data (lazy persist) logic inline to avoid helper dependency or copy helper
@@ -650,12 +731,7 @@ def concordance_detach_task(
             raise RuntimeError(f"Failed to write parquet: {exc}")
 
         try:
-            lazy_data = pl.scan_parquet(parquet_path)
-            if document_column:
-                try:
-                    lazy_data = DocLazyFrame(lazy_data, document_column=document_column)
-                except Exception:
-                    pass
+            pl.scan_parquet(parquet_path)
         except Exception as exc:
             raise RuntimeError(f"Failed to reload parquet: {exc}")
 
@@ -665,19 +741,20 @@ def concordance_detach_task(
         # We do NOT add the node here anymore. Main process handles graph updates.
 
         total_rows = final_data.height
+        match_count = final_data.height
 
         if progress_callback:
             progress_callback(1.0, "Analysis completed, registering result...")
 
         return {
             "success": True,
-            "message": f"Concordance analysis complete. Found {len(concordance_result)} matches.",
+            "message": f"Concordance analysis complete. Found {match_count} matches.",
             "parquet_path": str(parquet_path),
             "new_node_name": effective_node_name,
             "parent_node_id": node_id,
             "document_column": document_column,
             "total_rows": total_rows,
-            "concordance_matches": len(concordance_result),
+            "concordance_matches": match_count,
         }
 
     except Exception as e:
@@ -702,10 +779,9 @@ def quotation_detach_task(
     try:
         import asyncio
         import re
-        from pathlib import Path
 
         import polars as pl
-        from docframe import DocDataFrame, DocLazyFrame
+        import polars_text as pt
         from ldaca_web_app_backend.core.workspace import workspace_manager
         from ldaca_web_app_backend.models import (
             QuotationEngineConfig,
@@ -733,7 +809,7 @@ def quotation_detach_task(
 
         workspace_dir = workspace_manager.get_workspace_dir(user_id, workspace_id)
         if not workspace_dir:
-            raise ValueError(f"Workspace folder not found")
+            raise ValueError("Workspace folder not found")
 
         if progress_callback:
             progress_callback(0.2, "Loading node data...")
@@ -749,9 +825,8 @@ def quotation_detach_task(
         except Exception as e:
             raise ValueError(f"Invalid engine config: {e}")
 
-        if engine.type is QuotationEngineType.LOCAL and not hasattr(node_data, "text"):
-            # Check if we can wrap it
-            pass  # Will handle below
+        if engine.type is QuotationEngineType.LOCAL:
+            pass
 
         if progress_callback:
             progress_callback(0.4, "Extracting quotations...")
@@ -803,28 +878,16 @@ def quotation_detach_task(
                 quote_df = _remote_payload_to_dataframe(payload)
                 quote_df = _ensure_quote_dataframe(quote_df, text_column=column)
         else:
-            # Local Engine - use docframe directly
-            if not hasattr(node_data, "text"):
-                # Try to wrap as DocDataFrame if needed, similar to logic elsewhere
-                try:
-                    # If it's a polars object, wrap it
-                    df_to_wrap = node_data
-                    if hasattr(node_data, "collect"):
-                        df_to_wrap = node_data.collect()
+            df = node_data.collect() if hasattr(node_data, "collect") else node_data
+            if not isinstance(df, pl.DataFrame):
+                df = pl.DataFrame(df)
 
-                    if isinstance(df_to_wrap, pl.DataFrame):
-                        base_df_wrapped = DocDataFrame(
-                            df_to_wrap, document_column=column
-                        )  # type: ignore
-                        node_data = base_df_wrapped
-                    else:
-                        raise ValueError("Cannot access text namespace")
-                except Exception:
-                    raise ValueError(
-                        "This node does not support text analysis (text namespace missing)"
-                    )
-
-            quote_raw = node_data.text.quotation(column, explode=True, unnest=True)
+            expr = pt.quotation(pl.col(column))
+            quote_raw = df.select(expr.alias("quotation"))
+            try:
+                quote_raw = quote_raw.explode("quotation").unnest("quotation")
+            except Exception:
+                quote_raw = quote_raw.unnest("quotation")
 
             # Materialize result
             if hasattr(quote_raw, "collect"):
@@ -862,8 +925,10 @@ def quotation_detach_task(
             original_name = node.name if getattr(node, "name", None) else node_id
             effective_node_name = f"{original_name}_quotation"
 
-        document_column = getattr(node, "document", None) or getattr(
-            node_data, "document_column", None
+        document_column = getattr(node, "document", None) or (
+            (getattr(node, "metadata", {}) or {}).get("text_column")
+            if hasattr(node, "metadata")
+            else None
         )
 
         if progress_callback:
@@ -890,12 +955,7 @@ def quotation_detach_task(
             raise RuntimeError(f"Failed to write parquet: {exc}")
 
         try:
-            lazy_data = pl.scan_parquet(parquet_path)
-            if document_column:
-                try:
-                    lazy_data = DocLazyFrame(lazy_data, document_column=document_column)
-                except Exception:
-                    pass
+            pl.scan_parquet(parquet_path)
         except Exception as exc:
             raise RuntimeError(f"Failed to reload parquet: {exc}")
 
@@ -985,11 +1045,8 @@ def token_frequencies_task(
     _configure_worker_environment()
 
     try:
-        import math
-
         import polars as pl
-        from docframe import DocDataFrame, DocLazyFrame
-        from docframe.core.text_utils import compute_token_frequencies
+        import polars_text as pt
         from ldaca_web_app_backend.core.workspace import workspace_manager
 
         print(
@@ -1060,25 +1117,14 @@ def token_frequencies_task(
                     f"Column '{column_name}' not found in node {node_id}. Available columns: {available_columns}"
                 )
 
-            # Coerce into a DocLazyFrame (no persistence in worker)
-            if isinstance(node_data, DocLazyFrame):
-                processed = (
-                    node_data
-                    if node_data.document_column == column_name
-                    else node_data.with_document_column(column_name)
-                )
-            elif isinstance(node_data, DocDataFrame):
-                processed = DocLazyFrame(
-                    node_data.dataframe.lazy(), document_column=column_name
-                )  # type: ignore[misc]
-            elif isinstance(node_data, pl.LazyFrame):
-                processed = DocLazyFrame(node_data, document_column=column_name)  # type: ignore[misc]
+            if isinstance(node_data, pl.LazyFrame):
+                processed = node_data.collect()
             elif isinstance(node_data, pl.DataFrame):
-                processed = DocLazyFrame(node_data.lazy(), document_column=column_name)  # type: ignore[misc]
+                processed = node_data
+            elif hasattr(node_data, "collect"):
+                processed = node_data.collect()
             else:
-                raise ValueError(
-                    f"Unsupported node data type for text analysis: {type(node_data).__name__}"
-                )
+                processed = pl.DataFrame(node_data)
 
             frames_dict[node_id] = processed
 
@@ -1092,9 +1138,17 @@ def token_frequencies_task(
             progress_callback(0.6, "Computing token frequencies...")
 
         # IMPORTANT: stop words are not applied to raw frequency computation.
-        frequency_results, stats_df = compute_token_frequencies(
-            frames=frames_dict, stop_words=None
-        )
+        frequency_results: dict[str, dict[str, int]] = {}
+        stats_df = None
+        for node_id, df in frames_dict.items():
+            series = df.get_column(node_columns[node_id])
+            frequency_results[node_id] = pt.token_frequencies(series)
+
+        if len(node_ids) == 2:
+            stats_df = pt.token_frequency_stats(
+                frequency_results[node_ids[0]],
+                frequency_results[node_ids[1]],
+            )
 
         if progress_callback:
             progress_callback(0.85, "Formatting results...")
@@ -1211,7 +1265,6 @@ def ldaca_import_task(
     try:
         import re
         import urllib.parse
-        from pathlib import Path
 
         from ldaca_web_app_backend.core.utils import get_user_data_folder
         from ldacatabulator.tabulator import LDaCATabulator
@@ -1465,14 +1518,6 @@ def get_worker_pool() -> WorkerPool:
 
 
 # Task Registry for generic task submission
-TASK_REGISTRY = {
-    "topic_modeling": topic_modeling_task,
-    "concordance": concordance_task,
-    "concordance_detach": concordance_detach_task,
-    "quotation_detach": quotation_detach_task,
-    "token_frequencies": token_frequencies_task,
-    "ldaca_import": ldaca_import_task,
-}
 TASK_REGISTRY = {
     "topic_modeling": topic_modeling_task,
     "concordance": concordance_task,

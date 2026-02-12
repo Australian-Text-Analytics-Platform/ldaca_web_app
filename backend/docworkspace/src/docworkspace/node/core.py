@@ -15,51 +15,38 @@ from typing import Any, Dict, List, Literal, Optional
 import polars as pl
 from polars import DataFrame, LazyFrame
 
-from docframe import DocDataFrame  # type: ignore  # runtime import
-from docframe import DocLazyFrame
-
 if False:  # TYPE_CHECKING replacement to avoid runtime import cycle
     from ..workspace.core import Workspace  # pragma: no cover
 
 # Supported data types
-InitDataTypes = DataFrame | LazyFrame | DocDataFrame | DocLazyFrame
-LazyDataTypes = LazyFrame | DocLazyFrame
+InitDataTypes = DataFrame | LazyFrame
+LazyDataTypes = LazyFrame
 
 
 class NodeDataType(str, Enum):
     LazyFrame = "LazyFrame"
-    DocLazyFrame = "DocLazyFrame"
 
 
 SerializableDataType = Literal[
     "LazyFrame",
-    "DocLazyFrame",
     "DataFrame",
-    "DocDataFrame",
 ]
 
 
 def _ensure_lazy_data(data: InitDataTypes) -> LazyDataTypes:
     """Normalize supported data types to lazy representations."""
-
-    if isinstance(data, DocLazyFrame):
-        return data
     if isinstance(data, LazyFrame):
         return data
-    if isinstance(data, DocDataFrame):
-        return data.to_doclazyframe()
     if isinstance(data, DataFrame):
         return data.lazy()
     raise TypeError(
-        f"Unsupported data type: {type(data).__name__}. Node requires LazyFrame or DocLazyFrame inputs."
+        f"Unsupported data type: {type(data).__name__}. Node requires DataFrame or LazyFrame inputs."
     )
 
 
 def _unwrap_lazyframe(data: LazyDataTypes) -> pl.LazyFrame:
-    """Return the underlying polars LazyFrame for either LazyFrame or DocLazyFrame."""
+    """Return the underlying polars LazyFrame."""
 
-    if isinstance(data, DocLazyFrame):
-        return data.to_lazyframe()
     return data
 
 
@@ -78,6 +65,7 @@ class Node:
         self.name = name or f"node_{self.id[:8]}"
 
         self.data = _ensure_lazy_data(data)
+        self._document_column: Optional[str] = None
         self.parents: list[Node] = parents or []
         self.children: list[Node] = []
 
@@ -100,14 +88,17 @@ class Node:
 
         Non-dataframe results (scalars, lists, etc.) are returned directly.
         """
-        if isinstance(result, (pl.LazyFrame, DocLazyFrame)):
-            return Node(
+        if isinstance(result, pl.LazyFrame):
+            child = Node(
                 data=result,
                 name=f"{op_name}_{self.name}",
                 workspace=self.workspace,
                 parents=[self],
                 operation=op_name,
             )
+            if self.document:
+                child.document = self.document
+            return child
         return result
 
     def __getattr__(self, item: str) -> Any:  # pragma: no cover - thin wrapper
@@ -219,16 +210,10 @@ class Node:
     # Properties
     # ------------------------------------------------------------------
     def _extract_document(self) -> Optional[str]:
-        if isinstance(self.data, DocLazyFrame):
-            try:
-                return self.data.document_column
-            except Exception:
-                return None
-        return None
+        return self._document_column
 
     def _clear_document(self) -> None:
-        if isinstance(self.data, DocLazyFrame):
-            self.data = self.data.to_lazyframe()
+        self._document_column = None
 
     @property
     def document(self) -> Optional[str]:
@@ -239,33 +224,12 @@ class Node:
         if value is None:
             self._clear_document()
             return
-
-        if isinstance(self.data, DocLazyFrame):
-            if self.data.document_column == value:
-                return
-            self.data = self.data.set_document(value)
-            return
-
-        if isinstance(self.data, pl.LazyFrame):
-            self.data = DocLazyFrame(self.data, document_column=value)
-            return
-
-        raise TypeError(
-            f"Unsupported data type {type(self.data).__name__} for document assignment"
-        )
+        self._document_column = value
 
     # ------------------------------------------------------------------
     # Schema / materialization utilities
     # ------------------------------------------------------------------
     def materialize(self) -> "Node":
-        if isinstance(self.data, DocLazyFrame):
-            try:
-                collected = self.data.collect()
-                self.data = collected.to_doclazyframe()
-            except Exception:
-                pass
-            return self
-
         if isinstance(self.data, pl.LazyFrame):
             try:
                 collected = self.data.collect()
@@ -320,8 +284,8 @@ class Node:
             raise ValueError(f"Unsupported format: {format}")
 
         # For workspace persistence and API transport we intentionally serialize the
-        # *underlying* Polars LazyFrame payload. DocLazyFrame is reconstructed from
-        # the persisted `document` metadata on load.
+        # *underlying* Polars LazyFrame payload. The persisted `document` metadata
+        # is restored on load.
         normalized: SerializableDataType = "LazyFrame"
 
         # Suppress the deprecation warning for LazyFrame serialization
@@ -361,7 +325,7 @@ class Node:
         data_path = serialized_node.get("data_path")
         data_blob = serialized_node.get("serialized_data")
 
-        # Polars/DocFrame .serialize(format="json") returns a JSON string (or array-string)
+        # Polars .serialize(format="json") returns a JSON string (or array-string)
         # that DataFrame.deserialize expects as a file path *unless* provided a file-like.
         # The previous implementation passed the raw string causing it to be interpreted
         # as a (very long) file path, triggering OSError: File name too long.
@@ -395,14 +359,12 @@ class Node:
         node.id = node_meta["id"]
         node.name = node_meta["name"]
         node.data = data
+        node._document_column = None
         document_column = node_meta.get("document")
         if document_column is None:
             document_column = node_meta.get("document_column")
         if document_column is not None:
-            try:
-                node.document = document_column
-            except Exception:
-                pass
+            node._document_column = document_column
         node.parents = []
         node.children = []
         node.workspace = workspace

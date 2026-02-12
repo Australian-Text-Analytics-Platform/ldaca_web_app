@@ -11,8 +11,6 @@ class DataType(str, Enum):
 
     POLARS_DATAFRAME = "polars.DataFrame"
     POLARS_LAZYFRAME = "polars.LazyFrame"
-    DOC_DATAFRAME = "docframe.DocDataFrame"
-    DOC_LAZYFRAME = "docframe.DocLazyFrame"
 
 
 class ColumnSchema(BaseModel):

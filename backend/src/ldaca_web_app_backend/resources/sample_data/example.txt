@@ -1,0 +1,2 @@
+Sample placeholder content for XXX.txt.
+This file lives under ldaca_web_app_backend/resources/sample_data to support backend examples.

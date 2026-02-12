@@ -52,18 +52,6 @@ export function formatDataType(fullType: string): { display: string; full: strin
     return { display, full: fullType, category };
   }
   
-  else if (fullType.includes('atapcorpus')) {
-    const category = 'atapcorpus';
-    let display = className;
-    
-    // Special handling for atapcorpus types
-    if (className === 'DocDataFrame') {
-      display = 'atapcorpus.DocDataFrame';
-    }
-    
-    return { display, full: fullType, category };
-  }
-  
   else {
     // Generic handling for other types
     const category = parts[0] || 'unknown';
@@ -82,8 +70,6 @@ export function getTypeStyleClass(category: string): string {
       return 'text-blue-600 bg-blue-50';
     case 'polars':
       return 'text-green-600 bg-green-50';
-    case 'atapcorpus':
-      return 'text-purple-600 bg-purple-50';
     case 'builtin':
       return 'text-gray-600 bg-gray-50';
     default:

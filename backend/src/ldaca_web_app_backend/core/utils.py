@@ -2,11 +2,15 @@
 Core utilities for the LDaCA Web App
 """
 
+import io
 import json
 import os
 import re
 import shutil
 import uuid
+import zipfile
+from contextlib import nullcontext
+from importlib import resources
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
@@ -197,23 +201,31 @@ def import_sample_data_for_user(user_id: str) -> Dict[str, Any]:
     Removes any existing sample_data folder then copies from the canonical
     sample data source. Returns summary statistics.
     """
-    source_sample_data = settings.get_sample_data_folder()
+    source_override = settings.get_sample_data_folder()
     user_data_folder = get_user_data_folder(user_id)
     target_sample_data = user_data_folder / "sample_data"
 
-    if not source_sample_data.exists():
-        raise FileNotFoundError(
-            f"Source sample data folder not found: {source_sample_data}"
+    if source_override:
+        source_ctx = nullcontext(source_override)
+    else:
+        source_ctx = resources.as_file(
+            resources.files("ldaca_web_app_backend.resources").joinpath("sample_data")
         )
 
-    removed_existing = False
-    if target_sample_data.exists():
-        shutil.rmtree(target_sample_data)
-        removed_existing = True
+    with source_ctx as source_sample_data:
+        if not source_sample_data.exists():
+            raise FileNotFoundError(
+                f"Source sample data folder not found: {source_sample_data}"
+            )
 
-    temp_target = user_data_folder / f".sample_data_tmp_{uuid.uuid4().hex}"
-    shutil.copytree(source_sample_data, temp_target)
-    os.replace(temp_target, target_sample_data)
+        removed_existing = False
+        if target_sample_data.exists():
+            shutil.rmtree(target_sample_data)
+            removed_existing = True
+
+        temp_target = user_data_folder / f".sample_data_tmp_{uuid.uuid4().hex}"
+        shutil.copytree(source_sample_data, temp_target)
+        os.replace(temp_target, target_sample_data)
 
     file_count = 0
     bytes_copied = 0
@@ -298,20 +310,71 @@ def load_data_file(
             except Exception as ex2:
                 raise RuntimeError(f"Failed to read Excel via polars: {ex2}") from ex
     elif file_type == "zip":
-        import docframe
-
-        return docframe.read_zip(file_path)
+        return read_zip_file(file_path)
     elif file_type == "text":
-        import docframe
-
-        return docframe.read_text(file_path)
+        return read_text_file(file_path)
     else:
         raise ValueError(f"Unsupported file type: {file_type}")
 
 
+def read_text_file(file_path: Path) -> pl.DataFrame:
+    """Read a plain text file into a Polars DataFrame with a single text column."""
+    content = file_path.read_text(encoding="utf-8", errors="replace")
+    lines = content.splitlines()
+    if not lines:
+        return pl.DataFrame({"text": []})
+    return pl.DataFrame({"text": lines})
+
+
+def read_zip_file(file_path: Path) -> pl.DataFrame:
+    """Read a zip archive and return a Polars DataFrame.
+
+    Strategy: if the zip contains a single supported data file, read it.
+    Otherwise, return a DataFrame listing contained files.
+    """
+    with zipfile.ZipFile(file_path, "r") as zf:
+        file_infos = [info for info in zf.infolist() if not info.is_dir()]
+        if not file_infos:
+            return pl.DataFrame({"filename": [], "size": []})
+
+        def file_type_from_name(name: str) -> str:
+            return detect_file_type(name)
+
+        supported = [
+            info
+            for info in file_infos
+            if file_type_from_name(info.filename)
+            in {"csv", "tsv", "json", "jsonl", "ndjson", "parquet", "text"}
+        ]
+
+        if len(supported) == 1:
+            info = supported[0]
+            inner_type = file_type_from_name(info.filename)
+            with zf.open(info, "r") as fh:
+                data = fh.read()
+            if inner_type in {"csv", "tsv"}:
+                sep = "\t" if inner_type == "tsv" else ","
+                return pl.read_csv(io.BytesIO(data), separator=sep)
+            if inner_type in {"jsonl", "ndjson"}:
+                return pl.read_ndjson(io.BytesIO(data))
+            if inner_type == "json":
+                return pl.read_json(io.BytesIO(data))
+            if inner_type == "parquet":
+                return pl.read_parquet(io.BytesIO(data))
+            if inner_type == "text":
+                content = data.decode("utf-8", errors="replace")
+                lines = content.splitlines()
+                return pl.DataFrame({"text": lines})
+
+        return pl.DataFrame({
+            "filename": [info.filename for info in file_infos],
+            "size": [info.file_size for info in file_infos],
+        })
+
+
 def serialize_dataframe_for_json(df) -> Dict[str, Any]:
     """
-    Convert a DataFrame (polars or DocDataFrame) to JSON-serializable format
+    Convert a DataFrame (polars) to JSON-serializable format
     with complete type representation using module.ClassName format.
     """
     try:
@@ -327,7 +390,6 @@ def serialize_dataframe_for_json(df) -> Dict[str, Any]:
 
         # Extract underlying data if this is wrapped in docworkspace.Node
         underlying_data = df
-        is_doc_type = False
         doc_column = None
 
         # Handle docworkspace.Node wrapper
@@ -338,19 +400,11 @@ def serialize_dataframe_for_json(df) -> Dict[str, Any]:
                 f"DEBUG: Extracted data from docworkspace.Node, underlying type: {type(underlying_data)}"
             )
 
-        # Extract underlying polars data if this is a DocDataFrame or DocLazyFrame
-        if hasattr(underlying_data, "dataframe"):
-            # This is a DocDataFrame - get underlying polars DataFrame
-            underlying_data = underlying_data.dataframe
-            is_doc_type = True
-            doc_column = getattr(df, "active_document_name", None)
-            print("DEBUG: Extracted polars DataFrame from DocDataFrame")
-        elif hasattr(underlying_data, "lazyframe"):
-            # This is a DocLazyFrame - get underlying polars LazyFrame
-            underlying_data = underlying_data.lazyframe
-            is_doc_type = True
-            doc_column = getattr(df, "active_document_name", None)
-            print("DEBUG: Extracted polars LazyFrame from DocLazyFrame")
+        # Extract text column metadata when available
+        if doc_column is None and hasattr(df, "metadata"):
+            metadata = getattr(df, "metadata", None)
+            if isinstance(metadata, dict):
+                doc_column = metadata.get("text_column")
 
         # Now handle the underlying data uniformly
         # Handle shape - LazyFrames don't have a shape until collected
@@ -451,24 +505,17 @@ def serialize_dataframe_for_json(df) -> Dict[str, Any]:
         underlying_type = type(underlying_data)
         data_type_clean = f"{underlying_type.__module__}.{underlying_type.__name__}"
 
-        # For special handling of DocDataFrame and other custom types,
-        # we still use the underlying data but show the complete path
-        if is_doc_type:
-            # For DocDataFrame, show the wrapper type but with complete module path
-            wrapper_type = type(df)
-            data_type_clean = f"{wrapper_type.__module__}.{wrapper_type.__name__}"
-
         result = {
             "shape": shape,
             "columns": columns,
             "dtypes": dtypes,
             "preview": preview,
-            "is_text_data": is_doc_type,
+            "is_text_data": False,
             "data_type": data_type_clean,
         }
 
-        # Add document column info for DocDataFrame
-        if is_doc_type and doc_column:
+        # Add document/text column info when available
+        if doc_column:
             result["document"] = doc_column
 
         return result
@@ -478,7 +525,7 @@ def serialize_dataframe_for_json(df) -> Dict[str, Any]:
         # Fallback to basic info with complete type representation
         fallback_type = type(df) if df is not None else type(None)
         # Initialize variables that might not be set
-        is_doc_type = getattr(df, "__doc_type__", False) if df is not None else False
+        is_doc_type = False
         return {
             "shape": (0, 0),
             "columns": [],
@@ -616,17 +663,13 @@ def _map_workspace_type_to_display_type(workspace_type: str) -> str:
     Map workspace node type to display type for frontend.
 
     Args:
-        workspace_type: The type from workspace node (e.g., 'DataFrame', 'DocDataFrame')
+        workspace_type: The type from workspace node (e.g., 'DataFrame', 'LazyFrame')
 
     Returns:
         Display type string for frontend
     """
     if workspace_type in {"DataFrame", "LazyFrame"}:
         return "polars.LazyFrame"
-    elif workspace_type == "DocDataFrame":
-        return "docframe.DocDataFrame"
-    elif workspace_type == "DocLazyFrame":
-        return "docframe.DocLazyFrame"
     elif workspace_type == "Series":
         return "polars.Series"
     else:
@@ -645,18 +688,13 @@ def _get_node_color_by_type(data_type: str) -> str:
     """
     # Color based on data type
     if "DataFrame" in data_type:
-        if "Doc" in data_type:
-            return "#fff2cc"  # Yellow for DocDataFrame
-        elif "polars" in data_type.lower() or "pl." in data_type:
+        if "polars" in data_type.lower() or "pl." in data_type:
             return "#d4e6f1"  # Light blue for Polars
         else:
             return "#e8f4fd"  # Light blue for pandas
     elif "Series" in data_type:
         return "#f0e8ff"  # Light purple for Series
     elif "LazyFrame" in data_type:
-        if "Doc" in data_type:
-            return "#ffd2a6"  # Light orange-yellow for DocLazyFrame
-        else:
-            return "#ffe8cc"  # Light orange for LazyFrame (lazy evaluation)
+        return "#ffe8cc"  # Light orange for LazyFrame (lazy evaluation)
     else:
         return "#f5f5f5"  # Light gray for other types

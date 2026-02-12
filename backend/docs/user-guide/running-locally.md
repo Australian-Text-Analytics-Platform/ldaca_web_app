@@ -12,7 +12,7 @@
 
 **Question:** *Do I need a `.env` file?*
 
-**Answer:** Yes, for local development. Copy `.env.example` to `.env` and adjust values such as `DATABASE_URL` and `USER_DATA_FOLDER`.
+**Answer:** No. The backend reads environment variables directly. If your tooling loads `.env` files (e.g., a shell wrapper or IDE), you may use the optional template at `backend/src/ldaca_web_app_backend/resources/configs/.env.example` and copy it to `.env` in your working directory.
 
 ## Step 3 — Start the server
 

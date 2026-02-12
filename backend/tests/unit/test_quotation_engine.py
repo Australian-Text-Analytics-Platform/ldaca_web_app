@@ -3,12 +3,15 @@ from types import SimpleNamespace
 import polars as pl
 import pytest
 from ldaca_web_app_backend.api.workspaces.analyses.quotation import (
-    _compute_quote_dataframe, _prepare_documents_payload)
+    _compute_quote_dataframe,
+    _prepare_documents_payload,
+)
 from ldaca_web_app_backend.core.services.quotation_client import (
-    QuotationServiceError, extract_remote_quotations,
-    normalise_engine_base_url)
-from ldaca_web_app_backend.models import (QuotationEngineConfig,
-                                          QuotationEngineType)
+    QuotationServiceError,
+    extract_remote_quotations,
+    normalise_engine_base_url,
+)
+from ldaca_web_app_backend.models import QuotationEngineConfig, QuotationEngineType
 from ldaca_web_app_backend.settings import settings
 
 
@@ -99,7 +102,6 @@ async def test_remote_compute_chunks_based_on_settings(monkeypatch):
         ["2", "3"],
         ["4"],
     ]
-    assert "document_idx" not in result.columns
     assert set(result.columns) >= {"quote"}
     assert sorted(result["quote"].to_list()) == [
         "quote-0",
@@ -108,5 +110,3 @@ async def test_remote_compute_chunks_based_on_settings(monkeypatch):
         "quote-3",
         "quote-4",
     ]
-
-

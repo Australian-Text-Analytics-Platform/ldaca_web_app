@@ -7,6 +7,7 @@ Tests the end-to-end flow from API endpoints to file persistence.
 from datetime import datetime
 from types import SimpleNamespace
 
+import polars as pl
 import pytest
 from httpx import AsyncClient
 from ldaca_web_app_backend.analysis.manager import get_task_manager
@@ -93,7 +94,6 @@ def _list_analysis_records(user_id: str, workspace_id: str, task: str | None = N
         key_map = {
             "token_frequencies": "token-frequencies",
             "sequential_analysis": "sequential-analysis",
-            "frequency_analysis": "frequency-analysis",
             "topic_modeling": "topic-modeling",
             "quotation": "quotation",
             "concordance": "concordance",
@@ -108,6 +108,7 @@ def _list_analysis_records(user_id: str, workspace_id: str, task: str | None = N
         res = t.result.to_json() if hasattr(t.result, "to_json") else t.result
         return SimpleNamespace(
             task=task,
+            task_id=t.task_id,
             saved_at=(t.updated_at or t.created_at).isoformat(),
             request=req,
             result=res,
@@ -185,7 +186,7 @@ class TestTokenFrequencyPersistence:
         assert len(analyses) == 1
 
         record = analyses[0]
-        assert record.task == "token_frequencies"
+        assert record.task_id == task_id
         # Check that the core request parameters are preserved
         assert record.request["node_ids"] == request_payload["node_ids"]
         assert record.request["node_columns"] == request_payload["node_columns"]
@@ -484,8 +485,6 @@ class TestSequentialAnalysisPersistence:
         node_id: str,
         monkeypatch: pytest.MonkeyPatch,
     ) -> dict:
-        from types import SimpleNamespace
-
         from ldaca_web_app_backend.api.workspaces.analyses import (
             sequential_analysis as sequential_module,
         )
@@ -497,45 +496,15 @@ class TestSequentialAnalysisPersistence:
             "sort_by_time": True,
         }
 
-        class DummyResult:
-            def __init__(self) -> None:
-                self._rows = [
-                    {
-                        "time_period": "2024-01-01",
-                        "time_period_formatted": "2024-01-01",
-                        "sequential_count": 2,
-                        "category": "alpha",
-                    },
-                    {
-                        "time_period": "2024-01-02",
-                        "time_period_formatted": "2024-01-02",
-                        "sequential_count": 1,
-                        "category": "beta",
-                    },
-                ]
-                self.columns = list(self._rows[0].keys()) if self._rows else []
-
-            def to_dicts(self) -> list[dict[str, object]]:
-                return list(self._rows)
-
-            def __len__(self) -> int:
-                return len(self._rows)
-
-        class DummyTextOps:
-            @staticmethod
-            def sequential_analysis(*_args, **_kwargs) -> DummyResult:
-                return DummyResult()
-
-        dummy_node = SimpleNamespace(
-            data=SimpleNamespace(
-                columns=["published_at", "category"],
-                schema=[
-                    {"name": "published_at", "js_type": "datetime"},
-                    {"name": "category", "js_type": "string"},
-                ],
-                text=DummyTextOps(),
-            )
-        )
+        dummy_df = pl.DataFrame({
+            "published_at": [
+                datetime(2024, 1, 1),
+                datetime(2024, 1, 1),
+                datetime(2024, 1, 2),
+            ],
+            "category": ["alpha", "alpha", "beta"],
+        })
+        dummy_node = SimpleNamespace(data=dummy_df.lazy())
 
         monkeypatch.setattr(
             sequential_module,
@@ -573,16 +542,17 @@ class TestSequentialAnalysisPersistence:
         analyses = _list_analysis_records(test_user["id"], workspace_id)
         assert len(analyses) == 1
         record = analyses[0]
-        assert record.task == "sequential_analysis"
-        assert record.result.get("chart_type") == "line"
-
         task_id = await get_current_task_id(
             authenticated_client, workspace_id, "sequential-analysis"
         )
         assert task_id
-        current_result_response = await get_json(
+        assert record.task_id == task_id
+        assert record.result.get("chart_type") == "line"
+
+        current_result_response = await post_json(
             authenticated_client,
             f"/api/workspaces/{workspace_id}/sequential-analysis/tasks/{task_id}/result",
+            {},
         )
         assert current_result_response.status_code == 200
         current_payload = current_result_response.json()
@@ -619,9 +589,10 @@ class TestSequentialAnalysisPersistence:
             "data": {"chart_type": "bar"},
         }
 
-        current_result_response = await get_json(
+        current_result_response = await post_json(
             authenticated_client,
             f"/api/workspaces/{workspace_id}/sequential-analysis/tasks/{task_id}/result",
+            {},
         )
         assert current_result_response.status_code == 200
         current_payload = current_result_response.json()
@@ -666,35 +637,10 @@ class TestSequentialAnalysisPersistence:
         monkeypatch,
     ):
         """Numeric sequential analysis should persist origin/interval inputs."""
-
-        from types import SimpleNamespace
-
         captured_kwargs: dict[str, object] = {}
 
-        class DummyResult:
-            def __init__(self) -> None:
-                self._rows = []
-                self.columns = []
-
-            def to_dicts(self) -> list[dict[str, object]]:
-                return []
-
-            def __len__(self) -> int:
-                return 0
-
-        class DummyTextOps:
-            @staticmethod
-            def sequential_analysis(*_args, **kwargs) -> DummyResult:
-                captured_kwargs.update(kwargs)
-                return DummyResult()
-
-        dummy_node = SimpleNamespace(
-            data=SimpleNamespace(
-                columns=["score"],
-                schema=[{"name": "score", "js_type": "integer"}],
-                text=DummyTextOps(),
-            )
-        )
+        dummy_df = pl.DataFrame({"score": [0, 5, 10, 15]})
+        dummy_node = SimpleNamespace(data=dummy_df.lazy())
 
         from ldaca_web_app_backend.api.workspaces.analyses import (
             sequential_analysis as sequential_module,
@@ -705,6 +651,14 @@ class TestSequentialAnalysisPersistence:
             "get_node_with_data_or_400",
             lambda *_args, **_kwargs: (dummy_node, dummy_node.data),
         )
+
+        original_run = sequential_module._run_sequential_analysis
+
+        def _capture_run(*_args, **kwargs):
+            captured_kwargs.update(kwargs)
+            return original_run(*_args, **kwargs)
+
+        monkeypatch.setattr(sequential_module, "_run_sequential_analysis", _capture_run)
 
         payload = {
             "time_column": "score",
@@ -733,31 +687,8 @@ class TestSequentialAnalysisPersistence:
     ):
         """Missing numeric interval inputs should raise a validation error."""
 
-        from types import SimpleNamespace
-
-        class DummyResult:
-            def __init__(self) -> None:
-                self._rows = []
-                self.columns = []
-
-            def to_dicts(self) -> list[dict[str, object]]:
-                return []
-
-            def __len__(self) -> int:
-                return 0
-
-        class DummyTextOps:
-            @staticmethod
-            def sequential_analysis(*_args, **_kwargs) -> DummyResult:
-                return DummyResult()
-
-        dummy_node = SimpleNamespace(
-            data=SimpleNamespace(
-                columns=["score"],
-                schema=[{"name": "score", "js_type": "integer"}],
-                text=DummyTextOps(),
-            )
-        )
+        dummy_df = pl.DataFrame({"score": [0, 5, 10]})
+        dummy_node = SimpleNamespace(data=dummy_df.lazy())
 
         from ldaca_web_app_backend.api.workspaces.analyses import (
             sequential_analysis as sequential_module,
