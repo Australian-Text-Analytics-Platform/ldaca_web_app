@@ -105,7 +105,7 @@ jobs:
         run: |
           set -Eeuo pipefail
           shopt -s nullglob
-          repo_root="$(pwd)/.."
+          repo_root="$(cd .. && pwd -P)"
           dmg_files=("$repo_root"/target/release/bundle/macos/*.dmg)
           if [ ${#dmg_files[@]} -eq 0 ]; then
             echo "No DMG output found" >&2
