@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import os
-import platform
 import shutil
 import subprocess
 import sys
@@ -71,91 +70,6 @@ def sanitize_lockfile(lockfile: Path, sanitized: Path) -> None:
             if stripped.startswith(editable_prefixes):
                 continue
             dest.write(line)
-
-
-def copy_python_installation(source_root: Path, destination_root: Path) -> None:
-    if destination_root.exists():
-        shutil.rmtree(destination_root)
-    print(
-        f"[INFO] Copying Python installation from {source_root} to {destination_root}"
-    )
-    shutil.copytree(
-        source_root,
-        destination_root,
-        symlinks=False,
-        dirs_exist_ok=True,
-    )
-
-
-def fix_macos_python_linking(python_root: Path) -> None:
-    """Fix Python dynamic library linking on macOS to be relocatable."""
-    if platform.system() != "Darwin":
-        return
-
-    print("[INFO] Fixing macOS Python dynamic library linking for relocatability")
-
-    # Find the Python binary
-    python_bin = python_root / "bin" / "python3"
-    if not python_bin.exists():
-        print("   [WARNING] Python binary not found, skipping relinking")
-        return
-
-    # Find the Python dynamic library
-    lib_dir = python_root / "lib"
-    dylib_candidates = list(lib_dir.glob("libpython3*.dylib"))
-
-    if not dylib_candidates:
-        print("   [WARNING] Python dylib not found, skipping relinking")
-        return
-
-    dylib = dylib_candidates[0]
-    print(f"   Found Python dylib: {dylib.name}")
-
-    # Get the current install name
-    result = subprocess.run(
-        ["otool", "-L", str(python_bin)], capture_output=True, text=True, check=True
-    )
-
-    # Check if it references an absolute Framework path
-    framework_ref = None
-    for line in result.stdout.splitlines():
-        if (
-            "/Library/Frameworks/Python.framework" in line
-            or "/Python.framework" in line
-        ):
-            framework_ref = line.strip().split()[0]
-            break
-
-    if framework_ref:
-        print(f"   Changing {framework_ref}")
-        print(f"   To @executable_path/../lib/{dylib.name}")
-
-        # Change the Python binary to use @executable_path relative reference
-        subprocess.run(
-            [
-                "install_name_tool",
-                "-change",
-                framework_ref,
-                f"@executable_path/../lib/{dylib.name}",
-                str(python_bin),
-            ],
-            check=True,
-        )
-
-        # Also update the dylib's own install name to be relative
-        subprocess.run(
-            [
-                "install_name_tool",
-                "-id",
-                f"@rpath/{dylib.name}",
-                str(dylib),
-            ],
-            check=True,
-        )
-
-        print("   [SUCCESS] Python linking fixed for bundle relocatability")
-    else:
-        print("   [INFO] No absolute Framework references found, already relocatable")
 
 
 def remove_externally_managed_markers(root: Path) -> None:
@@ -261,52 +175,21 @@ def main() -> None:
     sanitize_lockfile(lockfile, sanitized_lockfile)
     print(f"[INFO] Lockfile written to {sanitized_lockfile}")
 
-    print("[INFO] Setting up Python...")
-
-    # Prefer UV_PYTHON_INSTALL_DIR if set (CI/managed environments)
-    uv_install_dir = os.environ.get("UV_PYTHON_INSTALL_DIR")
-    if uv_install_dir:
-        uv_install_path = Path(uv_install_dir)
-        # Ensure the install directory exists
-        uv_install_path.mkdir(parents=True, exist_ok=True)
-
-        # Install Python to the custom directory
-        run(["uv", "python", "install", args.python_version])
-
-        # Find the installed managed Python in the custom directory
-        managed_candidates = sorted(
-            uv_install_path.glob(f"cpython-{args.python_version}*")
-        )
-        if managed_candidates:
-            managed_root = managed_candidates[-1]
-            print(f"   Using managed Python from UV_PYTHON_INSTALL_DIR: {managed_root}")
-            python_install_root = managed_root
-        else:
-            raise RuntimeError(
-                f"UV_PYTHON_INSTALL_DIR is set to {uv_install_dir}, "
-                f"but no Python {args.python_version} installation was found there. "
-                f"Found directories: {list(uv_install_path.iterdir())}"
-            )
-    else:
-        # Fallback to standard uv python find
-        run(["uv", "python", "install", args.python_version])
-        find_result = run(
-            ["uv", "python", "find", "--managed-python", args.python_version],
-            capture_output=True,
-        )
-        # The detected path might be inside a venv (symlink). Resolve it to the actual interpreter.
-        raw_python_bin = Path(find_result.stdout.strip().splitlines()[-1])
-        base_python_bin = raw_python_bin.resolve()
-
-        print(f"   Base Python found at: {base_python_bin}")
-        if base_python_bin != raw_python_bin:
-            print(f"   Resolved from: {raw_python_bin}")
-
-        python_install_root = base_python_bin.parent.parent
+    print("[INFO] Setting up Python runtime via uv venv...")
+    run(["uv", "python", "install", args.python_version])
 
     runtime_python_dir = output_dir / "python"
-    copy_python_installation(python_install_root, runtime_python_dir)
-    fix_macos_python_linking(runtime_python_dir)
+    if runtime_python_dir.exists():
+        shutil.rmtree(runtime_python_dir)
+
+    run([
+        "uv",
+        "venv",
+        str(runtime_python_dir),
+        "--python",
+        args.python_version,
+    ])
+
     remove_externally_managed_markers(runtime_python_dir)
 
     python_bin = runtime_python_dir / "bin" / "python3"
