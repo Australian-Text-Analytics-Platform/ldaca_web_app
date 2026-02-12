@@ -4,8 +4,4 @@
 # irrelevant errors when running `pytest .`.
 
 /dist-tauri/
-/src-tauri/
-/src-tauri/target/
-/src-tauri/target/**
 */site-packages/
-node_modules/
