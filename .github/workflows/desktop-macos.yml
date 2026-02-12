@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   build-macos-apple-silicon:
-    runs-on: macos-14
+    runs-on: macos-latest
     env:
       CI: "true"
 
@@ -105,13 +105,14 @@ jobs:
         run: |
           set -Eeuo pipefail
           shopt -s nullglob
-          dmg_files=(src-tauri/target/release/bundle/macos/*.dmg)
+          repo_root="$(pwd)/.."
+          dmg_files=("$repo_root"/target/release/bundle/macos/*.dmg)
           if [ ${#dmg_files[@]} -eq 0 ]; then
             echo "No DMG output found" >&2
             exit 1
           fi
           primary_dmg="${dmg_files[0]}"
-          labeled_dmg="src-tauri/target/release/bundle/macos/ldaca-desktop-apple-silicon.dmg"
+          labeled_dmg="$repo_root/target/release/bundle/macos/ldaca-desktop-apple-silicon.dmg"
           cp "$primary_dmg" "$labeled_dmg"
           echo "path=$labeled_dmg" >> "$GITHUB_OUTPUT"
           echo "Primary DMG: $primary_dmg"
@@ -121,6 +122,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ldaca-desktop-macos-apple-silicon
-          path: frontend/${{ steps.label-dmg.outputs.path }}
+          path: ${{ steps.label-dmg.outputs.path }}
           if-no-files-found: error
           retention-days: 14

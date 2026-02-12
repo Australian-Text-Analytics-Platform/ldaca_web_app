@@ -97,6 +97,29 @@ def find_latest_wheel(wheel_dir: Path, prefix: str) -> Path:
     return matches[-1]
 
 
+def get_project_name(package_path: Path) -> str:
+    pyproject = package_path / "pyproject.toml"
+    if not pyproject.exists():
+        print(
+            f"[WARNING] No pyproject.toml found at {package_path}; using directory name."
+        )
+        return package_path.name
+
+    try:
+        data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+    except Exception as e:
+        print(
+            f"[WARNING] Failed to parse pyproject.toml at {package_path}: {e}; using directory name."
+        )
+        return package_path.name
+
+    name = data.get("project", {}).get("name")
+    if not name:
+        print(f"[WARNING] No [project].name in {pyproject}; using directory name.")
+        return package_path.name
+    return str(name)
+
+
 def get_workspace_packages(workspace_root: Path) -> list[tuple[str, Path]]:
     """Parse pyproject.toml to find workspace members."""
     pyproject = workspace_root / "pyproject.toml"
@@ -125,7 +148,7 @@ def get_workspace_packages(workspace_root: Path) -> list[tuple[str, Path]]:
             if path.resolve() == PROJECT_ROOT.resolve():
                 continue
             if path.is_dir() and (path / "pyproject.toml").exists():
-                packages.append((path.name, path))
+                packages.append((get_project_name(path), path))
 
     return packages
 
@@ -194,6 +217,8 @@ def main() -> None:
 
     python_bin = runtime_python_dir / "bin" / "python3"
     if not python_bin.exists():
+        python_bin = runtime_python_dir / "Scripts" / "python.exe"
+    if not python_bin.exists():
         python_bin = runtime_python_dir / "python.exe"
     if not python_bin.exists():
         raise RuntimeError(
@@ -206,7 +231,7 @@ def main() -> None:
     # Also build the root package (backend)
     # We infer the name from pyproject.toml or just use the dir name/hardcoded fallback
     # The original script used "ldaca-web-app-backend"
-    workspace_packages.append(("ldaca-web-app-backend", PROJECT_ROOT))
+    workspace_packages.append((get_project_name(PROJECT_ROOT), PROJECT_ROOT))
 
     built_wheels = []
     for pkg_name, pkg_path in workspace_packages:
