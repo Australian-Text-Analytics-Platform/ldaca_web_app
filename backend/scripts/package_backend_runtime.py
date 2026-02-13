@@ -200,6 +200,37 @@ def assert_runtime_python_is_relocatable(python_bin: Path, output_dir: Path) -> 
             )
 
 
+def ensure_venv_libpython(
+    *,
+    managed_install_dir: Path,
+    runtime_python_dir: Path,
+    python_version: str,
+) -> None:
+    """Copy libpython into the venv lib directory for relocatable execution.
+
+    The vendored CPython executable resolves `@rpath/libpythonX.Y.dylib` against the
+    virtualenv's `python/lib` directory when launched from the packaged app.
+    If that dylib is missing, startup fails on moved/DMG app bundles.
+    """
+    major_minor = ".".join(python_version.split(".")[:2])
+    libpython_name = f"libpython{major_minor}.dylib"
+
+    source = next(
+        managed_install_dir.glob(f"**/{libpython_name}"),
+        None,
+    )
+    if source is None:
+        raise RuntimeError(
+            f"Could not locate {libpython_name} under managed python at {managed_install_dir}"
+        )
+
+    venv_lib_dir = runtime_python_dir / "lib"
+    venv_lib_dir.mkdir(parents=True, exist_ok=True)
+    target = venv_lib_dir / libpython_name
+    shutil.copy2(source, target)
+    print(f"[INFO] Copied {libpython_name} to {target}")
+
+
 def write_runtime_manifest(
     *,
     output_dir: Path,
@@ -330,6 +361,11 @@ def main() -> None:
 
     python_bin = find_runtime_python(runtime_python_dir)
     assert_runtime_python_is_relocatable(python_bin, output_dir)
+    ensure_venv_libpython(
+        managed_install_dir=managed_python_dir,
+        runtime_python_dir=runtime_python_dir,
+        python_version=args.python_version,
+    )
 
     # DYNAMIC PACKAGE DISCOVERY
     workspace_packages = get_workspace_packages(WORKSPACE_ROOT)

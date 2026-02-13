@@ -88,7 +88,8 @@
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css,json}\"",
     "tauri": "tauri",
     "clean": "cd src-tauri && cargo clean",
-    "prepare:backend": "cd ../backend && uv run python scripts/package_backend_runtime.py --clean",
+    "stage:backend-runtime": "node scripts/stage-backend-runtime.mjs",
+    "prepare:backend": "cd ../backend && uv run python scripts/package_backend_runtime.py --clean && cd ../frontend && npm run stage:backend-runtime",
     "desktop:dev": "npm run prepare:backend && npm run build && tauri dev",
     "desktop:build:mac": "npm run prepare:backend && tauri build && npx create-dmg \"../target/release/bundle/macos/LDaCA Text Analytics.app\" \"../target/release/bundle/macos/\" --overwrite --no-code-sign",
     "desktop:build:windows": "echo 'Run this on Windows to build .msi' && npm run prepare:backend && tauri build"

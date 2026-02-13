@@ -86,6 +86,23 @@ jobs:
         working-directory: frontend
         run: npm run desktop:build:mac
 
+      - name: Validate bundled backend runtime
+        shell: bash
+        working-directory: frontend
+        run: |
+          set -Eeuo pipefail
+          app_path="../target/release/bundle/macos/LDaCA Text Analytics.app"
+          runtime_path="$app_path/Contents/Resources/backend-runtime"
+
+          test -d "$runtime_path"
+          test -f "$runtime_path/runtime-manifest.json"
+          test -f "$runtime_path/python/lib/libpython3.14.dylib"
+
+          # Ensure embedded Python can initialize stdlib from bundled paths.
+          "$runtime_path/python/bin/python3" -c "import encodings, sys; print(sys.version)"
+
+          echo "Bundled runtime validation succeeded: $runtime_path"
+
       - name: Label DMG output for Apple Silicon
         id: label-dmg
         shell: bash

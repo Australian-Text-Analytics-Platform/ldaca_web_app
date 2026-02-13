@@ -39,7 +39,7 @@
       "signingIdentity": "-"
     },
     "resources": [
-      "../../backend/dist-tauri/backend-runtime"
+      "backend-runtime"
     ],
     "copyright": "Copyright © 2025 Australian Text Analytics Platform",
     "category": "Education",

@@ -72,10 +72,20 @@ impl BackendProcessHandle {
 
 const DEV_BACKEND_RUNTIME: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../backend/dist-tauri/backend-runtime"
+    "/../../backend/dist-tauri/backend-runtime"
 );
 
 const BACKEND_HOST: &str = "127.0.0.1";
+const RUNTIME_MANIFEST: &str = "runtime-manifest.json";
+
+const BUNDLE_RUNTIME_CANDIDATES: &[&str] = &[
+    "backend-runtime",
+    "_up_/backend-runtime",
+    "_up_/_up_/backend-runtime",
+    "backend/dist-tauri/backend-runtime",
+    "_up_/backend/dist-tauri/backend-runtime",
+    "_up_/_up_/backend/dist-tauri/backend-runtime",
+];
 
 fn make_error(message: impl Into<String>) -> Box<dyn std::error::Error> {
     Box::new(io::Error::new(io::ErrorKind::Other, message.into()))
@@ -102,7 +112,7 @@ fn locate_backend_runtime(app: &AppHandle) -> Result<BackendRuntime, Box<dyn std
         .or_else(|| detect_runtime_dir(app))
         .ok_or_else(|| {
             make_error(
-                "Backend runtime not found. Run `npm run prepare:backend` and ensure the bundle includes backend/dist-tauri/backend-runtime.",
+                "Backend runtime not found. Run `npm run prepare:backend` and ensure the bundle includes resources/backend-runtime.",
             )
         })?;
 
@@ -115,50 +125,121 @@ fn locate_backend_runtime(app: &AppHandle) -> Result<BackendRuntime, Box<dyn std
     })
 }
 
+fn runtime_dir_has_manifest(dir: &Path) -> bool {
+    dir.join(RUNTIME_MANIFEST).exists()
+}
+
+fn scan_for_manifest(start_dir: &Path, max_depth: usize) -> Option<PathBuf> {
+    if max_depth == 0 {
+        return None;
+    }
+
+    let entries = std::fs::read_dir(start_dir).ok()?;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name == RUNTIME_MANIFEST)
+        {
+            return path.parent().map(Path::to_path_buf);
+        }
+
+        let file_type = match entry.file_type() {
+            Ok(file_type) => file_type,
+            Err(_) => continue,
+        };
+
+        if !file_type.is_dir() {
+            continue;
+        }
+
+        if let Some(runtime_dir) = scan_for_manifest(&path, max_depth.saturating_sub(1)) {
+            return Some(runtime_dir);
+        }
+    }
+
+    None
+}
+
 fn detect_runtime_dir(app: &AppHandle) -> Option<PathBuf> {
     let resolver = app.path();
-    for resource in [
-        "backend/dist-tauri/backend-runtime",
-        "backend-runtime",
-        "_up_/backend/dist-tauri/backend-runtime",
-        "Resources/_up_/backend/dist-tauri/backend-runtime",
-    ] {
+    for resource in BUNDLE_RUNTIME_CANDIDATES {
         if let Ok(candidate) = resolver.resolve(resource, BaseDirectory::Resource) {
-            if candidate.exists() {
+            if candidate.exists() && runtime_dir_has_manifest(&candidate) {
+                println!(
+                    "Resolved backend runtime via bundle candidate '{}': {}",
+                    resource,
+                    candidate.display()
+                );
                 return Some(candidate);
             }
         }
     }
 
-    let dev_path = PathBuf::from(DEV_BACKEND_RUNTIME);
-    if dev_path.exists() {
-        return Some(dev_path);
+    if let Ok(resource_dir) = resolver.resolve("", BaseDirectory::Resource) {
+        if let Some(runtime_dir) = scan_for_manifest(&resource_dir, 5) {
+            println!(
+                "Resolved backend runtime by scanning Resources tree: {}",
+                runtime_dir.display()
+            );
+            return Some(runtime_dir);
+        }
     }
 
-    const RELATIVE_SEARCH_PATHS: &[&str] = &[
-        "backend/dist-tauri/backend-runtime",
-        "_up_/backend/dist-tauri/backend-runtime",
-        "dist-tauri/backend-runtime",
-        "Resources/backend/dist-tauri/backend-runtime",
-        "Resources/_up_/backend/dist-tauri/backend-runtime",
-        "backend-runtime",
-    ];
-
+    // Fallback for direct executable launches where resolver may fail:
+    // derive bundle Resources from current executable location only.
     if let Ok(exe_path) = std::env::current_exe() {
-        if let Some(mut dir) = exe_path.parent().map(Path::to_path_buf) {
-            loop {
-                for relative in RELATIVE_SEARCH_PATHS {
-                    let candidate = dir.join(relative);
-                    if candidate.exists() {
-                        return Some(candidate);
-                    }
-                }
-
-                if !dir.pop() {
-                    break;
+        if let Some(resources_dir) = exe_path
+            .parent()
+            .and_then(|p| p.parent())
+            .map(|p| p.join("Resources"))
+        {
+            for rel in BUNDLE_RUNTIME_CANDIDATES {
+                let candidate = resources_dir.join(rel);
+                if candidate.exists() && runtime_dir_has_manifest(&candidate) {
+                    println!(
+                        "Resolved backend runtime via executable-relative candidate '{}': {}",
+                        rel,
+                        candidate.display()
+                    );
+                    return Some(candidate);
                 }
             }
+
+            if let Some(runtime_dir) = scan_for_manifest(&resources_dir, 5) {
+                println!(
+                    "Resolved backend runtime by scanning executable-relative Resources tree: {}",
+                    runtime_dir.display()
+                );
+                return Some(runtime_dir);
+            }
         }
+    }
+
+    // Keep local development fallback for `tauri dev` and local shell runs,
+    // but avoid using it in packaged release builds unless explicitly opted in.
+    let allow_dev_fallback = cfg!(debug_assertions)
+        || std::env::var("LDACA_ALLOW_DEV_RUNTIME_FALLBACK")
+            .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+            .unwrap_or(false);
+
+    if allow_dev_fallback {
+        let dev_path = PathBuf::from(DEV_BACKEND_RUNTIME);
+        if runtime_dir_has_manifest(&dev_path) {
+            println!(
+                "Resolved backend runtime via development fallback: {}",
+                dev_path.display()
+            );
+            return Some(dev_path);
+        }
+    }
+
+    if let Ok(exe_path) = std::env::current_exe() {
+        eprintln!(
+            "Backend runtime could not be resolved from bundle resources. current_exe={}.",
+            exe_path.display()
+        );
     }
 
     None
@@ -309,6 +390,53 @@ fn spawn_backend_process(
     command.env("LDACA_BACKEND_RUNTIME", runtime.root.as_os_str());
     command.env("LDACA_BACKEND_PYTHON", runtime.python.as_os_str());
 
+    // Ensure packaged Python runtime is relocatable across machines.
+    // `pyvenv.cfg` may contain build-machine absolute paths; use managed-python
+    // as PYTHONHOME and venv site-packages as PYTHONPATH.
+    let managed_python_home = std::fs::read_dir(runtime.root.join("managed-python"))
+        .ok()
+        .into_iter()
+        .flat_map(|entries| entries.flatten())
+        .map(|entry| entry.path())
+        .find(|path| {
+            std::fs::read_dir(path.join("lib"))
+                .ok()
+                .into_iter()
+                .flat_map(|entries| entries.flatten())
+                .map(|entry| entry.path())
+                .any(|lib_dir| {
+                    lib_dir
+                        .file_name()
+                        .and_then(|name| name.to_str())
+                        .is_some_and(|name| name.starts_with("python3."))
+                        && lib_dir.join("encodings").is_dir()
+                })
+        });
+
+    let venv_site_packages = std::fs::read_dir(runtime.root.join("python").join("lib"))
+        .ok()
+        .into_iter()
+        .flat_map(|entries| entries.flatten())
+        .map(|entry| entry.path())
+        .find(|lib_dir| {
+            lib_dir
+                .file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.starts_with("python3."))
+                && lib_dir.join("site-packages").is_dir()
+        })
+        .map(|lib_dir| lib_dir.join("site-packages"));
+
+    if let Some(home) = managed_python_home {
+        command.env("PYTHONHOME", home.as_os_str());
+        if let Some(site_packages) = venv_site_packages.as_deref() {
+            if let Ok(paths) = std::env::join_paths([site_packages]) {
+                command.env("PYTHONPATH", paths);
+            }
+        }
+        command.env("PYTHONNOUSERSITE", "1");
+    }
+
     let host_value = determine_server_host(env_overrides);
     command.env("SERVER_HOST", host_value.clone());
     command.env("LDACA_SERVER_HOST", host_value);
@@ -446,8 +574,13 @@ fn wait_for_backend_health(backend_url: &str) -> io::Result<()> {
 
 fn main() {
     // Find an available port for the backend (try 8001-8010)
-    let backend_port =
-        find_available_port(8001, 8010).expect("No available ports found in range 8001-8010");
+    let backend_port = match find_available_port(8001, 8010) {
+        Some(port) => port,
+        None => {
+            eprintln!("No available ports found in range 8001-8010");
+            return;
+        }
+    };
 
     // Use 127.0.0.1 instead of localhost to avoid mixed content issues on Windows
     // where Tauri serves from https://tauri.localhost
@@ -460,12 +593,14 @@ fn main() {
         closing: Arc::new(Mutex::new(false)),
     };
 
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .manage(backend_state)
         .invoke_handler(tauri::generate_handler![get_backend_url])
         .setup(move |app| {
-            let window = app.get_webview_window("main").unwrap();
+            let window = app
+                .get_webview_window("main")
+                .ok_or_else(|| make_error("Main window not found"))?;
 
             // Inject backend URL as an initialization script BEFORE any page content loads
             // This ensures window.__BACKEND_URL__ is available when React boots
@@ -605,22 +740,29 @@ fn main() {
                 });
             }
         })
-        .build(tauri::generate_context!())
-        .expect("error while building tauri application")
-        .run(|app_handle, event| {
-            // Handle app exit to ensure backend is terminated gracefully
-            if let tauri::RunEvent::ExitRequested { .. } = event {
-                if let Some(state) = app_handle.try_state::<BackendState>() {
-                    println!("App exiting - waiting for backend to terminate gracefully...");
-                    if let Some(process) = state
-                        .process
-                        .lock()
-                        .ok()
-                        .and_then(|mut guard| guard.take())
-                    {
-                        process.shutdown();
+        .build(tauri::generate_context!());
+
+    match app {
+        Ok(app) => {
+            app.run(|app_handle, event| {
+                // Handle app exit to ensure backend is terminated gracefully
+                if let tauri::RunEvent::ExitRequested { .. } = event {
+                    if let Some(state) = app_handle.try_state::<BackendState>() {
+                        println!("App exiting - waiting for backend to terminate gracefully...");
+                        if let Some(process) = state
+                            .process
+                            .lock()
+                            .ok()
+                            .and_then(|mut guard| guard.take())
+                        {
+                            process.shutdown();
+                        }
                     }
                 }
-            }
-        });
+            });
+        }
+        Err(err) => {
+            eprintln!("error while building tauri application: {}", err);
+        }
+    }
 }
