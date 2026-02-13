@@ -76,22 +76,10 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-uv-
 
-      - name: Package backend runtime
-        shell: bash
-        working-directory: backend
-        run: |
-          set -Eeuo pipefail
-          uv run --python 3.14 python scripts/package_backend_runtime.py --clean
-
       - name: Install frontend dependencies
         shell: bash
         working-directory: frontend
         run: npm install
-
-      - name: Build frontend
-        shell: bash
-        working-directory: frontend
-        run: npm run build
 
       - name: Build Tauri desktop application
         shell: bash

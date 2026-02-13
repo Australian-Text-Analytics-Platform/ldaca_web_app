@@ -276,14 +276,7 @@ async def import_ldaca_dataset(
         ldac_tb = LDaCATabulator(request.url)
         df = ldac_tb.get_text()
 
-        import pandas as pd
-
-        if isinstance(df, pd.DataFrame):
-            df.to_parquet(str(file_path))
-        elif hasattr(df, "write_parquet"):
-            df.write_parquet(file_path)
-        else:
-            pd.DataFrame(df).to_parquet(str(file_path))
+        df.to_parquet(str(file_path))
 
         return {
             "state": "successful",

@@ -1351,20 +1351,7 @@ def ldaca_import_task(
 
         # Save to parquet
         try:
-            # Check if dataframe is pandas or polars?
-            # The notebook says "pandas table".
-            import pandas as pd
-
-            if isinstance(df, pd.DataFrame):
-                df.to_parquet(str(file_path))
-            else:
-                # Assume polars or other
-                # Try to convert to polars if it has write_parquet, else try pandas
-                if hasattr(df, "write_parquet"):
-                    df.write_parquet(file_path)
-                else:
-                    # Final fallback, try converting to pandas
-                    pd.DataFrame(df).to_parquet(str(file_path))
+            df.to_parquet(str(file_path))
 
         except Exception as e:
             raise RuntimeError(f"Failed to save parquet file: {e}")

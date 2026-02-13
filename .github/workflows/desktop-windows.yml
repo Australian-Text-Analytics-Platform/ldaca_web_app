@@ -100,13 +100,7 @@ jobs:
           [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
           $env:PYTHONUTF8 = "1"
           $env:PYTHONIOENCODING = "utf-8"
-          $installDir = Join-Path (Get-Location) "dist-tauri\managed-python"
-          New-Item -ItemType Directory -Force -Path $installDir | Out-Null
-          $env:UV_PYTHON_INSTALL_DIR = $installDir
-          $env:UV_PYTHON = "3.12"
-          $env:UV_PYTHON_PREFER_MANAGED = "1"
-          $env:UV_LINK_MODE = "copy"
-          uv run --python 3.12 python scripts/package_backend_runtime.py --clean
+          uv run --python 3.14 python scripts/package_backend_runtime.py --clean --python-version 3.14
 
       - name: Clean up PyTorch unnecessary files for Windows bundling
         shell: pwsh
@@ -154,11 +148,6 @@ jobs:
         run: |
           Set-StrictMode -Version Latest
           [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-          $installDir = Join-Path (Get-Location) "..\backend\dist-tauri\managed-python"
-          $env:UV_PYTHON_INSTALL_DIR = $installDir
-          $env:UV_PYTHON = "3.12"
-          $env:UV_PYTHON_PREFER_MANAGED = "1"
-          $env:UV_LINK_MODE = "copy"
           
           # Build with NSIS target to avoid WiX issues on CI
           Write-Host "Building Tauri application with NSIS..."
