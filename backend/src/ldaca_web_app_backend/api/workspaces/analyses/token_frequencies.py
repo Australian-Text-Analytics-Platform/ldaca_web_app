@@ -3,8 +3,6 @@
 Paths preserved exactly as /workspaces/{workspace_id}/token-frequencies*.
 """
 
-import math
-
 import polars as pl
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -14,10 +12,11 @@ from ....analysis.implementations.token_frequency import (
 from ....analysis.manager import get_task_manager
 from ....analysis.models import AnalysisStatus, AnalysisTask
 from ....analysis.results import GenericAnalysisResult
+from ....core.analysis_helpers import sanitize_stop_words
 from ....core.auth import get_current_user
 from ....core.workspace import workspace_manager
 from ....models import TokenFrequencyRequest, TokenFrequencyResponse
-from ..utils import ensure_task_synced
+from ..utils import ensure_task_synced, get_workspace_or_404
 
 # This router uses the same '/workspaces' prefix as the base router so paths are identical
 # to their original definitions when included at top level.
@@ -37,32 +36,6 @@ def _coerce_limit_value(value) -> int:
     return candidate if candidate > 0 else DEFAULT_TOKEN_LIMIT
 
 
-def _sanitize_stop_words(value) -> list[str]:
-    if value is None:
-        return []
-    if isinstance(value, str):
-        raw_items = value.split(",")
-    elif isinstance(value, (list, tuple, set)):
-        raw_items = list(value)
-    else:
-        return []
-
-    sanitized: list[str] = []
-    seen: set[str] = set()
-    for item in raw_items:
-        if item is None:
-            continue
-        token = str(item).strip()
-        if not token:
-            continue
-        lowered = token.lower()
-        if lowered in seen:
-            continue
-        seen.add(lowered)
-        sanitized.append(token)
-    return sanitized
-
-
 def _persist_text_column(node, column_name: str, user_id: str, workspace_id: str):
     """Persist the chosen text column on node metadata for future analyses."""
     try:
@@ -79,16 +52,6 @@ def _persist_text_column(node, column_name: str, user_id: str, workspace_id: str
         pass
 
 
-def _safe_float(value, *, default: float | None = 0.0) -> float | None:
-    try:
-        number = float(value)
-    except TypeError, ValueError:
-        return default
-    if math.isnan(number) or math.isinf(number):
-        return default
-    return number
-
-
 def _normalize_limit_payload(payload: dict | None) -> dict:
     if not isinstance(payload, dict):
         limit = DEFAULT_TOKEN_LIMIT
@@ -102,7 +65,7 @@ def _normalize_limit_payload(payload: dict | None) -> dict:
 
     limit = _coerce_limit_value(candidate)
     merged["token_limit"] = limit
-    merged["stop_words"] = _sanitize_stop_words(merged.get("stop_words"))
+    merged["stop_words"] = sanitize_stop_words(merged.get("stop_words"))
     return merged
 
 
@@ -161,7 +124,7 @@ def _prepare_result_blob(
     else:
         raw_stop_words = stop_words_override
 
-    stop_words = _sanitize_stop_words(raw_stop_words)
+    stop_words = sanitize_stop_words(raw_stop_words)
 
     server_limit = min(
         max(limit_value * SERVER_LIMIT_MULTIPLIER, DEFAULT_TOKEN_LIMIT),
@@ -360,32 +323,23 @@ async def calculate_token_frequencies(
             status_code=400, detail="token_limit must be a positive integer"
         )
 
-    workspace = workspace_manager.get_workspace(user_id, workspace_id)
-    if not workspace:
-        raise HTTPException(
-            status_code=404, detail=f"Workspace {workspace_id} not found"
-        )
+    get_workspace_or_404(
+        user_id, workspace_id, detail=f"Workspace {workspace_id} not found"
+    )
 
     validated_columns: dict[str, str] = {}
-    node_display_names: dict[str, str] = {}
-
     for node_id in request.node_ids:
         node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
         if not node:
             raise HTTPException(status_code=404, detail=f"Node {node_id} not found")
 
-        node_data = node.data if hasattr(node, "data") else node
-        node_name = node.name if hasattr(node, "name") and node.name else node_id
-        node_display_names[node_id] = node_name
-
-        if hasattr(node_data, "columns"):
-            available_columns = node_data.columns
-        elif hasattr(node_data, "collect_schema"):
-            available_columns = list(node_data.collect_schema().keys())
-        elif hasattr(node_data, "schema"):
-            available_columns = list(node_data.schema.keys())
-        else:
-            available_columns = []
+        node_data = getattr(node, "data", None)
+        if not isinstance(node_data, pl.LazyFrame):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Node {node_id} data must be a LazyFrame",
+            )
+        available_columns = list(node_data.collect_schema().names())
 
         column_name = request.node_columns.get(node_id)
         if not column_name:
@@ -415,7 +369,7 @@ async def calculate_token_frequencies(
         validated_columns[node_id] = column_name
 
     # Stop words are UI-only preferences; persist them but do not apply to compute.
-    requested_stop_words = _sanitize_stop_words(request.stop_words)
+    requested_stop_words = sanitize_stop_words(request.stop_words)
 
     task_info = await tm.submit_task(
         user_id=user_id,

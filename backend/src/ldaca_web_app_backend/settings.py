@@ -133,5 +133,3 @@ class Settings(BaseSettings):
 
 # Global settings instance
 settings = Settings()  # type: ignore[arg-type]
-settings = Settings()  # type: ignore[arg-type]
-settings = Settings()  # type: ignore[arg-type]

@@ -164,6 +164,17 @@ def get_node_with_data_or_400(
     return node, data
 
 
+def get_workspace_or_404(
+    user_id: str,
+    workspace_id: str,
+    detail: Optional[str] = None,
+):
+    workspace = workspace_manager.get_workspace(user_id, workspace_id)
+    if not workspace:
+        raise HTTPException(status_code=404, detail=detail or "Workspace not found")
+    return workspace
+
+
 def _handle_operation_result(result: Any) -> Tuple[bool, str, Any]:  # exported
     try:
         if isinstance(result, tuple) and len(result) == 3:
@@ -214,5 +225,6 @@ __all__ = [
     "configure_numba_threading",
     "get_node_or_404",
     "get_node_with_data_or_400",
+    "get_workspace_or_404",
     "stage_dataframe_as_lazy",
 ]

@@ -4,8 +4,7 @@ from unittest.mock import MagicMock
 
 import polars as pl
 import pytest
-from ldaca_web_app_backend.analysis.implementations.quotation import \
-    QuotationRequest
+from ldaca_web_app_backend.analysis.implementations.quotation import QuotationRequest
 from ldaca_web_app_backend.analysis.manager import get_task_manager
 from ldaca_web_app_backend.analysis.results import GenericAnalysisResult
 from ldaca_web_app_backend.core.workspace import workspace_manager
@@ -18,7 +17,7 @@ TASK = "quotation"
 
 def _prime_workspace_state():
     """Prime workspace state for TaskManager-backed tests."""
-    base_df = pl.DataFrame({"text": ["alpha doc", "beta doc"]})
+    base_df = pl.DataFrame({"text": ["alpha doc", "beta doc"]}).lazy()
 
     class DummyWorkspace:
         def __init__(self, df):
@@ -268,7 +267,7 @@ async def test_quotation_endpoint_recomputes_on_demand(
         def get_node(self, node_id):
             return SimpleNamespace(id=node_id, data=self._df, name=node_id)
 
-    base_df = pl.DataFrame({"text": ["alpha doc", "beta doc"]})
+    base_df = pl.DataFrame({"text": ["alpha doc", "beta doc"]}).lazy()
     workspace_manager._current[USER_ID] = {
         "id": WORKSPACE_ID,
         "ws": DummyWorkspace(base_df),

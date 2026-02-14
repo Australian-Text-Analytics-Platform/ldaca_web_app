@@ -13,15 +13,16 @@ from typing import Optional
 import polars as pl
 from fastapi import APIRouter, Depends, HTTPException
 
-from ....analysis.implementations.sequential_analysis import \
-    SequentialAnalysisRequest as AnalysisSequentialAnalysisRequest
+from ....analysis.implementations.sequential_analysis import (
+    SequentialAnalysisRequest as AnalysisSequentialAnalysisRequest,
+)
 from ....analysis.manager import get_task_manager
 from ....analysis.models import AnalysisStatus, AnalysisTask
 from ....analysis.results import GenericAnalysisResult
 from ....core.auth import get_current_user
 from ....core.workspace import workspace_manager
 from ....models import SequentialAnalysisRequest
-from ..utils import get_node_with_data_or_400
+from ..utils import get_node_with_data_or_400, get_workspace_or_404
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,7 @@ SEQUENTIAL_TASK = "sequential_analysis"
 # ---------------------------------------------------------------------------
 # Standalone sequential-analysis logic (ported from docframe)
 # ---------------------------------------------------------------------------
+
 
 def _run_sequential_analysis(
     lf: pl.LazyFrame,
@@ -82,18 +84,12 @@ def _run_sequential_analysis(
             time_format = "%Y-W%U"
         elif frequency == "monthly":
             time_expr = (
-                pl.col(time_column)
-                .dt.truncate("1mo")
-                .dt.date()
-                .alias("time_period")
+                pl.col(time_column).dt.truncate("1mo").dt.date().alias("time_period")
             )
             time_format = "%Y-%m"
         elif frequency == "quarterly":
             time_expr = (
-                pl.col(time_column)
-                .dt.truncate("3mo")
-                .dt.date()
-                .alias("time_period")
+                pl.col(time_column).dt.truncate("3mo").dt.date().alias("time_period")
             )
             time_format = "%Y-Q"
         elif frequency == "yearly":
@@ -159,7 +155,8 @@ def _run_sequential_analysis(
     if normalized_column_type == "datetime":
         if frequency == "weekly":
             result_df = result_df.with_columns(
-                pl.col("time_period")
+                pl
+                .col("time_period")
                 .dt.strftime("%Y-W%W")
                 .alias("time_period_formatted")
             )
@@ -179,7 +176,8 @@ def _run_sequential_analysis(
             ).drop(["__year__", "__quarter__"])
         else:
             result_df = result_df.with_columns(
-                pl.col("time_period")
+                pl
+                .col("time_period")
                 .dt.strftime(time_format)
                 .alias("time_period_formatted")
             )
@@ -196,10 +194,12 @@ def _run_sequential_analysis(
             return format(value, ".6g")
 
         result_df = result_df.with_columns([
-            pl.col("time_period")
+            pl
+            .col("time_period")
             .map_elements(_format_numeric, return_dtype=pl.String)
             .alias("__numeric_period_label_start__"),
-            pl.col("__numeric_period_end__")
+            pl
+            .col("__numeric_period_end__")
             .map_elements(_format_numeric, return_dtype=pl.String)
             .alias("__numeric_period_label_end__"),
         ])
@@ -232,9 +232,7 @@ async def run_sequential_analysis(
 ):
     """Run sequential analysis on a node with polars-text integration."""
     user_id = current_user["id"]
-    ws = workspace_manager.get_workspace(user_id, workspace_id)
-    if not ws:
-        raise HTTPException(status_code=404, detail="Workspace not found")
+    get_workspace_or_404(user_id, workspace_id)
 
     task_manager = get_task_manager(user_id, workspace_id)
     existing_task_ids = task_manager.get_current_task_ids("sequential-analysis")
@@ -263,13 +261,16 @@ async def run_sequential_analysis(
     try:
         node, node_data = get_node_with_data_or_400(user_id, workspace_id, node_id)
 
+        if not isinstance(node_data, pl.LazyFrame):
+            raise HTTPException(
+                status_code=400,
+                detail="Node data must be a LazyFrame",
+            )
+
+        schema = node_data.collect_schema()
+
         # Determine available columns
-        if hasattr(node_data, "columns"):
-            available_columns = node_data.columns
-        elif hasattr(node_data, "schema"):
-            available_columns = list(node_data.schema.keys())
-        else:
-            available_columns = []
+        available_columns = list(schema.names())
 
         def normalize_type_name(value: object | None) -> str | None:
             if value is None:
@@ -298,27 +299,8 @@ async def run_sequential_analysis(
             if normalized:
                 column_type_lookup.setdefault(name, normalized)
 
-        schema_attr = getattr(node_data, "schema", None)
-        if isinstance(schema_attr, list):
-            for entry in schema_attr:
-                if isinstance(entry, dict):
-                    register_type(
-                        entry.get("name"),
-                        entry.get("js_type") or entry.get("type") or entry.get("dtype"),
-                    )
-        elif isinstance(schema_attr, dict):
-            for name, raw in schema_attr.items():
-                if isinstance(raw, dict):
-                    register_type(
-                        name, raw.get("js_type") or raw.get("type") or raw.get("dtype")
-                    )
-                else:
-                    register_type(name, raw)
-
-        dtypes_attr = getattr(node_data, "dtypes", None)
-        if isinstance(dtypes_attr, dict):
-            for name, raw in dtypes_attr.items():
-                register_type(name, raw)
+        for name, raw in zip(schema.names(), schema.dtypes()):
+            register_type(name, raw)
 
         if available_columns and request.time_column not in available_columns:
             raise HTTPException(
@@ -380,12 +362,6 @@ async def run_sequential_analysis(
             raise HTTPException(
                 status_code=400,
                 detail=f"Invalid frequency '{request.frequency}'. Valid options: {valid_frequencies}",
-            )
-
-        if not hasattr(node_data, "columns") and not hasattr(node_data, "schema"):
-            raise HTTPException(
-                status_code=400,
-                detail="Node data is not a valid DataFrame/LazyFrame.",
             )
 
         sequential_result = _run_sequential_analysis(
