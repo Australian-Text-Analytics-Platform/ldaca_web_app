@@ -455,21 +455,7 @@ class WorkerTaskManager:
             task = task_manager.get_task(task_info.id)
             if task:
                 if task_type == "topic_modeling":
-                    try:
-                        from ..api.workspaces.analyses.topic_modeling import (
-                            TOPIC_MODELING_CACHE,
-                            _cache_key,
-                        )
-
-                        TOPIC_MODELING_CACHE[
-                            _cache_key(user_id, workspace_id, task_info.id)
-                        ] = result
-                    except Exception:
-                        logger.debug(
-                            "Failed to cache topic modeling result for task %s",
-                            task_info.id,
-                        )
-                    task.complete(GenericAnalysisResult({"ready": True}))
+                    task.complete(GenericAnalysisResult(result))
                 else:
                     task.complete(GenericAnalysisResult(result))
                 task_manager.save_task(task)

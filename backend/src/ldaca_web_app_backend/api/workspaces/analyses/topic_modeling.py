@@ -1,66 +1,58 @@
-"""Topic Modeling analysis endpoints extracted from workspaces monolith."""
+"""Topic Modeling analysis endpoints (background-task based)."""
 
-import math
+from __future__ import annotations
 
 import polars as pl
 from fastapi import APIRouter, Depends, HTTPException
 
+from ....analysis.implementations.topic_modeling import (
+    TopicModelingRequest as AnalysisTopicModelingRequest,
+)
 from ....analysis.manager import get_task_manager
 from ....analysis.models import AnalysisStatus, AnalysisTask
-from ....analysis.results import GenericAnalysisResult
 from ....core.auth import get_current_user
-from ....core.json_utils import json_sanitize
 from ....core.workspace import workspace_manager
 from ....models import TopicModelingRequest, TopicModelingResponse
-from ..utils import get_workspace_or_404
+from ..utils import ensure_task_synced, get_workspace_or_404
 
 router = APIRouter(prefix="/workspaces", tags=["topic-modeling"])
 
 
-@router.post(
-    "/{workspace_id}/topic-modeling",
-    response_model=TopicModelingResponse,
-)
+@router.delete("/{workspace_id}/topic-modeling")
+async def clear_topic_modeling_results(
+    workspace_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    user_id = current_user["id"]
+    get_workspace_or_404(user_id, workspace_id)
+
+    task_manager = get_task_manager(user_id, workspace_id)
+    current_id = task_manager.get_current_task_ids("topic_modeling")
+    if current_id:
+        task_manager.clear_task(current_id[0])
+    return {
+        "state": "successful",
+        "message": "Topic modeling analysis results have been cleared.",
+    }
+
+
+@router.post("/{workspace_id}/topic-modeling", response_model=TopicModelingResponse)
 async def run_topic_modeling(
     workspace_id: str,
     request: TopicModelingRequest,
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-
     get_workspace_or_404(user_id, workspace_id)
 
-    task_manager = get_task_manager(user_id, workspace_id)
+    if not request.node_ids:
+        raise HTTPException(
+            status_code=400, detail="At least one node ID must be provided"
+        )
 
-    # Return running task if present
-    for task in task_manager.tasks.values():
-        if (
-            task.status == AnalysisStatus.RUNNING
-            and task.request
-            and hasattr(task.request, "__class__")
-            and task.request.__class__.__name__ == "TopicModelingRequest"
-        ):
-            return TopicModelingResponse(
-                state="running",
-                message="Topic Modeling analysis already running",
-                data=None,
-                metadata={"task_id": task.task_id},
-            )
+    requested_node_columns = request.node_columns or {}
 
-    # Reject if background manager already has running analysis task
-    tm = workspace_manager.get_task_manager(user_id, workspace_id)
-    try:
-        if tm and tm.any_running():
-            raise HTTPException(
-                status_code=409,
-                detail="Another analysis task is currently running. Please wait for it to complete before starting Topic Modeling.",
-            )
-    except AttributeError:
-        pass
-
-    corpora: list[list[str]] = []
-    node_names: list[str] = []
-
+    node_columns: dict[str, str] = {}
     for node_id in request.node_ids:
         node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
         if not node:
@@ -73,10 +65,8 @@ async def run_topic_modeling(
                 detail=f"Node {node_id} data must be a LazyFrame",
             )
 
-        node_name = node.name if hasattr(node, "name") else node_id
         available_columns = list(node_data.collect_schema().names())
-
-        column_name = request.node_columns.get(node_id)
+        column_name = requested_node_columns.get(node_id)
         if not column_name:
             metadata = getattr(node, "metadata", {}) or {}
             if isinstance(metadata, dict):
@@ -102,110 +92,116 @@ async def run_topic_modeling(
                 detail=f"Column '{column_name}' not found in node {node_id}. Available columns: {available_columns}",
             )
 
-        selected_data = node_data.select(
-            pl.col(column_name).alias("__doc_col__")
-        ).collect()
-        docs = [
-            str(val) if val is not None else ""
-            for val in selected_data["__doc_col__"].to_list()
-        ]
-        corpora.append(docs)
-        node_names.append(node_name)
+        node_columns[node_id] = column_name
 
-    # Keep native fast path for stable behavior
-    use_native = True
-
-    if use_native:
-        import polars_text as pt
-
-        all_docs = [doc for corpus in corpora for doc in corpus]
-        corpus_sizes = [len(corpus) for corpus in corpora]
-
-        if not all_docs:
-            tv_data = {
-                "topics": [],
-                "corpus_sizes": corpus_sizes,
-                "per_corpus_topic_counts": [],
-                "meta": {},
-            }
-        else:
-            series = pl.Series("text", all_docs)
-            topics_map, doc_topics = pt.topic_modeling(
-                series,
-                min_points=request.min_topic_size,
+    tm = workspace_manager.get_task_manager(user_id, workspace_id)
+    # Match token-frequencies behavior: only short-circuit when the same analysis is
+    # already running for this workspace/user.
+    try:
+        if await tm.any_running(
+            task_type="topic_modeling", user_id=user_id, workspace_id=workspace_id
+        ):
+            latest = await tm.latest_by_type(
+                "topic_modeling", user_id=user_id, workspace_id=workspace_id
             )
+            return TopicModelingResponse(
+                state="running",
+                message="Topic Modeling analysis already running",
+                data=None,
+                metadata={"task_id": latest.id if latest else None},
+            )
+    except Exception:
+        # Non-fatal: proceed to submit a new task.
+        pass
 
-            top_topics: list[int] = []
-            for row in doc_topics.to_list():
-                if not row:
-                    top_topics.append(-1)
-                    continue
-                best = max(row, key=lambda item: item.get("weight", 0.0))
-                top_topics.append(int(best.get("topic_id", -1)))
-
-            per_corpus_topic_counts: list[dict[int, int]] = []
-            idx = 0
-            for size in corpus_sizes:
-                counts: dict[int, int] = {}
-                for topic_id in top_topics[idx : idx + size]:
-                    counts[topic_id] = counts.get(topic_id, 0) + 1
-                per_corpus_topic_counts.append(counts)
-                idx += size
-
-            topic_ids = sorted(set(top_topics) | set(topics_map.keys()))
-            topic_ids = [t for t in topic_ids if t != -1]
-            topic_payloads = []
-            if topic_ids:
-                for i, topic_id in enumerate(topic_ids):
-                    angle = 2 * math.pi * (i / max(len(topic_ids), 1))
-                    x = float(math.cos(angle))
-                    y = float(math.sin(angle))
-                    per_sizes = [
-                        per_corpus_topic_counts[j].get(topic_id, 0)
-                        for j in range(len(per_corpus_topic_counts))
-                    ]
-                    total_size = sum(per_sizes)
-                    label = topics_map.get(topic_id, f"Topic {topic_id}")
-                    topic_payloads.append({
-                        "id": topic_id,
-                        "label": label,
-                        "size": per_sizes,
-                        "total_size": total_size,
-                        "x": x,
-                        "y": y,
-                    })
-
-            tv_data = {
-                "topics": topic_payloads,
-                "corpus_sizes": corpus_sizes,
-                "per_corpus_topic_counts": per_corpus_topic_counts,
-                "meta": {"native": True},
-            }
-    else:
-        raise HTTPException(status_code=501, detail="Fallback path removed")
-
-    result_payload = {
-        "topics": tv_data["topics"],
-        "corpus_sizes": tv_data["corpus_sizes"],
-        "per_corpus_topic_counts": tv_data.get("per_corpus_topic_counts"),
-        "meta": {**tv_data.get("meta", {}), "node_names": node_names},
-    }
-
-    serialized_result_payload = json_sanitize(result_payload)
-
-    analysis_task = AnalysisTask(
-        task_id="topic_modeling_current",
+    worker_task = await tm.submit_task(
         user_id=user_id,
         workspace_id=workspace_id,
-        request=request,
-        status=AnalysisStatus.COMPLETED,
-        result=GenericAnalysisResult(serialized_result_payload),
+        task_type="topic_modeling",
+        task_args={
+            "node_ids": request.node_ids,
+            "node_columns": node_columns,
+            "min_topic_size": request.min_topic_size,
+            "use_ctfidf": request.use_ctfidf,
+        },
+        task_name="Topic Modeling",
     )
-    task_manager.save_task(analysis_task)
+
+    analysis_tm = get_task_manager(user_id, workspace_id)
+    analysis_request = AnalysisTopicModelingRequest(
+        node_ids=request.node_ids,
+        node_columns=node_columns,
+        min_topic_size=request.min_topic_size,
+        use_ctfidf=request.use_ctfidf,
+    )
+    analysis_tm.save_task(
+        AnalysisTask(
+            task_id=worker_task.id,
+            user_id=user_id,
+            workspace_id=workspace_id,
+            request=analysis_request,
+            status=AnalysisStatus.RUNNING,
+        )
+    )
+    analysis_tm.set_current_task("topic_modeling", worker_task.id)
 
     return TopicModelingResponse(
-        state="successful",
-        message="Topic Modeling analysis complete",
-        data=serialized_result_payload,
-        metadata={"task_id": "topic_modeling_current"},
+        state="running",
+        message="Topic Modeling analysis started",
+        data=None,
+        metadata={"task_id": worker_task.id},
+    )
+
+
+@router.get(
+    "/{workspace_id}/topic-modeling/tasks/{task_id}/result",
+    response_model=TopicModelingResponse,
+)
+async def topic_modeling_task_result(
+    workspace_id: str,
+    task_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    user_id = current_user["id"]
+    get_workspace_or_404(user_id, workspace_id)
+
+    task = await ensure_task_synced(
+        user_id, workspace_id, task_id, get_task_manager(user_id, workspace_id)
+    )
+
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if task.status == AnalysisStatus.RUNNING:
+        return TopicModelingResponse(
+            state="running",
+            message="Topic Modeling analysis is running",
+            data=None,
+            metadata={"task_id": task_id},
+        )
+
+    if task.status == AnalysisStatus.FAILED:
+        return TopicModelingResponse(
+            state="failed",
+            message=(task.error or "Topic Modeling analysis failed"),
+            data=None,
+            metadata={"task_id": task_id},
+        )
+
+    if task.status == AnalysisStatus.COMPLETED and task.result:
+        payload = task.result.to_json()
+        if not isinstance(payload, dict):
+            payload = {}
+        return TopicModelingResponse(
+            state="successful",
+            message="Topic Modeling analysis complete",
+            data=payload,
+            metadata={"task_id": task_id},
+        )
+
+    return TopicModelingResponse(
+        state="failed",
+        message="Topic Modeling analysis failed",
+        data=None,
+        metadata={"task_id": task_id},
     )

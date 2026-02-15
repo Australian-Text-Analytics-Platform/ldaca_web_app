@@ -8,18 +8,24 @@ from typing import Any, Optional
 import polars as pl
 from fastapi import APIRouter, Depends, HTTPException
 
-from ....analysis.implementations.quotation import \
-    QuotationRequest as AnalysisQuotationRequest
+from ....analysis.implementations.quotation import (
+    QuotationRequest as AnalysisQuotationRequest,
+)
 from ....analysis.manager import get_task_manager
 from ....analysis.results import GenericAnalysisResult
-from ....core.analysis_helpers import \
-    normalize_sort_order as _normalize_sort_order
+from ....core.analysis_helpers import normalize_sort_order as _normalize_sort_order
 from ....core.auth import get_current_user
-from ....core.services.quotation_client import (QuotationServiceError,
-                                                extract_remote_quotations)
+from ....core.services.quotation_client import (
+    QuotationServiceError,
+    extract_remote_quotations,
+)
 from ....core.workspace import workspace_manager
-from ....models import (QuotationDetachRequest, QuotationEngineConfig,
-                        QuotationRequest, QuotationResultQuery)
+from ....models import (
+    QuotationDetachRequest,
+    QuotationEngineConfig,
+    QuotationRequest,
+    QuotationResultQuery,
+)
 from ....settings import settings
 from ..utils import get_node_with_data_or_400, get_workspace_or_404
 from . import quotation_core as qcore
@@ -382,14 +388,6 @@ async def detach_quotation(
             "message": "Quotation detach started",
             "data": None,
             "metadata": {"task_id": task_info.id},
-        }
-
-    except Exception as exc:
-        logger.exception("Error submitting detach quotation task")
-        raise HTTPException(
-            status_code=500, detail=f"Error submitting detach task: {exc}"
-        )
-        )
         }
 
     except Exception as exc:

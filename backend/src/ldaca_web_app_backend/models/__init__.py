@@ -675,6 +675,8 @@ class TopicModelingTopic(BaseModel):
 class TopicModelingData(BaseModel):
     topics: List[TopicModelingTopic]
     corpus_sizes: List[int]
+    per_corpus_topic_counts: Optional[List[Dict[int, int]]] = None
+    meta: Optional[Dict[str, Any]] = None
 
 
 # =============================================================================
@@ -700,7 +702,6 @@ class FeedbackResponse(BaseModel):
     state: str  # 'successful' | 'failed'
     message: str
     record_id: Optional[str] = None
-    per_corpus_topic_counts: Optional[List[Dict[int, int]]] = None
     meta: Dict[str, Any] = {}
 
 

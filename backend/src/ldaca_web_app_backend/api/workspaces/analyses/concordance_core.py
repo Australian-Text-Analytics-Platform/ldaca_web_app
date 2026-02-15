@@ -8,8 +8,7 @@ from typing import Any, Optional
 import polars as pl
 from fastapi import HTTPException
 
-from ....core.analysis_helpers import \
-    normalize_sort_order as _normalize_sort_order
+from ....core.analysis_helpers import normalize_sort_order as _normalize_sort_order
 from ....core.workspace import workspace_manager
 
 CORE_CONCORDANCE_COLUMNS = {
@@ -60,19 +59,22 @@ def sanitize_request_for_storage(request_dict: dict[str, Any]) -> dict[str, Any]
 
 def concordance_non_empty_expr() -> pl.Expr:
     return pl.any_horizontal([
-        pl.col("matched_text")
+        pl
+        .col("matched_text")
         .cast(pl.Utf8, strict=False)
         .str.strip_chars()
         .str.len_chars()
         .fill_null(0)
         > 0,
-        pl.col("left_context")
+        pl
+        .col("left_context")
         .cast(pl.Utf8, strict=False)
         .str.strip_chars()
         .str.len_chars()
         .fill_null(0)
         > 0,
-        pl.col("right_context")
+        pl
+        .col("right_context")
         .cast(pl.Utf8, strict=False)
         .str.strip_chars()
         .str.len_chars()
@@ -97,7 +99,8 @@ def build_concordance_lazyframe(
         case_sensitive=request["case_sensitive"],
     )
     return (
-        node_data.select([pl.all(), expr.alias("concordance")])
+        node_data
+        .select([pl.all(), expr.alias("concordance")])
         .explode("concordance")
         .unnest("concordance")
         .filter(concordance_non_empty_expr())
@@ -459,5 +462,4 @@ def build_concordance_response(
         "data": data,
         "analysis_params": analysis_params,
         "combinable": combinable,
-    }
     }
