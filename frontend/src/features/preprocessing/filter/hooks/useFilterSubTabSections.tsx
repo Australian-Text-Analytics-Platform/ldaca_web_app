@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Loader2 } from 'lucide-react';
 import { nodesApi } from '../../../../api/nodes';
-import { Button } from '../../../../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../../components/ui/select';
 import { Checkbox } from '../../../../components/ui/checkbox';
 import type { NodeColumnSelection, WorkspaceNodeLike } from '../../../../components/NodeSelectionPanel';
@@ -10,6 +8,7 @@ import { normalizeTypeName, getOperatorsForType, formatPreviewValue } from '../.
 import { ISO_PLACEHOLDER } from '../../utils/dateTimeHelpers';
 import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
 import { buildFilterRequestPayload, isConditionComplete } from '../utils/serializers';
+import { FilterValueChecklist } from '../components/FilterValueChecklist';
 import type {
   ConditionRange,
   ConditionValue,
@@ -173,6 +172,7 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     loading: boolean;
     error: string | null;
   }>>({});
+  const [optionSearchQueries, setOptionSearchQueries] = useState<Record<string, string>>({});
 
   const availableColumns = useMemo(() => {
     const columns: ConditionColumnOption[] = [];
@@ -328,6 +328,7 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
 
   useEffect(() => {
     setCategoricalOptions({});
+    setOptionSearchQueries({});
   }, [currentWorkspaceId, selectedNodeId]);
 
   useEffect(() => {
@@ -457,6 +458,11 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
   const handleRemoveCondition = (id: string) => {
     if (conditions.length > 1) {
       setConditions(conditions.filter(c => c.id !== id));
+      setOptionSearchQueries((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
     }
   };
 
@@ -539,6 +545,10 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
       
       return updated;
     }));
+
+    if (field === 'column' || field === 'operator') {
+      setOptionSearchQueries((prev) => ({ ...prev, [id]: '' }));
+    }
 
     if (nextCategoricalColumnToLoad) {
       const targetCondition = conditions.find((entry) => entry.id === id);
@@ -689,6 +699,7 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
       const key = column ? getCategoricalKey(column) : null;
       const optionState = key ? categoricalOptions[key] : undefined;
       const optionEntries = optionState?.options ?? [];
+      const searchQuery = optionSearchQueries[condition.id] ?? '';
       const selectedValues = Array.isArray(condition.value)
         ? (condition.value as Array<unknown>).map(toCategoricalPrimitive)
         : [];
@@ -719,87 +730,39 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
         updateSelections(optionEntries.map((entry) => entry.value));
       };
 
+      const handleSelectVisible = (visibleOptions: CategoricalOptionEntry[]) => {
+        if (disabled) return;
+        const merged = new Map<string, CategoricalPrimitive>(
+          selectedValues.map((entry) => [getCategoricalOptionKey(entry), entry]),
+        );
+        visibleOptions.forEach((entry) => {
+          merged.set(entry.key, entry.value);
+        });
+        updateSelections(Array.from(merged.values()));
+      };
+
       const handleClearAll = () => {
         if (disabled) return;
         updateSelections([]);
       };
 
-      return (
-        <div className="flex flex-col gap-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              disabled={disabled || isLoadingOptions || optionEntries.length === 0}
-              onClick={handleSelectAll}
-            >
-              Select all
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              disabled={disabled || (selectedKeys.size === 0 && !isLoadingOptions)}
-              onClick={handleClearAll}
-            >
-              Clear
-            </Button>
-            {optionError && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => column && ensureCategoricalOptions(column, dataType)}
-                disabled={disabled}
-              >
-                Retry
-              </Button>
-            )}
-          </div>
+      const onSelectAllForMode = searchQuery.trim().length > 0 ? handleSelectVisible : () => handleSelectAll();
 
-          {isLoadingOptions ? (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span>Loading categories…</span>
-            </div>
-          ) : optionError ? (
-            <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-              Failed to load categories: {optionError}
-            </div>
-          ) : (
-            <div className="max-h-48 overflow-y-auto rounded-md border border-border/60 bg-background px-3 py-2">
-              {optionEntries.length === 0 ? (
-                <div className="text-xs text-muted-foreground">No categories available.</div>
-              ) : (
-                optionEntries.map((option) => {
-                  const checked = selectedKeys.has(option.key);
-                  return (
-                    <label
-                      key={`${condition.id}-${option.key}`}
-                      className={`flex items-center gap-2 py-1 text-sm ${
-                        option.isNull ? 'text-amber-700' : 'text-foreground'
-                      }`}
-                    >
-                      <Checkbox
-                        checked={checked}
-                        onCheckedChange={(next) => toggleValue(option, next === true)}
-                        disabled={disabled}
-                        id={`${condition.id}-${option.key}`}
-                      />
-                      <span
-                        className={`flex-1 truncate ${option.isNull ? 'font-medium' : ''}`}
-                        title={option.isNull ? 'Null (no value)' : option.label}
-                      >
-                        {option.isNull ? 'Null (no value)' : option.label}
-                      </span>
-                    </label>
-                  );
-                })
-              )}
-            </div>
-          )}
-        </div>
+      return (
+        <FilterValueChecklist
+          idPrefix={condition.id}
+          options={optionEntries}
+          selectedKeys={selectedKeys}
+          disabled={disabled}
+          loading={isLoadingOptions}
+          error={optionError}
+          searchQuery={searchQuery}
+          onSearchQueryChange={(query) => setOptionSearchQueries((prev) => ({ ...prev, [condition.id]: query }))}
+          onToggleOption={toggleValue}
+          onSelectAll={(visibleOptions) => onSelectAllForMode(visibleOptions as CategoricalOptionEntry[])}
+          onClearAll={handleClearAll}
+          onRetry={column ? () => ensureCategoricalOptions(column, dataType) : undefined}
+        />
       );
     }
 
