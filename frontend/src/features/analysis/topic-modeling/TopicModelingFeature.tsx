@@ -14,11 +14,23 @@ import useNodeColumnInfos from '../../../hooks/useNodeColumnInfos';
 import { useAnalysisLockState } from '../../../hooks/useAnalysisLockState';
 import { Button } from '../../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../../../components/ui/alert-dialog';
 import { Input } from '../../../components/ui/input';
 import { Checkbox } from '../../../components/ui/checkbox';
 import HelpIcon from '../../../components/help/HelpIcon';
 import { AlertTriangle, Loader2, Play, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '../../../lib/queryKeys';
 import { applySelectedColumnsToSnapshots } from '../../../hooks/useSchemaManagement';
 import { ANALYSIS_LOCKED_MESSAGE } from '../../../components/tabs/AnalysisLockedNotice';
 import AnalysisTaskBanner from '../../../components/tabs/AnalysisTaskBanner';
@@ -26,6 +38,10 @@ import type { AnalysisTaskStatus } from '../../../hooks/useAnalysisTaskStatus';
 import useAnalysisTaskLifecycle, { type AnalysisTaskRefreshContext } from '../../../hooks/useAnalysisTaskLifecycle';
 import { getAnalysisActionState } from '../common/analysisActionState';
 import { useAnalysisHydration } from '../common';
+import type {
+  TopicModelingDetachNodeOption,
+  TopicModelingDetachRequest,
+} from '../../../api/text';
 interface TopicModelingTopic { id: number; label: string; size: number[]; total_size: number; x: number; y: number; }
 interface TopicModelingResponse { state?: 'running' | 'successful' | 'failed' | 'cancelled'; message?: string; data?: { topics: TopicModelingTopic[]; corpus_sizes?: number[] }; metadata?: { task_id?: string; [k: string]: any } }
 
@@ -61,6 +77,7 @@ const TopicModelingFeature: React.FC = () => {
   const { selectedNodes } = useWorkspaceSelection();
   const { currentWorkspaceId } = useWorkspaceData();
   const { getAuthHeaders } = useAuth();
+  const queryClient = useQueryClient();
   const topicModelingReadyTaskId = useAnalysisStore((state: any) => state.topicModelingReadyTaskId);
   const currentView = useUIStore((state) => state.currentView);
   const isActiveTab = currentView === 'topic-modeling';
@@ -105,12 +122,17 @@ const TopicModelingFeature: React.FC = () => {
     resultRef.current = newResult;
   };
   
-  const [minTopicSize, setMinTopicSize] = useState(5);
-  const [useCtTfidf, setUseCtTfidf] = useState(false);
+  const [minTopicSize, setMinTopicSize] = useState(10);
+  const [useCtTfidf, setUseCtTfidf] = useState(true);
   const [nodeColors, setNodeColors] = useState<Record<string,string>>({});
   const [isClearing, setIsClearing] = useState(false);
   const [hoveredTopicId, setHoveredTopicId] = useState<number | null>(null);
   const [tooltip, setTooltip] = useState<{x:number;y:number; topic: TopicModelingTopic | null}>({x:0,y:0,topic:null});
+  const [detachDialogOpen, setDetachDialogOpen] = useState(false);
+  const [isDetachLoading, setIsDetachLoading] = useState(false);
+  const [isDetaching, setIsDetaching] = useState(false);
+  const [detachNodeOptions, setDetachNodeOptions] = useState<TopicModelingDetachNodeOption[]>([]);
+  const [selectedDetachColumns, setSelectedDetachColumns] = useState<Record<string, string[]>>({});
   const containerRef = useRef<HTMLDivElement | null>(null); // overall card
   const chartRef = useRef<HTMLDivElement | null>(null); // chart area
   const [chartWidth, setChartWidth] = useState<number>(800);
@@ -400,6 +422,86 @@ const TopicModelingFeature: React.FC = () => {
     }
   };
 
+  const openDetachDialog = useCallback(async () => {
+    if (!currentWorkspaceId) return;
+    const taskId = await resolveTopicModelingTaskId();
+    if (!taskId) {
+      toast.error('No topic modeling task available for detach');
+      return;
+    }
+
+    try {
+      setIsDetachLoading(true);
+      const resp = await textApi.getTopicModelingDetachOptions(currentWorkspaceId, taskId, getAuthHeaders());
+      const nodes = resp?.data?.nodes ?? [];
+      setDetachNodeOptions(nodes);
+      const initialSelections: Record<string, string[]> = {};
+      nodes.forEach((node) => {
+        initialSelections[node.node_id] = (node.available_columns || []).filter(
+          (col) => !(node.disabled_columns || []).includes(col)
+        );
+      });
+      setSelectedDetachColumns(initialSelections);
+      setDetachDialogOpen(true);
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to load topic detach options');
+    } finally {
+      setIsDetachLoading(false);
+    }
+  }, [currentWorkspaceId, getAuthHeaders, resolveTopicModelingTaskId]);
+
+  const toggleDetachColumn = useCallback((nodeId: string, column: string, checked: boolean) => {
+    setSelectedDetachColumns((prev) => {
+      const current = new Set(prev[nodeId] || []);
+      if (checked) {
+        current.add(column);
+      } else {
+        current.delete(column);
+      }
+      return { ...prev, [nodeId]: Array.from(current) };
+    });
+  }, []);
+
+  const handleDetachConfirm = useCallback(async () => {
+    if (!currentWorkspaceId) return;
+    const taskId = await resolveTopicModelingTaskId();
+    if (!taskId) {
+      toast.error('No topic modeling task available for detach');
+      return;
+    }
+
+    const nodeIds = detachNodeOptions.map((n) => n.node_id);
+    const hasSelections = nodeIds.every((nodeId) => (selectedDetachColumns[nodeId] || []).length > 0);
+    if (!hasSelections) {
+      toast.error('Please select at least one column for each node');
+      return;
+    }
+
+    try {
+      setIsDetaching(true);
+      const payload: TopicModelingDetachRequest = {
+        node_ids: nodeIds,
+        selected_columns: selectedDetachColumns,
+      };
+      const resp = await textApi.topicModelingDetach(currentWorkspaceId, taskId, payload, getAuthHeaders());
+      if (resp?.state !== 'successful') {
+        throw new Error(resp?.message || 'Topic detach failed');
+      }
+
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.workspaceNodes(currentWorkspaceId) }),
+      ]);
+
+      setDetachDialogOpen(false);
+      toast.success('Detached topic node(s) created');
+    } catch (e: any) {
+      toast.error(e?.message || 'Topic detach failed');
+    } finally {
+      setIsDetaching(false);
+    }
+  }, [currentWorkspaceId, detachNodeOptions, getAuthHeaders, queryClient, resolveTopicModelingTaskId, selectedDetachColumns]);
+
   const topics: TopicModelingTopic[] = result?.data?.topics || [];
   const corpusCount = result?.data?.corpus_sizes?.length || 0;
 
@@ -519,8 +621,8 @@ const TopicModelingFeature: React.FC = () => {
     const node_columns: Record<string,string> = req.node_columns || {};
     const sels = nodeIds.map((id: string) => ({ nodeId: id, column: node_columns[id] || '' }));
     setNodeColumnSelections(sels, { replace: true });
-    setMinTopicSize(Number(req.min_topic_size ?? 5));
-    setUseCtTfidf(!!req.use_ctfidf);
+    setMinTopicSize(Number(req.min_topic_size ?? 10));
+    setUseCtTfidf(req.use_ctfidf === undefined ? true : !!req.use_ctfidf);
 
     const snaps: Array<{ id: string; name: string; columns: string[] }> = [];
     for (const id of nodeIds) {
@@ -706,7 +808,7 @@ const TopicModelingFeature: React.FC = () => {
                   type="number"
                   min={2}
                   value={minTopicSize}
-                  onChange={e=>setMinTopicSize(parseInt(e.target.value, 10) || 5)}
+                  onChange={e=>setMinTopicSize(parseInt(e.target.value, 10) || 10)}
                   disabled={!!isLocked}
                   className="md:w-40"
                 />
@@ -898,6 +1000,22 @@ const TopicModelingFeature: React.FC = () => {
                   />
                 </CardTitle>
               </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full sm:w-auto"
+                onClick={() => void openDetachDialog()}
+                disabled={isDetachLoading || isDetaching}
+              >
+                {isDetachLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Loading Detach…
+                  </>
+                ) : (
+                  'Detach'
+                )}
+              </Button>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="relative w-full overflow-hidden rounded-lg border border-muted-foreground/30 bg-background" ref={chartRef}>
@@ -933,6 +1051,58 @@ const TopicModelingFeature: React.FC = () => {
             </CardContent>
           </Card>
         )}
+
+      <AlertDialog open={detachDialogOpen} onOpenChange={setDetachDialogOpen}>
+        <AlertDialogContent className="max-w-3xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Detach Topic Results</AlertDialogTitle>
+            <AlertDialogDescription>
+              Select metadata columns to include with the detached topic column. Existing source <code>topic</code> columns are shown but cannot be selected.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="max-h-[60vh] space-y-4 overflow-y-auto pr-1">
+            {detachNodeOptions.map((node) => (
+              <div key={node.node_id} className="rounded-md border p-3">
+                <div className="mb-2 text-sm font-semibold text-foreground">{node.node_name}</div>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {node.available_columns.map((column) => {
+                    const disabled = (node.disabled_columns || []).includes(column);
+                    const checked = (selectedDetachColumns[node.node_id] || []).includes(column);
+                    return (
+                      <label key={`${node.node_id}-${column}`} className={`flex items-center gap-2 text-sm ${disabled ? 'opacity-60' : ''}`}>
+                        <Checkbox
+                          checked={checked}
+                          onCheckedChange={(value) => toggleDetachColumn(node.node_id, column, value === true)}
+                          disabled={disabled || isDetaching}
+                        />
+                        <span>{column}{disabled ? ' (disabled)' : ''}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDetaching}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                void handleDetachConfirm();
+              }}
+              disabled={isDetaching}
+            >
+              {isDetaching ? (
+                <span className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" />Detaching…</span>
+              ) : (
+                'Detach'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       </div>
   );
 };

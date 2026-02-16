@@ -647,8 +647,8 @@ class TokenFrequencyResponse(BaseModel):
 class TopicModelingRequest(BaseModel):
     node_ids: List[str]  # 1 or 2 node IDs
     node_columns: Optional[Dict[str, str]] = None  # Maps node_id -> column_name
-    min_topic_size: Optional[int] = 5  # DBSCAN min_points
-    use_ctfidf: Optional[bool] = False  # Unused (kept for compatibility)
+    min_topic_size: Optional[int] = 10  # BERTopic minimum topic size
+    use_ctfidf: Optional[bool] = True
 
     # Pydantic v2 model config
     model_config = ConfigDict(
@@ -656,8 +656,8 @@ class TopicModelingRequest(BaseModel):
             "example": {
                 "node_ids": ["node1", "node2"],
                 "node_columns": {"node1": "text", "node2": "content"},
-                "min_topic_size": 5,
-                "use_ctfidf": False,
+                "min_topic_size": 10,
+                "use_ctfidf": True,
             }
         }
     )
@@ -709,6 +709,37 @@ class TopicModelingResponse(BaseModel):
     state: str  # 'successful', 'failed', 'running', 'cancelled'
     message: str
     data: Optional[TopicModelingData] = None
+    metadata: Optional[Dict[str, Any]] = None
+
+
+class TopicModelingDetachRequest(BaseModel):
+    """Request payload for detaching topic assignments from cached topic-modeling output."""
+
+    node_ids: Optional[List[str]] = None
+    selected_columns: Dict[str, List[str]] = Field(default_factory=dict)
+    new_node_names: Optional[Dict[str, str]] = None
+    topic_column_name: Optional[str] = "topic"
+
+
+class TopicModelingDetachNodeOption(BaseModel):
+    node_id: str
+    node_name: str
+    text_column: Optional[str] = None
+    available_columns: List[str]
+    disabled_columns: List[str] = Field(default_factory=list)
+
+
+class TopicModelingDetachOptionsResponse(BaseModel):
+    state: str
+    message: str
+    data: Dict[str, List[TopicModelingDetachNodeOption]]
+    metadata: Optional[Dict[str, Any]] = None
+
+
+class TopicModelingDetachResponse(BaseModel):
+    state: str
+    message: str
+    data: Optional[Dict[str, Any]] = None
     metadata: Optional[Dict[str, Any]] = None
 
 

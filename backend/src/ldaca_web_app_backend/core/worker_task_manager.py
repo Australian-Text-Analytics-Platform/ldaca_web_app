@@ -120,6 +120,8 @@ class WorkerTaskManager:
         self._tasks: Dict[str, TaskInfo] = {}
         self._lock = asyncio.Lock()
         self._progress_store: Dict[str, Dict[str, Any]] = {}  # task_id -> progress info
+        self._topic_lazyframe_cache: Dict[tuple[str, str], Dict[str, Any]] = {}
+        self._topic_meanings_cache: Dict[str, Dict[str, Any]] = {}
 
         # Event bus for real-time updates
         self._subscribers: Dict[
@@ -448,14 +450,100 @@ class WorkerTaskManager:
     ):
         """Save analysis result to analysis store."""
         try:
+            import polars as pl
+
             from ..analysis.manager import get_task_manager
             from ..analysis.results import GenericAnalysisResult
+            from .workspace import workspace_manager
+
+            persisted_result = result
+            if task_type == "topic_modeling" and isinstance(result, dict):
+                persisted_result = dict(result)
+                cache_payload = persisted_result.pop("cache_payload", None)
+                topics_payload = persisted_result.get("topics") or []
+
+                if isinstance(topics_payload, list):
+                    meanings_records = []
+                    for topic in topics_payload:
+                        if not isinstance(topic, dict):
+                            continue
+                        topic_id = topic.get("id")
+                        topic_label = topic.get("label")
+                        if topic_id is None:
+                            continue
+                        meanings_records.append({
+                            "topic": int(topic_id),
+                            "topic_meaning": str(topic_label or ""),
+                        })
+
+                    topic_meanings_df = pl.DataFrame(
+                        meanings_records,
+                        schema={"topic": pl.Int64, "topic_meaning": pl.Utf8},
+                    )
+                    self._topic_meanings_cache[task_info.id] = {
+                        "lazyframe": topic_meanings_df.lazy(),
+                        "columns": ["topic", "topic_meaning"],
+                    }
+
+                cache_nodes = []
+                if isinstance(cache_payload, dict):
+                    cache_nodes = cache_payload.get("nodes") or []
+
+                for node_payload in cache_nodes:
+                    node_id = node_payload.get("node_id")
+                    if not node_id:
+                        continue
+
+                    node = workspace_manager.get_node_from_workspace(
+                        user_id, workspace_id, node_id
+                    )
+                    if not node:
+                        continue
+
+                    node_data = getattr(node, "data", None)
+                    if not isinstance(node_data, pl.LazyFrame):
+                        continue
+
+                    embeddings = node_payload.get("embeddings") or []
+                    topics = node_payload.get("topics") or []
+                    if len(embeddings) != len(topics):
+                        raise ValueError(
+                            f"Topic cache payload length mismatch for node {node_id}: "
+                            f"embeddings={len(embeddings)}, topics={len(topics)}"
+                        )
+
+                    source_count_df = node_data.select(
+                        pl.len().alias("__n_rows__")
+                    ).collect()
+                    source_count = (
+                        int(source_count_df["__n_rows__"][0])
+                        if source_count_df.height
+                        else 0
+                    )
+                    if source_count != len(topics):
+                        raise ValueError(
+                            f"Topic cache payload row mismatch for node {node_id}: "
+                            f"source_rows={source_count}, cached_rows={len(topics)}"
+                        )
+
+                    augmented_lf = node_data.with_columns([
+                        pl.Series("_tm_embedding", embeddings),
+                        pl.Series("_tm_topic", topics, dtype=pl.Int64),
+                    ])
+
+                    self._topic_lazyframe_cache[(task_info.id, node_id)] = {
+                        "lazyframe": augmented_lf,
+                        "node_name": node_payload.get("node_name") or node_id,
+                        "text_column": node_payload.get("text_column"),
+                        "original_columns": node_payload.get("original_columns")
+                        or list(node_data.collect_schema().names()),
+                    }
 
             task_manager = get_task_manager(user_id, workspace_id)
             task = task_manager.get_task(task_info.id)
             if task:
                 if task_type == "topic_modeling":
-                    task.complete(GenericAnalysisResult(result))
+                    task.complete(GenericAnalysisResult(persisted_result))
                 else:
                     task.complete(GenericAnalysisResult(result))
                 task_manager.save_task(task)
@@ -843,6 +931,10 @@ class WorkerTaskManager:
             # Remove from tracking
             del self._tasks[task_id]
             self._progress_store.pop(task_id, None)
+            for key in list(self._topic_lazyframe_cache.keys()):
+                if key[0] == task_id:
+                    del self._topic_lazyframe_cache[key]
+            self._topic_meanings_cache.pop(task_id, None)
             return True
 
     async def clear_tasks(
@@ -876,9 +968,31 @@ class WorkerTaskManager:
                 del self._tasks[task_id]
                 # Clean up progress store
                 self._progress_store.pop(task_id, None)
+                for key in list(self._topic_lazyframe_cache.keys()):
+                    if key[0] == task_id:
+                        del self._topic_lazyframe_cache[key]
+                self._topic_meanings_cache.pop(task_id, None)
                 count += 1
 
         return count
+
+    def get_topic_lazyframe_cache(
+        self, task_id: str, node_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """Get cached augmented topic-modeling LazyFrame for one node."""
+        return self._topic_lazyframe_cache.get((task_id, node_id))
+
+    def list_topic_lazyframe_cache(self, task_id: str) -> Dict[str, Dict[str, Any]]:
+        """List cached augmented topic-modeling LazyFrames for a task."""
+        out: Dict[str, Dict[str, Any]] = {}
+        for (cached_task_id, node_id), payload in self._topic_lazyframe_cache.items():
+            if cached_task_id == task_id:
+                out[node_id] = payload
+        return out
+
+    def get_topic_meanings_cache(self, task_id: str) -> Optional[Dict[str, Any]]:
+        """Get cached topic-meanings LazyFrame for a topic-modeling task."""
+        return self._topic_meanings_cache.get(task_id)
 
     async def cleanup_finished_tasks(self, max_age_seconds: int = 3600):
         """Clean up old finished tasks to prevent memory leaks."""
@@ -901,3 +1015,7 @@ class WorkerTaskManager:
             for task_id in task_ids_to_remove:
                 del self._tasks[task_id]
                 self._progress_store.pop(task_id, None)
+                for key in list(self._topic_lazyframe_cache.keys()):
+                    if key[0] == task_id:
+                        del self._topic_lazyframe_cache[key]
+                self._topic_meanings_cache.pop(task_id, None)

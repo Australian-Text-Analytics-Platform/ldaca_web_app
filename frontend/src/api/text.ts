@@ -89,6 +89,31 @@ export interface TokenFrequencyResponse {
 export interface TopicModelingRequest { node_ids: string[]; node_columns?: Record<string,string>; min_topic_size?: number; use_ctfidf?: boolean; }
 // Topic Modeling now uses the canonical 'state' field (legacy 'status' removed)
 export interface TopicModelingResponse { state: 'running' | 'successful' | 'failed' | 'cancelled'; message: string; data?: { topics: any[]; corpus_sizes?: number[] }; metadata?: { task_id?: string; [k: string]: any } }
+export interface TopicModelingDetachNodeOption {
+  node_id: string;
+  node_name: string;
+  text_column?: string | null;
+  available_columns: string[];
+  disabled_columns: string[];
+}
+export interface TopicModelingDetachOptionsResponse {
+  state: 'running' | 'successful' | 'failed' | 'cancelled';
+  message: string;
+  data?: { nodes: TopicModelingDetachNodeOption[] };
+  metadata?: { task_id?: string; [k: string]: any };
+}
+export interface TopicModelingDetachRequest {
+  node_ids?: string[];
+  selected_columns: Record<string, string[]>;
+  new_node_names?: Record<string, string>;
+  topic_column_name?: string;
+}
+export interface TopicModelingDetachResponse {
+  state: 'running' | 'successful' | 'failed' | 'cancelled';
+  message: string;
+  data?: { detached_nodes?: Array<{ source_node_id: string; new_node_id: string }> };
+  metadata?: { task_id?: string; [k: string]: any };
+}
 
 export const textApi = {
   concordance: (ws: string, req: ConcordanceAnalysisRequest, headers: Record<string,string> = {}) => post<ConcordanceAnalysisResponse>(`/workspaces/${ws}/concordance`, req, headers),
@@ -115,6 +140,10 @@ export const textApi = {
   // Topic Modeling
   topicModeling: (ws: string, req: TopicModelingRequest, headers: Record<string, string> = {}) => post(`/workspaces/${ws}/topic-modeling`, req, headers),
   getTopicModelingTaskResult: (ws: string, taskId: string, headers: Record<string, string> = {}) => httpRequest<TopicModelingResponse>(`/workspaces/${ws}/topic-modeling/tasks/${taskId}/result`, { method: 'GET', headers }),
+  getTopicModelingDetachOptions: (ws: string, taskId: string, headers: Record<string, string> = {}) =>
+    httpRequest<TopicModelingDetachOptionsResponse>(`/workspaces/${ws}/topic-modeling/tasks/${taskId}/detach-options`, { method: 'GET', headers }),
+  topicModelingDetach: (ws: string, taskId: string, req: TopicModelingDetachRequest, headers: Record<string, string> = {}) =>
+    post<TopicModelingDetachResponse>(`/workspaces/${ws}/topic-modeling/tasks/${taskId}/detach`, req, headers),
 
   getAnalysisCurrent: (ws: string, analysis: string, headers: Record<string, string> = {}) => httpRequest(`/workspaces/${ws}/${analysis}/current`, { method: 'GET', headers }),
   getTaskRequest: (ws: string, taskId: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/tasks/${taskId}/request`, { method: 'GET', headers }),

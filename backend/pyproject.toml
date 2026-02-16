@@ -19,6 +19,7 @@ classifiers = [
 ]
 dependencies = [
     "aiosqlite>=0.21.0",
+    "bertopic>=0.17.3",
     "fastapi-users[sqlalchemy]>=14.0.1", # Includes fastapi, python-multipart, sqlalchemy
     "fastapi[standard]>=0.115.14", # Includes uvicorn, pydantic, starlette
     "fastexcel>=0.18.0",

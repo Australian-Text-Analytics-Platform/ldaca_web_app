@@ -12,7 +12,13 @@ from ....analysis.manager import get_task_manager
 from ....analysis.models import AnalysisStatus, AnalysisTask
 from ....core.auth import get_current_user
 from ....core.workspace import workspace_manager
-from ....models import TopicModelingRequest, TopicModelingResponse
+from ....models import (
+    TopicModelingDetachOptionsResponse,
+    TopicModelingDetachRequest,
+    TopicModelingDetachResponse,
+    TopicModelingRequest,
+    TopicModelingResponse,
+)
 from ..utils import ensure_task_synced, get_workspace_or_404
 
 router = APIRouter(prefix="/workspaces", tags=["topic-modeling"])
@@ -30,6 +36,11 @@ async def clear_topic_modeling_results(
     current_id = task_manager.get_current_task_ids("topic_modeling")
     if current_id:
         task_manager.clear_task(current_id[0])
+
+    worker_tm = workspace_manager.get_task_manager(user_id, workspace_id)
+    if current_id:
+        await worker_tm.clear_task(current_id[0])
+
     return {
         "state": "successful",
         "message": "Topic modeling analysis results have been cleared.",
@@ -203,5 +214,213 @@ async def topic_modeling_task_result(
         state="failed",
         message="Topic Modeling analysis failed",
         data=None,
+        metadata={"task_id": task_id},
+    )
+
+
+def _resolve_topic_column_name(base_name: str, existing_columns: set[str]) -> str:
+    candidate = base_name.strip() or "topic"
+    if candidate not in existing_columns:
+        return candidate
+    idx = 1
+    while f"{candidate}_{idx}" in existing_columns:
+        idx += 1
+    return f"{candidate}_{idx}"
+
+
+@router.get(
+    "/{workspace_id}/topic-modeling/tasks/{task_id}/detach-options",
+    response_model=TopicModelingDetachOptionsResponse,
+)
+async def topic_modeling_detach_options(
+    workspace_id: str,
+    task_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    user_id = current_user["id"]
+    get_workspace_or_404(user_id, workspace_id)
+
+    analysis_tm = get_task_manager(user_id, workspace_id)
+    task = analysis_tm.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    worker_tm = workspace_manager.get_task_manager(user_id, workspace_id)
+    cache_entries = worker_tm.list_topic_lazyframe_cache(task_id)
+    if not cache_entries:
+        raise HTTPException(
+            status_code=404,
+            detail="No cached topic snapshot found for this task. Please rerun topic modeling.",
+        )
+    nodes = []
+    for node_id, payload in cache_entries.items():
+        original_columns = list(payload.get("original_columns") or [])
+        disabled_columns = ["topic"] if "topic" in original_columns else []
+        nodes.append({
+            "node_id": node_id,
+            "node_name": payload.get("node_name") or node_id,
+            "text_column": payload.get("text_column"),
+            "available_columns": original_columns,
+            "disabled_columns": disabled_columns,
+        })
+
+    return TopicModelingDetachOptionsResponse(
+        state="successful",
+        message="Topic detach options loaded",
+        data={"nodes": nodes},
+        metadata={"task_id": task_id},
+    )
+
+
+@router.post(
+    "/{workspace_id}/topic-modeling/tasks/{task_id}/detach",
+    response_model=TopicModelingDetachResponse,
+)
+async def detach_topic_modeling(
+    workspace_id: str,
+    task_id: str,
+    request: TopicModelingDetachRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    user_id = current_user["id"]
+    get_workspace_or_404(user_id, workspace_id)
+
+    analysis_tm = get_task_manager(user_id, workspace_id)
+    task = analysis_tm.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    worker_tm = workspace_manager.get_task_manager(user_id, workspace_id)
+    cache_entries = worker_tm.list_topic_lazyframe_cache(task_id)
+    meanings_cache = worker_tm.get_topic_meanings_cache(task_id)
+    if not cache_entries:
+        raise HTTPException(
+            status_code=404,
+            detail="No cached topic snapshot found for this task. Please rerun topic modeling.",
+        )
+    if not meanings_cache:
+        raise HTTPException(
+            status_code=404,
+            detail="No cached topic meanings found for this task. Please rerun topic modeling.",
+        )
+
+    meanings_lf = meanings_cache.get("lazyframe")
+    if not isinstance(meanings_lf, pl.LazyFrame):
+        raise HTTPException(
+            status_code=500,
+            detail="Cached topic meanings snapshot is invalid",
+        )
+
+    target_node_ids = request.node_ids or list(cache_entries.keys())
+    if not target_node_ids:
+        raise HTTPException(status_code=400, detail="No node IDs provided for detach")
+
+    detached_nodes: list[dict[str, str]] = []
+    for node_id in target_node_ids:
+        cache_payload = cache_entries.get(node_id)
+        if not cache_payload:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Node {node_id} is not available in cached topic snapshot",
+            )
+
+        cached_lf = cache_payload.get("lazyframe")
+        if not isinstance(cached_lf, pl.LazyFrame):
+            raise HTTPException(
+                status_code=500,
+                detail=f"Cached topic snapshot for node {node_id} is invalid",
+            )
+
+        original_columns = list(cache_payload.get("original_columns") or [])
+        selected_columns = list((request.selected_columns or {}).get(node_id) or [])
+        if not selected_columns:
+            raise HTTPException(
+                status_code=400,
+                detail=f"No columns selected for node {node_id}",
+            )
+
+        invalid = [col for col in selected_columns if col not in original_columns]
+        if invalid:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid selected columns for node {node_id}: {invalid}",
+            )
+
+        if "topic" in selected_columns:
+            raise HTTPException(
+                status_code=400,
+                detail="Original 'topic' column cannot be selected for topic detach",
+            )
+
+        topic_column_name = _resolve_topic_column_name(
+            request.topic_column_name or "topic",
+            set(original_columns) | set(selected_columns),
+        )
+
+        output_lf = cached_lf.select(
+            [pl.col(col) for col in selected_columns]
+            + [pl.col("_tm_topic").alias(topic_column_name)]
+        )
+
+        source_node = workspace_manager.get_node_from_workspace(
+            user_id, workspace_id, node_id
+        )
+        parents = [source_node] if source_node else []
+        node_name = (
+            (request.new_node_names or {}).get(node_id)
+            if request.new_node_names
+            else None
+        ) or f"{cache_payload.get('node_name') or node_id}_topic_detach"
+
+        new_node = workspace_manager.add_node_to_workspace(
+            user_id=user_id,
+            workspace_id=workspace_id,
+            data=output_lf,
+            node_name=node_name,
+            operation="topic_modeling_detach",
+            parents=parents,
+        )
+        if not new_node:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to create detached node for {node_id}",
+            )
+
+        text_column = cache_payload.get("text_column")
+        if (
+            text_column
+            and hasattr(new_node, "set_metadata")
+            and text_column in selected_columns
+        ):
+            try:
+                new_node.set_metadata("text_column", text_column)
+            except Exception:
+                pass
+
+        meanings_node_name = f"{node_name}_topic_meanings"
+        meanings_node = workspace_manager.add_node_to_workspace(
+            user_id=user_id,
+            workspace_id=workspace_id,
+            data=meanings_lf,
+            node_name=meanings_node_name,
+            operation="topic_modeling_meanings_detach",
+            parents=[new_node],
+        )
+        if not meanings_node:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to create topic meanings node for {node_id}",
+            )
+
+        detached_nodes.append({
+            "source_node_id": node_id,
+            "new_node_id": new_node.id,
+            "topic_meanings_node_id": meanings_node.id,
+        })
+
+    return TopicModelingDetachResponse(
+        state="successful",
+        message="Topic detach completed",
+        data={"detached_nodes": detached_nodes},
         metadata={"task_id": task_id},
     )
