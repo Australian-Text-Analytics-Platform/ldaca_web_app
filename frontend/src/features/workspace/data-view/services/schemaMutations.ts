@@ -7,7 +7,7 @@ export const DATA_TYPES = [
   { value: 'float', label: 'float' },
   { value: 'boolean', label: 'boolean' },
   { value: 'datetime', label: 'datetime' },
-  { value: 'array', label: 'array' },
+  { value: 'list_string', label: 'list_string' },
 ] as const;
 
 export const extractColumnTypes = (
@@ -30,6 +30,15 @@ export const extractColumnTypes = (
 
 export const normalizeTypeName = (type: string): string => {
   const lowercaseType = type.toLowerCase();
+  if (
+    lowercaseType === 'list_string' ||
+    lowercaseType.includes('list(string') ||
+    lowercaseType.includes('list[utf8') ||
+    lowercaseType.includes('list[str')
+  ) {
+    return 'list_string';
+  }
+  if (lowercaseType.includes('list') || lowercaseType.includes('array')) return 'unknown';
   if (lowercaseType.includes('utf8') || lowercaseType.includes('string')) return 'string';
   if (lowercaseType.includes('categorical') || lowercaseType.includes('category')) return 'categorical';
   if (lowercaseType.includes('int')) return 'integer';
@@ -37,7 +46,7 @@ export const normalizeTypeName = (type: string): string => {
   if (lowercaseType.includes('bool')) return 'boolean';
   if (lowercaseType.includes('date')) return 'datetime';
   if (lowercaseType.includes('datetime')) return 'datetime';
-  if (lowercaseType.includes('list') || lowercaseType.includes('array')) return 'array';
+  if (lowercaseType.includes('unknown')) return 'unknown';
   return type;
 };
 

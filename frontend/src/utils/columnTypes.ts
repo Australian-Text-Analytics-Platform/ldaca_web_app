@@ -11,7 +11,7 @@ export interface ColumnInfo {
  * Handles Polars, Pandas, and generic type strings.
  * 
  * @param type - Raw type string from backend (e.g., 'Utf8', 'Int64', 'Datetime')
- * @returns Normalized type name ('string', 'integer', 'float', 'datetime', 'boolean', 'categorical', 'array', 'struct')
+ * @returns Normalized type name ('string', 'integer', 'float', 'datetime', 'boolean', 'categorical', 'list_string', 'unknown', 'struct')
  * 
  * @example
  * ```ts
@@ -28,6 +28,15 @@ export const normalizeTypeName = (type?: string | null): string => {
 
   const lowercaseType = type.toLowerCase();
 
+  if (
+    lowercaseType === 'list_string' ||
+    lowercaseType.includes('list(string') ||
+    lowercaseType.includes('list[utf8') ||
+    lowercaseType.includes('list[str')
+  ) {
+    return 'list_string';
+  }
+
   if (lowercaseType.includes('utf8') || lowercaseType.includes('string') || lowercaseType.includes('str')) {
     return 'string';
   }
@@ -43,6 +52,9 @@ export const normalizeTypeName = (type?: string | null): string => {
   if (lowercaseType.includes('categorical') || lowercaseType.includes('category')) {
     return 'categorical';
   }
+  if (lowercaseType.includes('list') || lowercaseType.includes('array')) {
+    return 'unknown';
+  }
   if (lowercaseType.includes('bool')) {
     return 'boolean';
   }
@@ -55,11 +67,12 @@ export const normalizeTypeName = (type?: string | null): string => {
   if (lowercaseType.includes('decimal') || lowercaseType.includes('numeric')) {
     return 'float';
   }
-  if (lowercaseType.includes('list') || lowercaseType.includes('array')) {
-    return 'array';
-  }
   if (lowercaseType.includes('json') || lowercaseType.includes('struct') || lowercaseType.includes('map')) {
     return 'struct';
+  }
+
+  if (lowercaseType.includes('unknown')) {
+    return 'unknown';
   }
 
   return 'string';

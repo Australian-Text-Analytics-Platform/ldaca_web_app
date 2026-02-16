@@ -20,7 +20,11 @@ class ColumnSchema(BaseModel):
     dtype: str
     js_type: str = Field(
         ...,
-        description="JavaScript-compatible type (string, integer, float, boolean, datetime)",
+        description=(
+            "JavaScript-compatible type "
+            "(string, categorical, integer, float, boolean, datetime, "
+            "list_string, unknown)"
+        ),
     )
 
 

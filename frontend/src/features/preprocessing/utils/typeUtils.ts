@@ -3,13 +3,22 @@
  */
 export const normalizeTypeName = (type: string): string => {
   const lowercaseType = type.toLowerCase();
+  if (
+    lowercaseType === 'list_string' ||
+    lowercaseType.includes('list(string') ||
+    lowercaseType.includes('list[utf8') ||
+    lowercaseType.includes('list[str')
+  ) {
+    return 'list_string';
+  }
+  if (lowercaseType.includes('list') || lowercaseType.includes('array')) return 'unknown';
   if (lowercaseType.includes('utf8') || lowercaseType.includes('string')) return 'string';
   if (lowercaseType.includes('categorical') || lowercaseType.includes('category')) return 'categorical';
   if (lowercaseType.includes('int') && !lowercaseType.includes('interval')) return 'integer';
   if (lowercaseType.includes('float') || lowercaseType.includes('double')) return 'float';
   if (lowercaseType.includes('bool')) return 'boolean';
   if (lowercaseType.includes('datetime') || lowercaseType.includes('timestamp')) return 'datetime';
-  if (lowercaseType.includes('list') || lowercaseType.includes('array')) return 'array';
+  if (lowercaseType.includes('unknown')) return 'unknown';
   return 'string'; // Default fallback
 };
 
@@ -29,6 +38,10 @@ export const getOperatorsForType = (dataType: string) => {
     case 'categorical':
       return [
         { value: 'in', label: 'is one of' },
+      ];
+    case 'list_string':
+      return [
+        { value: 'in', label: 'contains any of' },
       ];
     case 'integer':
     case 'float':

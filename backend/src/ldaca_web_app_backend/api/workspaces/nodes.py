@@ -77,12 +77,23 @@ def _resolve_expression_column_name(request: ExpressionTransformRequest) -> str:
     return _sanitize_column_alias(candidate)
 
 
-def _build_filter_expression(request: FilterRequest) -> pl.Expr:
+def _is_string_list_dtype(dtype: Any) -> bool:
+    """Return True when dtype is exactly a list of strings."""
+    return dtype == pl.List(pl.String) or dtype == pl.List(pl.Utf8)
+
+
+def _build_filter_expression(
+    request: FilterRequest,
+    column_dtypes: Optional[dict[str, Any]] = None,
+) -> pl.Expr:
     logic = (request.logic or "and").lower()
     filter_expr = None
+    schema_map = column_dtypes or {}
 
     for condition in request.conditions:
         column_expr = pl.col(condition.column)
+        column_dtype = schema_map.get(condition.column)
+        is_string_list_column = _is_string_list_dtype(column_dtype)
         op = condition.operator
         raw_value = condition.value
         expr = None
@@ -127,12 +138,22 @@ def _build_filter_expression(request: FilterRequest) -> pl.Expr:
             else:
                 values = [_coerce_scalar(_parse_temporal(raw_value))]
 
-            if values:
-                expr = column_expr.is_in(values)
-                if include_null:
-                    expr = expr | column_expr.is_null()
-            elif include_null:
-                expr = column_expr.is_null()
+            if is_string_list_column:
+                string_values = [str(item) for item in values if item is not None]
+                if string_values:
+                    expr = column_expr.list.eval(
+                        pl.element().cast(pl.String).is_in(string_values),
+                        parallel=False,
+                    ).list.any()
+                else:
+                    expr = pl.lit(False)
+            else:
+                if values:
+                    expr = column_expr.is_in(values)
+                    if include_null:
+                        expr = expr | column_expr.is_null()
+                elif include_null:
+                    expr = column_expr.is_null()
         elif op == "contains":
             pattern = str(raw_value)
             if getattr(condition, "regex", False):
@@ -591,10 +612,19 @@ async def get_column_unique_values(
         if isinstance(data_obj, pl.LazyFrame):
             lazyframe = data_obj
 
+        schema_map: dict[str, Any] = {}
         if lazyframe is not None:
-            columns = list(lazyframe.collect_schema().names())
+            schema = lazyframe.collect_schema()
+            columns = list(schema.names())
+            schema_map = dict(schema.items())
         elif hasattr(data_obj, "schema"):
-            columns = list(data_obj.schema.keys())
+            schema_obj = data_obj.schema
+            schema_map = (
+                dict(schema_obj.items()) if hasattr(schema_obj, "items") else {}
+            )
+            columns = (
+                list(schema_map.keys()) if schema_map else list(data_obj.schema.keys())
+            )
         elif hasattr(data_obj, "columns"):
             columns = list(data_obj.columns)
         else:
@@ -610,6 +640,32 @@ async def get_column_unique_values(
         else:
             df = data_obj
         try:
+            if _is_string_list_dtype(schema_map.get(column_name)):
+                exploded_series = df.select(
+                    pl.col(column_name).explode().alias(column_name)
+                ).to_series()
+                raw_values = exploded_series.to_list()
+                has_null = any(value is None for value in raw_values)
+
+                deduped_values: list[str] = []
+                seen_values: set[str] = set()
+                for value in raw_values:
+                    if value is None:
+                        continue
+                    text_value = str(value)
+                    if text_value in seen_values:
+                        continue
+                    seen_values.add(text_value)
+                    deduped_values.append(text_value)
+
+                unique_count = len(deduped_values) + (1 if has_null else 0)
+                return {
+                    "column_name": column_name,
+                    "unique_count": unique_count,
+                    "unique_values": deduped_values,
+                    "has_null": has_null,
+                }
+
             column_series = df.select(pl.col(column_name)).to_series()
             unique_series = column_series.unique()
             raw_values = unique_series.to_list()
@@ -975,7 +1031,13 @@ async def filter_node(
         except HTTPException as exc:
             detail = exc.detail if isinstance(exc.detail, str) else "Node not found"
             raise ValueError(detail) from exc
-        filter_expr = _build_filter_expression(request)
+        schema_map: dict[str, Any] = {}
+        if hasattr(node.data, "collect_schema"):
+            try:
+                schema_map = dict(node.data.collect_schema().items())
+            except Exception:
+                schema_map = {}
+        filter_expr = _build_filter_expression(request, column_dtypes=schema_map)
         if hasattr(node.data, "filter"):
             filtered_data = node.data.filter(filter_expr)
         else:
@@ -1013,7 +1075,13 @@ async def filter_preview(
     _, data_obj = get_node_with_data_or_400(user_id, workspace_id, node_id)
 
     try:
-        filter_expr = _build_filter_expression(request)
+        schema_map: dict[str, Any] = {}
+        if hasattr(data_obj, "collect_schema"):
+            try:
+                schema_map = dict(data_obj.collect_schema().items())
+            except Exception:
+                schema_map = {}
+        filter_expr = _build_filter_expression(request, column_dtypes=schema_map)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

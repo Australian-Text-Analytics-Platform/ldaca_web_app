@@ -567,6 +567,36 @@ class TestWorkspaceAPI:
         assert sorted(payload["unique_values"]) == ["alpha", "beta"]
         assert payload["has_null"] is True
 
+    async def test_unique_values_endpoint_flattens_list_string_values(
+        self, authenticated_client
+    ):
+        """String-list columns return flattened unique string elements."""
+        import polars as pl
+
+        source_df = pl.DataFrame({
+            "topic": [["a", "b"], ["b", "c"], None, [], ["d"]]
+        }).lazy()
+
+        class DummyNode:
+            def __init__(self):
+                self.data = source_df
+
+        with patch(
+            "ldaca_web_app_backend.api.workspaces.workspace_manager.get_node_from_workspace"
+        ) as mock_get_node:
+            mock_get_node.return_value = DummyNode()
+
+            response = await authenticated_client.get(
+                "/api/workspaces/test-workspace/nodes/test-node/columns/topic/unique"
+            )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["column_name"] == "topic"
+        assert payload["unique_values"] == ["a", "b", "c", "d"]
+        assert payload["has_null"] is True
+        assert payload["unique_count"] == 5
+
     async def test_cast_node_unsupported_type(self, authenticated_client):
         """Test that unsupported casting types raise errors"""
         import polars as pl

@@ -112,3 +112,80 @@ async def test_filter_preview_in_operator_with_null(authenticated_client, monkey
     assert payload["pagination"]["total_rows"] == 2
     returned_categories = [row["category"] for row in payload["data"]]
     assert all(category is None for category in returned_categories)
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_filter_preview_in_operator_matches_any_list_string_element(
+    authenticated_client, monkeypatch
+):
+    df = pl.DataFrame({
+        "value": [1, 2, 3, 4, 5],
+        "topic": [["a", "b"], ["c"], None, [], ["d", "a"]],
+    })
+
+    class DummyNode:
+        def __init__(self):
+            self.data = df.lazy()
+            self.name = "sample"
+
+    monkeypatch.setattr(
+        nodes_api.workspace_manager,
+        "get_node_from_workspace",
+        lambda user_id, workspace_id, node_id: DummyNode(),
+    )
+
+    response = await authenticated_client.post(
+        "/api/workspaces/ws123/nodes/node456/filter/preview",
+        params={"page": 1, "page_size": 10},
+        json={
+            "conditions": [
+                {"column": "topic", "operator": "in", "value": ["a", "x"]},
+            ],
+            "logic": "and",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["pagination"]["total_rows"] == 2
+    returned_values = [row["value"] for row in payload["data"]]
+    assert returned_values == [1, 5]
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_filter_preview_list_string_in_does_not_match_null_rows(
+    authenticated_client, monkeypatch
+):
+    df = pl.DataFrame({
+        "value": [1, 2, 3],
+        "topic": [None, ["a"], ["b"]],
+    })
+
+    class DummyNode:
+        def __init__(self):
+            self.data = df.lazy()
+            self.name = "sample"
+
+    monkeypatch.setattr(
+        nodes_api.workspace_manager,
+        "get_node_from_workspace",
+        lambda user_id, workspace_id, node_id: DummyNode(),
+    )
+
+    response = await authenticated_client.post(
+        "/api/workspaces/ws123/nodes/node456/filter/preview",
+        params={"page": 1, "page_size": 10},
+        json={
+            "conditions": [
+                {"column": "topic", "operator": "in", "value": [None]},
+            ],
+            "logic": "and",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["pagination"]["total_rows"] == 0
+    assert payload["data"] == []

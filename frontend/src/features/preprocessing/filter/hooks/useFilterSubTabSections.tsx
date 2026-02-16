@@ -229,7 +229,7 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
   );
 
   const ensureCategoricalOptions = useCallback(
-    async (column: string) => {
+    async (column: string, dataType: string) => {
       if (!currentWorkspaceId || !selectedNodeId || !column) {
         return;
       }
@@ -254,7 +254,8 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
       try {
         const response = await nodesApi.uniqueValues(currentWorkspaceId, selectedNodeId, column);
         const rawValues: unknown[] = Array.isArray(response?.unique_values) ? response.unique_values : [];
-        const hasNullFromResponse = Boolean(response?.has_null);
+        const includeNullOption = dataType === 'categorical';
+        const hasNullFromResponse = includeNullOption && Boolean(response?.has_null);
         const uniqueEntries = new Map<string, CategoricalOptionEntry>();
 
         rawValues.forEach((value) => {
@@ -335,10 +336,13 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     }
 
     conditions.forEach((condition) => {
-      if (condition.dataType === 'categorical' && condition.column) {
+      if (
+        (condition.dataType === 'categorical' || condition.dataType === 'list_string') &&
+        condition.column
+      ) {
         const key = getCategoricalKey(condition.column);
         if (!categoricalOptions[key]) {
-          void ensureCategoricalOptions(condition.column);
+          void ensureCategoricalOptions(condition.column, condition.dataType);
         }
       }
     });
@@ -477,7 +481,7 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
           updated.value = nextOperator === 'in' ? [] : '';
           updated.regex = nextOperator === 'contains';
 
-          if (columnInfo.dataType === 'categorical') {
+          if (columnInfo.dataType === 'categorical' || columnInfo.dataType === 'list_string') {
             nextCategoricalColumnToLoad = columnInfo.name;
           }
           
@@ -502,7 +506,10 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
       if (field === 'operator') {
         if (value === 'in') {
           updated.value = Array.isArray(updated.value) ? updated.value : [];
-          if (updated.dataType === 'categorical' && updated.column) {
+          if (
+            (updated.dataType === 'categorical' || updated.dataType === 'list_string') &&
+            updated.column
+          ) {
             nextCategoricalColumnToLoad = updated.column;
           }
         } else if (updated.dataType === 'categorical' && Array.isArray(updated.value)) {
@@ -534,7 +541,17 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     }));
 
     if (nextCategoricalColumnToLoad) {
-      void ensureCategoricalOptions(nextCategoricalColumnToLoad);
+      const targetCondition = conditions.find((entry) => entry.id === id);
+      const targetType =
+        field === 'column'
+          ? availableColumns.find((entry) => entry.name === value)?.dataType
+          : targetCondition?.dataType;
+      void ensureCategoricalOptions(
+        nextCategoricalColumnToLoad,
+        targetType === 'categorical' || targetType === 'list_string'
+          ? targetType
+          : 'categorical',
+      );
     }
   };
 
@@ -567,7 +584,9 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     [handleConditionChange]
   );
 
-  const shouldHideOperatorSelect = (condition: FilterConditionWithId) => condition.dataType === 'categorical';
+  const shouldHideOperatorSelect = (condition: FilterConditionWithId) => (
+    condition.dataType === 'categorical' || condition.dataType === 'list_string'
+  );
 
   const getConditionOperatorOptions = (condition: FilterConditionWithId) => (
     getOperatorsForType(condition.dataType || 'string')
@@ -665,7 +684,7 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
 
     const dataType = condition.dataType || 'string';
 
-    if (dataType === 'categorical') {
+    if (dataType === 'categorical' || dataType === 'list_string') {
       const column = condition.column;
       const key = column ? getCategoricalKey(column) : null;
       const optionState = key ? categoricalOptions[key] : undefined;
@@ -731,7 +750,7 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => column && ensureCategoricalOptions(column)}
+                onClick={() => column && ensureCategoricalOptions(column, dataType)}
                 disabled={disabled}
               >
                 Retry

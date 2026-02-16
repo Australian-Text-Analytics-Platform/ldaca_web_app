@@ -159,3 +159,37 @@ class TestDocWorkspaceTypeMapping:
         assert (
             DocWorkspaceAPIUtils.polars_type_to_js_type(pl.Categorical) == "categorical"
         )
+
+    def test_polars_type_to_js_type_list_string(self):
+        """Exact list-of-string dtype maps to list_string."""
+        from ldaca_web_app_backend.core.docworkspace_api import DocWorkspaceAPIUtils
+
+        assert (
+            DocWorkspaceAPIUtils.polars_type_to_js_type(pl.List(pl.String))
+            == "list_string"
+        )
+
+    def test_polars_type_to_js_type_non_string_list_is_unknown(self):
+        """Non-string list dtypes map to unknown."""
+        from ldaca_web_app_backend.core.docworkspace_api import DocWorkspaceAPIUtils
+
+        assert (
+            DocWorkspaceAPIUtils.polars_type_to_js_type(pl.List(pl.Int64)) == "unknown"
+        )
+
+    def test_polars_type_to_js_type_array_is_unknown(self):
+        """Array dtypes map to unknown."""
+        from ldaca_web_app_backend.core.docworkspace_api import DocWorkspaceAPIUtils
+
+        assert (
+            DocWorkspaceAPIUtils.polars_type_to_js_type(pl.Array(pl.Int64, 2))
+            == "unknown"
+        )
+        assert (
+            DocWorkspaceAPIUtils.polars_type_to_js_type(pl.Array(pl.Int64, 2))
+            == "unknown"
+        )
+        assert (
+            DocWorkspaceAPIUtils.polars_type_to_js_type(pl.Array(pl.Int64, 2))
+            == "unknown"
+        )

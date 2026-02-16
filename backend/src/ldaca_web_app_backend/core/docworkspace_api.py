@@ -37,7 +37,8 @@ class DocWorkspaceAPIUtils:
             polars_type: Polars data type object (e.g., pl.Int64, pl.Float32)
 
         Returns:
-            JavaScript-compatible type string: 'integer', 'float', 'string', 'boolean', 'datetime', 'array', 'categorical'
+            JavaScript-compatible type string: 'integer', 'float', 'string',
+            'boolean', 'datetime', 'categorical', 'list_string', 'unknown'.
         """
         # Identity-based classification (no pattern matching) to support wider runtime versions.
         if polars_type in (
@@ -61,7 +62,10 @@ class DocWorkspaceAPIUtils:
             return "string"
         if polars_type in (pl.Date, pl.Datetime, pl.Time):
             return "datetime"
-        # Detect list/struct types safely
+        if polars_type == pl.List(pl.String) or polars_type == pl.List(pl.Utf8):
+            return "list_string"
+
+        # Detect list/struct/array types safely
         cls_obj = getattr(polars_type, "__class__", None)
         cls_name = getattr(cls_obj, "__name__", "") if cls_obj else ""
         type_name = (
@@ -70,11 +74,16 @@ class DocWorkspaceAPIUtils:
             else ""
         )
         lowered_type = type_name.lower()
-        if cls_name == "List" or lowered_type == "list":
-            return "array"
+        if (
+            cls_name == "List"
+            or lowered_type == "list"
+            or cls_name == "Array"
+            or lowered_type == "array"
+        ):
+            return "unknown"
         if cls_name == "Struct" or lowered_type == "struct":
             return "object"
-        return "string"  # To be changed to 'unknown' in future versions
+        return "unknown"
 
     @staticmethod
     def convert_schema_to_js_types(schema) -> Dict[str, str]:
