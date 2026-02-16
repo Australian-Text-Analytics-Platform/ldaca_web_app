@@ -10,7 +10,16 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ICONS_DIR="$SCRIPT_DIR/icons"
-SOURCE_ICON="$SCRIPT_DIR/../frontend/public/logo512.png"
+SOURCE_ICON_SVG="$SCRIPT_DIR/../public/LDaCAFavicon_Dark.svg"
+SOURCE_ICON_PNG="$SCRIPT_DIR/../public/logo512.png"
+RENDER_DENSITY=1536
+
+SOURCE_ICON=""
+if [ -f "$SOURCE_ICON_SVG" ]; then
+    SOURCE_ICON="$SOURCE_ICON_SVG"
+elif [ -f "$SOURCE_ICON_PNG" ]; then
+    SOURCE_ICON="$SOURCE_ICON_PNG"
+fi
 
 # Use ImageMagick's 'magick' CLI (user requested Python fallbacks be removed)
 if ! command -v magick &> /dev/null; then
@@ -21,10 +30,31 @@ if ! command -v magick &> /dev/null; then
 fi
 
 # Check if source icon exists
-if [ ! -f "$SOURCE_ICON" ]; then
-    echo "❌ Source icon not found: $SOURCE_ICON"
+if [ -z "$SOURCE_ICON" ]; then
+    echo "❌ Source icon not found. Expected one of:"
+    echo "   - $SOURCE_ICON_SVG"
+    echo "   - $SOURCE_ICON_PNG"
     exit 1
 fi
+
+render_png_icon() {
+    local size="$1"
+    local output="$2"
+    if [[ "$SOURCE_ICON" == *.svg ]]; then
+        magick -density "$RENDER_DENSITY" "$SOURCE_ICON" \
+          -background none \
+          -filter LanczosSharp \
+          -resize "${size}x${size}" \
+          PNG32:"$output"
+    else
+        magick "$SOURCE_ICON" \
+          -alpha set \
+          -background none \
+          -filter LanczosSharp \
+          -resize "${size}x${size}" \
+          PNG32:"$output"
+    fi
+}
 
 echo "🎨 Generating Tauri icons from: $SOURCE_ICON"
 echo ""
@@ -35,26 +65,26 @@ mkdir -p "$ICONS_DIR"
 # Generate PNG icons (ensure alpha channel / RGBA - force PNG32 output)
 echo "📱 Generating PNG icons..."
 # Use PNG32: prefix to force RGBA (4-channel) PNG output which Tauri requires
-magick "$SOURCE_ICON" -alpha set -background none -resize 32x32 PNG32:"$ICONS_DIR/32x32.png"
-magick "$SOURCE_ICON" -alpha set -background none -resize 128x128 PNG32:"$ICONS_DIR/128x128.png"
-magick "$SOURCE_ICON" -alpha set -background none -resize 256x256 PNG32:"$ICONS_DIR/128x128@2x.png"
-magick "$SOURCE_ICON" -alpha set -background none -resize 256x256 PNG32:"$ICONS_DIR/icon.png"
+render_png_icon 32 "$ICONS_DIR/32x32.png"
+render_png_icon 128 "$ICONS_DIR/128x128.png"
+render_png_icon 256 "$ICONS_DIR/128x128@2x.png"
+render_png_icon 256 "$ICONS_DIR/icon.png"
 
 # Generate macOS icon (.icns) - requires multiple sizes collected into an .iconset
 echo "🍎 Generating macOS icon..."
 ICONSET_DIR="$ICONS_DIR/icon.iconset"
 mkdir -p "$ICONSET_DIR"
 
-magick "$SOURCE_ICON" -alpha set -background none -resize 16x16 PNG32:"$ICONSET_DIR/icon_16x16.png"
-magick "$SOURCE_ICON" -alpha set -background none -resize 32x32 PNG32:"$ICONSET_DIR/icon_16x16@2x.png"
-magick "$SOURCE_ICON" -alpha set -background none -resize 32x32 PNG32:"$ICONSET_DIR/icon_32x32.png"
-magick "$SOURCE_ICON" -alpha set -background none -resize 64x64 PNG32:"$ICONSET_DIR/icon_32x32@2x.png"
-magick "$SOURCE_ICON" -alpha set -background none -resize 128x128 PNG32:"$ICONSET_DIR/icon_128x128.png"
-magick "$SOURCE_ICON" -alpha set -background none -resize 256x256 PNG32:"$ICONSET_DIR/icon_128x128@2x.png"
-magick "$SOURCE_ICON" -alpha set -background none -resize 256x256 PNG32:"$ICONSET_DIR/icon_256x256.png"
-magick "$SOURCE_ICON" -alpha set -background none -resize 512x512 PNG32:"$ICONSET_DIR/icon_256x256@2x.png"
-magick "$SOURCE_ICON" -alpha set -background none -resize 512x512 PNG32:"$ICONSET_DIR/icon_512x512.png"
-magick "$SOURCE_ICON" -alpha set -background none -resize 1024x1024 PNG32:"$ICONSET_DIR/icon_512x512@2x.png"
+render_png_icon 16 "$ICONSET_DIR/icon_16x16.png"
+render_png_icon 32 "$ICONSET_DIR/icon_16x16@2x.png"
+render_png_icon 32 "$ICONSET_DIR/icon_32x32.png"
+render_png_icon 64 "$ICONSET_DIR/icon_32x32@2x.png"
+render_png_icon 128 "$ICONSET_DIR/icon_128x128.png"
+render_png_icon 256 "$ICONSET_DIR/icon_128x128@2x.png"
+render_png_icon 256 "$ICONSET_DIR/icon_256x256.png"
+render_png_icon 512 "$ICONSET_DIR/icon_256x256@2x.png"
+render_png_icon 512 "$ICONSET_DIR/icon_512x512.png"
+render_png_icon 1024 "$ICONSET_DIR/icon_512x512@2x.png"
 
 if command -v iconutil &> /dev/null; then
     iconutil -c icns "$ICONSET_DIR" -o "$ICONS_DIR/icon.icns"
@@ -65,7 +95,10 @@ fi
 
 # Generate Windows icon (.ico)
 echo "🪟 Generating Windows icon..."
-magick "$SOURCE_ICON" -alpha set -background none -define icon:auto-resize=256,128,96,64,48,32,16 "$ICONS_DIR/icon.ico"
+TMP_ICON_BASE="$ICONS_DIR/.icon-base-1024.png"
+render_png_icon 1024 "$TMP_ICON_BASE"
+magick "$TMP_ICON_BASE" -background none -define icon:auto-resize=256,128,96,64,48,32,16 "$ICONS_DIR/icon.ico"
+rm -f "$TMP_ICON_BASE"
 
 echo ""
 echo "✅ Icons generated successfully in: $ICONS_DIR"

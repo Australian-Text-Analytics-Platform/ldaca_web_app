@@ -337,11 +337,13 @@ const Sidebar: React.FC = () => {
     <SidebarRoot>
       <SidebarHeader className="border-b border-border/40 px-3 py-2">
         <div className="flex items-start gap-2">
-          <div className="flex min-w-0 flex-1 items-center gap-2">
-            <SidebarTrigger className="md:hidden" />
-            <img src={logo} alt="LDaCA Logo" className="h-8 w-auto" />
-            <div className="flex min-w-0 flex-col leading-tight">
-              <p className="text-sm font-semibold">LDaCA Corpus Analysis</p>
+          <div className="flex min-w-0 flex-1 flex-col items-start gap-2 w-full">
+            <div className="flex items-center gap-2 w-full">
+              <SidebarTrigger className="md:hidden" />
+              <img src={logo} alt="LDaCA Logo" className="w-full h-auto object-contain" />
+            </div>
+            <div className="flex min-w-0 flex-col leading-tight w-full">
+              <p className="text-xl font-semibold w-full">Text Analytics</p>
               {isMultiUserMode && (
                 <p className="text-[11px] text-muted-foreground truncate" title={user?.name ?? 'Guest'}>
                   Welcome, {user?.name ?? 'Guest'}
