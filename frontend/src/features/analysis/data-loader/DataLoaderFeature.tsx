@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Loader2, FolderPlus, Upload, Trash2, Eye, Download as DownloadIcon, Plus, RefreshCcw, LogOut } from 'lucide-react';
+import { Loader2, FolderPlus, Upload, Trash2, Eye, Download as DownloadIcon, Plus, RefreshCcw, LogOut, Quote } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
 import { useWorkspaceActions } from '../../../hooks/useWorkspaceActions';
 import { useWorkspaceStatus } from '../../../hooks/useWorkspaceStatus';
@@ -97,6 +99,7 @@ export const DataLoaderFeature: React.FC = () => {
   const [ldacaImportOpen, setLdacaImportOpen] = useState(false);
   const [ldacaUrl, setLdacaUrl] = useState('');
   const [ldacaImporting, setLdacaImporting] = useState(false);
+  const [citationFile, setCitationFile] = useState<FileInfo | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const activeCardRef = useRef<HTMLDivElement | null>(null);
@@ -550,7 +553,21 @@ export const DataLoaderFeature: React.FC = () => {
                   {sortedFiles.map((file) => (
                     <TableRow key={file.filename} className={selectedFile === file.filename ? 'bg-muted/50' : undefined}>
                       <TableCell>
-                        <div className="font-medium text-foreground">{file.display_name || file.filename}</div>
+                        <div className="flex items-center gap-1.5 font-medium text-foreground">
+                          <span>{file.display_name || file.filename}</span>
+                          {Boolean(file.readme?.trim()) && (file.display_name || '').toLowerCase() !== 'readme.md' && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                              aria-label={`View citation for ${file.display_name || file.filename}`}
+                              title="View citation"
+                              onClick={() => setCitationFile(file)}
+                            >
+                              <Quote className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                        </div>
                         <div className="text-xs text-muted-foreground font-mono">{file.filename}</div>
                       </TableCell>
                       <TableCell className="hidden text-sm text-muted-foreground md:table-cell">{formatBytes(file.size)}</TableCell>
@@ -713,6 +730,24 @@ export const DataLoaderFeature: React.FC = () => {
               Import
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(citationFile)} onOpenChange={(open) => !open && setCitationFile(null)}>
+        <DialogContent className="max-h-[80vh] max-w-3xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Citation</DialogTitle>
+            <DialogDescription>
+              {citationFile ? `Source: ${citationFile.folder || '(root)'} / README.md` : 'Citation metadata'}
+            </DialogDescription>
+          </DialogHeader>
+          {citationFile?.readme ? (
+            <div className="prose prose-sm max-w-none dark:prose-invert">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{citationFile.readme}</ReactMarkdown>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No citation available for this file.</p>
+          )}
         </DialogContent>
       </Dialog>
     </div>

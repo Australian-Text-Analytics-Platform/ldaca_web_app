@@ -7,6 +7,7 @@ export interface FileInfo {
   size: number;
   created_at: number;
   file_type: string;
+  readme?: string | null;
   modified?: string;
   type?: string;
 }

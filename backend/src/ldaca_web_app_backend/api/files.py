@@ -30,6 +30,38 @@ from ..models import (
 
 router = APIRouter(prefix="/files", tags=["file_management"])
 
+README_FILENAME = "README.md"
+README_MAX_BYTES = 200_000
+
+
+def _read_sample_folder_readme(readme_path: Path) -> Optional[str]:
+    """Read a sample-folder README safely for citation display.
+
+    Returns markdown text or None when no readable README exists.
+    Applies a hard size cap to keep /files payload bounded.
+    """
+    if not readme_path.exists() or not readme_path.is_file():
+        return None
+
+    try:
+        with open(readme_path, "rb") as readme_file:
+            content = readme_file.read(README_MAX_BYTES + 1)
+    except OSError:
+        return None
+
+    if not content:
+        return None
+
+    truncated = len(content) > README_MAX_BYTES
+    if truncated:
+        content = content[:README_MAX_BYTES]
+
+    decoded = content.decode("utf-8", errors="replace")
+    if truncated:
+        decoded = f"{decoded}\n\n… (README truncated for display)"
+
+    return decoded
+
 
 class LDaCAImportRequest(BaseModel):
     url: str
@@ -134,6 +166,7 @@ async def get_user_files(current_user: dict = Depends(get_current_user)):
     data_folder = get_user_data_folder(user_id)
 
     files = []
+    folder_readme_cache: Dict[str, Optional[str]] = {}
 
     # Recursively find all files in the user's data folder
     for file_path in data_folder.rglob("*"):
@@ -142,6 +175,19 @@ async def get_user_files(current_user: dict = Depends(get_current_user)):
             relative_path = file_path.relative_to(data_folder)
             rel_str = str(relative_path)
             is_sample = rel_str.startswith("sample_data/")
+            folder_rel = (
+                str(relative_path.parent) if str(relative_path.parent) != "." else ""
+            )
+
+            readme_content: Optional[str] = None
+            is_readme_row = file_path.name.lower() == README_FILENAME.lower()
+            if is_sample and not is_readme_row:
+                if folder_rel not in folder_readme_cache:
+                    folder_readme_cache[folder_rel] = _read_sample_folder_readme(
+                        data_folder / relative_path.parent / README_FILENAME
+                    )
+                readme_content = folder_readme_cache[folder_rel]
+
             files.append({
                 "filename": rel_str,  # full path relative to user data root
                 "full_path": rel_str,
@@ -149,11 +195,10 @@ async def get_user_files(current_user: dict = Depends(get_current_user)):
                 "size": file_path.stat().st_size,
                 "created_at": file_path.stat().st_ctime,
                 "file_type": detect_file_type(file_path.name),
-                "folder": str(relative_path.parent)
-                if str(relative_path.parent) != "."
-                else "",
+                "folder": folder_rel,
                 "is_sample": is_sample,
                 "path_type": "sample" if is_sample else "user",
+                "readme": readme_content,
             })
 
     return {
