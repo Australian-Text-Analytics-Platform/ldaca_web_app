@@ -111,7 +111,7 @@ const ExportFeature: React.FC = () => {
       <Card>
         <CardHeader className="space-y-1">
           <CardTitle className="flex items-center gap-2">
-            Export Nodes
+            Export Data Tables
             <HelpIcon
               targetKey="analysis.export.parameters"
               label="Export parameters"
@@ -125,12 +125,12 @@ const ExportFeature: React.FC = () => {
               Workspace ID: <span className="font-mono text-foreground">{currentWorkspaceId ?? '—'}</span>
             </div>
             <Badge variant={selectedNodes.length ? 'default' : 'outline'}>
-              {selectedNodes.length ? `${selectedNodes.length} node${selectedNodes.length > 1 ? 's' : ''} selected` : 'No nodes selected'}
+              {selectedNodes.length ? `${selectedNodes.length} data table${selectedNodes.length > 1 ? 's' : ''} selected` : 'No data tables selected'}
             </Badge>
           </div>
 
           <div className="space-y-3">
-            <Label className="text-sm font-medium">Selected Nodes</Label>
+            <Label className="text-sm font-medium">Selected Data Tables</Label>
             <div className="max-h-104 space-y-2 overflow-y-auto rounded-lg border border-border/60 bg-background p-2 shadow-sm">
               {selectedNodes.length === 0 && (
                 <div className="flex items-center justify-center rounded-md border border-dashed border-border/40 bg-muted/30 py-10 text-sm text-muted-foreground">
@@ -206,7 +206,7 @@ const ExportFeature: React.FC = () => {
       {!selectedNodes.length && (
         <Card className="border-dashed border-border/50 bg-muted/30">
           <CardContent className="py-8 text-center text-sm text-muted-foreground">
-            Tip: open the Data tab and use the node checkbox to mark items for export.
+            Tip: open the Data tab and use the data table checkbox to mark items for export.
           </CardContent>
         </Card>
       )}

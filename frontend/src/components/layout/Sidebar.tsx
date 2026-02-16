@@ -63,14 +63,14 @@ type SectionKey = 'views' | 'nodes' | 'tasks';
 const SECTION_KEYS: SectionKey[] = ['views', 'nodes', 'tasks'];
 const SECTION_TITLES: Record<SectionKey, string> = {
   views: 'Views',
-  nodes: 'Nodes',
+  nodes: 'Data Tables',
   tasks: 'Tasks',
 };
 const MIN_SECTION_HEIGHT = 120;
 
 const NAV_ITEMS: NavItem[] = [
   { id: 'data-loader', label: 'Data Loader', icon: FolderOpen },
-  { id: 'filter', label: 'Data Preprocessing', icon: Filter },
+  { id: 'filter', label: 'Data Structuring', icon: Filter },
   { id: 'token-frequency', label: 'Token Frequency', icon: TrendingUp },
   { id: 'concordance', label: 'Concordance', icon: FileText },
   { id: 'analysis', label: 'Sequential Analysis', icon: BarChart3 },

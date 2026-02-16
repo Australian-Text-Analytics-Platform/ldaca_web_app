@@ -395,12 +395,12 @@ def _derive_concat_node_name(nodes: List[Any], desired_name: Optional[str]) -> s
         return desired_name
     labels = [_get_node_display_name(node) for node in nodes]
     if not labels:
-        return "Concat Result"
+        return "Stack Result"
     if len(labels) <= 3:
         label_str = ", ".join(labels)
     else:
         label_str = ", ".join(labels[:3]) + ", ..."
-    return f"Concat({label_str})"
+    return f"Stack({label_str})"
 
 
 @router.post(

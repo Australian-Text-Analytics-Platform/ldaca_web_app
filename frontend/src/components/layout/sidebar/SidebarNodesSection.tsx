@@ -84,7 +84,7 @@ const SidebarNodesSection: React.FC<SidebarNodesSectionProps> = ({
             const shape = formatShapeLabel(node);
             const checked = selectedNodeIds?.includes(node.id);
             const copyNameValue = name && name.length > 0 ? name : node.id;
-            const displayName = copyNameValue || 'Untitled node';
+            const displayName = copyNameValue || 'Untitled data table';
             const isNameCopied = copiedField?.nodeId === node.id && copiedField.field === 'name';
             const isIdCopied = copiedField?.nodeId === node.id && copiedField.field === 'id';
             const isExpanded = hoveredNodeId === node.id;
@@ -157,7 +157,7 @@ const SidebarNodesSection: React.FC<SidebarNodesSectionProps> = ({
                       void handleCopy(node.id, node.id, 'id');
                     }}
                     className="flex min-w-0 max-w-full items-center gap-1 text-left text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                    title="Copy node id"
+                    title="Copy data table ID"
                   >
                     <span className="text-[10px] uppercase tracking-wide text-muted-foreground/80 shrink-0">ID</span>
                     <span className="truncate font-mono text-[11px] text-foreground">{node.id}</span>
@@ -172,7 +172,7 @@ const SidebarNodesSection: React.FC<SidebarNodesSectionProps> = ({
             );
           })
         ) : (
-          <div className="rounded-md bg-accent/40 px-2 py-2 text-xs text-muted-foreground">No nodes</div>
+          <div className="rounded-md bg-accent/40 px-2 py-2 text-xs text-muted-foreground">No data tables</div>
         )}
       </div>
     </div>

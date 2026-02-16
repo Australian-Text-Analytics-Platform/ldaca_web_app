@@ -49,7 +49,7 @@ const DeselectButton = ({
     className="react-flow__controls-button"
     onClick={onClear}
     disabled={disabled}
-    title="Deselect all selected nodes"
+    title="Deselect all selected data tables"
     style={{ opacity: disabled ? 0.5 : 1 }}
   >
     ⊘

@@ -69,7 +69,7 @@ export const FilterSubTab: React.FC<FilterSubTabProps> = (props) => {
             headerAddon={
               <HelpIcon
                 targetKey="preprocessing.common.node-selection"
-                label="Selected nodes"
+                label="Selected data tables"
                 className="h-4 w-4 text-muted-foreground"
               />
             }

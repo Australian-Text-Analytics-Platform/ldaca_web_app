@@ -610,7 +610,7 @@ const ConcordanceFeature: React.FC = () => {
 
     const incompleteSelections = effectiveSelections.filter((sel) => !sel.column);
     if (incompleteSelections.length > 0) {
-      toast.error('Please select a text column for all selected nodes.');
+      toast.error('Please select a text column for all selected data tables.');
       return;
     }
 

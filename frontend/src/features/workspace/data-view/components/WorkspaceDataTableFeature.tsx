@@ -11,7 +11,7 @@ const LoadingState = () => (
   <div className="space-y-6 p-6">
     <div className="flex items-center gap-2 text-sm text-muted-foreground">
       <Loader2 className="h-4 w-4 animate-spin" />
-      <span>Loading node data…</span>
+      <span>Loading data table…</span>
     </div>
     <div className="space-y-4">
       <div className="flex items-center gap-4">
@@ -50,8 +50,8 @@ const EmptyState = () => (
           d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
         />
       </svg>
-      <h3 className="mt-3 text-sm font-semibold text-foreground">No Node Selected</h3>
-      <p className="mt-1 text-xs text-muted-foreground">Select a node from the graph to view its data.</p>
+      <h3 className="mt-3 text-sm font-semibold text-foreground">No Data Table Selected</h3>
+      <p className="mt-1 text-xs text-muted-foreground">Select a data table from the graph to view its data.</p>
     </div>
   </div>
 );

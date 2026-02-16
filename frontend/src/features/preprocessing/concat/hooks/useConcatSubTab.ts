@@ -149,12 +149,12 @@ const analyzeSchema = (summaries: ConcatNodeSummary[]): ConcatSchemaAnalysis => 
   };
 
   if (summaries.length === 0) {
-    result.issues = 'Select nodes in the workspace to enable concatenation.';
+    result.issues = 'Select data tables in the workspace to enable stacking.';
     return result;
   }
 
   if (summaries.length < 2) {
-    result.issues = 'Pick at least two nodes to concatenate.';
+    result.issues = 'Pick at least two data tables to stack.';
     return result;
   }
 
@@ -210,9 +210,9 @@ const analyzeSchema = (summaries: ConcatNodeSummary[]): ConcatSchemaAnalysis => 
 
   if (result.mismatches.length === 0) {
     result.ready = true;
-    result.issues = `Ready to concatenate ${summaries.length} nodes (${result.baseColumnCount} columns).`;
+    result.issues = `Ready to stack ${summaries.length} data tables (${result.baseColumnCount} columns).`;
   } else {
-    result.issues = 'Resolve schema mismatches before concatenating.';
+    result.issues = 'Resolve schema mismatches before stacking.';
   }
 
   return result;
@@ -269,10 +269,10 @@ export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult
       .filter(Boolean);
     if (!labels.length) return '';
     if (labels.length <= 3) {
-      return `Concat(${labels.join(', ')})`;
+      return `Stack(${labels.join(', ')})`;
     }
     const shortened = `${labels.slice(0, 3).join(', ')}, …`;
-    return `Concat(${shortened})`;
+    return `Stack(${shortened})`;
   }, [concatAnalysis.summaries]);
 
   const concatUsedNodeIds = useMemo(() => concatAnalysis.summaries.map((summary) => summary.nodeId), [concatAnalysis.summaries]);
@@ -348,7 +348,7 @@ export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult
   }, [setConcatPreviewPageSize]);
 
   const readyMessage = concatAnalysis.summaries.length < 2
-    ? 'Select at least two nodes to generate a concat preview.'
+    ? 'Select at least two data tables to generate a stack preview.'
     : concatAnalysis.issues;
 
   const applyDisabled =
@@ -356,12 +356,12 @@ export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult
 
   const handleApplyConcat = useCallback(async () => {
     if (!concatAnalysis.ready) {
-      onAlert(concatAnalysis.issues || 'Select at least two compatible nodes to concatenate.');
+      onAlert(concatAnalysis.issues || 'Select at least two compatible data tables to stack.');
       return;
     }
     const nodeIds = concatAnalysis.summaries.map((summary) => summary.nodeId);
     if (nodeIds.length < 2) {
-      onAlert('Pick at least two nodes to concatenate.');
+      onAlert('Pick at least two data tables to stack.');
       return;
     }
 
@@ -370,8 +370,8 @@ export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult
       setIsConcatenating(true);
       await concatNodes(nodeIds, requestedName);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error applying concat';
-      onAlert(`Error applying concat: ${message}`);
+      const message = error instanceof Error ? error.message : 'Unknown error applying stack';
+      onAlert(`Error applying stack: ${message}`);
     } finally {
       setIsConcatenating(false);
     }
@@ -395,7 +395,7 @@ export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult
   };
 
   const extraSelectionMessage = concatOriginalCount > MAX_CONCAT_NODES
-    ? `Using the first ${MAX_CONCAT_NODES} of ${concatOriginalCount} selected nodes. Deselect extras to include them.`
+    ? `Using the first ${MAX_CONCAT_NODES} of ${concatOriginalCount} selected data tables. Deselect extras to include them.`
     : null;
 
   return {
