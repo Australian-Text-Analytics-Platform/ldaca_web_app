@@ -668,6 +668,9 @@ fn main() {
                         }} else if (event.key === '0') {{
                             event.preventDefault();
                             setZoom(1.0);
+                        }} else if (event.key === 'r' || event.key === 'R') {{
+                            event.preventDefault();
+                            window.location.reload();
                         }}
                     }});
 

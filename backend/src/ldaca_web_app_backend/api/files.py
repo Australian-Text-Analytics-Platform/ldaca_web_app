@@ -181,6 +181,9 @@ async def get_user_files(current_user: dict = Depends(get_current_user)):
 
             readme_content: Optional[str] = None
             is_readme_row = file_path.name.lower() == README_FILENAME.lower()
+            if is_readme_row:
+                continue
+
             if is_sample and not is_readme_row:
                 if folder_rel not in folder_readme_cache:
                     folder_readme_cache[folder_rel] = _read_sample_folder_readme(

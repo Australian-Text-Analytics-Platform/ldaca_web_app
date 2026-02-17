@@ -2,11 +2,13 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Loader2, FolderPlus, Upload, Trash2, Eye, Download as DownloadIcon, Plus, RefreshCcw, LogOut, Quote } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { useQueryClient } from '@tanstack/react-query';
 import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
 import { useWorkspaceActions } from '../../../hooks/useWorkspaceActions';
 import { useWorkspaceStatus } from '../../../hooks/useWorkspaceStatus';
 import { useAuth } from '../../../hooks/useAuth';
 import { useFiles } from '../../../hooks/useFiles';
+import { queryKeys } from '../../../lib/queryKeys';
 import { filesApi } from '../../../api/files';
 import { FileInfo } from '../../../types';
 import { AddFilePanel, FilePreviewPanel } from '../../../components/panels';
@@ -64,6 +66,7 @@ const getWorkspaceId = (workspace: Record<string, any>): string | null =>
   workspace?.workspace_id || workspace?.id || workspace?.unique_id || null;
 
 export const DataLoaderFeature: React.FC = () => {
+  const queryClient = useQueryClient();
   const { workspaces, currentWorkspaceId, workspaceGraph } = useWorkspaceData();
   const workspaceActions = useWorkspaceActions();
   const { isLoading } = useWorkspaceStatus();
@@ -100,6 +103,8 @@ export const DataLoaderFeature: React.FC = () => {
   const [ldacaUrl, setLdacaUrl] = useState('');
   const [ldacaImporting, setLdacaImporting] = useState(false);
   const [citationFile, setCitationFile] = useState<FileInfo | null>(null);
+  const [refreshingWorkspaces, setRefreshingWorkspaces] = useState(false);
+  const [refreshingFiles, setRefreshingFiles] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const activeCardRef = useRef<HTMLDivElement | null>(null);
@@ -247,6 +252,33 @@ export const DataLoaderFeature: React.FC = () => {
       console.error('[DataLoaderFeature] import sample data failed', error);
     } finally {
       setImportingSamples(false);
+    }
+  };
+
+  const handleRefreshWorkspaces = async () => {
+    setRefreshingWorkspaces(true);
+    try {
+      await queryClient.refetchQueries({
+        queryKey: queryKeys.workspaces,
+        exact: true,
+      });
+      notify('success', 'Workspace list refreshed.');
+    } catch (error) {
+      notify('error', (error as Error).message || 'Failed to refresh workspace list.');
+    } finally {
+      setRefreshingWorkspaces(false);
+    }
+  };
+
+  const handleRefreshFiles = async () => {
+    setRefreshingFiles(true);
+    try {
+      await refetchFiles();
+      notify('success', 'File list refreshed.');
+    } catch (error) {
+      notify('error', (error as Error).message || 'Failed to refresh file list.');
+    } finally {
+      setRefreshingFiles(false);
     }
   };
 
@@ -420,14 +452,26 @@ export const DataLoaderFeature: React.FC = () => {
           style={activeCardHeight ? { height: activeCardHeight } : undefined}
         >
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              Workspace manager
-              <HelpIcon
-                targetKey="data-loader.workspace-manager.section"
-                label="Workspace manager overview"
-                tooltip="Switch between saved workspaces or remove ones you no longer need."
-              />
-            </CardTitle>
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle className="flex items-center gap-2">
+                Workspace manager
+                <HelpIcon
+                  targetKey="data-loader.workspace-manager.section"
+                  label="Workspace manager overview"
+                  tooltip="Switch between saved workspaces or remove ones you no longer need."
+                />
+              </CardTitle>
+              <Button
+                size="icon"
+                variant="ghost"
+                aria-label="Refresh workspace list"
+                title="Refresh workspace list"
+                onClick={handleRefreshWorkspaces}
+                disabled={refreshingWorkspaces || workspaceBusy}
+              >
+                <RefreshCcw className={`h-4 w-4 ${refreshingWorkspaces ? 'animate-spin' : ''}`} />
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="flex flex-1 flex-col min-h-0 overflow-hidden">
             {workspaceBusy && !sortedWorkspaces.length ? (
@@ -485,14 +529,26 @@ export const DataLoaderFeature: React.FC = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            Files & uploads
-            <HelpIcon
-              targetKey="data-loader.files.section"
-              label="Files and uploads section"
-              tooltip="Upload CSV, TSV, Excel, or JSON files, preview them, and add them to the active workspace."
-            />
-          </CardTitle>
+          <div className="flex items-center justify-between gap-2">
+            <CardTitle className="flex items-center gap-2">
+              Files & uploads
+              <HelpIcon
+                targetKey="data-loader.files.section"
+                label="Files and uploads section"
+                tooltip="Upload CSV, TSV, Excel, or JSON files, preview them, and add them to the active workspace."
+              />
+            </CardTitle>
+            <Button
+              size="icon"
+              variant="ghost"
+              aria-label="Refresh file list"
+              title="Refresh file list"
+              onClick={handleRefreshFiles}
+              disabled={refreshingFiles || loadingFiles}
+            >
+              <RefreshCcw className={`h-4 w-4 ${refreshingFiles ? 'animate-spin' : ''}`} />
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-wrap items-center gap-2">

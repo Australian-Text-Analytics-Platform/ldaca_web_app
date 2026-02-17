@@ -88,14 +88,9 @@ def test_list_files_embeds_readme_for_eligible_sample_rows(
     assert isinstance(ado_data.get("readme"), str)
     assert "ADO Citation" in ado_data["readme"]
 
-    ado_readme_row = next(
-        item
-        for item in files
-        if item.get("display_name") == "README.md"
-        and item.get("folder", "").endswith("sample_data/ADO")
+    assert all(
+        (item.get("display_name") or "").lower() != "readme.md" for item in files
     )
-    assert ado_readme_row["path_type"] == "sample"
-    assert ado_readme_row.get("readme") is None
 
     no_readme_data = next(
         item
