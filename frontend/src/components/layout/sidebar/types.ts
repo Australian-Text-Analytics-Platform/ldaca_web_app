@@ -4,7 +4,11 @@ export type SidebarTaskRecord = {
   task_id: string;
   task_type: string;
   state?: SidebarTaskStatus;
-  metadata?: { name?: string };
+  metadata?: {
+    name?: string;
+    task_scope?: string;
+    [key: string]: unknown;
+  };
   message?: string;
   created_at?: number;
   started_at?: number;

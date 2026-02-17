@@ -64,6 +64,12 @@ TASK_PROGRESS_MESSAGES = {
     },
 }
 
+ANALYSIS_TASK_TYPES = {
+    "topic_modeling",
+    "concordance",
+    "token_frequencies",
+}
+
 
 class TaskStatus(str, Enum):
     PENDING = "pending"
@@ -375,7 +381,7 @@ class WorkerTaskManager:
                         )
 
                 # Handle ANALYSIS tasks (save to TaskManager)
-                elif task_type in TASK_REGISTRY:
+                elif task_type in ANALYSIS_TASK_TYPES:
                     try:
                         # Save the analysis result
                         await self._save_analysis_result(

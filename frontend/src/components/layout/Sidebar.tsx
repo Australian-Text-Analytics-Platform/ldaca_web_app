@@ -19,6 +19,7 @@ import { useWorkspaceSelection } from '@/hooks/useWorkspaceSelection';
 import { useWorkspaceActions } from '@/hooks/useWorkspaceActions';
 import { useWorkspaceTaskStream } from '@/hooks/useWorkspaceTaskStream';
 import { useAuth } from '@/hooks/useAuth';
+import { filesApi } from '@/api/files';
 import { workspacesApi } from '@/api/workspaces';
 import { useAnalysisStore } from '@/stores/analysisStore';
 import { useUIStore } from '@/stores';
@@ -310,9 +311,14 @@ const Sidebar: React.FC = () => {
     </SidebarMenu>
   );
   const handleCancelTask = async (task: SidebarTaskRecord) => {
-    if (!currentWorkspaceId) return;
     try {
-      await workspacesApi.cancelTasks(currentWorkspaceId, { task_id: task.task_id }, getAuthHeaders());
+      const isFilesTask = task.metadata?.task_scope === 'files';
+      if (isFilesTask) {
+        await filesApi.cancelTasks({ task_id: task.task_id }, getAuthHeaders());
+      } else {
+        if (!currentWorkspaceId) return;
+        await workspacesApi.cancelTasks(currentWorkspaceId, { task_id: task.task_id }, getAuthHeaders());
+      }
       setTasks((prev) =>
         prev.map((item) =>
           item.task_id === task.task_id ? { ...item, state: 'cancelled' } : item
@@ -324,9 +330,14 @@ const Sidebar: React.FC = () => {
   };
 
   const handleClearTask = async (task: SidebarTaskRecord) => {
-    if (!currentWorkspaceId) return;
     try {
-      await workspacesApi.clearTasks(currentWorkspaceId, { task_id: task.task_id }, getAuthHeaders());
+      const isFilesTask = task.metadata?.task_scope === 'files';
+      if (isFilesTask) {
+        await filesApi.clearTasks({ task_id: task.task_id }, getAuthHeaders());
+      } else {
+        if (!currentWorkspaceId) return;
+        await workspacesApi.clearTasks(currentWorkspaceId, { task_id: task.task_id }, getAuthHeaders());
+      }
       setTasks((prev) => prev.filter((item) => item.task_id !== task.task_id));
     } catch (error) {
       console.error('Failed to clear task', error);

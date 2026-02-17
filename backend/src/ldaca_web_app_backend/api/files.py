@@ -273,12 +273,9 @@ async def import_ldaca_dataset(
     """Import a dataset from LDaCA using a zip URL as a background task."""
     user_id = current_user["id"]
     try:
-        # Prefer currently selected workspace task center when present so
-        # sidebar task stream remains visible; otherwise use files scope.
-        task_scope = workspace_manager.get_current_workspace_id(user_id)
-        if not task_scope:
-            task_scope = FILES_TASK_SCOPE
-
+        # Files import must be independent of workspace routing and always use
+        # the files task scope so /api/files/tasks* can track progress.
+        task_scope = FILES_TASK_SCOPE
         tm = workspace_manager.get_task_manager(user_id, task_scope)
         task_info = await tm.submit_task(
             user_id=user_id,
