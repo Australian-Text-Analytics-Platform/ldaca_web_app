@@ -565,7 +565,7 @@ export const DataLoaderFeature: React.FC = () => {
               <HelpIcon targetKey="data-loader.import-sample.button" label="Import sample data" />
             </div>
             <div className="flex items-center gap-1">
-              <Button variant="outline" onClick={() => setLdacaImportOpen(true)} disabled={ldacaImporting || !hasWorkspaceSelected}>
+              <Button variant="outline" onClick={() => setLdacaImportOpen(true)} disabled={ldacaImporting}>
                 <DownloadIcon className="mr-2 h-4 w-4" /> Import from LDaCA
               </Button>
               <HelpIcon targetKey="data-loader.import-ldaca.button" label="Import from LDaCA" />
