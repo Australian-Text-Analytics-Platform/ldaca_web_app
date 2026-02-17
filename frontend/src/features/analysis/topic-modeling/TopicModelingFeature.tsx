@@ -340,7 +340,7 @@ const TopicModelingFeature: React.FC = () => {
     if (!currentWorkspaceId || panelNodeIds.length === 0) return;
     if (runningRef.current) return; // guard double click
     if (panelHasMissingColumns) {
-      toast.error('Select a text column for all selected data tables');
+      toast.error('Select a text column for all selected data blocks');
       return;
     }
   const requestNodeIds = panelNodeIds.slice(0, 2);

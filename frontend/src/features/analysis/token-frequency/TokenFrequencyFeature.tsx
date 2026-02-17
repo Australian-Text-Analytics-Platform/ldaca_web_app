@@ -1137,7 +1137,7 @@ function TokenFrequencyFeature() {
 
     const incompleteSelections = effectiveNodeColumnSelections.filter((sel) => !sel.column);
     if (incompleteSelections.length > 0) {
-      toast.error('Please select a text column for all selected data tables.');
+      toast.error('Please select a text column for all selected data blocks.');
       return;
     }
 

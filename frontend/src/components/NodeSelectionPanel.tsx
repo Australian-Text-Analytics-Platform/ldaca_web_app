@@ -157,7 +157,7 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
         <div className="flex items-center justify-between px-3 pt-1.5">
           <div className="flex items-center gap-2">
             <label className="block text-sm font-medium text-muted-foreground">
-              Selected Data Tables ({(originalCount ?? selectedNodes.length)}/{maxCompare})
+              Selected Data Blocks ({(originalCount ?? selectedNodes.length)}/{maxCompare})
             </label>
             {headerAddon}
           </div>
@@ -191,7 +191,7 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
         <div className="rounded-md border border-dashed border-muted-foreground/40 bg-muted/40 p-3 text-sm italic text-muted-foreground">
           { (originalCount && originalCount > 0)
             ? `Over-selected (${originalCount}) but none usable. Reduce to max ${maxCompare}.`
-            : `No data tables selected. Single click on data tables in the workspace view to select them (max ${maxCompare} for comparison).` }
+            : `No data blocks selected. Single click on data blocks in the workspace view to select them (max ${maxCompare} for comparison).` }
         </div>
       ) : (
         <NodeSelectionList
@@ -209,7 +209,7 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
       {(originalCount ?? selectedNodes.length) > maxCompare && (
         <div className="mt-1 flex items-center gap-1 text-sm text-amber-600">
           <AlertTriangle className="h-4 w-4 shrink-0" />
-          Maximum {maxCompare} data table allowed here. Currently {(originalCount ?? selectedNodes.length)} selected in workspace; only the first {maxCompare} is used.
+          Maximum {maxCompare} data block allowed here. Currently {(originalCount ?? selectedNodes.length)} selected in workspace; only the first {maxCompare} is used.
         </div>
       )}
     </div>

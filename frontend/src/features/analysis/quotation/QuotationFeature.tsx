@@ -542,26 +542,6 @@ const QuotationFeature: React.FC = () => {
   // Deprecated per-node loading indicator; rely on DataView-like UX
   const [nodeDetaching, setNodeDetaching] = useState<Record<string, boolean>>({});
   const [resultsByNode, setResultsByNode] = useState<Record<string, QuotationResultState>>({});
-  const [pageInputByNode, setPageInputByNode] = useState<Record<string, string>>({}); // kept for fetchQuotations sync
-
-  const primaryResultInfo = (() => {
-    const firstNode = displayedNodes[0];
-    if (!firstNode) {
-      return null;
-    }
-    const nodeId = resolveNodeId(firstNode, 0);
-    const state = resultsByNode[nodeId];
-    if (!state) {
-      return null;
-    }
-    const pagination = state.pagination || {};
-    const pageSize = Number(pagination.page_size) || DEFAULT_PAGE_SIZE;
-    return {
-      pageSize,
-    };
-  })();
-
-  // Derived state from primary result
 
   const currentRequestParams = (() => {
     const targetNode = (isLocked && lockedNodesSnapshot.length ? lockedNodesSnapshot[0] : displayedNodes[0]) as any;
@@ -859,10 +839,6 @@ const QuotationFeature: React.FC = () => {
         sortBy: normalized.sorting.sort_by ?? undefined,
         sortOrder: normalized.sorting.sort_order,
       },
-    }));
-    setPageInputByNode((prev) => ({
-      ...prev,
-      [nodeId]: String(normalized.pagination.page),
     }));
     return normalized;
   };

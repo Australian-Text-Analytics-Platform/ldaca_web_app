@@ -131,7 +131,7 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
             headerAddon={
               <HelpIcon
                 targetKey="preprocessing.common.node-selection"
-                label="Selected data tables"
+                label="Selected data blocks"
                 className="h-4 w-4 text-muted-foreground"
               />
             }

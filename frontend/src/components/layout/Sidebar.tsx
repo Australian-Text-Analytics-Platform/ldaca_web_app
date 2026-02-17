@@ -63,7 +63,7 @@ type SectionKey = 'views' | 'nodes' | 'tasks';
 const SECTION_KEYS: SectionKey[] = ['views', 'nodes', 'tasks'];
 const SECTION_TITLES: Record<SectionKey, string> = {
   views: 'Views',
-  nodes: 'Data Tables',
+  nodes: 'Data Blocks',
   tasks: 'Tasks',
 };
 const MIN_SECTION_HEIGHT = 120;

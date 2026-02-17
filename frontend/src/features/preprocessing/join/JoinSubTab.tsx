@@ -90,7 +90,7 @@ export const JoinSubTab: React.FC<JoinSubTabProps> = (props) => {
             headerAddon={
               <HelpIcon
                 targetKey="preprocessing.common.node-selection"
-                label="Selected data tables"
+                label="Selected data blocks"
                 className="h-4 w-4 text-muted-foreground"
               />
             }

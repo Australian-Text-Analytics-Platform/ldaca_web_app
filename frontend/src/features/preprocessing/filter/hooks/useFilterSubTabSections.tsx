@@ -9,6 +9,7 @@ import { ISO_PLACEHOLDER } from '../../utils/dateTimeHelpers';
 import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
 import { buildFilterRequestPayload, isConditionComplete } from '../utils/serializers';
 import { FilterValueChecklist } from '../components/FilterValueChecklist';
+import type { FilterChecklistOption } from '../components/FilterValueChecklist';
 import type {
   ConditionRange,
   ConditionValue,
@@ -705,17 +706,17 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
         : [];
       const selectedKeys = new Set(selectedValues.map((entry) => getCategoricalOptionKey(entry)));
       const isLoadingOptions = optionState?.loading ?? false;
-      const optionError = optionState?.error;
+      const optionError = optionState?.error ?? null;
 
       const updateSelections = (nextSelections: CategoricalPrimitive[]) => {
         handleConditionChange(condition.id, 'value', nextSelections);
       };
 
-      const toggleValue = (entry: CategoricalOptionEntry, nextChecked: boolean) => {
+      const toggleValue = (entry: FilterChecklistOption, nextChecked: boolean) => {
         if (disabled) return;
         if (nextChecked) {
           if (selectedKeys.has(entry.key)) return;
-          updateSelections([...selectedValues, entry.value]);
+          updateSelections([...selectedValues, toCategoricalPrimitive(entry.value)]);
         } else {
           updateSelections(
             selectedValues.filter(
@@ -730,13 +731,13 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
         updateSelections(optionEntries.map((entry) => entry.value));
       };
 
-      const handleSelectVisible = (visibleOptions: CategoricalOptionEntry[]) => {
+      const handleSelectVisible = (visibleOptions: FilterChecklistOption[]) => {
         if (disabled) return;
         const merged = new Map<string, CategoricalPrimitive>(
           selectedValues.map((entry) => [getCategoricalOptionKey(entry), entry]),
         );
         visibleOptions.forEach((entry) => {
-          merged.set(entry.key, entry.value);
+          merged.set(entry.key, toCategoricalPrimitive(entry.value));
         });
         updateSelections(Array.from(merged.values()));
       };
@@ -759,7 +760,7 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
           searchQuery={searchQuery}
           onSearchQueryChange={(query) => setOptionSearchQueries((prev) => ({ ...prev, [condition.id]: query }))}
           onToggleOption={toggleValue}
-          onSelectAll={(visibleOptions) => onSelectAllForMode(visibleOptions as CategoricalOptionEntry[])}
+          onSelectAll={onSelectAllForMode}
           onClearAll={handleClearAll}
           onRetry={column ? () => ensureCategoricalOptions(column, dataType) : undefined}
         />
