@@ -39,7 +39,7 @@ Key capabilities include:
 ## Tutorial sections
 
 - [Data loader](./data-loader.md) — create workspaces and upload data.
-- [Preprocessing](./preprocessing.md) — filter, slice, join, concat, and compute columns.
+- [Data Structuring](./preprocessing.md) — filter, slice, join, stack, and create columns.
 - [Token frequency](./token-frequency.md) — count and explore common terms.
 - [Concordance](./concordance.md) — inspect terms in context.
 - [Topic modeling](./topic-modeling.md) — discover themes with BERTopic.

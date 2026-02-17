@@ -93,7 +93,7 @@ const registry: Record<string, TutorialTarget> = {
   'preprocessing.common.node-selection': {
     file: 'tutorials/preprocessing.md',
     anchor: 'help-preprocessing-common-node-selection',
-    label: 'Node selection',
+    label: 'Data block selection',
   },
   'preprocessing.common.apply-button': {
     file: 'tutorials/preprocessing.md',
@@ -143,12 +143,12 @@ const registry: Record<string, TutorialTarget> = {
   'preprocessing.concat.tab': {
     file: 'tutorials/preprocessing.md',
     anchor: 'help-preprocessing-concat-section',
-    label: 'Concat sub-tab overview',
+    label: 'Stack sub-tab overview',
   },
   'preprocessing.concat.new-node-name': {
     file: 'tutorials/preprocessing.md',
     anchor: 'help-preprocessing-concat-new-node-name',
-    label: 'Concat output name',
+    label: 'Stack output name',
   },
   'preprocessing.concat.schema-status': {
     file: 'tutorials/preprocessing.md',
@@ -158,7 +158,7 @@ const registry: Record<string, TutorialTarget> = {
   'preprocessing.aggregate.tab': {
     file: 'tutorials/preprocessing.md',
     anchor: 'help-preprocessing-aggregate-section',
-    label: 'Aggregate sub-tab overview',
+    label: 'Create sub-tab overview',
   },
   'preprocessing.aggregate.builder': {
     file: 'tutorials/preprocessing.md',

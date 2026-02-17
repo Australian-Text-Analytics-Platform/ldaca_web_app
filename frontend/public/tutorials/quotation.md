@@ -4,6 +4,8 @@
 
 <h1 id="help-quotation-section">Quotation extraction tutorial</h1>
 
+![Quotation extraction screenshot](tutorials/assets/quotation_extraction.png)
+
 Quotation extraction finds quoted segments in text and adds context around them. It is useful for analyzing reported speech or citations.
 
 > **Placeholder (image):** Example of quotation extraction results with context columns.

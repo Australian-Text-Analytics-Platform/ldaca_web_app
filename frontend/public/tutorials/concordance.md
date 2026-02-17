@@ -4,6 +4,8 @@
 
 <h1 id="help-concordance-section">Concordance tutorial</h1>
 
+![Concordance screenshot](tutorials/assets/concordance.png)
+
 Concordance helps you see how a word or phrase is used by showing it in context.
 
 > **Placeholder (image):** Screenshot of concordance results with highlighted term.

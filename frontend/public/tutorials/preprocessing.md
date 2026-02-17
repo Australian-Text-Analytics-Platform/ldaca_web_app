@@ -2,13 +2,15 @@
 
 [← Back to tutorial index](./index.md)
 
-<h1>Preprocessing tutorial</h1>
+<h1>Data Structuring tutorial</h1>
 
-Preprocessing turns raw text data into analysis-ready datasets. Each sub-tab helps you shape data in a focused way, and every action creates a **new node** so you can compare results without overwriting the original.
+![Preprocessing screenshot](tutorials/assets/preprocessing.png)
+
+Data Structuring turns raw text data into analysis-ready datasets. Each sub-tab helps you shape data in a focused way, and every action creates a **new data block** so you can compare results without overwriting the original.
 
 Use this workflow in any tab:
 
-1. Select one or more nodes from the workspace.
+1. Select one or more data blocks from the workspace.
 2. Configure the transformation.
 3. Review the preview table.
 4. Add the result back to the workspace.
@@ -17,13 +19,13 @@ Use this workflow in any tab:
 
 These controls appear in multiple preprocessing tabs and behave the same way across the workflow.
 
-<h3 id="help-preprocessing-common-node-selection">Node selection panel</h3>
+<h3 id="help-preprocessing-common-node-selection">Data block selection panel</h3>
 
-Select one or more nodes from the workspace graph. Each tab will show only the number of nodes it supports.
+Select one or more data blocks from the workspace graph. Each tab will show only the number of data blocks it supports.
 
 <h3 id="help-preprocessing-common-apply-button">Apply action</h3>
 
-Use **Add to Workspace** or **Add to Node** to run the transformation. A new node is created (or the selected node is updated) without overwriting your source data.
+Use **Add to Workspace** or **Add to Node** to run the transformation. A new data block is created (or the selected data block is updated) without overwriting your source data.
 
 <h3 id="help-preprocessing-common-preview">Preview table</h3>
 
@@ -31,25 +33,33 @@ The preview shows a paginated sample of what the output will look like. It is a 
 
 <h2 id="help-preprocessing-filter-section">Filter</h2>
 
+![Filter screenshot](tutorials/assets/preprocessing_filter.png)
+
 Filter keeps only the rows that match your conditions. Use it to remove noise, focus on a subset, or create a clean working dataset before analysis.
 
 <h3 id="help-preprocessing-filter-conditions">Filter conditions</h3>
 
+![Filter conditions screenshot](tutorials/assets/preprocessing_filter_conditions.png)
+
 Define one or more column-based rules, then choose AND/OR logic to combine them.
 
-<h3 id="help-preprocessing-filter-new-node-name">New node name</h3>
+<h3 id="help-preprocessing-filter-new-node-name">New data block name</h3>
+
+![Filter new data block name screenshot](tutorials/assets/preprocessing_filter_new_node_name.png)
 
 Name the filtered output so it is easy to spot in the workspace.
 
-Key controls include the node selection panel, the filter conditions builder (with AND/OR logic), the new node name input, the status summary, the **Add to Workspace** action, and the preview table that shows matched rows.
+Key controls include the data block selection panel, the filter conditions builder (with AND/OR logic), the new data block name input, the status summary, the **Add to Workspace** action, and the preview table that shows matched rows.
 
 Practice exercise:
 
 1. Select a dataset with a clear category column.
 2. Add a condition that keeps only one category.
-3. Add the filtered result as a new node.
+3. Add the filtered result as a new data block.
 
 <h2 id="help-preprocessing-slice-section">Slice</h2>
+
+![Slice screenshot](tutorials/assets/preprocessing_slice.png)
 
 Slice extracts a contiguous range of rows. It is useful for sampling, debugging, or grabbing a fixed subset of text data.
 
@@ -61,44 +71,48 @@ The zero-based index of the first row to include.
 
 The number of rows to include. Leave it blank to slice until the end.
 
-<h3 id="help-preprocessing-slice-new-node-name">New node name</h3>
+<h3 id="help-preprocessing-slice-new-node-name">New data block name</h3>
 
 Label the slice output so it is easy to find later.
 
-Key controls include the node selection panel, offset and length inputs, the new node name field, the range summary, the **Add to Workspace** action, and the preview table for the slice output.
+Key controls include the data block selection panel, offset and length inputs, the new data block name field, the range summary, the **Add to Workspace** action, and the preview table for the slice output.
 
 Practice exercise:
 
 1. Pick a dataset with at least 200 rows.
 2. Set offset to 50 and length to 25.
-3. Add the slice as a new node and compare the row count.
+3. Add the slice as a new data block and compare the row count.
 
 <h2>Join</h2>
 
-Join combines two datasets using matching columns. Use it when your text data lives in one node and metadata lives in another, or when you need to enrich a dataset before analysis.
+![Join screenshot](tutorials/assets/preprocessing_join.png)
+
+Join combines two datasets using matching columns. Use it when your text data lives in one data block and metadata lives in another, or when you need to enrich a dataset before analysis.
 
 <h3 id="help-preprocessing-join-section">Join sub-tab overview</h3>
 
-The Join sub-tab guides you through selecting up to two datasets, choosing join columns, and producing a combined node.
+The Join sub-tab guides you through selecting up to two datasets, choosing join columns, and producing a combined data block.
 
 <h3 id="help-preprocessing-join-column-picker">Join column picker</h3>
 
+![Join column picker screenshot](tutorials/assets/preprocessing_join_column_picker.png)
+
 Column pickers choose which column to match in each dataset.
 
-- Pick columns that represent the same identifier in both nodes.
+- Pick columns that represent the same identifier in both data blocks.
 - Clean, consistent IDs produce the best joins.
 
 <h3 id="help-preprocessing-join-type">Join type selector</h3>
 
 Join type controls how unmatched rows are handled:
 
-- **Inner:** only matching rows from both nodes.
-- **Left:** all rows from the left node plus matches from the right.
-- **Right:** all rows from the right node plus matches from the left.
-- **Full:** all rows from both nodes; unmatched values become nulls.
-- **Semi:** rows from the left node that have at least one match.
-- **Anti:** rows from the left node with no matches.
-- **Cross:** Cartesian product of both nodes (can be very large).
+- **Inner:** only matching rows from both data blocks.
+- **Left:** all rows from the left data block plus matches from the right.
+- **Right:** all rows from the right data block plus matches from the left.
+- **Full:** all rows from both data blocks; unmatched values become nulls.
+- **Semi:** rows from the left data block that have at least one match.
+- **Anti:** rows from the left data block with no matches.
+- **Cross:** Cartesian product of both data blocks (can be very large).
 
 <h3 id="help-preprocessing-join-node-name">Join output name</h3>
 
@@ -106,7 +120,7 @@ Give the new joined dataset a clear name so it is easy to find later. Leave it b
 
 <h3 id="help-preprocessing-join-apply">Apply join</h3>
 
-Use **Add to Workspace** to run the join and create a new node. Review the preview table before applying to confirm the output shape.
+Use **Add to Workspace** to run the join and create a new data block. Review the preview table before applying to confirm the output shape.
 
 Practice exercise:
 
@@ -114,43 +128,64 @@ Practice exercise:
 2. Choose that ID in both column pickers.
 3. Run an inner join and compare row counts.
 
-<h2 id="help-preprocessing-concat-section">Concat</h2>
+<h2 id="help-preprocessing-concat-section">Stack</h2>
 
-Concat stacks multiple datasets vertically. Use it when you want to combine similar tables into one larger dataset.
+![Stack screenshot](tutorials/assets/preprocessing_concat.png)
 
-<h3 id="help-preprocessing-concat-new-node-name">New node name</h3>
+Stack combines multiple datasets vertically. Use it when you want to merge similar tables into one larger dataset.
+
+<h3 id="help-preprocessing-concat-new-node-name">New data block name</h3>
 
 Provide a label for the stacked output. Leave it blank to use the suggested name.
 
 <h3 id="help-preprocessing-concat-schema-status">Schema status</h3>
 
-The schema status summary tells you whether all selected nodes share the same column structure and highlights mismatches.
+![Schema status screenshot](tutorials/assets/preprocessing_concat_schema_status.png)
 
-Key controls include multi-selecting nodes in the workspace, reviewing schema status and mismatch details, choosing an optional output name, applying **Add to Workspace**, and checking the preview table.
+The schema status summary tells you whether all selected data blocks share the same column structure and highlights mismatches.
+
+Key controls include multi-selecting data blocks in the workspace, reviewing schema status and mismatch details, choosing an optional output name, applying **Add to Workspace**, and checking the preview table.
 
 Practice exercise:
 
 1. Select two datasets with the same columns.
-2. Leave the new node name blank.
-3. Add the concatenated result and confirm the column list matches.
+2. Leave the new data block name blank.
+3. Add the stacked result and confirm the column list matches.
 
-<h2 id="help-preprocessing-aggregate-section">Aggregate</h2>
+<h2 id="help-preprocessing-aggregate-section">Create</h2>
 
-Aggregate builds computed columns on top of a selected node. Use it to create derived fields before analysis.
+![Create screenshot](tutorials/assets/preprocessing_create.png)
+
+Create builds computed columns on top of a selected data block. Use it to create derived fields before analysis.
 
 <h3 id="help-preprocessing-aggregate-builder">Expression builder</h3>
 
 Drag column tokens and custom text to build a Polars-style expression without typing.
 
+How it works:
+
+- Drag column bubbles into the builder to add them to the equation.
+- Add the Custom Text bubble for operators or literals, then click it to edit.
+- The builder concatenates tokens with `+` automatically, quoting custom text.
+- Reorder any bubble by dragging it before or after an existing one.
+
 <h3 id="help-preprocessing-aggregate-expression">Advanced expression</h3>
 
+![Advanced expression screenshot](tutorials/assets/preprocessing_create_expression.png)
+
 Write the expression directly when you need full control, helper functions, or complex logic.
+
+Expression tips:
+
+- Use column names directly (`A`) or wrap spaced names in quotes (`"Total Count"`).
+- Combine with helpers like `abs()`, `round(value, 2)`, `when(condition, then, otherwise)`, `coalesce(a, b)`.
+- Call `lit("value")` to force a literal string when it matches an existing column name.
 
 <h3 id="help-preprocessing-aggregate-column-name">New column name</h3>
 
 Set a clear label for the computed column so it is easy to use downstream.
 
-Key controls include the node selection panel, the Basic builder, the Advanced editor, the optional new column name, the **Add to Node** action, and the preview showing the computed column.
+Key controls include the data block selection panel, the Basic builder, the Advanced editor, the optional new column name, the **Add to Node** action, and the preview showing the computed column.
 
 Practice exercise:
 

@@ -4,6 +4,8 @@
 
 <h1 id="help-export-section">Export tutorial</h1>
 
+![Export screenshot](tutorials/assets/export.png)
+
 Export lets you download tables or results for reports, sharing, or additional analysis in other tools.
 
 > **Placeholder (GIF):** Exporting results to CSV.

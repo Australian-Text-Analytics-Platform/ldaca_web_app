@@ -4,6 +4,8 @@
 
 <h1 id="help-sequential-section">Sequential analysis tutorial</h1>
 
+![Sequential analysis screenshot](tutorials/assets/sequential_analysis.png)
+
 Sequential analysis explores how events or terms evolve over time. It is useful when your data has timestamps.
 
 > **Placeholder (GIF):** Selecting a time column and previewing a sequence chart.

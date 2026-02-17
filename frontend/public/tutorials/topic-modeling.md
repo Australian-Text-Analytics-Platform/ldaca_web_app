@@ -4,13 +4,15 @@
 
 <h1 id="help-topic-modeling-section">Topic modeling tutorial</h1>
 
+![Topic modeling screenshot](tutorials/assets/topic_modeling.png)
+
 Topic modeling helps you discover themes in a large collection of documents. The app uses BERTopic under the hood.
 
 > **Placeholder (image):** Screenshot of topic modeling setup panel and results.
 
 <h2 id="help-topic-modeling-parameters">Parameter panel</h2>
 
-Use the parameter panel to pick your nodes, set topic size, and decide how keywords are scored.
+Use the parameter panel to pick your data blocks, set topic size, and decide how keywords are scored.
 
 <h3 id="help-topic-modeling-min-topic-size">Minimum topic size</h3>
 

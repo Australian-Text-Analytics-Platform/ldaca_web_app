@@ -1,5 +1,5 @@
 import React from 'react';
-import { Calculator, Lightbulb, Loader2 } from 'lucide-react';
+import { Calculator, Loader2 } from 'lucide-react';
 
 import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
 import HelpIcon from '../../../components/help/HelpIcon';
@@ -146,23 +146,6 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
             </TabsList>
 
             <TabsContent value="basic" className="space-y-4">
-              <div className="rounded-md border border-blue-200 bg-blue-50/80 p-4 text-sm text-blue-800 dark:border-blue-500/40 dark:bg-blue-500/10 dark:text-blue-100">
-                <div className="flex items-start gap-2">
-                  <Lightbulb className="mt-0.5 h-4 w-4 shrink-0" />
-                  <div className="space-y-1">
-                    <p className="font-medium">How it works</p>
-                    <ul className="list-disc space-y-1 pl-5">
-                      <li>Drag column bubbles into the builder to add them to the equation.</li>
-                      <li>Add the Custom Text bubble for operators or literals, then click it to edit.</li>
-                      <li>
-                        The builder concatenates tokens with <code>+</code> automatically, quoting custom text.
-                      </li>
-                      <li>Reorder any bubble by dragging it before or after an existing one.</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-
               <div className="space-y-2">
                 <span className="text-sm font-medium text-foreground">Available tokens</span>
                 {basicBuilder.availableColumns.length > 0 ? (
@@ -334,25 +317,6 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
             </TabsContent>
 
             <TabsContent value="advanced" className="space-y-4">
-              <div className="rounded-md border border-blue-200 bg-blue-50/80 p-4 text-sm text-blue-800 dark:border-blue-500/40 dark:bg-blue-500/10 dark:text-blue-100">
-                <div className="flex items-start gap-2">
-                  <Lightbulb className="mt-0.5 h-4 w-4 shrink-0" />
-                  <div className="space-y-1">
-                    <p className="font-medium">Expression tips</p>
-                    <ul className="list-disc space-y-1 pl-5">
-                      <li>Use column names directly (`A`) or wrap spaced names in quotes (`&quot;Total Count&quot;`).</li>
-                      <li>
-                        Combine with helpers like `abs()`, `round(value, 2)`, `when(condition, then, otherwise)`,
-                        `coalesce(a, b)`.
-                      </li>
-                      <li>
-                        Call `lit(&quot;value&quot;)` to force a literal string when it matches an existing column name.
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-
               <label className="flex flex-col gap-2">
                 <span className="flex items-center gap-2 text-sm font-medium text-foreground">
                   Expression

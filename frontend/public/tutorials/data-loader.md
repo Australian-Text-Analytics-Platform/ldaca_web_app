@@ -6,7 +6,7 @@
 
 Use this page to create or load a workspace and bring files into the system. If you are brand new, start here.
 
-> **Placeholder (GIF):** Show creating a workspace and uploading a CSV.
+![Data loader screenshot](tutorials/assets/data_loader.png)
 
 ## Getting oriented
 
@@ -15,6 +15,8 @@ Use this page to create or load a workspace and bring files into the system. If 
 It is the front door for your data. You use it to create or load workspaces, upload files, and add datasets to the workspace graph.
 
 <h2 id="help-data-loader-active-workspace">Active workspace overview</h2>
+
+![Active workspace screenshot](tutorials/assets/data_loader_active_workspace.png)
 
 The active workspace tells you which project you are currently working in. Everything you upload and analyze stays in this workspace until you unload it.
 
@@ -56,13 +58,17 @@ Unload closes the active workspace without deleting it.
 
 <h2 id="help-data-loader-workspace-manager">Workspace manager overview</h2>
 
+![Workspace manager screenshot](tutorials/assets/data_loader_workspace_manager.png)
+
 The workspace manager lists every saved workspace so you can switch projects and keep your workspace list tidy.
 
 - Click **Activate** to make a workspace current (the active one is highlighted).
-- Review the updated time and node count to confirm you are opening the right workspace.
+- Review the updated time and data block count to confirm you are opening the right workspace.
 - Use **Delete** to permanently remove a workspace you no longer need.
 
 <h2 id="help-data-loader-files-section">Files and uploads section</h2>
+
+![Files section screenshot](tutorials/assets/data_loader_files_section.png)
 
 This panel is where you bring new data into your workspace. It includes upload, sample import, and add-to-workspace actions.
 
@@ -94,10 +100,10 @@ Click this to import a dataset directly from the Language Data Commons of Austra
 
 <h2 id="help-data-loader-add-button">Add file to workspace</h2>
 
-This action adds the selected file into the workspace graph as a node.
+This action adds the selected file into the workspace graph as a data block.
 
 - After adding, you can run analyses on it.
-- Use descriptive node names for clarity.
+- Use descriptive data block names for clarity.
 
 ## Practice exercise
 

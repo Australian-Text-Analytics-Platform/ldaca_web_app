@@ -4,6 +4,8 @@
 
 <h1 id="help-token-frequency-section">Token frequency tutorial</h1>
 
+![Token frequency screenshot](tutorials/assets/token_frequency.png)
+
 Token frequency counts how often words or tokens appear in your text data. It is one of the quickest ways to spot themes and jargon.
 
 > **Placeholder (GIF):** Run token frequency and scroll through the top tokens.
@@ -13,6 +15,8 @@ Token frequency counts how often words or tokens appear in your text data. It is
 Use the parameter panel to choose what text to analyze, how many tokens to display, and which stop words should be filtered from the view.
 
 <h3 id="help-token-frequency-stop-words">Stop words input</h3>
+
+![Stop words screenshot](tutorials/assets/token_frequency_stop_words.png)
 
 Stop words are words you want to ignore (like “the”, “and”, or domain-specific filler). Add them here to clean your results.
 
@@ -29,17 +33,22 @@ This action runs the token frequency analysis on the selected dataset.
 
 <h2 id="help-token-frequency-results">Result panel</h2>
 
-Use the result panel to inspect token lists, compare two nodes, and review the statistical summary. Click any token to jump to concordance.
+
+Use the result panel to inspect token lists, compare two data blocks, and review the statistical summary. Click any token to jump to concordance.
 
 <h3 id="help-token-frequency-unified-word-cloud">Unified word cloud</h3>
 
-The unified word cloud blends the two selected nodes into one comparison view.
+![Unified word cloud screenshot](tutorials/assets/token_frequency_unified_word_cloud.png)
+
+The unified word cloud blends the two selected data blocks into one comparison view.
 
 - **Selection:** tokens are ranked by $\log_{10}(O_1 + O_2) \times \text{LogRatio}$ and the view includes the lowest and highest scores (up to twice the token limit).
 - **Size:** token size reflects $O_1 + O_2$ (combined frequency across both datasets).
 - **Color:** color shifts toward the side where the token has a higher percentage share, so different dataset sizes do not dominate the palette.
 
 <h3 id="help-token-frequency-statistical-measures">Statistical measures</h3>
+
+![Statistical measures screenshot](tutorials/assets/token_frequency_statistical_measures.png)
 
 The statistical table summarizes token differences between the two datasets.
 
