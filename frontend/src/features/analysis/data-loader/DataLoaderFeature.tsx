@@ -287,10 +287,11 @@ export const DataLoaderFeature: React.FC = () => {
     
     setLdacaImporting(true);
     try {
-      await filesApi.importLdaca(ldacaUrl, authHeaders);
-      notify('success', 'LDaCA import completed.');
+      const response = await filesApi.importLdaca(ldacaUrl, authHeaders);
+      notify('success', response.message || 'LDaCA import started in background.');
       setLdacaUrl('');
       setLdacaImportOpen(false);
+      await refetchFiles();
     } catch (error) {
       notify('error', (error as Error).message || 'Failed to start LDaCA import.');
     } finally {

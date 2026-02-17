@@ -2,6 +2,9 @@
 File management endpoints
 """
 
+import asyncio
+import json
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -21,6 +24,7 @@ from ..core.utils import (
     serialize_dataframe_for_json,
     validate_file_path,
 )
+from ..core.workspace import workspace_manager
 from ..models import (
     FilePreviewRequest,
     FilePreviewResponse,
@@ -32,6 +36,7 @@ router = APIRouter(prefix="/files", tags=["file_management"])
 
 README_FILENAME = "README.md"
 README_MAX_BYTES = 200_000
+FILES_TASK_SCOPE = "__files__"
 
 
 def _read_sample_folder_readme(readme_path: Path) -> Optional[str]:
@@ -125,38 +130,6 @@ def _get_supported_types_by_extension(file_type: str) -> List[str]:
 
 def _read_excel_sheet(file_path: Path, sheet_name: str) -> pl.DataFrame:
     return pl.read_excel(file_path, sheet_name=sheet_name)
-
-
-def _sanitize_ldaca_filename(url: str, filename: Optional[str]) -> str:
-    import re
-    import urllib.parse
-
-    if filename:
-        candidate = filename
-    else:
-        try:
-            parsed = urllib.parse.urlparse(url)
-            path_parts = parsed.path.split("/")
-            candidate = path_parts[-1] if path_parts else "ldaca_import"
-            candidate = urllib.parse.unquote(candidate)
-        except Exception:
-            candidate = "ldaca_import"
-
-    if candidate.startswith("arcp://"):
-        candidate = candidate[7:]
-
-    candidate = re.sub(r"[^a-zA-Z0-9._~-]", "_", candidate)
-    candidate = re.sub(r"_+", "_", candidate)
-
-    if not candidate or candidate == ".":
-        candidate = "ldaca_import"
-
-    if candidate.lower().endswith(".zip"):
-        candidate = candidate[:-4] + ".parquet"
-    elif not candidate.lower().endswith(".parquet"):
-        candidate += ".parquet"
-
-    return candidate
 
 
 @router.get("/")
@@ -297,44 +270,168 @@ async def import_ldaca_dataset(
     request: LDaCAImportRequest,
     current_user: dict = Depends(get_current_user),
 ):
-    """Import a dataset from LDaCA using a zip URL.
-
-    Downloads and converts the LDaCA zip into a parquet file stored under the
-    user's data folder (LDaCA/...). This operation is user-scoped and does not
-    create workspace nodes.
-    """
+    """Import a dataset from LDaCA using a zip URL as a background task."""
     user_id = current_user["id"]
     try:
-        from ldacatabulator.tabulator import LDaCATabulator
+        # Prefer currently selected workspace task center when present so
+        # sidebar task stream remains visible; otherwise use files scope.
+        task_scope = workspace_manager.get_current_workspace_id(user_id)
+        if not task_scope:
+            task_scope = FILES_TASK_SCOPE
 
-        user_data_folder = get_user_data_folder(user_id)
-        ldaca_folder = user_data_folder / "LDaCA"
-        ldaca_folder.mkdir(parents=True, exist_ok=True)
-
-        safe_filename = _sanitize_ldaca_filename(request.url, request.filename)
-        file_path = ldaca_folder / safe_filename
-
-        stem = file_path.stem
-        suffix = file_path.suffix
-        counter = 1
-        while file_path.exists():
-            file_path = ldaca_folder / f"{stem}_{counter}{suffix}"
-            counter += 1
-
-        ldac_tb = LDaCATabulator(request.url)
-        df = ldac_tb.get_text()
-
-        df.to_parquet(str(file_path))
+        tm = workspace_manager.get_task_manager(user_id, task_scope)
+        task_info = await tm.submit_task(
+            user_id=user_id,
+            workspace_id=task_scope,
+            task_type="ldaca_import",
+            task_args={"url": request.url, "filename": request.filename},
+            metadata={"task_scope": "files"},
+        )
 
         return {
-            "state": "successful",
-            "filename": file_path.name,
-            "path": str(file_path),
-            "size": file_path.stat().st_size,
-            "message": f"Successfully imported {file_path.name}",
+            "state": "running",
+            "message": "LDaCA import started",
+            "metadata": {
+                "task_id": task_info.id,
+                "task_scope": "files",
+            },
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to import LDaCA: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to start import: {e}")
+
+
+@router.get("/tasks")
+async def list_files_tasks(current_user: dict = Depends(get_current_user)):
+    """List files-scope tasks for this user."""
+    user_id = current_user["id"]
+    tm = workspace_manager.get_task_manager(user_id, FILES_TASK_SCOPE)
+    data = await tm.list(user_id=user_id, workspace_id=FILES_TASK_SCOPE)
+    return {
+        "state": "successful",
+        "data": data,
+        "message": "Tasks retrieved successfully.",
+    }
+
+
+@router.post("/tasks/cancel")
+async def cancel_files_tasks(
+    task_type: Optional[str] = None,
+    task_id: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+):
+    """Cancel files-scope tasks for this user."""
+    user_id = current_user["id"]
+    tm = workspace_manager.get_task_manager(user_id, FILES_TASK_SCOPE)
+    if task_id:
+        ok = await tm.cancel_task(task_id)
+        return {
+            "state": "successful",
+            "data": {"cancelled": ok},
+            "message": "Task cancelled successfully.",
+        }
+    count = await tm.cancel_all(
+        task_type=task_type,
+        user_id=user_id,
+        workspace_id=FILES_TASK_SCOPE,
+    )
+    return {
+        "state": "successful",
+        "data": {"cancelled_count": count},
+        "message": "All tasks cancelled successfully.",
+    }
+
+
+@router.post("/tasks/clear")
+async def clear_files_tasks(
+    task_type: Optional[str] = None,
+    task_id: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+):
+    """Clear files-scope task records for this user."""
+    user_id = current_user["id"]
+    tm = workspace_manager.get_task_manager(user_id, FILES_TASK_SCOPE)
+    if task_id:
+        cleared = await tm.clear_task(task_id)
+        return {
+            "state": "successful",
+            "data": {"cleared_count": 1 if cleared else 0},
+            "message": "Task cleared successfully.",
+        }
+    count = await tm.clear_tasks(
+        task_type=task_type,
+        user_id=user_id,
+        workspace_id=FILES_TASK_SCOPE,
+    )
+    return {
+        "state": "successful",
+        "data": {"cleared_count": count},
+        "message": "All tasks cleared successfully.",
+    }
+
+
+@router.get("/tasks/stream")
+async def stream_files_task_progress(
+    current_user: dict = Depends(get_current_user),
+):
+    """Server-Sent Events stream for files-scope task progress updates."""
+    user_id = current_user["id"]
+    tm = workspace_manager.get_task_manager(user_id, FILES_TASK_SCOPE)
+
+    async def event_generator():
+        queue = None
+        try:
+            queue = await tm.subscribe(user_id, FILES_TASK_SCOPE)
+
+            tasks = await tm.list(user_id=user_id, workspace_id=FILES_TASK_SCOPE)
+            initial_data = {
+                "type": "tasks_snapshot",
+                "tasks": tasks,
+                "timestamp": time.time(),
+            }
+            yield f"data: {json.dumps(initial_data)}\\n\\n"
+
+            last_heartbeat = time.time()
+            while True:
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=30.0)
+                    yield f"data: {json.dumps(event)}\\n\\n"
+                    last_heartbeat = time.time()
+                except asyncio.TimeoutError:
+                    if time.time() - last_heartbeat > 30:
+                        heartbeat_data = {
+                            "type": "heartbeat",
+                            "timestamp": time.time(),
+                        }
+                        yield f"data: {json.dumps(heartbeat_data)}\\n\\n"
+                        last_heartbeat = time.time()
+
+        except asyncio.CancelledError:  # pragma: no cover
+            print(f"Files SSE stream cancelled for user {user_id}")
+        except Exception as e:  # pragma: no cover
+            print(f"Files SSE stream error: {e}")
+            error_data = {
+                "type": "error",
+                "message": str(e),
+                "timestamp": time.time(),
+            }
+            yield f"data: {json.dumps(error_data)}\\n\\n"
+        finally:
+            if queue:
+                try:
+                    await tm.unsubscribe(user_id, FILES_TASK_SCOPE, queue)
+                except Exception as e:
+                    print(f"Error unsubscribing from files events: {e}")
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "Cache-Control",
+        },
+    )
 
 
 @router.post("/preview", response_model=FilePreviewResponse)
