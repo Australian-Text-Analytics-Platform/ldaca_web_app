@@ -17,6 +17,7 @@ from .api.auth import router as auth_router
 from .api.config import router as config_router
 from .api.feedback import router as feedback_router
 from .api.files import router as files_router
+from .api.tasks import router as tasks_router
 from .api.text import router as text_router
 from .api.users import router as users_router
 from .api.workspaces import router as workspaces_router
@@ -183,6 +184,7 @@ app.add_middleware(
 app.include_router(auth_router, prefix="/api", tags=["authentication"])
 app.include_router(config_router, prefix="/api", tags=["configuration"])
 app.include_router(files_router, prefix="/api", tags=["file_management"])
+app.include_router(tasks_router, prefix="/api", tags=["task_streaming"])
 app.include_router(feedback_router, prefix="/api", tags=["feedback"])
 app.include_router(text_router, prefix="/api", tags=["text_analysis"])
 app.include_router(workspaces_router, prefix="/api", tags=["workspace_management"])

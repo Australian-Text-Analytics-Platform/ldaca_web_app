@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
-import { filesApi } from '@/api/files';
 import { useAnalysisStore } from '@/stores/analysisStore';
 import { queryKeys } from '@/lib/queryKeys';
 import type { TaskItem } from '@/stores/analysisStore';
@@ -10,7 +9,6 @@ import {
   useWorkspaceTaskStreamClient,
   type WorkspaceTaskStreamClientState,
 } from './useWorkspaceTaskStreamClient';
-import { useFilesTaskStreamClient } from './useFilesTaskStreamClient';
 
 interface TaskMergeUpdate {
   task: Partial<TaskItem> & { task_id?: string };
@@ -218,86 +216,18 @@ export const useWorkspaceTaskInbox = (
   );
 
   const clientState = useWorkspaceTaskStreamClient(workspaceId, {
-    enabled: Boolean(workspaceId),
-    getAuthHeaders,
-    onEvent: handlePayload,
-  });
-
-  const filesClientState = useFilesTaskStreamClient({
     enabled: true,
     getAuthHeaders,
     onEvent: handlePayload,
   });
 
-  const mergedStatus: WorkspaceTaskStreamClientState['status'] =
-    clientState.status === 'open' || filesClientState.status === 'open'
-      ? 'open'
-      : clientState.status === 'connecting' || filesClientState.status === 'connecting'
-        ? 'connecting'
-        : clientState.status === 'error' && filesClientState.status === 'error'
-          ? 'error'
-          : clientState.status !== 'idle' || filesClientState.status !== 'idle'
-            ? 'connecting'
-            : 'idle';
-
-  const mergedError =
-    transientError ||
-    (clientState.status === 'error' && filesClientState.status === 'error'
-      ? [clientState.error, filesClientState.error].filter(Boolean).join(' | ')
-      : null);
-
-  const mergedReconnect = () => {
-    clientState.reconnect();
-    filesClientState.reconnect();
-  };
-
-  const mergedLastEventTimestamp = [
-    clientState.lastEventTimestamp ?? 0,
-    filesClientState.lastEventTimestamp ?? 0,
-  ].reduce((acc, ts) => (ts > acc ? ts : acc), 0);
-
-  const mergedReconnectAttempt = Math.max(
-    clientState.reconnectAttempt,
-    filesClientState.reconnectAttempt
-  );
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const syncFilesTasks = async () => {
-      try {
-        const payload = await filesApi.listTasks(getAuthHeaders());
-        if (cancelled || !Array.isArray(payload?.data)) return;
-
-        setTasks((prevTasks: TaskItem[]) =>
-          mergeTaskUpdates(
-            prevTasks,
-            payload.data.map((task) => ({
-              task: task as Partial<TaskItem> & { task_id?: string },
-            }))
-          )
-        );
-      } catch {
-        // Best-effort fallback; SSE remains primary signal path.
+  return transientError
+    ? {
+        ...clientState,
+        status: 'error',
+        error: transientError,
       }
-    };
-
-    syncFilesTasks();
-    const timer = window.setInterval(syncFilesTasks, 3000);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
-  }, [getAuthHeaders, setTasks]);
-
-  return {
-    status: mergedStatus,
-    error: mergedError,
-    reconnect: mergedReconnect,
-    lastEventTimestamp: mergedLastEventTimestamp || null,
-    reconnectAttempt: mergedReconnectAttempt,
-  };
+    : clientState;
 };
 
 export default useWorkspaceTaskInbox;

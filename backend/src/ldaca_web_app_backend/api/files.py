@@ -1,10 +1,5 @@
-"""
-File management endpoints
-"""
+"""File management endpoints."""
 
-import asyncio
-import json
-import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -364,71 +359,6 @@ async def clear_files_tasks(
         "data": {"cleared_count": count},
         "message": "All tasks cleared successfully.",
     }
-
-
-@router.get("/tasks/stream")
-async def stream_files_task_progress(
-    current_user: dict = Depends(get_current_user),
-):
-    """Server-Sent Events stream for files-scope task progress updates."""
-    user_id = current_user["id"]
-    tm = workspace_manager.get_task_manager(user_id, FILES_TASK_SCOPE)
-
-    async def event_generator():
-        queue = None
-        try:
-            queue = await tm.subscribe(user_id, FILES_TASK_SCOPE)
-
-            tasks = await tm.list(user_id=user_id, workspace_id=FILES_TASK_SCOPE)
-            initial_data = {
-                "type": "tasks_snapshot",
-                "tasks": tasks,
-                "timestamp": time.time(),
-            }
-            yield f"data: {json.dumps(initial_data)}\\n\\n"
-
-            last_heartbeat = time.time()
-            while True:
-                try:
-                    event = await asyncio.wait_for(queue.get(), timeout=30.0)
-                    yield f"data: {json.dumps(event)}\\n\\n"
-                    last_heartbeat = time.time()
-                except asyncio.TimeoutError:
-                    if time.time() - last_heartbeat > 30:
-                        heartbeat_data = {
-                            "type": "heartbeat",
-                            "timestamp": time.time(),
-                        }
-                        yield f"data: {json.dumps(heartbeat_data)}\\n\\n"
-                        last_heartbeat = time.time()
-
-        except asyncio.CancelledError:  # pragma: no cover
-            print(f"Files SSE stream cancelled for user {user_id}")
-        except Exception as e:  # pragma: no cover
-            print(f"Files SSE stream error: {e}")
-            error_data = {
-                "type": "error",
-                "message": str(e),
-                "timestamp": time.time(),
-            }
-            yield f"data: {json.dumps(error_data)}\\n\\n"
-        finally:
-            if queue:
-                try:
-                    await tm.unsubscribe(user_id, FILES_TASK_SCOPE, queue)
-                except Exception as e:
-                    print(f"Error unsubscribing from files events: {e}")
-
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Headers": "Cache-Control",
-        },
-    )
 
 
 @router.post("/preview", response_model=FilePreviewResponse)

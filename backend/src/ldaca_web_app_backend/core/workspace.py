@@ -16,8 +16,10 @@ from typing import Any, Dict, Optional, Union
 
 import polars as pl
 from docworkspace import Node, Workspace  # type: ignore
-from docworkspace.workspace.io import read_workspace  # type: ignore
-from docworkspace.workspace.io import write_workspace
+from docworkspace.workspace.io import (
+    read_workspace,  # type: ignore
+    write_workspace,
+)
 
 from .docworkspace_api import (
     DocWorkspaceAPIUtils,
@@ -285,6 +287,22 @@ class WorkspaceManager:
             tm = WorkerTaskManager()
             self._task_managers[key] = tm
         return tm
+
+    def list_user_task_scopes(self, user_id: str) -> list[str]:
+        """List workspace/task scopes that currently have task manager instances.
+
+        Includes any already-created task managers for this user plus the current
+        workspace (if set) so callers can proactively subscribe.
+        """
+        scopes = {
+            workspace_id
+            for (uid, workspace_id) in self._task_managers.keys()
+            if uid == user_id
+        }
+        current_workspace_id = self.get_current_workspace_id(user_id)
+        if current_workspace_id:
+            scopes.add(current_workspace_id)
+        return sorted(scopes)
 
     def get_workspace_dir(self, user_id: str, workspace_id: str) -> Optional[Path]:
         cached = self._get_cached_path(user_id, workspace_id)

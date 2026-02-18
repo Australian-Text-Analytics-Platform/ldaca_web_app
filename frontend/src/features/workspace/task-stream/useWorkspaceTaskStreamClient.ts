@@ -36,9 +36,12 @@ const clampRetryDelay = (attempt: number) => {
   return Math.min(backoff, STREAM_RETRY_MAX_MS);
 };
 
-const buildUrl = (workspaceId: string) => {
+const buildUrl = (workspaceId: string | null) => {
   const baseUrl = getApiBase();
-  return `${baseUrl}/workspaces/${workspaceId}/tasks/stream`;
+  if (workspaceId) {
+    return `${baseUrl}/tasks/stream?workspace_id=${encodeURIComponent(workspaceId)}`;
+  }
+  return `${baseUrl}/tasks/stream`;
 };
 
 const parseSseFrames = (buffer: string, onMessage: (message: TaskEventPayload) => void) => {
@@ -93,7 +96,7 @@ export const useWorkspaceTaskStreamClient = (
   }, []);
 
   useEffect(() => {
-    if (!workspaceId || !enabled) {
+    if (!enabled) {
       setState({ status: 'idle', error: null, reconnectAttempt: 0, lastEventTimestamp: null });
       reconnectRef.current = () => {};
       return;
