@@ -1,16 +1,8 @@
 """FastAPI integration models for DocWorkspace."""
 
-from enum import Enum
 from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field
-
-
-class DataType(str, Enum):
-    """Supported data types in DocWorkspace."""
-
-    POLARS_DATAFRAME = "polars.DataFrame"
-    POLARS_LAZYFRAME = "polars.LazyFrame"
 
 
 class ColumnSchema(BaseModel):
@@ -33,7 +25,6 @@ class NodeSummary(BaseModel):
 
     id: str
     name: str
-    data_type: DataType
     operation: Optional[str] = None
     shape: tuple[int, int] = (0, 0)
     columns: List[str] = Field(default_factory=list)

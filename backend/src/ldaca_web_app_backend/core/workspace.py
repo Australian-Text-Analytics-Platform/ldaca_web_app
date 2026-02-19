@@ -480,7 +480,6 @@ class WorkspaceManager:
                     node_id=result.id,
                     data={
                         "node_name": result.name,
-                        "data_type": type(result.data).__name__,
                     },
                 )
             else:
