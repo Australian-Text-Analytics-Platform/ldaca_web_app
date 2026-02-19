@@ -75,30 +75,22 @@ def extract_context_preference(record_result: Optional[Dict[str, Any]]) -> int:
 
 
 def to_polars_dataframe(data: Any) -> pl.DataFrame:
-    """Convert supported inputs into an eager Polars DataFrame.
+    """Convert node data into an eager Polars DataFrame.
 
     Used by:
     - `compute_quote_dataframe`
 
     Why:
-    - Accepts LazyFrame-like and eager sources through one conversion boundary.
+    - Enforces strict Polars-only node data contracts for quotation analysis.
     """
     if isinstance(data, pl.DataFrame):
         return data
     if isinstance(data, pl.LazyFrame):
         return data.collect()
 
-    if hasattr(data, "collect"):
-        try:
-            collected = data.collect()
-            if isinstance(collected, pl.LazyFrame):
-                return collected.collect()
-            if isinstance(collected, pl.DataFrame):
-                return collected
-        except Exception:  # pragma: no cover
-            pass
-
-    return pl.DataFrame(data)
+    raise ValueError(
+        f"Quotation analysis requires Polars DataFrame/LazyFrame, got {type(data).__name__}"
+    )
 
 
 def empty_quote_dataframe(text_column: Optional[str] = None) -> pl.DataFrame:

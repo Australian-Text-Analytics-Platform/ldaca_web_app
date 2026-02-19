@@ -1,9 +1,9 @@
 """Node-level data manipulation helpers used by workspace APIs.
 
-These utilities operate purely on data objects (Polars DataFrame/LazyFrame) and
-raise ``NodeDataError`` when a requested operation cannot be applied. Keeping
-this logic outside of the FastAPI modules makes it easier to reuse in other
-contexts (CLI, task workers) and keeps the HTTP layer thin.
+These utilities operate on Polars LazyFrame node data and raise
+``NodeDataError`` when a requested operation cannot be applied. Keeping this
+logic outside FastAPI modules makes it reusable in other contexts (CLI, task
+workers) and keeps the HTTP layer thin.
 """
 
 from __future__ import annotations
@@ -14,12 +14,7 @@ from typing import Iterable, Sequence
 import polars as pl
 
 
-@dataclass(slots=True)
-class _NormalizedLazy:
-    lazyframe: pl.LazyFrame
-
-
-def _normalize_lazy_data(data: object) -> _NormalizedLazy:
+def _normalize_lazy_data(data: object) -> pl.LazyFrame:
     """Validate and normalize node data to the lazy-only contract.
 
     Used by:
@@ -30,17 +25,13 @@ def _normalize_lazy_data(data: object) -> _NormalizedLazy:
     - Enforces backend convention that workspace node data stays lazy.
     """
     if isinstance(data, pl.LazyFrame):
-        return _NormalizedLazy(data)
-
-    if isinstance(data, pl.DataFrame):
-        raise NodeDataError(
-            message=(
-                "Workspace node data must remain lazy. Convert DataFrame inputs via .lazy() before continuing."
-            )
-        )
+        return data
 
     raise NodeDataError(
-        message=f"Unsupported data type '{type(data).__name__}' for lazy operations.",
+        message=(
+            "Workspace node data must be a Polars LazyFrame. "
+            f"Received '{type(data).__name__}'."
+        ),
         status_code=400,
     )
 
@@ -84,7 +75,7 @@ def _schema_names(lazyframe: pl.LazyFrame) -> Iterable[str]:
     return lazyframe.collect_schema().names()
 
 
-def drop_column(data: object, column_name: str) -> object:
+def drop_column(data: object, column_name: str) -> pl.LazyFrame:
     """Return data with one column removed under lazy-only constraints.
 
     Used by:
@@ -94,15 +85,15 @@ def drop_column(data: object, column_name: str) -> object:
     - Centralizes column removal validation and error semantics.
     """
 
-    normalized = _normalize_lazy_data(data)
-    schema_names = tuple(_schema_names(normalized.lazyframe))
+    lazyframe = _normalize_lazy_data(data)
+    schema_names = tuple(_schema_names(lazyframe))
     _ensure_column_present(schema_names, column_name)
 
-    result_lazy = normalized.lazyframe.drop([column_name])
+    result_lazy = lazyframe.drop([column_name])
     return result_lazy
 
 
-def rename_column(data: object, column_name: str, new_name: str) -> object:
+def rename_column(data: object, column_name: str, new_name: str) -> pl.LazyFrame:
     """Return data with one column renamed under lazy-only constraints.
 
     Used by:
@@ -110,10 +101,6 @@ def rename_column(data: object, column_name: str, new_name: str) -> object:
 
     Why:
     - Reuses consistent validation for existence/uniqueness/name normalization.
-
-    Refactor note:
-    - Name-trimming logic overlaps route-layer trimming; route can delegate fully
-        to this helper and remove duplicate normalization.
     """
 
     trimmed_name = (new_name or "").strip()
@@ -122,13 +109,14 @@ def rename_column(data: object, column_name: str, new_name: str) -> object:
             message="New column name must be a non-empty string.",
         )
 
-    normalized = _normalize_lazy_data(data)
-    schema = tuple(_schema_names(normalized.lazyframe))
+    lazyframe = _normalize_lazy_data(data)
+    schema = tuple(_schema_names(lazyframe))
     _ensure_column_present(schema, column_name)
     _ensure_unique_target(schema, trimmed_name, column_name)
 
-    renamed_lazy = normalized.lazyframe.rename({column_name: trimmed_name})
+    renamed_lazy = lazyframe.rename({column_name: trimmed_name})
     return renamed_lazy
 
 
+__all__ = ["NodeDataError", "drop_column", "rename_column"]
 __all__ = ["NodeDataError", "drop_column", "rename_column"]

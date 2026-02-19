@@ -7,7 +7,6 @@ All business logic is handled by the DocWorkspace library itself.
 
 import logging
 import os
-from typing import cast
 
 import polars as pl
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
@@ -291,7 +290,7 @@ async def add_node_to_workspace(
         node = workspace_manager.add_node_to_workspace(
             user_id=user_id,
             workspace_id=workspace_id,
-            data=cast(pl.DataFrame | pl.LazyFrame, lazy_data),
+            data=lazy_data,
             node_name=node_name,
         )
 
@@ -423,12 +422,6 @@ async def cast_node(
 
         original_dtype = schema[column_name]
         original_type = str(original_dtype)
-
-        if column_name not in columns:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Column '{column_name}' not found in data. Available columns: {columns}",
-            )
 
         # Determine operation based on target type
         target_lower = target_type.lower()
@@ -703,6 +696,7 @@ async def export_nodes(
 # ============================================================================
 
 
+# ============================================================================
 # ============================================================================
 # ============================================================================
 # ============================================================================
