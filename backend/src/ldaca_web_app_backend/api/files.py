@@ -6,25 +6,29 @@ from typing import Any, Dict, List, Optional
 import polars as pl
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
 
 from ..core.auth import get_current_user
 from ..core.utils import (
     detect_file_type,
     get_user_data_folder,
     import_sample_data_for_user,
-    load_data_file,
     read_text_file,
     read_zip_file,
-    serialize_dataframe_for_json,
     validate_file_path,
 )
 from ..core.workspace import workspace_manager
 from ..models import (
+    FileInfoResponse,
     FilePreviewRequest,
     FilePreviewResponse,
+    FilesImportTaskStartResponse,
+    FilesTaskActionResponse,
+    FilesTasksListResponse,
     FileUploadResponse,
     ImportSampleDataResponse,
+    LDaCAImportRequest,
+    MessageResponse,
+    UserFilesResponse,
 )
 
 router = APIRouter(prefix="/files", tags=["file_management"])
@@ -67,11 +71,6 @@ def _read_sample_folder_readme(readme_path: Path) -> Optional[str]:
         decoded = f"{decoded}\n\n… (README truncated for display)"
 
     return decoded
-
-
-class LDaCAImportRequest(BaseModel):
-    url: str
-    filename: Optional[str] = None
 
 
 def _lazy_scan(file_path, file_type: str) -> pl.LazyFrame:
@@ -154,7 +153,7 @@ def _read_excel_sheet(file_path: Path, sheet_name: str) -> pl.DataFrame:
     return pl.read_excel(file_path, sheet_name=sheet_name)
 
 
-@router.get("/")
+@router.get("/", response_model=UserFilesResponse)
 async def get_user_files(current_user: dict = Depends(get_current_user)):
     """List user-visible files with metadata and sample README context.
 
@@ -249,7 +248,7 @@ async def upload_file(file: UploadFile, current_user: dict = Depends(get_current
     }
 
 
-@router.delete("/{filename:path}")
+@router.delete("/{filename:path}", response_model=MessageResponse)
 async def delete_file(filename: str, current_user: dict = Depends(get_current_user)):
     """Delete user's file"""
     user_id = current_user["id"]
@@ -294,7 +293,7 @@ async def import_sample_data(current_user: dict = Depends(get_current_user)):
         )
 
 
-@router.post("/import-ldaca")
+@router.post("/import-ldaca", response_model=FilesImportTaskStartResponse)
 async def import_ldaca_dataset(
     request: LDaCAImportRequest,
     current_user: dict = Depends(get_current_user),
@@ -333,7 +332,7 @@ async def import_ldaca_dataset(
         raise HTTPException(status_code=500, detail=f"Failed to start import: {e}")
 
 
-@router.get("/tasks")
+@router.get("/tasks", response_model=FilesTasksListResponse)
 async def list_files_tasks(current_user: dict = Depends(get_current_user)):
     """List worker tasks scoped to file operations.
 
@@ -353,7 +352,7 @@ async def list_files_tasks(current_user: dict = Depends(get_current_user)):
     }
 
 
-@router.post("/tasks/cancel")
+@router.post("/tasks/cancel", response_model=FilesTaskActionResponse)
 async def cancel_files_tasks(
     task_type: Optional[str] = None,
     task_id: Optional[str] = None,
@@ -388,7 +387,7 @@ async def cancel_files_tasks(
     }
 
 
-@router.post("/tasks/clear")
+@router.post("/tasks/clear", response_model=FilesTaskActionResponse)
 async def clear_files_tasks(
     task_type: Optional[str] = None,
     task_id: Optional[str] = None,
@@ -542,7 +541,7 @@ async def unified_file_preview(
         )
 
 
-@router.get("/{filename:path}/info")
+@router.get("/{filename:path}/info", response_model=FileInfoResponse)
 async def get_file_info(filename: str, current_user: dict = Depends(get_current_user)):
     """Get detailed file information"""
     user_id = current_user["id"]
@@ -562,22 +561,12 @@ async def get_file_info(filename: str, current_user: dict = Depends(get_current_
         stat = file_path.stat()
         file_type = detect_file_type(filename)
 
-        # Try to get DataFrame info
-        df_info = None
-        try:
-            df = load_data_file(file_path)
-            df_info = serialize_dataframe_for_json(df)
-        except Exception:
-            pass
-
         return {
             "filename": filename,
-            "size": stat.st_size,
-            "size_mb": stat.st_size / (1024 * 1024),
+            "size_Byte": stat.st_size,
             "created_at": stat.st_ctime,
             "modified_at": stat.st_mtime,
             "file_type": file_type,
-            "dataframe_info": df_info,
         }
     except Exception as e:
         raise HTTPException(

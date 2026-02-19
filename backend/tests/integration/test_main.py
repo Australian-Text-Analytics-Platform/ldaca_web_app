@@ -122,7 +122,6 @@ class TestMainApp:
                 "auth",
                 "files",
                 "workspaces",
-                "user",
                 "admin",
             ]
 

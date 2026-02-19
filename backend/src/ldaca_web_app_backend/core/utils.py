@@ -5,7 +5,6 @@ Core utilities for the LDaCA Web App
 import io
 import json
 import os
-import re
 import shutil
 import uuid
 import zipfile
@@ -52,14 +51,6 @@ def get_user_workspace_folder(user_id: str) -> Path:
     return workspace_folder
 
 
-def sanitize_workspace_folder_name(name: str) -> str:
-    """Create a filesystem-safe folder name from a workspace name."""
-
-    safe = re.sub(r"[^A-Za-z0-9._-]+", "_", name.strip())
-    safe = safe.strip("._")
-    return safe or "workspace"
-
-
 def validate_workspace_name(name: str) -> tuple[bool, str]:
     """Validate workspace names for safe, portable folder usage.
 
@@ -94,7 +85,11 @@ def allocate_workspace_folder(user_id: str, workspace_name: str) -> Path:
     base = get_user_workspace_folder(user_id)
     base.mkdir(parents=True, exist_ok=True)
 
-    preferred = sanitize_workspace_folder_name(workspace_name)
+    is_valid, reason = validate_workspace_name(workspace_name)
+    if not is_valid:
+        raise ValueError(reason)
+
+    preferred = workspace_name.strip()
     candidate = preferred
     counter = 1
     while (base / candidate).exists():
@@ -114,7 +109,11 @@ def ensure_display_folder_name(current_folder: Path, desired_name: str) -> Path:
     """
 
     parent = current_folder.parent
-    desired = sanitize_workspace_folder_name(desired_name)
+    is_valid, reason = validate_workspace_name(desired_name)
+    if not is_valid:
+        raise ValueError(reason)
+
+    desired = desired_name.strip()
     target = parent / desired
 
     if current_folder == target:
@@ -135,21 +134,6 @@ def ensure_display_folder_name(current_folder: Path, desired_name: str) -> Path:
         counter += 1
 
 
-def load_workspace_metadata(metadata_path: Path) -> Optional[Dict[str, Any]]:
-    """Load workspace metadata JSON from the given path.
-
-    Returns None if the file does not exist or cannot be parsed.
-    """
-
-    if not metadata_path.exists() or not metadata_path.is_file():
-        return None
-    try:
-        with metadata_path.open("r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return None
-
-
 def find_workspace_folder_by_id(user_id: str, workspace_id: str) -> Optional[Path]:
     """Locate the workspace folder for a given workspace ID, if it exists."""
 
@@ -160,8 +144,12 @@ def find_workspace_folder_by_id(user_id: str, workspace_id: str) -> Optional[Pat
         if not candidate.is_dir():
             continue
         metadata_path = candidate / "metadata.json"
-        data = load_workspace_metadata(metadata_path)
-        if not data:
+        if not metadata_path.exists() or not metadata_path.is_file():
+            continue
+        try:
+            with metadata_path.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:
             continue
         ws_meta = data.get("workspace_metadata", {})
         if ws_meta.get("id") == workspace_id:
@@ -255,15 +243,6 @@ def import_sample_data_for_user(user_id: str) -> Dict[str, Any]:
         "bytes_copied": bytes_copied,
         "sample_dir": str(target_sample_data),
     }
-
-
-def get_folder_size_mb(folder_path: Path) -> float:
-    """Get total size of folder in MB"""
-    total_size = 0
-    for file_path in folder_path.rglob("*"):
-        if file_path.is_file():
-            total_size += file_path.stat().st_size
-    return total_size / (1024 * 1024)
 
 
 def detect_file_type(filename: str) -> str:
@@ -377,176 +356,6 @@ def read_zip_file(file_path: Path) -> pl.DataFrame:
             "filename": [info.filename for info in file_infos],
             "size": [info.file_size for info in file_infos],
         })
-
-
-def serialize_dataframe_for_json(df) -> Dict[str, Any]:
-    """
-    Convert a DataFrame (polars) to JSON-serializable format
-    with complete type representation using module.ClassName format.
-
-    Used by:
-    - file upload/inspection endpoints in `api/files.py`
-
-    Why:
-    - Produces stable preview metadata from both eager and lazy data objects.
-    """
-    try:
-        if df is None:
-            return {
-                "shape": (0, 0),
-                "columns": [],
-                "dtypes": {},
-                "preview": [],
-                "is_text_data": False,
-                "data_type": f"{type(None).__module__}.{type(None).__name__}",
-            }
-
-        # Extract underlying data if this is wrapped in docworkspace.Node
-        underlying_data = df
-        doc_column = None
-
-        # Handle docworkspace.Node wrapper
-        if hasattr(df, "data") and hasattr(df, "name") and hasattr(df, "id"):
-            # This is likely an docworkspace.Node - extract the underlying data
-            underlying_data = df.data
-            print(
-                f"DEBUG: Extracted data from docworkspace.Node, underlying type: {type(underlying_data)}"
-            )
-
-        # Extract text column metadata when available
-        if doc_column is None and hasattr(df, "metadata"):
-            metadata = getattr(df, "metadata", None)
-            if isinstance(metadata, dict):
-                doc_column = metadata.get("text_column")
-
-        # Now handle the underlying data uniformly
-        # Handle shape - LazyFrames don't have a shape until collected
-        if hasattr(underlying_data, "shape"):
-            shape = underlying_data.shape
-            print(f"DEBUG: Got shape from .shape property: {shape}")
-        elif hasattr(underlying_data, "collect_schema"):
-            # LazyFrame - we can get column count from schema and row count from .select(pl.len()).collect()
-            print("DEBUG: Processing LazyFrame shape calculation")
-            try:
-                schema = underlying_data.collect_schema()
-                col_count = len(schema)
-                print(f"DEBUG: Got column count from schema: {col_count}")
-
-                # Get row count by collecting length
-                try:
-                    row_count = underlying_data.select(pl.len()).collect().item()
-                    shape = (row_count, col_count)
-                    print(f"DEBUG: Successfully calculated LazyFrame shape: {shape}")
-                except Exception as e:
-                    print(f"Warning: Could not get LazyFrame row count: {e}")
-                    shape = (
-                        0,
-                        col_count,
-                    )  # Row count unknown for lazy, but we have columns
-            except Exception as e:
-                print(f"Warning: Could not get LazyFrame schema: {e}")
-                shape = (0, 0)
-        else:
-            shape = (0, 0)
-            print(
-                "DEBUG: No shape or collect_schema method found, defaulting to (0, 0)"
-            )
-
-        # Handle columns - use collect_schema for LazyFrames to avoid performance warnings
-        if hasattr(underlying_data, "collect_schema"):
-            # LazyFrame
-            try:
-                schema = underlying_data.collect_schema()
-                columns = list(schema.names())
-            except Exception as e:
-                print(f"Warning: Could not get LazyFrame columns: {e}")
-                columns = []
-        elif hasattr(underlying_data, "columns"):
-            columns = list(underlying_data.columns)
-        else:
-            columns = []
-
-        # Get dtypes - use collect_schema for LazyFrames
-        dtypes = {}
-        if hasattr(underlying_data, "collect_schema"):
-            # LazyFrame
-            try:
-                schema = underlying_data.collect_schema()
-                dtypes = {col: str(dtype) for col, dtype in schema.items()}
-            except Exception as e:
-                print(f"Warning: Could not get LazyFrame dtypes: {e}")
-                dtypes = {}
-        elif hasattr(underlying_data, "schema"):
-            # Regular polars DataFrame
-            dtypes = {col: str(dtype) for col, dtype in underlying_data.schema.items()}
-        elif hasattr(underlying_data, "dtypes"):
-            # Polars legacy (if schema is not available)
-            dtypes = {col: str(dtype) for col, dtype in underlying_data.dtypes.items()}
-
-        # Get preview data - collect LazyFrame for preview
-        preview = []
-        if hasattr(underlying_data, "head"):
-            try:
-                # Check if it's a LazyFrame by checking for collect method
-                if hasattr(underlying_data, "collect") and hasattr(
-                    underlying_data, "collect_schema"
-                ):
-                    # LazyFrame - collect first 5 rows
-                    preview_df = underlying_data.head(5).collect()
-                else:
-                    # Regular DataFrame
-                    preview_df = underlying_data.head(5)
-
-                # Convert to dict - polars DataFrames have to_dicts() or write_json()
-                try:
-                    if hasattr(preview_df, "to_dicts"):
-                        # Polars DataFrame
-                        preview = preview_df.to_dicts()
-                    elif hasattr(preview_df, "to_dict"):
-                        # Fallback to to_dict
-                        preview = preview_df.to_dict(as_series=False)
-                    else:
-                        preview = []
-                except Exception as e:
-                    print(f"Warning: Could not convert preview to dict: {e}")
-                    preview = []
-            except Exception as e:
-                print(f"Error getting preview: {e}")
-                preview = []
-
-        # Use the most complete data type representation: module.ClassName
-        underlying_type = type(underlying_data)
-        data_type_clean = f"{underlying_type.__module__}.{underlying_type.__name__}"
-
-        result = {
-            "shape": shape,
-            "columns": columns,
-            "dtypes": dtypes,
-            "preview": preview,
-            "is_text_data": False,
-            "data_type": data_type_clean,
-        }
-
-        # Add document/text column info when available
-        if doc_column:
-            result["document"] = doc_column
-
-        return result
-
-    except Exception as e:
-        print(f"Error processing DataFrame: {e}")
-        # Fallback to basic info with complete type representation
-        fallback_type = type(df) if df is not None else type(None)
-        # Initialize variables that might not be set
-        is_doc_type = False
-        return {
-            "shape": (0, 0),
-            "columns": [],
-            "dtypes": {},
-            "preview": [],
-            "is_text_data": is_doc_type,
-            "data_type": f"{fallback_type.__module__}.{fallback_type.__name__}",
-        }
 
 
 def generate_workspace_id() -> str:

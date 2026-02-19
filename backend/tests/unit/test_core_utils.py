@@ -10,11 +10,9 @@ import pytest
 from ldaca_web_app_backend.core.utils import (
     detect_file_type,
     generate_workspace_id,
-    get_folder_size_mb,
     get_user_data_folder,
     get_user_workspace_folder,
     load_data_file,
-    serialize_dataframe_for_json,
     setup_user_folders,
     validate_file_path,
 )
@@ -84,16 +82,6 @@ class TestUserFolders:
 
 class TestFileOperations:
     """Test file operation utilities"""
-
-    def test_get_folder_size_mb(self, temp_dir):
-        """Test getting total folder size in MB"""
-        # Create test files totaling about 1MB
-        for i in range(2):
-            test_file = temp_dir / f"test_{i}.txt"
-            test_file.write_text("x" * (512 * 1024))  # 0.5MB each
-
-        total_size = get_folder_size_mb(temp_dir)
-        assert abs(total_size - 1.0) < 0.1
 
     def test_detect_file_type(self):
         """Test file type detection"""
@@ -256,48 +244,6 @@ class TestFileOperations:
         else:
             # It's a DataFrame
             assert df.shape[0] == 3
-
-
-class TestDataFrameUtils:
-    """Test DataFrame utility functions"""
-
-    def test_serialize_dataframe_for_json(self):
-        """Test DataFrame serialization for JSON"""
-        df = pl.DataFrame({
-            "name": ["Alice", "Bob", "Charlie"],
-            "age": [25, 30, 35],
-            "score": [95.5, 87.2, 92.1],
-        })
-
-        result = serialize_dataframe_for_json(df)
-
-        assert result["shape"] == (3, 3)
-        assert result["columns"] == ["name", "age", "score"]
-        assert "dtypes" in result
-        assert "preview" in result
-        assert len(result["preview"]) == 3
-        assert result["is_text_data"] is False
-
-    def test_serialize_dataframe_with_nulls(self):
-        """Test DataFrame serialization with null values"""
-        df = pl.DataFrame({"name": ["Alice", None, "Charlie"], "age": [25, 30, None]})
-
-        result = serialize_dataframe_for_json(df)
-
-        assert result["shape"] == (3, 2)
-        assert len(result["preview"]) == 3
-        # Check that nulls are preserved as None values
-        assert any(row["name"] is None for row in result["preview"])
-
-    def test_serialize_invalid_dataframe(self):
-        """Test serialization of invalid DataFrame-like object"""
-        fake_df = object()  # Not a DataFrame
-
-        result = serialize_dataframe_for_json(fake_df)
-
-        assert result["shape"] == (0, 0)
-        assert result["columns"] == []
-        assert result["preview"] == []
 
 
 class TestUtilityFunctions:

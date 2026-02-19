@@ -8,6 +8,7 @@ Design Goals:
 * Backward compatibility deliberately dropped.
 """
 
+import json
 import os
 import shutil
 from datetime import datetime
@@ -16,10 +17,8 @@ from typing import Any, Dict, Optional, Union
 
 import polars as pl
 from docworkspace import Node, Workspace  # type: ignore
-from docworkspace.workspace.io import (
-    read_workspace,  # type: ignore
-    write_workspace,
-)
+from docworkspace.workspace.io import read_workspace  # type: ignore
+from docworkspace.workspace.io import write_workspace
 
 from .api_models import OperationResult
 from .docworkspace_api import DocWorkspaceAPIUtils, exception_to_error_response
@@ -29,7 +28,6 @@ from .utils import (
     find_workspace_folder_by_id,
     generate_workspace_id,
     get_user_workspace_folder,
-    load_workspace_metadata,
 )
 
 
@@ -241,8 +239,12 @@ class WorkspaceManager:
             if not workspace_dir.is_dir():
                 continue
             metadata_path = workspace_dir / "metadata.json"
-            raw = load_workspace_metadata(metadata_path)
-            if not raw:
+            if not metadata_path.exists() or not metadata_path.is_file():
+                continue
+            try:
+                with metadata_path.open("r", encoding="utf-8") as f:
+                    raw = json.load(f)
+            except Exception:
                 continue
             ws_meta = raw.get("workspace_metadata", {})
             wid = ws_meta.get("id")
@@ -518,5 +520,7 @@ class WorkspaceManager:
         self._save(user_id, workspace_id, workspace)
 
 
+# Global singleton
+workspace_manager = WorkspaceManager()
 # Global singleton
 workspace_manager = WorkspaceManager()

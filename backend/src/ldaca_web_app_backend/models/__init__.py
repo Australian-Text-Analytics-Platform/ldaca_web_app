@@ -77,22 +77,6 @@ class UserResponse(BaseModel):
 # =============================================================================
 
 
-class UserStorageInfo(BaseModel):
-    data_files_count: int
-    data_files_size_mb: float
-    workspaces_count: int
-    workspaces_size_mb: float
-    total_size_mb: float
-    quota_limit_mb: Optional[float] = None
-
-
-class UserFolderInfo(BaseModel):
-    data_folder: str
-    workspace_folder: str
-    total_files: int
-    total_workspaces: int
-
-
 # =============================================================================
 # FILE MANAGEMENT MODELS
 # =============================================================================
@@ -119,6 +103,71 @@ class DataFileInfo(BaseModel):
     filename: str
     size: int
     created_at: str
+    file_type: str
+
+
+class LDaCAImportRequest(BaseModel):
+    url: str
+    filename: Optional[str] = None
+
+
+class FileListItemResponse(BaseModel):
+    filename: str
+    full_path: str
+    display_name: str
+    size: int
+    created_at: float
+    file_type: str
+    folder: str
+    is_sample: bool
+    path_type: str
+    readme: Optional[str] = None
+
+
+class UserFilesResponse(BaseModel):
+    files: List[FileListItemResponse]
+    total: int
+    user_folder: str
+
+
+class MessageResponse(BaseModel):
+    message: str
+
+
+class FilesTaskMetadataResponse(BaseModel):
+    task_id: str
+    task_scope: str
+
+
+class FilesImportTaskStartResponse(BaseModel):
+    state: str
+    message: str
+    metadata: FilesTaskMetadataResponse
+
+
+class FilesTasksListResponse(BaseModel):
+    state: str
+    data: List[Dict[str, Any]]
+    message: str
+
+
+class FilesTaskActionDataResponse(BaseModel):
+    cancelled: Optional[bool] = None
+    cancelled_count: Optional[int] = None
+    cleared_count: Optional[int] = None
+
+
+class FilesTaskActionResponse(BaseModel):
+    state: str
+    data: FilesTaskActionDataResponse
+    message: str
+
+
+class FileInfoResponse(BaseModel):
+    filename: str
+    size_Byte: int
+    created_at: float
+    modified_at: float
     file_type: str
 
 

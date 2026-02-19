@@ -19,7 +19,6 @@ from .api.feedback import router as feedback_router
 from .api.files import router as files_router
 from .api.tasks import router as tasks_router
 from .api.text import router as text_router
-from .api.users import router as users_router
 from .api.workspaces import router as workspaces_router
 
 # Ensure DocWorkspace API conversion utilities are available at startup.
@@ -196,7 +195,6 @@ app.include_router(tasks_router, prefix="/api", tags=["task_streaming"])
 app.include_router(feedback_router, prefix="/api", tags=["feedback"])
 app.include_router(text_router, prefix="/api", tags=["text_analysis"])
 app.include_router(workspaces_router, prefix="/api", tags=["workspace_management"])
-app.include_router(users_router, prefix="/api", tags=["user_management"])
 app.include_router(admin_router, prefix="/api", tags=["administration"])
 
 
@@ -255,7 +253,6 @@ async def root():
                 "nodes": "/api/workspaces/{workspace_id}/nodes",
                 "node_data": "/api/workspaces/{workspace_id}/nodes/{node_id}/data",
             },
-            "user": {"folders": "/api/user/folders", "storage": "/api/user/storage"},
             "admin": {"users": "/api/admin/users", "cleanup": "/api/admin/cleanup"},
         },
     }
@@ -331,7 +328,6 @@ async def status():
             "auth": "Google OAuth authentication and session management",
             "files": "File upload, download, preview, and management",
             "workspaces": "Multi-user workspace and node management",
-            "users": "User folder and storage management",
             "admin": "Administrative functions and monitoring",
         },
     }

@@ -161,7 +161,7 @@ class Settings(BaseSettings):
 
         Refactor note:
         - `secret_key` default value is placeholder-grade; enforce env-provided
-            secret in production startup validation to reduce misconfiguration risk.
+          secret in production startup validation to reduce misconfiguration risk.
         """
         if self.database_url and self.database_url.strip():
             return self.database_url
