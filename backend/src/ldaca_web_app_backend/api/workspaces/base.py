@@ -246,19 +246,13 @@ async def add_node_to_workspace(
             )
 
         # Normalize to an eager Polars DataFrame
-        # LazyFrame-only migration note:
-        # The branches below support legacy mixed payload types (wrapper,
-        # pandas-like, generic mapping/list). Remove once upload/create inputs
-        # are validated to strict LazyFrame/Polars-only contracts.
         try:
             if isinstance(data, pl.LazyFrame):
                 data = data.collect()
-            elif hasattr(data, "dataframe"):
-                data = pl.DataFrame(getattr(data, "dataframe"))  # type: ignore[arg-type]
-            elif hasattr(data, "iloc"):
-                data = pl.DataFrame(data)  # pandas -> polars
             elif not isinstance(data, pl.DataFrame):
-                data = pl.DataFrame(data)
+                raise TypeError(
+                    f"Expected Polars DataFrame/LazyFrame from loader, got {type(data).__name__}"
+                )
         except Exception as exc:
             raise HTTPException(
                 status_code=400,
@@ -634,39 +628,21 @@ async def export_nodes(
     if not ids:
         raise HTTPException(status_code=400, detail="No node_ids provided")
 
-    # Helper to materialize node data as Polars DataFrame
-    # LazyFrame-only migration note:
-    # This helper intentionally keeps eager/wrapper compatibility fallbacks.
-    # After full LazyFrame-only rollout, simplify to strict
-    # `node.data.collect()` plus hard type assertions.
+    # Helper to materialize node data as Polars DataFrame.
     def node_to_df(node):
         data = getattr(node, "data", None)
         if data is None:
-            return pl.DataFrame()
+            raise HTTPException(status_code=400, detail="Node has no data")
         try:
-            if hasattr(data, "collect"):
-                collected = data.collect()
-            else:
-                # Legacy eager fallback; removable under strict LazyFrame contract.
-                collected = data
+            if not isinstance(data, pl.LazyFrame):
+                raise TypeError(
+                    f"Export requires LazyFrame node data, got {type(data).__name__}"
+                )
+            collected = data.collect()
         except Exception as e:  # pragma: no cover
             raise HTTPException(
                 status_code=500, detail=f"Failed to materialize node data: {e}"
             )
-
-        # Unwrap custom wrappers if needed
-        if hasattr(collected, "_df") and not isinstance(collected, pl.DataFrame):
-            try:
-                collected = collected._df  # type: ignore[attr-defined]
-            except Exception:
-                pass
-        if not isinstance(collected, pl.DataFrame):
-            try:
-                collected = pl.DataFrame(collected)
-            except Exception:
-                raise HTTPException(
-                    status_code=500, detail="Could not convert node data to DataFrame"
-                )
         return collected
 
     exported: list[tuple[str, bytes]] = []
@@ -727,6 +703,7 @@ async def export_nodes(
 # ============================================================================
 
 
+# ============================================================================
 # ============================================================================
 # ============================================================================
 # ============================================================================

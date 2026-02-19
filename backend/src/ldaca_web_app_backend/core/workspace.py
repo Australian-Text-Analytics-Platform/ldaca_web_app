@@ -22,7 +22,7 @@ from docworkspace.workspace.io import (
 )
 
 from .api_models import OperationResult
-from .docworkspace_api import DocWorkspaceAPIUtils, handle_api_error
+from .docworkspace_api import DocWorkspaceAPIUtils, exception_to_error_response
 from .utils import (
     allocate_workspace_folder,
     ensure_display_folder_name,
@@ -429,7 +429,7 @@ class WorkspaceManager:
         if ws is None:
             return None
         # Always use backend utility to produce API graph (no core monkey patching)
-        graph = DocWorkspaceAPIUtils.workspace_to_react_flow(ws)
+        graph = DocWorkspaceAPIUtils.workspace_to_ui_graph_payload(ws)
         if hasattr(graph, "model_dump"):
             return graph.model_dump()
         if hasattr(graph, "dict"):
@@ -441,7 +441,7 @@ class WorkspaceManager:
         if ws is None:
             return []
         return [
-            DocWorkspaceAPIUtils.node_to_summary(node) for node in ws.nodes.values()
+            DocWorkspaceAPIUtils.node_to_api_summary(node) for node in ws.nodes.values()
         ]
 
     def get_workspace_info(
@@ -464,7 +464,7 @@ class WorkspaceManager:
             "status_counts": summary["status_counts"],
         }
 
-    def execute_safe_operation(
+    def execute_workspace_operation(
         self, user_id: str, workspace_id: str, operation_func, *args, **kwargs
     ):
         ws = self.get_workspace(user_id, workspace_id)
@@ -489,7 +489,7 @@ class WorkspaceManager:
                     data={"result": str(result)},
                 )
         except Exception as e:
-            error_response = handle_api_error(e)
+            error_response = exception_to_error_response(e)
             op_result = OperationResult(
                 success=False,
                 message=f"Operation failed: {error_response.message}",

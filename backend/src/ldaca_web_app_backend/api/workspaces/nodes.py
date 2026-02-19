@@ -321,20 +321,7 @@ def _get_concat_nodes(
 def _extract_lazy_schema(
     lazy_frame: pl.LazyFrame,
 ) -> tuple[List[str], dict[str, str]]:
-    schema_candidate = None
-    if hasattr(lazy_frame, "collect_schema"):
-        try:
-            schema_candidate = lazy_frame.collect_schema()
-        except Exception:
-            schema_candidate = None
-    if schema_candidate is None:
-        schema_candidate = lazy_frame.schema
-
-    schema_dict = (
-        schema_candidate
-        if isinstance(schema_candidate, dict)
-        else dict(schema_candidate)
-    )
+    schema_dict = dict(lazy_frame.collect_schema().items())
     columns = list(schema_dict.keys())
     dtypes = {col: str(dtype) for col, dtype in schema_dict.items()}
     return columns, dtypes
@@ -399,12 +386,7 @@ def _calculate_concat_row_count(
     for lazy_frame in aligned_frames:
         try:
             count_df = lazy_frame.select(pl.len().alias("_len")).collect()
-            polars_df = (
-                count_df.to_dataframe()
-                if hasattr(count_df, "to_dataframe")
-                else count_df
-            )
-            total += int(polars_df.to_series(0).item())
+            total += int(count_df.to_series(0).item())
         except Exception:
             return None
     return total
@@ -508,10 +490,7 @@ async def compute_column_apply(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     try:
-        if hasattr(data_obj, "with_columns"):
-            updated_data = data_obj.with_columns(expr)
-        else:
-            updated_data = lazy_data.with_columns(expr)
+        updated_data = lazy_data.with_columns(expr)
     except Exception as exc:
         raise HTTPException(
             status_code=400,
@@ -520,17 +499,10 @@ async def compute_column_apply(
 
     dtype_str: Optional[str] = None
     try:
-        if hasattr(updated_data, "collect_schema"):
-            schema = updated_data.collect_schema()
-        elif hasattr(updated_data, "schema"):
-            schema = updated_data.schema
-        else:
-            schema = None
-        if schema is not None:
-            schema_dict = schema if isinstance(schema, dict) else dict(schema)  # type: ignore[arg-type]
-            dtype = schema_dict.get(column_name)
-            if dtype is not None:
-                dtype_str = str(dtype)
+        schema_dict = dict(updated_data.collect_schema().items())
+        dtype = schema_dict.get(column_name)
+        if dtype is not None:
+            dtype_str = str(dtype)
     except Exception:  # pragma: no cover - best effort only
         dtype_str = None
 
@@ -576,10 +548,8 @@ async def get_node_data(
     user_id = current_user["id"]
     node, data_obj = get_node_with_data_or_400(user_id, workspace_id, node_id)
     try:
-        if hasattr(data_obj, "collect"):
-            df = data_obj.collect()
-        else:
-            df = data_obj
+        lazyframe = _unwrap_lazyframe(data_obj, purpose="Get node data")
+        df = lazyframe.collect()
         total_rows = len(df)
         start_idx = (page - 1) * page_size
         paginated_df = df.slice(start_idx, page_size)
@@ -1006,20 +976,10 @@ async def filter_node(
         except HTTPException as exc:
             detail = exc.detail if isinstance(exc.detail, str) else "Node not found"
             raise ValueError(detail) from exc
-        schema_map: dict[str, Any] = {}
-        if hasattr(node.data, "collect_schema"):
-            try:
-                schema_map = dict(node.data.collect_schema().items())
-            except Exception:
-                schema_map = {}
+            lazy_data = _unwrap_lazyframe(node.data, purpose="Filter node")
+            schema_map: dict[str, Any] = dict(lazy_data.collect_schema().items())
         filter_expr = _build_filter_expression(request, column_dtypes=schema_map)
-        if hasattr(node.data, "filter"):
-            filtered_data = node.data.filter(filter_expr)
-        else:
-            # LazyFrame-only migration note:
-            # `.lazy()` fallback is for legacy eager nodes and can be removed when
-            # node.data is strictly LazyFrame.
-            filtered_data = node.data.lazy().filter(filter_expr)
+        filtered_data = lazy_data.filter(filter_expr)
         new_node_name = request.new_node_name or f"{node.name}_filtered"
         new_node = workspace_manager.add_node_to_workspace(
             user_id=user_id,
@@ -1031,7 +991,7 @@ async def filter_node(
         )
         return new_node
 
-    result = workspace_manager.execute_safe_operation(
+    result = workspace_manager.execute_workspace_operation(
         user_id, workspace_id, filter_operation
     )
     success, message, result_obj = _handle_operation_result(result)
@@ -1051,20 +1011,15 @@ async def filter_preview(
 ) -> FilterPreviewResponse:
     user_id = current_user["id"]
     _, data_obj = get_node_with_data_or_400(user_id, workspace_id, node_id)
+    lazy_data = _unwrap_lazyframe(data_obj, purpose="Filter preview")
 
     try:
-        schema_map: dict[str, Any] = {}
-        if hasattr(data_obj, "collect_schema"):
-            try:
-                schema_map = dict(data_obj.collect_schema().items())
-            except Exception:
-                schema_map = {}
+        schema_map: dict[str, Any] = dict(lazy_data.collect_schema().items())
         filter_expr = _build_filter_expression(request, column_dtypes=schema_map)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     try:
-        lazy_data = _unwrap_lazyframe(data_obj, purpose="Filter preview")
         filtered_lazy = lazy_data.filter(filter_expr)
 
         total_rows_series = (
@@ -1124,18 +1079,12 @@ async def slice_node(
         except HTTPException as exc:
             detail = exc.detail if isinstance(exc.detail, str) else "Node not found"
             raise ValueError(detail) from exc
+        lazy_data = _unwrap_lazyframe(node.data, purpose="Slice node")
         offset = int(request.offset or 0)
         length = request.length
-        sliced_data = node.data
+        sliced_data = lazy_data
         try:
-            if hasattr(sliced_data, "slice"):
-                sliced_data = sliced_data.slice(offset, length)
-            elif hasattr(sliced_data, "lazy"):
-                # LazyFrame-only migration note:
-                # Legacy eager fallback path for slice; remove in strict mode.
-                sliced_data = sliced_data.lazy().slice(offset, length)
-            else:
-                raise ValueError("Node data does not support slicing")
+            sliced_data = sliced_data.slice(offset, length)
         except Exception as exc:  # pragma: no cover - defensive guard
             raise ValueError(f"Failed to slice node data: {exc}") from exc
 
@@ -1153,7 +1102,7 @@ async def slice_node(
         )
         return new_node
 
-    result = workspace_manager.execute_safe_operation(
+    result = workspace_manager.execute_workspace_operation(
         user_id, workspace_id, slice_operation
     )
     success, message, result_obj = _handle_operation_result(result)
@@ -1445,8 +1394,12 @@ async def join_nodes(
             right_node_id,
             detail=f"Right node '{right_node_id}' not found",
         )
-        left_data = left_node.data
-        right_data = right_node.data
+        left_data = _unwrap_lazyframe(
+            left_node.data, purpose="Join requires lazy left node"
+        )
+        right_data = _unwrap_lazyframe(
+            right_node.data, purpose="Join requires lazy right node"
+        )
         allowed_hows = {"inner", "left", "right", "full", "semi", "anti", "cross"}
         how_val = (how or "inner").lower()
         if how_val not in allowed_hows:

@@ -102,7 +102,7 @@ def failed(message: str, error: Any = None, status_code: int = 400):
 
 
 def stage_dataframe_as_lazy(
-    data: Any,
+    data: pl.DataFrame,
     workspace_dir: Path,
     node_name: str,
     document_column: Optional[str] = None,
@@ -127,28 +127,12 @@ def stage_dataframe_as_lazy(
         parquet_path = data_dir / f"{base_stem}_{suffix}.parquet"
         suffix += 1
 
-    # Normalize to an eager Polars DataFrame before persisting
-    df: pl.DataFrame
-    try:
-        if hasattr(data, "lazyframe"):
-            data = data.lazyframe  # type: ignore[attr-defined]
-        if isinstance(data, pl.LazyFrame):
-            df = data.collect()
-        elif hasattr(data, "dataframe"):
-            df = pl.DataFrame(getattr(data, "dataframe"))  # type: ignore[arg-type]
-        elif hasattr(data, "collect") and not isinstance(data, pl.DataFrame):
-            collected = data.collect()  # type: ignore[operator]
-            df = (
-                collected
-                if isinstance(collected, pl.DataFrame)
-                else pl.DataFrame(collected)
-            )
-        else:
-            df = data if isinstance(data, pl.DataFrame) else pl.DataFrame(data)
-    except Exception as exc:  # pragma: no cover - defensive coercion
+    if not isinstance(data, pl.DataFrame):
         raise HTTPException(
-            status_code=400, detail=f"Failed to coerce data to DataFrame: {exc}"
+            status_code=400,
+            detail=f"Expected Polars DataFrame for staging, got {type(data).__name__}",
         )
+    df = data
 
     try:
         df.write_parquet(parquet_path)

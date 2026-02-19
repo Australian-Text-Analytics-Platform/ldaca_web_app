@@ -27,9 +27,9 @@ class DocWorkspaceAPIUtils:
     """Utility class for FastAPI integration with DocWorkspace."""
 
     @staticmethod
-    def polars_type_to_js_type(polars_type: pl.DataType) -> str:
-        """Convert Polars data type to JavaScript-compatible type."""
-        if polars_type in (
+    def polars_dtype_to_ldaca_dtype(polars_dtype: pl.DataType) -> str:
+        """Convert Polars dtype into LDaCA-controlled dtype categories."""
+        if polars_dtype in (
             pl.Int8,
             pl.Int16,
             pl.Int32,
@@ -40,24 +40,24 @@ class DocWorkspaceAPIUtils:
             pl.UInt64,
         ):
             return "integer"
-        if polars_type in (pl.Float32, pl.Float64):
+        if polars_dtype in (pl.Float32, pl.Float64):
             return "float"
-        if polars_type == pl.Boolean:
+        if polars_dtype == pl.Boolean:
             return "boolean"
-        if polars_type == pl.Categorical:
+        if polars_dtype == pl.Categorical:
             return "categorical"
-        if polars_type in (pl.Utf8, pl.String):
+        if polars_dtype in (pl.Utf8, pl.String):
             return "string"
-        if polars_type in (pl.Date, pl.Datetime, pl.Time):
+        if polars_dtype in (pl.Date, pl.Datetime, pl.Time):
             return "datetime"
-        if polars_type == pl.List(pl.String) or polars_type == pl.List(pl.Utf8):
+        if polars_dtype == pl.List(pl.String) or polars_dtype == pl.List(pl.Utf8):
             return "list_string"
 
-        cls_obj = getattr(polars_type, "__class__", None)
+        cls_obj = getattr(polars_dtype, "__class__", None)
         cls_name = getattr(cls_obj, "__name__", "") if cls_obj else ""
         type_name = (
-            getattr(polars_type, "__name__", "")
-            if hasattr(polars_type, "__name__")
+            getattr(polars_dtype, "__name__", "")
+            if hasattr(polars_dtype, "__name__")
             else ""
         )
         lowered_type = type_name.lower()
@@ -73,14 +73,14 @@ class DocWorkspaceAPIUtils:
         return "unknown"
 
     @staticmethod
-    def get_node_schema(node: Any) -> List[ColumnSchema]:
-        """Extract schema information from a LazyFrame-backed node."""
+    def get_node_schema_json_with_ldaca_dtype(node: Any) -> List[ColumnSchema]:
+        """Build JSON-ready column schema with LDaCA dtype mapping."""
         data_schema = node.data.collect_schema()
         return [
             ColumnSchema(
                 name=col_name,
                 dtype=str(polars_type),
-                js_type=DocWorkspaceAPIUtils.polars_type_to_js_type(polars_type),
+                js_type=DocWorkspaceAPIUtils.polars_dtype_to_ldaca_dtype(polars_type),
             )
             for col_name, polars_type in data_schema.items()
         ]
@@ -95,7 +95,7 @@ class DocWorkspaceAPIUtils:
         return (rows, cols)
 
     @staticmethod
-    def node_to_summary(node: Any) -> NodeSummary:
+    def node_to_api_summary(node: Any) -> NodeSummary:
         """Convert a Node to NodeSummary for API responses."""
         node_info = node.info()
         return NodeSummary(
@@ -104,14 +104,14 @@ class DocWorkspaceAPIUtils:
             operation=node.operation,
             shape=DocWorkspaceAPIUtils.compute_node_shape(node),
             columns=list(node_info.get("columns", [])),
-            schema=DocWorkspaceAPIUtils.get_node_schema(node),
+            schema=DocWorkspaceAPIUtils.get_node_schema_json_with_ldaca_dtype(node),
             document=node.document,
             parent_ids=[parent.id for parent in node.parents],
             child_ids=[child.id for child in node.children],
         )
 
     @staticmethod
-    def get_paginated_data(
+    def get_paginated_node_rows(
         node: Any,
         page: int = 1,
         page_size: int = 100,
@@ -138,11 +138,11 @@ class DocWorkspaceAPIUtils:
                 "has_previous": page > 1,
             },
             columns=node_columns,
-            schema=DocWorkspaceAPIUtils.get_node_schema(node),
+            schema=DocWorkspaceAPIUtils.get_node_schema_json_with_ldaca_dtype(node),
         )
 
     @staticmethod
-    def workspace_to_react_flow(workspace: Any) -> WorkspaceGraph:
+    def workspace_to_ui_graph_payload(workspace: Any) -> WorkspaceGraph:
         """Convert workspace graph objects to React Flow-compatible payloads.
 
         Used by:
@@ -200,7 +200,7 @@ class DocWorkspaceAPIUtils:
         return WorkspaceGraph(nodes=nodes, edges=edges, workspace_info=workspace_info)
 
 
-def handle_api_error(error: Exception) -> ErrorResponse:
+def exception_to_error_response(error: Exception) -> ErrorResponse:
     """Convert exceptions into standardized API error payloads."""
     return ErrorResponse(
         error=type(error).__name__,

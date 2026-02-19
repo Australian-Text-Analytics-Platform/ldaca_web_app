@@ -43,7 +43,7 @@ class FakeWorkspaceManager:
         self.add_calls.append({"kwargs": kwargs, "node": new_node})
         return new_node
 
-    def execute_safe_operation(
+    def execute_workspace_operation(
         self, _user_id: str, _workspace_id: str, func, *args, **kwargs
     ):
         try:

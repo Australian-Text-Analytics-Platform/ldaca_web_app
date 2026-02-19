@@ -190,10 +190,10 @@ from docworkspace import FastAPIUtils, WorkspaceGraph, NodeSummary
 graph_data = workspace.to_api_graph()
 
 # Get node summaries
-summaries = [FastAPIUtils.node_to_summary(node) for node in workspace.nodes.values()]
+summaries = [FastAPIUtils.node_to_api_summary(node) for node in workspace.nodes.values()]
 
 # Get paginated data
-paginated = FastAPIUtils.get_paginated_data(node, page=1, page_size=100)
+paginated = FastAPIUtils.get_paginated_node_rows(node, page=1, page_size=100)
 ```
 
 ### 4. Serialization
@@ -372,9 +372,9 @@ Workspace(name=None, data=None, data_name=None, csv_lazy=True, **csv_kwargs)
 #### Utilities
 
 ```python
-FastAPIUtils.node_to_summary(node) -> NodeSummary
-FastAPIUtils.get_paginated_data(node, page=1, page_size=100) -> PaginatedData
-FastAPIUtils.workspace_to_react_flow(workspace) -> WorkspaceGraph
+FastAPIUtils.node_to_api_summary(node) -> NodeSummary
+FastAPIUtils.get_paginated_node_rows(node, page=1, page_size=100) -> PaginatedData
+FastAPIUtils.workspace_to_ui_graph_payload(workspace) -> WorkspaceGraph
 ```
 
 ## Examples
