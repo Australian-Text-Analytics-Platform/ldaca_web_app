@@ -9,7 +9,6 @@ workers) and keeps the HTTP layer thin.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable, Sequence
 
 import polars as pl
 
@@ -47,34 +46,6 @@ class NodeDataError(Exception):
         return self.message
 
 
-def _ensure_column_present(columns: Sequence[str], column_name: str) -> None:
-    if column_name not in columns:
-        raise NodeDataError(
-            message=f"Column '{column_name}' not found in node data.",
-            status_code=404,
-        )
-
-
-def _ensure_unique_target(
-    columns: Sequence[str], new_name: str, current_name: str
-) -> None:
-    if new_name in columns and new_name != current_name:
-        raise NodeDataError(
-            message=f"Column '{new_name}' already exists in node data.",
-            status_code=400,
-        )
-
-
-def _schema_names(lazyframe: pl.LazyFrame) -> Iterable[str]:
-    """Return schema column names from a lazyframe.
-
-    Used by:
-    - `drop_column`
-    - `rename_column`
-    """
-    return lazyframe.collect_schema().names()
-
-
 def drop_column(data: object, column_name: str) -> pl.LazyFrame:
     """Return data with one column removed under lazy-only constraints.
 
@@ -86,8 +57,12 @@ def drop_column(data: object, column_name: str) -> pl.LazyFrame:
     """
 
     lazyframe = _normalize_lazy_data(data)
-    schema_names = tuple(_schema_names(lazyframe))
-    _ensure_column_present(schema_names, column_name)
+    schema_names = tuple(lazyframe.collect_schema().names())
+    if column_name not in schema_names:
+        raise NodeDataError(
+            message=f"Column '{column_name}' not found in node data.",
+            status_code=404,
+        )
 
     result_lazy = lazyframe.drop([column_name])
     return result_lazy
@@ -110,13 +85,20 @@ def rename_column(data: object, column_name: str, new_name: str) -> pl.LazyFrame
         )
 
     lazyframe = _normalize_lazy_data(data)
-    schema = tuple(_schema_names(lazyframe))
-    _ensure_column_present(schema, column_name)
-    _ensure_unique_target(schema, trimmed_name, column_name)
+    schema = tuple(lazyframe.collect_schema().names())
+    if column_name not in schema:
+        raise NodeDataError(
+            message=f"Column '{column_name}' not found in node data.",
+            status_code=404,
+        )
+    if trimmed_name in schema and trimmed_name != column_name:
+        raise NodeDataError(
+            message=f"Column '{trimmed_name}' already exists in node data.",
+            status_code=400,
+        )
 
     renamed_lazy = lazyframe.rename({column_name: trimmed_name})
     return renamed_lazy
 
 
-__all__ = ["NodeDataError", "drop_column", "rename_column"]
 __all__ = ["NodeDataError", "drop_column", "rename_column"]
