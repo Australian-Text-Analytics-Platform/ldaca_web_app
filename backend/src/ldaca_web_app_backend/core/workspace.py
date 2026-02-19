@@ -21,11 +21,8 @@ from docworkspace.workspace.io import (
     write_workspace,
 )
 
-from .docworkspace_api import (
-    DocWorkspaceAPIUtils,
-    create_operation_result,
-    handle_api_error,
-)
+from .api_models import OperationResult
+from .docworkspace_api import DocWorkspaceAPIUtils, handle_api_error
 from .utils import (
     allocate_workspace_folder,
     ensure_display_folder_name,
@@ -80,6 +77,14 @@ class WorkspaceManager:
     def _resolve_workspace_dir(
         self, user_id: str, workspace_id: str, workspace_name: str
     ) -> Path:
+        """Resolve or allocate on-disk folder for a workspace id/name.
+
+        Used by:
+        - `_save`, `_replace_current`, `create_workspace`
+
+        Why:
+        - Keeps workspace folder naming consistent and discoverable on disk.
+        """
         cached = self._get_cached_path(user_id, workspace_id)
         if cached and cached.exists():
             updated = ensure_display_folder_name(cached, workspace_name)
@@ -98,6 +103,14 @@ class WorkspaceManager:
         return allocated
 
     def _save(self, user_id: str, workspace_id: str, workspace: Workspace) -> None:
+        """Persist workspace metadata and node payloads to its folder.
+
+        Used by:
+        - lifecycle operations, node mutations, workspace switching
+
+        Why:
+        - Centralizes durable persistence and path bookkeeping.
+        """
         workspace.set_metadata("modified_at", datetime.now().isoformat())
         target_dir = self._resolve_workspace_dir(
             user_id=user_id, workspace_id=workspace_id, workspace_name=workspace.name
@@ -111,6 +124,14 @@ class WorkspaceManager:
             self._current[user_id] = current_entry
 
     def _load(self, user_id: str, workspace_id: str) -> Workspace | None:
+        """Load a workspace from disk and attach runtime directory metadata.
+
+        Used by:
+        - `get_workspace`, `set_current_workspace`
+
+        Why:
+        - Provides one deserialization boundary for all workspace access paths.
+        """
         target_dir = find_workspace_folder_by_id(user_id, workspace_id)
         if target_dir is None:
             print(
@@ -210,12 +231,6 @@ class WorkspaceManager:
         self._replace_current(user_id, workspace_id, ws)
         return ws
 
-    def list_user_workspaces(self, user_id: str) -> Dict[str, Any]:
-        cid, cws, _ = self._get_current_entry(user_id)
-        if cid and cws:
-            return {cid: cws}
-        return {}
-
     def list_user_workspaces_summaries(self, user_id: str) -> Dict[str, Dict[str, Any]]:
         summaries: Dict[str, Dict[str, Any]] = {}
         cid, cws, _ = self._get_current_entry(user_id)
@@ -279,6 +294,18 @@ class WorkspaceManager:
         return False
 
     def get_task_manager(self, user_id: str, workspace_id: str):
+        """Return or create worker-task manager bound to user/workspace key.
+
+        Used by:
+        - task endpoints and analysis routes submitting background work
+
+        Why:
+        - Keeps worker task tracking isolated by workspace scope.
+
+        Refactor note:
+        - Lazy import avoids cycles but obscures typing; introducing a protocol or
+            factory module could reduce import indirection.
+        """
         from ldaca_web_app_backend.core.worker_task_manager import WorkerTaskManager
 
         key = (user_id, workspace_id)
@@ -321,6 +348,14 @@ class WorkspaceManager:
         return None
 
     def unload_workspace(self, user_id: str, save: bool = True) -> bool:
+        """Unload current workspace object from memory, optionally persisting first.
+
+        Used by:
+        - lifecycle unload/switch operations
+
+        Why:
+        - Enforces one-active-workspace-per-user memory policy.
+        """
         cid, cws, _ = self._get_current_entry(user_id)
         if not cid or not cws:
             return False
@@ -439,7 +474,7 @@ class WorkspaceManager:
             result = operation_func(*args, **kwargs)
             # If operation produced a Node, include metadata; else, include stringified result
             if Node is not None and isinstance(result, Node):  # type: ignore[arg-type]
-                op_result = create_operation_result(
+                op_result = OperationResult(
                     success=True,
                     message="Operation completed successfully",
                     node_id=result.id,
@@ -449,14 +484,14 @@ class WorkspaceManager:
                     },
                 )
             else:
-                op_result = create_operation_result(
+                op_result = OperationResult(
                     success=True,
                     message="Operation completed successfully",
                     data={"result": str(result)},
                 )
         except Exception as e:
             error_response = handle_api_error(e)
-            op_result = create_operation_result(
+            op_result = OperationResult(
                 success=False,
                 message=f"Operation failed: {error_response.message}",
                 errors=[error_response.error],
@@ -468,6 +503,20 @@ class WorkspaceManager:
         ws = self.get_workspace(user_id, workspace_id)
         if ws is not None:
             self._save(user_id, workspace_id, ws)
+
+    def save_workspace_object(
+        self, user_id: str, workspace_id: str, workspace: Workspace
+    ) -> None:
+        """Persist a provided workspace object under the given workspace id.
+
+        Used by:
+        - lifecycle clone/import flows that materialize a workspace object first
+
+        Why:
+        - Provides a public persistence API for callers that already hold a
+          workspace instance, avoiding private method coupling.
+        """
+        self._save(user_id, workspace_id, workspace)
 
 
 # Global singleton

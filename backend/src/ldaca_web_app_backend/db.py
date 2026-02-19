@@ -52,25 +52,53 @@ async_session_maker = async_sessionmaker(engine, expire_on_commit=False)
 
 
 async def create_db_and_tables():
-    """Create database tables"""
+    """Create all configured SQLAlchemy tables.
+
+    Used by:
+    - `init_db`
+
+    Why:
+    - Ensures schema exists before auth/session operations begin.
+    """
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
 
 async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
-    """Get async database session"""
+    """Yield an async SQLAlchemy session for dependency injection.
+
+    Used by:
+    - FastAPI DB dependencies (`get_user_db`)
+
+    Why:
+    - Centralizes session lifecycle and transaction scope.
+    """
     async with async_session_maker() as session:
         yield session
 
 
 async def get_user_db(session: AsyncSession = Depends(get_async_session)):
-    """Get FastAPI Users database adapter"""
+    """Yield FastAPI Users DB adapter bound to current async session.
+
+    Used by:
+    - auth/user management dependencies
+
+    Why:
+    - Bridges app user model with fastapi-users integration points.
+    """
     yield SQLAlchemyUserDatabase(session, User)
 
 
 # Compatibility functions for existing code
 async def init_db():
-    """Initialize database tables"""
+    """Initialize persistent DB environment and schema.
+
+    Used by:
+    - app startup lifespan hook
+
+    Why:
+    - Creates data root + schema before handling API traffic.
+    """
     # Ensure DATA_ROOT exists before creating/opening DB file
     data_root = settings.get_data_root()
     data_root.mkdir(parents=True, exist_ok=True)
@@ -81,7 +109,14 @@ async def init_db():
 async def get_or_create_user(
     email: str, name: str, picture: str, google_id: str
 ) -> Dict[str, Any]:
-    """Get existing user or create new one by email"""
+    """Fetch existing user by email or create/update OAuth user record.
+
+    Used by:
+    - `api.auth.google_auth`
+
+    Why:
+    - Maintains idempotent user provisioning from Google identity payloads.
+    """
     async with async_session_maker() as session:
         # Try to get existing user by email
         result = await session.execute(select(User).where(User.email == email))
@@ -129,7 +164,18 @@ async def get_or_create_user(
 
 
 async def create_user_session(user_id: str, google_token: str) -> Dict[str, Any]:
-    """Create a new session token for the user"""
+    """Create/replace active session token pair for a user.
+
+    Used by:
+    - `api.auth.google_auth`
+
+    Why:
+    - Enforces single active session row per user in current design.
+
+    Refactor note:
+    - `google_token` argument is currently unused; remove parameter or persist
+        provenance metadata if multi-token support is planned.
+    """
     async with async_session_maker() as session:
         # Generate our own access token
         access_token = secrets.token_urlsafe(32)
@@ -167,7 +213,14 @@ async def create_user_session(user_id: str, google_token: str) -> Dict[str, Any]
 
 
 async def validate_access_token(access_token: str) -> Optional[Dict[str, Any]]:
-    """Validate access token and return user info if valid"""
+    """Validate access token and return user/session payload when active.
+
+    Used by:
+    - auth dependency validation paths
+
+    Why:
+    - Centralizes token expiry and join logic for user identity resolution.
+    """
     async with async_session_maker() as session:
         result = await session.execute(
             select(User, UserSession)
@@ -198,7 +251,14 @@ async def validate_access_token(access_token: str) -> Optional[Dict[str, Any]]:
 
 
 async def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
-    """Get user by email"""
+    """Return user payload by email when present.
+
+    Used by:
+    - auth/user administration lookup paths
+
+    Why:
+    - Provides a consistent dict payload shape for caller code.
+    """
     async with async_session_maker() as session:
         result = await session.execute(select(User).where(User.email == email))
         user = result.scalar_one_or_none()
@@ -221,7 +281,14 @@ async def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
 
 
 async def cleanup_expired_sessions():
-    """Clean up expired sessions"""
+    """Delete expired session rows from storage.
+
+    Used by:
+    - app startup/shutdown maintenance and logout flows
+
+    Why:
+    - Prevents stale sessions from accumulating indefinitely.
+    """
     async with async_session_maker() as session:
         result = await session.execute(
             select(UserSession).where(
@@ -235,7 +302,14 @@ async def cleanup_expired_sessions():
 
 
 async def update_user_folder_path(user_id: str, folder_path: str) -> None:
-    """Update user's folder path in the database"""
+    """Persist user folder location after storage provisioning.
+
+    Used by:
+    - `api.auth.google_auth`
+
+    Why:
+    - Keeps DB user metadata aligned with filesystem initialization.
+    """
     async with async_session_maker() as session:
         result = await session.execute(
             select(User).where(User.id == uuid.UUID(user_id))

@@ -29,7 +29,14 @@ __all__ = [
 
 
 class ExpressionParseError(ValueError):
-    """Raised when an expression cannot be translated into a Polars expression."""
+    """Raised when an expression cannot be translated into a Polars expression.
+
+    Used by:
+    - aggregate/expression endpoints in `api.workspaces.nodes`
+
+    Why:
+    - Allows UI-facing handlers to return clear parse/validation errors.
+    """
 
 
 @dataclass
@@ -61,6 +68,12 @@ def build_polars_expression(expression: str, *, columns: Iterable[str]) -> pl.Ex
     Raises:
         ExpressionParseError: if the expression contains unsupported syntax or
         references unknown columns/functions.
+
+    Used by:
+    - expression preview/apply handlers in `api.workspaces.nodes`
+
+    Why:
+    - Restricts user expressions to a safe, curated AST subset.
     """
 
     expression = expression.strip()
@@ -84,7 +97,14 @@ def build_polars_expression(expression: str, *, columns: Iterable[str]) -> pl.Ex
 
 
 class _PolarsExpressionBuilder(ast.NodeVisitor):
-    """Translate a restricted Python AST into Polars expressions."""
+    """Translate a restricted Python AST into Polars expressions.
+
+    Used by:
+    - `build_polars_expression`
+
+    Why:
+    - Encapsulates all parsing/validation rules in a single visitor.
+    """
 
     def __init__(self, *, columns: set[str]):
         self._columns = columns

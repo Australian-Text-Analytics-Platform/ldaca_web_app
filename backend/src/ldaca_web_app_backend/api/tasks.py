@@ -22,10 +22,28 @@ router = APIRouter(prefix="/tasks", tags=["task_streaming"])
 
 
 def _event_scope(workspace_id: str) -> str:
+    """Resolve task scope label from workspace identifier.
+
+    Used by:
+    - `_annotate_task`
+    - `_annotate_event`
+
+    Why:
+    - Keeps files-scope vs workspace-scope events distinguishable in one stream.
+    """
     return "files" if workspace_id == FILES_TASK_SCOPE else "workspace"
 
 
 def _annotate_task(task: Dict[str, Any], workspace_id: str) -> Dict[str, Any]:
+    """Attach normalized task metadata for SSE consumers.
+
+    Used by:
+    - `_annotate_event`
+    - initial snapshot generation in `stream_tasks`
+
+    Why:
+    - Ensures each task includes scope/workspace hints for Task Center rendering.
+    """
     annotated = dict(task)
     metadata = dict((annotated.get("metadata") or {}))
     metadata.setdefault("task_scope", _event_scope(workspace_id))
@@ -37,6 +55,14 @@ def _annotate_task(task: Dict[str, Any], workspace_id: str) -> Dict[str, Any]:
 
 
 def _annotate_event(event: Dict[str, Any], workspace_id: str) -> Dict[str, Any]:
+    """Attach scope metadata to task events and nested task payloads.
+
+    Used by:
+    - `stream_tasks`
+
+    Why:
+    - Normalizes mixed event payloads from multiple task-manager scopes.
+    """
     payload = dict(event)
     scope = _event_scope(workspace_id)
 
@@ -68,6 +94,16 @@ async def stream_tasks(
     """Unified SSE stream for task center.
 
     Includes files-scope tasks and all known workspace scopes for the user.
+
+        Used by:
+        - frontend Task Center SSE subscriber
+
+        Why:
+        - Consolidates multi-scope task updates into one stream connection.
+
+        Refactor note:
+        - Nested helper closures inside endpoint are sizeable; extraction to a small
+            streaming service object could improve testability.
     """
     user_id = current_user["id"]
 

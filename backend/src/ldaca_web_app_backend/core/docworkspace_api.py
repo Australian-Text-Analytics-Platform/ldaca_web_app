@@ -9,7 +9,6 @@ import math
 from typing import Any, Dict, List, Optional, Tuple
 
 import polars as pl
-from docworkspace import Node, Workspace
 
 # Import API models
 from .api_models import (
@@ -17,7 +16,6 @@ from .api_models import (
     DataType,
     ErrorResponse,
     NodeSummary,
-    OperationResult,
     PaginatedData,
     ReactFlowEdge,
     ReactFlowNode,
@@ -31,16 +29,7 @@ class DocWorkspaceAPIUtils:
 
     @staticmethod
     def polars_type_to_js_type(polars_type: pl.DataType) -> str:
-        """Convert Polars data type to JavaScript-compatible type.
-
-        Args:
-            polars_type: Polars data type object (e.g., pl.Int64, pl.Float32)
-
-        Returns:
-            JavaScript-compatible type string: 'integer', 'float', 'string',
-            'boolean', 'datetime', 'categorical', 'list_string', 'unknown'.
-        """
-        # Identity-based classification (no pattern matching) to support wider runtime versions.
+        """Convert Polars data type to JavaScript-compatible type."""
         if polars_type in (
             pl.Int8,
             pl.Int16,
@@ -65,7 +54,6 @@ class DocWorkspaceAPIUtils:
         if polars_type == pl.List(pl.String) or polars_type == pl.List(pl.Utf8):
             return "list_string"
 
-        # Detect list/struct/array types safely
         cls_obj = getattr(polars_type, "__class__", None)
         cls_name = getattr(cls_obj, "__name__", "") if cls_obj else ""
         type_name = (
@@ -86,90 +74,6 @@ class DocWorkspaceAPIUtils:
         return "unknown"
 
     @staticmethod
-    def convert_schema_to_js_types(schema) -> Dict[str, str]:
-        """Convert a Polars schema to JavaScript-compatible types.
-
-        This function handles the conversion that was previously done in
-        docworkspace's schema_to_json function, but belongs in the API layer.
-        """
-        if schema is None:
-            return {}
-
-        # Handle both dict-like schemas and Polars Schema objects
-        if hasattr(schema, "items"):
-            # Polars Schema object or dict - pass the actual type objects
-            return {
-                col_name: DocWorkspaceAPIUtils.polars_type_to_js_type(col_type)
-                for col_name, col_type in schema.items()
-            }
-        elif isinstance(schema, dict):
-            # Already a dict - pass the values as-is (could be type objects or strings)
-            return {
-                col_name: DocWorkspaceAPIUtils.polars_type_to_js_type(col_type)
-                for col_name, col_type in schema.items()
-            }
-        else:
-            return {}
-
-    @staticmethod
-    def convert_node_info_for_api(node: Any) -> Dict[str, Any]:
-        """Convert node info to API-compatible format with JS types.
-
-        This replaces the node.info(json=True) pattern by getting raw node info
-        and converting the schema to JS types in the API layer.
-        """
-        # Get raw node info (no JSON conversion in core library)
-        info = node.info()
-
-        # Convert schema to JS types if present
-        if "schema" in info and info["schema"] is not None:
-            info["schema"] = DocWorkspaceAPIUtils.convert_schema_to_js_types(
-                info["schema"]
-            )
-
-        # Remove internal-only fields from display while preserving document metadata
-        info.pop("dtype", None)
-        document_value = info.pop("document", None)
-        if document_value is None:
-            document_value = info.pop("document_column", None)
-        if document_value is None:
-            try:
-                metadata = getattr(node, "metadata", None)
-                if isinstance(metadata, dict):
-                    document_value = metadata.get("text_column")
-            except Exception:
-                document_value = None
-        if document_value is not None:
-            info["document"] = document_value
-
-        # Explicitly add columns field for frontend compatibility
-        if "columns" not in info:
-            cols = []
-            try:
-                data_obj = getattr(node, "data", node)
-                if hasattr(data_obj, "collect_schema"):
-                    cols = data_obj.collect_schema().names()
-                elif hasattr(data_obj, "columns"):
-                    cols = data_obj.columns
-            except Exception:
-                pass
-
-            # Sanitize non-serializable objects (e.g., Mock) that could cause recursion
-            if isinstance(cols, (list, tuple)):
-                safe_cols = list(cols)
-            else:
-                try:
-                    if hasattr(cols, "__iter__") and not isinstance(cols, (str, bytes)):
-                        safe_cols = [c for c in list(cols)]  # type: ignore[arg-type]
-                    else:
-                        safe_cols = []
-                except Exception:
-                    safe_cols = []
-            info["columns"] = safe_cols
-
-        return info
-
-    @staticmethod
     def get_node_schema(node: Any) -> List[ColumnSchema]:
         """Extract schema information from a Node."""
         schema_data = []
@@ -179,10 +83,8 @@ class DocWorkspaceAPIUtils:
 
             # Get schema efficiently
             data_schema = None
-            if hasattr(data_obj, "collect_schema"):
+            if isinstance(data_obj, pl.LazyFrame):
                 data_schema = data_obj.collect_schema()
-            elif hasattr(data_obj, "schema"):
-                data_schema = data_obj.schema
 
             if data_schema:
                 # data_schema is Schema object or dict
@@ -209,56 +111,30 @@ class DocWorkspaceAPIUtils:
 
     @staticmethod
     def get_data_type(node: Any) -> DataType:
-        """Determine the DataType enum value for a node."""
-        data_type_name = type(node.data).__name__
+        """Determine the DataType enum value for a node.
 
-        if "LazyFrame" in data_type_name:
+        Strict-design note:
+        - Backend nodes are expected to be LazyFrame-backed.
+        """
+        data_obj = node.data if hasattr(node, "data") else node
+        if isinstance(data_obj, pl.LazyFrame):
             return DataType.POLARS_LAZYFRAME
-        else:
-            return DataType.POLARS_DATAFRAME
+        return DataType.UNKNOWN
 
     @staticmethod
     def compute_node_shape(target: Any) -> Tuple[int, int]:
-        """Calculate the actual shape of a node.
+        """Calculate node shape as `(rows, cols)` for LazyFrame-backed nodes."""
+        lazyframe = target.data if hasattr(target, "data") else target
+        if not isinstance(lazyframe, pl.LazyFrame):
+            return (0, 0)
 
-        Always returns (rows, cols). For lazy frames, this triggers a count query.
-        """
-        data_obj = getattr(target, "data", target)
-
-        # 1. Try direct shape attribute (e.g. DataFrame)
-        if hasattr(data_obj, "shape"):
-            try:
-                shape = data_obj.shape
-                if isinstance(shape, (list, tuple)) and len(shape) >= 2:
-                    return (int(shape[0]), int(shape[1]))
-            except Exception:
-                pass
-
-        # 2. Handle LazyFrame (Polars)
-        inner_obj = data_obj
-
-        rows = 0
-        cols = 0
-
-        # Get columns count
         try:
-            # Prefer collect_schema() for LazyFrame to avoid PerformanceWarning
-            if hasattr(inner_obj, "collect_schema"):
-                cols = len(inner_obj.collect_schema())
-            elif hasattr(inner_obj, "columns"):
-                cols = len(inner_obj.columns)
+            schema = lazyframe.collect_schema()
+            cols = len(schema)
+            rows = int(lazyframe.select(pl.len()).collect().item())
+            return (rows, cols)
         except Exception:
-            pass
-
-        # Get row count (force calculation for lazy frames)
-        try:
-            if hasattr(inner_obj, "select") and hasattr(inner_obj, "collect"):
-                # Efficient count for Polars LazyFrame
-                rows = inner_obj.select(pl.len()).collect().item()
-        except Exception:
-            pass
-
-        return (rows, cols)
+            return (0, 0)
 
     @staticmethod
     def node_to_summary(node: Any) -> NodeSummary:
@@ -276,13 +152,8 @@ class DocWorkspaceAPIUtils:
                 operation=getattr(node, "operation", None),
                 shape=shape,
                 columns=columns,
-                schema=DocWorkspaceAPIUtils.get_node_schema(node),  # alias
-                document=getattr(node, "document", None)
-                or (
-                    (getattr(node, "metadata", {}) or {}).get("text_column")
-                    if hasattr(node, "metadata")
-                    else None
-                ),
+                schema=DocWorkspaceAPIUtils.get_node_schema(node),
+                document=getattr(node, "document", None),
                 parent_ids=[parent.id for parent in getattr(node, "parents", [])],
                 child_ids=[child.id for child in getattr(node, "children", [])],
             )
@@ -294,7 +165,7 @@ class DocWorkspaceAPIUtils:
             return NodeSummary(
                 id=getattr(node, "id", "unknown"),
                 name=getattr(node, "name", "unknown"),
-                data_type=DataType.POLARS_DATAFRAME,  # Default fallback
+                data_type=DataType.UNKNOWN,
                 columns=[],
                 schema=[],
                 shape=(0, 0),
@@ -307,30 +178,19 @@ class DocWorkspaceAPIUtils:
         page_size: int = 100,
         columns: Optional[List[str]] = None,
     ) -> PaginatedData:
-        """Get paginated data from a Node."""
+        """Get paginated rows from a LazyFrame-backed node."""
         try:
-            # Calculate pagination
-            total_rows = node.shape[0] if hasattr(node, "shape") else 0
+            data_obj = node.data if hasattr(node, "data") else node
+            if not isinstance(data_obj, pl.LazyFrame):
+                raise TypeError("Node data must be a Polars LazyFrame")
+
+            total_rows = int(data_obj.select(pl.len()).collect().item())
             total_pages = math.ceil(total_rows / page_size) if total_rows > 0 else 0
             start_idx = (page - 1) * page_size
-            end_idx = start_idx + page_size
 
-            # Get data slice
-            if hasattr(node, "slice"):
-                sliced_data = node.slice(start_idx, end_idx)
-            else:
-                # Fallback to head if slice not available
-                sliced_data = node.head(page_size) if page == 1 else node
-
-            # Convert to dict format for API
-            data_list = []
-            if hasattr(sliced_data, "to_dicts"):
-                data_list = sliced_data.to_dicts()
-            elif hasattr(sliced_data.data, "to_dicts"):
-                data_list = sliced_data.data.to_dicts()
-
-            # Get columns
-            node_columns = columns or getattr(node, "columns", [])
+            sliced_df = data_obj.slice(start_idx, page_size).collect()
+            data_list = sliced_df.to_dicts()
+            node_columns = columns or list(data_obj.collect_schema().names())
 
             return PaginatedData(
                 data=data_list,
@@ -347,7 +207,6 @@ class DocWorkspaceAPIUtils:
             )
 
         except Exception:
-            # Return empty paginated data on error
             return PaginatedData(
                 data=[],
                 pagination={
@@ -366,7 +225,14 @@ class DocWorkspaceAPIUtils:
     def workspace_to_react_flow(
         workspace: Any, layout_algorithm: str = "grid", node_spacing: int = 250
     ) -> WorkspaceGraph:
-        """Convert workspace to React Flow compatible graph."""
+        """Convert workspace graph objects to React Flow-compatible payloads.
+
+        Used by:
+        - `WorkspaceManager.get_workspace_graph`
+
+        Why:
+        - Centralizes graph serialization and layout defaults.
+        """
         nodes = []
         edges = []
 
@@ -388,8 +254,7 @@ class DocWorkspaceAPIUtils:
                     "nodeType": DocWorkspaceAPIUtils.get_data_type(node).value,
                     "shape": shape,
                     "columns": getattr(node, "columns", []),
-                    "document": getattr(node, "document", None)
-                    or (getattr(node, "metadata", {}) or {}).get("text_column"),
+                    "document": getattr(node, "document", None),
                 },
                 connectable=True,
             )
@@ -451,108 +316,9 @@ class DocWorkspaceAPIUtils:
 
 
 def handle_api_error(error: Exception) -> ErrorResponse:
-    """Convert exception to standardized API error response."""
+    """Convert exceptions into standardized API error payloads."""
     return ErrorResponse(
         error=type(error).__name__,
         message=str(error),
         details={"exception_type": type(error).__name__},
     )
-
-
-def create_operation_result(
-    success: bool,
-    message: str,
-    node_id: Optional[str] = None,
-    data: Optional[Dict[str, Any]] = None,
-    errors: Optional[List[str]] = None,
-) -> OperationResult:
-    """Create standardized operation result."""
-    return OperationResult(
-        success=success,
-        message=message,
-        node_id=node_id,
-        data=data or {},
-        errors=errors or [],
-    )
-
-
-# Extension methods for Node and Workspace classes
-def extend_node_with_api_methods():
-    """Add API methods to Node class if available."""
-    if Node is not None:
-
-        def to_api_summary(self):
-            """Convert node to API summary."""
-            return DocWorkspaceAPIUtils.node_to_summary(self)
-
-        def get_paginated_data(
-            self,
-            page: int = 1,
-            page_size: int = 100,
-            columns: Optional[List[str]] = None,
-        ):
-            """Get paginated data for API responses."""
-            return DocWorkspaceAPIUtils.get_paginated_data(
-                self, page, page_size, columns
-            )
-
-    # Dynamic monkey patching (acceptable here) - ignore type checker
-    Node.to_api_summary = to_api_summary  # type: ignore[attr-defined]
-    Node.get_paginated_data = get_paginated_data  # type: ignore[attr-defined]
-
-
-def extend_workspace_with_api_methods():
-    """Add API methods to Workspace class if available."""
-    if Workspace is not None:
-
-        def to_api_graph(self, layout_algorithm: str = "grid", node_spacing: int = 250):
-            """Convert workspace to React Flow graph."""
-            return DocWorkspaceAPIUtils.workspace_to_react_flow(
-                self, layout_algorithm, node_spacing
-            )
-
-        def get_node_summaries(self):
-            """Get API summaries of all nodes."""
-            return [
-                DocWorkspaceAPIUtils.node_to_summary(node)
-                for node in self.nodes.values()
-            ]
-
-        def safe_operation(self, operation_func, *args, **kwargs):
-            """Execute operation safely and return result."""
-            try:
-                result = operation_func(*args, **kwargs)
-                # Node can be None at import time; guard before isinstance
-                if Node is not None and isinstance(result, Node):  # type: ignore[arg-type]
-                    return create_operation_result(
-                        success=True,
-                        message="Operation completed successfully",
-                        node_id=result.id,
-                        data={
-                            "node_name": result.name,
-                            "data_type": type(result.data).__name__,
-                        },
-                    )
-                else:
-                    return create_operation_result(
-                        success=True,
-                        message="Operation completed successfully",
-                        data={"result": str(result)},
-                    )
-            except Exception as e:
-                error_response = handle_api_error(e)
-                return create_operation_result(
-                    success=False,
-                    message=f"Operation failed: {error_response.message}",
-                    errors=[error_response.error],
-                )
-
-    Workspace.to_api_graph = to_api_graph  # type: ignore[attr-defined]
-    Workspace.get_node_summaries = get_node_summaries  # type: ignore[attr-defined]
-    Workspace.safe_operation = safe_operation  # type: ignore[attr-defined]
-
-
-# Note: We intentionally do NOT auto-extend core classes at import time.
-# This preserves the separation between the core docworkspace library and the backend API.
-# If extension methods are desired for an interactive session, call the functions
-# explicitly: extend_node_with_api_methods(); extend_workspace_with_api_methods().

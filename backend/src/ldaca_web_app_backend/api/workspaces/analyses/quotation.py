@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import logging
+from functools import partial
 from typing import Any, Optional
 
-import polars as pl
 from fastapi import APIRouter, Depends, HTTPException
 
 from ....analysis.implementations.quotation import (
@@ -35,33 +35,6 @@ logger = logging.getLogger(__name__)
 DEFAULT_CONTEXT_LENGTH = qcore.DEFAULT_CONTEXT_LENGTH
 DEFAULT_PAGE_SIZE = qcore.DEFAULT_PAGE_SIZE
 
-# Backward-compatible test hooks (tests patch these names directly)
-_prepare_documents_payload = qcore.prepare_documents_payload
-_normalize_context_length = qcore.normalize_context_length
-_normalize_pagination = qcore.normalize_pagination
-_extract_context_preference = qcore.extract_context_preference
-
-
-async def _compute_quote_dataframe(
-    node: Any,
-    base_df: pl.DataFrame,
-    column: str,
-    engine: QuotationEngineConfig,
-    *,
-    use_base_only: bool = False,
-) -> pl.DataFrame:
-    """Compatibility wrapper that preserves monkeypatch points in tests."""
-    return await qcore.compute_quote_dataframe(
-        node,
-        base_df,
-        column,
-        engine,
-        use_base_only=use_base_only,
-        extract_remote_fn=extract_remote_quotations,
-        quotation_service_max_batch_size=settings.quotation_service_max_batch_size,
-        quotation_service_timeout=settings.quotation_service_timeout,
-    )
-
 
 async def _compute_on_demand_page(
     node: Any,
@@ -73,6 +46,23 @@ async def _compute_on_demand_page(
     sort_by: Optional[str],
     sort_order: str,
 ) -> dict[str, Any]:
+    """Compute paged quotation payloads via shared quotation-core helper.
+
+    Used by:
+    - `quotation_task_result`
+    - `update_quotation_task_result`
+    - `get_quotation`
+
+    Why:
+    - Centralizes paging/sorting computation across read/update/run flows.
+    """
+    compute_quote_dataframe_fn = partial(
+        qcore.compute_quote_dataframe,
+        extract_remote_fn=extract_remote_quotations,
+        quotation_service_max_batch_size=settings.quotation_service_max_batch_size,
+        quotation_service_timeout=settings.quotation_service_timeout,
+    )
+
     return await qcore.compute_on_demand_page(
         node,
         column,
@@ -81,7 +71,7 @@ async def _compute_on_demand_page(
         page_size=page_size,
         sort_by=sort_by,
         sort_order=sort_order,
-        compute_quote_dataframe_fn=_compute_quote_dataframe,
+        compute_quote_dataframe_fn=compute_quote_dataframe_fn,
         normalize_sort_order_fn=_normalize_sort_order,
     )
 
@@ -99,6 +89,14 @@ async def quotation_task_result(
     sort_order: Optional[str] = None,
     current_user: dict = Depends(get_current_user),
 ):
+    """Return stored quotation result, optionally recomputed for new page params.
+
+    Used by:
+    - frontend polling route for quotation result panels
+
+    Why:
+    - Supports cheap preference-only reads and on-demand page recomputation.
+    """
     user_id = current_user["id"]
     task_manager = get_task_manager(user_id, workspace_id)
     task = task_manager.get_task(task_id)
@@ -131,7 +129,7 @@ async def quotation_task_result(
         if not node:
             return base_result
 
-        normalized_page, normalized_size = _normalize_pagination(
+        normalized_page, normalized_size = qcore.normalize_pagination(
             page if page is not None else 1,
             page_size if page_size is not None else DEFAULT_PAGE_SIZE,
         )
@@ -156,6 +154,18 @@ async def update_quotation_task_result(
     query: QuotationResultQuery,
     current_user: dict = Depends(get_current_user),
 ):
+    """Persist quotation display preferences and optional page overrides.
+
+    Used by:
+    - frontend preference updates for context length/sort/page controls
+
+    Why:
+    - Lets UI tune quotation presentation without rerunning analysis creation.
+
+    Refactor note:
+    - Shares substantial logic with `quotation_task_result`; both could delegate
+      to a single internal read/update orchestrator.
+    """
     user_id = current_user["id"]
     task_manager = get_task_manager(user_id, workspace_id)
     task = task_manager.get_task(task_id)
@@ -169,9 +179,9 @@ async def update_quotation_task_result(
     )
     base_result = task.result.to_json()
 
-    context_length_value = _extract_context_preference(base_result)
+    context_length_value = qcore.extract_context_preference(base_result)
     if query.context_length is not None:
-        context_length_value = _normalize_context_length(query.context_length)
+        context_length_value = qcore.normalize_context_length(query.context_length)
 
     preferences = {
         **(
@@ -227,7 +237,7 @@ async def update_quotation_task_result(
     if not node:
         raise HTTPException(status_code=404, detail="Node not found")
 
-    normalized_page, normalized_size = _normalize_pagination(
+    normalized_page, normalized_size = qcore.normalize_pagination(
         query.page if query.page is not None else 1,
         query.page_size if query.page_size is not None else DEFAULT_PAGE_SIZE,
     )
@@ -269,6 +279,14 @@ async def get_quotation(
     request: QuotationRequest,
     current_user: dict = Depends(get_current_user),
 ):
+    """Run quotation extraction on selected node and store latest task payload.
+
+    Used by:
+    - frontend quotation run/search action
+
+    Why:
+    - Produces immediate result payload and persists it as current quotation task.
+    """
     user_id = current_user["id"]
     get_workspace_or_404(user_id, workspace_id)
 
@@ -278,7 +296,7 @@ async def get_quotation(
         node, _node_data = get_node_with_data_or_400(user_id, workspace_id, node_id)
         engine = request.engine or QuotationEngineConfig()
 
-        page, page_size = _normalize_pagination(request.page, request.page_size)
+        page, page_size = qcore.normalize_pagination(request.page, request.page_size)
 
         page_payload = await _compute_on_demand_page(
             node,
@@ -298,7 +316,7 @@ async def get_quotation(
             )
             if prev_task and prev_task.result:
                 prev_result = prev_task.result.to_json()
-                context_length_pref = _extract_context_preference(prev_result)
+                context_length_pref = qcore.extract_context_preference(prev_result)
         except Exception:  # pragma: no cover
             context_length_pref = DEFAULT_CONTEXT_LENGTH
 
@@ -362,6 +380,14 @@ async def detach_quotation(
     request: QuotationDetachRequest,
     current_user: dict = Depends(get_current_user),
 ):
+    """Submit background task to detach quotations into a new workspace node.
+
+    Used by:
+    - frontend quotation detach action
+
+    Why:
+    - Offloads potentially expensive extraction/materialization to worker tasks.
+    """
     user_id = current_user["id"]
     tm = workspace_manager.get_task_manager(user_id, workspace_id)
 

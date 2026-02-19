@@ -22,8 +22,9 @@ from .api.text import router as text_router
 from .api.users import router as users_router
 from .api.workspaces import router as workspaces_router
 
-# Ensure DocWorkspace classes are extended with API methods (e.g., to_api_graph).
-# Importing this module applies the monkey patches on startup.
+# Ensure DocWorkspace API conversion utilities are available at startup.
+# Note: this import no longer auto-applies monkey patches; extension hooks are
+# explicit in `core.docworkspace_api`.
 from .core import docworkspace_api  # noqa: F401
 from .db import cleanup_expired_sessions, init_db
 from .settings import settings
@@ -31,7 +32,14 @@ from .settings import settings
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan manager"""
+    """Manage startup/shutdown lifecycle for backend runtime dependencies.
+
+    Used by:
+    - FastAPI app lifecycle hooks
+
+    Why:
+    - Initializes data folders/DB/session cleanup and performs safe worker shutdown.
+    """
     # Setup file logging for packaged app (especially Windows)
     log_file = None
     try:
@@ -199,7 +207,14 @@ app.include_router(admin_router, prefix="/api", tags=["administration"])
 
 @app.get("/")
 async def root():
-    """API root endpoint with feature overview"""
+    """Return API feature/index metadata.
+
+    Used by:
+    - browser/manual root checks and basic service discovery
+
+    Why:
+    - Provides a human-readable entrypoint summary for backend capabilities.
+    """
     return {
         "message": "Enhanced LDaCA Web App API",
         "version": "3.0.0",
@@ -248,7 +263,14 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint with system status"""
+    """Return lightweight health status for liveness probes.
+
+    Used by:
+    - deployment health checks and uptime monitors
+
+    Why:
+    - Gives a fast no-auth probe endpoint for runtime readiness checks.
+    """
     return {
         "status": "healthy",
         "version": "3.0.0",
@@ -267,7 +289,14 @@ async def health_check():
 
 @app.get("/status")
 async def status():
-    """Detailed system status endpoint"""
+    """Return detailed component/module status information.
+
+    Used by:
+    - diagnostics pages and manual troubleshooting
+
+    Why:
+    - Exposes richer operational metadata than `/health`.
+    """
     return {
         "system": "Enhanced LDaCA Web App API",
         "version": "3.0.0",

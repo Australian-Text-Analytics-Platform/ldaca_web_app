@@ -17,7 +17,14 @@ router = APIRouter(prefix="/user", tags=["user_management"])
 
 @router.get("/folders", response_model=UserFolderInfo)
 async def get_user_folders(current_user: dict = Depends(get_current_user)):
-    """Get user folder information"""
+    """Return folder paths and counts for the current user.
+
+    Used by:
+    - frontend user settings/storage views
+
+    Why:
+    - Exposes filesystem locations and inventory for user-owned content.
+    """
     user_id = current_user["id"]
     data_folder = get_user_data_folder(user_id)
     workspace_folder = get_user_workspace_folder(user_id)
@@ -34,23 +41,19 @@ async def get_user_folders(current_user: dict = Depends(get_current_user)):
     }
 
 
-@router.post("/folders/create")
-async def create_user_folders(current_user: dict = Depends(get_current_user)):
-    """Create user folders if they don't exist"""
-    user_id = current_user["id"]
-    data_folder = get_user_data_folder(user_id)
-    workspace_folder = get_user_workspace_folder(user_id)
-
-    return {
-        "message": "User folders created successfully",
-        "data_folder": str(data_folder),
-        "workspace_folder": str(workspace_folder),
-    }
-
-
 @router.get("/storage", response_model=UserStorageInfo)
 async def get_user_storage(current_user: dict = Depends(get_current_user)):
-    """Get user storage usage statistics"""
+    """Return user storage usage statistics.
+
+    Used by:
+    - frontend storage quota display
+
+    Why:
+    - Aggregates file/workspace counts and sizes for user visibility.
+
+    Refactor note:
+    - Quota value is hardcoded; consider sourcing from settings to avoid drift.
+    """
     user_id = current_user["id"]
     data_folder = get_user_data_folder(user_id)
     workspace_folder = get_user_workspace_folder(user_id)

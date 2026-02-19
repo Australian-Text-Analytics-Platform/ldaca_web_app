@@ -2,9 +2,9 @@ from types import SimpleNamespace
 
 import polars as pl
 import pytest
-from ldaca_web_app_backend.api.workspaces.analyses.quotation import (
-    _compute_quote_dataframe,
-    _prepare_documents_payload,
+from ldaca_web_app_backend.api.workspaces.analyses.quotation_core import (
+    compute_quote_dataframe,
+    prepare_documents_payload,
 )
 from ldaca_web_app_backend.core.services.quotation_client import (
     QuotationServiceError,
@@ -52,7 +52,7 @@ async def test_extract_remote_requires_remote_engine():
 
 def test_prepare_documents_payload_stable_order():
     df = pl.DataFrame({"text": ["a", "b", "c"]})
-    docs = _prepare_documents_payload(df, "text")
+    docs = prepare_documents_payload(df, "text")
     assert list(docs.keys()) == ["0", "1", "2"]
     assert docs["0"]["text"] == "a"
 
@@ -88,13 +88,17 @@ async def test_remote_compute_chunks_based_on_settings(monkeypatch):
             ]
         }
 
-    monkeypatch.setattr(
-        "ldaca_web_app_backend.api.workspaces.analyses.quotation.extract_remote_quotations",
-        fake_extract,
-    )
     monkeypatch.setattr(settings, "quotation_service_max_batch_size", 2)
 
-    result = await _compute_quote_dataframe(node, df, "body", engine)
+    result = await compute_quote_dataframe(
+        node,
+        df,
+        "body",
+        engine,
+        extract_remote_fn=fake_extract,
+        quotation_service_max_batch_size=settings.quotation_service_max_batch_size,
+        quotation_service_timeout=settings.quotation_service_timeout,
+    )
 
     assert len(calls) == 3  # 5 docs -> batches of 2,2,1
     assert [list(call["documents"].keys()) for call in calls] == [

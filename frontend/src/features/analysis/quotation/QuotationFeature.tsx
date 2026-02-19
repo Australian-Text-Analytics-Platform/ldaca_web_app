@@ -39,7 +39,12 @@ import {
 import { ScrollArea } from '../../../components/ui/scroll-area';
 import { ArrowUpDown, Loader2, Search, Trash2, Unlink } from 'lucide-react';
 import { getAnalysisActionState } from '../common/analysisActionState';
-import { useAnalysisHydration } from '../common';
+import { getNodeIdentifier, useAnalysisHydration } from '../common';
+import {
+  clearAnalysisTaskResults,
+  collectTaskIds,
+  resolveAnalysisTaskId,
+} from '../../../hooks/analysisTaskUtils';
 import { AnalysisPagination } from '../../../components/AnalysisPagination';
 
 interface QuotationResultState {
@@ -248,22 +253,6 @@ const normalizeRemoteUrl = (value: string): NormalizedRemoteUrl => {
   return { normalized: trimmed, valid: false, reason: 'format' };
 };
 
-const resolveNodeId = (node: any, fallbackIndex = 0): string => {
-  if (!node) return `node-${fallbackIndex}`;
-  const candidates = [
-    node.id,
-    node.node_id,
-    node.data?.id,
-    node.data?.node_id,
-  ];
-  for (const candidate of candidates) {
-    if (typeof candidate === 'string' && candidate.length) {
-      return candidate;
-    }
-  }
-  return `node-${fallbackIndex}`;
-};
-
 const QuotationFeature: React.FC = () => {
   const { selectedNodes, handlePageChange: baseHandlePageChange, handlePageSizeChange: baseHandlePageSizeChange } = useWorkspaceSelection();
   const { currentWorkspaceId, nodeData } = useWorkspaceData();
@@ -324,7 +313,7 @@ const QuotationFeature: React.FC = () => {
   const originalColumnsByNode = (() => {
     const map: Record<string, string[]> = {};
     displayedNodes.forEach((node, idx) => {
-      const nodeId = resolveNodeId(node, idx);
+      const nodeId = getNodeIdentifier(node, idx);
       if (!nodeId) return;
       map[nodeId] = getColumnInfos(node).map((info) => info.name);
     });
@@ -440,23 +429,16 @@ const QuotationFeature: React.FC = () => {
       return null;
     }
 
-    if (localQuotationTaskId && localQuotationTaskId.trim().length > 0) {
-      return localQuotationTaskId;
-    }
-
-    try {
-      const headers = getAuthHeaders();
-      const current = await textApi.getAnalysisCurrent(currentWorkspaceId, 'quotation', headers) as any;
-      const taskId = Array.isArray(current?.task_ids) ? current.task_ids[0] : null;
-      if (typeof taskId === 'string' && taskId.trim().length > 0) {
-        setLocalQuotationTaskId(taskId);
-        return taskId;
-      }
-    } catch {
-      return null;
-    }
-
-    return null;
+    return resolveAnalysisTaskId({
+      candidateIds: [localQuotationTaskId],
+      fetchCurrentTaskId: async () => {
+        const headers = getAuthHeaders();
+        const current = (await textApi.getAnalysisCurrent(currentWorkspaceId, 'quotation', headers)) as any;
+        const taskId = Array.isArray(current?.task_ids) ? current.task_ids[0] : null;
+        return typeof taskId === 'string' && taskId.trim().length > 0 ? taskId : null;
+      },
+      onResolved: setLocalQuotationTaskId,
+    });
   };
 
   const persistContextLengthPreference = async (value: number) => {
@@ -525,7 +507,7 @@ const QuotationFeature: React.FC = () => {
   };
 
   const hasIncompleteSelections = !displayedNodes.length || displayedNodes.some((node, idx) => {
-    const nodeId = resolveNodeId(node, idx);
+    const nodeId = getNodeIdentifier(node, idx);
     const selection = activeSelections.find((sel) => sel.nodeId === nodeId);
     return !selection || !selection.column;
   });
@@ -548,7 +530,7 @@ const QuotationFeature: React.FC = () => {
     if (!targetNode) {
       return {} as Record<string, unknown>;
     }
-    const nodeId = resolveNodeId(targetNode, 0);
+    const nodeId = getNodeIdentifier(targetNode, 0);
     const selection = activeSelections.find((sel) => sel.nodeId === nodeId);
     if (!selection?.column) {
       return {} as Record<string, unknown>;
@@ -595,7 +577,7 @@ const QuotationFeature: React.FC = () => {
       if (!sourceNode) {
         return null;
       }
-      const nodeId = resolveNodeId(sourceNode, 0);
+      const nodeId = getNodeIdentifier(sourceNode, 0);
       const selection = activeSelections.find((sel) => sel.nodeId === nodeId);
       const fallbackColumn = typeof lockedRequestParams?.column === 'string' ? lockedRequestParams.column : undefined;
       const column = selection?.column || fallbackColumn;
@@ -1000,7 +982,7 @@ const QuotationFeature: React.FC = () => {
 
   const handleSearchAll = async () => {
     const targetNode = displayedNodes[0];
-    const nodeId = targetNode ? resolveNodeId(targetNode, 0) : '';
+    const nodeId = targetNode ? getNodeIdentifier(targetNode, 0) : '';
     if (!nodeId) return;
 
     setIsLoadingQuotations(true);
@@ -1040,7 +1022,7 @@ const QuotationFeature: React.FC = () => {
 
   const handlePageChange = async (newPage: number) => {
     const targetNode = (isLocked && lockedNodesSnapshot.length ? lockedNodesSnapshot[0] : displayedNodes[0]) as any;
-    const nodeId = targetNode ? resolveNodeId(targetNode, 0) : '';
+    const nodeId = targetNode ? getNodeIdentifier(targetNode, 0) : '';
     if (!nodeId) {
       baseHandlePageChange(newPage);
       return;
@@ -1057,7 +1039,7 @@ const QuotationFeature: React.FC = () => {
 
   const handlePageSizeChange = async (pageSize: number) => {
     const targetNode = (isLocked && lockedNodesSnapshot.length ? lockedNodesSnapshot[0] : displayedNodes[0]) as any;
-    const nodeId = targetNode ? resolveNodeId(targetNode, 0) : '';
+    const nodeId = targetNode ? getNodeIdentifier(targetNode, 0) : '';
     if (!nodeId) {
       baseHandlePageSizeChange(pageSize);
       return;
@@ -1407,14 +1389,15 @@ const QuotationFeature: React.FC = () => {
                     if (!currentWorkspaceId) return;
                     setIsClearing(true);
                     try {
-                      try {
-                        const taskId = await resolveQuotationTaskId();
-                        if (taskId) {
-                          await textApi.clearTask(currentWorkspaceId, taskId, getAuthHeaders());
-                        }
-                      } catch {
-                        /* ignore */
-                      }
+                      const resolvedTaskId = await resolveQuotationTaskId();
+                      const taskIds = collectTaskIds([localQuotationTaskId, resolvedTaskId]);
+                      await clearAnalysisTaskResults({
+                        workspaceId: currentWorkspaceId,
+                        taskIds,
+                        clearAnalysisTask: (workspaceId, taskId) =>
+                          textApi.clearTask(workspaceId, taskId, getAuthHeaders()),
+                        warnContext: 'quotation',
+                      });
                     } finally {
                       setIsClearing(false);
                       setLocalQuotationTaskId(null);
@@ -1514,7 +1497,7 @@ const QuotationFeature: React.FC = () => {
             </CardHeader>
             <CardContent className="space-y-8">
               {displayedNodes.map((node, idx) => {
-                const nodeId = resolveNodeId(node, idx);
+                const nodeId = getNodeIdentifier(node, idx);
                 const selection = activeSelections.find((s) => s.nodeId === nodeId);
                 const textCol = selection?.column || '';
 

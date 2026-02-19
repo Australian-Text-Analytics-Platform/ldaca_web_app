@@ -1,3 +1,12 @@
+"""Token-frequency analysis request schema module.
+
+Used by:
+- token-frequency routes and worker task request validation
+
+Why:
+- Keeps token-frequency analysis input contract centralized.
+"""
+
 from typing import Dict, List, Optional
 
 from pydantic import Field
@@ -7,7 +16,13 @@ from ..models import BaseAnalysisRequest
 
 class TokenFrequencyRequest(BaseAnalysisRequest):
     """
-    Request model for Token Frequency analysis.
+    Request model for token-frequency analysis.
+
+    Used by:
+    - token-frequency run/update endpoints
+
+    Why:
+    - Validates node selection, stop-word, and token-limit parameters.
     """
 
     node_ids: List[str] = Field(..., description="List of node IDs to analyze (1 or 2)")

@@ -45,6 +45,13 @@ def _clear_tuple_prefix_cache_for(
 
     This is intentionally defensive: if the module/attr doesn't exist or isn't a
     mutable mapping, it returns 0.
+
+        Used by:
+        - `clear_analysis_cache_for`
+
+        Why:
+        - Performs safe best-effort cache cleanup without hard dependency on cache
+            module availability.
     """
 
     try:
@@ -85,6 +92,12 @@ def clear_analysis_cache_for(user_id: str, workspace_id: str) -> int:
     """Clear analysis in-memory caches for a workspace.
 
     Clears all known analysis caches for the workspace.
+
+    Used by:
+    - `clear_analyses_and_cache`
+
+    Why:
+    - Prevents stale in-memory analysis artifacts after clear actions.
     """
     if not _CACHE_SPECS:
         return 0
@@ -105,6 +118,16 @@ async def clear_analyses_and_cache(
     """Clear persisted analyses (optionally filtered by task), concordance cache,
     and task manager records. Task clearing is routed through WorkerTaskManager
     so callers can keep SSE task lists in sync with backend state.
+
+        Used by:
+        - analysis clear endpoints (task-specific and global)
+
+        Why:
+        - Coordinates analysis-store cleanup with worker task-state cleanup.
+
+        Refactor note:
+        - Mixes sync `analysis.manager` task clearing and async worker task clearing;
+            unifying onto one task storage abstraction could simplify semantics.
     """
 
     cleared_task_ids: list[str] = []

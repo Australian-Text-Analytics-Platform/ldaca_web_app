@@ -35,6 +35,15 @@ _REQUEST_EXCLUDE_KEYS = {
 
 
 def normalize_saved_request(raw_request: Optional[dict]) -> Optional[dict]:
+    """Normalize stored concordance request payloads.
+
+    Used by:
+    - `sanitize_request_for_storage`
+    - concordance result endpoints before response rebuild
+
+    Why:
+    - Ensures persisted requests omit view-only keys and keep stable defaults.
+    """
     if not raw_request:
         return None
     if "node_ids" not in raw_request or "node_columns" not in raw_request:
@@ -53,11 +62,27 @@ def normalize_saved_request(raw_request: Optional[dict]) -> Optional[dict]:
 
 
 def sanitize_request_for_storage(request_dict: dict[str, Any]) -> dict[str, Any]:
+    """Return a storage-safe concordance request snapshot.
+
+    Used by:
+    - Concordance route handlers when persisting task requests.
+
+    Why:
+    - Prevents transient pagination/sorting fields from polluting saved inputs.
+    """
     normalized = normalize_saved_request(request_dict)
     return normalized or {}
 
 
 def concordance_non_empty_expr() -> pl.Expr:
+    """Build an expression that removes empty concordance rows.
+
+    Used by:
+    - `build_concordance_lazyframe`
+
+    Why:
+    - Drops rows with no meaningful matched/context text before pagination.
+    """
     return pl.any_horizontal([
         pl
         .col("matched_text")
@@ -88,6 +113,15 @@ def build_concordance_lazyframe(
     column: str,
     request: dict[str, Any],
 ) -> pl.LazyFrame:
+    """Create concordance rows from a source LazyFrame and request options.
+
+    Used by:
+    - `compute_concordance_page`
+
+    Why:
+    - Encapsulates `polars_text.concordance` expansion and filtering in one
+      reusable transformation step.
+    """
     import polars_text as pt
 
     expr = pt.concordance(
@@ -112,6 +146,14 @@ def resolve_node_sources(
     workspace_id: str,
     request: dict[str, Any],
 ) -> tuple[dict[str, dict[str, Any]], dict[str, str], dict[str, str]]:
+    """Resolve workspace nodes into validated concordance source metadata.
+
+    Used by:
+    - `build_concordance_response`
+
+    Why:
+    - Centralizes node lookup, label mapping, and LazyFrame/type validation.
+    """
     node_ids = request.get("node_ids") or []
     node_columns = request.get("node_columns") or {}
 
@@ -155,6 +197,16 @@ def compute_concordance_page(
     sort_order: Optional[str],
     node_label: Optional[str] = None,
 ) -> dict[str, Any]:
+    """Compute one concordance page for a single node source.
+
+    Used by:
+    - `build_concordance_response`
+    - `collect_interleaved_combined`
+
+    Why:
+    - Produces a stable page payload shape shared by single-node and combined
+      result views.
+    """
     total_source_rows = base_lf.select(pl.len()).collect().item()
 
     effective_sort_by: Optional[str] = None
@@ -209,6 +261,14 @@ def compute_concordance_page(
 
 
 def empty_concordance_page(page: int, page_size: int) -> dict[str, Any]:
+    """Return an empty concordance page payload with metadata defaults.
+
+    Used by:
+    - `build_concordance_response` fallback paths
+
+    Why:
+    - Keeps response contracts consistent when no source rows are available.
+    """
     return {
         "data": [],
         "columns": [],
@@ -244,6 +304,14 @@ def collect_interleaved_combined(
     left_label: Optional[str] = None,
     right_label: Optional[str] = None,
 ) -> dict[str, Any]:
+    """Combine two node concordance pages using left-right interleaving.
+
+    Used by:
+    - `build_concordance_response` when `combined=True` and two nodes are set.
+
+    Why:
+    - Preserves per-node page semantics while presenting a merged comparison view.
+    """
     left_result = compute_concordance_page(
         left_base_lf,
         left_column,
@@ -346,6 +414,17 @@ def build_concordance_response(
     workspace_id: str,
     request: dict[str, Any],
 ) -> dict[str, Any]:
+    """Build the full concordance API response from a normalized request.
+
+    Used by:
+    - `concordance.run_concordance`
+    - `concordance_task_result`
+    - `concordance_task_result_post`
+
+    Why:
+    - Provides one shared response builder for run and retrieval endpoints,
+      avoiding payload drift across routes.
+    """
     page = int(request.get("page") or DEFAULT_CONCORDANCE_PAGE)
     page_size = int(request.get("page_size") or DEFAULT_CONCORDANCE_PAGE_SIZE)
     sort_by = request.get("sort_by")

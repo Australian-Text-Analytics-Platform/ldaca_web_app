@@ -28,6 +28,14 @@ router = APIRouter(prefix="/feedback", tags=["feedback"])
 
 
 def _airtable_available() -> bool:
+    """Return whether Airtable submission should be attempted.
+
+    Used by:
+    - `submit_feedback`
+
+    Why:
+    - Prevents network side effects in tests and short-circuits unconfigured envs.
+    """
     # Disable network side-effects during test runs
     if os.getenv("PYTEST_CURRENT_TEST"):
         return False
@@ -46,6 +54,16 @@ async def submit_feedback(
     """Submit feedback to Airtable.
 
     When Airtable is not configured, returns success with a warning message so UI can still proceed.
+
+        Used by:
+        - frontend feedback form submission
+
+        Why:
+        - Captures user feedback while failing soft in non-configured environments.
+
+        Refactor note:
+        - Airtable-specific construction could move to a service module to keep route
+            strictly transport-focused.
     """
 
     if not request.subject.strip():

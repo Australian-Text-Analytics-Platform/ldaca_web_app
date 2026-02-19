@@ -44,6 +44,18 @@ _server_task: asyncio.Task | None = None
 
 
 def start_backend(port=8001):
+    """Start backend FastAPI server in current event loop as background task.
+
+    Used by:
+    - notebook/Colab deployment workflows
+
+    Why:
+    - Allows non-blocking backend startup for interactive environments.
+
+    Refactor note:
+    - Stores process-wide mutable globals (`_server`, `_server_task`); consider
+        encapsulating state in a small service object for multi-session safety.
+    """
     global _server, _server_task
     if _server and getattr(_server, "started", False):
         print(f"Server already running at http://localhost:{port}")
@@ -72,6 +84,10 @@ def start_frontend(
     To use IPython display features, install optional dependencies:
         pip install ldaca-web-app-backend[deploy]
     """
+    # Used by: notebook/Colab launch flows that pair frontend proxy with backend.
+    # Why: provides one helper to build/fetch frontend assets and expose them.
+    # Refactor note: function is long and mixes download/build/nginx/proxy logic;
+    # split into smaller helpers for readability and testing.
     if not IPYTHON_AVAILABLE and not ON_COLAB:
         print("Warning: IPython not available. Display features will be limited.")
         print(

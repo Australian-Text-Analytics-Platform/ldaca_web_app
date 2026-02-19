@@ -15,7 +15,17 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 
 @router.get("/users")
 async def list_users(current_user: dict = Depends(get_current_user)):
-    """List all users with session info (admin endpoint)"""
+    """List users with active-session counts.
+
+    Used by:
+    - admin dashboard/user management views
+
+    Why:
+    - Provides operational visibility into user and session activity.
+
+    Refactor note:
+    - Add `require_admin` dependency before wider deployment to avoid role drift.
+    """
     # TODO: Add admin role check in production
 
     async with async_session_maker() as session:
@@ -51,7 +61,17 @@ async def list_users(current_user: dict = Depends(get_current_user)):
 
 @router.get("/cleanup")
 async def admin_cleanup(current_user: dict = Depends(get_current_user)):
-    """Clean up expired sessions (admin endpoint)"""
+    """Trigger cleanup of expired session rows.
+
+    Used by:
+    - admin maintenance actions
+
+    Why:
+    - Allows manual session-store maintenance in addition to automatic cleanup.
+
+    Refactor note:
+    - Add `require_admin` dependency before wider deployment.
+    """
     # TODO: Add admin role check in production
     await cleanup_expired_sessions()
     return {

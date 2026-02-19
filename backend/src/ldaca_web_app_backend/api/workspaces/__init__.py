@@ -2,6 +2,16 @@
 
 Exports a single FastAPI `router` that combines core workspace endpoints
 (`base.py`) and modular analysis endpoints under `analyses/`.
+
+Used by:
+- `main.py` router registration
+
+Why:
+- Keeps workspace endpoint composition centralized.
+
+Refactor note:
+- Router includes are manually enumerated; if module count grows, consider
+    declarative router registration to reduce merge conflicts.
 """
 
 from fastapi import APIRouter

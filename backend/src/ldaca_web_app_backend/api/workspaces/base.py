@@ -7,13 +7,12 @@ All business logic is handled by the DocWorkspace library itself.
 
 import logging
 import os
-from typing import Any, Optional, cast
+from typing import cast
 
 import polars as pl
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 
 from ...core.auth import get_current_user
-from ...core.docworkspace_api import DocWorkspaceAPIUtils
 
 # Note: DocWorkspace API helpers are not used directly in this HTTP layer
 from ...core.utils import get_user_data_folder, load_data_file
@@ -54,7 +53,7 @@ async def delete_node_column(
         except Exception:  # pragma: no cover - non-critical history update
             pass
         workspace_manager.persist(user_id, workspace_id)
-        return DocWorkspaceAPIUtils.convert_node_info_for_api(node)
+        return node.info()
     except NodeDataError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc))
     except Exception as exc:  # pragma: no cover - defensive
@@ -94,7 +93,7 @@ async def rename_node_column(
             except Exception:  # pragma: no cover
                 pass
         workspace_manager.persist(user_id, workspace_id)
-        return DocWorkspaceAPIUtils.convert_node_info_for_api(node)
+        return node.info()
     except NodeDataError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc))
     except Exception as exc:  # pragma: no cover
@@ -108,7 +107,18 @@ async def rename_node_column(
 # Configure Numba threading layer with automatic TBB detection and fallback
 # -----------------------------------------------------------------------------
 def _configure_numba_threading():
-    """Configure Numba threading layer with TBB detection and fallback to workqueue."""
+    """Configure process-wide Numba threading defaults with safe fallbacks.
+
+    Used by:
+    - module import side effect in `base.py`
+
+    Why:
+    - Reduces runtime instability from incompatible threading backends.
+
+    Refactor note:
+    - Duplicates intent of `api.workspaces.utils.configure_numba_threading`; these
+        should converge to one shared helper.
+    """
     try:
         # Check if TBB is available to Numba
         tbb_available = False
@@ -236,6 +246,10 @@ async def add_node_to_workspace(
             )
 
         # Normalize to an eager Polars DataFrame
+        # LazyFrame-only migration note:
+        # The branches below support legacy mixed payload types (wrapper,
+        # pandas-like, generic mapping/list). Remove once upload/create inputs
+        # are validated to strict LazyFrame/Polars-only contracts.
         try:
             if isinstance(data, pl.LazyFrame):
                 data = data.collect()
@@ -293,7 +307,7 @@ async def add_node_to_workspace(
             )
 
         # Return node info
-        return DocWorkspaceAPIUtils.convert_node_info_for_api(node)
+        return node.info()
 
     except HTTPException:
         # Re-raise HTTPExceptions as-is
@@ -390,12 +404,6 @@ async def cast_node(
 
         # Get node using shared helper (guarantees data presence)
         node, current_df = get_node_with_data_or_400(user_id, workspace_id, node_id)
-
-        document_column: Optional[str] = None
-        if hasattr(node, "metadata"):
-            metadata = getattr(node, "metadata", None)
-            if isinstance(metadata, dict):
-                document_column = metadata.get("text_column")
 
         if isinstance(current_df, pl.LazyFrame):
             lazyframe = current_df
@@ -627,6 +635,10 @@ async def export_nodes(
         raise HTTPException(status_code=400, detail="No node_ids provided")
 
     # Helper to materialize node data as Polars DataFrame
+    # LazyFrame-only migration note:
+    # This helper intentionally keeps eager/wrapper compatibility fallbacks.
+    # After full LazyFrame-only rollout, simplify to strict
+    # `node.data.collect()` plus hard type assertions.
     def node_to_df(node):
         data = getattr(node, "data", None)
         if data is None:
@@ -635,6 +647,7 @@ async def export_nodes(
             if hasattr(data, "collect"):
                 collected = data.collect()
             else:
+                # Legacy eager fallback; removable under strict LazyFrame contract.
                 collected = data
         except Exception as e:  # pragma: no cover
             raise HTTPException(
@@ -714,6 +727,8 @@ async def export_nodes(
 # ============================================================================
 
 
+# ============================================================================
+# ============================================================================
 # ============================================================================
 # ============================================================================
 # ============================================================================

@@ -19,7 +19,14 @@ async def get_current_tasks(
     analysis: str,
     current_user: dict = Depends(get_current_user),
 ) -> dict[str, list[str]]:
-    """Return the current task id(s) for an analysis tab."""
+    """Return current task ids registered for one analysis tab.
+
+    Used by:
+    - frontend analysis-result rehydration flows
+
+    Why:
+    - Lets clients resolve latest task id(s) before fetching request/result.
+    """
     user_id = current_user["id"]
     manager = get_task_manager(user_id, workspace_id)
     return {"task_ids": manager.get_current_task_ids(analysis)}
@@ -31,7 +38,14 @@ async def get_task_request(
     task_id: str,
     current_user: dict = Depends(get_current_user),
 ) -> Any:
-    """Return the stored request for a task id."""
+    """Return stored request payload for a task id.
+
+    Used by:
+    - frontend result panels that need original analysis parameters
+
+    Why:
+    - Preserves reproducibility and UI state reconstruction from saved tasks.
+    """
     user_id = current_user["id"]
     manager = get_task_manager(user_id, workspace_id)
     task = manager.get_task(task_id)
@@ -47,7 +61,18 @@ async def get_task_result(
     task_id: str,
     current_user: dict = Depends(get_current_user),
 ) -> Any:
-    """Return the stored result for a task id."""
+    """Return stored task result, syncing with worker if still running.
+
+    Used by:
+    - generic task result retrieval endpoint consumers
+
+    Why:
+    - Bridges legacy in-memory task state with worker-backed completion updates.
+
+    Refactor note:
+    - Result envelope normalization duplicates logic in analysis-specific routes;
+      a shared response helper could reduce drift.
+    """
     user_id = current_user["id"]
     manager = get_task_manager(user_id, workspace_id)
 
@@ -80,7 +105,14 @@ async def clear_task(
     task_id: str,
     current_user: dict = Depends(get_current_user),
 ) -> dict[str, str]:
-    """Clear a stored task by id."""
+    """Clear one stored task record by id.
+
+    Used by:
+    - frontend cleanup controls for generic task-manager routes
+
+    Why:
+    - Removes stale in-memory task entries without deleting analysis artifacts.
+    """
     user_id = current_user["id"]
     manager = get_task_manager(user_id, workspace_id)
     task = manager.get_task(task_id)

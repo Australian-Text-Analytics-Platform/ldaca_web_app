@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import NodeSelectionPanel, { WorkspaceNodeLike } from '../../../components/NodeSelectionPanel';
+import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
 import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '../../../hooks/useWorkspaceSelection';
 import { useAuth } from '../../../hooks/useAuth';
@@ -37,31 +37,19 @@ import AnalysisTaskBanner from '../../../components/tabs/AnalysisTaskBanner';
 import type { AnalysisTaskStatus } from '../../../hooks/useAnalysisTaskStatus';
 import useAnalysisTaskLifecycle, { type AnalysisTaskRefreshContext } from '../../../hooks/useAnalysisTaskLifecycle';
 import { getAnalysisActionState } from '../common/analysisActionState';
-import { useAnalysisHydration } from '../common';
+import { getNodeIdentifier, useAnalysisHydration, useColorStackAllocator } from '../common';
+import {
+  clearAnalysisTaskArtifacts,
+  collectTaskIds,
+  pruneTasksById,
+  resolveAnalysisTaskId,
+} from '../../../hooks/analysisTaskUtils';
 import type {
   TopicModelingDetachNodeOption,
   TopicModelingDetachRequest,
 } from '../../../api/text';
 interface TopicModelingTopic { id: number; label: string; size: number[]; total_size: number; x: number; y: number; }
 interface TopicModelingResponse { state?: 'running' | 'successful' | 'failed' | 'cancelled'; message?: string; data?: { topics: TopicModelingTopic[]; corpus_sizes?: number[] }; metadata?: { task_id?: string; [k: string]: any } }
-
-const resolveWorkspaceNodeId = (node: WorkspaceNodeLike, fallbackIndex: number): string => {
-  const candidates = [
-    node.id,
-    node.node_id,
-    node.data?.id,
-    node.data?.node_id,
-    node.unique_id,
-  ];
-
-  for (const candidate of candidates) {
-    if (typeof candidate === 'string' && candidate.length > 0) {
-      return candidate;
-    }
-  }
-
-  return `node-${fallbackIndex}`;
-};
 
 // Simple linear gradient between two colors given t in [0,1]
 function interpolateColor(c1: string, c2: string, t: number) {
@@ -124,7 +112,7 @@ const TopicModelingFeature: React.FC = () => {
   
   const [minTopicSize, setMinTopicSize] = useState(10);
   const [useCtTfidf, setUseCtTfidf] = useState(true);
-  const [nodeColors, setNodeColors] = useState<Record<string,string>>({});
+  const [manualColors, setManualColors] = useState<Record<string,string>>({});
   const [isClearing, setIsClearing] = useState(false);
   const [hoveredTopicId, setHoveredTopicId] = useState<number | null>(null);
   const [tooltip, setTooltip] = useState<{x:number;y:number; topic: TopicModelingTopic | null}>({x:0,y:0,topic:null});
@@ -146,29 +134,28 @@ const TopicModelingFeature: React.FC = () => {
   const resolveTopicModelingTaskId = useCallback(async (): Promise<string | null> => {
     if (!currentWorkspaceId) return null;
 
-    const candidateIds = [
-      localTopicModelingTaskId,
-      (resultRef.current as any)?.metadata?.task_id,
-      topicModelingReadyTaskId,
-    ];
-    const known = candidateIds.find((candidate) => typeof candidate === 'string' && candidate.trim().length > 0);
-    if (known) {
-      return known;
-    }
-
-    try {
-      const headers = getAuthHeaders();
-      const current = await textApi.getAnalysisCurrent(currentWorkspaceId, 'topic-modeling', headers) as any;
-      const taskId = Array.isArray(current?.task_ids) ? current.task_ids[0] : null;
-      if (typeof taskId === 'string' && taskId.trim().length > 0) {
-        setLocalTopicModelingTaskId(taskId);
-        return taskId;
-      }
-    } catch {
-      return null;
-    }
-
-    return null;
+    return resolveAnalysisTaskId({
+      candidateIds: [
+        localTopicModelingTaskId,
+        (resultRef.current as any)?.metadata?.task_id,
+        topicModelingReadyTaskId,
+        topicTaskStatus.activeTaskId,
+        topicRunningTask?.task_id,
+        topicTaskStatus.queuedTask?.task_id,
+        topicTaskStatus.terminalTask?.task_id,
+      ],
+      fetchCurrentTaskId: async () => {
+        const headers = getAuthHeaders();
+        const current = (await textApi.getAnalysisCurrent(
+          currentWorkspaceId,
+          'topic-modeling',
+          headers
+        )) as any;
+        const taskId = Array.isArray(current?.task_ids) ? current.task_ids[0] : null;
+        return typeof taskId === 'string' && taskId.trim().length > 0 ? taskId : null;
+      },
+      onResolved: setLocalTopicModelingTaskId,
+    });
   }, [currentWorkspaceId, localTopicModelingTaskId, topicModelingReadyTaskId, getAuthHeaders]);
 
   const fetchTopicModelingResult = useCallback(async (taskId: string | null, expectedState: 'successful' | 'failed') => {
@@ -266,7 +253,7 @@ const TopicModelingFeature: React.FC = () => {
 
   const panelNodeIds = panelSelectedNodes
     .slice(0, 2)
-    .map((node, idx) => resolveWorkspaceNodeId(node, idx) || activeNodeIds[idx])
+    .map((node, idx) => getNodeIdentifier(node, idx) || activeNodeIds[idx])
     .filter((id): id is string => Boolean(id));
   const panelNodeIdsKey = panelNodeIds.join('|');
   const actionState = getAnalysisActionState({
@@ -294,6 +281,35 @@ const TopicModelingFeature: React.FC = () => {
   },[]);
 
   const defaultPalette = DEFAULT_PALETTE;
+  const stackPalette = React.useMemo(() => DEFAULT_PALETTE.slice(0, 6), []);
+
+  // Use stack-based allocator for automatic color assignment
+  const stackActiveNodeIds = panelNodeIds.slice(0, 2); // Topic modeling uses first 2 nodes from panel
+  const { nodeColors: stackColors } = useColorStackAllocator({
+    colors: stackPalette, // Use first six palette colors in stack order
+    activeNodeIds: stackActiveNodeIds,
+  });
+  // Merge stack-allocated and manually set colors
+  const nodeColors = React.useMemo(() => {
+    const merged: Record<string, string> = {};
+    // Start with stack-allocated colors
+    Object.entries(stackColors).forEach(([id, color]) => {
+      merged[id] = color;
+    });
+    // Override with manual selections
+    Object.entries(manualColors).forEach(([id, color]) => {
+      if (stackActiveNodeIds.includes(id)) {
+        merged[id] = color;
+      }
+    });
+    // Fallback for overflow (>6 nodes)
+    panelNodeIds.forEach((id, index) => {
+      if (!merged[id]) {
+        merged[id] = DEFAULT_PALETTE[index % DEFAULT_PALETTE.length];
+      }
+    });
+    return merged;
+  }, [stackColors, manualColors, stackActiveNodeIds, panelNodeIds]);
 
   const effectiveNodeColumnSelections = isLocked ? activeNodeColumnSelections : nodeColumnSelections;
 
@@ -307,22 +323,7 @@ const TopicModelingFeature: React.FC = () => {
     return !selection || !selection.column;
   });
 
-  // Ensure colors assigned
-  useEffect(()=>{
-    setNodeColors(prev=>{
-      const out = { ...prev };
-      let paletteIndex = 0;
-      panelSelectedNodes.slice(0, 2).forEach((node, idx) => {
-        const nodeId = resolveWorkspaceNodeId(node, idx);
-        if (!nodeId || out[nodeId]) {
-          return;
-        }
-        out[nodeId] = defaultPalette[paletteIndex % defaultPalette.length];
-        paletteIndex += 1;
-      });
-      return out;
-    });
-  },[panelSelectedNodes, defaultPalette]);
+  // Color assignment now handled by stack allocator - no auto-fill effect needed
 
   useEffect(() => {
     if (!isLocked && panelNodeIds.length > 0 && nodeColumnSelections.length === 0) {
@@ -334,7 +335,7 @@ const TopicModelingFeature: React.FC = () => {
     if (isLocked) return;
     setNodeColumnSelection(nodeId, column);
   };
-  const handleColorChange = (nodeId: string, color: string) => setNodeColors(p=>({...p,[nodeId]:color}));
+  const handleColorChange = (nodeId: string, color: string) => setManualColors(p=>({...p,[nodeId]:color}));
 
   const handleRun = async () => {
     if (!currentWorkspaceId || panelNodeIds.length === 0) return;
@@ -857,59 +858,33 @@ const TopicModelingFeature: React.FC = () => {
                   onClick={async () => {
                     if (!currentWorkspaceId) return;
                     setIsClearing(true);
+                    const taskIds = collectTaskIds([
+                      (result as any)?.metadata?.task_id,
+                      localTopicModelingTaskId,
+                      topicTaskStatus.activeTaskId,
+                      topicRunningTask?.task_id,
+                      topicSuccessfulTask?.task_id,
+                      topicFailedTask?.task_id,
+                    ]);
                     try {
-                      const taskIds = new Set<string>();
-                      const candidates = [
-                        (result as any)?.metadata?.task_id,
-                        topicTaskStatus.activeTaskId,
-                        topicRunningTask?.task_id,
-                        topicSuccessfulTask?.task_id,
-                        topicFailedTask?.task_id,
-                      ];
-                      candidates.forEach((candidate) => {
-                        if (typeof candidate === 'string' && candidate.trim()) {
-                          taskIds.add(candidate);
-                        }
-                      });
+                      const headers = getAuthHeaders();
+                      const resolvedTaskId = await resolveTopicModelingTaskId();
+                      const allTaskIds = collectTaskIds([
+                        ...taskIds,
+                        resolvedTaskId,
+                      ]);
 
-                      try {
-                        if (taskIds.size > 0) {
-                          await Promise.all(
-                            Array.from(taskIds).map(async (taskId) => {
-                              try {
-                                await workspacesApi.cancelTasks(currentWorkspaceId, { task_id: taskId }, getAuthHeaders());
-                              } catch {
-                                /* ignore cancellation errors */
-                              }
-                            })
-                          );
-                        }
-                      } catch {
-                        /* ignore cancellation errors */
-                      }
-                      try {
-                        if (taskIds.size > 0) {
-                          await Promise.all(
-                            Array.from(taskIds).map(async (taskId) => {
-                              try {
-                                await workspacesApi.clearTasks(currentWorkspaceId, { task_id: taskId }, getAuthHeaders());
-                              } catch {
-                                /* ignore task clearing errors */
-                              }
-                            })
-                          );
-                        }
-                      } catch {
-                        /* ignore task clearing errors */
-                      }
-                      try {
-                        const taskId = await resolveTopicModelingTaskId();
-                        if (taskId) {
-                          await textApi.clearTask(currentWorkspaceId, taskId, getAuthHeaders());
-                        }
-                      } catch {
-                        /* ignore clear errors */
-                      }
+                      await clearAnalysisTaskArtifacts({
+                        workspaceId: currentWorkspaceId,
+                        taskIds: allTaskIds,
+                        cancelTask: (workspaceId, taskId) =>
+                          workspacesApi.cancelTasks(workspaceId, { task_id: taskId }, headers),
+                        clearManagerTask: (workspaceId, taskId) =>
+                          workspacesApi.clearTasks(workspaceId, { task_id: taskId }, headers),
+                        clearAnalysisTask: (workspaceId, taskId) =>
+                          textApi.clearTask(workspaceId, taskId, headers),
+                        warnContext: 'topic-modeling',
+                      });
                     } finally {
                       setIsClearing(false);
                       setResultSafely(null);
@@ -924,25 +899,17 @@ const TopicModelingFeature: React.FC = () => {
                       recomputeAutoColumns();
                       setTasks((prev: any[]) =>
                         Array.isArray(prev)
-                          ? (() => {
-                              const taskIds = new Set<string>();
-                              const candidates = [
+                          ? pruneTasksById(
+                              prev,
+                              collectTaskIds([
                                 (result as any)?.metadata?.task_id,
+                                localTopicModelingTaskId,
                                 topicTaskStatus.activeTaskId,
                                 topicRunningTask?.task_id,
                                 topicSuccessfulTask?.task_id,
                                 topicFailedTask?.task_id,
-                              ];
-                              candidates.forEach((candidate) => {
-                                if (typeof candidate === 'string' && candidate.trim()) {
-                                  taskIds.add(candidate);
-                                }
-                              });
-                              if (taskIds.size === 0) {
-                                return prev;
-                              }
-                              return prev.filter((task) => task && !taskIds.has(task.task_id));
-                            })()
+                              ])
+                            )
                           : prev
                       );
                     }

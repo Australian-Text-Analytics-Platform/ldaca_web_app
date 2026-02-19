@@ -12,7 +12,6 @@ from __future__ import annotations
 from typing import Any, Optional
 from uuid import uuid4
 
-import polars as pl
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
@@ -27,19 +26,24 @@ from .concordance_core import (
     DEFAULT_CONCORDANCE_PAGE,
     DEFAULT_CONCORDANCE_PAGE_SIZE,
     build_concordance_response,
-    concordance_non_empty_expr,
     normalize_saved_request,
-    sanitize_request_for_storage,
 )
-
-_concordance_non_empty_expr = concordance_non_empty_expr
-_normalize_saved_request = normalize_saved_request
-_sanitize_request_for_storage = sanitize_request_for_storage
+from .text_column_prefs import resolve_text_columns_for_nodes
 
 router = APIRouter(prefix="/workspaces", tags=["concordance"])
 
 
 class ConcordanceResultQuery(BaseModel):
+    """Query overrides for reading persisted concordance results.
+
+    Used by:
+    - `concordance_task_result`
+    - `concordance_task_result_post`
+
+    Why:
+    - Allows pagination and sorting updates without recomputing concordance.
+    """
+
     node_id: Optional[str] = None
     combined: Optional[bool] = None
     page: Optional[int] = None
@@ -55,7 +59,15 @@ def _apply_result_query_overrides(
     normalized_request: dict[str, Any],
     query: ConcordanceResultQuery,
 ) -> dict[str, Any]:
-    """Apply pagination/sorting overrides from ConcordanceResultQuery."""
+    """Apply request overrides from query parameters.
+
+    Used by:
+    - `concordance_task_result`
+    - `concordance_task_result_post`
+
+    Why:
+    - Reuses one normalization path for GET and POST result retrieval APIs.
+    """
     page = query.page_number if query.page_number is not None else query.page
     if page is not None:
         normalized_request["page"] = page
@@ -79,6 +91,15 @@ async def run_concordance(
     request: ConcordanceAnalysisRequest,
     current_user: dict = Depends(get_current_user),
 ):
+    """Run concordance immediately and store task metadata for retrieval.
+
+    Used by:
+    - Frontend run route: `POST /workspaces/{id}/concordance`
+
+    Why:
+    - Keeps API behavior aligned with other analyses by returning task-linked
+        responses while using shared concordance response builders.
+    """
     user_id = current_user["id"]
     get_workspace_or_404(user_id, workspace_id)
 
@@ -89,45 +110,13 @@ async def run_concordance(
             status_code=400, detail="At least one node ID must be provided"
         )
 
-    validated_columns: dict[str, str] = {}
-    node_columns = request.node_columns or {}
-
-    for node_id in request.node_ids:
-        node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
-        if not node:
-            raise HTTPException(status_code=404, detail=f"Node {node_id} not found")
-
-        node_data = getattr(node, "data", None)
-        if not isinstance(node_data, pl.LazyFrame):
-            raise HTTPException(
-                status_code=400,
-                detail=f"Node {node_id} data must be a LazyFrame",
-            )
-        available_columns = list(node_data.collect_schema().names())
-
-        column_name = node_columns.get(node_id)
-        if not column_name:
-            common = [
-                c
-                for c in ["document", "text", "content", "body", "message"]
-                if c in available_columns
-            ]
-            if common:
-                column_name = common[0]
-
-        if not column_name:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Could not determine text column for node {node_id}",
-            )
-
-        if column_name not in available_columns:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Column '{column_name}' not found in node {node_id}",
-            )
-
-        validated_columns[node_id] = column_name
+    validated_columns = resolve_text_columns_for_nodes(
+        user_id=user_id,
+        workspace_id=workspace_id,
+        node_ids=request.node_ids,
+        requested_node_columns=request.node_columns or {},
+        persist_preference=True,
+    )
 
     try:
         from ....analysis.implementations.concordance import ConcordanceRequest
@@ -157,7 +146,7 @@ async def run_concordance(
         task_manager.set_current_task("concordance", task_id)
 
         normalized_request = (
-            _normalize_saved_request(analysis_request.model_dump()) or {}
+            normalize_saved_request(analysis_request.model_dump()) or {}
         )
         normalized_request.setdefault("page", DEFAULT_CONCORDANCE_PAGE)
         normalized_request.setdefault("page_size", DEFAULT_CONCORDANCE_PAGE_SIZE)
@@ -186,6 +175,18 @@ async def concordance_task_result(
     query: ConcordanceResultQuery = Depends(),
     current_user: dict = Depends(get_current_user),
 ):
+    """Read concordance result with optional pagination/sort overrides.
+
+    Used by:
+    - Frontend polling route: `GET /workspaces/{id}/concordance/tasks/{id}/result`
+
+    Why:
+    - Hydrates saved concordance state while allowing query-time view changes.
+
+        Refactor note:
+        - Can likely be merged with `concordance_task_result_post` through a shared
+            result-read helper that accepts normalized override input.
+    """
     user_id = current_user["id"]
     task_manager = get_task_manager(user_id, workspace_id)
 
@@ -198,7 +199,7 @@ async def concordance_task_result(
         if hasattr(task.request, "model_dump")
         else task.request.dict()
     )
-    normalized_request = _normalize_saved_request(req_dict) or {}
+    normalized_request = normalize_saved_request(req_dict) or {}
     _apply_result_query_overrides(normalized_request, query)
     return build_concordance_response(user_id, workspace_id, normalized_request)
 
@@ -210,6 +211,20 @@ async def concordance_task_result_post(
     query: ConcordanceResultQuery,
     current_user: dict = Depends(get_current_user),
 ):
+    """Read concordance result using POST body overrides.
+
+    Used by:
+    - Frontend state-sync route:
+        `POST /workspaces/{id}/concordance/tasks/{id}/result`
+
+    Why:
+    - Preserves compatibility with clients that send result preferences in body
+        payloads instead of query parameters.
+
+        Refactor note:
+        - Mostly duplicates `concordance_task_result`; both routes could delegate to
+            one internal helper and keep only transport-layer differences.
+    """
     user_id = current_user["id"]
     task_manager = get_task_manager(user_id, workspace_id)
     task = task_manager.get_task(task_id)
@@ -231,7 +246,7 @@ async def concordance_task_result_post(
         if hasattr(task.request, "model_dump")
         else task.request.dict()
     )
-    normalized_request = _normalize_saved_request(req_dict) or {}
+    normalized_request = normalize_saved_request(req_dict) or {}
     _apply_result_query_overrides(normalized_request, query)
     return build_concordance_response(user_id, workspace_id, normalized_request)
 
@@ -243,6 +258,16 @@ async def detach_concordance(
     request: ConcordanceDetachRequest,
     current_user: dict = Depends(get_current_user),
 ):
+    """Submit a background task to create a concordance-detached node.
+
+    Used by:
+    - Frontend detach action:
+        `POST /workspaces/{id}/nodes/{node_id}/concordance/detach`
+
+    Why:
+    - Runs potentially expensive row extraction out-of-band and returns task id
+        for progress tracking.
+    """
     user_id = current_user["id"]
     tm = workspace_manager.get_task_manager(user_id, workspace_id)
 

@@ -20,6 +20,7 @@ from ....models import (
     TopicModelingResponse,
 )
 from ..utils import ensure_task_synced, get_workspace_or_404
+from .text_column_prefs import resolve_text_columns_for_nodes
 
 router = APIRouter(prefix="/workspaces", tags=["topic-modeling"])
 
@@ -29,6 +30,15 @@ async def clear_topic_modeling_results(
     workspace_id: str,
     current_user: dict = Depends(get_current_user),
 ):
+    """Clear stored topic-modeling task state for a workspace.
+
+    Used by:
+    - Frontend clear action: `DELETE /workspaces/{id}/topic-modeling`
+
+    Why:
+    - Removes stale result/task pointers before reruns and keeps UI state
+        aligned with backend task registries.
+    """
     user_id = current_user["id"]
     get_workspace_or_404(user_id, workspace_id)
 
@@ -53,6 +63,15 @@ async def run_topic_modeling(
     request: TopicModelingRequest,
     current_user: dict = Depends(get_current_user),
 ):
+    """Submit topic-modeling analysis as a worker-backed background task.
+
+    Used by:
+    - Frontend run route: `POST /workspaces/{id}/topic-modeling`
+
+    Why:
+    - Offloads heavy modeling work to worker processes and returns `task_id`
+        for progress/result polling.
+    """
     user_id = current_user["id"]
     get_workspace_or_404(user_id, workspace_id)
 
@@ -61,49 +80,13 @@ async def run_topic_modeling(
             status_code=400, detail="At least one node ID must be provided"
         )
 
-    requested_node_columns = request.node_columns or {}
-
-    node_columns: dict[str, str] = {}
-    for node_id in request.node_ids:
-        node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
-        if not node:
-            raise HTTPException(status_code=404, detail=f"Node {node_id} not found")
-
-        node_data = getattr(node, "data", None)
-        if not isinstance(node_data, pl.LazyFrame):
-            raise HTTPException(
-                status_code=400,
-                detail=f"Node {node_id} data must be a LazyFrame",
-            )
-
-        available_columns = list(node_data.collect_schema().names())
-        column_name = requested_node_columns.get(node_id)
-        if not column_name:
-            metadata = getattr(node, "metadata", {}) or {}
-            if isinstance(metadata, dict):
-                column_name = metadata.get("text_column")
-            if not column_name:
-                common_text_columns = [
-                    col
-                    for col in ["document", "text", "content", "body", "message"]
-                    if col in available_columns
-                ]
-                if common_text_columns:
-                    column_name = common_text_columns[0]
-
-        if not column_name:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Could not determine text column for node {node_id}. Available columns: {available_columns}",
-            )
-
-        if column_name not in available_columns:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Column '{column_name}' not found in node {node_id}. Available columns: {available_columns}",
-            )
-
-        node_columns[node_id] = column_name
+    node_columns = resolve_text_columns_for_nodes(
+        user_id=user_id,
+        workspace_id=workspace_id,
+        node_ids=request.node_ids,
+        requested_node_columns=request.node_columns or {},
+        persist_preference=True,
+    )
 
     tm = workspace_manager.get_task_manager(user_id, workspace_id)
     # Match token-frequencies behavior: only short-circuit when the same analysis is
@@ -173,6 +156,15 @@ async def topic_modeling_task_result(
     task_id: str,
     current_user: dict = Depends(get_current_user),
 ):
+    """Return current status or final payload for a topic-modeling task.
+
+    Used by:
+    - Frontend polling route:
+        `GET /workspaces/{id}/topic-modeling/tasks/{task_id}/result`
+
+    Why:
+    - Normalizes task lifecycle states into one response contract for UI polling.
+    """
     user_id = current_user["id"]
     get_workspace_or_404(user_id, workspace_id)
 
@@ -219,6 +211,14 @@ async def topic_modeling_task_result(
 
 
 def _resolve_topic_column_name(base_name: str, existing_columns: set[str]) -> str:
+    """Return a unique output column name for detached topic labels.
+
+    Used by:
+    - `detach_topic_modeling`
+
+    Why:
+    - Prevents overwriting source columns when attaching generated topic labels.
+    """
     candidate = base_name.strip() or "topic"
     if candidate not in existing_columns:
         return candidate
@@ -237,6 +237,15 @@ async def topic_modeling_detach_options(
     task_id: str,
     current_user: dict = Depends(get_current_user),
 ):
+    """List detachable node/column options for a completed topic task.
+
+    Used by:
+    - Frontend detach-options route:
+        `GET /workspaces/{id}/topic-modeling/tasks/{task_id}/detach-options`
+
+    Why:
+    - Exposes cached snapshot metadata so users can choose output columns safely.
+    """
     user_id = current_user["id"]
     get_workspace_or_404(user_id, workspace_id)
 
@@ -282,6 +291,16 @@ async def detach_topic_modeling(
     request: TopicModelingDetachRequest,
     current_user: dict = Depends(get_current_user),
 ):
+    """Create detached nodes from cached topic-modeling outputs.
+
+    Used by:
+    - Frontend detach route:
+        `POST /workspaces/{id}/topic-modeling/tasks/{task_id}/detach`
+
+    Why:
+    - Materializes user-selected columns and topic labels as reusable workspace
+        nodes without rerunning the model.
+    """
     user_id = current_user["id"]
     get_workspace_or_404(user_id, workspace_id)
 

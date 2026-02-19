@@ -16,6 +16,15 @@ DEFAULT_SORT_ORDER = "asc"
 
 
 def normalize_context_length(value: Any) -> int:
+    """Normalize quote-context length into bounded integer limits.
+
+    Used by:
+    - quotation request normalization paths
+    - `extract_context_preference`
+
+    Why:
+    - Prevents invalid or oversized context values from destabilizing parsing.
+    """
     try:
         numeric = int(value)
     except TypeError, ValueError:
@@ -30,6 +39,14 @@ def normalize_context_length(value: Any) -> int:
 def normalize_pagination(
     page: Optional[int], page_size: Optional[int]
 ) -> Tuple[int, int]:
+    """Normalize page and page-size inputs for quotation views.
+
+    Used by:
+    - quotation result endpoints before page computation
+
+    Why:
+    - Keeps pagination behavior stable across GET/POST result retrieval flows.
+    """
     normalized_page = max(1, int(page)) if isinstance(page, int) else 1
     try:
         normalized_size = int(page_size) if page_size is not None else DEFAULT_PAGE_SIZE
@@ -41,6 +58,14 @@ def normalize_pagination(
 
 
 def extract_context_preference(record_result: Optional[Dict[str, Any]]) -> int:
+    """Read preferred context length from a stored quotation payload.
+
+    Used by:
+    - quotation result hydration logic
+
+    Why:
+    - Reuses saved UI preferences when users revisit existing analysis tasks.
+    """
     if not record_result:
         return DEFAULT_CONTEXT_LENGTH
     prefs = record_result.get("preferences")
@@ -50,6 +75,14 @@ def extract_context_preference(record_result: Optional[Dict[str, Any]]) -> int:
 
 
 def to_polars_dataframe(data: Any) -> pl.DataFrame:
+    """Convert supported inputs into an eager Polars DataFrame.
+
+    Used by:
+    - `compute_quote_dataframe`
+
+    Why:
+    - Accepts LazyFrame-like and eager sources through one conversion boundary.
+    """
     if isinstance(data, pl.DataFrame):
         return data
     if isinstance(data, pl.LazyFrame):
@@ -69,6 +102,15 @@ def to_polars_dataframe(data: Any) -> pl.DataFrame:
 
 
 def empty_quote_dataframe(text_column: Optional[str] = None) -> pl.DataFrame:
+    """Return an empty quotation-schema DataFrame.
+
+    Used by:
+    - `remote_payload_to_dataframe`
+    - `compute_quote_dataframe`
+
+    Why:
+    - Ensures callers always receive a predictable schema, even with no quotes.
+    """
     columns: Dict[str, pl.Series] = {
         "speaker": pl.Series("speaker", [], dtype=pl.Utf8),
         "speaker_start_idx": pl.Series("speaker_start_idx", [], dtype=pl.Int64),
@@ -94,6 +136,16 @@ def empty_quote_dataframe(text_column: Optional[str] = None) -> pl.DataFrame:
 def ensure_quote_dataframe(
     df: pl.DataFrame, *, text_column: Optional[str] = None
 ) -> pl.DataFrame:
+    """Enforce expected quote dataframe column types and defaults.
+
+    Used by:
+    - `remote_payload_to_dataframe`
+    - `compute_quote_dataframe`
+    - `compute_on_demand_page`
+
+    Why:
+    - Normalizes mixed upstream outputs to a stable schema for API responses.
+    """
     result = df
 
     if "quote_row_idx" not in result.columns:
@@ -134,6 +186,14 @@ def ensure_quote_dataframe(
 def prepare_documents_payload(
     base_df: pl.DataFrame, column: str
 ) -> Dict[str, Dict[str, Any]]:
+    """Build remote-extraction payload documents from a source text column.
+
+    Used by:
+    - `compute_quote_dataframe` for remote quotation engines
+
+    Why:
+    - Adapts tabular node data into the remote service input contract.
+    """
     try:
         series = base_df.get_column(column)
     except pl.ColumnNotFoundError as exc:  # pragma: no cover
@@ -152,6 +212,14 @@ def prepare_documents_payload(
 
 
 def remote_payload_to_dataframe(payload: Dict[str, Any]) -> pl.DataFrame:
+    """Convert remote quotation service payloads into quote rows.
+
+    Used by:
+    - `compute_quote_dataframe`
+
+    Why:
+    - Normalizes service responses to the same structure as local extraction.
+    """
     results = payload.get("results", []) if isinstance(payload, dict) else []
     rows = []
     for entry in results:
@@ -186,6 +254,14 @@ def remote_payload_to_dataframe(payload: Dict[str, Any]) -> pl.DataFrame:
 def stable_document_items(
     documents: Dict[str, Dict[str, Any]],
 ) -> List[Tuple[str, Dict[str, Any]]]:
+    """Return deterministically ordered document items for batching.
+
+    Used by:
+    - `batched_documents`
+
+    Why:
+    - Keeps batch ordering reproducible for pagination and debugging.
+    """
     items: List[Tuple[str, Dict[str, Any]]] = list(documents.items())
 
     def _key(pair: Tuple[str, Dict[str, Any]]) -> Tuple[int, Any]:
@@ -203,6 +279,14 @@ def batched_documents(
     documents: Dict[str, Dict[str, Any]],
     batch_size: int,
 ) -> Iterable[Dict[str, Dict[str, Any]]]:
+    """Yield deterministic document chunks for remote extraction.
+
+    Used by:
+    - `extract_remote_paginated`
+
+    Why:
+    - Splits large requests to honor remote service batch limits.
+    """
     if batch_size <= 0:
         batch_size = len(documents) or 1
 
@@ -220,6 +304,14 @@ async def extract_remote_paginated(
     timeout: float,
     extract_remote_fn,
 ) -> Dict[str, Any]:
+    """Call remote quotation extraction in batches and merge responses.
+
+    Used by:
+    - `compute_quote_dataframe`
+
+    Why:
+    - Avoids oversized single requests while preserving one combined payload.
+    """
     combined_payload: Dict[str, Any] = {"results": []}
     combined_errors: List[Any] = []
     combined_warnings: List[Any] = []
@@ -261,6 +353,14 @@ async def extract_remote_paginated(
 
 
 def quotation_via_polars_text(df: pl.DataFrame, column: str) -> pl.DataFrame:
+    """Extract quotations locally using the `polars_text` plugin.
+
+    Used by:
+    - `compute_quote_dataframe`
+
+    Why:
+    - Provides the in-process quotation path when remote engine is not selected.
+    """
     tmp = df.with_columns(pl.col(column).text.quotation().alias("__quotation__"))
     exploded = tmp.explode("__quotation__")
     return exploded.unnest("__quotation__")
@@ -277,6 +377,14 @@ async def compute_quote_dataframe(
     quotation_service_max_batch_size: int,
     quotation_service_timeout: float,
 ) -> pl.DataFrame:
+    """Compute normalized quote rows for one node/column pair.
+
+    Used by:
+    - quotation API endpoints and on-demand page computation flow
+
+    Why:
+    - Abstracts local vs remote extraction behind one shared contract.
+    """
     if engine.type is QuotationEngineType.REMOTE:
         documents = prepare_documents_payload(base_df, column)
         if not documents:
@@ -316,9 +424,19 @@ async def compute_on_demand_page(
     compute_quote_dataframe_fn,
     normalize_sort_order_fn,
 ) -> Dict[str, Any]:
+    """Compute one on-demand quotation page from source node data.
+
+    Used by:
+    - quotation result endpoints with pagination/sorting
+
+    Why:
+    - Delays expensive quotation extraction to requested slices for responsive
+      UI paging.
+    """
     node_data = getattr(node, "data", None)
     if not isinstance(node_data, pl.LazyFrame):
         raise ValueError("Node data must be a LazyFrame")
+
     lazy_df = node_data
     try:
         schema = lazy_df.collect_schema()

@@ -370,7 +370,7 @@ def test_user():
 async def workspace_id(authenticated_client):
     """Create a test workspace and ensure it's deleted after the test."""
     response = await authenticated_client.post(
-        "/api/workspaces",
+        "/api/workspaces/",
         json={"name": "test_workspace", "description": "Test workspace for analysis"},
     )
     assert response.status_code == 200

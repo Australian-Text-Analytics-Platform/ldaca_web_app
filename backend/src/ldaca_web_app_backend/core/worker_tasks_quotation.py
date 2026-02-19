@@ -18,7 +18,20 @@ def run_quotation_detach_task(
     new_node_name: Optional[str] = None,
     progress_callback: Optional[callable] = None,
 ) -> Dict[str, Any]:
-    """Execute quotation detach in a worker process."""
+    """Execute quotation detach in a worker process.
+
+    Used by:
+    - `core.worker.quotation_detach_task`
+    - `TASK_REGISTRY["quotation_detach"]`
+
+    Why:
+    - Extracts quotations and materializes detached parquet output for node
+      creation in task completion flow.
+
+    Refactor note:
+    - Imports `_compute_quote_dataframe` from API code; extract a shared public
+      helper to reduce worker/API layering coupling.
+    """
     configure_worker_environment()
 
     try:

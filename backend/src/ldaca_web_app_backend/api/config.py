@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from pydantic import BaseModel
 
 from ..settings import settings
@@ -19,7 +19,14 @@ class ConfigUpdate(BaseModel):
 
 @router.get("/", response_model=ConfigResponse)
 async def get_config():
-    """Get global configuration."""
+    """Return currently effective runtime configuration values.
+
+    Used by:
+    - frontend settings/config panels
+
+    Why:
+    - Exposes backend mode and storage root for client configuration UX.
+    """
     return ConfigResponse(
         data_root=str(settings.get_data_root()), multi_user_mode=settings.multi_user
     )
@@ -27,7 +34,18 @@ async def get_config():
 
 @router.post("/", response_model=ConfigResponse)
 async def update_config(config: ConfigUpdate):
-    """Update global configuration."""
+    """Update in-memory runtime configuration values.
+
+    Used by:
+    - frontend config edit flow
+
+    Why:
+    - Allows runtime overrides without process restart.
+
+    Refactor note:
+    - Current update is in-memory only; persist-or-reload strategy may be needed
+        for multi-process or restart-stable configuration behavior.
+    """
     new_path = Path(config.data_root)
 
     # Update settings in memory

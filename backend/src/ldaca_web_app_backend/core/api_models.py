@@ -123,6 +123,13 @@ class OperationResult(BaseModel):
 
 
 # Type aliases for FastAPI route annotations
+# Used by:
+# - route return annotations in workspace API modules
+# Why:
+# - keeps endpoint signatures concise while preserving explicit union response types
+# Refactor note:
+# - these aliases currently have no in-repo consumers; remove if annotation usage
+#   remains absent to reduce dead declarations.
 NodeResponse = Union[NodeSummary, ErrorResponse]
 WorkspaceResponse = Union[WorkspaceGraph, ErrorResponse]
 DataResponse = Union[PaginatedData, ErrorResponse]

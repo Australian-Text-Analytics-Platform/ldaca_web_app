@@ -6,7 +6,6 @@ import polars as pl
 import pytest
 from ldaca_web_app_backend.api.workspaces import nodes as nodes_api
 from ldaca_web_app_backend.api.workspaces import utils as workspace_utils
-from ldaca_web_app_backend.core.docworkspace_api import create_operation_result
 from ldaca_web_app_backend.models import SliceRequest
 
 
@@ -50,26 +49,18 @@ class FakeWorkspaceManager:
         try:
             result = func(*args, **kwargs)
             if isinstance(result, DummyNode):
-                return create_operation_result(
-                    success=True,
-                    message="Operation completed successfully",
-                    node_id=result.id,
-                    data={
+                return (
+                    True,
+                    "Operation completed successfully",
+                    {
                         "node_name": result.name,
                         "data_type": type(result.data).__name__,
+                        "node_id": result.id,
                     },
                 )
-            return create_operation_result(
-                success=True,
-                message="Operation completed successfully",
-                data={"result": result},
-            )
+            return True, "Operation completed successfully", {"result": result}
         except Exception as exc:  # pragma: no cover - defensive guard
-            return create_operation_result(
-                success=False,
-                message=f"Operation failed: {exc}",
-                errors=[str(exc)],
-            )
+            return False, f"Operation failed: {exc}", None
 
 
 @pytest.fixture
@@ -93,9 +84,8 @@ async def test_slice_node_with_offset_and_length(fake_workspace_manager):
         "ws1", "node_base", request, current_user={"id": "user"}
     )
 
-    assert result.success is True
-    assert result.data["node_name"] == "subset_rows"
-    assert result.node_id == "generated_0"
+    assert result["node_name"] == "subset_rows"
+    assert result["node_id"] == "generated_0"
 
     assert len(fake_workspace_manager.add_calls) == 1
     created = fake_workspace_manager.add_calls[0]["node"]
@@ -114,9 +104,8 @@ async def test_slice_node_without_length_uses_tail(fake_workspace_manager):
         "ws1", "node_base", request, current_user={"id": "user"}
     )
 
-    assert result.success is True
-    assert result.data["node_name"] == "base_node_sliced"
-    assert result.node_id == "generated_0"
+    assert result["node_name"] == "base_node_sliced"
+    assert result["node_id"] == "generated_0"
 
     assert len(fake_workspace_manager.add_calls) == 1
     created = fake_workspace_manager.add_calls[0]["node"]

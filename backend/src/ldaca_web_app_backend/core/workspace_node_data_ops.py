@@ -9,7 +9,7 @@ contexts (CLI, task workers) and keeps the HTTP layer thin.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Iterable, Optional, Sequence
+from typing import Iterable, Sequence
 
 import polars as pl
 
@@ -19,7 +19,16 @@ class _NormalizedLazy:
     lazyframe: pl.LazyFrame
 
 
-def _normalize_lazy_data(data: Any) -> _NormalizedLazy:
+def _normalize_lazy_data(data: object) -> _NormalizedLazy:
+    """Validate and normalize node data to the lazy-only contract.
+
+    Used by:
+    - `drop_column`
+    - `rename_column`
+
+    Why:
+    - Enforces backend convention that workspace node data stays lazy.
+    """
     if isinstance(data, pl.LazyFrame):
         return _NormalizedLazy(data)
 
@@ -66,11 +75,24 @@ def _ensure_unique_target(
 
 
 def _schema_names(lazyframe: pl.LazyFrame) -> Iterable[str]:
+    """Return schema column names from a lazyframe.
+
+    Used by:
+    - `drop_column`
+    - `rename_column`
+    """
     return lazyframe.collect_schema().names()
 
 
-def drop_column(data: Any, column_name: str) -> Any:
-    """Return ``data`` without ``column_name`` (lazy-only contract)."""
+def drop_column(data: object, column_name: str) -> object:
+    """Return data with one column removed under lazy-only constraints.
+
+    Used by:
+    - `api.workspaces.base.drop_node_column`
+
+    Why:
+    - Centralizes column removal validation and error semantics.
+    """
 
     normalized = _normalize_lazy_data(data)
     schema_names = tuple(_schema_names(normalized.lazyframe))
@@ -80,8 +102,19 @@ def drop_column(data: Any, column_name: str) -> Any:
     return result_lazy
 
 
-def rename_column(data: Any, column_name: str, new_name: str) -> Any:
-    """Return ``data`` with ``column_name`` renamed to ``new_name`` (lazy-only)."""
+def rename_column(data: object, column_name: str, new_name: str) -> object:
+    """Return data with one column renamed under lazy-only constraints.
+
+    Used by:
+    - `api.workspaces.base.rename_node_column`
+
+    Why:
+    - Reuses consistent validation for existence/uniqueness/name normalization.
+
+    Refactor note:
+    - Name-trimming logic overlaps route-layer trimming; route can delegate fully
+        to this helper and remove duplicate normalization.
+    """
 
     trimmed_name = (new_name or "").strip()
     if not trimmed_name:

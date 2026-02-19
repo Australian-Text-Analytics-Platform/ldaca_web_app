@@ -16,7 +16,16 @@ def run_topic_modeling_task(
     use_ctfidf: bool = False,
     progress_callback: Optional[callable] = None,
 ) -> Dict[str, Any]:
-    """Execute topic modeling in a worker process."""
+    """Execute topic modeling in a worker process.
+
+    Used by:
+    - `core.worker.topic_modeling_task`
+    - `TASK_REGISTRY["topic_modeling"]`
+
+    Why:
+    - Runs BERTopic embedding/modeling out-of-process and returns both user
+      payload and cache data for detach workflows.
+    """
     configure_worker_environment()
 
     try:

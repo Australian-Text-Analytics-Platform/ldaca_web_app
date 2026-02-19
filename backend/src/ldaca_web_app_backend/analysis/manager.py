@@ -16,6 +16,15 @@ from .models import AnalysisStatus, AnalysisTask, BaseAnalysisRequest
 
 
 class TaskManagerStore:
+    """Per-workspace in-memory storage for analysis task records.
+
+    Used by:
+    - `TaskManager`
+
+    Why:
+    - Keeps task persistence lightweight and scoped by `(user_id, workspace_id)`.
+    """
+
     def __init__(self) -> None:
         self.tasks: Dict[str, AnalysisTask] = {}
         self.current_task_ids: Dict[str, str] = {}
@@ -31,9 +40,6 @@ class TaskManagerStore:
 
     def set_current_task(self, tab: str, task_id: str) -> None:
         self.current_task_ids[tab] = task_id
-
-    def get_current_task_id(self, tab: str) -> Optional[str]:
-        return self.current_task_ids.get(tab)
 
     def get_current_task_ids(self, tab: str) -> List[str]:
         task_id = self.current_task_ids.get(tab)
@@ -68,6 +74,14 @@ class TaskManager:
         self.store = _TASK_MANAGER_STORE[self.key]
 
     def create_task(self, request: BaseModel | dict | BaseAnalysisRequest) -> str:
+        """Create and store a new pending analysis task.
+
+        Used by:
+        - analysis route handlers before launching work
+
+        Why:
+        - Gives routes a stable task id and normalized request snapshot.
+        """
         task_id = str(uuid4())
         normalized_request = self._normalize_request(request)
         task = AnalysisTask(
@@ -119,4 +133,12 @@ class TaskManager:
 
 
 def get_task_manager(user_id: str, workspace_id: str) -> TaskManager:
+    """Return the analysis task manager for a user/workspace pair.
+
+    Used by:
+    - analysis API routes and worker result persistence paths
+
+    Why:
+    - Centralizes access to per-workspace in-memory analysis task storage.
+    """
     return TaskManager(user_id, workspace_id)

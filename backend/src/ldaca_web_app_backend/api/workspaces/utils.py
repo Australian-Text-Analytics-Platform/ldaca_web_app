@@ -21,8 +21,18 @@ async def ensure_task_synced(
 ):
     """Sync the in-memory task status with the backend worker task manager.
 
-    If the in-memory task is 'running', this checks the worker (Redis/Celery)
+        If the in-memory task is 'running', this checks the worker
     status and updates the in-memory task if the worker has completed (success/fail).
+
+        Used by:
+        - analysis task-result endpoints that bridge memory store and worker store
+
+        Why:
+        - Keeps legacy in-memory task records consistent with worker completion.
+
+        Refactor note:
+        - Similar sync logic appears across analysis routes; extraction to a shared
+            task-sync service could reduce endpoint duplication.
     """
     task = memory_task_manager.get_task(task_id)
     if not task:
@@ -50,6 +60,14 @@ async def ensure_task_synced(
 
 
 def success(data=None, message: str = "ok", state: str = "successful", **extra):
+    """Build a standardized success payload and sanitize JSON values.
+
+    Used by:
+    - workspace API handlers returning `{state,message,data}` contracts
+
+    Why:
+    - Prevents serialization drift and non-JSON-safe value leaks.
+    """
     payload = {"state": state, "message": message, "data": data}
     if extra:
         payload.update(extra)
@@ -57,10 +75,26 @@ def success(data=None, message: str = "ok", state: str = "successful", **extra):
 
 
 def running(message: str = "running", metadata: Optional[dict] = None):
+    """Shortcut for standardized in-progress response payloads.
+
+    Used by:
+    - task-producing endpoints that return pre-completion status
+
+    Why:
+    - Aligns `running` responses with the same schema as `success`.
+    """
     return success(data=None, message=message, state="running", metadata=metadata or {})
 
 
 def failed(message: str, error: Any = None, status_code: int = 400):
+    """Raise a structured HTTP error payload.
+
+    Used by:
+    - workspace routes and helpers for uniform error surfaces
+
+    Why:
+    - Consolidates API error formatting in one helper.
+    """
     detail = {"message": message}
     if error is not None:
         detail["error"] = str(error)
@@ -145,6 +179,14 @@ def stage_dataframe_as_lazy(
 def get_node_or_404(
     user_id: str, workspace_id: str, node_id: str, detail: Optional[str] = None
 ):
+    """Fetch node from workspace or raise 404.
+
+    Used by:
+    - workspace node and analysis endpoints
+
+    Why:
+    - Avoids repeated existence checks in route handlers.
+    """
     node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
     if not node:
         raise HTTPException(status_code=404, detail=detail or "Node not found")
@@ -157,6 +199,14 @@ def get_node_with_data_or_400(
     node_id: str,
     not_found_detail: Optional[str] = None,
 ):
+    """Fetch node and enforce presence of attached data.
+
+    Used by:
+    - data-transforming workspace endpoints
+
+    Why:
+    - Centralizes validation of required node payload before processing.
+    """
     node = get_node_or_404(user_id, workspace_id, node_id, detail=not_found_detail)
     data = getattr(node, "data", None)
     if data is None:
@@ -169,6 +219,14 @@ def get_workspace_or_404(
     workspace_id: str,
     detail: Optional[str] = None,
 ):
+    """Fetch workspace or raise 404.
+
+    Used by:
+    - workspace-scoped endpoints before filesystem/data operations
+
+    Why:
+    - Removes repeated null checks around workspace retrieval.
+    """
     workspace = workspace_manager.get_workspace(user_id, workspace_id)
     if not workspace:
         raise HTTPException(status_code=404, detail=detail or "Workspace not found")
@@ -176,6 +234,14 @@ def get_workspace_or_404(
 
 
 def _handle_operation_result(result: Any) -> Tuple[bool, str, Any]:  # exported
+    """Normalize operation return shape into `(success, message, object)`.
+
+    Used by:
+    - workspace node operation handlers
+
+    Why:
+    - Supports both tuple-style and object-only operation return conventions.
+    """
     try:
         if isinstance(result, tuple) and len(result) == 3:
             return result  # (success, message, object)
@@ -184,45 +250,11 @@ def _handle_operation_result(result: Any) -> Tuple[bool, str, Any]:  # exported
         return False, f"Unexpected result format: {e}", None
 
 
-def configure_numba_threading():  # moved from base, idempotent
-    import os
-
-    try:
-        import importlib
-
-        numba_spec = importlib.util.find_spec("numba")
-        if not numba_spec:
-            return
-        importlib.import_module("numba")  # type: ignore
-        from numba import config  # type: ignore
-
-        available_layers = getattr(config, "THREADING_LAYER_PRIORITY", [])
-        tbb_available = False
-        if isinstance(available_layers, (list, tuple)):
-            tbb_available = "tbb" in available_layers
-        elif isinstance(available_layers, str):
-            tbb_available = "tbb" in available_layers
-        if not tbb_available and importlib.util.find_spec("tbb"):
-            tbb_available = True
-        if tbb_available:
-            os.environ.setdefault("NUMBA_THREADING_LAYER_PRIORITY", "tbb workqueue omp")
-            os.environ.setdefault("NUMBA_THREADING_LAYER", "tbb")
-        else:
-            os.environ.setdefault("NUMBA_THREADING_LAYER", "workqueue")
-            os.environ.setdefault("NUMBA_THREADING_LAYER_PRIORITY", "workqueue omp tbb")
-            os.environ.setdefault("NUMBA_NUM_THREADS", "1")
-    except Exception:  # pragma: no cover
-        os.environ.setdefault("NUMBA_THREADING_LAYER", "workqueue")
-        os.environ.setdefault("NUMBA_THREADING_LAYER_PRIORITY", "workqueue omp tbb")
-        os.environ.setdefault("NUMBA_NUM_THREADS", "1")
-
-
 __all__ = [
     "success",
     "running",
     "failed",
     "_handle_operation_result",
-    "configure_numba_threading",
     "get_node_or_404",
     "get_node_with_data_or_400",
     "get_workspace_or_404",

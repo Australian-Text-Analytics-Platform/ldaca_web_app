@@ -17,7 +17,14 @@ __all__ = [
 
 
 class QuotationServiceError(RuntimeError):
-    """Raised when the external quotation service cannot satisfy a request."""
+    """Raised when remote quotation extraction fails.
+
+    Used by:
+    - quotation core/worker paths calling remote extraction
+
+    Why:
+    - Provides a domain-specific error type for consistent API translation.
+    """
 
 
 def normalise_engine_base_url(raw_url: str) -> str:
@@ -25,6 +32,12 @@ def normalise_engine_base_url(raw_url: str) -> str:
 
     Accepts roots that may already include `/api/v1/quotation` or `/extract` suffixes
     and trims redundant segments. Trailing slashes are stripped for consistency.
+
+    Used by:
+    - `extract_remote_quotations`
+
+    Why:
+    - Prevents endpoint concatenation bugs from user-supplied base URLs.
     """
 
     base = (raw_url or "").strip()
@@ -52,7 +65,18 @@ async def extract_remote_quotations(
     options: Optional[Dict[str, Any]] = None,
     timeout: Optional[float] = None,
 ) -> Dict[str, Any]:
-    """Invoke the remote quotation engine and return the decoded JSON payload."""
+    """Call remote quotation extraction API and return decoded JSON payload.
+
+    Used by:
+    - `quotation_core.extract_remote_paginated`
+
+    Why:
+    - Encapsulates transport, timeout, and error normalization for remote engine calls.
+
+    Refactor note:
+    - If additional remote analysis engines are added, consider a shared HTTP
+        client abstraction to consolidate retry/auth/error policy.
+    """
 
     if engine.type is not QuotationEngineType.REMOTE:
         raise QuotationServiceError(

@@ -14,7 +14,6 @@ import polars as pl
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ...core.auth import get_current_user
-from ...core.docworkspace_api import DocWorkspaceAPIUtils
 from ...core.expression_parser import ExpressionParseError, build_polars_expression
 from ...core.workspace import workspace_manager
 from ...models import (
@@ -27,6 +26,10 @@ from ...models import (
     FilterRequest,
     SliceRequest,
 )
+from .analyses.text_column_prefs import (
+    guess_text_column,
+    persist_text_column_preference,
+)
 from .utils import _handle_operation_result, get_node_or_404, get_node_with_data_or_400
 
 router = APIRouter(prefix="/workspaces", tags=["nodes"])
@@ -38,6 +41,14 @@ ISO_PATTERN = re.compile(
 
 
 def _parse_temporal(value: Any) -> Any:
+    """Parse ISO-like datetime strings into `datetime` objects when possible.
+
+    Used by:
+    - `_build_filter_expression`
+
+    Why:
+    - Enables temporal comparisons in filter operators.
+    """
     if isinstance(value, str) and ISO_PATTERN.match(value):
         s = value
         if s.endswith("Z"):
@@ -52,6 +63,14 @@ def _parse_temporal(value: Any) -> Any:
 
 
 def _coerce_scalar(value: Any) -> Any:
+    """Coerce string scalars into bool/int/float when safe.
+
+    Used by:
+    - `_build_filter_expression`
+
+    Why:
+    - Keeps query payload values aligned with Polars expression expectations.
+    """
     if isinstance(value, str):
         lowered = value.lower()
         if lowered in {"true", "false"}:
@@ -73,6 +92,15 @@ def _sanitize_column_alias(label: str) -> str:
 
 
 def _resolve_expression_column_name(request: ExpressionTransformRequest) -> str:
+    """Resolve final computed-column name from request expression metadata.
+
+    Used by:
+    - `compute_column_preview`
+    - `compute_column_apply`
+
+    Why:
+    - Keeps naming rules consistent between preview and apply endpoints.
+    """
     candidate = (request.new_column_name or request.expression or "").strip()
     return _sanitize_column_alias(candidate)
 
@@ -230,27 +258,19 @@ def _unwrap_lazyframe(data: Any, *, purpose: str) -> pl.LazyFrame:
 
 
 def _set_text_column(node: Any, text_column: Optional[str]) -> None:
+    """Persist a node text-column preference when available.
+
+    Used by:
+    - `convert_node`
+    - `reset_node_document_column`
+
+    Why:
+    - Delegates metadata persistence to the shared text-column helper so node
+      operations and analysis routes stay aligned.
+    """
     if text_column is None:
         return
-    if hasattr(node, "document"):
-        try:
-            node.document = text_column
-        except Exception:
-            pass
-    if hasattr(node, "set_metadata"):
-        try:
-            node.set_metadata("text_column", text_column)
-            return
-        except Exception:
-            pass
-    metadata = getattr(node, "metadata", None)
-    if not isinstance(metadata, dict):
-        metadata = {}
-    metadata["text_column"] = text_column
-    try:
-        setattr(node, "metadata", metadata)
-    except Exception:
-        pass
+    persist_text_column_preference(node, text_column)
 
 
 def _get_node_display_name(node: Any) -> str:
@@ -540,7 +560,7 @@ async def get_node_info(
     user_id = current_user["id"]
     node = get_node_or_404(user_id, workspace_id, node_id)
     try:
-        return DocWorkspaceAPIUtils.convert_node_info_for_api(node)
+        return node.info()
     except Exception as e:  # pragma: no cover
         raise HTTPException(status_code=500, detail=f"Failed to get node info: {e}")
 
@@ -585,12 +605,10 @@ async def get_node_shape(
     workspace_id: str, node_id: str, current_user: dict = Depends(get_current_user)
 ):
     user_id = current_user["id"]
-    node, data_obj = get_node_with_data_or_400(user_id, workspace_id, node_id)
+    node = get_node_or_404(user_id, workspace_id, node_id)
     try:
-        shape, calculated, doc_wrapper = DocWorkspaceAPIUtils.compute_node_shape(
-            data_obj
-        )
-        return {"shape": shape, "calculated": calculated, "doc_wrapper": doc_wrapper}
+        info = node.info()
+        return {"shape": info["shape"]}
     except Exception as e:  # pragma: no cover
         raise HTTPException(
             status_code=500,
@@ -608,37 +626,15 @@ async def get_column_unique_values(
     user_id = current_user["id"]
     _, data_obj = get_node_with_data_or_400(user_id, workspace_id, node_id)
     try:
-        lazyframe: Optional[pl.LazyFrame] = None
-        if isinstance(data_obj, pl.LazyFrame):
-            lazyframe = data_obj
-
-        schema_map: dict[str, Any] = {}
-        if lazyframe is not None:
-            schema = lazyframe.collect_schema()
-            columns = list(schema.names())
-            schema_map = dict(schema.items())
-        elif hasattr(data_obj, "schema"):
-            schema_obj = data_obj.schema
-            schema_map = (
-                dict(schema_obj.items()) if hasattr(schema_obj, "items") else {}
-            )
-            columns = (
-                list(schema_map.keys()) if schema_map else list(data_obj.schema.keys())
-            )
-        elif hasattr(data_obj, "columns"):
-            columns = list(data_obj.columns)
-        else:
-            raise HTTPException(status_code=400, detail="Cannot determine columns")
+        lazyframe = _unwrap_lazyframe(data_obj, purpose="Get unique column values")
+        schema = lazyframe.collect_schema()
+        columns = list(schema.names())
+        schema_map: dict[str, Any] = dict(schema.items())
         if column_name not in columns:
             raise HTTPException(
                 status_code=404, detail=f"Column '{column_name}' not found"
             )
-        if lazyframe is not None:
-            df = lazyframe.collect()
-        elif hasattr(data_obj, "collect"):
-            df = data_obj.collect()
-        else:
-            df = data_obj
+        df = lazyframe.collect()
         try:
             if _is_string_list_dtype(schema_map.get(column_name)):
                 exploded_series = df.select(
@@ -704,24 +700,15 @@ async def describe_column(
     _, data_obj = get_node_with_data_or_400(user_id, workspace_id, node_id)
 
     try:
-        # Get columns
-        if hasattr(data_obj, "columns"):
-            columns = list(data_obj.columns)
-        elif hasattr(data_obj, "schema"):
-            columns = list(data_obj.schema.keys())
-        else:
-            raise HTTPException(status_code=400, detail="Cannot determine columns")
+        lazyframe = _unwrap_lazyframe(data_obj, purpose="Describe column")
+        columns = list(lazyframe.collect_schema().names())
 
         if column_name not in columns:
             raise HTTPException(
                 status_code=404, detail=f"Column '{column_name}' not found"
             )
 
-        # Collect if lazy
-        if hasattr(data_obj, "collect"):
-            df = data_obj.collect()
-        else:
-            df = data_obj
+        df = lazyframe.collect()
 
         # Check if column is datetime type
         import polars as pl
@@ -845,7 +832,9 @@ async def convert_node(
         operation_name = f"convert_to_{target}"
         if target == "lazyframe":
             lazyframe = _unwrap_lazyframe(data, purpose="Convert to LazyFrame")
-            doc_col = document_column or _guess_doc_column(lazyframe)
+            doc_col = document_column or guess_text_column(
+                available_columns=list(lazyframe.collect_schema().keys())
+            )
             if doc_col:
                 schema = lazyframe.collect_schema()
                 if doc_col not in schema:
@@ -873,29 +862,13 @@ async def convert_node(
         workspace = workspace_manager.get_workspace(user_id, workspace_id)
         if workspace is not None:
             workspace_manager.persist(user_id, workspace_id)
-        return DocWorkspaceAPIUtils.convert_node_info_for_api(src_node)
+        return src_node.info()
     except HTTPException:
         raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Conversion failed: {e}")
-
-
-def _guess_doc_column(data) -> Optional[str]:
-    candidates = ["document", "text", "content", "body", "message"]
-    try:
-        cols = (
-            list(data.collect_schema().keys())
-            if hasattr(data, "collect_schema")
-            else list(getattr(data, "columns", []))
-        )
-        for c in candidates:
-            if c in cols:
-                return c
-    except Exception:
-        return None
-    return None
 
 
 @router.post("/{workspace_id}/nodes/{node_id}/reset-document")
@@ -910,7 +883,9 @@ async def reset_node_document_column(
     try:
         new_data = None
         lazyframe = _unwrap_lazyframe(data, purpose="Reset document column")
-        target_col = document_column or _guess_doc_column(lazyframe)
+        target_col = document_column or guess_text_column(
+            available_columns=list(lazyframe.collect_schema().keys())
+        )
         if not target_col:
             raise HTTPException(
                 status_code=400,
@@ -937,7 +912,7 @@ async def reset_node_document_column(
         workspace = workspace_manager.get_workspace(user_id, workspace_id)
         if workspace is not None:
             workspace_manager.persist(user_id, workspace_id)
-        return DocWorkspaceAPIUtils.convert_node_info_for_api(src_node)
+        return src_node.info()
     except HTTPException:
         raise
     except Exception as e:
@@ -962,7 +937,7 @@ async def update_node_name(
             except Exception:
                 pass
         try:
-            return DocWorkspaceAPIUtils.convert_node_info_for_api(node)  # type: ignore[call-arg]
+            return node.info()
         except Exception:
             return {"id": getattr(node, "id", node_id), "name": new_name}
     except HTTPException:
@@ -1007,7 +982,7 @@ async def copy_node(
         if not new_node:
             raise HTTPException(status_code=500, detail="Failed to copy node")
         try:
-            return DocWorkspaceAPIUtils.convert_node_info_for_api(new_node)  # type: ignore[call-arg]
+            return new_node.info()
         except Exception:
             return {"id": getattr(new_node, "id", None), "name": new_name}
     except HTTPException:
@@ -1041,6 +1016,9 @@ async def filter_node(
         if hasattr(node.data, "filter"):
             filtered_data = node.data.filter(filter_expr)
         else:
+            # LazyFrame-only migration note:
+            # `.lazy()` fallback is for legacy eager nodes and can be removed when
+            # node.data is strictly LazyFrame.
             filtered_data = node.data.lazy().filter(filter_expr)
         new_node_name = request.new_node_name or f"{node.name}_filtered"
         new_node = workspace_manager.add_node_to_workspace(
@@ -1153,6 +1131,8 @@ async def slice_node(
             if hasattr(sliced_data, "slice"):
                 sliced_data = sliced_data.slice(offset, length)
             elif hasattr(sliced_data, "lazy"):
+                # LazyFrame-only migration note:
+                # Legacy eager fallback path for slice; remove in strict mode.
                 sliced_data = sliced_data.lazy().slice(offset, length)
             else:
                 raise ValueError("Node data does not support slicing")
@@ -1332,7 +1312,7 @@ async def concat_nodes(
             operation=operation_label,
             parents=nodes,
         )
-        return DocWorkspaceAPIUtils.convert_node_info_for_api(new_node)
+        return new_node.info()
     except HTTPException:
         raise
     except Exception as exc:
@@ -1489,7 +1469,7 @@ async def join_nodes(
             operation=f"join({left_node.name}, {right_node.name})",
             parents=[left_node, right_node],
         )
-        return DocWorkspaceAPIUtils.convert_node_info_for_api(new_node)
+        return new_node.info()
     except HTTPException:
         raise
     except Exception as e:

@@ -41,6 +41,11 @@ import {
 import { normalizeTypeName } from '../../../utils/columnTypes';
 import { getAnalysisActionState } from '../common/analysisActionState';
 import { useAnalysisHydration } from '../common';
+import {
+  clearAnalysisTaskResults,
+  collectTaskIds,
+  resolveAnalysisTaskId,
+} from '../../../hooks/analysisTaskUtils';
 
 // Component to display unique value count for a column
 interface UniqueValueCountProps {
@@ -201,32 +206,25 @@ const SequentialAnalysisFeature: React.FC = () => {
       return null;
     }
 
-    if (localSequentialTaskId && localSequentialTaskId.trim().length > 0) {
-      return localSequentialTaskId;
-    }
-
     const metadataTaskId =
       (results as any)?.metadata?.task_id ??
       (results as any)?.metadata?.taskId ??
       null;
-    if (typeof metadataTaskId === 'string' && metadataTaskId.trim().length > 0) {
-      setLocalSequentialTaskId(metadataTaskId);
-      return metadataTaskId;
-    }
 
-    try {
-      const headers = getAuthHeaders();
-      const current = await textApi.getAnalysisCurrent(currentWorkspaceId, 'sequential-analysis', headers) as any;
-      const taskId = Array.isArray(current?.task_ids) ? current.task_ids[0] : null;
-      if (typeof taskId === 'string' && taskId.trim().length > 0) {
-        setLocalSequentialTaskId(taskId);
-        return taskId;
-      }
-    } catch {
-      return null;
-    }
-
-    return null;
+    return resolveAnalysisTaskId({
+      candidateIds: [localSequentialTaskId, metadataTaskId],
+      fetchCurrentTaskId: async () => {
+        const headers = getAuthHeaders();
+        const current = (await textApi.getAnalysisCurrent(
+          currentWorkspaceId,
+          'sequential-analysis',
+          headers
+        )) as any;
+        const taskId = Array.isArray(current?.task_ids) ? current.task_ids[0] : null;
+        return typeof taskId === 'string' && taskId.trim().length > 0 ? taskId : null;
+      },
+      onResolved: setLocalSequentialTaskId,
+    });
   }, [currentWorkspaceId, getAuthHeaders, localSequentialTaskId, results]);
 
   const timeCompatibleColumns = useMemo(
@@ -449,28 +447,32 @@ const handleAnalyze = async () => {
 
 const handleUpdateResults = async () => {
     // Clear current results and rerun with new parameters
-    try {
-      if (currentWorkspaceId) {
-        const taskId = await resolveSequentialTaskId();
-        if (taskId) {
-          await textApi.clearTask(currentWorkspaceId, taskId, getAuthHeaders());
-        }
-      }
-    } catch { /* ignore */ }
+    if (currentWorkspaceId) {
+      const taskId = await resolveSequentialTaskId();
+      await clearAnalysisTaskResults({
+        workspaceId: currentWorkspaceId,
+        taskIds: collectTaskIds([localSequentialTaskId, taskId]),
+        clearAnalysisTask: (workspaceId, id) =>
+          textApi.clearTask(workspaceId, id, getAuthHeaders()),
+        warnContext: 'sequential-analysis',
+      });
+    }
     setResults(null);
     // Keep locked state and nodes, just update the analysis with new params
     await handleAnalyze();
   };
 
   const handleClearResults = async () => {
-    try {
-      if (currentWorkspaceId) {
-        const taskId = await resolveSequentialTaskId();
-        if (taskId) {
-          await textApi.clearTask(currentWorkspaceId, taskId, getAuthHeaders());
-        }
-      }
-    } catch { /* ignore */ }
+    if (currentWorkspaceId) {
+      const taskId = await resolveSequentialTaskId();
+      await clearAnalysisTaskResults({
+        workspaceId: currentWorkspaceId,
+        taskIds: collectTaskIds([localSequentialTaskId, taskId]),
+        clearAnalysisTask: (workspaceId, id) =>
+          textApi.clearTask(workspaceId, id, getAuthHeaders()),
+        warnContext: 'sequential-analysis',
+      });
+    }
     setLocalSequentialTaskId(null);
     setResults(null);
     setLockedNodesSnapshot([]);

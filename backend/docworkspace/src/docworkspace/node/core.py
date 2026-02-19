@@ -250,33 +250,33 @@ class Node:
     # Info / serialization (minimal)
     # ------------------------------------------------------------------
     def info(self) -> Dict[str, Any]:
-        """Get node information with raw schema data.
+        """Get JSON-safe node information suitable for API responses.
 
-        Returns raw Polars schema - JSON type conversion should be handled
-        by the API layer, not in the core docworkspace library.
+        All values are plain Python types (str, int, list, dict, None)
+        so the result can be returned directly by FastAPI without
+        additional conversion.
         """
-        dtype = type(self.data)
         info_dict: Dict[str, Any] = {
             "id": self.id,
             "name": self.name,
-            "dtype": dtype,  # Return actual type object - API layer will convert to string
             "operation": self.operation,
             "parent_ids": [p.id for p in self.parents],
             "child_ids": [c.id for c in self.children],
             "lazy": True,
+            "document": self.document,
+            "shape": (0, 0),
+            "schema": {},
+            "columns": [],
         }
-        info_dict["shape"] = (0, 0)
-        info_dict["schema"] = {}
         try:
             lf = _unwrap_lazyframe(self.data)
+            schema = lf.collect_schema()
             height = lf.select(pl.len()).collect().item()
-            width = len(lf.collect_schema().names())
-            info_dict["shape"] = (height, width)
-            info_dict["schema"] = lf.collect_schema()
+            info_dict["shape"] = (height, len(schema.names()))
+            info_dict["schema"] = {col: str(dtype) for col, dtype in schema.items()}
+            info_dict["columns"] = list(schema.names())
         except Exception:
             pass
-        if self.document is not None:
-            info_dict["document"] = self.document
         return info_dict
 
     def serialize(self, format: str = "json") -> Dict[str, Any]:

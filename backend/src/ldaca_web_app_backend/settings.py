@@ -105,25 +105,64 @@ class Settings(BaseSettings):
     )
 
     def get_data_root(self) -> Path:
-        """Get DATA_ROOT as absolute Path."""
+        """Return configured data root path.
+
+        Used by:
+        - startup initialization, file utilities, DB URL derivation
+
+        Why:
+        - Centralizes conversion from env-config value to `Path` object.
+        """
         return Path(self.data_root)
 
     def get_user_data_folder(self) -> Path:
-        """Get user data folder absolute path (DATA_ROOT/user_data_folder)."""
+        """Return user data base folder path under data root.
+
+        Used by:
+        - user/file/workspace folder helpers
+
+        Why:
+        - Keeps all user-owned storage rooted under one configurable path.
+        """
         return self.get_data_root() / self.user_data_folder
 
     def get_sample_data_folder(self) -> Path | None:
-        """Get optional sample data folder override as a Path."""
+        """Return optional sample-data override path.
+
+        Used by:
+        - sample-data import/setup utilities
+
+        Why:
+        - Supports external dataset bundles without code changes.
+        """
         if not self.sample_data:
             return None
         return Path(self.sample_data)
 
     def get_database_backup_folder(self) -> Path:
-        """Get database backup folder absolute path (DATA_ROOT/database_backup_folder)."""
+        """Return database backup folder path under data root.
+
+        Used by:
+        - backup and maintenance tooling
+
+        Why:
+        - Keeps backup location configurable and co-located with runtime data.
+        """
         return self.get_data_root() / self.database_backup_folder
 
     def get_database_url(self) -> str:
-        """Return effective database URL, deriving from DATA_ROOT if not provided."""
+        """Return effective database URL, deriving SQLite path when omitted.
+
+        Used by:
+        - `db.py` engine initialization
+
+        Why:
+        - Allows simple local setup while supporting explicit DB URLs in deploys.
+
+        Refactor note:
+        - `secret_key` default value is placeholder-grade; enforce env-provided
+            secret in production startup validation to reduce misconfiguration risk.
+        """
         if self.database_url and self.database_url.strip():
             return self.database_url
         # Construct a sqlite URL under DATA_ROOT/database_file

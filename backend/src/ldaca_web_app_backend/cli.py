@@ -8,7 +8,18 @@ import sys
 
 
 def main():
-    """Main entry point for the CLI."""
+        """Start backend server from packaged/CLI runtime entrypoint.
+
+        Used by:
+        - `if __name__ == "__main__"` execution path in packaged and local CLI runs
+
+        Why:
+        - Coordinates startup logging, signal handling, and uvicorn app launch.
+
+        Refactor note:
+        - Function is large and handles logging/process/signal/server concerns;
+            splitting into focused helpers would improve maintainability.
+        """
     # Setup file logging immediately for packaged app debugging
     import os
     from pathlib import Path
@@ -64,7 +75,14 @@ def main():
 
     # Setup cleanup handlers for child processes
     def cleanup_child_processes():
-        """Clean up any child processes on shutdown."""
+        """Terminate worker pool and child processes during shutdown.
+
+        Used by:
+        - signal handlers and `atexit` cleanup registration
+
+        Why:
+        - Prevents orphaned workers when desktop shell exits.
+        """
         try:
             # Shutdown worker pool if it exists
             from ldaca_web_app_backend.core.worker import get_worker_pool
@@ -110,7 +128,14 @@ def main():
             print(f"Warning: Error during child process cleanup: {e}")
 
     def signal_handler(signum, frame):
-        """Handle shutdown signals."""
+        """Handle termination signals with graceful cleanup.
+
+        Used by:
+        - SIGINT/SIGTERM/SIGQUIT registrations
+
+        Why:
+        - Ensures worker cleanup runs before process exit.
+        """
         print(f"\nReceived signal {signum}, shutting down gracefully...")
         cleanup_child_processes()
         sys.exit(0)

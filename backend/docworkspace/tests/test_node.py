@@ -119,26 +119,23 @@ class TestNode:
         assert head_node.parents[0] == node
 
     def test_node_info(self, sample_df):
-        """Test node info method."""
+        """Test node info method returns JSON-safe dict."""
         workspace = Workspace("test_workspace")
         node = Node(sample_df, "test_node", workspace, operation="load")
 
         info = node.info()
 
         assert info["name"] == "test_node"
-        assert info["dtype"] == pl.LazyFrame
         assert info["operation"] == "load"
         assert info["shape"] == (3, 2)
-        assert "schema" in info  # Schema should be present instead of columns
-        assert len(info["schema"]) == 2  # Should have 2 columns
-        assert info.get("document") is None
-
-        # Test that info returns raw types (no JSON conversion in core library)
-        raw_info = node.info()
-        # dtype should be the actual type object, not a string
-        assert raw_info["dtype"] == pl.LazyFrame
-        # schema should be raw Polars schema, not converted to JS types
-        assert hasattr(raw_info["schema"], "items")  # Polars schema has items() method
+        assert info["document"] is None
+        assert info["lazy"] is True
+        # Schema should be a dict of column name -> string type
+        assert isinstance(info["schema"], dict)
+        assert len(info["schema"]) == 2
+        assert all(isinstance(v, str) for v in info["schema"].values())
+        # Columns should be a list of column names
+        assert info["columns"] == ["text", "value"]
 
     def test_node_repr(self, sample_df):
         """Test string representation of Node."""

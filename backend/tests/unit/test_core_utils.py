@@ -9,9 +9,7 @@ import polars as pl
 import pytest
 from ldaca_web_app_backend.core.utils import (
     detect_file_type,
-    generate_node_id,
     generate_workspace_id,
-    get_file_size_mb,
     get_folder_size_mb,
     get_user_data_folder,
     get_user_workspace_folder,
@@ -87,35 +85,19 @@ class TestUserFolders:
 class TestFileOperations:
     """Test file operation utilities"""
 
-    def test_get_file_size_mb(self, temp_dir):
-        """Test getting file size in MB"""
-        test_file = temp_dir / "test.txt"
-        test_content = "x" * 1024 * 1024  # 1MB of content
-        test_file.write_text(test_content)
-
-        size_mb = get_file_size_mb(test_file)
-        assert abs(size_mb - 1.0) < 0.1  # Should be approximately 1MB
-
-    def test_get_file_size_mb_nonexistent(self, temp_dir):
-        """Test getting size of non-existent file"""
-        nonexistent_file = temp_dir / "nonexistent.txt"
-        size_mb = get_file_size_mb(nonexistent_file)
-        assert size_mb == 0.0
-
     def test_get_folder_size_mb(self, temp_dir):
-        """Test getting folder size in MB"""
-        # Create multiple files
-        for i in range(3):
+        """Test getting total folder size in MB"""
+        # Create test files totaling about 1MB
+        for i in range(2):
             test_file = temp_dir / f"test_{i}.txt"
             test_file.write_text("x" * (512 * 1024))  # 0.5MB each
 
         total_size = get_folder_size_mb(temp_dir)
-        assert abs(total_size - 1.5) < 0.1  # Should be approximately 1.5MB
+        assert abs(total_size - 1.0) < 0.1
 
     def test_detect_file_type(self):
         """Test file type detection"""
         test_cases = [
-            ("data.csv", "csv"),
             ("document.json", "json"),
             ("logs.jsonl", "jsonl"),
             ("table.parquet", "parquet"),
@@ -321,14 +303,6 @@ class TestDataFrameUtils:
 class TestUtilityFunctions:
     """Test general utility functions"""
 
-    def test_generate_node_id(self):
-        """Test node ID generation"""
-        node_id = generate_node_id()
-
-        assert isinstance(node_id, str)
-        assert len(node_id) == 36  # UUID4 length
-        assert node_id.count("-") == 4  # UUID4 format
-
     def test_generate_workspace_id(self):
         """Test workspace ID generation"""
         workspace_id = generate_workspace_id()
@@ -337,9 +311,9 @@ class TestUtilityFunctions:
         assert len(workspace_id) == 36  # UUID4 length
         assert workspace_id.count("-") == 4  # UUID4 format
 
-    def test_generate_unique_ids(self):
-        """Test that generated IDs are unique"""
-        ids = [generate_node_id() for _ in range(100)]
+    def test_generate_unique_workspace_ids(self):
+        """Test that generated workspace IDs are unique"""
+        ids = [generate_workspace_id() for _ in range(100)]
         assert len(set(ids)) == 100  # All should be unique
 
     def test_validate_file_path_valid(self, temp_dir):

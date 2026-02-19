@@ -22,7 +22,14 @@ router = APIRouter(prefix="/workspaces", tags=["workspace-tasks"])
 async def list_workspace_tasks(
     workspace_id: str, current_user: dict = Depends(get_current_user)
 ):
-    """List tasks for this workspace and current user."""
+    """List worker tasks for a workspace.
+
+    Used by:
+    - frontend task manager panel and polling views
+
+    Why:
+    - Exposes normalized task state for cancellation/clear operations.
+    """
     user_id = current_user["id"]
     tm = workspace_manager.get_task_manager(user_id, workspace_id)
     data = await tm.list()
@@ -40,7 +47,14 @@ async def cancel_workspace_tasks(
     task_id: Optional[str] = None,
     current_user: dict = Depends(get_current_user),
 ):
-    """Cancel tasks for this workspace. If task_id provided, cancel only that task. Otherwise cancel all running tasks, optionally filtered by task_type."""
+    """Cancel workspace tasks by id or by optional type filter.
+
+    Used by:
+    - frontend task controls
+
+    Why:
+    - Supports both granular and bulk task interruption from one endpoint.
+    """
     user_id = current_user["id"]
     tm = workspace_manager.get_task_manager(user_id, workspace_id)
     if task_id:
@@ -67,8 +81,19 @@ async def clear_workspace_tasks(
 ):
     """Clear (remove) task records for this workspace. This only removes task tracking records, not analysis results.
 
-    If task_id provided, clear only that task. Otherwise clear all completed tasks, optionally filtered by task_type.
+        If task_id provided, clear only that task. Otherwise clear all completed tasks,
+        optionally filtered by task_type.
     Analysis results are preserved and only task records are removed from memory.
+
+        Used by:
+        - frontend cleanup actions after completed/failed analyses
+
+        Why:
+        - Lets users reset task lists without deleting persisted analysis outputs.
+
+        Refactor note:
+        - Shares response schema with cancel endpoint; small response helper could
+            reduce repeated payload construction.
     """
     user_id = current_user["id"]
     tm = workspace_manager.get_task_manager(user_id, workspace_id)

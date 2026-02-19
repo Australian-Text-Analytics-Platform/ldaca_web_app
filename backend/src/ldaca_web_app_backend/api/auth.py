@@ -32,6 +32,12 @@ async def get_auth_info(authorization: Optional[str] = Header(None)):
     - In single-user mode: authenticated=True with root user info
     - In multi-user mode with valid token: authenticated=True with user info
     - In multi-user mode without token: authenticated=False with available auth methods
+
+    Used by:
+    - frontend app bootstrap auth probe
+
+    Why:
+    - Provides one canonical auth capability + identity payload per startup.
     """
     if not settings.multi_user:
         # Single-user mode - return root user directly
@@ -90,7 +96,14 @@ async def get_auth_info(authorization: Optional[str] = Header(None)):
 
 @router.post("/google", response_model=GoogleOut)
 async def google_auth(payload: GoogleIn):
-    """Google OAuth authentication - only available in multi-user mode"""
+    """Authenticate user via Google OAuth and create app session tokens.
+
+    Used by:
+    - frontend Google sign-in flow
+
+    Why:
+    - Bridges Google ID token verification with local user/session provisioning.
+    """
     if not settings.multi_user:
         raise HTTPException(
             status_code=400,
@@ -171,7 +184,14 @@ async def google_auth(payload: GoogleIn):
 
 @router.get("/me", response_model=UserResponse)
 async def get_current_user_info(current_user: dict = Depends(get_current_user)):
-    """Get current user information"""
+    """Return normalized current user profile fields.
+
+    Used by:
+    - frontend profile/session widgets
+
+    Why:
+    - Provides stable user response shape independent of DB row types.
+    """
     # Convert datetime objects to ISO format strings
     created_at_str = (
         current_user["created_at"].isoformat() if current_user["created_at"] else ""
@@ -194,7 +214,14 @@ async def get_current_user_info(current_user: dict = Depends(get_current_user)):
 
 @router.post("/logout")
 async def logout(current_user: dict = Depends(get_current_user)):
-    """Logout current user - only meaningful in multi-user mode"""
+    """Logout current user session (multi-user) or no-op (single-user).
+
+    Used by:
+    - frontend sign-out action
+
+    Why:
+    - Keeps logout behavior mode-aware while preserving shared endpoint contract.
+    """
     if not settings.multi_user:
         return {"message": "Logout not applicable in single-user mode"}
 
@@ -205,7 +232,14 @@ async def logout(current_user: dict = Depends(get_current_user)):
 
 @router.get("/status")
 async def auth_status(current_user: dict = Depends(get_current_user)):
-    """Check if user is authenticated"""
+    """Return minimal authenticated status payload.
+
+    Used by:
+    - lightweight frontend auth status checks
+
+    Why:
+    - Allows cheap auth verification without full `get_auth_info` metadata.
+    """
     response = {
         "authenticated": True,
         "user": {
@@ -222,61 +256,16 @@ async def auth_status(current_user: dict = Depends(get_current_user)):
     return response
 
 
-@router.get("/debug/token")
-async def debug_token_validation(authorization: str = Header(None)):
-    """Debug endpoint to check token validation (remove in production)"""
-    if not authorization:
-        return {"error": "No authorization header", "header": None}
-
-    try:
-        # Extract token from "Bearer <token>"
-        token = (
-            authorization.split(" ")[1]
-            if authorization.startswith("Bearer ")
-            else authorization
-        )
-
-        from ..db import validate_access_token
-
-        user = await validate_access_token(token)
-
-        if user:
-            return {
-                "token_valid": True,
-                "user_id": user["id"],
-                "email": user["email"],
-                "token_preview": f"{token[:10]}...{token[-10:]}",
-            }
-        else:
-            return {
-                "token_valid": False,
-                "token_preview": f"{token[:10]}...{token[-10:]}"
-                if len(token) > 20
-                else token,
-                "message": "Token not found in database or expired",
-            }
-    except Exception as e:
-        return {
-            "error": str(e),
-            "token_preview": authorization[:20] if authorization else None,
-        }
-
-
-@router.options("/google")
-async def google_auth_options():
-    """Handle preflight requests for Google auth"""
-    return {"message": "OK"}
-
-
-@router.options("/status")
-async def auth_status_options():
-    """Handle preflight requests for auth status"""
-    return {"message": "OK"}
-
-
 @router.get("/health")
 async def auth_health():
-    """Authentication health check - no auth required"""
+    """Return authentication subsystem readiness metadata.
+
+    Used by:
+    - health/status probes and diagnostics pages
+
+    Why:
+    - Exposes auth mode and endpoint availability without authentication.
+    """
     return {
         "status": "healthy",
         "mode": "single-user" if not settings.multi_user else "multi-user",

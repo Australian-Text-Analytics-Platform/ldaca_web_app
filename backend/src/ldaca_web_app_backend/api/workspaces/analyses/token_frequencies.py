@@ -3,7 +3,6 @@
 Paths preserved exactly as /workspaces/{workspace_id}/token-frequencies*.
 """
 
-import polars as pl
 from fastapi import APIRouter, Depends, HTTPException
 
 from ....analysis.implementations.token_frequency import (
@@ -17,6 +16,7 @@ from ....core.auth import get_current_user
 from ....core.workspace import workspace_manager
 from ....models import TokenFrequencyRequest, TokenFrequencyResponse
 from ..utils import ensure_task_synced, get_workspace_or_404
+from .text_column_prefs import resolve_text_columns_for_nodes
 
 # This router uses the same '/workspaces' prefix as the base router so paths are identical
 # to their original definitions when included at top level.
@@ -29,6 +29,15 @@ _STOP_WORDS_UNSET = object()
 
 
 def _coerce_limit_value(value) -> int:
+    """Coerce token-limit input to a safe positive integer.
+
+    Used by:
+    - `_normalize_limit_payload`
+    - `_prepare_result_blob`
+
+    Why:
+    - Keeps request/result metadata stable even when clients send invalid values.
+    """
     try:
         candidate = int(value)  # type: ignore[arg-type]
     except TypeError, ValueError:
@@ -36,23 +45,16 @@ def _coerce_limit_value(value) -> int:
     return candidate if candidate > 0 else DEFAULT_TOKEN_LIMIT
 
 
-def _persist_text_column(node, column_name: str, user_id: str, workspace_id: str):
-    """Persist the chosen text column on node metadata for future analyses."""
-    try:
-        if hasattr(node, "set_metadata"):
-            node.set_metadata("text_column", column_name)
-        else:
-            metadata = getattr(node, "metadata", None)
-            if not isinstance(metadata, dict):
-                metadata = {}
-            metadata["text_column"] = column_name
-            setattr(node, "metadata", metadata)
-        workspace_manager.persist(user_id, workspace_id)
-    except Exception:
-        pass
-
-
 def _normalize_limit_payload(payload: dict | None) -> dict:
+    """Normalize persisted token-frequency request preferences.
+
+    Used by:
+    - `_prepare_result_blob`
+
+    Why:
+    - Ensures downstream result composition always has canonical
+      `token_limit` and `stop_words` values.
+    """
     if not isinstance(payload, dict):
         limit = DEFAULT_TOKEN_LIMIT
         return {
@@ -76,6 +78,15 @@ def _prepare_result_blob(
     limit_override: int | None = None,
     stop_words_override=_STOP_WORDS_UNSET,
 ):
+    """Merge stored output with normalized token preference metadata.
+
+    Used by:
+    - `token_frequencies_task_result`
+    - `update_token_frequencies_task_result`
+
+    Why:
+    - Ensures read and update endpoints emit the same response schema.
+    """
     normalized_request = _normalize_limit_payload(request_payload)
     # Build shallow copies so callers can mutate without affecting stored state
     normalized_result = {**result_blob}
@@ -153,13 +164,18 @@ def _prepare_result_blob(
 
 
 def _unwrap_task_manager_result(result_dict: dict) -> dict:
-    """Handle the WorkerTaskManager result wrapper.
+    """Unwrap worker payloads from task-manager envelope shapes.
 
-    For worker-backed tasks, analysis_store may contain a wrapper like:
-      {"status": "successful", "message": "...", "data": <worker_result>}
+    Used by:
+    - `token_frequencies_task_result`
+    - `update_token_frequencies_task_result`
 
-    For historical/synchronous paths, analysis_store may contain the final
-    response payload directly.
+    Why:
+    - Worker and legacy paths persist different wrapper formats.
+
+        Refactor note:
+        - Similar unwrapping exists in multiple analysis routers; this helper could
+            be removed after extracting a shared utility in analysis router utils.
     """
 
     if not isinstance(result_dict, dict):
@@ -180,7 +196,15 @@ async def token_frequencies_task_result(
     task_id: str,
     current_user: dict = Depends(get_current_user),
 ):
-    """Return a normalized token frequency result for a task id."""
+    """Return normalized token-frequency result payload for one task.
+
+    Used by:
+    - Frontend polling route:
+        `GET /workspaces/{id}/token-frequencies/tasks/{id}/result`
+
+    Why:
+    - Rehydrates completed background tasks with stable preference metadata.
+    """
     user_id = current_user["id"]
     task_manager = get_task_manager(user_id, workspace_id)
 
@@ -216,7 +240,15 @@ async def update_token_frequencies_task_result(
     updates: dict | None,
     current_user: dict = Depends(get_current_user),
 ):
-    """Update stored token frequency preferences for a task id."""
+    """Persist token-frequency preference overrides on an existing task.
+
+    Used by:
+    - Frontend preference updates route:
+        `POST /workspaces/{id}/token-frequencies/tasks/{id}/result`
+
+    Why:
+    - Updates UI preferences without re-running token computation.
+    """
     user_id = current_user["id"]
     task_manager = get_task_manager(user_id, workspace_id)
     task = task_manager.get_task(task_id)
@@ -272,7 +304,13 @@ async def calculate_token_frequencies(
     request: TokenFrequencyRequest,
     current_user: dict = Depends(get_current_user),
 ):
-    """Start token frequency analysis in a background worker process.
+    """Submit token-frequency analysis as a worker-backed task.
+
+    Used by:
+    - Frontend run route: `POST /workspaces/{id}/token-frequencies`
+
+    Why:
+    - Offloads CPU-heavy token counting and returns `task_id` for polling.
 
     Mirrors the concordance/topic-modeling convention:
     - POST submits a process-backed task and returns a task_id (state=running)
@@ -327,46 +365,13 @@ async def calculate_token_frequencies(
         user_id, workspace_id, detail=f"Workspace {workspace_id} not found"
     )
 
-    validated_columns: dict[str, str] = {}
-    for node_id in request.node_ids:
-        node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
-        if not node:
-            raise HTTPException(status_code=404, detail=f"Node {node_id} not found")
-
-        node_data = getattr(node, "data", None)
-        if not isinstance(node_data, pl.LazyFrame):
-            raise HTTPException(
-                status_code=400,
-                detail=f"Node {node_id} data must be a LazyFrame",
-            )
-        available_columns = list(node_data.collect_schema().names())
-
-        column_name = request.node_columns.get(node_id)
-        if not column_name:
-            metadata = getattr(node, "metadata", {}) or {}
-            if isinstance(metadata, dict):
-                column_name = metadata.get("text_column")
-        if not column_name:
-            for col in ["document", "text", "content", "body", "message"]:
-                if col in available_columns:
-                    column_name = col
-                    break
-        if not column_name:
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    f"Could not determine text column for node {node_id}. Available columns: {available_columns}"
-                ),
-            )
-        if column_name not in available_columns:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Column '{column_name}' not found in node {node_id}. Available columns: {available_columns}",
-            )
-
-        # Persist chosen document column for future analyses (lightweight)
-        _persist_text_column(node, column_name, user_id, workspace_id)
-        validated_columns[node_id] = column_name
+    validated_columns = resolve_text_columns_for_nodes(
+        user_id=user_id,
+        workspace_id=workspace_id,
+        node_ids=request.node_ids,
+        requested_node_columns=request.node_columns,
+        persist_preference=True,
+    )
 
     # Stop words are UI-only preferences; persist them but do not apply to compute.
     requested_stop_words = sanitize_stop_words(request.stop_words)

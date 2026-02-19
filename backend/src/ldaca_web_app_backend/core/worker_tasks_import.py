@@ -14,7 +14,19 @@ def run_ldaca_import_task(
     filename: Optional[str] = None,
     progress_callback: Optional[callable] = None,
 ) -> Dict[str, Any]:
-    """Execute LDaCA import in a worker process."""
+    """Execute LDaCA dataset import in a worker process.
+
+    Used by:
+    - `core.worker.ldaca_import_task`
+    - `TASK_REGISTRY["ldaca_import"]`
+
+    Why:
+    - Performs download/extract/convert/save steps off the API thread.
+
+    Refactor note:
+    - URL-derived filename normalization logic is substantial; extracting a
+      small pure helper would simplify this function and improve testability.
+    """
     configure_worker_environment()
 
     try:

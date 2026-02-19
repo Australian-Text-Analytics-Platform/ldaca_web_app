@@ -52,6 +52,12 @@ def _run_sequential_analysis(
 ) -> pl.DataFrame:
     """Pure-Polars implementation of sequential analysis.
 
+    Used by:
+    - `run_sequential_analysis`
+
+    Why:
+    - Keeps binning/grouping logic independent from route orchestration.
+
     Groups records by time period (datetime truncation or numeric binning),
     counts occurrences per group, and returns a DataFrame with aggregated
     results.  No text-processing dependency required.
@@ -230,7 +236,14 @@ async def run_sequential_analysis(
     request: SequentialAnalysisRequest,
     current_user: dict = Depends(get_current_user),
 ):
-    """Run sequential analysis on a node with polars-text integration."""
+    """Run sequential analysis for one node and persist/update task payload.
+
+    Used by:
+    - frontend sequential-analysis run action
+
+    Why:
+    - Produces aggregated time-series counts and stores them as current task data.
+    """
     user_id = current_user["id"]
     get_workspace_or_404(user_id, workspace_id)
 
@@ -440,6 +453,18 @@ async def update_sequential_analysis_task_result(
     updates: dict | None,
     current_user: dict = Depends(get_current_user),
 ):
+    """Persist display-only sequential analysis options on a saved task.
+
+    Used by:
+    - frontend chart-type preference updates
+
+    Why:
+    - Avoids recomputation when only chart presentation changes.
+
+    Refactor note:
+    - Mirrors preference update behavior in other analyses; a shared
+        task-preferences helper could reduce duplication.
+    """
     user_id = current_user["id"]
     task_manager = get_task_manager(user_id, workspace_id)
     task = task_manager.get_task(task_id)

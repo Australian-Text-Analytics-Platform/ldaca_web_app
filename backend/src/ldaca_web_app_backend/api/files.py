@@ -39,6 +39,12 @@ def _read_sample_folder_readme(readme_path: Path) -> Optional[str]:
 
     Returns markdown text or None when no readable README exists.
     Applies a hard size cap to keep /files payload bounded.
+
+    Used by:
+    - `get_user_files`
+
+    Why:
+    - Attaches dataset-level README context without unbounded payload growth.
     """
     if not readme_path.exists() or not readme_path.is_file():
         return None
@@ -73,6 +79,12 @@ def _lazy_scan(file_path, file_type: str) -> pl.LazyFrame:
 
     Prefers scan_* readers to avoid loading the whole file into memory.
     Falls back to eager read + .lazy() for formats without a native scanner.
+
+    Used by:
+    - `unified_file_preview`
+
+    Why:
+    - Keeps preview path memory-efficient for large tabular files.
     """
     ft = (file_type or "").lower()
     if ft == "csv":
@@ -105,7 +117,14 @@ def _lazy_scan(file_path, file_type: str) -> pl.LazyFrame:
 
 
 def _get_supported_types_by_extension(file_type: str) -> List[str]:
-    """Return supported data types for a given file type/extension."""
+    """Return supported backend data representations by file extension.
+
+    Used by:
+    - `unified_file_preview`
+
+    Why:
+    - Exposes deterministic frontend capability hints per file type.
+    """
 
     ft = (file_type or "").lower()
     mapping: Dict[str, List[str]] = {
@@ -124,12 +143,27 @@ def _get_supported_types_by_extension(file_type: str) -> List[str]:
 
 
 def _read_excel_sheet(file_path: Path, sheet_name: str) -> pl.DataFrame:
+    """Read one Excel sheet as eager Polars DataFrame.
+
+    Used by:
+    - `unified_file_preview`
+
+    Why:
+    - Isolates sheet-level reads for preview pagination.
+    """
     return pl.read_excel(file_path, sheet_name=sheet_name)
 
 
 @router.get("/")
 async def get_user_files(current_user: dict = Depends(get_current_user)):
-    """Get user's files with path metadata and totals"""
+    """List user-visible files with metadata and sample README context.
+
+    Used by:
+    - frontend file browser panel
+
+    Why:
+    - Provides one aggregate listing endpoint for user + sample content trees.
+    """
     user_id = current_user["id"]
     data_folder = get_user_data_folder(user_id)
 
@@ -265,7 +299,14 @@ async def import_ldaca_dataset(
     request: LDaCAImportRequest,
     current_user: dict = Depends(get_current_user),
 ):
-    """Import a dataset from LDaCA using a zip URL as a background task."""
+    """Submit background task to import LDaCA dataset from URL.
+
+    Used by:
+    - frontend dataset import action
+
+    Why:
+    - Runs network/download/import pipeline outside request-response lifecycle.
+    """
     user_id = current_user["id"]
     try:
         # Files import must be independent of workspace routing and always use
@@ -294,7 +335,14 @@ async def import_ldaca_dataset(
 
 @router.get("/tasks")
 async def list_files_tasks(current_user: dict = Depends(get_current_user)):
-    """List files-scope tasks for this user."""
+    """List worker tasks scoped to file operations.
+
+    Used by:
+    - frontend import-task status polling
+
+    Why:
+    - Separates file-import task stream from workspace-analysis task stream.
+    """
     user_id = current_user["id"]
     tm = workspace_manager.get_task_manager(user_id, FILES_TASK_SCOPE)
     data = await tm.list(user_id=user_id, workspace_id=FILES_TASK_SCOPE)
@@ -311,7 +359,14 @@ async def cancel_files_tasks(
     task_id: Optional[str] = None,
     current_user: dict = Depends(get_current_user),
 ):
-    """Cancel files-scope tasks for this user."""
+    """Cancel one or many file-scope worker tasks.
+
+    Used by:
+    - frontend import task cancellation controls
+
+    Why:
+    - Provides operational control for long-running remote imports.
+    """
     user_id = current_user["id"]
     tm = workspace_manager.get_task_manager(user_id, FILES_TASK_SCOPE)
     if task_id:
@@ -339,7 +394,14 @@ async def clear_files_tasks(
     task_id: Optional[str] = None,
     current_user: dict = Depends(get_current_user),
 ):
-    """Clear files-scope task records for this user."""
+    """Clear persisted file-scope task records.
+
+    Used by:
+    - frontend task-list cleanup actions
+
+    Why:
+    - Removes completed/failed task clutter while keeping imported artifacts.
+    """
     user_id = current_user["id"]
     tm = workspace_manager.get_task_manager(user_id, FILES_TASK_SCOPE)
     if task_id:
@@ -370,6 +432,12 @@ async def unified_file_preview(
     - Returns supported types based on extension.
     - Provides preview data (first few rows or page slice).
     - For Excel files, returns sheet_names and supports selecting sheet via payload.sheet_name.
+
+    Used by:
+    - frontend file preview modal/table
+
+    Why:
+    - Provides one format-aware preview API for heterogeneous file types.
     """
     user_id = current_user["id"]
     data_folder = get_user_data_folder(user_id)

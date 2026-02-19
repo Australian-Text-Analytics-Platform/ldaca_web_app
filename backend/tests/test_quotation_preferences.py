@@ -168,7 +168,15 @@ async def test_quotation_current_result_respects_page_params(
 ):
     task_id = seeded_paginated_quotation
 
-    async def fake_compute(node, base_df, column, engine, *, use_base_only=False):
+    async def fake_compute(
+        node,
+        base_df,
+        column,
+        engine,
+        *,
+        use_base_only=False,
+        **_kwargs,
+    ):
         doc_texts = base_df.get_column(column).to_list()
         rows = []
         for text in doc_texts:
@@ -179,7 +187,7 @@ async def test_quotation_current_result_respects_page_params(
         return pl.DataFrame(rows)
 
     monkeypatch.setattr(
-        "ldaca_web_app_backend.api.workspaces.analyses.quotation._compute_quote_dataframe",
+        "ldaca_web_app_backend.api.workspaces.analyses.quotation_core.compute_quote_dataframe",
         fake_compute,
     )
     response = await authenticated_client.get(
@@ -198,7 +206,15 @@ async def test_update_quotation_current_result_returns_page_payload(
 ):
     task_id = seeded_paginated_quotation
 
-    async def fake_compute(node, base_df, column, engine, *, use_base_only=False):
+    async def fake_compute(
+        node,
+        base_df,
+        column,
+        engine,
+        *,
+        use_base_only=False,
+        **_kwargs,
+    ):
         doc_texts = base_df.get_column(column).to_list()
         rows = []
         for text in doc_texts:
@@ -209,7 +225,7 @@ async def test_update_quotation_current_result_returns_page_payload(
         return pl.DataFrame(rows)
 
     monkeypatch.setattr(
-        "ldaca_web_app_backend.api.workspaces.analyses.quotation._compute_quote_dataframe",
+        "ldaca_web_app_backend.api.workspaces.analyses.quotation_core.compute_quote_dataframe",
         fake_compute,
     )
     response = await authenticated_client.post(
@@ -229,7 +245,15 @@ async def test_quotation_current_result_returns_all_quotes_for_document_page(
     task_id = seeded_paginated_quotation
     """Page size is in documents; all quotes within the selected docs should be returned."""
 
-    async def fake_compute(node, base_df, column, engine, *, use_base_only=False):
+    async def fake_compute(
+        node,
+        base_df,
+        column,
+        engine,
+        *,
+        use_base_only=False,
+        **_kwargs,
+    ):
         doc_texts = base_df.get_column(column).to_list()
         rows = []
         for text in doc_texts:
@@ -241,7 +265,7 @@ async def test_quotation_current_result_returns_all_quotes_for_document_page(
         return pl.DataFrame(rows)
 
     monkeypatch.setattr(
-        "ldaca_web_app_backend.api.workspaces.analyses.quotation._compute_quote_dataframe",
+        "ldaca_web_app_backend.api.workspaces.analyses.quotation_core.compute_quote_dataframe",
         fake_compute,
     )
 
@@ -277,7 +301,15 @@ async def test_quotation_endpoint_recomputes_on_demand(
 
     recompute_called = False
 
-    async def fake_compute(node, base_df_slice, column, engine, *, use_base_only=False):
+    async def fake_compute(
+        node,
+        base_df_slice,
+        column,
+        engine,
+        *,
+        use_base_only=False,
+        **_kwargs,
+    ):
         nonlocal recompute_called
         recompute_called = True
         doc_texts = base_df_slice.get_column(column).to_list()
@@ -290,7 +322,7 @@ async def test_quotation_endpoint_recomputes_on_demand(
         return pl.DataFrame(rows)
 
     monkeypatch.setattr(
-        "ldaca_web_app_backend.api.workspaces.analyses.quotation._compute_quote_dataframe",
+        "ldaca_web_app_backend.api.workspaces.analyses.quotation_core.compute_quote_dataframe",
         fake_compute,
     )
 
@@ -303,5 +335,6 @@ async def test_quotation_endpoint_recomputes_on_demand(
     payload = response.json()
     assert payload["pagination"]["page"] == 2
     assert payload["data"][0]["quote"] == "beta"
+    assert recompute_called is True
     assert recompute_called is True
     assert recompute_called is True

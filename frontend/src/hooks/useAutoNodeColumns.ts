@@ -32,10 +32,21 @@ type NodeColumnSource = string[] | ColumnInfo[];
 const DEFAULT_HEURISTIC_CANDIDATES = ['document', 'text', 'content', 'body', 'transcript'];
 
 const extractDocumentColumn = (node: any): string => {
-  const dataColumn = (node?.data as { documentColumn?: string } | undefined)?.documentColumn;
-  if (typeof dataColumn === 'string' && dataColumn.length) return dataColumn;
-  const nodeColumn = (node as { documentColumn?: string } | undefined)?.documentColumn;
-  if (typeof nodeColumn === 'string' && nodeColumn.length) return nodeColumn;
+  const candidates = [
+    (node?.data as { documentColumn?: string } | undefined)?.documentColumn,
+    (node?.data as { document_column?: string } | undefined)?.document_column,
+    (node?.data as { document?: string } | undefined)?.document,
+    (node as { documentColumn?: string } | undefined)?.documentColumn,
+    (node as { document_column?: string } | undefined)?.document_column,
+    (node as { document?: string } | undefined)?.document,
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string' && candidate.length) {
+      return candidate;
+    }
+  }
+
   return '';
 };
 

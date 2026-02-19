@@ -35,7 +35,13 @@ import AnalysisTaskBanner from '../../../components/tabs/AnalysisTaskBanner';
 import type { AnalysisTaskStatus } from '../../../hooks/useAnalysisTaskStatus';
 import useAnalysisTaskLifecycle, { type AnalysisTaskRefreshContext } from '../../../hooks/useAnalysisTaskLifecycle';
 import { getAnalysisActionState } from '../common/analysisActionState';
-import { useAnalysisHydration } from '../common';
+import { useAnalysisHydration, useColorStackAllocator } from '../common';
+import {
+  clearAnalysisTaskArtifacts,
+  collectTaskIds,
+  pruneTasksById,
+  resolveAnalysisTaskId,
+} from '../../../hooks/analysisTaskUtils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../../components/ui/dialog';
 import { AnalysisPagination } from '../../../components/AnalysisPagination';
 
@@ -196,7 +202,34 @@ const ConcordanceFeature: React.FC = () => {
   })();
 
   // Color management & view mode
-  const [nodeColors, setNodeColors] = useState<Record<string,string>>({});
+  // Use stack-based allocator for automatic color assignment
+  const stackPalette = React.useMemo(() => DEFAULT_PALETTE.slice(0, 6), []);
+  const { nodeColors: stackColors } = useColorStackAllocator({
+    colors: stackPalette, // Use first six palette colors in stack order
+    activeNodeIds: activeNodeIds,
+  });
+  const [manualColors, setManualColors] = useState<Record<string,string>>({});
+  // Merge stack-allocated and manually set colors
+  const nodeColors = React.useMemo(() => {
+    const merged: Record<string, string> = {};
+    // Start with stack-allocated colors
+    Object.entries(stackColors).forEach(([id, color]) => {
+      merged[id] = color;
+    });
+    // Override with manual selections
+    Object.entries(manualColors).forEach(([id, color]) => {
+      if (activeNodeIds.includes(id)) {
+        merged[id] = color;
+      }
+    });
+    // Fallback for overflow (>6 nodes)
+    activeNodeIds.forEach((id, index) => {
+      if (!merged[id]) {
+        merged[id] = DEFAULT_PALETTE[index % DEFAULT_PALETTE.length];
+      }
+    });
+    return merged;
+  }, [stackColors, manualColors, activeNodeIds]);
   const defaultPalette = DEFAULT_PALETTE;
   const [viewMode, setViewMode] = useState<'separated'|'combined'>('separated');
   const [combinedPage, setCombinedPage] = useState(1);
@@ -271,32 +304,27 @@ const ConcordanceFeature: React.FC = () => {
     }
 
     const status = concordanceTaskStatusRef.current;
-    const candidateIds = [
-      localConcordanceTaskId,
-      (results as any)?.metadata?.task_id,
-      status?.activeTaskId,
-      status?.runningTask?.task_id,
-      status?.queuedTask?.task_id,
-      status?.terminalTask?.task_id,
-    ];
-    const known = candidateIds.find((candidate) => typeof candidate === 'string' && candidate.trim().length > 0);
-    if (known) {
-      return known;
-    }
-
-    try {
-      const headers = getAuthHeaders();
-      const current = await textApi.getAnalysisCurrent(currentWorkspaceId, 'concordance', headers) as any;
-      const taskId = Array.isArray(current?.task_ids) ? current.task_ids[0] : null;
-      if (typeof taskId === 'string' && taskId.trim().length > 0) {
-        setLocalConcordanceTaskId(taskId);
-        return taskId;
-      }
-    } catch {
-      return null;
-    }
-
-    return null;
+    return resolveAnalysisTaskId({
+      candidateIds: [
+        localConcordanceTaskId,
+        (results as any)?.metadata?.task_id,
+        status?.activeTaskId,
+        status?.runningTask?.task_id,
+        status?.queuedTask?.task_id,
+        status?.terminalTask?.task_id,
+      ],
+      fetchCurrentTaskId: async () => {
+        const headers = getAuthHeaders();
+        const current = (await textApi.getAnalysisCurrent(
+          currentWorkspaceId,
+          'concordance',
+          headers
+        )) as any;
+        const taskId = Array.isArray(current?.task_ids) ? current.task_ids[0] : null;
+        return typeof taskId === 'string' && taskId.trim().length > 0 ? taskId : null;
+      },
+      onResolved: setLocalConcordanceTaskId,
+    });
   };
 
   const effectiveNodeColumnSelections = isLocked ? activeNodeColumnSelections : nodeColumnSelections;
@@ -519,7 +547,7 @@ const ConcordanceFeature: React.FC = () => {
     }
 
     if (pendingConcordance.nodeColors) {
-      setNodeColors((prev) => ({ ...pendingConcordance.nodeColors, ...prev }));
+      setManualColors((prev) => ({ ...pendingConcordance.nodeColors, ...prev }));
     }
 
     const shouldAutoRun = pendingConcordance.autoRun === true;
@@ -551,27 +579,10 @@ const ConcordanceFeature: React.FC = () => {
   }, [isLocked, selectedNodes, nodeColumnSelections, recomputeAutoColumns]);
 
 
-  // Ensure every selected node has a color
-  useEffect(() => {
-    if (!activeNodeIds.length) return;
-    setNodeColors(prev => {
-      const updated = { ...prev };
-      let paletteIndex = 0;
-      activeNodeIds.slice(0, 2).forEach((nodeId) => {
-        if (!updated[nodeId]) {
-          while (Object.values(updated).includes(defaultPalette[paletteIndex % defaultPalette.length]) && paletteIndex < defaultPalette.length * 2) {
-            paletteIndex++;
-          }
-          updated[nodeId] = defaultPalette[paletteIndex % defaultPalette.length];
-          paletteIndex++;
-        }
-      });
-      return updated;
-    });
-  }, [activeNodeIds, defaultPalette]);
+  // Color assignment now handled by stack allocator - no auto-fill effect needed
 
 
-  const handleColorChange = (nodeId: string, color: string) => setNodeColors(prev => ({ ...prev, [nodeId]: color }));
+  const handleColorChange = (nodeId: string, color: string) => setManualColors(prev => ({ ...prev, [nodeId]: color }));
 
   const handleColumnChange = (nodeId: string, column: string) => setNodeColumnSelection(nodeId, column);
 
@@ -831,85 +842,37 @@ const ConcordanceFeature: React.FC = () => {
   }, [currentWorkspaceId, hydrateFromServer, isActiveTab]);
 
   const handleClearResults = async () => {
+    const taskIds = collectTaskIds([
+      (results as any)?.metadata?.task_id,
+      localConcordanceTaskId,
+      concordanceTaskStatus.activeTaskId,
+      concordanceTaskStatus.runningTask?.task_id,
+      concordanceTaskStatus.queuedTask?.task_id,
+      concordanceTaskStatus.terminalTask?.task_id,
+    ]);
+
     if (currentWorkspaceId) {
       const headers = getAuthHeaders();
 
-      const taskIds = new Set<string>();
-      const candidates = [
-        (results as any)?.metadata?.task_id,
-        localConcordanceTaskId,
-        concordanceTaskStatus.activeTaskId,
-        concordanceTaskStatus.runningTask?.task_id,
-        concordanceTaskStatus.queuedTask?.task_id,
-        concordanceTaskStatus.terminalTask?.task_id,
-      ];
-      candidates.forEach((candidate) => {
-        if (typeof candidate === 'string' && candidate.trim()) {
-          taskIds.add(candidate);
-        }
+      await clearAnalysisTaskArtifacts({
+        workspaceId: currentWorkspaceId,
+        taskIds,
+        cancelTask: (workspaceId, taskId) =>
+          workspacesApi.cancelTasks(workspaceId, { task_id: taskId }, headers),
+        clearManagerTask: (workspaceId, taskId) =>
+          workspacesApi.clearTasks(workspaceId, { task_id: taskId }, headers),
+        clearAnalysisTask: (workspaceId, taskId) =>
+          textApi.clearTask(workspaceId, taskId, headers),
+        warnContext: 'concordance',
       });
-
-      try {
-        if (taskIds.size > 0) {
-          await Promise.all(
-            Array.from(taskIds).map(async (taskId) => {
-              try {
-                await workspacesApi.cancelTasks(currentWorkspaceId, { task_id: taskId }, headers);
-              } catch (error) {
-                console.warn('Failed to cancel concordance task before clearing', { taskId, error });
-              }
-            })
-          );
-        }
-      } catch (error) {
-        console.warn('Failed to cancel concordance tasks before clearing', error);
-      }
-      try {
-        if (taskIds.size > 0) {
-          await Promise.all(
-            Array.from(taskIds).map(async (taskId) => {
-              try {
-                await workspacesApi.clearTasks(currentWorkspaceId, { task_id: taskId }, headers);
-              } catch (error) {
-                console.warn('Failed to clear concordance task from task manager', { taskId, error });
-              }
-            })
-          );
-        }
-      } catch (error) {
-        console.warn('Failed to clear concordance tasks from task manager', error);
-      }
-      try {
-        if (taskIds.size > 0) {
-          await Promise.all(
-            Array.from(taskIds).map((taskId) => textApi.clearTask(currentWorkspaceId, taskId, headers))
-          );
-        }
-      } catch (error) {
-        console.error('Failed to clear backend analyses/cache:', error);
-      }
     }
 
     setTasks((prev) => {
       if (!Array.isArray(prev)) return prev;
-      const taskIds = new Set<string>();
-      const candidates = [
-        (results as any)?.metadata?.task_id,
-        localConcordanceTaskId,
-        concordanceTaskStatus.activeTaskId,
-        concordanceTaskStatus.runningTask?.task_id,
-        concordanceTaskStatus.queuedTask?.task_id,
-        concordanceTaskStatus.terminalTask?.task_id,
-      ];
-      candidates.forEach((candidate) => {
-        if (typeof candidate === 'string' && candidate.trim()) {
-          taskIds.add(candidate);
-        }
-      });
-      if (taskIds.size === 0) {
+      if (taskIds.length === 0) {
         return prev;
       }
-      return prev.filter((task) => task && !taskIds.has(task.task_id));
+      return pruneTasksById(prev, taskIds);
     });
     setResults(null);
     setNodePagination({});

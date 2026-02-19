@@ -1,5 +1,14 @@
-"""
-Pydantic models for the ATAP Web App API
+"""Pydantic request/response models for backend API contracts.
+
+Used by:
+- API routers and worker result serialization boundaries
+
+Why:
+- Centralizes schema contracts shared between frontend and backend endpoints.
+
+Refactor note:
+- This module is large and mixes domains (auth/files/workspaces/analysis); future
+    split by domain files could improve maintainability and import clarity.
 """
 
 from enum import Enum

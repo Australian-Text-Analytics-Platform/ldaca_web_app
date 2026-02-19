@@ -7,33 +7,9 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
-
-def _concordance_non_empty_expr():
-    import polars as pl
-
-    return pl.any_horizontal([
-        pl
-        .col("matched_text")
-        .cast(pl.Utf8, strict=False)
-        .str.strip_chars()
-        .str.len_chars()
-        .fill_null(0)
-        > 0,
-        pl
-        .col("left_context")
-        .cast(pl.Utf8, strict=False)
-        .str.strip_chars()
-        .str.len_chars()
-        .fill_null(0)
-        > 0,
-        pl
-        .col("right_context")
-        .cast(pl.Utf8, strict=False)
-        .str.strip_chars()
-        .str.len_chars()
-        .fill_null(0)
-        > 0,
-    ])
+from ldaca_web_app_backend.api.workspaces.analyses.concordance_core import (
+    concordance_non_empty_expr,
+)
 
 
 def run_concordance_detach_task(
@@ -50,7 +26,15 @@ def run_concordance_detach_task(
     new_node_name: Optional[str] = None,
     progress_callback: Optional[callable] = None,
 ) -> Dict[str, Any]:
-    """Execute concordance detach in a worker process."""
+    """Execute concordance detach in a worker process.
+
+    Used by:
+    - `core.worker.concordance_detach_task`
+    - `TASK_REGISTRY["concordance_detach"]`
+
+    Why:
+    - Computes concordance matches and writes a detached parquet-backed node.
+    """
     configure_worker_environment()
 
     try:
@@ -117,7 +101,7 @@ def run_concordance_detach_task(
             .with_columns(expr.alias("concordance"))
             .explode("concordance")
             .unnest("concordance")
-            .filter(_concordance_non_empty_expr())
+            .filter(concordance_non_empty_expr())
         )
 
         if progress_callback:

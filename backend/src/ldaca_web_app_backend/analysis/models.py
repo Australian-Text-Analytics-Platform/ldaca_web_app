@@ -12,6 +12,16 @@ from .results import BaseAnalysisResult
 
 
 class AnalysisStatus(str, Enum):
+    """Lifecycle states for analysis tasks.
+
+    Used by:
+    - `AnalysisTask`
+    - analysis/task APIs and worker sync helpers
+
+    Why:
+    - Keeps task status values consistent across storage and API responses.
+    """
+
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -46,11 +56,28 @@ class AnalysisTask(BaseModel, Generic[TRequest, TResult]):
     error: Optional[str] = None
 
     def complete(self, result: TResult) -> None:
+        """Mark task completed and attach result payload.
+
+        Used by:
+        - `analysis.manager.TaskManager.update_task`
+        - worker sync paths that finalize memory tasks
+
+        Why:
+        - Provides one canonical status transition to `COMPLETED`.
+        """
         self.result = result
         self.status = AnalysisStatus.COMPLETED
         self.updated_at = datetime.now()
 
     def fail(self, error: str) -> None:
+        """Mark task failed with error details.
+
+        Used by:
+        - worker sync and error propagation paths
+
+        Why:
+        - Standardizes failure transition metadata for UI/task APIs.
+        """
         self.error = error
         self.status = AnalysisStatus.FAILED
         self.updated_at = datetime.now()

@@ -20,8 +20,20 @@ def run_token_frequencies_task(
     stop_words: Optional[list[str]] = None,
     progress_callback: Optional[callable] = None,
 ) -> Dict[str, Any]:
-    """Execute token frequency analysis in a worker process."""
+    """Execute token-frequency analysis inside a worker process.
 
+    Used by:
+    - `core.worker.token_frequencies_task`
+    - `TASK_REGISTRY["token_frequencies"]`
+
+    Why:
+    - Computes token frequencies off the API thread and returns normalized
+      comparison payloads for one or two nodes.
+
+    Refactor note:
+    - If wrapper indirection is removed, this function can be imported directly
+      into `TASK_REGISTRY`.
+    """
     configure_worker_environment()
 
     try:

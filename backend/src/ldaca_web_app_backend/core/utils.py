@@ -176,6 +176,12 @@ def setup_user_folders(user_id: str) -> Dict[str, Path]:
     Clients that wish to import sample data must call the dedicated
     "import sample data" endpoint which will invoke a controlled copy
     operation. This keeps login fast and avoids unexpected data resets.
+
+    Used by:
+    - auth login/session bootstrap endpoints
+
+    Why:
+    - Ensures required user data/workspace directories always exist before I/O.
     """
     folder_name = f"user_{user_id}"
 
@@ -200,6 +206,12 @@ def import_sample_data_for_user(user_id: str) -> Dict[str, Any]:
 
     Removes any existing sample_data folder then copies from the canonical
     sample data source. Returns summary statistics.
+
+    Used by:
+    - sample-data import API endpoint
+
+    Why:
+    - Keeps sample data provisioning explicit and idempotent.
     """
     source_override = settings.get_sample_data_folder()
     user_data_folder = get_user_data_folder(user_id)
@@ -243,11 +255,6 @@ def import_sample_data_for_user(user_id: str) -> Dict[str, Any]:
         "bytes_copied": bytes_copied,
         "sample_dir": str(target_sample_data),
     }
-
-
-def get_file_size_mb(file_path: Path) -> float:
-    """Get file size in MB"""
-    return file_path.stat().st_size / (1024 * 1024) if file_path.exists() else 0.0
 
 
 def get_folder_size_mb(folder_path: Path) -> float:
@@ -376,6 +383,12 @@ def serialize_dataframe_for_json(df) -> Dict[str, Any]:
     """
     Convert a DataFrame (polars) to JSON-serializable format
     with complete type representation using module.ClassName format.
+
+    Used by:
+    - file upload/inspection endpoints in `api/files.py`
+
+    Why:
+    - Produces stable preview metadata from both eager and lazy data objects.
     """
     try:
         if df is None:
@@ -536,11 +549,6 @@ def serialize_dataframe_for_json(df) -> Dict[str, Any]:
         }
 
 
-def generate_node_id() -> str:
-    """Generate a unique node ID"""
-    return str(uuid.uuid4())
-
-
 def generate_workspace_id() -> str:
     """Generate a unique workspace ID"""
     return str(uuid.uuid4())
@@ -553,148 +561,3 @@ def validate_file_path(file_path: Path, user_folder: Path) -> bool:
         return True
     except ValueError:
         return False
-
-
-def convert_to_react_flow_graph(generic_graph: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Convert generic graph structure to React Flow compatible format.
-
-    Args:
-        generic_graph: Generic graph structure from docworkspace
-
-    Returns:
-        React Flow compatible graph structure
-    """
-    react_flow_nodes = []
-    react_flow_edges = []
-
-    nodes_data = generic_graph.get("nodes", [])
-    edges_data = generic_graph.get("edges", [])
-    workspace_info = generic_graph.get("workspace_info", {})
-
-    # Generate grid layout positions
-    grid_size = int(len(nodes_data) ** 0.5) + 1 if nodes_data else 1
-
-    for i, node_data in enumerate(nodes_data):
-        # Calculate position in grid
-        x = (i % grid_size) * 250  # 250px spacing
-        y = (i // grid_size) * 150  # 150px vertical spacing
-
-        # Format shape information for display
-        shape_display = ""
-        if node_data.get("shape_info"):
-            shape_info = node_data["shape_info"]
-            if shape_info["type"] == "shape":
-                shape_display = f" ({shape_info['rows']}×{shape_info['columns']})"
-            elif shape_info["type"] == "length":
-                shape_display = f" (len: {shape_info['length']})"
-
-        # Determine node type based on relationships
-        node_type = "default"
-        if node_data.get("is_root"):
-            node_type = "input"
-        elif node_data.get("is_leaf"):
-            node_type = "output"
-
-        # Create React Flow node
-        react_flow_node = {
-            "id": node_data["id"],
-            "type": node_type,
-            "position": {"x": x, "y": y},
-            "data": {
-                "label": f"{node_data['name']}{shape_display}",
-                "nodeId": node_data["id"],
-                "nodeName": node_data["name"],
-                "dataType": _map_workspace_type_to_display_type(
-                    node_data.get("type", "unknown")
-                ),
-                "status": node_data.get("status", "ready"),
-                "operation": node_data.get("operation", "unknown"),
-                "parentCount": node_data.get("parent_count", 0),
-                "childCount": node_data.get("child_count", 0),
-                "shape_info": node_data.get(
-                    "shape_info"
-                ),  # Preserve shape_info for frontend
-            },
-            "style": {
-                "background": _get_node_color_by_type(
-                    _map_workspace_type_to_display_type(
-                        node_data.get("type", "unknown")
-                    )
-                ),
-                "border": "2px solid #222",
-                "borderRadius": "8px",
-                "padding": "10px",
-                "fontSize": "12px",
-            },
-        }
-
-        # Override background for special node types
-        if node_data.get("is_root"):
-            react_flow_node["style"]["background"] = "#e8f5e8"  # Light green for root
-        elif node_data.get("is_leaf"):
-            react_flow_node["style"]["background"] = "#f5e8e8"  # Light red for leaf
-
-        react_flow_nodes.append(react_flow_node)
-
-    # Convert edges
-    for edge_data in edges_data:
-        react_flow_edge = {
-            "id": edge_data["id"],
-            "source": edge_data["source"],
-            "target": edge_data["target"],
-            "type": "smoothstep",
-            "animated": False,
-            "style": {"stroke": "#888", "strokeWidth": 2},
-            "markerEnd": {"type": "arrow", "color": "#888"},
-            "data": {"operation": edge_data.get("operation", "relationship")},
-        }
-        react_flow_edges.append(react_flow_edge)
-
-    return {
-        "nodes": react_flow_nodes,
-        "edges": react_flow_edges,
-        "workspace_info": workspace_info,
-    }
-
-
-def _map_workspace_type_to_display_type(workspace_type: str) -> str:
-    """
-    Map workspace node type to display type for frontend.
-
-    Args:
-        workspace_type: The type from workspace node (e.g., 'DataFrame', 'LazyFrame')
-
-    Returns:
-        Display type string for frontend
-    """
-    if workspace_type in {"DataFrame", "LazyFrame"}:
-        return "polars.LazyFrame"
-    elif workspace_type == "Series":
-        return "polars.Series"
-    else:
-        return workspace_type
-
-
-def _get_node_color_by_type(data_type: str) -> str:
-    """
-    Get color for a node based on its data type.
-
-    Args:
-        data_type: The data type name
-
-    Returns:
-        Hex color string
-    """
-    # Color based on data type
-    if "DataFrame" in data_type:
-        if "polars" in data_type.lower() or "pl." in data_type:
-            return "#d4e6f1"  # Light blue for Polars
-        else:
-            return "#e8f4fd"  # Light blue for pandas
-    elif "Series" in data_type:
-        return "#f0e8ff"  # Light purple for Series
-    elif "LazyFrame" in data_type:
-        return "#ffe8cc"  # Light orange for LazyFrame (lazy evaluation)
-    else:
-        return "#f5f5f5"  # Light gray for other types

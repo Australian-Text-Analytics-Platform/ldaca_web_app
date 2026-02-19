@@ -1,24 +1,36 @@
-"""Workspace lifecycle endpoints extracted from base.py.
-Routes preserved exactly for backward compatibility."""
+"""Workspace lifecycle endpoints for workspace create/load/save/import flows."""
 
 import json
 from typing import Any, Dict, Optional
 
-from docworkspace.workspace.io import deserialize_workspace  # type: ignore
-from docworkspace.workspace.io import serialize_workspace
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from docworkspace.workspace.io import (
+    deserialize_workspace,  # type: ignore
+    serialize_workspace,
+)
+from fastapi import APIRouter, Depends, HTTPException
 
 from ...core.auth import get_current_user
 from ...core.json_utils import json_sanitize
 from ...core.utils import generate_workspace_id, validate_workspace_name
 from ...core.workspace import workspace_manager
 from ...models import WorkspaceCreateRequest, WorkspaceInfo
+from .analyses.token_frequencies import (
+    _unwrap_task_manager_result as unwrap_task_manager_result,
+)
 
 router = APIRouter(prefix="/workspaces", tags=["lifecycle"])
 
 
 @router.get("/")
 async def list_workspaces(current_user: dict = Depends(get_current_user)):
+    """List all persisted workspaces visible to the current user.
+
+    Used by:
+    - frontend workspace switcher/landing views
+
+    Why:
+    - Provides fast summary metadata without loading full workspace graphs.
+    """
     user_id = current_user["id"]
     summaries = workspace_manager.list_user_workspaces_summaries(user_id)
     return {"workspaces": list(summaries.values())}
@@ -35,6 +47,14 @@ async def get_current_workspace(current_user: dict = Depends(get_current_user)):
 async def set_current_workspace(
     workspace_id: Optional[str] = None, current_user: dict = Depends(get_current_user)
 ):
+    """Set or clear the current in-memory workspace for the user.
+
+    Used by:
+    - frontend workspace selection flow
+
+    Why:
+    - Ensures subsequent node/analysis operations target the intended workspace.
+    """
     user_id = current_user["id"]
     success = workspace_manager.set_current_workspace(user_id, workspace_id)
     if not success and workspace_id is not None:
@@ -46,6 +66,14 @@ async def set_current_workspace(
 async def create_workspace(
     request: WorkspaceCreateRequest, current_user: dict = Depends(get_current_user)
 ):
+    """Create a workspace and return normalized workspace metadata.
+
+    Used by:
+    - frontend new-workspace dialog
+
+    Why:
+    - Centralizes workspace-name validation and initialization metadata.
+    """
     user_id = current_user["id"]
     is_valid, reason = validate_workspace_name(request.name)
     if not is_valid:
@@ -77,13 +105,6 @@ async def create_workspace(
             status_code=500,
             detail=f"Internal server error during workspace creation: {e}",
         )
-
-
-@router.post("", response_model=WorkspaceInfo)
-async def create_workspace_no_trailing_slash(
-    request: WorkspaceCreateRequest, current_user: dict = Depends(get_current_user)
-):
-    return await create_workspace(request, current_user)
 
 
 @router.delete("/{workspace_id}")
@@ -173,6 +194,15 @@ async def save_workspace(
 async def save_workspace_as(
     workspace_id: str, folder_name: str, current_user: dict = Depends(get_current_user)
 ):
+    """Clone a workspace into a new id/name and persist it as a separate copy.
+
+    Used by:
+    - frontend “Save As” flow
+
+    Why:
+    - Creates branch-like workspace copies without mutating source workspace.
+
+    """
     user_id = current_user["id"]
     source = workspace_manager.get_workspace(user_id, workspace_id)
     if not source:
@@ -190,7 +220,7 @@ async def save_workspace_as(
         new_ws = deserialize_workspace(payload)
         new_ws.id = new_id
 
-        workspace_manager._save(user_id, new_id, new_ws)
+        workspace_manager.save_workspace_object(user_id, new_id, new_ws)
         info = workspace_manager.get_workspace_info(user_id, new_id)
         return {
             "state": "successful",
@@ -205,23 +235,29 @@ async def save_workspace_as(
 
 @router.post("/import")
 async def import_workspace(
-    file: UploadFile = File(...), current_user: dict = Depends(get_current_user)
+    request: dict[str, Any],
+    current_user: dict = Depends(get_current_user),
 ):
-    user_id = current_user["id"]
-    filename = file.filename or "workspace.json"
-    if not filename.lower().endswith(".json"):
-        raise HTTPException(
-            status_code=400, detail="Only .json workspace files are supported"
-        )
-    try:
-        content = await file.read()
-        try:
-            payload = json.loads(content.decode("utf-8"))
-        except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Invalid JSON payload: {e}")
+    """Import a workspace from JSON content.
 
+    Used by:
+    - frontend workspace import flow
+
+    Why:
+    - Rehydrates a serialized workspace payload into persistent user workspace
+      storage.
+    """
+    user_id = current_user["id"]
+    json_content = str(request.get("json_content") or "")
+    filename = str(request.get("filename") or "workspace.json")
+
+    if not json_content:
+        raise HTTPException(status_code=400, detail="Missing json_content")
+
+    try:
         try:
-            new_ws = deserialize_workspace(payload)
+            data = json.loads(json_content)
+            new_ws = deserialize_workspace(data)
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Invalid workspace JSON: {e}")
 
@@ -234,7 +270,7 @@ async def import_workspace(
             except Exception:
                 pass
 
-        workspace_manager._save(user_id, new_id, new_ws)
+        workspace_manager.save_workspace_object(user_id, new_id, new_ws)
         info = workspace_manager.get_workspace_info(user_id, new_id) or {
             "workspace_id": new_id,
             "name": getattr(new_ws, "name", base_name),
@@ -261,27 +297,24 @@ async def get_workspace_info(
 async def get_workspace_graph(
     workspace_id: str, current_user: dict = Depends(get_current_user)
 ):
+    """Return graph payload enriched with latest analysis snapshots.
+
+    Used by:
+    - frontend graph canvas initialization and refresh
+
+    Why:
+    - Combines structural graph data with latest analysis state for one roundtrip.
+
+    Refactor note:
+    - Latest-analysis enrichment logic could move to a shared graph assembler to
+      reduce route-level orchestration.
+    """
     user_id = current_user["id"]
     graph_data = workspace_manager.get_workspace_graph(user_id, workspace_id)
     if not graph_data:
         raise HTTPException(status_code=404, detail="Workspace not found")
     try:  # enrichment with latest analyses
         from ....analysis.manager import get_task_manager
-
-        def _unwrap_task_manager_result(result: Any) -> Any:
-            """Unwrap WorkerTaskManager's persisted wrapper.
-
-            The process task manager persists results as:
-              {"status": "successful", "message": "...", "data": <analysis_payload>}
-
-            Most API consumers expect the analysis payload directly (which includes
-            fields like "state").
-            """
-
-            if isinstance(result, dict) and "status" in result and "data" in result:
-                unwrapped = result.get("data")
-                return unwrapped if unwrapped is not None else result
-            return result
 
         task_manager = get_task_manager(user_id, workspace_id)
         latest: Dict[str, Any] = {}
@@ -293,7 +326,7 @@ async def get_workspace_graph(
             if hasattr(raw_result, "to_json"):
                 raw_result = raw_result.to_json()
 
-            unwrapped_result = _unwrap_task_manager_result(raw_result)
+            unwrapped_result = unwrap_task_manager_result(raw_result)
             latest[str(analysis)] = {
                 "task": str(analysis),
                 "saved_at": json_sanitize(getattr(task, "updated_at", None)),
@@ -312,5 +345,4 @@ async def get_workspace_nodes(
 ):
     user_id = current_user["id"]
     summaries = workspace_manager.get_node_summaries(user_id, workspace_id)
-    return {"nodes": summaries}
     return {"nodes": summaries}

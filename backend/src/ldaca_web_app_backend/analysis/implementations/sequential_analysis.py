@@ -1,3 +1,12 @@
+"""Sequential analysis request schema module.
+
+Used by:
+- sequential analysis routes and task persistence models
+
+Why:
+- Keeps sequential-analysis specific request fields versioned in one place.
+"""
+
 from typing import List, Optional
 
 from pydantic import Field
@@ -7,7 +16,17 @@ from ..models import BaseAnalysisRequest
 
 class SequentialAnalysisRequest(BaseAnalysisRequest):
     """
-    Request model for Sequential Analysis.
+    Request model for sequential analysis.
+
+    Used by:
+    - sequential analysis run/update endpoints
+
+    Why:
+    - Validates temporal grouping and binning parameters.
+
+    Refactor note:
+    - `column_type`, `numeric_origin`, and `numeric_interval` are declared twice;
+        remove duplicated declarations to reduce schema ambiguity.
     """
 
     node_id: Optional[str] = Field(None, description="Node ID to analyze")

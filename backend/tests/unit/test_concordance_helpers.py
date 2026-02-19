@@ -1,9 +1,9 @@
 import polars as pl
 import pytest
-from ldaca_web_app_backend.api.workspaces.analyses.concordance import (
-    _concordance_non_empty_expr,
-    _normalize_saved_request,
-    _sanitize_request_for_storage,
+from ldaca_web_app_backend.api.workspaces.analyses.concordance_core import (
+    concordance_non_empty_expr,
+    normalize_saved_request,
+    sanitize_request_for_storage,
 )
 
 
@@ -24,7 +24,7 @@ from ldaca_web_app_backend.api.workspaces.analyses.concordance import (
     ],
 )
 def test_sanitize_request_excludes_pagination_keys(raw_request):
-    sanitized = _sanitize_request_for_storage(raw_request)
+    sanitized = sanitize_request_for_storage(raw_request)
 
     assert sanitized == {
         "node_ids": ["node-1"],
@@ -45,7 +45,7 @@ def test_normalize_saved_request_coerces_legacy_shape():
         "search_word": "alpha",
     }
 
-    assert _normalize_saved_request(raw_request) is None
+    assert normalize_saved_request(raw_request) is None
 
 
 def test_filter_concordance_rows_removes_blank_entries():
@@ -55,6 +55,6 @@ def test_filter_concordance_rows_removes_blank_entries():
         "right_context": ["", "context", "\t", None],
     })
 
-    filtered = df.filter(_concordance_non_empty_expr())
+    filtered = df.filter(concordance_non_empty_expr())
 
     assert filtered.height == 2

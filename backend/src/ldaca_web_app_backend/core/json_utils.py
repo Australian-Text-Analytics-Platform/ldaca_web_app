@@ -21,6 +21,12 @@ def json_sanitize(obj):
 
     Returns:
         A JSON-serializable version of the object
+
+    Used by:
+    - API response helpers in `api.workspaces.utils.success`
+
+    Why:
+    - Prevents JSON encoding failures from numpy scalars, nested keys, and model objects.
     """
     try:
         import numpy as _np  # type: ignore
