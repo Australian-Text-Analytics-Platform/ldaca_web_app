@@ -9,7 +9,6 @@ import math
 from typing import Any, Dict, List, Optional, Tuple
 
 import polars as pl
-
 # Import API models
 from .api_models import (
     ColumnSchema,
@@ -322,3 +321,6 @@ def handle_api_error(error: Exception) -> ErrorResponse:
         message=str(error),
         details={"exception_type": type(error).__name__},
     )
+
+
+

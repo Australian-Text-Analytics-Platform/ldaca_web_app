@@ -22,7 +22,10 @@ from docworkspace.workspace.io import (
 )
 
 from .api_models import OperationResult
-from .docworkspace_api import DocWorkspaceAPIUtils, handle_api_error
+from .docworkspace_api import (
+    DocWorkspaceAPIUtils,
+    handle_api_error,
+)
 from .utils import (
     allocate_workspace_folder,
     ensure_display_folder_name,

@@ -273,7 +273,9 @@ class Node:
             schema = lf.collect_schema()
             height = lf.select(pl.len()).collect().item()
             info_dict["shape"] = (height, len(schema.names()))
-            info_dict["schema"] = {col: str(dtype) for col, dtype in schema.items()}
+            info_dict["schema"] = {
+                col: str(dtype) for col, dtype in schema.items()
+            }
             info_dict["columns"] = list(schema.names())
         except Exception:
             pass
