@@ -170,6 +170,8 @@ async def stream_tasks(
 
                 for pending_task in pending:
                     pending_task.cancel()
+                if pending:
+                    await asyncio.gather(*pending, return_exceptions=True)
 
                 if not done:
                     if time.time() - last_heartbeat > 30:

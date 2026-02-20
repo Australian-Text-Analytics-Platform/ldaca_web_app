@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 import polars as pl
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -23,6 +25,17 @@ from ..utils import ensure_task_synced, get_workspace_or_404
 from .text_column_prefs import resolve_text_columns_for_nodes
 
 router = APIRouter(prefix="/workspaces", tags=["topic-modeling"])
+
+_TOPIC_SUBMISSION_LOCKS: dict[tuple[str, str], asyncio.Lock] = {}
+
+
+def _topic_submission_lock(user_id: str, workspace_id: str) -> asyncio.Lock:
+    key = (user_id, workspace_id)
+    lock = _TOPIC_SUBMISSION_LOCKS.get(key)
+    if lock is None:
+        lock = asyncio.Lock()
+        _TOPIC_SUBMISSION_LOCKS[key] = lock
+    return lock
 
 
 @router.delete("/{workspace_id}/topic-modeling")
@@ -88,38 +101,84 @@ async def run_topic_modeling(
         persist_preference=True,
     )
 
-    tm = workspace_manager.get_task_manager(user_id, workspace_id)
-    # Match token-frequencies behavior: only short-circuit when the same analysis is
-    # already running for this workspace/user.
-    try:
-        if await tm.any_running(
-            task_type="topic_modeling", user_id=user_id, workspace_id=workspace_id
-        ):
-            latest = await tm.latest_by_type(
-                "topic_modeling", user_id=user_id, workspace_id=workspace_id
-            )
-            return TopicModelingResponse(
-                state="running",
-                message="Topic Modeling analysis already running",
-                data=None,
-                metadata={"task_id": latest.id if latest else None},
-            )
-    except Exception:
-        # Non-fatal: proceed to submit a new task.
-        pass
+    corpora: list[list[str]] = []
+    node_infos: list[dict[str, object]] = []
+    for node_id in request.node_ids:
+        node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
+        if not node:
+            raise HTTPException(status_code=404, detail=f"Node {node_id} not found")
 
-    worker_task = await tm.submit_task(
-        user_id=user_id,
-        workspace_id=workspace_id,
-        task_type="topic_modeling",
-        task_args={
-            "node_ids": request.node_ids,
-            "node_columns": node_columns,
-            "min_topic_size": request.min_topic_size,
-            "use_ctfidf": request.use_ctfidf,
-        },
-        task_name="Topic Modeling",
-    )
+        node_data = getattr(node, "data", None)
+        if not isinstance(node_data, pl.LazyFrame):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Node {node_id} data must be a LazyFrame",
+            )
+
+        column_name = node_columns.get(node_id)
+        if not column_name:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Could not determine text column for node {node_id}",
+            )
+
+        available_columns = list(node_data.collect_schema().names())
+        if column_name not in available_columns:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Column '{column_name}' not in node {node_id}. "
+                    f"Available: {available_columns}"
+                ),
+            )
+
+        sel_df = node_data.select(pl.col(column_name).alias("__doc_col__")).collect()
+        docs = [
+            str(v) if v is not None else "" for v in sel_df["__doc_col__"].to_list()
+        ]
+        corpora.append(docs)
+
+        node_infos.append({
+            "node_id": node_id,
+            "node_name": getattr(node, "name", None) or node_id,
+            "text_column": column_name,
+            "original_columns": available_columns,
+        })
+    tm = workspace_manager.get_task_manager(user_id, workspace_id)
+    submission_lock = _topic_submission_lock(user_id, workspace_id)
+    async with submission_lock:
+        # Match token-frequencies behavior: short-circuit when topic modeling is
+        # already running for this workspace/user, with lock to avoid duplicate
+        # concurrent submissions.
+        try:
+            if await tm.any_running(
+                task_type="topic_modeling", user_id=user_id, workspace_id=workspace_id
+            ):
+                latest = await tm.latest_by_type(
+                    "topic_modeling", user_id=user_id, workspace_id=workspace_id
+                )
+                return TopicModelingResponse(
+                    state="running",
+                    message="Topic Modeling analysis already running",
+                    data=None,
+                    metadata={"task_id": latest.id if latest else None},
+                )
+        except Exception:
+            # Non-fatal: proceed to submit a new task.
+            pass
+
+        worker_task = await tm.submit_task(
+            user_id=user_id,
+            workspace_id=workspace_id,
+            task_type="topic_modeling",
+            task_args={
+                "corpora": corpora,
+                "node_infos": node_infos,
+                "min_topic_size": request.min_topic_size,
+                "use_ctfidf": request.use_ctfidf,
+            },
+            task_name="Topic Modeling",
+        )
 
     analysis_tm = get_task_manager(user_id, workspace_id)
     analysis_request = AnalysisTopicModelingRequest(

@@ -183,11 +183,10 @@ def workspace_download_task(
 def topic_modeling_task(
     user_id: str,
     workspace_id: str,
-    node_ids: list[str],
-    node_columns: Dict[str, str],
-    num_topics: int = 10,
-    num_words: int = 10,
-    custom_stopwords: Optional[list[str]] = None,
+    corpora: list[list[str]],
+    node_infos: list[Dict[str, Any]],
+    min_topic_size: int = 5,
+    use_ctfidf: bool = False,
     progress_callback: Optional[callable] = None,
 ) -> Dict[str, Any]:
     """Delegate topic-modeling execution to the dedicated task module.
@@ -202,11 +201,10 @@ def topic_modeling_task(
         _configure_worker_environment,
         user_id,
         workspace_id,
-        node_ids,
-        node_columns,
-        num_topics=num_topics,
-        num_words=num_words,
-        custom_stopwords=custom_stopwords,
+        corpora,
+        node_infos,
+        min_topic_size=min_topic_size,
+        use_ctfidf=use_ctfidf,
         progress_callback=progress_callback,
     )
 

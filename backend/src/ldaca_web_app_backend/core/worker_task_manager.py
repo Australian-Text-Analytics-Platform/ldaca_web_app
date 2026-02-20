@@ -603,6 +603,8 @@ class WorkerTaskManager:
                 if isinstance(cache_payload, dict):
                     cache_nodes = cache_payload.get("nodes") or []
 
+                workspace_fallback = None
+
                 for node_payload in cache_nodes:
                     node_id = node_payload.get("node_id")
                     if not node_id:
@@ -611,6 +613,23 @@ class WorkerTaskManager:
                     node = workspace_manager.get_node_from_workspace(
                         user_id, workspace_id, node_id
                     )
+                    if not node:
+                        if workspace_fallback is None:
+                            try:
+                                from docworkspace import Workspace
+
+                                workspace_dir = workspace_manager.get_workspace_dir(
+                                    user_id, workspace_id
+                                )
+                                if workspace_dir and workspace_dir.exists():
+                                    workspace_fallback = Workspace.load(workspace_dir)
+                            except Exception:
+                                workspace_fallback = None
+                        if workspace_fallback is not None:
+                            try:
+                                node = workspace_fallback.get_node(node_id)
+                            except Exception:
+                                node = None
                     if not node:
                         continue
 

@@ -5,13 +5,28 @@ from __future__ import annotations
 import os
 from typing import Any, Dict, Optional
 
+_EMBEDDER_CACHE: dict[str, Any] = {}
+
+
+def _get_embedder(model_name: str):
+    """Get or create a cached sentence-transformer embedder per worker process."""
+    embedder = _EMBEDDER_CACHE.get(model_name)
+    if embedder is not None:
+        return embedder
+
+    from sentence_transformers import SentenceTransformer
+
+    embedder = SentenceTransformer(model_name)
+    _EMBEDDER_CACHE[model_name] = embedder
+    return embedder
+
 
 def run_topic_modeling_task(
     configure_worker_environment,
     user_id: str,
     workspace_id: str,
-    node_ids: list[str],
-    node_columns: Dict[str, str],
+    corpora: list[list[str]],
+    node_infos: list[Dict[str, Any]],
     min_topic_size: int = 5,
     use_ctfidf: bool = False,
     progress_callback: Optional[callable] = None,
@@ -33,90 +48,26 @@ def run_topic_modeling_task(
         import polars as pl
         from bertopic import BERTopic
         from bertopic._utils import select_topic_representation
-        from ldaca_web_app_backend.core.workspace import workspace_manager
 
         print(
             f"[Worker {os.getpid()}] Starting topic modeling task for workspace {workspace_id}"
         )
 
-        if progress_callback:
-            progress_callback(0.1, "Initializing workspace...")
-
-        workspace = workspace_manager.get_workspace(user_id, workspace_id)
-        if not workspace:
-            success = workspace_manager.set_current_workspace(user_id, workspace_id)
-            if success:
-                workspace = workspace_manager.get_workspace(user_id, workspace_id)
-
-        if not workspace:
+        if len(corpora) != len(node_infos):
             raise ValueError(
-                f"Workspace {workspace_id} not found (worker process cannot access workspace)"
+                "Topic modeling payload mismatch: corpora and node_infos lengths differ"
             )
 
         if progress_callback:
-            progress_callback(0.2, "Loading node data...")
+            progress_callback(0.2, "Preparing topic modeling payload...")
 
-        corpora = []
-        node_names = []
-        node_infos: list[dict[str, Any]] = []
+        node_names = [
+            str(info.get("node_name") or info.get("node_id") or "node")
+            for info in node_infos
+        ]
 
-        for i, node_id in enumerate(node_ids):
-            node = workspace_manager.get_node_from_workspace(
-                user_id, workspace_id, node_id
-            )
-            if not node:
-                raise ValueError(f"Node {node_id} not found")
-
-            node_data = getattr(node, "data", None)
-            if not isinstance(node_data, pl.LazyFrame):
-                raise ValueError(f"Node {node_id} data must be a LazyFrame")
-
-            node_name = getattr(node, "name", None) or node_id
-            available_columns = list(node_data.collect_schema().names())
-
-            column_name = node_columns.get(node_id)
-            if not column_name:
-                metadata = getattr(node, "metadata", {}) or {}
-                if isinstance(metadata, dict):
-                    column_name = metadata.get("text_column")
-                if not column_name:
-                    common = [
-                        c
-                        for c in ["document", "text", "content", "body", "message"]
-                        if c in available_columns
-                    ]
-                    if common:
-                        column_name = common[0]
-
-            if not column_name:
-                raise ValueError(
-                    f"Could not determine text column for node {node_id}. Available: {available_columns}"
-                )
-
-            if column_name not in available_columns:
-                raise ValueError(
-                    f"Column '{column_name}' not in node {node_id}. Available: {available_columns}"
-                )
-
-            sel_df = node_data.select(
-                pl.col(column_name).alias("__doc_col__")
-            ).collect()
-            docs = [
-                str(v) if v is not None else "" for v in sel_df["__doc_col__"].to_list()
-            ]
-            corpora.append(docs)
-            node_names.append(node_name)
-            node_infos.append({
-                "node_id": node_id,
-                "node_name": node_name,
-                "text_column": column_name,
-                "original_columns": available_columns,
-            })
-
-            if progress_callback:
-                progress_callback(
-                    0.2 + 0.3 * (i + 1) / len(node_ids), f"Loaded {node_name}"
-                )
+        if progress_callback:
+            progress_callback(0.5, "Payload ready; running topic modeling...")
 
         if progress_callback:
             progress_callback(0.6, "Running topic modeling...")
@@ -141,19 +92,16 @@ def run_topic_modeling_task(
             embedding_model_name = "all-MiniLM-L6-v2"
 
             # Build embeddings once for downstream cache + BERTopic fitting.
-            from sentence_transformers import SentenceTransformer
-
-            embedder = SentenceTransformer(embedding_model_name)
+            embedder = _get_embedder(embedding_model_name)
             all_embeddings = embedder.encode(all_docs, show_progress_bar=False)
             embedding_rows = all_embeddings.tolist()
 
-            # BERTopic uses sentence-transformers internally by default.
-            # Keep defaults for this stopgap implementation and preserve existing
-            # response shape for frontend compatibility.
+            # Reuse the same loaded embedder instance to avoid loading model
+            # weights twice in a single task.
             topic_model = BERTopic(
                 verbose=False,
                 min_topic_size=int(min_topic_size),
-                embedding_model=embedding_model_name,
+                embedding_model=embedder,
             )
             assigned_topics, _ = topic_model.fit_transform(all_docs, all_embeddings)
 
