@@ -9,6 +9,18 @@ class _DummyNode:
         self.name = "dummy"
 
 
+class _DummyWorkspace:
+    def __init__(self, persist_calls: dict[str, int]):
+        self.name = "ws"
+        self._persist_calls = persist_calls
+
+    def set_metadata(self, *_args, **_kwargs):
+        return None
+
+    def save(self, *_args, **_kwargs):
+        self._persist_calls["count"] += 1
+
+
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_compute_column_preview_adds_new_column(
@@ -25,6 +37,11 @@ async def test_compute_column_preview_adds_new_column(
         nodes_api.workspace_manager,
         "get_node_from_workspace",
         lambda user_id, workspace_id, node_id: node,
+    )
+    monkeypatch.setattr(
+        nodes_api.workspace_manager,
+        "get_workspace",
+        lambda user_id, workspace_id: _DummyWorkspace({"count": 0}),
     )
 
     response = await authenticated_client.post(
@@ -64,12 +81,24 @@ async def test_compute_column_apply_mutates_node(authenticated_client, monkeypat
     )
     monkeypatch.setattr(
         nodes_api.workspace_manager,
-        "persist",
-        lambda user_id, workspace_id: persist_calls.__setitem__(
-            "count", persist_calls["count"] + 1
-        ),
+        "_resolve_workspace_dir",
+        lambda user_id, workspace_id, workspace_name: "/tmp/ws",
     )
-
+    monkeypatch.setattr(
+        nodes_api.workspace_manager,
+        "_attach_workspace_dir",
+        lambda workspace, path: None,
+    )
+    monkeypatch.setattr(
+        nodes_api.workspace_manager,
+        "_set_cached_path",
+        lambda user_id, workspace_id, path: None,
+    )
+    monkeypatch.setattr(
+        nodes_api.workspace_manager,
+        "get_workspace",
+        lambda user_id, workspace_id: _DummyWorkspace(persist_calls),
+    )
     response = await authenticated_client.post(
         "/api/workspaces/ws-alpha/nodes/node-123/compute-column",
         json={

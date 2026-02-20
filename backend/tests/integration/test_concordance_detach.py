@@ -11,7 +11,7 @@ async def test_concordance_detach_starts_task(authenticated_client, workspace_id
     node = workspace_manager.add_node_to_workspace(
         user_id="test",  # provided by authenticated_client fixture
         workspace_id=workspace_id,
-        data=df,
+        data=df.lazy(),
         node_name="text_node",
         operation="test_add",
         parents=[],

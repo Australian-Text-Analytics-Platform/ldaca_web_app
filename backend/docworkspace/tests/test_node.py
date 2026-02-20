@@ -21,7 +21,7 @@ class TestNode:
     def test_node_creation_with_workspace(self, sample_df):
         """Test creating a Node with explicit workspace."""
         workspace = Workspace("test_workspace")
-        node = Node(sample_df, "test_node", workspace)
+        node = Node(sample_df.lazy(), "test_node", workspace)
 
         assert node.name == "test_node"
         assert isinstance(node.data, pl.LazyFrame)
@@ -31,7 +31,7 @@ class TestNode:
 
     def test_node_creation_without_workspace(self, sample_df):
         """Test creating a Node without workspace (should create one automatically)."""
-        node = Node(sample_df, "test_node")
+        node = Node(sample_df.lazy(), "test_node")
 
         assert node.name == "test_node"
         assert isinstance(node.data, pl.LazyFrame)
@@ -41,7 +41,7 @@ class TestNode:
 
     def test_node_lazy_status_polars_dataframe(self, sample_df):
         """Test lazy status for polars DataFrame."""
-        node = Node(sample_df, "test_node")
+        node = Node(sample_df.lazy(), "test_node")
         assert isinstance(node.data, pl.LazyFrame)
 
     def test_node_lazy_status_polars_lazyframe(self, sample_lazy_df):
@@ -52,7 +52,7 @@ class TestNode:
     def test_node_filter(self, sample_df):
         """Test filtering a Node."""
         workspace = Workspace("test_workspace")
-        node = Node(sample_df, "test_node", workspace)
+        node = Node(sample_df.lazy(), "test_node", workspace)
 
         # Filter using polars syntax
         filtered = node.filter(pl.col("value") > 1)
@@ -66,7 +66,7 @@ class TestNode:
 
     def test_node_slice(self, sample_df):
         """Test slicing a Node."""
-        node = Node(sample_df, "test_node")
+        node = Node(sample_df.lazy(), "test_node")
         sliced = node.slice(slice(0, 2))
 
         assert len(sliced.parents) == 1
@@ -79,8 +79,8 @@ class TestNode:
         df2 = pl.DataFrame({"key": ["A", "B"], "value2": [3, 4]})
 
         workspace = Workspace("test_workspace")
-        node1 = Node(df1, "node1", workspace)
-        node2 = Node(df2, "node2", workspace)
+        node1 = Node(df1.lazy(), "node1", workspace)
+        node2 = Node(df2.lazy(), "node2", workspace)
 
         # Polars uses join instead of merge
         merged = node1.join(node2, on="key")
@@ -88,7 +88,7 @@ class TestNode:
         assert len(merged.parents) == 2
         assert node1 in merged.parents
         assert node2 in merged.parents
-        assert len(merged.data.collect_schema().names()) == 3  # key, value1, value2
+        assert merged.data.collect_schema().len() == 3  # key, value1, value2
 
     def test_node_materialize(self, sample_lazy_df):
         """Test materializing a lazy Node."""
@@ -106,10 +106,10 @@ class TestNode:
 
     def test_node_attribute_delegation(self, sample_df):
         """Test that Node delegates attributes to the underlying data."""
-        node = Node(sample_df, "test_node")
+        node = Node(sample_df.lazy(), "test_node")
 
         # Test property access
-        assert node.shape is None
+        assert node.shape == (3, 2)
         assert list(node.columns) == list(sample_df.columns)
 
         # Test method call that returns a new DataFrame
@@ -121,7 +121,7 @@ class TestNode:
     def test_node_info(self, sample_df):
         """Test node info method returns JSON-safe dict."""
         workspace = Workspace("test_workspace")
-        node = Node(sample_df, "test_node", workspace, operation="load")
+        node = Node(sample_df.lazy(), "test_node", workspace, operation="load")
 
         info = node.info()
 
@@ -139,7 +139,7 @@ class TestNode:
 
     def test_node_repr(self, sample_df):
         """Test string representation of Node."""
-        node = Node(sample_df, "test_node")
+        node = Node(sample_df.lazy(), "test_node")
 
         repr_str = repr(node)
         assert "test_node" in repr_str
@@ -166,7 +166,7 @@ class TestNodeRelationships:
 
     def test_filter_creates_parent_child_relationship(self, workspace, sample_df):
         """Test that filter operation creates proper parent-child relationship."""
-        parent = Node(sample_df, "parent", workspace)
+        parent = Node(sample_df.lazy(), "parent", workspace)
         child = parent.filter(pl.col("category") == "A")
 
         assert len(parent.children) == 1
@@ -176,7 +176,7 @@ class TestNodeRelationships:
 
     def test_multiple_children(self, workspace, sample_df):
         """Test that a node can have multiple children."""
-        parent = Node(sample_df, "parent", workspace)
+        parent = Node(sample_df.lazy(), "parent", workspace)
 
         child1 = parent.filter(pl.col("category") == "A")
         child2 = parent.filter(pl.col("category") == "B")
@@ -192,8 +192,8 @@ class TestNodeRelationships:
         df1 = pl.DataFrame({"key": [1, 2], "val1": ["a", "b"]})
         df2 = pl.DataFrame({"key": [1, 2], "val2": ["x", "y"]})
 
-        parent1 = Node(df1, "parent1", workspace)
-        parent2 = Node(df2, "parent2", workspace)
+        parent1 = Node(df1.lazy(), "parent1", workspace)
+        parent2 = Node(df2.lazy(), "parent2", workspace)
 
         merged = parent1.join(parent2, on="key")
 

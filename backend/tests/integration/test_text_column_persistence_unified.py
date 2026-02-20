@@ -46,7 +46,7 @@ async def test_text_column_preference_persists_across_text_analyses(
                 "delta from column b",
                 "epsilon from column b",
             ],
-        }),
+        }).lazy(),
         node_name="dual_text_node",
         operation="test_setup",
         parents=[],

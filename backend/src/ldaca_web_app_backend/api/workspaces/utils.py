@@ -9,7 +9,6 @@ import polars as pl
 from fastapi import HTTPException
 
 from ...analysis.models import AnalysisStatus
-from ...core.json_utils import json_sanitize  # type: ignore
 from ...core.workspace import workspace_manager
 
 
@@ -60,18 +59,18 @@ async def ensure_task_synced(
 
 
 def success(data=None, message: str = "ok", state: str = "successful", **extra):
-    """Build a standardized success payload and sanitize JSON values.
+    """Build a standardized success payload.
 
     Used by:
     - workspace API handlers returning `{state,message,data}` contracts
 
     Why:
-    - Prevents serialization drift and non-JSON-safe value leaks.
+    - Keeps response assembly lightweight; serialization is handled by FastAPI.
     """
     payload = {"state": state, "message": message, "data": data}
     if extra:
         payload.update(extra)
-    return json_sanitize(payload)
+    return payload
 
 
 def running(message: str = "running", metadata: Optional[dict] = None):

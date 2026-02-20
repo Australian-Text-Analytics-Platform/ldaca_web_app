@@ -37,7 +37,7 @@ class TestWorkspace:
 
     def test_add_node(self, workspace, sample_df):
         """Test adding a node to workspace."""
-        node = Node(sample_df, "test_node", workspace)
+        node = Node(sample_df.lazy(), "test_node", workspace)
 
         # Node should already be in workspace due to constructor
         assert len(workspace.nodes) == 1
@@ -47,7 +47,7 @@ class TestWorkspace:
     def test_load_dataframe(self, workspace, sample_df):
         """Test loading a DataFrame into a Workspace."""
         node = workspace.add_node(
-            Node(data=sample_df, name="test_data", workspace=workspace)
+            Node(data=sample_df.lazy(), name="test_data", workspace=workspace)
         )
 
         assert len(workspace.nodes) == 1
@@ -68,15 +68,17 @@ class TestWorkspace:
         assert node.name == "lazy_data"
 
     def test_load_csv(self, workspace, sample_df):
-        """Test loading a CSV file into a Workspace."""
+        """Test explicit CSV loading into an existing Workspace."""
         # Create a temporary CSV file
         with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
             sample_df.write_csv(f.name)
             temp_path = f.name
 
         try:
-            # Use workspace's CSV loading via _load_initial_data
-            node = workspace._load_initial_data(temp_path, "csv_data", csv_lazy=False)
+            lazy_data = pl.read_csv(temp_path).lazy()
+            node = workspace.add_node(
+                Node(data=lazy_data, name="csv_data", workspace=workspace)
+            )
 
             assert len(workspace.nodes) == 1
             assert node.name == "csv_data"
@@ -88,7 +90,7 @@ class TestWorkspace:
     def test_get_node_by_name(self, workspace, sample_df):
         """Test getting a node by name."""
         node = workspace.add_node(
-            Node(data=sample_df, name="test_data", workspace=workspace)
+            Node(data=sample_df.lazy(), name="test_data", workspace=workspace)
         )
 
         found_node = workspace.get_node_by_name("test_data")
@@ -100,7 +102,7 @@ class TestWorkspace:
     def test_get_root_nodes(self, workspace, sample_df):
         """Test getting root nodes (nodes without parents)."""
         root_node = workspace.add_node(
-            Node(data=sample_df, name="root", workspace=workspace)
+            Node(data=sample_df.lazy(), name="root", workspace=workspace)
         )
         child_node = root_node.filter(pl.col("value") > 1)
 
@@ -113,7 +115,7 @@ class TestWorkspace:
     def test_get_leaf_nodes(self, workspace, sample_df):
         """Test getting leaf nodes (nodes without children)."""
         root_node = workspace.add_node(
-            Node(data=sample_df, name="root", workspace=workspace)
+            Node(data=sample_df.lazy(), name="root", workspace=workspace)
         )
         child_node = root_node.filter(pl.col("value") > 1)
 
@@ -144,7 +146,7 @@ class TestWorkspace:
         """Test workspace summary."""
         # Create some nodes
         root1 = workspace.add_node(
-            Node(data=sample_df, name="root1", workspace=workspace)
+            Node(data=sample_df.lazy(), name="root1", workspace=workspace)
         )
         root2 = workspace.add_node(
             Node(data=sample_df.lazy(), name="root2", workspace=workspace)
@@ -162,13 +164,13 @@ class TestWorkspace:
     def test_workspace_iteration(self, workspace, sample_df):
         """Test iterating over workspace nodes."""
         node1 = workspace.add_node(
-            Node(data=sample_df, name="node1", workspace=workspace)
+            Node(data=sample_df.lazy(), name="node1", workspace=workspace)
         )
         node2 = workspace.add_node(
-            Node(data=sample_df, name="node2", workspace=workspace)
+            Node(data=sample_df.lazy(), name="node2", workspace=workspace)
         )
         node3 = workspace.add_node(
-            Node(data=sample_df, name="node3", workspace=workspace)
+            Node(data=sample_df.lazy(), name="node3", workspace=workspace)
         )
 
         nodes_list = list(workspace)
@@ -182,10 +184,14 @@ class TestWorkspace:
         """Test len() on workspace."""
         assert len(workspace) == 0
 
-        workspace.add_node(Node(data=sample_df, name="node1", workspace=workspace))
+        workspace.add_node(
+            Node(data=sample_df.lazy(), name="node1", workspace=workspace)
+        )
         assert len(workspace) == 1
 
-        workspace.add_node(Node(data=sample_df, name="node2", workspace=workspace))
+        workspace.add_node(
+            Node(data=sample_df.lazy(), name="node2", workspace=workspace)
+        )
         assert len(workspace) == 2
 
 
@@ -209,8 +215,12 @@ class TestWorkspaceSerialization:
 
         df2 = pl.DataFrame({"id": [1, 2, 3], "extra": ["x", "y", "z"]})
 
-        root1 = workspace.add_node(Node(data=df1, name="root1", workspace=workspace))
-        root2 = workspace.add_node(Node(data=df2, name="root2", workspace=workspace))
+        root1 = workspace.add_node(
+            Node(data=df1.lazy(), name="root1", workspace=workspace)
+        )
+        root2 = workspace.add_node(
+            Node(data=df2.lazy(), name="root2", workspace=workspace)
+        )
 
         # Create relationships
         root1.filter(pl.col("category") == "A")
@@ -224,10 +234,10 @@ class TestWorkspaceSerialization:
             meta_path = Path(tmpdir) / "metadata.json"
 
             # Serialize
-            populated_workspace.serialize(meta_path)
+            populated_workspace.save(meta_path)
 
             # Deserialize
-            loaded_workspace = Workspace.deserialize(meta_path)
+            loaded_workspace = Workspace.load(meta_path)
 
             # Check workspace properties
             assert loaded_workspace.name == populated_workspace.name
@@ -256,10 +266,10 @@ class TestWorkspaceSerialization:
             meta_path = Path(tmpdir) / "metadata.json"
 
             # Serialize
-            populated_workspace.serialize(meta_path)
+            populated_workspace.save(meta_path)
 
             # Deserialize
-            loaded_workspace = Workspace.deserialize(meta_path)
+            loaded_workspace = Workspace.load(meta_path)
 
             # Check workspace properties
             assert loaded_workspace.name == populated_workspace.name
@@ -284,10 +294,10 @@ class TestWorkspaceSerialization:
             meta_path = Path(tmpdir) / "metadata.json"
 
             # Serialize (JSON format only)
-            workspace.serialize(meta_path)
+            workspace.save(meta_path)
 
             # Deserialize
-            loaded_workspace = Workspace.deserialize(meta_path)
+            loaded_workspace = Workspace.load(meta_path)
 
             # Check nodes
             loaded_lazy = loaded_workspace.get_node_by_name("lazy_node")
@@ -300,7 +310,9 @@ class TestWorkspaceSerialization:
         # Create a workspace and export to new format
         workspace = Workspace("test")
         df = pl.DataFrame({"a": [1, 2, 3]})
-        node = workspace.add_node(Node(data=df, name="test_df", workspace=workspace))
+        node = workspace.add_node(
+            Node(data=df.lazy(), name="test_df", workspace=workspace)
+        )
         workspace.set_metadata("description", "dict workspace")
         workspace.set_metadata("created_at", "2024-02-01T00:00:00Z")
         workspace.set_metadata("modified_at", "2024-02-02T00:00:00Z")
@@ -325,7 +337,7 @@ class TestWorkspaceSerialization:
             workspace_dict["nodes"].append(node_payload)
 
         # Load from dict
-        loaded = Workspace.from_dict(workspace_dict)
+        loaded = Workspace.load(workspace_dict)
 
         assert loaded.name == workspace.name
         assert len(loaded.nodes) == 1
@@ -342,7 +354,7 @@ class TestWorkspaceSerialization:
         """
         with tempfile.TemporaryDirectory() as tmpdir:
             meta_path = Path(tmpdir) / "metadata.json"
-            populated_workspace.serialize(meta_path)
+            populated_workspace.save(meta_path)
             import json as _json
 
             with open(meta_path, "r", encoding="utf-8") as fh:
@@ -370,12 +382,12 @@ class TestWorkspaceSerialization:
         """
         workspace = Workspace("ws")
         df = pl.DataFrame({"a": [1, 2, 3]})
-        node = workspace.add_node(Node(data=df, name="n", workspace=workspace))
+        node = workspace.add_node(Node(data=df.lazy(), name="n", workspace=workspace))
 
         with tempfile.TemporaryDirectory() as tmpdir:
             # Persist once to create the binary file
             meta_path = Path(tmpdir) / "metadata.json"
-            workspace.serialize(meta_path)
+            workspace.save(meta_path)
 
             # Simulate backend behavior: attach workspace dir for file cleanup
             setattr(workspace, "_workspace_dir", Path(tmpdir))
@@ -390,11 +402,11 @@ class TestWorkspaceSerialization:
         """Persisting should clean up stale *.plbin files not referenced by nodes."""
         workspace = Workspace("ws")
         df = pl.DataFrame({"a": [1]})
-        workspace.add_node(Node(data=df, name="n", workspace=workspace))
+        workspace.add_node(Node(data=df.lazy(), name="n", workspace=workspace))
 
         with tempfile.TemporaryDirectory() as tmpdir:
             meta_path = Path(tmpdir) / "metadata.json"
-            workspace.serialize(meta_path)
+            workspace.save(meta_path)
 
             orphan = Path(tmpdir) / "data" / "orphan.plbin"
             orphan.parent.mkdir(parents=True, exist_ok=True)
@@ -402,7 +414,7 @@ class TestWorkspaceSerialization:
             assert orphan.exists()
 
             # Re-save; should remove orphan
-            workspace.serialize(meta_path)
+            workspace.save(meta_path)
             assert not orphan.exists()
 
 
@@ -418,8 +430,8 @@ class TestWorkspaceGraphOperations:
         df1 = pl.DataFrame({"id": [1, 2, 3], "value": [10, 20, 30]})
         df2 = pl.DataFrame({"id": [2, 3, 4], "score": [0.5, 0.7, 0.9]})
 
-        root1 = workspace.add_node(Node(df1, "root1"))
-        root2 = workspace.add_node(Node(df2, "root2"))
+        root1 = workspace.add_node(Node(df1.lazy(), "root1"))
+        root2 = workspace.add_node(Node(df2.lazy(), "root2"))
 
         # Create derived nodes
         filtered1 = root1.filter(pl.col("value") > 15)
@@ -465,22 +477,26 @@ class TestWorkspaceGraphOperations:
             assert node.name in visualization
 
     def test_workspace_with_initial_data_loading(self):
-        """Test workspace creation with initial data loading."""
-        # Test with DataFrame
+        """Test explicit initial data loading after creating an empty workspace."""
+        # Test with DataFrame converted to LazyFrame before creating a Node.
         df = pl.DataFrame({"col": [1, 2, 3]})
-        workspace1 = Workspace("test1", data=df, data_name="initial_data")
+        workspace1 = Workspace("test1")
+        workspace1.add_node(
+            Node(data=df.lazy(), name="initial_data", workspace=workspace1)
+        )
         assert len(workspace1.nodes) == 1
         assert "initial_data" in [n.name for n in workspace1.nodes.values()]
 
         # Test with LazyFrame
         lazy_df = pl.LazyFrame({"col": [4, 5, 6]})
-        workspace2 = Workspace("test2", data=lazy_df, data_name="lazy_data")
+        workspace2 = Workspace("test2")
+        workspace2.add_node(Node(data=lazy_df, name="lazy_data", workspace=workspace2))
         assert len(workspace2.nodes) == 1
         node = list(workspace2.nodes.values())[0]
         assert isinstance(node.data, pl.LazyFrame)
 
     def test_workspace_csv_loading(self):
-        """Test workspace CSV loading functionality."""
+        """Test explicit CSV loading workflow for workspaces."""
         # Create a temporary CSV file
         df = pl.DataFrame({
             "name": ["Alice", "Bob", "Charlie"],
@@ -493,15 +509,27 @@ class TestWorkspaceGraphOperations:
             temp_path = f.name
 
         try:
-            # Test lazy loading (default)
-            workspace1 = Workspace("csv_test1", data=temp_path, data_name="csv_data")
+            # Test lazy loading (scan CSV and add node explicitly)
+            workspace1 = Workspace("csv_test1")
+            workspace1.add_node(
+                Node(
+                    data=pl.scan_csv(temp_path),
+                    name="csv_data",
+                    workspace=workspace1,
+                )
+            )
             assert len(workspace1.nodes) == 1
             node1 = list(workspace1.nodes.values())[0]
             assert isinstance(node1.data, pl.LazyFrame)
 
-            # Test eager loading (still coerced to lazy)
-            workspace2 = Workspace(
-                "csv_test2", data=temp_path, data_name="csv_data", csv_lazy=False
+            # Test eager loading converted to LazyFrame before add.
+            workspace2 = Workspace("csv_test2")
+            workspace2.add_node(
+                Node(
+                    data=pl.read_csv(temp_path).lazy(),
+                    name="csv_data",
+                    workspace=workspace2,
+                )
             )
             assert len(workspace2.nodes) == 1
             node2 = list(workspace2.nodes.values())[0]
@@ -515,7 +543,7 @@ class TestWorkspaceGraphOperations:
         workspace2 = Workspace("ws2")
 
         df = pl.DataFrame({"col": [1, 2, 3]})
-        node = Node(df, "test_node", workspace1)
+        node = Node(df.lazy(), "test_node", workspace1)
 
         # Node should be in workspace1
         assert node.id in workspace1.nodes
@@ -562,7 +590,7 @@ class TestWorkspaceGraphOperations:
 
         # Add a node
         df = pl.DataFrame({"col": [1]})
-        workspace.add_node(Node(df, "test"))
+        workspace.add_node(Node(df.lazy(), "test"))
 
         assert bool(workspace) is True
         assert len(workspace) == 1
@@ -574,8 +602,8 @@ class TestWorkspaceGraphOperations:
         df1 = pl.DataFrame({"col1": [1, 2]})
         df2 = pl.DataFrame({"col2": [3, 4]})
 
-        node1 = workspace.add_node(Node(df1, "node1"))
-        node2 = workspace.add_node(Node(df2, "node2"))
+        node1 = workspace.add_node(Node(df1.lazy(), "node1"))
+        node2 = workspace.add_node(Node(df2.lazy(), "node2"))
 
         # Test iteration
         nodes_from_iter = list(workspace)
@@ -589,7 +617,7 @@ class TestWorkspaceGraphOperations:
 
         # Create parent and child nodes
         df = pl.LazyFrame({"col": [1, 2, 3, 4, 5]})
-        parent = workspace.add_node(Node(df, "parent"))
+        parent = workspace.add_node(Node(df.lazy(), "parent"))
         child = parent.filter(pl.col("col") > 2)
 
         assert isinstance(child.data, pl.LazyFrame)

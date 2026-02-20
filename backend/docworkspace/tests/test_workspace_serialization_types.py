@@ -12,19 +12,19 @@ def build_sample_objects():
     return pdf, lazy
 
 
-def test_workspace_serialize_deserialize_preserves_types(tmp_path):
+def test_workspace_save_load_preserves_types(tmp_path):
     pdf, lazy = build_sample_objects()
 
     ws = Workspace(name="test_ws")
-    ws.add_node(Node(data=pdf, name="df"))
+    ws.add_node(Node(data=pdf.lazy(), name="df"))
     ws.add_node(Node(data=lazy, name="lazy"))
 
     out_file = tmp_path / "workspace_save.json"
-    ws.serialize(out_file, format="json")
+    ws.save(out_file, format="json")
 
     assert out_file.exists(), "Serialized workspace file not created"
 
-    ws2 = Workspace.deserialize(out_file, format="json")
+    ws2 = Workspace.load(out_file, format="json")
 
     # Collect types by node name
     type_map = {n.name: type(n.data).__name__ for n in ws2.nodes.values()}
@@ -39,10 +39,10 @@ def test_workspace_serialize_deserialize_preserves_types(tmp_path):
 
 def test_workspace_binary_not_implemented(tmp_path):
     ws = Workspace(name="bin_ws")
-    ws.add_node(Node(data=pl.DataFrame({"x": [1]}), name="df"))
+    ws.add_node(Node(data=pl.DataFrame({"x": [1]}).lazy(), name="df"))
 
     with pytest.raises(NotImplementedError):
-        ws.serialize(tmp_path / "ws.bin", format="binary")
+        ws.save(tmp_path / "ws.bin", format="binary")
 
     # Create a dummy json file to attempt binary deserialize and confirm error
     dummy = tmp_path / "ws.json"
@@ -57,4 +57,4 @@ def test_workspace_binary_not_implemented(tmp_path):
         })
     )
     with pytest.raises(NotImplementedError):
-        Workspace.deserialize(dummy, format="binary")
+        Workspace.load(dummy, format="binary")

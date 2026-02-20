@@ -13,20 +13,15 @@ import os
 import shutil
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional
 
 import polars as pl
 from docworkspace import Node, Workspace  # type: ignore
-from docworkspace.workspace.io import read_workspace  # type: ignore
-from docworkspace.workspace.io import write_workspace
 
-from .api_models import OperationResult
-from .docworkspace_api import DocWorkspaceAPIUtils, exception_to_error_response
+from .docworkspace_api import DocWorkspaceAPIUtils
 from .utils import (
     allocate_workspace_folder,
     ensure_display_folder_name,
-    find_workspace_folder_by_id,
-    generate_workspace_id,
     get_user_workspace_folder,
 )
 
@@ -59,6 +54,44 @@ class WorkspaceManager:
     def _set_cached_path(self, user_id: str, workspace_id: str, path: Path) -> None:
         self._paths[self._path_key(user_id, workspace_id)] = path
 
+    def _clear_user_cached_paths(self, user_id: str) -> None:
+        """Remove all cached workspace-folder mappings for a user."""
+        keys = [key for key in self._paths.keys() if key[0] == user_id]
+        for key in keys:
+            self._paths.pop(key, None)
+
+    def _refresh_user_workspace_paths(self, user_id: str) -> None:
+        """Actively rescan user workspace folders and rebuild id->path cache."""
+        self._clear_user_cached_paths(user_id)
+        user_folder = get_user_workspace_folder(user_id)
+        if not user_folder.exists():
+            return
+
+        for workspace_dir in user_folder.iterdir():
+            if not workspace_dir.is_dir():
+                continue
+
+            metadata_path = workspace_dir / "metadata.json"
+            if not metadata_path.exists() or not metadata_path.is_file():
+                continue
+
+            try:
+                with metadata_path.open("r", encoding="utf-8") as f:
+                    raw = json.load(f)
+            except Exception:
+                continue
+
+            wid = raw.get("workspace_metadata", {}).get("id")
+            if wid:
+                self._set_cached_path(user_id, wid, workspace_dir)
+
+    def _get_indexed_path(self, user_id: str, workspace_id: str) -> Optional[Path]:
+        """Get workspace folder from cache only (no active directory scans)."""
+        cached = self._get_cached_path(user_id, workspace_id)
+        if cached and cached.exists():
+            return cached
+        return None
+
     def _attach_workspace_dir(self, workspace: Workspace, path: Path) -> None:
         try:
             setattr(workspace, "_workspace_dir", path)
@@ -78,20 +111,14 @@ class WorkspaceManager:
         """Resolve or allocate on-disk folder for a workspace id/name.
 
         Used by:
-        - `_save`, `_replace_current`, `create_workspace`
+        - workspace persistence operations
 
         Why:
         - Keeps workspace folder naming consistent and discoverable on disk.
         """
-        cached = self._get_cached_path(user_id, workspace_id)
+        cached = self._get_indexed_path(user_id, workspace_id)
         if cached and cached.exists():
             updated = ensure_display_folder_name(cached, workspace_name)
-            self._set_cached_path(user_id, workspace_id, updated)
-            return updated
-
-        found = find_workspace_folder_by_id(user_id, workspace_id)
-        if found:
-            updated = ensure_display_folder_name(found, workspace_name)
             self._set_cached_path(user_id, workspace_id, updated)
             return updated
 
@@ -99,69 +126,6 @@ class WorkspaceManager:
         allocated = allocate_workspace_folder(user_id, workspace_name)
         self._set_cached_path(user_id, workspace_id, allocated)
         return allocated
-
-    def _save(self, user_id: str, workspace_id: str, workspace: Workspace) -> None:
-        """Persist workspace metadata and node payloads to its folder.
-
-        Used by:
-        - lifecycle operations, node mutations, workspace switching
-
-        Why:
-        - Centralizes durable persistence and path bookkeeping.
-        """
-        workspace.set_metadata("modified_at", datetime.now().isoformat())
-        target_dir = self._resolve_workspace_dir(
-            user_id=user_id, workspace_id=workspace_id, workspace_name=workspace.name
-        )
-        self._attach_workspace_dir(workspace, target_dir)
-        write_workspace(workspace, target_dir)
-        self._set_cached_path(user_id, workspace_id, target_dir)
-        current_entry = self._current.get(user_id)
-        if current_entry and current_entry.get("id") == workspace_id:
-            current_entry["path"] = target_dir
-            self._current[user_id] = current_entry
-
-    def _load(self, user_id: str, workspace_id: str) -> Workspace | None:
-        """Load a workspace from disk and attach runtime directory metadata.
-
-        Used by:
-        - `get_workspace`, `set_current_workspace`
-
-        Why:
-        - Provides one deserialization boundary for all workspace access paths.
-        """
-        target_dir = find_workspace_folder_by_id(user_id, workspace_id)
-        if target_dir is None:
-            print(
-                f"Workspace folder not found for workspace {workspace_id} under user {user_id}"
-            )
-            return None
-        try:
-            ws = read_workspace(target_dir)
-            # Ensure folder name mirrors current workspace name for discoverability
-            updated_dir = ensure_display_folder_name(target_dir, ws.name)
-            self._attach_workspace_dir(ws, updated_dir)
-            self._set_working_dir(updated_dir)
-            self._set_cached_path(user_id, workspace_id, updated_dir)
-            return ws
-        except Exception as e:  # pragma: no cover
-            print(
-                f"Failed to deserialize workspace {workspace_id} from {target_dir}: {e}"
-            )
-            return None
-
-    def _replace_current(self, user_id: str, new_id: str, new_ws: Any):
-        current_id, current_ws, _ = self._get_current_entry(user_id)
-        if current_id is not None and current_ws is not None:
-            self._save(user_id, current_id, current_ws)
-            # Don't drop analysis state when switching workspaces - analyses should
-            # persist across workspace switches until explicitly cleared or unloaded
-            # if current_id != new_id:
-            #     self.drop_analysis_state(user_id, current_id)
-        new_path = self._resolve_workspace_dir(user_id, new_id, new_ws.name)
-        self._attach_workspace_dir(new_ws, new_path)
-        self._set_working_dir(new_path)
-        self._current[user_id] = {"id": new_id, "ws": new_ws, "path": new_path}
 
     # ---------------- Public API ----------------
     def get_current_workspace_id(self, user_id: str) -> Optional[str]:
@@ -176,43 +140,49 @@ class WorkspaceManager:
         if workspace_id is None:
             cid, cws, _ = self._get_current_entry(user_id)
             if cid and cws:
-                self._save(user_id, cid, cws)
+                cws.set_metadata("modified_at", datetime.now().isoformat())
+                target_dir = self._resolve_workspace_dir(
+                    user_id=user_id,
+                    workspace_id=cid,
+                    workspace_name=cws.name,
+                )
+                self._attach_workspace_dir(cws, target_dir)
+                cws.save(target_dir)
+                self._set_cached_path(user_id, cid, target_dir)
             self._current.pop(user_id, None)
             return True
         cid, cws, _ = self._get_current_entry(user_id)
         if cid == workspace_id and cws is not None:
             return True
-        new_ws = self._load(user_id, workspace_id)
+        if cid is not None and cws is not None:
+            # Strict switch behavior: always unload current before loading next.
+            self.unload_workspace(user_id, save=True)
+        target_dir = self._get_indexed_path(user_id, workspace_id)
+        if target_dir is None:
+            print(
+                f"Workspace folder not found for workspace {workspace_id} under user {user_id}"
+            )
+            return False
+        try:
+            new_ws = Workspace.load(target_dir)
+            updated_dir = ensure_display_folder_name(target_dir, new_ws.name)
+            self._attach_workspace_dir(new_ws, updated_dir)
+            self._set_working_dir(updated_dir)
+            self._set_cached_path(user_id, workspace_id, updated_dir)
+        except Exception as e:  # pragma: no cover
+            print(
+                f"Failed to deserialize workspace {workspace_id} from {target_dir}: {e}"
+            )
+            return False
         if not new_ws:
             return False
-        self._replace_current(user_id, workspace_id, new_ws)
+        current_path = self._get_cached_path(user_id, workspace_id)
+        self._current[user_id] = {
+            "id": workspace_id,
+            "ws": new_ws,
+            "path": current_path,
+        }
         return True
-
-    def create_workspace(
-        self,
-        user_id: str,
-        name: str,
-        description: str = "",
-        data: Optional[Union[str, Path, pl.DataFrame, pl.LazyFrame]] = None,
-        data_name: Optional[str] = None,
-    ) -> Any:
-        cid, cws, _ = self._get_current_entry(user_id)
-        if cid is not None and cws is not None:
-            self._save(user_id, cid, cws)
-        ws = Workspace(name=name, data=data, data_name=data_name)
-        wid = generate_workspace_id()
-        ws.id = wid
-        now = datetime.now().isoformat()
-        ws.set_metadata("description", description)
-        ws.set_metadata("created_at", now)
-        ws.set_metadata("modified_at", now)
-        target_dir = self._resolve_workspace_dir(user_id, wid, ws.name)
-        self._attach_workspace_dir(ws, target_dir)
-        self._set_working_dir(target_dir)
-        write_workspace(ws, target_dir)
-        self._set_cached_path(user_id, wid, target_dir)
-        self._current[user_id] = {"id": wid, "ws": ws, "path": target_dir}
-        return ws
 
     def get_workspace(self, user_id: str, workspace_id: str) -> Optional[Any]:
         cid, cws, _ = self._get_current_entry(user_id)
@@ -223,53 +193,54 @@ class WorkspaceManager:
                     self._attach_workspace_dir(cws, cached)
                     self._set_working_dir(cached)
             return cws
-        ws = self._load(user_id, workspace_id)
-        if not ws:
+        if not self.set_current_workspace(user_id, workspace_id):
             return None
-        self._replace_current(user_id, workspace_id, ws)
+        _, ws, _ = self._get_current_entry(user_id)
         return ws
 
     def list_user_workspaces_summaries(self, user_id: str) -> Dict[str, Dict[str, Any]]:
         summaries: Dict[str, Dict[str, Any]] = {}
         cid, cws, _ = self._get_current_entry(user_id)
-        user_folder = get_user_workspace_folder(user_id)
-        if not user_folder.exists():
-            return summaries
-        for workspace_dir in user_folder.iterdir():
-            if not workspace_dir.is_dir():
-                continue
-            metadata_path = workspace_dir / "metadata.json"
-            if not metadata_path.exists() or not metadata_path.is_file():
-                continue
-            try:
-                with metadata_path.open("r", encoding="utf-8") as f:
-                    raw = json.load(f)
-            except Exception:
-                continue
-            ws_meta = raw.get("workspace_metadata", {})
-            wid = ws_meta.get("id")
-            if not wid:
-                continue
+        # Active refresh point: called when Data Loader opens and when user presses refresh.
+        self._refresh_user_workspace_paths(user_id)
+
+        user_workspace_items = [
+            (wid, path)
+            for (uid, wid), path in self._paths.items()
+            if uid == user_id and path.exists()
+        ]
+
+        for wid, workspace_dir in user_workspace_items:
             if wid == cid and cws is not None:
                 target = cws
             else:
-                target = self._load(user_id, wid)
+                try:
+                    target = Workspace.load(workspace_dir)
+                    updated_dir = ensure_display_folder_name(workspace_dir, target.name)
+                    self._attach_workspace_dir(target, updated_dir)
+                    self._set_cached_path(user_id, wid, updated_dir)
+                except Exception:
+                    target = None
             if not target:
                 continue
             try:
                 summary = target.summary()
-                cached_path = self._get_cached_path(user_id, wid) or workspace_dir
+                cached_path = workspace_dir
+                workspace_size_Byte = 0
+                try:
+                    for file_path in cached_path.rglob("*"):
+                        if file_path.is_file():
+                            workspace_size_Byte += file_path.stat().st_size
+                except Exception:
+                    workspace_size_Byte = 0
                 summaries[wid] = {
                     "workspace_id": wid,
                     "name": getattr(target, "name", wid),
                     "description": target.get_metadata("description") or "",
                     "created_at": target.get_metadata("created_at") or "",
                     "modified_at": target.get_metadata("modified_at") or "",
-                    "file_size": metadata_path.stat().st_size,
                     "node_count": summary.get("total_nodes"),
-                    "root_nodes": summary.get("root_nodes"),
-                    "leaf_nodes": summary.get("leaf_nodes"),
-                    "node_types": summary.get("node_types"),
+                    "workspace_size_Byte": workspace_size_Byte,
                     "folder_name": cached_path.name,
                 }
             except Exception:
@@ -282,13 +253,19 @@ class WorkspaceManager:
         cid, cws, _ = self._get_current_entry(user_id)
         if cid == workspace_id and cws is not None:
             try:
-                self._save(user_id, cid, cws)
+                cws.set_metadata("modified_at", datetime.now().isoformat())
+                target_dir = self._resolve_workspace_dir(
+                    user_id=user_id,
+                    workspace_id=cid,
+                    workspace_name=cws.name,
+                )
+                self._attach_workspace_dir(cws, target_dir)
+                cws.save(target_dir)
+                self._set_cached_path(user_id, cid, target_dir)
             except Exception:
                 pass
             self._current.pop(user_id, None)
-        target_dir = self._get_cached_path(
-            user_id, workspace_id
-        ) or find_workspace_folder_by_id(user_id, workspace_id)
+        target_dir = self._get_indexed_path(user_id, workspace_id)
         if target_dir and target_dir.exists():
             shutil.rmtree(target_dir, ignore_errors=True)
             self._paths.pop(self._path_key(user_id, workspace_id), None)
@@ -334,19 +311,15 @@ class WorkspaceManager:
         return sorted(scopes)
 
     def get_workspace_dir(self, user_id: str, workspace_id: str) -> Optional[Path]:
-        cached = self._get_cached_path(user_id, workspace_id)
+        cached = self._get_indexed_path(user_id, workspace_id)
+        if cached is None:
+            self._refresh_user_workspace_paths(user_id)
+            cached = self._get_indexed_path(user_id, workspace_id)
         if cached and cached.exists():
             cid, cws, _ = self._get_current_entry(user_id)
             if cid == workspace_id and cws is not None:
                 self._attach_workspace_dir(cws, cached)
             return cached
-        found = find_workspace_folder_by_id(user_id, workspace_id)
-        if found:
-            self._set_cached_path(user_id, workspace_id, found)
-            cid, cws, _ = self._get_current_entry(user_id)
-            if cid == workspace_id and cws is not None:
-                self._attach_workspace_dir(cws, found)
-            return found
         return None
 
     def unload_workspace(self, user_id: str, save: bool = True) -> bool:
@@ -362,7 +335,15 @@ class WorkspaceManager:
         if not cid or not cws:
             return False
         if save:
-            self._save(user_id, cid, cws)
+            cws.set_metadata("modified_at", datetime.now().isoformat())
+            target_dir = self._resolve_workspace_dir(
+                user_id=user_id,
+                workspace_id=cid,
+                workspace_name=cws.name,
+            )
+            self._attach_workspace_dir(cws, target_dir)
+            cws.save(target_dir)
+            self._set_cached_path(user_id, cid, target_dir)
         self._current.pop(user_id, None)
         return True
 
@@ -371,7 +352,7 @@ class WorkspaceManager:
         self,
         user_id: str,
         workspace_id: str,
-        data: Any,
+        data: pl.LazyFrame,
         node_name: str,
         operation: str = "manual_add",
         parents: Optional[list[Any]] = None,
@@ -387,7 +368,15 @@ class WorkspaceManager:
                 parents=parents or [],
                 operation=operation,
             )
-            self._save(user_id, workspace_id, ws)
+            ws.set_metadata("modified_at", datetime.now().isoformat())
+            target_dir = self._resolve_workspace_dir(
+                user_id=user_id,
+                workspace_id=workspace_id,
+                workspace_name=ws.name,
+            )
+            self._attach_workspace_dir(ws, target_dir)
+            ws.save(target_dir)
+            self._set_cached_path(user_id, workspace_id, target_dir)
             return node
         except Exception as e:  # pragma: no cover
             print(f"Error creating node: {e}")
@@ -420,7 +409,15 @@ class WorkspaceManager:
                             candidate.unlink()
             except Exception:
                 pass
-            self._save(user_id, workspace_id, ws)
+            ws.set_metadata("modified_at", datetime.now().isoformat())
+            target_dir = self._resolve_workspace_dir(
+                user_id=user_id,
+                workspace_id=workspace_id,
+                workspace_name=ws.name,
+            )
+            self._attach_workspace_dir(ws, target_dir)
+            ws.save(target_dir)
+            self._set_cached_path(user_id, workspace_id, target_dir)
         return success
 
     # ---------------- Graph / info operations ----------------
@@ -466,61 +463,6 @@ class WorkspaceManager:
             "status_counts": summary["status_counts"],
         }
 
-    def execute_workspace_operation(
-        self, user_id: str, workspace_id: str, operation_func, *args, **kwargs
-    ):
-        ws = self.get_workspace(user_id, workspace_id)
-        if ws is None:
-            return {"success": False, "message": "Workspace not found"}
-        try:
-            result = operation_func(*args, **kwargs)
-            # If operation produced a Node, include metadata; else, include stringified result
-            if Node is not None and isinstance(result, Node):  # type: ignore[arg-type]
-                op_result = OperationResult(
-                    success=True,
-                    message="Operation completed successfully",
-                    node_id=result.id,
-                    data={
-                        "node_name": result.name,
-                    },
-                )
-            else:
-                op_result = OperationResult(
-                    success=True,
-                    message="Operation completed successfully",
-                    data={"result": str(result)},
-                )
-        except Exception as e:
-            error_response = exception_to_error_response(e)
-            op_result = OperationResult(
-                success=False,
-                message=f"Operation failed: {error_response.message}",
-                errors=[error_response.error],
-            )
-        self._save(user_id, workspace_id, ws)
-        return op_result
 
-    def persist(self, user_id: str, workspace_id: str) -> None:
-        ws = self.get_workspace(user_id, workspace_id)
-        if ws is not None:
-            self._save(user_id, workspace_id, ws)
-
-    def save_workspace_object(
-        self, user_id: str, workspace_id: str, workspace: Workspace
-    ) -> None:
-        """Persist a provided workspace object under the given workspace id.
-
-        Used by:
-        - lifecycle clone/import flows that materialize a workspace object first
-
-        Why:
-        - Provides a public persistence API for callers that already hold a
-          workspace instance, avoiding private method coupling.
-        """
-        self._save(user_id, workspace_id, workspace)
-
-
-# Global singleton
-workspace_manager = WorkspaceManager()
 # Global singleton
 workspace_manager = WorkspaceManager()

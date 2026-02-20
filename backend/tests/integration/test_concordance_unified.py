@@ -74,7 +74,7 @@ async def test_concordance_single_node_roundtrip(authenticated_client, workspace
     node = workspace_manager.add_node_to_workspace(
         user_id="test",
         workspace_id=workspace_id,
-        data=df,
+        data=df.lazy(),
         node_name="single_text_node",
         operation="test_setup",
         parents=[],
@@ -211,7 +211,7 @@ async def test_concordance_multi_node_combined(authenticated_client, workspace_i
     left_node = workspace_manager.add_node_to_workspace(
         user_id="test",
         workspace_id=workspace_id,
-        data=df_left,
+        data=df_left.lazy(),
         node_name="left_docs",
         operation="test_setup",
         parents=[],
@@ -221,7 +221,7 @@ async def test_concordance_multi_node_combined(authenticated_client, workspace_i
     right_node = workspace_manager.add_node_to_workspace(
         user_id="test",
         workspace_id=workspace_id,
-        data=df_right,
+        data=df_right.lazy(),
         node_name="right_docs",
         operation="test_setup",
         parents=[],
@@ -301,7 +301,7 @@ async def test_concordance_combined_toggle_after_separated_request(
     left_node = workspace_manager.add_node_to_workspace(
         user_id="test",
         workspace_id=workspace_id,
-        data=df_left,
+        data=df_left.lazy(),
         node_name="left_docs",
         operation="test_setup",
         parents=[],
@@ -311,7 +311,7 @@ async def test_concordance_combined_toggle_after_separated_request(
     right_node = workspace_manager.add_node_to_workspace(
         user_id="test",
         workspace_id=workspace_id,
-        data=df_right,
+        data=df_right.lazy(),
         node_name="right_docs",
         operation="test_setup",
         parents=[],
@@ -381,7 +381,7 @@ async def test_concordance_combined_handles_mismatched_columns(
     left_node = workspace_manager.add_node_to_workspace(
         user_id="test",
         workspace_id=workspace_id,
-        data=left_df,
+        data=left_df.lazy(),
         node_name="left_docs",
         operation="test_setup",
         parents=[],
@@ -391,7 +391,7 @@ async def test_concordance_combined_handles_mismatched_columns(
     right_node = workspace_manager.add_node_to_workspace(
         user_id="test",
         workspace_id=workspace_id,
-        data=right_df,
+        data=right_df.lazy(),
         node_name="right_docs",
         operation="test_setup",
         parents=[],

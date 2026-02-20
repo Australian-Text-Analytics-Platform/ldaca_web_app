@@ -2,6 +2,7 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import DataLoaderFeature from '../DataLoaderFeature';
 
 vi.mock('sonner', () => ({
@@ -100,14 +101,32 @@ vi.mock('@/components/help/HelpIcon', () => ({
   default: () => null,
 }));
 
+vi.mock('@/api/workspaces', () => ({
+  workspacesApi: {
+    uploadZip: vi.fn(),
+    downloadZip: vi.fn(),
+  },
+}));
+
 describe('DataLoaderFeature citation UI', () => {
+  const renderWithProviders = (ui: React.ReactElement) => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+        },
+      },
+    });
+    return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it('shows inline citation icon only for files with readme and opens citation dialog', async () => {
     const user = userEvent.setup();
-    render(<DataLoaderFeature />);
+    renderWithProviders(<DataLoaderFeature />);
 
     const citationButtons = screen.getAllByLabelText(/view citation/i);
     expect(citationButtons).toHaveLength(1);
@@ -117,5 +136,12 @@ describe('DataLoaderFeature citation UI', () => {
     expect(screen.getByRole('heading', { name: 'Citation' })).toBeInTheDocument();
     expect(screen.getByText('ADO Citation')).toBeInTheDocument();
     expect(screen.getByText('Reference text.')).toBeInTheDocument();
+  });
+
+  it('renders workspace upload and download controls', () => {
+    renderWithProviders(<DataLoaderFeature />);
+
+    expect(screen.getByRole('button', { name: /upload workspace/i })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /download/i }).length).toBeGreaterThan(0);
   });
 });

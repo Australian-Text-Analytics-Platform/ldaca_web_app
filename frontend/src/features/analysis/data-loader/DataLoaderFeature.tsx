@@ -10,6 +10,7 @@ import { useAuth } from '../../../hooks/useAuth';
 import { useFiles } from '../../../hooks/useFiles';
 import { queryKeys } from '../../../lib/queryKeys';
 import { filesApi } from '../../../api/files';
+import { workspacesApi } from '../../../api/workspaces';
 import { FileInfo } from '../../../types';
 import { AddFilePanel, FilePreviewPanel } from '../../../components/panels';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
@@ -105,8 +106,11 @@ export const DataLoaderFeature: React.FC = () => {
   const [citationFile, setCitationFile] = useState<FileInfo | null>(null);
   const [refreshingWorkspaces, setRefreshingWorkspaces] = useState(false);
   const [refreshingFiles, setRefreshingFiles] = useState(false);
+  const [uploadingWorkspaceZip, setUploadingWorkspaceZip] = useState(false);
+  const [downloadingWorkspaceId, setDownloadingWorkspaceId] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const workspaceZipInputRef = useRef<HTMLInputElement | null>(null);
   const activeCardRef = useRef<HTMLDivElement | null>(null);
   const [activeCardHeight, setActiveCardHeight] = useState<number | null>(null);
   const hasWorkspaceSelected = Boolean(currentWorkspaceId);
@@ -175,7 +179,6 @@ export const DataLoaderFeature: React.FC = () => {
   };
 
   const handleRenameWorkspace = async () => {
-    if (!hasWorkspaceSelected || !renameValue.trim()) return;
     try {
       await workspaceActions.renameWorkspace(renameValue.trim());
       notify('success', 'Workspace renamed.');
@@ -267,6 +270,46 @@ export const DataLoaderFeature: React.FC = () => {
       notify('error', (error as Error).message || 'Failed to refresh workspace list.');
     } finally {
       setRefreshingWorkspaces(false);
+    }
+  };
+
+  const openWorkspaceZipPicker = () => {
+    workspaceZipInputRef.current?.click();
+  };
+
+  const handleWorkspaceZipInputChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      setUploadingWorkspaceZip(true);
+      await workspacesApi.uploadZip(file, authHeaders);
+      await queryClient.refetchQueries({ queryKey: queryKeys.workspaces, exact: true });
+      notify('success', `Workspace ZIP "${file.name}" uploaded.`);
+    } catch (error) {
+      notify('error', (error as Error).message || 'Failed to upload workspace ZIP.');
+    } finally {
+      setUploadingWorkspaceZip(false);
+      event.target.value = '';
+    }
+  };
+
+  const handleDownloadWorkspaceZip = async (workspaceId: string, workspaceName: string) => {
+    try {
+      setDownloadingWorkspaceId(workspaceId);
+      const blob = await workspacesApi.downloadZip(workspaceId, authHeaders);
+      const objectUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = objectUrl;
+      anchor.download = `${(workspaceName || workspaceId).replace(/[^a-zA-Z0-9._-]+/g, '_')}.zip`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      URL.revokeObjectURL(objectUrl);
+      notify('success', `Downloaded workspace "${workspaceName || workspaceId}".`);
+    } catch (error) {
+      notify('error', (error as Error).message || 'Failed to download workspace ZIP.');
+    } finally {
+      setDownloadingWorkspaceId(null);
     }
   };
 
@@ -369,7 +412,7 @@ export const DataLoaderFeature: React.FC = () => {
                   <Badge>{nodeCount} nodes</Badge>
                 </div>
                 <div className="mt-1 text-xs text-muted-foreground">
-                  Updated {formatTimestamp(currentWorkspace.modified_at || currentWorkspace.updated_at)} · Created {formatTimestamp(currentWorkspace.created_at)}
+                  Updated {formatTimestamp(currentWorkspace.modified_at || currentWorkspace.updated_at)} | Size {formatBytes(Number(currentWorkspace.workspace_size_Byte || 0))} | Created {formatTimestamp(currentWorkspace.created_at)}
                 </div>
               </div>
             ) : (
@@ -463,16 +506,34 @@ export const DataLoaderFeature: React.FC = () => {
                   tooltip="Switch between saved workspaces or remove ones you no longer need."
                 />
               </CardTitle>
-              <Button
-                size="icon"
-                variant="ghost"
-                aria-label="Refresh workspace list"
-                title="Refresh workspace list"
-                onClick={handleRefreshWorkspaces}
-                disabled={refreshingWorkspaces || workspaceBusy}
-              >
-                <RefreshCcw className={`h-4 w-4 ${refreshingWorkspaces ? 'animate-spin' : ''}`} />
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={openWorkspaceZipPicker}
+                  disabled={uploadingWorkspaceZip || workspaceBusy}
+                >
+                  <Upload className="mr-1.5 h-4 w-4" />
+                  {uploadingWorkspaceZip ? 'Uploading…' : 'Upload workspace'}
+                </Button>
+                <input
+                  ref={workspaceZipInputRef}
+                  type="file"
+                  accept=".zip,application/zip"
+                  className="hidden"
+                  onChange={handleWorkspaceZipInputChange}
+                />
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  aria-label="Refresh workspace list"
+                  title="Refresh workspace list"
+                  onClick={handleRefreshWorkspaces}
+                  disabled={refreshingWorkspaces || workspaceBusy}
+                >
+                  <RefreshCcw className={`h-4 w-4 ${refreshingWorkspaces ? 'animate-spin' : ''}`} />
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="flex flex-1 flex-col min-h-0 overflow-hidden">
@@ -500,7 +561,7 @@ export const DataLoaderFeature: React.FC = () => {
                       <div>
                         <div className="font-medium text-foreground">{workspace.name || workspaceId}</div>
                         <div className="text-xs text-muted-foreground">
-                          Updated {formatTimestamp(workspace.modified_at || workspace.updated_at)} · {workspace.dataframe_count ?? workspace.node_count ?? 0} nodes
+                          Updated {formatTimestamp(workspace.modified_at || workspace.updated_at)} | {workspace.dataframe_count ?? workspace.node_count ?? 0} nodes | Size {formatBytes(Number(workspace.workspace_size_Byte || 0))}
                         </div>
                       </div>
                       <div className="flex flex-wrap gap-2">
@@ -511,6 +572,15 @@ export const DataLoaderFeature: React.FC = () => {
                           disabled={isActive}
                         >
                           {isActive ? 'Active' : 'Activate'}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleDownloadWorkspaceZip(workspaceId, workspace.name || workspaceId)}
+                          disabled={downloadingWorkspaceId === workspaceId}
+                        >
+                          <DownloadIcon className="mr-1.5 h-4 w-4" />
+                          {downloadingWorkspaceId === workspaceId ? 'Downloading…' : 'Download'}
                         </Button>
                         <Button
                           size="sm"

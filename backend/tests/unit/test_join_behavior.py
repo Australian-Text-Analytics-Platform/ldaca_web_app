@@ -41,8 +41,8 @@ class TestJoinBehavior:
         self, regular_dataframe, secondary_dataframe
     ):
         """Test that joins between regular DataFrames return regular DataFrame"""
-        node1 = Node(regular_dataframe, name="regular_data")
-        node2 = Node(secondary_dataframe, name="secondary_data")
+        node1 = Node(regular_dataframe.lazy(), name="regular_data")
+        node2 = Node(secondary_dataframe.lazy(), name="secondary_data")
 
         # Perform join
         joined_node = node1.join(node2, on="id", how="inner")
@@ -61,8 +61,8 @@ class TestJoinBehavior:
         self, regular_dataframe, secondary_dataframe
     ):
         """Test that data integrity is preserved in joins"""
-        node1 = Node(regular_dataframe, name="regular_data")
-        node2 = Node(secondary_dataframe, name="secondary_data")
+        node1 = Node(regular_dataframe.lazy(), name="regular_data")
+        node2 = Node(secondary_dataframe.lazy(), name="secondary_data")
 
         joined_node = node1.join(node2, on="id", how="inner")
         joined_data = _materialize_to_dataframe(joined_node.data)
@@ -81,8 +81,8 @@ class TestJoinBehavior:
             "id": [1, 2],  # Missing id=3
             "category": ["A", "B"],
         })
-        node1 = Node(regular_dataframe, name="regular_data")
-        node2 = Node(small_data, name="small_data")
+        node1 = Node(regular_dataframe.lazy(), name="regular_data")
+        node2 = Node(small_data.lazy(), name="small_data")
 
         # Left join should keep all rows from regular_dataframe
         left_joined = node1.join(node2, on="id", how="left")

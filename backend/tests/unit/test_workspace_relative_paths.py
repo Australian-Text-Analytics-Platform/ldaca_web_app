@@ -1,9 +1,12 @@
 import os
+from datetime import datetime
 from pathlib import Path
 
 import polars as pl
+from docworkspace import Workspace
 from ldaca_web_app_backend.api.workspaces.utils import stage_dataframe_as_lazy
 from ldaca_web_app_backend.core import utils as core_utils
+from ldaca_web_app_backend.core.utils import generate_workspace_id
 from ldaca_web_app_backend.core.workspace import WorkspaceManager
 
 
@@ -40,7 +43,18 @@ def test_workspace_manager_sets_cwd_on_create(tmp_path, monkeypatch):
         monkeypatch.setattr(core_utils.settings, "data_root", tmp_path, raising=False)
 
         manager = WorkspaceManager()
-        ws = manager.create_workspace(user_id="test", name="Workspace")
+        ws = Workspace(name="Workspace")
+        ws.id = generate_workspace_id()
+        ws.set_metadata("modified_at", datetime.now().isoformat())
+        target_dir = manager._resolve_workspace_dir(
+            user_id="test",
+            workspace_id=ws.id,
+            workspace_name=ws.name,
+        )
+        manager._attach_workspace_dir(ws, target_dir)
+        ws.save(target_dir)
+        manager._set_cached_path("test", ws.id, target_dir)
+        manager.set_current_workspace("test", ws.id)
         workspace_dir = manager.get_workspace_dir("test", ws.id)
         assert workspace_dir is not None
         assert Path.cwd() == workspace_dir

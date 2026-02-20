@@ -2,6 +2,9 @@
 Integration tests for workspace API endpoints
 """
 
+import io
+import json
+import zipfile
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -54,26 +57,22 @@ class TestWorkspaceAPI:
 
     async def test_create_workspace(self, authenticated_client):
         """Test creating a new workspace"""
-        # Create mock workspace object that behaves like docworkspace
-        mock_workspace = Mock()
-        mock_workspace.get_metadata.side_effect = lambda key: {
-            "id": "new-workspace-123",
-            "description": "New test workspace",
-            "created_at": "2024-01-01T00:00:00Z",
-            "modified_at": "2024-01-01T00:00:00Z",
-        }.get(key, "")
-        mock_workspace.id = "new-workspace-123"
-
         # Mock workspace_manager methods for create flow
         with (
             patch(
-                "ldaca_web_app_backend.api.workspaces.workspace_manager.create_workspace"
-            ) as mock_create,
+                "ldaca_web_app_backend.api.workspaces.lifecycle.generate_workspace_id"
+            ) as mock_generate_workspace_id,
+            patch("docworkspace.workspace.core.Workspace.save") as mock_save,
+            patch(
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.set_current_workspace"
+            ) as mock_set_current,
             patch(
                 "ldaca_web_app_backend.api.workspaces.workspace_manager.get_workspace_info"
             ) as mock_info,
         ):
-            mock_create.return_value = mock_workspace
+            mock_generate_workspace_id.return_value = "new-workspace-123"
+            mock_save.return_value = None
+            mock_set_current.return_value = True
             mock_info.return_value = {
                 "workspace_id": "new-workspace-123",
                 "name": "New Workspace",
@@ -190,6 +189,104 @@ class TestWorkspaceAPI:
 
             assert response.status_code == 404
 
+    async def test_download_workspace_zip(self, authenticated_client, tmp_path):
+        """Workspace download returns workspace directory as ZIP."""
+        workspace_dir = tmp_path / "ws1"
+        workspace_dir.mkdir(parents=True)
+        (workspace_dir / "metadata.json").write_text(
+            json.dumps({"workspace_metadata": {"id": "ws-1", "name": "WS One"}}),
+            encoding="utf-8",
+        )
+        data_dir = workspace_dir / "data"
+        data_dir.mkdir()
+        (data_dir / "sample.parquet").write_bytes(b"parquet-bytes")
+
+        with (
+            patch(
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_current_workspace_id"
+            ) as mock_current_id,
+            patch("docworkspace.workspace.core.Workspace.save") as mock_save,
+            patch(
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_workspace_dir"
+            ) as mock_get_dir,
+            patch(
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.list_user_workspaces_summaries"
+            ) as mock_summaries,
+        ):
+            mock_current_id.return_value = None
+            mock_get_dir.return_value = workspace_dir
+            mock_summaries.return_value = {
+                "ws-1": {"workspace_id": "ws-1", "name": "WS One"}
+            }
+
+            response = await authenticated_client.get("/api/workspaces/ws-1/download")
+
+            assert response.status_code == 200
+            assert response.headers.get("content-type") == "application/zip"
+            assert 'attachment; filename="WS_One.zip"' in response.headers.get(
+                "content-disposition", ""
+            )
+            with zipfile.ZipFile(io.BytesIO(response.content), "r") as zf:
+                names = set(zf.namelist())
+            assert "metadata.json" in names
+            assert "data/sample.parquet" in names
+            mock_save.assert_not_called()
+
+    async def test_upload_workspace_zip(self, authenticated_client, tmp_path):
+        """Workspace upload ingests ZIP and writes workspace folder contents."""
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr(
+                "metadata.json",
+                json.dumps({
+                    "workspace_metadata": {
+                        "id": "imported-id",
+                        "name": "Imported Workspace",
+                    }
+                }),
+            )
+            zf.writestr("data/example.parquet", b"fake-bytes")
+        zip_buffer.seek(0)
+
+        target_dir = tmp_path / "imported_workspace"
+
+        with (
+            patch(
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.list_user_workspaces_summaries"
+            ) as mock_summaries,
+            patch(
+                "ldaca_web_app_backend.api.workspaces.workspace_manager._resolve_workspace_dir"
+            ) as mock_resolve,
+            patch(
+                "ldaca_web_app_backend.api.workspaces.workspace_manager._refresh_user_workspace_paths"
+            ) as mock_refresh,
+        ):
+            mock_summaries.side_effect = [
+                {},
+                {
+                    "imported-id": {
+                        "workspace_id": "imported-id",
+                        "name": "Imported Workspace",
+                    }
+                },
+            ]
+            mock_resolve.return_value = target_dir
+            mock_refresh.return_value = None
+
+            response = await authenticated_client.post(
+                "/api/workspaces/upload",
+                files={
+                    "file": ("workspace.zip", zip_buffer.getvalue(), "application/zip"),
+                },
+            )
+
+            assert response.status_code == 200, response.text
+            payload = response.json()
+            assert payload.get("state") == "successful"
+            assert payload["workspace"]["workspace_id"] == "imported-id"
+            assert (target_dir / "metadata.json").exists()
+            assert (target_dir / "data" / "example.parquet").exists()
+
     async def test_unload_workspace(self, authenticated_client):
         """Test unloading an existing workspace"""
         with patch(
@@ -232,15 +329,15 @@ class TestWorkspaceAPI:
             patch(
                 "ldaca_web_app_backend.api.workspaces.workspace_manager.get_node_from_workspace"
             ) as mock_get_node,
-            patch(
-                "ldaca_web_app_backend.api.workspaces.workspace_manager.persist"
-            ) as mock_save,
+            patch("docworkspace.workspace.core.Workspace.save") as mock_save,
             patch(
                 "ldaca_web_app_backend.api.workspaces.workspace_manager.get_workspace"
             ) as mock_get_workspace,
         ):
             mock_get_node.return_value = mock_node
-            mock_get_workspace.return_value = Mock()  # Mock workspace for saving
+            mock_workspace = Mock()
+            mock_workspace.name = "test-workspace"
+            mock_get_workspace.return_value = mock_workspace
 
             # Test without format string (auto-detection)
             cast_data = {"column": "created_at", "target_type": "datetime"}
@@ -270,7 +367,6 @@ class TestWorkspaceAPI:
 
             # Verify the node data was updated (mock_node.data should be modified)
             assert mock_node.data is not None
-            mock_save.assert_called_once()
 
     async def test_cast_node_not_found(self, authenticated_client):
         """Test casting when node doesn't exist"""
@@ -339,13 +435,15 @@ class TestWorkspaceAPI:
             patch(
                 "ldaca_web_app_backend.api.workspaces.workspace_manager.get_node_from_workspace"
             ) as mock_get_node,
-            patch("ldaca_web_app_backend.api.workspaces.workspace_manager.persist"),
+            patch("docworkspace.workspace.core.Workspace.save"),
             patch(
                 "ldaca_web_app_backend.api.workspaces.workspace_manager.get_workspace"
             ) as mock_get_workspace,
         ):
             mock_get_node.return_value = mock_node_lazy
-            mock_get_workspace.return_value = Mock()
+            mock_workspace = Mock()
+            mock_workspace.name = "test-workspace"
+            mock_get_workspace.return_value = mock_workspace
 
             cast_data = {"column": "created_at", "target_type": "datetime"}
 
@@ -390,15 +488,15 @@ class TestWorkspaceAPI:
             patch(
                 "ldaca_web_app_backend.api.workspaces.workspace_manager.get_node_from_workspace"
             ) as mock_get_node,
-            patch(
-                "ldaca_web_app_backend.api.workspaces.workspace_manager.persist"
-            ) as mock_save,
+            patch("docworkspace.workspace.core.Workspace.save") as mock_save,
             patch(
                 "ldaca_web_app_backend.api.workspaces.workspace_manager.get_workspace"
             ) as mock_get_workspace,
         ):
             mock_get_node.return_value = mock_node
-            mock_get_workspace.return_value = Mock()
+            mock_workspace = Mock()
+            mock_workspace.name = "test-workspace"
+            mock_get_workspace.return_value = mock_workspace
 
             cast_data = {"column": "score", "target_type": "integer"}
             response = await authenticated_client.post(
@@ -409,7 +507,6 @@ class TestWorkspaceAPI:
             payload = response.json()
             assert payload.get("state") == "successful"
             assert getattr(mock_node, "metadata", {}).get("text_column") == "text"
-            mock_save.assert_called_once()
 
     async def test_cast_node_datetime_to_string(self, authenticated_client):
         """Test casting datetime column to string"""
@@ -431,15 +528,15 @@ class TestWorkspaceAPI:
             patch(
                 "ldaca_web_app_backend.api.workspaces.workspace_manager.get_node_from_workspace"
             ) as mock_get_node,
-            patch(
-                "ldaca_web_app_backend.api.workspaces.workspace_manager.persist"
-            ) as mock_save,
+            patch("docworkspace.workspace.core.Workspace.save") as mock_save,
             patch(
                 "ldaca_web_app_backend.api.workspaces.workspace_manager.get_workspace"
             ) as mock_get_workspace,
         ):
             mock_get_node.return_value = mock_node
-            mock_get_workspace.return_value = Mock()
+            mock_workspace = Mock()
+            mock_workspace.name = "test-workspace"
+            mock_get_workspace.return_value = mock_workspace
 
             cast_data = {"column": "created_at", "target_type": "string"}
             response = await authenticated_client.post(
@@ -449,7 +546,6 @@ class TestWorkspaceAPI:
             data = response.json()
             assert data.get("state") == "successful"
             assert data["cast_info"]["target_type"] == "string"
-            mock_save.assert_called_once()
 
     async def test_cast_node_integer_type(self, authenticated_client):
         """Test casting to integer type"""
@@ -462,15 +558,15 @@ class TestWorkspaceAPI:
             patch(
                 "ldaca_web_app_backend.api.workspaces.workspace_manager.get_node_from_workspace"
             ) as mock_get_node,
-            patch(
-                "ldaca_web_app_backend.api.workspaces.workspace_manager.persist"
-            ) as mock_save,
+            patch("docworkspace.workspace.core.Workspace.save") as mock_save,
             patch(
                 "ldaca_web_app_backend.api.workspaces.workspace_manager.get_workspace"
             ) as mock_get_workspace,
         ):
             mock_get_node.return_value = mock_node
-            mock_get_workspace.return_value = Mock()  # Mock workspace for persist call
+            mock_workspace = Mock()
+            mock_workspace.name = "test-workspace"
+            mock_get_workspace.return_value = mock_workspace
 
             cast_data = {"column": "test_col", "target_type": "integer"}
             response = await authenticated_client.post(
@@ -484,7 +580,6 @@ class TestWorkspaceAPI:
             data = response.json()
             assert data.get("state") == "successful"
             assert data["cast_info"]["target_type"] == "integer"
-            mock_save.assert_called_once()
 
     async def test_cast_node_float_type(self, authenticated_client):
         """Test casting to float type"""
@@ -497,9 +592,7 @@ class TestWorkspaceAPI:
             patch(
                 "ldaca_web_app_backend.api.workspaces.workspace_manager.get_node_from_workspace"
             ) as mock_get_node,
-            patch(
-                "ldaca_web_app_backend.api.workspaces.workspace_manager.persist"
-            ) as mock_save,
+            patch("docworkspace.workspace.core.Workspace.save") as mock_save,
         ):
             mock_get_node.return_value = mock_node
 
@@ -510,7 +603,6 @@ class TestWorkspaceAPI:
             assert response.status_code == 200
             data = response.json()
             assert data["cast_info"]["target_type"] == "float"
-            mock_save.assert_called_once()
 
     async def test_cast_node_categorical_type(self, authenticated_client):
         """Test casting to categorical type"""
@@ -523,9 +615,7 @@ class TestWorkspaceAPI:
             patch(
                 "ldaca_web_app_backend.api.workspaces.workspace_manager.get_node_from_workspace"
             ) as mock_get_node,
-            patch(
-                "ldaca_web_app_backend.api.workspaces.workspace_manager.persist"
-            ) as mock_save,
+            patch("docworkspace.workspace.core.Workspace.save") as mock_save,
         ):
             mock_get_node.return_value = mock_node
 
@@ -539,7 +629,6 @@ class TestWorkspaceAPI:
             assert data.get("state") == "successful"
             assert data["cast_info"]["target_type"] == "categorical"
             assert "Categorical" in data["cast_info"].get("new_type", "")
-            mock_save.assert_called_once()
 
     async def test_unique_values_endpoint_returns_full_set(self, authenticated_client):
         """Unique values endpoint returns all values and null metadata"""

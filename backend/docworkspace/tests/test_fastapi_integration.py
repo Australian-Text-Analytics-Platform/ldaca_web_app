@@ -31,7 +31,7 @@ class TestCoreLibraryIndependence:
         })
 
         workspace = Workspace("test")
-        node = workspace.add_node(Node(df, "test_node"))
+        node = workspace.add_node(Node(df.lazy(), "test_node"))
 
         # These API methods should NOT exist in core library
         api_methods = [
@@ -59,13 +59,13 @@ class TestCoreLibraryIndependence:
         workspace = Workspace("core_test")
         df = pl.DataFrame({"x": [1, 2, 3], "y": ["a", "b", "c"]})
 
-        node = workspace.add_node(Node(df, "test_data"))
+        node = workspace.add_node(Node(df.lazy(), "test_data"))
 
         # Test core functionality
         assert len(workspace.nodes) == 1
         assert node.name == "test_data"
         assert node.data.collect().height == 3
-        assert node.data.collect().width == 2
+        assert node.data.collect_schema().len() == 2
         assert isinstance(node.data, pl.LazyFrame)
 
         # Test node operations (polars delegation)

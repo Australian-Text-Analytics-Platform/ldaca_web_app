@@ -89,8 +89,7 @@ class DocWorkspaceAPIUtils:
     def compute_node_shape(node: Any) -> Tuple[int, int]:
         """Calculate node shape as `(rows, cols)` for LazyFrame-backed nodes."""
         lazyframe = node.data
-        schema = lazyframe.collect_schema()
-        cols = len(schema)
+        cols = lazyframe.collect_schema().len()
         rows = int(lazyframe.select(pl.len()).collect().item())
         return (rows, cols)
 

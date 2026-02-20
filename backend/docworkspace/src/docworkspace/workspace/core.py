@@ -15,9 +15,8 @@ from __future__ import annotations
 
 import uuid
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Optional, Union
+from typing import Any, Dict, Iterator, List, Optional
 
-import polars as pl
 import polars_text  # noqa: F401  (register text namespace side-effects)
 
 from ..node import Node
@@ -29,10 +28,6 @@ class Workspace:
     def __init__(
         self,
         name: Optional[str] = None,
-        data: Optional[Union[str, Path, pl.DataFrame, pl.LazyFrame, Any]] = None,
-        data_name: Optional[str] = None,
-        csv_lazy: bool = True,
-        **csv_kwargs,
     ) -> None:
         self.id = str(uuid.uuid4())
         self.name = name or f"workspace_{self.id[:8]}"
@@ -41,31 +36,8 @@ class Workspace:
         self.created_at: Optional[str] = None
         self.modified_at: Optional[str] = None
         self.analysis: Any = None  # Placeholder for analysis storage/manager
-        if data is not None:
-            self._load_initial_data(data, data_name, csv_lazy, **csv_kwargs)
 
     # Node management -------------------------------------------------
-    def _load_initial_data(
-        self,
-        data: Union[str, Path, pl.DataFrame, pl.LazyFrame, Any],
-        data_name: Optional[str] = None,
-        csv_lazy: bool = True,
-        **csv_kwargs,
-    ) -> Node:
-        if isinstance(data, (str, Path)):
-            file_path = Path(data)
-            if csv_lazy:
-                df = pl.scan_csv(file_path, **csv_kwargs)
-            else:
-                df = pl.read_csv(file_path, **csv_kwargs)
-            node_name = data_name or f"csv_{file_path.stem}"
-            operation = f"load_csv({file_path})"
-        else:
-            df = data
-            node_name = data_name or f"data_{len(self.nodes)}"
-            operation = "load_data"
-        node = Node(data=df, name=node_name, workspace=self, operation=operation)
-        return self.add_node(node)
 
     def add_node(self, node: Node) -> Node:
         if node.id in self.nodes:
@@ -189,16 +161,8 @@ class Workspace:
         return True
 
     # Backward-compatible helpers (serialize/deserialize & summaries) ----
-    def serialize(self, path: Any, format: str = "json") -> Any:  # pragma: no cover
-        """Serialize workspace to a metadata.json file inside a folder (json only).
-
-        Parameters
-        ----------
-        path : str | Path
-            Destination directory or metadata.json file path.
-        format : str
-            Currently only 'json' supported. 'binary' raises NotImplementedError.
-        """
+    def save(self, path: Any, format: str = "json") -> Any:  # pragma: no cover
+        """Persist workspace to disk (json only)."""
         from pathlib import Path as _P
 
         from .io import write_workspace
@@ -210,12 +174,11 @@ class Workspace:
         if isinstance(path, (str, _P)):
             write_workspace(self, path)
             return path
-        raise TypeError("Path must be str or Path for serialize")
+        raise TypeError("Path must be str or Path for save")
 
     @classmethod
-    def deserialize(
-        cls, path: Any, format: str = "json"
-    ) -> "Workspace":  # pragma: no cover
+    def load(cls, path: Any, format: str = "json") -> "Workspace":  # pragma: no cover
+        """Load workspace from disk path or from serialized dictionary."""
         from pathlib import Path as _P
 
         from .io import deserialize_workspace, read_workspace
@@ -230,19 +193,7 @@ class Workspace:
             return read_workspace(path)
         if isinstance(path, dict):
             return deserialize_workspace(path, format=format)
-        raise TypeError("Unsupported input for deserialize (expect path or dict)")
-
-    def to_dict(self) -> Dict[str, Any]:  # pragma: no cover
-        from .io import serialize_workspace
-
-        return serialize_workspace(self)
-
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Workspace":  # pragma: no cover
-        """Build workspace from dictionary using the current serialization format."""
-        if "workspace_metadata" not in data:
-            raise ValueError("Invalid workspace dict: missing workspace_metadata")
-        return cls.deserialize(data)
+        raise TypeError("Unsupported input for load (expect path or dict)")
 
     def summary(self, json: bool = False) -> Dict[str, Any]:  # pragma: no cover
         from .analysis import summary

@@ -3,7 +3,6 @@ Core utilities for the LDaCA Web App
 """
 
 import io
-import json
 import os
 import shutil
 import uuid
@@ -11,7 +10,7 @@ import zipfile
 from contextlib import nullcontext
 from importlib import resources
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Union
 
 import polars as pl
 
@@ -132,29 +131,6 @@ def ensure_display_folder_name(current_folder: Path, desired_name: str) -> Path:
             current_folder.rename(candidate)
             return candidate
         counter += 1
-
-
-def find_workspace_folder_by_id(user_id: str, workspace_id: str) -> Optional[Path]:
-    """Locate the workspace folder for a given workspace ID, if it exists."""
-
-    base = get_user_workspace_folder(user_id)
-    if not base.exists():
-        return None
-    for candidate in base.iterdir():
-        if not candidate.is_dir():
-            continue
-        metadata_path = candidate / "metadata.json"
-        if not metadata_path.exists() or not metadata_path.is_file():
-            continue
-        try:
-            with metadata_path.open("r", encoding="utf-8") as f:
-                data = json.load(f)
-        except Exception:
-            continue
-        ws_meta = data.get("workspace_metadata", {})
-        if ws_meta.get("id") == workspace_id:
-            return candidate
-    return None
 
 
 def setup_user_folders(user_id: str) -> Dict[str, Path]:

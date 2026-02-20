@@ -9,6 +9,7 @@ Why:
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 import polars as pl
@@ -146,7 +147,17 @@ def resolve_text_columns_for_nodes(
 
     if persist_preference:
         try:
-            workspace_manager.persist(user_id, workspace_id)
+            workspace = workspace_manager.get_workspace(user_id, workspace_id)
+            if workspace is not None:
+                workspace.set_metadata("modified_at", datetime.now().isoformat())
+                target_dir = workspace_manager._resolve_workspace_dir(
+                    user_id=user_id,
+                    workspace_id=workspace_id,
+                    workspace_name=workspace.name,
+                )
+                workspace_manager._attach_workspace_dir(workspace, target_dir)
+                workspace.save(target_dir)
+                workspace_manager._set_cached_path(user_id, workspace_id, target_dir)
         except Exception:
             # Best-effort only.
             pass

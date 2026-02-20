@@ -13,7 +13,7 @@ class TestSimpleOperations:
         workspace = Workspace("filter_test")
         df = pl.DataFrame({"id": [1, 2, 3, 4, 5], "value": [10, 20, 30, 40, 50]})
 
-        original = workspace.add_node(Node(df, "original"))
+        original = workspace.add_node(Node(df.lazy(), "original"))
         filtered = original.filter(pl.col("value") > 25)
 
         # Should create a new node automatically
@@ -33,11 +33,11 @@ class TestSimpleOperations:
             "value": [10, 20, 30],
         })
 
-        original = workspace.add_node(Node(df, "original"))
+        original = workspace.add_node(Node(df.lazy(), "original"))
         selected = original.select(["id", "name"])
 
         assert len(workspace.nodes) == 2
-        assert len(selected.data.collect_schema().names()) == 2
+        assert selected.data.collect_schema().len() == 2
         assert len(selected.parents) == 1
 
     def test_chained_operations(self):
@@ -49,7 +49,7 @@ class TestSimpleOperations:
             "value": [10, 20, 30, 40, 50],
         })
 
-        original = workspace.add_node(Node(df, "original"))
+        original = workspace.add_node(Node(df.lazy(), "original"))
         filtered = original.filter(pl.col("value") > 15)
         selected = filtered.select(["id", "category"])
 
@@ -67,7 +67,7 @@ class TestSimpleOperations:
         workspace = Workspace("metadata_test")
         df = pl.DataFrame({"x": [1, 2], "y": ["a", "b"]})
 
-        node = workspace.add_node(Node(df, "test_node"))
+        node = workspace.add_node(Node(df.lazy(), "test_node"))
 
         # Test basic properties
         assert len(workspace.nodes) == 1

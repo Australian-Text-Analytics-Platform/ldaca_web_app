@@ -43,24 +43,8 @@ class FakeWorkspaceManager:
         self.add_calls.append({"kwargs": kwargs, "node": new_node})
         return new_node
 
-    def execute_workspace_operation(
-        self, _user_id: str, _workspace_id: str, func, *args, **kwargs
-    ):
-        try:
-            result = func(*args, **kwargs)
-            if isinstance(result, DummyNode):
-                return (
-                    True,
-                    "Operation completed successfully",
-                    {
-                        "node_name": result.name,
-                        "data_type": type(result.data).__name__,
-                        "node_id": result.id,
-                    },
-                )
-            return True, "Operation completed successfully", {"result": result}
-        except Exception as exc:  # pragma: no cover - defensive guard
-            return False, f"Operation failed: {exc}", None
+    def save_workspace(self, _user_id: str, _workspace_id: str) -> None:
+        pass
 
 
 @pytest.fixture

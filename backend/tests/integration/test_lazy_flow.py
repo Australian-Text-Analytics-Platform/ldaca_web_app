@@ -33,7 +33,7 @@ class TestLazyFlowIntegration:
     def test_node_info_includes_lazy_field(self, sample_dataframe):
         """Test that Node.info() method includes lazy field"""
         # Create node with regular DataFrame
-        node = Node(sample_dataframe, name="test_node")
+        node = Node(sample_dataframe.lazy(), name="test_node")
         info = node.info()
 
         # Check that info includes lazy field and reflects lazy-by-default contract
@@ -56,7 +56,7 @@ class TestLazyFlowIntegration:
         self, sample_dataframe, lazy_dataframe
     ):
         """Test that operations on lazy DataFrames preserve lazy state"""
-        regular_node = Node(sample_dataframe, name="regular")
+        regular_node = Node(sample_dataframe.lazy(), name="regular")
         lazy_node = Node(lazy_dataframe, name="lazy")
 
         # Join operation
@@ -83,7 +83,7 @@ class TestLazyFlowIntegration:
         # Create workspace with both regular and lazy nodes
         workspace = Workspace()
 
-        regular_node = Node(sample_dataframe, name="regular")
+        regular_node = Node(sample_dataframe.lazy(), name="regular")
         lazy_node = Node(lazy_dataframe, name="lazy")
 
         workspace.add_node(regular_node)
@@ -109,7 +109,7 @@ class TestLazyFlowIntegration:
         collected_data = lazy_node.data.collect()
 
         # Create new node with collected data
-        collected_node = Node(collected_data, name="collected")
+        collected_node = Node(collected_data.lazy(), name="collected")
         collected_info = collected_node.info()
 
         # Nodes wrap collected data back into lazy form, so flag remains True
