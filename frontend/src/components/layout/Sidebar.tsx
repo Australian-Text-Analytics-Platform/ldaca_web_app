@@ -312,8 +312,8 @@ const Sidebar: React.FC = () => {
   );
   const handleCancelTask = async (task: SidebarTaskRecord) => {
     try {
-      const isFilesTask = task.metadata?.task_scope === 'files';
-      if (isFilesTask) {
+      const isUserTask = task.metadata?.task_scope === 'user';
+      if (isUserTask) {
         await filesApi.cancelTasks({ task_id: task.task_id }, getAuthHeaders());
       } else {
         if (!currentWorkspaceId) return;
@@ -331,8 +331,8 @@ const Sidebar: React.FC = () => {
 
   const handleClearTask = async (task: SidebarTaskRecord) => {
     try {
-      const isFilesTask = task.metadata?.task_scope === 'files';
-      if (isFilesTask) {
+      const isUserTask = task.metadata?.task_scope === 'user';
+      if (isUserTask) {
         await filesApi.clearTasks({ task_id: task.task_id }, getAuthHeaders());
       } else {
         if (!currentWorkspaceId) return;

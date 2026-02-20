@@ -47,7 +47,7 @@ def client(tmp_path):
         app.dependency_overrides.clear()
 
 
-def test_import_ldaca_starts_background_task_under_files_scope(client: TestClient):
+def test_import_ldaca_starts_background_task_under_user_scope(client: TestClient):
     """Import should return running state and task metadata without blocking."""
     from ldaca_web_app_backend.api import files as files_api
 
@@ -75,13 +75,13 @@ def test_import_ldaca_starts_background_task_under_files_scope(client: TestClien
     payload = response.json()
     assert payload["state"] == "running"
     assert payload["metadata"]["task_id"] == "task-123"
-    assert payload["metadata"]["task_scope"] == "files"
-    get_task_manager.assert_called_once_with("test_user", files_api.FILES_TASK_SCOPE)
+    assert payload["metadata"]["task_scope"] == "user"
+    get_task_manager.assert_called_once_with("test_user", files_api.USER_TASK_SCOPE)
     mock_tm.submit_task.assert_awaited_once()
 
 
 def test_import_ldaca_ignores_current_workspace_for_task_scope(client: TestClient):
-    """Files import must remain files-scoped even when a workspace is active."""
+    """LDaCA import must remain user-scoped even when a workspace is active."""
     from ldaca_web_app_backend.api import files as files_api
 
     mock_tm = MagicMock()
@@ -108,16 +108,16 @@ def test_import_ldaca_ignores_current_workspace_for_task_scope(client: TestClien
     payload = response.json()
     assert payload["state"] == "running"
     assert payload["metadata"]["task_id"] == "task-456"
-    assert payload["metadata"]["task_scope"] == "files"
-    get_task_manager.assert_called_once_with("test_user", files_api.FILES_TASK_SCOPE)
+    assert payload["metadata"]["task_scope"] == "user"
+    get_task_manager.assert_called_once_with("test_user", files_api.USER_TASK_SCOPE)
 
 
-def test_list_files_tasks_returns_files_scope_tasks(client: TestClient):
-    """Files task listing should be filtered to files scope for the current user."""
+def test_list_files_tasks_returns_user_scope_tasks(client: TestClient):
+    """Files task listing should be filtered to user scope for the current user."""
     from ldaca_web_app_backend.api import files as files_api
 
-    mock_tm = MagicMock()
-    mock_tm.list = AsyncMock(
+    mock_user_tm = MagicMock()
+    mock_user_tm.list = AsyncMock(
         return_value=[
             {
                 "task_id": "task-abc",
@@ -126,11 +126,10 @@ def test_list_files_tasks_returns_files_scope_tasks(client: TestClient):
             }
         ]
     )
-
     with patch.object(
         files_api.workspace_manager,
         "get_task_manager",
-        return_value=mock_tm,
+        return_value=mock_user_tm,
     ):
         response = client.get("/api/files/tasks")
 
@@ -138,7 +137,7 @@ def test_list_files_tasks_returns_files_scope_tasks(client: TestClient):
     payload = response.json()
     assert payload["state"] == "successful"
     assert payload["data"][0]["task_id"] == "task-abc"
-    mock_tm.list.assert_awaited_once_with(
+    mock_user_tm.list.assert_awaited_once_with(
         user_id="test_user",
-        workspace_id=files_api.FILES_TASK_SCOPE,
+        workspace_id=files_api.USER_TASK_SCOPE,
     )

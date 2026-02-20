@@ -11,6 +11,7 @@ import { useFiles } from '../../../hooks/useFiles';
 import { queryKeys } from '../../../lib/queryKeys';
 import { filesApi } from '../../../api/files';
 import { workspacesApi } from '../../../api/workspaces';
+import { useAnalysisStore, TaskItem } from '../../../stores/analysisStore';
 import { FileInfo } from '../../../types';
 import { AddFilePanel, FilePreviewPanel } from '../../../components/panels';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
@@ -108,6 +109,8 @@ export const DataLoaderFeature: React.FC = () => {
   const [refreshingFiles, setRefreshingFiles] = useState(false);
   const [uploadingWorkspaceZip, setUploadingWorkspaceZip] = useState(false);
   const [downloadingWorkspaceId, setDownloadingWorkspaceId] = useState<string | null>(null);
+  const [pendingDownloads, setPendingDownloads] = useState<Record<string, { taskId: string; workspaceName: string }>>({});
+  const tasks = useAnalysisStore((state) => state.tasks);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const workspaceZipInputRef = useRef<HTMLInputElement | null>(null);
@@ -296,22 +299,61 @@ export const DataLoaderFeature: React.FC = () => {
   const handleDownloadWorkspaceZip = async (workspaceId: string, workspaceName: string) => {
     try {
       setDownloadingWorkspaceId(workspaceId);
-      const blob = await workspacesApi.downloadZip(workspaceId, authHeaders);
-      const objectUrl = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = objectUrl;
-      anchor.download = `${(workspaceName || workspaceId).replace(/[^a-zA-Z0-9._-]+/g, '_')}.zip`;
-      document.body.appendChild(anchor);
-      anchor.click();
-      document.body.removeChild(anchor);
-      URL.revokeObjectURL(objectUrl);
-      notify('success', `Downloaded workspace "${workspaceName || workspaceId}".`);
+      const response = await workspacesApi.startDownloadTask(workspaceId, authHeaders);
+      const taskId = response?.metadata?.task_id;
+      if (!taskId) throw new Error('No task ID returned');
+      setPendingDownloads((prev) => ({ ...prev, [workspaceId]: { taskId, workspaceName } }));
+      notify('info', 'Preparing workspace download…');
     } catch (error) {
-      notify('error', (error as Error).message || 'Failed to download workspace ZIP.');
+      notify('error', (error as Error).message || 'Failed to start workspace download.');
     } finally {
       setDownloadingWorkspaceId(null);
     }
   };
+
+  // Auto-download when a workspace_download task completes
+  useEffect(() => {
+    const entries = Object.entries(pendingDownloads);
+    if (!entries.length) return;
+
+    for (const [workspaceId, { taskId, workspaceName }] of entries) {
+      const task = tasks.find((t: TaskItem) => t.task_id === taskId);
+      if (!task) continue;
+
+      if (task.state === 'successful') {
+        // Remove from pending immediately to prevent double-trigger
+        setPendingDownloads((prev) => {
+          const next = { ...prev };
+          delete next[workspaceId];
+          return next;
+        });
+        // Fetch the artifact and trigger browser download
+        (async () => {
+          try {
+            const blob = await workspacesApi.downloadTaskArtifact(workspaceId, taskId, authHeaders);
+            const objectUrl = URL.createObjectURL(blob);
+            const anchor = document.createElement('a');
+            anchor.href = objectUrl;
+            anchor.download = `${(workspaceName || workspaceId).replace(/[^a-zA-Z0-9._-]+/g, '_')}.zip`;
+            document.body.appendChild(anchor);
+            anchor.click();
+            document.body.removeChild(anchor);
+            URL.revokeObjectURL(objectUrl);
+            notify('success', `Downloaded workspace "${workspaceName || workspaceId}".`);
+          } catch (err) {
+            notify('error', (err as Error).message || 'Failed to download workspace ZIP.');
+          }
+        })();
+      } else if (task.state === 'failed' || task.state === 'cancelled') {
+        setPendingDownloads((prev) => {
+          const next = { ...prev };
+          delete next[workspaceId];
+          return next;
+        });
+        notify('error', task.message || 'Workspace download failed.');
+      }
+    }
+  }, [tasks, pendingDownloads, authHeaders]);
 
   const handleRefreshFiles = async () => {
     setRefreshingFiles(true);
@@ -577,10 +619,10 @@ export const DataLoaderFeature: React.FC = () => {
                           size="sm"
                           variant="outline"
                           onClick={() => handleDownloadWorkspaceZip(workspaceId, workspace.name || workspaceId)}
-                          disabled={downloadingWorkspaceId === workspaceId}
+                          disabled={downloadingWorkspaceId === workspaceId || Boolean(pendingDownloads[workspaceId])}
                         >
                           <DownloadIcon className="mr-1.5 h-4 w-4" />
-                          {downloadingWorkspaceId === workspaceId ? 'Downloading…' : 'Download'}
+                          {pendingDownloads[workspaceId] ? 'Preparing…' : downloadingWorkspaceId === workspaceId ? 'Starting…' : 'Download'}
                         </Button>
                         <Button
                           size="sm"

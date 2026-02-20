@@ -56,6 +56,12 @@ TASK_PROGRESS_MESSAGES = {
         "generating": "Converting to DataFrame...",
         "finalizing": "Saving to user data...",
     },
+    "workspace_download": {
+        "loading": "Locating workspace...",
+        "processing": "Compressing workspace files...",
+        "generating": "Building ZIP archive...",
+        "finalizing": "Preparing download...",
+    },
     "default": {
         "loading": "Loading data...",
         "processing": "Processing...",

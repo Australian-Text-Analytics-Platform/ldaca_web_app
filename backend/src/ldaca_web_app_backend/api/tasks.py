@@ -16,7 +16,7 @@ from fastapi.responses import StreamingResponse
 
 from ..core.auth import get_current_user
 from ..core.workspace import workspace_manager
-from .files import FILES_TASK_SCOPE
+from .files import USER_TASK_SCOPE
 
 router = APIRouter(prefix="/tasks", tags=["task_streaming"])
 
@@ -29,9 +29,9 @@ def _event_scope(workspace_id: str) -> str:
     - `_annotate_event`
 
     Why:
-    - Keeps files-scope vs workspace-scope events distinguishable in one stream.
+    - Keeps user-scope vs workspace-scope events distinguishable in one stream.
     """
-    return "files" if workspace_id == FILES_TASK_SCOPE else "workspace"
+    return "user" if workspace_id == USER_TASK_SCOPE else "workspace"
 
 
 def _annotate_task(task: Dict[str, Any], workspace_id: str) -> Dict[str, Any]:
@@ -48,7 +48,7 @@ def _annotate_task(task: Dict[str, Any], workspace_id: str) -> Dict[str, Any]:
     metadata = dict((annotated.get("metadata") or {}))
     metadata.setdefault("task_scope", _event_scope(workspace_id))
     metadata.setdefault(
-        "workspace_id", None if workspace_id == FILES_TASK_SCOPE else workspace_id
+        "workspace_id", None if workspace_id == USER_TASK_SCOPE else workspace_id
     )
     annotated["metadata"] = metadata
     return annotated
@@ -68,7 +68,7 @@ def _annotate_event(event: Dict[str, Any], workspace_id: str) -> Dict[str, Any]:
 
     payload.setdefault("task_scope", scope)
     payload.setdefault(
-        "workspace_id", None if workspace_id == FILES_TASK_SCOPE else workspace_id
+        "workspace_id", None if workspace_id == USER_TASK_SCOPE else workspace_id
     )
 
     if isinstance(payload.get("task"), dict):
@@ -93,7 +93,7 @@ async def stream_tasks(
 ):
     """Unified SSE stream for task center.
 
-    Includes files-scope tasks and all known workspace scopes for the user.
+    Includes user-scope tasks and all known workspace scopes for the user.
 
         Used by:
         - frontend Task Center SSE subscriber
@@ -119,7 +119,7 @@ async def stream_tasks(
 
         async def refresh_scope_subscriptions():
             scopes = set(workspace_manager.list_user_task_scopes(user_id))
-            scopes.add(FILES_TASK_SCOPE)
+            scopes.add(USER_TASK_SCOPE)
             if workspace_id:
                 scopes.add(workspace_id)
 

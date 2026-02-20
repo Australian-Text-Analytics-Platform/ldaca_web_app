@@ -11,6 +11,7 @@ from concurrent.futures import Future, ProcessPoolExecutor
 from typing import Any, Dict, Optional
 
 from .worker_tasks_concordance import run_concordance_detach_task
+from .worker_tasks_download import run_workspace_download_task
 from .worker_tasks_import import run_ldaca_import_task
 from .worker_tasks_quotation import run_quotation_detach_task
 from .worker_tasks_token import run_token_frequencies_task
@@ -151,6 +152,30 @@ def ldaca_import_task(
         workspace_id,
         url,
         filename=filename,
+        progress_callback=progress_callback,
+    )
+
+
+def workspace_download_task(
+    user_id: str,
+    workspace_id: str,
+    target_workspace_id: Optional[str] = None,
+    target_workspace_dir: Optional[str] = None,
+    progress_callback: Optional[callable] = None,
+) -> Dict[str, Any]:
+    """Delegate workspace download (ZIP packaging) to the dedicated task module.
+
+    Used by:
+    - `TASK_REGISTRY["workspace_download"]` via `WorkerTaskManager.submit_task`
+
+    ``target_workspace_id`` overrides ``workspace_id`` so the task can be
+    scoped to user-level task channels while still packaging the correct workspace.
+    """
+    return run_workspace_download_task(
+        _configure_worker_environment,
+        user_id,
+        target_workspace_id or workspace_id,
+        target_workspace_dir=target_workspace_dir,
         progress_callback=progress_callback,
     )
 
@@ -335,4 +360,5 @@ TASK_REGISTRY = {
     "quotation_detach": quotation_detach_task,
     "token_frequencies": token_frequencies_task,
     "ldaca_import": ldaca_import_task,
+    "workspace_download": workspace_download_task,
 }

@@ -6,7 +6,7 @@ import io
 import json
 import zipfile
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 
@@ -190,7 +190,7 @@ class TestWorkspaceAPI:
             assert response.status_code == 404
 
     async def test_download_workspace_zip(self, authenticated_client, tmp_path):
-        """Workspace download returns workspace directory as ZIP."""
+        """Workspace download kickoff submits task under USER_TASK_SCOPE."""
         workspace_dir = tmp_path / "ws1"
         workspace_dir.mkdir(parents=True)
         (workspace_dir / "metadata.json").write_text(
@@ -201,36 +201,116 @@ class TestWorkspaceAPI:
         data_dir.mkdir()
         (data_dir / "sample.parquet").write_bytes(b"parquet-bytes")
 
+        mock_task_info = MagicMock()
+        mock_task_info.id = "task-download-123"
+
+        mock_tm = AsyncMock()
+        mock_tm.submit_task = AsyncMock(return_value=mock_task_info)
+
+        mock_ws = MagicMock()
+        mock_ws.name = "WS One"
+
         with (
             patch(
                 "ldaca_web_app_backend.api.workspaces.workspace_manager.get_current_workspace_id"
             ) as mock_current_id,
-            patch("docworkspace.workspace.core.Workspace.save") as mock_save,
             patch(
                 "ldaca_web_app_backend.api.workspaces.workspace_manager.get_workspace_dir"
             ) as mock_get_dir,
             patch(
-                "ldaca_web_app_backend.api.workspaces.workspace_manager.list_user_workspaces_summaries"
-            ) as mock_summaries,
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_workspace"
+            ) as mock_get_ws,
+            patch(
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_task_manager"
+            ) as mock_get_tm,
         ):
             mock_current_id.return_value = None
             mock_get_dir.return_value = workspace_dir
-            mock_summaries.return_value = {
-                "ws-1": {"workspace_id": "ws-1", "name": "WS One"}
-            }
+            mock_get_ws.return_value = mock_ws
+            mock_get_tm.return_value = mock_tm
 
-            response = await authenticated_client.get("/api/workspaces/ws-1/download")
+            response = await authenticated_client.post("/api/workspaces/ws-1/download")
+
+            assert response.status_code == 200
+            body = response.json()
+            assert body["state"] == "running"
+            assert body["metadata"]["task_id"] == "task-download-123"
+            assert body["metadata"]["task_scope"] == "user"
+            mock_get_tm.assert_called_once_with("test", "__user__")
+            mock_tm.submit_task.assert_called_once()
+
+    async def test_download_workspace_artifact(self, authenticated_client, tmp_path):
+        """Workspace artifact endpoint streams ZIP and deletes after download."""
+        from ldaca_web_app_backend.core.worker_task_manager import TaskStatus
+
+        artifact = tmp_path / "artifact.zip"
+        artifact.write_bytes(b"PK-fake-zip-content")
+
+        mock_task_info = MagicMock()
+        mock_task_info.status = TaskStatus.SUCCESSFUL
+        mock_task_info.metadata = {
+            "workspace_id": "ws-1",
+            "task_type": "workspace_download",
+        }
+        mock_task_info.result = {
+            "artifact_path": str(artifact),
+            "filename": "WS_One.zip",
+        }
+
+        mock_tm = AsyncMock()
+        mock_tm.get_task = AsyncMock(return_value=mock_task_info)
+
+        with patch(
+            "ldaca_web_app_backend.api.workspaces.workspace_manager.get_task_manager"
+        ) as mock_get_tm:
+            mock_get_tm.return_value = mock_tm
+
+            response = await authenticated_client.get(
+                "/api/workspaces/ws-1/download/tasks/task-123/artifact"
+            )
 
             assert response.status_code == 200
             assert response.headers.get("content-type") == "application/zip"
             assert 'attachment; filename="WS_One.zip"' in response.headers.get(
                 "content-disposition", ""
             )
-            with zipfile.ZipFile(io.BytesIO(response.content), "r") as zf:
-                names = set(zf.namelist())
-            assert "metadata.json" in names
-            assert "data/sample.parquet" in names
-            mock_save.assert_not_called()
+            assert response.content == b"PK-fake-zip-content"
+            # Artifact deleted after download
+            assert not artifact.exists()
+            # Task looked up under USER_TASK_SCOPE
+            mock_get_tm.assert_called_once_with("test", "__user__")
+
+    async def test_download_workspace_artifact_already_deleted(
+        self, authenticated_client, tmp_path
+    ):
+        """Second artifact fetch returns 410 after first download deletes it."""
+        from ldaca_web_app_backend.core.worker_task_manager import TaskStatus
+
+        mock_task_info = MagicMock()
+        mock_task_info.status = TaskStatus.SUCCESSFUL
+        mock_task_info.metadata = {
+            "workspace_id": "ws-1",
+            "task_type": "workspace_download",
+        }
+        mock_task_info.result = {
+            "artifact_path": str(tmp_path / "gone.zip"),
+            "filename": "WS_One.zip",
+        }
+
+        mock_tm = AsyncMock()
+        mock_tm.get_task = AsyncMock(return_value=mock_task_info)
+
+        with patch(
+            "ldaca_web_app_backend.api.workspaces.workspace_manager.get_task_manager"
+        ) as mock_get_tm:
+            mock_get_tm.return_value = mock_tm
+
+            response = await authenticated_client.get(
+                "/api/workspaces/ws-1/download/tasks/task-123/artifact"
+            )
+
+            assert response.status_code == 410
+            mock_get_tm.assert_called_once_with("test", "__user__")
 
     async def test_upload_workspace_zip(self, authenticated_client, tmp_path):
         """Workspace upload ingests ZIP and writes workspace folder contents."""

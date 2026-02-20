@@ -35,7 +35,7 @@ router = APIRouter(prefix="/files", tags=["file_management"])
 
 README_FILENAME = "README.md"
 README_MAX_BYTES = 200_000
-FILES_TASK_SCOPE = "__files__"
+USER_TASK_SCOPE = "__user__"
 
 
 def _read_sample_folder_readme(readme_path: Path) -> Optional[str]:
@@ -308,16 +308,16 @@ async def import_ldaca_dataset(
     """
     user_id = current_user["id"]
     try:
-        # Files import must be independent of workspace routing and always use
-        # the files task scope so /api/files/tasks* can track progress.
-        task_scope = FILES_TASK_SCOPE
+        # LDaCA import is independent of a specific workspace and always uses
+        # a user-level task scope so /api/files/tasks* can track progress.
+        task_scope = USER_TASK_SCOPE
         tm = workspace_manager.get_task_manager(user_id, task_scope)
         task_info = await tm.submit_task(
             user_id=user_id,
             workspace_id=task_scope,
             task_type="ldaca_import",
             task_args={"url": request.url, "filename": request.filename},
-            metadata={"task_scope": "files"},
+            metadata={"task_scope": "user"},
         )
 
         return {
@@ -325,7 +325,7 @@ async def import_ldaca_dataset(
             "message": "LDaCA import started",
             "metadata": {
                 "task_id": task_info.id,
-                "task_scope": "files",
+                "task_scope": "user",
             },
         }
     except Exception as e:
@@ -334,17 +334,18 @@ async def import_ldaca_dataset(
 
 @router.get("/tasks", response_model=FilesTasksListResponse)
 async def list_files_tasks(current_user: dict = Depends(get_current_user)):
-    """List worker tasks scoped to file operations.
+    """List user-scope worker tasks exposed via the files API.
 
     Used by:
     - frontend import-task status polling
 
     Why:
-    - Separates file-import task stream from workspace-analysis task stream.
+        - Keeps user-level import/download task stream separate from
+            workspace-analysis task streams.
     """
     user_id = current_user["id"]
-    tm = workspace_manager.get_task_manager(user_id, FILES_TASK_SCOPE)
-    data = await tm.list(user_id=user_id, workspace_id=FILES_TASK_SCOPE)
+    tm = workspace_manager.get_task_manager(user_id, USER_TASK_SCOPE)
+    data = await tm.list(user_id=user_id, workspace_id=USER_TASK_SCOPE)
     return {
         "state": "successful",
         "data": data,
@@ -358,7 +359,7 @@ async def cancel_files_tasks(
     task_id: Optional[str] = None,
     current_user: dict = Depends(get_current_user),
 ):
-    """Cancel one or many file-scope worker tasks.
+    """Cancel one or many user-scope worker tasks.
 
     Used by:
     - frontend import task cancellation controls
@@ -367,7 +368,7 @@ async def cancel_files_tasks(
     - Provides operational control for long-running remote imports.
     """
     user_id = current_user["id"]
-    tm = workspace_manager.get_task_manager(user_id, FILES_TASK_SCOPE)
+    tm = workspace_manager.get_task_manager(user_id, USER_TASK_SCOPE)
     if task_id:
         ok = await tm.cancel_task(task_id)
         return {
@@ -378,7 +379,7 @@ async def cancel_files_tasks(
     count = await tm.cancel_all(
         task_type=task_type,
         user_id=user_id,
-        workspace_id=FILES_TASK_SCOPE,
+        workspace_id=USER_TASK_SCOPE,
     )
     return {
         "state": "successful",
@@ -393,7 +394,7 @@ async def clear_files_tasks(
     task_id: Optional[str] = None,
     current_user: dict = Depends(get_current_user),
 ):
-    """Clear persisted file-scope task records.
+    """Clear persisted user-scope task records.
 
     Used by:
     - frontend task-list cleanup actions
@@ -402,7 +403,7 @@ async def clear_files_tasks(
     - Removes completed/failed task clutter while keeping imported artifacts.
     """
     user_id = current_user["id"]
-    tm = workspace_manager.get_task_manager(user_id, FILES_TASK_SCOPE)
+    tm = workspace_manager.get_task_manager(user_id, USER_TASK_SCOPE)
     if task_id:
         cleared = await tm.clear_task(task_id)
         return {
@@ -413,7 +414,7 @@ async def clear_files_tasks(
     count = await tm.clear_tasks(
         task_type=task_type,
         user_id=user_id,
-        workspace_id=FILES_TASK_SCOPE,
+        workspace_id=USER_TASK_SCOPE,
     )
     return {
         "state": "successful",

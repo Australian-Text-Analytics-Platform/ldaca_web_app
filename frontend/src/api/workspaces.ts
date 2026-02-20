@@ -7,6 +7,8 @@ export const workspacesApi = {
   delete: (id: string, headers: Record<string,string> = {}) => del(`/workspaces/${id}`, headers),
   uploadZip: (file: File, headers: Record<string,string> = {}) => { const fd = new FormData(); fd.append('file', file); return httpRequest('/workspaces/upload', { method: 'POST', formData: fd, headers }); },
   downloadZip: (id: string, headers: Record<string,string> = {}) => httpRequest<Blob>(`/workspaces/${id}/download`, { method: 'GET', headers, expectBlob: true }),
+  startDownloadTask: (id: string, headers: Record<string,string> = {}) => post<{ state: string; message: string; metadata: { task_id: string; task_scope: string } }>(`/workspaces/${id}/download`, {}, headers),
+  downloadTaskArtifact: (workspaceId: string, taskId: string, headers: Record<string,string> = {}) => httpRequest<Blob>(`/workspaces/${workspaceId}/download/tasks/${taskId}/artifact`, { method: 'GET', headers, expectBlob: true }),
   nodes: (id: string, headers: Record<string,string> = {}) => get<any>(`/workspaces/${id}/nodes`, headers).then(r => r.nodes || r),
   graph: (id: string, headers: Record<string,string> = {}) => get(`/workspaces/${id}/graph`, headers),
   save: (id: string, headers: Record<string,string> = {}) => post(`/workspaces/${id}/save`, {}, headers),

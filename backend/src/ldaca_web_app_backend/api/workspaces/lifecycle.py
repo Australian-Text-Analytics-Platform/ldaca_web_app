@@ -18,6 +18,7 @@ from ...core.auth import get_current_user
 from ...core.utils import generate_workspace_id, validate_workspace_name
 from ...core.workspace import workspace_manager
 from ...models import WorkspaceCreateRequest, WorkspaceInfo
+from ..files import USER_TASK_SCOPE
 from .analyses.token_frequencies import (
     _unwrap_task_manager_result as unwrap_task_manager_result,
 )
@@ -228,37 +229,134 @@ async def save_workspace(
         raise HTTPException(status_code=500, detail=f"Failed to save workspace: {e}")
 
 
-@router.get("/{workspace_id}/download")
-async def download_workspace_zip(
+@router.post("/{workspace_id}/download")
+async def start_workspace_download(
     workspace_id: str, current_user: dict = Depends(get_current_user)
 ):
-    """Download a workspace folder as a ZIP archive."""
+    """Start a background task to package the workspace as a ZIP archive.
+
+    Used by:
+    - frontend Download button in Workspace Manager
+
+    Why:
+    - Moves potentially slow ZIP compression into the Task Center so users can
+      track progress and the UI stays responsive.
+    """
     user_id = current_user["id"]
 
+    # Persist latest state if this is the current in-memory workspace
     current_workspace_id = workspace_manager.get_current_workspace_id(user_id)
     if current_workspace_id == workspace_id:
         current_workspace = workspace_manager.get_workspace(user_id, workspace_id)
         if current_workspace is not None:
             _persist_workspace(user_id, workspace_id, current_workspace)
 
+    # Verify workspace directory exists before submitting
     workspace_dir = workspace_manager.get_workspace_dir(user_id, workspace_id)
     if workspace_dir is None or not workspace_dir.exists():
         raise HTTPException(status_code=404, detail="Workspace not found")
 
-    summaries = workspace_manager.list_user_workspaces_summaries(user_id)
-    workspace_name = summaries.get(workspace_id, {}).get("name") or workspace_id
-    filename = f"{_safe_download_name(workspace_name)}.zip"
+    # Resolve a human-readable name for the task centre label
+    ws = workspace_manager.get_workspace(user_id, workspace_id)
+    ws_name = ws.name if ws else workspace_id
 
-    zip_buffer = io.BytesIO()
-    with zipfile.ZipFile(zip_buffer, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-        for file_path in workspace_dir.rglob("*"):
-            if file_path.is_file():
-                arcname = file_path.relative_to(workspace_dir).as_posix()
-                zf.write(file_path, arcname=arcname)
+    # Use USER_TASK_SCOPE so the download task appears in the unified
+    # SSE stream immediately (the stream always subscribes to this scope).
+    tm = workspace_manager.get_task_manager(user_id, USER_TASK_SCOPE)
+    task_info = await tm.submit_task(
+        user_id=user_id,
+        workspace_id=USER_TASK_SCOPE,
+        task_type="workspace_download",
+        task_args={
+            "target_workspace_id": workspace_id,
+            "target_workspace_dir": str(workspace_dir),
+        },
+        task_name=f"Download: {ws_name}",
+        metadata={
+            "task_scope": "user",
+            "workspace_id": workspace_id,
+        },
+    )
 
-    zip_buffer.seek(0)
+    return {
+        "state": "running",
+        "message": "Workspace download started",
+        "metadata": {
+            "task_id": task_info.id,
+            "task_scope": "user",
+        },
+    }
+
+
+@router.get("/{workspace_id}/download/tasks/{task_id}/artifact")
+async def download_workspace_artifact(
+    workspace_id: str,
+    task_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Stream a completed workspace ZIP artifact and delete it after download.
+
+    Used by:
+    - frontend auto-download on task completion
+
+    Why:
+    - One-time artifact policy: the ZIP is deleted after the first successful
+      download to avoid unbounded disk usage.
+    """
+    user_id = current_user["id"]
+
+    # Download tasks live under USER_TASK_SCOPE for unified SSE visibility.
+    tm = workspace_manager.get_task_manager(user_id, USER_TASK_SCOPE)
+    task_info = await tm.get_task(task_id)
+    if task_info is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    # Verify the task belongs to this workspace
+    if task_info.metadata.get("workspace_id") != workspace_id:
+        raise HTTPException(
+            status_code=403, detail="Task does not belong to this workspace"
+        )
+
+    if task_info.metadata.get("task_type") != "workspace_download":
+        raise HTTPException(status_code=400, detail="Task is not a workspace download")
+
+    from ...core.worker_task_manager import TaskStatus
+
+    if task_info.status != TaskStatus.SUCCESSFUL:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Task is not completed (state: {task_info.status.value})",
+        )
+
+    result = task_info.result
+    if not isinstance(result, dict) or not result.get("artifact_path"):
+        raise HTTPException(status_code=410, detail="Artifact metadata missing")
+
+    artifact_path = Path(result["artifact_path"])
+    if not artifact_path.exists():
+        raise HTTPException(
+            status_code=410, detail="Artifact already downloaded or deleted"
+        )
+
+    filename = result.get("filename", f"{workspace_id}.zip")
+
+    def _stream_and_delete():
+        """Yield ZIP content then delete the artifact file."""
+        try:
+            with open(artifact_path, "rb") as fh:
+                while True:
+                    chunk = fh.read(64 * 1024)
+                    if not chunk:
+                        break
+                    yield chunk
+        finally:
+            try:
+                artifact_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+
     return StreamingResponse(
-        zip_buffer,
+        _stream_and_delete(),
         media_type="application/zip",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
