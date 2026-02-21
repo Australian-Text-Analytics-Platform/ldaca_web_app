@@ -7,11 +7,9 @@ import { useAuth } from '../../../hooks/useAuth';
 import { textApi } from '../../../api/text';
 import type { TopicModelingRequest } from '../../../api/text';
 import { workspacesApi } from '../../../api/workspaces';
-import { getNodeInfo } from '../../../lib/nodeInfoCache';
 import { useAnalysisStore } from '../../../stores/analysisStore';
 import { useUIStore } from '../../../stores';
 import useNodeColumnInfos from '../../../hooks/useNodeColumnInfos';
-import { useAnalysisLockState } from '../../../hooks/useAnalysisLockState';
 import { Button } from '../../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
 import {
@@ -27,7 +25,7 @@ import {
 import { Input } from '../../../components/ui/input';
 import { Checkbox } from '../../../components/ui/checkbox';
 import HelpIcon from '../../../components/help/HelpIcon';
-import { AlertTriangle, Loader2, Play, Trash2 } from 'lucide-react';
+import { AlertTriangle, Loader2, Play, Scan, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '../../../lib/queryKeys';
@@ -37,7 +35,13 @@ import AnalysisTaskBanner from '../../../components/tabs/AnalysisTaskBanner';
 import type { AnalysisTaskStatus } from '../../../hooks/useAnalysisTaskStatus';
 import useAnalysisTaskLifecycle, { type AnalysisTaskRefreshContext } from '../../../hooks/useAnalysisTaskLifecycle';
 import { getAnalysisActionState } from '../common/analysisActionState';
-import { getNodeIdentifier, useAnalysisHydration, useColorStackAllocator } from '../common';
+import {
+  getNodeIdentifier,
+  restoreAnalysisLockFromRequest,
+  useAnalysisHydration,
+  useAnalysisLockMachine,
+  useColorStackAllocator,
+} from '../common';
 import {
   clearAnalysisTaskArtifacts,
   collectTaskIds,
@@ -50,6 +54,8 @@ import type {
 } from '../../../api/text';
 interface TopicModelingTopic { id: number; label: string; size: number[]; total_size: number; x: number; y: number; }
 interface TopicModelingResponse { state?: 'running' | 'successful' | 'failed' | 'cancelled'; message?: string; data?: { topics: TopicModelingTopic[]; corpus_sizes?: number[] }; metadata?: { task_id?: string; [k: string]: any } }
+interface ZoomDomain { xMin: number; xMax: number; yMin: number; yMax: number; }
+interface BrushRect { startX: number; startY: number; currentX: number; currentY: number; }
 
 // Simple linear gradient between two colors given t in [0,1]
 function interpolateColor(c1: string, c2: string, t: number) {
@@ -66,11 +72,8 @@ const TopicModelingFeature: React.FC = () => {
   const { currentWorkspaceId } = useWorkspaceData();
   const { getAuthHeaders } = useAuth();
   const queryClient = useQueryClient();
-  const topicModelingReadyTaskId = useAnalysisStore((state: any) => state.topicModelingReadyTaskId);
   const currentView = useUIStore((state) => state.currentView);
   const isActiveTab = currentView === 'topic-modeling';
-  const topicModelingReadyTimestamp = useAnalysisStore((state: any) => state.topicModelingReadyTimestamp);
-  const resetTopicModelingReady = useAnalysisStore((state: any) => state.resetTopicModelingReady);
   const setTasks = useAnalysisStore((state: any) => state.setTasks);
   const [isRunning, setIsRunning] = useState(false);
   const {
@@ -86,11 +89,13 @@ const TopicModelingFeature: React.FC = () => {
     activeNodeColumnSelections,
     panelSelectedNodes,
     displayNodeCount,
-  } = useAnalysisLockState({
+  } = useAnalysisLockMachine({
     allowedDataTypes: ['string'],
     maxNodes: 2,
     docTypeOnly: true,
     enableHeuristicGuess: false,
+    workspaceId: currentWorkspaceId,
+    getAuthHeaders,
   });
   const runningRef = useRef<boolean>(false);
   const fetchingTaskIdRef = useRef<string | null>(null); // Prevent duplicate inflight requests
@@ -119,17 +124,21 @@ const TopicModelingFeature: React.FC = () => {
   const [detachDialogOpen, setDetachDialogOpen] = useState(false);
   const [isDetachLoading, setIsDetachLoading] = useState(false);
   const [isDetaching, setIsDetaching] = useState(false);
+  const [zoomDomain, setZoomDomain] = useState<ZoomDomain | null>(null);
+  const [brushRect, setBrushRect] = useState<BrushRect | null>(null);
+  const [isBrushing, setIsBrushing] = useState(false);
   const [detachNodeOptions, setDetachNodeOptions] = useState<TopicModelingDetachNodeOption[]>([]);
   const [selectedDetachColumns, setSelectedDetachColumns] = useState<Record<string, string[]>>({});
   const containerRef = useRef<HTMLDivElement | null>(null); // overall card
   const chartRef = useRef<HTMLDivElement | null>(null); // chart area
+  const chartSvgRef = useRef<SVGSVGElement | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
   const [chartWidth, setChartWidth] = useState<number>(800);
   const lastFetchedRef = useRef<{ taskId: string | null; state: 'successful' | 'failed' | null }>({ taskId: null, state: null });
   useEffect(() => {
     lastFetchedRef.current = { taskId: null, state: null };
-    resetTopicModelingReady();
     setLocalTopicModelingTaskId(null);
-  }, [currentWorkspaceId, resetTopicModelingReady]);
+  }, [currentWorkspaceId]);
 
   const resolveTopicModelingTaskId = useCallback(async (): Promise<string | null> => {
     if (!currentWorkspaceId) return null;
@@ -138,7 +147,6 @@ const TopicModelingFeature: React.FC = () => {
       candidateIds: [
         localTopicModelingTaskId,
         (resultRef.current as any)?.metadata?.task_id,
-        topicModelingReadyTaskId,
         topicTaskStatus.activeTaskId,
         topicRunningTask?.task_id,
         topicTaskStatus.queuedTask?.task_id,
@@ -156,7 +164,7 @@ const TopicModelingFeature: React.FC = () => {
       },
       onResolved: setLocalTopicModelingTaskId,
     });
-  }, [currentWorkspaceId, localTopicModelingTaskId, topicModelingReadyTaskId, getAuthHeaders]);
+  }, [currentWorkspaceId, localTopicModelingTaskId, getAuthHeaders]);
 
   const fetchTopicModelingResult = useCallback(async (taskId: string | null, expectedState: 'successful' | 'failed') => {
     if (!isActiveTab) return;
@@ -180,6 +188,38 @@ const TopicModelingFeature: React.FC = () => {
       fetchingTaskIdRef.current = resolvedTaskId;
       const rr = await textApi.getTopicModelingTaskResult(currentWorkspaceId, resolvedTaskId, getAuthHeaders());
       if (!rr) return;
+
+      // Ensure lock snapshot + node-column selections are restored from task request,
+      // so Topic Modeling matches other tabs on tab re-entry.
+      try {
+        const reqPayload = await textApi.getTaskRequest(currentWorkspaceId, resolvedTaskId, getAuthHeaders());
+        const req = (reqPayload as any)?.data ?? reqPayload;
+        const nodeIds: string[] = Array.isArray(req?.node_ids)
+          ? req.node_ids
+              .slice(0, 2)
+              .filter((id: unknown): id is string => typeof id === 'string' && id.trim().length > 0)
+          : [];
+        const nodeColumns: Record<string, string> =
+          req?.node_columns && typeof req.node_columns === 'object'
+            ? req.node_columns
+            : {};
+
+        if (nodeIds.length) {
+          setNodeColumnSelections(
+            nodeIds.map((nodeId) => ({ nodeId, column: nodeColumns[nodeId] || '' })),
+            { replace: true }
+          );
+          await restoreAnalysisLockFromRequest({
+            workspaceId: currentWorkspaceId,
+            requestData: req,
+            getAuthHeaders,
+            lockWithSnapshots,
+            maxNodes: 2,
+          });
+        }
+      } catch {
+        /* best effort restore */
+      }
 
       const processedResult = rr as TopicModelingResponse;
 
@@ -346,7 +386,6 @@ const TopicModelingFeature: React.FC = () => {
     }
   const requestNodeIds = panelNodeIds.slice(0, 2);
     lastFetchedRef.current = { taskId: null, state: null };
-    resetTopicModelingReady();
     // Optimistically enter running state immediately
     setIsRunning(true);
     runningRef.current = true;
@@ -360,6 +399,31 @@ const TopicModelingFeature: React.FC = () => {
         }
       });
 
+      // Lock snapshot immediately (synchronous, no network) so parameter panel
+      // remains stable even if workspace selection changes while the task runs.
+      const snapshotById = new Map<string, { id: string; name: string; columns: string[] }>(
+        panelSelectedNodes
+          .filter((node): node is typeof node & { id: string } => typeof node.id === 'string' && node.id.length > 0)
+          .map((node) => [
+            node.id,
+            {
+              id: node.id,
+              name: String(node.name || node.data?.name || node.id),
+              columns: Array.isArray(node.columns)
+                ? node.columns.filter((col): col is string => typeof col === 'string')
+                : [],
+            },
+          ])
+      );
+      const lockSnapshots = requestNodeIds.map((id) => snapshotById.get(id) || {
+        id,
+        name: id,
+        columns: [],
+      });
+      const normalizedSnapshots = applySelectedColumnsToSnapshots(lockSnapshots, node_columns);
+      lockWithSnapshots(normalizedSnapshots);
+      setIsLocked(true);
+
       const req: TopicModelingRequest = {
         node_ids: requestNodeIds,
         node_columns,
@@ -371,8 +435,7 @@ const TopicModelingFeature: React.FC = () => {
       setResultSafely(res);
 
       if (res.state === 'running') {
-        // lock immediately while task is running
-        setIsLocked(true);
+        // already locked above
         // SSE will provide task updates automatically, no need to manually fetch
       } else if (res.state === 'failed') {
         // Immediate failure (validation etc.)
@@ -385,36 +448,6 @@ const TopicModelingFeature: React.FC = () => {
         setError(res.message || 'Topic modeling failed');
       }
 
-      // Lock with snapshot
-      try {
-        const ids = requestNodeIds;
-        const snaps: Array<{ id: string; name: string; columns: string[] }> = [];
-
-        for (const id of ids) {
-          try {
-            const info = await getNodeInfo({ workspaceId: currentWorkspaceId!, nodeId: id, getAuthHeaders });
-            const name = info?.name || info?.data?.name || id;
-            const columns = Array.isArray(info?.columns)
-              ? info.columns
-              : (Array.isArray(info?.data?.columns) ? info.data.columns : []);
-            snaps.push({ id, name: String(name), columns });
-          } catch {
-            snaps.push({ id, name: id, columns: [] });
-          }
-        }
-
-        const lockedSelections = effectiveNodeColumnSelections.filter((sel) => ids.includes(sel.nodeId));
-        const normalizedSnapshots = applySelectedColumnsToSnapshots(
-          snaps,
-          lockedSelections.reduce<Record<string, string | undefined>>((acc, sel) => {
-            acc[sel.nodeId] = sel.column;
-            return acc;
-          }, {})
-        );
-        lockWithSnapshots(normalizedSnapshots);
-      } catch {
-        /* ignore */
-      }
     } catch (e:any) {
       setError(e?.message || 'Error running topic modeling');
       // Exit running state on error
@@ -505,6 +538,173 @@ const TopicModelingFeature: React.FC = () => {
 
   const topics: TopicModelingTopic[] = result?.data?.topics || [];
   const corpusCount = result?.data?.corpus_sizes?.length || 0;
+  const chartPadding = 40;
+  const chartHeight = React.useMemo(
+    () => Math.min(520, Math.max(320, Math.round(chartWidth * 0.55))),
+    [chartWidth]
+  );
+
+  const fullDomain = React.useMemo<ZoomDomain | null>(() => {
+    if (!topics.length) return null;
+    const xs = topics.map((t) => t.x);
+    const ys = topics.map((t) => t.y);
+    const xMin = Math.min(...xs);
+    const xMax = Math.max(...xs);
+    const yMin = Math.min(...ys);
+    const yMax = Math.max(...ys);
+    const epsilon = 1e-6;
+    return {
+      xMin,
+      xMax: xMax === xMin ? xMin + epsilon : xMax,
+      yMin,
+      yMax: yMax === yMin ? yMin + epsilon : yMax,
+    };
+  }, [topics]);
+
+  const activeDomain = zoomDomain ?? fullDomain;
+
+  useEffect(() => {
+    if (!fullDomain) {
+      setZoomDomain(null);
+      return;
+    }
+    setZoomDomain(fullDomain);
+  }, [fullDomain]);
+
+  useEffect(() => {
+    return () => {
+      if (animationFrameRef.current != null) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+    };
+  }, []);
+
+  const animateDomainTo = useCallback((target: ZoomDomain) => {
+    const start = activeDomain ?? target;
+    if (animationFrameRef.current != null) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+
+    const startAt = performance.now();
+    const durationMs = 260;
+    const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
+
+    const step = (now: number) => {
+      const raw = (now - startAt) / durationMs;
+      const t = Math.max(0, Math.min(1, raw));
+      const e = easeOutCubic(t);
+      setZoomDomain({
+        xMin: start.xMin + (target.xMin - start.xMin) * e,
+        xMax: start.xMax + (target.xMax - start.xMax) * e,
+        yMin: start.yMin + (target.yMin - start.yMin) * e,
+        yMax: start.yMax + (target.yMax - start.yMax) * e,
+      });
+      if (t < 1) {
+        animationFrameRef.current = requestAnimationFrame(step);
+      } else {
+        setZoomDomain(target);
+        animationFrameRef.current = null;
+      }
+    };
+
+    animationFrameRef.current = requestAnimationFrame(step);
+  }, [activeDomain]);
+
+  const toSvgPoint = useCallback((event: React.MouseEvent<SVGSVGElement>) => {
+    const svg = chartSvgRef.current;
+    if (!svg) return null;
+    const rect = svg.getBoundingClientRect();
+    return {
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top,
+    };
+  }, []);
+
+  const handleBrushStart = useCallback((event: React.MouseEvent<SVGSVGElement>) => {
+    if (event.button !== 0 || !activeDomain) return;
+    const point = toSvgPoint(event);
+    if (!point) return;
+    setIsBrushing(true);
+    setTooltip((t) => ({ ...t, topic: null }));
+    setHoveredTopicId(null);
+    setBrushRect({
+      startX: point.x,
+      startY: point.y,
+      currentX: point.x,
+      currentY: point.y,
+    });
+  }, [activeDomain, toSvgPoint]);
+
+  const handleBrushMove = useCallback((event: React.MouseEvent<SVGSVGElement>) => {
+    if (!isBrushing) return;
+    const point = toSvgPoint(event);
+    if (!point) return;
+    setBrushRect((prev) => (prev ? { ...prev, currentX: point.x, currentY: point.y } : prev));
+  }, [isBrushing, toSvgPoint]);
+
+  const handleBrushEnd = useCallback(() => {
+    if (!isBrushing || !brushRect || !activeDomain) {
+      setIsBrushing(false);
+      setBrushRect(null);
+      return;
+    }
+
+    const x0 = Math.min(brushRect.startX, brushRect.currentX);
+    const x1 = Math.max(brushRect.startX, brushRect.currentX);
+    const y0 = Math.min(brushRect.startY, brushRect.currentY);
+    const y1 = Math.max(brushRect.startY, brushRect.currentY);
+
+    setIsBrushing(false);
+    setBrushRect(null);
+
+    if (x1 - x0 < 8 || y1 - y0 < 8) {
+      return;
+    }
+
+    const innerWidth = Math.max(1, chartWidth - 2 * chartPadding);
+    const innerHeight = Math.max(1, chartHeight - 2 * chartPadding);
+    const clamp = (value: number, low: number, high: number) => Math.min(high, Math.max(low, value));
+
+    const invX = (px: number) => {
+      const t = clamp((px - chartPadding) / innerWidth, 0, 1);
+      return activeDomain.xMin + t * (activeDomain.xMax - activeDomain.xMin);
+    };
+    const invY = (py: number) => {
+      const t = clamp((py - chartPadding) / innerHeight, 0, 1);
+      return activeDomain.yMin + t * (activeDomain.yMax - activeDomain.yMin);
+    };
+
+    const nx0 = invX(x0);
+    const nx1 = invX(x1);
+    const ny0 = invY(y0);
+    const ny1 = invY(y1);
+
+    const epsilon = 1e-6;
+    animateDomainTo({
+      xMin: Math.min(nx0, nx1),
+      xMax: Math.max(nx0, nx1) + epsilon,
+      yMin: Math.min(ny0, ny1),
+      yMax: Math.max(ny0, ny1) + epsilon,
+    });
+  }, [activeDomain, animateDomainTo, brushRect, chartHeight, chartWidth, isBrushing]);
+
+  const handleResetZoom = useCallback(() => {
+    if (!fullDomain) return;
+    animateDomainTo(fullDomain);
+  }, [animateDomainTo, fullDomain]);
+
+  const isAtGlobalZoom = React.useMemo(() => {
+    if (!fullDomain || !activeDomain) return true;
+    const eps = 1e-6;
+    return (
+      Math.abs(activeDomain.xMin - fullDomain.xMin) < eps &&
+      Math.abs(activeDomain.xMax - fullDomain.xMax) < eps &&
+      Math.abs(activeDomain.yMin - fullDomain.yMin) < eps &&
+      Math.abs(activeDomain.yMax - fullDomain.yMax) < eps
+    );
+  }, [activeDomain, fullDomain]);
 
   const fallbackPrimaryColor = defaultPalette[0] ?? '#2563eb';
   const fallbackSecondaryColor = defaultPalette[1] ?? '#dc2626';
@@ -556,21 +756,40 @@ const TopicModelingFeature: React.FC = () => {
 
   // Layout bubbles simply using returned coordinates scaled
   const bubbleElements = (() => {
-    if(!topics.length) return null;
-    const xs = topics.map(t=>t.x); const ys = topics.map(t=>t.y);
-    const xMin=Math.min(...xs), xMax=Math.max(...xs), yMin=Math.min(...ys), yMax=Math.max(...ys);
-    const pad = 40; const width=chartWidth; const height=Math.min(520, Math.max(320, Math.round(width * 0.55)));
-    const scaleX = (x:number)=> ( (x - xMin)/(xMax-xMin || 1) )*(width-2*pad)+pad;
-    const scaleY = (y:number)=> ( (y - yMin)/(yMax-yMin || 1) )*(height-2*pad)+pad;
+    if(!topics.length || !activeDomain) return null;
+    const width=chartWidth;
+    const height=chartHeight;
+    const scaleX = (x:number)=> ( (x - activeDomain.xMin)/(activeDomain.xMax-activeDomain.xMin || 1) )*(width-2*chartPadding)+chartPadding;
+    const scaleY = (y:number)=> ( (y - activeDomain.yMin)/(activeDomain.yMax-activeDomain.yMin || 1) )*(height-2*chartPadding)+chartPadding;
     const maxSize = Math.max(...topics.map(t=>t.total_size));
+    const brushDisplay = brushRect
+      ? {
+          x: Math.min(brushRect.startX, brushRect.currentX),
+          y: Math.min(brushRect.startY, brushRect.currentY),
+          width: Math.abs(brushRect.currentX - brushRect.startX),
+          height: Math.abs(brushRect.currentY - brushRect.startY),
+        }
+      : null;
     return (
       <svg
+        ref={chartSvgRef}
         width={width}
         height={height}
         className="border rounded bg-white block w-full"
         role="img"
         aria-label="Topic bubble chart"
-        onMouseLeave={()=>{ setHoveredTopicId(null); setTooltip(t=>({...t,topic:null})); }}
+        style={{ cursor: isBrushing ? 'grabbing' : 'crosshair' }}
+        onMouseDown={handleBrushStart}
+        onMouseMove={handleBrushMove}
+        onMouseUp={handleBrushEnd}
+        onMouseLeave={()=>{
+          if (isBrushing) {
+            handleBrushEnd();
+            return;
+          }
+          setHoveredTopicId(null);
+          setTooltip(t=>({...t,topic:null}));
+        }}
       >
         {topics.map((t)=>{
           const sizes = t.size || [];
@@ -586,6 +805,7 @@ const TopicModelingFeature: React.FC = () => {
                 key={t.id}
                 transform={`translate(${cx},${cy})`}
                 onMouseEnter={(e)=>{
+                  if (isBrushing) return;
                   setHoveredTopicId(t.id);
                   const bbox = (chartRef.current?.getBoundingClientRect());
                   if (bbox) {
@@ -597,11 +817,16 @@ const TopicModelingFeature: React.FC = () => {
                   }
                 }}
                 onMouseMove={(e)=>{
+                  if (isBrushing) return;
                   if(!chartRef.current) return;
                   const bbox = chartRef.current.getBoundingClientRect();
                   setTooltip(tp=> tp.topic && tp.topic.id===t.id ? { x: e.clientX - bbox.left + 12, y: e.clientY - bbox.top + 12, topic: t } : tp);
                 }}
-                onMouseLeave={()=>{ setHoveredTopicId(null); setTooltip(tp=> ({...tp, topic:null})); }}
+                onMouseLeave={()=>{
+                  if (isBrushing) return;
+                  setHoveredTopicId(null);
+                  setTooltip(tp=> ({...tp, topic:null}));
+                }}
               >
                 <circle r={r} fill={fill} fillOpacity={isHovered?0.92:0.7} stroke={isHovered? '#1d4ed8':'#334155'} strokeWidth={isHovered?2:1} />
                 <text textAnchor="middle" dy={4} fontSize={12} className="pointer-events-none select-none" fill="#1e293b">
@@ -610,6 +835,19 @@ const TopicModelingFeature: React.FC = () => {
               </g>
             );
         })}
+        {brushDisplay && (
+          <rect
+            x={brushDisplay.x}
+            y={brushDisplay.y}
+            width={brushDisplay.width}
+            height={brushDisplay.height}
+            fill="rgba(37, 99, 235, 0.12)"
+            stroke="rgba(37, 99, 235, 0.8)"
+            strokeWidth={1.5}
+            strokeDasharray="4 3"
+            pointerEvents="none"
+          />
+        )}
       </svg>
     );
   })();
@@ -625,22 +863,18 @@ const TopicModelingFeature: React.FC = () => {
     setMinTopicSize(Number(req.min_topic_size ?? 10));
     setUseCtTfidf(req.use_ctfidf === undefined ? true : !!req.use_ctfidf);
 
-    const snaps: Array<{ id: string; name: string; columns: string[] }> = [];
-    for (const id of nodeIds) {
+    if (nodeIds.length && currentWorkspaceId) {
       try {
-        const info = await getNodeInfo({ workspaceId: currentWorkspaceId!, nodeId: id, getAuthHeaders });
-        const name = info?.name || info?.data?.name || id;
-        const columns = Array.isArray(info?.columns)
-          ? info.columns
-          : (Array.isArray(info?.data?.columns) ? info.data.columns : []);
-        snaps.push({ id, name: String(name), columns });
+        await restoreAnalysisLockFromRequest({
+          workspaceId: currentWorkspaceId,
+          requestData: req,
+          getAuthHeaders,
+          lockWithSnapshots,
+          maxNodes: 2,
+        });
       } catch {
-        snaps.push({ id, name: id, columns: [] });
+        /* ignore snapshot failures */
       }
-    }
-    if (snaps.length) {
-      const normalizedSnapshots = applySelectedColumnsToSnapshots(snaps, node_columns);
-      lockWithSnapshots(normalizedSnapshots);
     }
   };
 
@@ -738,17 +972,6 @@ const TopicModelingFeature: React.FC = () => {
     fetchTopicModelingResult,
     setIsLocked,
   ]);
-
-  // React to explicit ready markers from task stream (covers persisted results without state change yet)
-  useEffect(() => {
-    if (!topicModelingReadyTaskId) return;
-    if (!isActiveTab) return;
-
-    (async () => {
-      await fetchTopicModelingResult(topicModelingReadyTaskId, 'successful');
-      resetTopicModelingReady();
-    })();
-  }, [topicModelingReadyTaskId, topicModelingReadyTimestamp, fetchTopicModelingResult, resetTopicModelingReady, isActiveTab]);
 
   // If result failed, keep the panel locked and run disabled until cleared
   useEffect(() => {
@@ -893,7 +1116,6 @@ const TopicModelingFeature: React.FC = () => {
                       setIsRunning(false);
                       runningRef.current = false;
                       setLocalTopicModelingTaskId(null);
-                      resetTopicModelingReady();
                       lastFetchedRef.current = { taskId: null, state: null };
                       setNodeColumnSelections([], { replace: true, persist: false });
                       recomputeAutoColumns();
@@ -967,25 +1189,38 @@ const TopicModelingFeature: React.FC = () => {
                   />
                 </CardTitle>
               </div>
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full sm:w-auto"
-                onClick={() => void openDetachDialog()}
-                disabled={isDetachLoading || isDetaching}
-              >
-                {isDetachLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Loading Detach…
-                  </>
-                ) : (
-                  'Detach'
-                )}
-              </Button>
+              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full sm:w-auto"
+                  onClick={() => void openDetachDialog()}
+                  disabled={isDetachLoading || isDetaching}
+                >
+                  {isDetachLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Loading Detach…
+                    </>
+                  ) : (
+                    'Detach'
+                  )}
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="relative w-full overflow-hidden rounded-lg border border-muted-foreground/30 bg-background" ref={chartRef}>
+                <button
+                  type="button"
+                  className="react-flow__controls-button absolute top-2 right-2 z-20 border border-border bg-white/90"
+                  onClick={handleResetZoom}
+                  disabled={isAtGlobalZoom}
+                  title="Reset zoom to global view"
+                  aria-label="Reset zoom to global view"
+                  style={{ opacity: isAtGlobalZoom ? 0.5 : 1 }}
+                >
+                  <Scan className="h-4 w-4" />
+                </button>
                 {bubbleElements}
                 {tooltip.topic && (
                   <div

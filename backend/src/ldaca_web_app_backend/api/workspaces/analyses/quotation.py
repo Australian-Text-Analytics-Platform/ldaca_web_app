@@ -5,7 +5,9 @@ from __future__ import annotations
 import logging
 from functools import partial
 from typing import Any, Optional
+from uuid import uuid4
 
+import polars as pl
 from fastapi import APIRouter, Depends, HTTPException
 
 from ....analysis.implementations.quotation import (
@@ -77,6 +79,16 @@ async def _compute_on_demand_page(
 
 
 router = APIRouter(prefix="/workspaces", tags=["quotation"])
+
+
+def _prepare_quotation_artifact_target(
+    user_id: str, workspace_id: str
+) -> tuple[str, str]:
+    artifact_dir = workspace_manager.ensure_workspace_artifacts_dir(
+        user_id, workspace_id
+    )
+    artifact_prefix = f"quotation_detach_{uuid4().hex}"
+    return str(artifact_dir), artifact_prefix
 
 
 @router.get("/{workspace_id}/quotation/tasks/{task_id}/result")
@@ -401,10 +413,13 @@ async def detach_quotation(
             workspace_id=workspace_id,
             task_type="quotation_detach",
             task_args={
-                "node_id": node_id,
-                "column": request.column,
+                "node_corpus": node_corpus,
+                "parent_node_id": node_id,
+                "document_column": request.column,
                 "engine_config": request.engine.model_dump() if request.engine else {},
                 "new_node_name": request.new_node_name,
+                "artifact_dir": artifact_dir,
+                "artifact_prefix": artifact_prefix,
             },
             task_name="Detach Quotation",
         )

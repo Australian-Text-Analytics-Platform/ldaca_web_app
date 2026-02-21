@@ -1,8 +1,18 @@
-"""Token Frequency analysis endpoints extracted from workspaces monolith.
+"""Token Frequency analysis endpoints.
 
-Paths preserved exactly as /workspaces/{workspace_id}/token-frequencies*.
+Artifact-first implementation:
+- API gathers immutable payload (node corpora) in main process.
+- Worker computes and writes Parquet artifacts.
+- Result endpoint reconstructs response by lazy-scanning artifacts.
 """
 
+from __future__ import annotations
+
+import math
+from pathlib import Path
+from uuid import uuid4
+
+import polars as pl
 from fastapi import APIRouter, Depends, HTTPException
 
 from ....analysis.implementations.token_frequency import (
@@ -10,7 +20,6 @@ from ....analysis.implementations.token_frequency import (
 )
 from ....analysis.manager import get_task_manager
 from ....analysis.models import AnalysisStatus, AnalysisTask
-from ....analysis.results import GenericAnalysisResult
 from ....core.analysis_helpers import sanitize_stop_words
 from ....core.auth import get_current_user
 from ....core.workspace import workspace_manager
@@ -18,26 +27,29 @@ from ....models import TokenFrequencyRequest, TokenFrequencyResponse
 from ..utils import ensure_task_synced, get_workspace_or_404
 from .text_column_prefs import resolve_text_columns_for_nodes
 
-# This router uses the same '/workspaces' prefix as the base router so paths are identical
-# to their original definitions when included at top level.
 router = APIRouter(prefix="/workspaces")
 
 DEFAULT_TOKEN_LIMIT = 10
 SERVER_LIMIT_MULTIPLIER = 5
 MAX_SERVER_TOKEN_LIMIT = 5000
-_STOP_WORDS_UNSET = object()
+
+
+def _unwrap_task_manager_result(raw_result):
+    """Normalize stored TaskManager result wrappers into plain dictionaries."""
+    if raw_result is None:
+        return {}
+    if isinstance(raw_result, dict):
+        nested = raw_result.get("result")
+        if isinstance(nested, dict):
+            return nested
+        return raw_result
+    if isinstance(raw_result, str):
+        return {"state": "successful", "message": raw_result}
+    return {"state": "successful"}
 
 
 def _coerce_limit_value(value) -> int:
-    """Coerce token-limit input to a safe positive integer.
-
-    Used by:
-    - `_normalize_limit_payload`
-    - `_prepare_result_blob`
-
-    Why:
-    - Keeps request/result metadata stable even when clients send invalid values.
-    """
+    """Coerce token-limit input to a safe positive integer."""
     try:
         candidate = int(value)  # type: ignore[arg-type]
     except TypeError, ValueError:
@@ -45,149 +57,189 @@ def _coerce_limit_value(value) -> int:
     return candidate if candidate > 0 else DEFAULT_TOKEN_LIMIT
 
 
-def _normalize_limit_payload(payload: dict | None) -> dict:
-    """Normalize persisted token-frequency request preferences.
+def _prepare_token_artifact_target(user_id: str, workspace_id: str) -> tuple[Path, str]:
+    workspace_artifacts_dir = workspace_manager.ensure_workspace_artifacts_dir(
+        user_id, workspace_id
+    )
+    if workspace_artifacts_dir is None:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    artifact_prefix = f"token_frequencies_{uuid4()}"
+    return workspace_artifacts_dir, artifact_prefix
 
-    Used by:
-    - `_prepare_result_blob`
 
-    Why:
-    - Ensures downstream result composition always has canonical
-      `token_limit` and `stop_words` values.
-    """
+def _task_result_payload(task: AnalysisTask) -> dict:
+    if task.result is None:
+        return {}
+    payload = task.result.to_json()
     if not isinstance(payload, dict):
-        limit = DEFAULT_TOKEN_LIMIT
-        return {
-            "token_limit": limit,
-            "stop_words": [],
-        }
-
-    merged = {**payload}
-    candidate = merged.get("token_limit")
-
-    limit = _coerce_limit_value(candidate)
-    merged["token_limit"] = limit
-    merged["stop_words"] = sanitize_stop_words(merged.get("stop_words"))
-    return merged
+        return {}
+    return payload
 
 
-def _prepare_result_blob(
-    result_blob: dict,
-    request_payload: dict | None,
-    *,
-    limit_override: int | None = None,
-    stop_words_override=_STOP_WORDS_UNSET,
-):
-    """Merge stored output with normalized token preference metadata.
-
-    Used by:
-    - `token_frequencies_task_result`
-    - `update_token_frequencies_task_result`
-
-    Why:
-    - Ensures read and update endpoints emit the same response schema.
-    """
-    normalized_request = _normalize_limit_payload(request_payload)
-    # Build shallow copies so callers can mutate without affecting stored state
-    normalized_result = {**result_blob}
-    existing_metadata = (
-        {**normalized_result.get("metadata", {})}
-        if isinstance(normalized_result.get("metadata"), dict)
-        else {}
-    )
-    existing_params = (
-        {**normalized_result.get("analysis_params", {})}
-        if isinstance(normalized_result.get("analysis_params"), dict)
-        else {}
-    )
-
-    limit_candidates = [
-        limit_override,
-        normalized_result.get("token_limit"),
-        existing_params.get("token_limit"),
-        existing_metadata.get("token_limit"),
-        normalized_request.get("token_limit"),
-    ]
-
-    limit_value = next(
-        (
-            _coerce_limit_value(candidate)
-            for candidate in limit_candidates
-            if candidate is not None
-        ),
-        DEFAULT_TOKEN_LIMIT,
-    )
-
-    if limit_override is not None:
-        limit_value = _coerce_limit_value(limit_override)
-
-    if stop_words_override is _STOP_WORDS_UNSET:
-        stop_candidates = [
-            normalized_result.get("stop_words"),
-            existing_metadata.get("stop_words"),
-            existing_params.get("stop_words"),
-            normalized_request.get("stop_words"),
-        ]
-        raw_stop_words = next(
-            (candidate for candidate in stop_candidates if candidate is not None),
-            [],
+def _token_artifacts_from_task(task: AnalysisTask) -> dict:
+    payload = _task_result_payload(task)
+    artifacts = payload.get("artifacts")
+    if not isinstance(artifacts, dict):
+        raise HTTPException(
+            status_code=404,
+            detail="Token-frequency artifacts are not available for this task",
         )
-    else:
-        raw_stop_words = stop_words_override
+    node_artifacts = artifacts.get("nodes")
+    if not isinstance(node_artifacts, list):
+        raise HTTPException(
+            status_code=500,
+            detail="Token-frequency artifact manifest is invalid",
+        )
+    return payload
 
-    stop_words = sanitize_stop_words(raw_stop_words)
 
-    server_limit = min(
-        max(limit_value * SERVER_LIMIT_MULTIPLIER, DEFAULT_TOKEN_LIMIT),
+def _server_limit(token_limit: int) -> int:
+    return min(
+        max(token_limit * SERVER_LIMIT_MULTIPLIER, DEFAULT_TOKEN_LIMIT),
         MAX_SERVER_TOKEN_LIMIT,
     )
 
-    existing_metadata["token_limit"] = limit_value
-    existing_metadata["server_limit"] = server_limit
-    existing_metadata["stop_words"] = stop_words
 
-    existing_params["token_limit"] = limit_value
-    existing_params["stop_words"] = stop_words
-
-    normalized_request["token_limit"] = limit_value
-    normalized_request["stop_words"] = stop_words
-
-    normalized_result["token_limit"] = limit_value
-    normalized_result["analysis_params"] = existing_params
-    normalized_result["metadata"] = existing_metadata
-    normalized_result["stop_words"] = stop_words
-
-    if "state" not in normalized_result:
-        normalized_result["state"] = "successful"
-
-    return normalized_result, normalized_request, limit_value, stop_words
+def _safe_float(value, default: float | None = 0.0):
+    if value is None:
+        return default
+    try:
+        numeric = float(value)
+    except TypeError, ValueError:
+        return default
+    if not math.isfinite(numeric):
+        return default
+    return numeric
 
 
-def _unwrap_task_manager_result(result_dict: dict) -> dict:
-    """Unwrap worker payloads from task-manager envelope shapes.
+def _rebuild_token_result(task: AnalysisTask) -> dict:
+    payload = _token_artifacts_from_task(task)
+    artifacts = payload["artifacts"]
 
-    Used by:
-    - `token_frequencies_task_result`
-    - `update_token_frequencies_task_result`
+    request_payload = task.request.model_dump()
+    token_limit = _coerce_limit_value(request_payload.get("token_limit"))
+    stop_words = sanitize_stop_words(request_payload.get("stop_words"))
+    stop_word_set = set(stop_words)
 
-    Why:
-    - Worker and legacy paths persist different wrapper formats.
+    node_results: dict[str, dict] = {}
+    for node_entry in artifacts.get("nodes", []):
+        if not isinstance(node_entry, dict):
+            continue
+        node_id = str(node_entry.get("node_id") or "")
+        if not node_id:
+            continue
+        token_path = Path(str(node_entry.get("token_parquet_path") or ""))
+        if not token_path.exists():
+            raise HTTPException(
+                status_code=404,
+                detail=f"Token artifact missing for node {node_id}",
+            )
 
-        Refactor note:
-        - Similar unwrapping exists in multiple analysis routers; this helper could
-            be removed after extracting a shared utility in analysis router utils.
-    """
+        token_lf = pl.scan_parquet(token_path)
+        if stop_word_set:
+            token_lf = token_lf.filter(~pl.col("token").is_in(list(stop_word_set)))
 
-    if not isinstance(result_dict, dict):
-        return {}
-    # If it's already the final response blob, keep it.
-    if "state" in result_dict and "message" in result_dict:
-        return result_dict
-    # If it's wrapped (WorkerTaskManager convention), unwrap the inner payload.
-    inner = result_dict.get("data")
-    if isinstance(inner, dict):
-        return inner
-    return result_dict
+        token_df = token_lf.collect()
+        rows = token_df.to_dicts()
+        total_tokens = len(rows)
+        display_name = str(node_entry.get("node_name") or node_id)
+        node_results[node_id] = {
+            "data": [
+                {
+                    "token": str(row.get("token") or ""),
+                    "frequency": int(row.get("frequency") or 0),
+                }
+                for row in rows
+            ],
+            "columns": ["token", "frequency"],
+            "metadata": {
+                "applied_server_limit": None,
+                "total_tokens_before_limit": total_tokens,
+                "total_tokens_returned": total_tokens,
+                "truncated": False,
+                "token_limit": token_limit,
+                "node_id": node_id,
+                "display_name": display_name,
+                "node_name": display_name,
+            },
+        }
+
+    statistics_payload = None
+    stats_path_str = artifacts.get("statistics_parquet_path")
+    if isinstance(stats_path_str, str) and stats_path_str:
+        stats_path = Path(stats_path_str)
+        if not stats_path.exists():
+            raise HTTPException(
+                status_code=404, detail="Token statistics artifact is missing"
+            )
+        stats_df = pl.scan_parquet(stats_path).collect()
+        statistics_payload = [
+            {
+                "token": str(row.get("token") or ""),
+                "freq_corpus_0": int(row.get("freq_corpus_0") or 0),
+                "freq_corpus_1": int(row.get("freq_corpus_1") or 0),
+                "expected_0": _safe_float(row.get("expected_0"), 0.0),
+                "expected_1": _safe_float(row.get("expected_1"), 0.0),
+                "corpus_0_total": int(row.get("corpus_0_total") or 0),
+                "corpus_1_total": int(row.get("corpus_1_total") or 0),
+                "percent_corpus_0": _safe_float(row.get("percent_corpus_0"), 0.0),
+                "percent_corpus_1": _safe_float(row.get("percent_corpus_1"), 0.0),
+                "percent_diff": _safe_float(row.get("percent_diff"), 0.0),
+                "log_likelihood_llv": _safe_float(row.get("log_likelihood_llv"), 0.0),
+                "bayes_factor_bic": _safe_float(row.get("bayes_factor_bic"), 0.0),
+                "effect_size_ell": _safe_float(row.get("effect_size_ell"), 0.0),
+                "relative_risk": (
+                    _safe_float(row.get("relative_risk"), None)
+                    if row.get("relative_risk") is not None
+                    else None
+                ),
+                "log_ratio": (
+                    _safe_float(row.get("log_ratio"), None)
+                    if row.get("log_ratio") is not None
+                    else None
+                ),
+                "odds_ratio": (
+                    _safe_float(row.get("odds_ratio"), None)
+                    if row.get("odds_ratio") is not None
+                    else None
+                ),
+                "significance": str(row.get("significance") or ""),
+            }
+            for row in stats_df.to_dicts()
+        ]
+
+    server_limit = _server_limit(token_limit)
+    analysis_params = {
+        "node_ids": list(request_payload.get("node_ids") or []),
+        "node_columns": dict(request_payload.get("node_columns") or {}),
+        "token_limit": token_limit,
+        "server_limit": server_limit,
+        "stop_words": stop_words,
+    }
+    metadata = {
+        "token_limit": token_limit,
+        "server_limit": server_limit,
+        "stop_words": stop_words,
+        "node_display_names": {
+            str(entry.get("node_id")): str(
+                entry.get("node_name") or entry.get("node_id")
+            )
+            for entry in artifacts.get("nodes", [])
+            if isinstance(entry, dict) and entry.get("node_id")
+        },
+    }
+
+    return {
+        "state": payload.get("state") or "successful",
+        "message": payload.get("message")
+        or f"Successfully calculated token frequencies for {len(node_results)} node(s)",
+        "data": node_results,
+        "statistics": statistics_payload,
+        "token_limit": token_limit,
+        "analysis_params": analysis_params,
+        "metadata": metadata,
+        "stop_words": stop_words,
+    }
 
 
 @router.get("/{workspace_id}/token-frequencies/tasks/{task_id}/result")
@@ -196,41 +248,21 @@ async def token_frequencies_task_result(
     task_id: str,
     current_user: dict = Depends(get_current_user),
 ):
-    """Return normalized token-frequency result payload for one task.
-
-    Used by:
-    - Frontend polling route:
-        `GET /workspaces/{id}/token-frequencies/tasks/{id}/result`
-
-    Why:
-    - Rehydrates completed background tasks with stable preference metadata.
-    """
+    """Return normalized token-frequency result payload for one task."""
     user_id = current_user["id"]
     task_manager = get_task_manager(user_id, workspace_id)
 
-    # Sync with worker if running using shared utility
     task = await ensure_task_synced(user_id, workspace_id, task_id, task_manager)
     if not task or not task.result:
         return None
-
-    stored = task.result.to_json() if hasattr(task.result, "to_json") else task.result
-    if not isinstance(stored, dict):
-        return None
-
-    stored = _unwrap_task_manager_result(stored)
-    if not isinstance(stored, dict) or not stored:
-        return None
-
-    request_payload = (
-        task.request.model_dump()
-        if hasattr(task.request, "model_dump")
-        else task.request.dict()
-    )
-    result_blob, _normalized_request, _limit_value, _stop_words = _prepare_result_blob(
-        stored,
-        request_payload,
-    )
-    return result_blob
+    if task.status == AnalysisStatus.RUNNING:
+        return {
+            "state": "running",
+            "message": "Token frequency analysis is still running",
+            "data": None,
+            "metadata": {"task_id": task_id},
+        }
+    return _rebuild_token_result(task)
 
 
 @router.post("/{workspace_id}/token-frequencies/tasks/{task_id}/result")
@@ -240,15 +272,7 @@ async def update_token_frequencies_task_result(
     updates: dict | None,
     current_user: dict = Depends(get_current_user),
 ):
-    """Persist token-frequency preference overrides on an existing task.
-
-    Used by:
-    - Frontend preference updates route:
-        `POST /workspaces/{id}/token-frequencies/tasks/{id}/result`
-
-    Why:
-    - Updates UI preferences without re-running token computation.
-    """
+    """Persist token-frequency preference overrides on an existing task."""
     user_id = current_user["id"]
     task_manager = get_task_manager(user_id, workspace_id)
     task = task_manager.get_task(task_id)
@@ -256,33 +280,19 @@ async def update_token_frequencies_task_result(
         raise HTTPException(status_code=404, detail="No token frequency task found")
 
     request_payload = task.request.model_dump()
-    result_payload_raw = task.result.to_json() if task.result else {}
-    result_payload = _unwrap_task_manager_result(result_payload_raw)
-    if not isinstance(result_payload, dict):
-        result_payload = {}
 
-    limit_override = None
-    stop_words_override = _STOP_WORDS_UNSET
     if isinstance(updates, dict):
         if "token_limit" in updates:
-            limit_override = updates.get("token_limit")
+            request_payload["token_limit"] = _coerce_limit_value(
+                updates.get("token_limit")
+            )
         if "stop_words" in updates:
-            stop_words_override = updates.get("stop_words")
-    else:
-        updates = {}
-
-    result_blob, normalized_request, _limit_value, _stop_words = _prepare_result_blob(
-        result_payload,
-        request_payload,
-        limit_override=limit_override,
-        stop_words_override=stop_words_override,
-    )
-
-    request_payload.update(normalized_request)
+            request_payload["stop_words"] = sanitize_stop_words(
+                updates.get("stop_words")
+            )
 
     try:
         task.request = AnalysisTokenFrequencyRequest(**request_payload)
-        task.complete(GenericAnalysisResult(result_blob))
         task_manager.save_task(task)
     except Exception as exc:  # pragma: no cover
         raise HTTPException(
@@ -304,24 +314,11 @@ async def calculate_token_frequencies(
     request: TokenFrequencyRequest,
     current_user: dict = Depends(get_current_user),
 ):
-    """Submit token-frequency analysis as a worker-backed task.
-
-    Used by:
-    - Frontend run route: `POST /workspaces/{id}/token-frequencies`
-
-    Why:
-    - Offloads CPU-heavy token counting and returns `task_id` for polling.
-
-    Mirrors the concordance/topic-modeling convention:
-    - POST submits a process-backed task and returns a task_id (state=running)
-    - request is persisted immediately into analysis_store with an empty result
-    - GET current-result serves the persisted result when the worker completes
-    """
+    """Submit token-frequency analysis as a worker-backed artifact-first task."""
 
     user_id = current_user["id"]
     tm = workspace_manager.get_task_manager(user_id, workspace_id)
 
-    # Check if already running
     try:
         if await tm.any_running(
             task_type="token_frequencies", user_id=user_id, workspace_id=workspace_id
@@ -336,7 +333,6 @@ async def calculate_token_frequencies(
                 "metadata": {"task_id": latest.id if latest else None},
             }
     except Exception:
-        # Non-fatal: proceed to submit
         pass
 
     if not request.node_ids:
@@ -347,8 +343,6 @@ async def calculate_token_frequencies(
         raise HTTPException(
             status_code=400, detail="Maximum of 2 nodes can be compared"
         )
-    if not request.node_columns:
-        request.node_columns = {}
 
     requested_token_limit = getattr(request, "token_limit", None)
     effective_limit = (
@@ -369,20 +363,55 @@ async def calculate_token_frequencies(
         user_id=user_id,
         workspace_id=workspace_id,
         node_ids=request.node_ids,
-        requested_node_columns=request.node_columns,
+        requested_node_columns=request.node_columns or {},
         persist_preference=True,
     )
 
-    # Stop words are UI-only preferences; persist them but do not apply to compute.
+    node_corpora: dict[str, list[str]] = {}
+    node_display_names: dict[str, str] = {}
+    for node_id in request.node_ids:
+        node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
+        if not node:
+            raise HTTPException(status_code=404, detail=f"Node {node_id} not found")
+
+        node_data = getattr(node, "data", None)
+        if not isinstance(node_data, pl.LazyFrame):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Node {node_id} data must be a LazyFrame",
+            )
+
+        column_name = validated_columns.get(node_id)
+        available_columns = list(node_data.collect_schema().names())
+        if not column_name or column_name not in available_columns:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Column '{column_name}' not found in node {node_id}. "
+                    f"Available columns: {available_columns}"
+                ),
+            )
+
+        docs_df = node_data.select(pl.col(column_name).alias("__doc_col__")).collect()
+        node_corpora[node_id] = [
+            str(v) if v is not None else "" for v in docs_df["__doc_col__"].to_list()
+        ]
+        node_display_names[node_id] = str(getattr(node, "name", None) or node_id)
+
     requested_stop_words = sanitize_stop_words(request.stop_words)
+    artifact_dir, artifact_prefix = _prepare_token_artifact_target(
+        user_id, workspace_id
+    )
 
     task_info = await tm.submit_task(
         user_id=user_id,
         workspace_id=workspace_id,
         task_type="token_frequencies",
         task_args={
-            "node_ids": request.node_ids,
-            "node_columns": validated_columns,
+            "node_corpora": node_corpora,
+            "node_display_names": node_display_names,
+            "artifact_dir": str(artifact_dir),
+            "artifact_prefix": artifact_prefix,
             "token_limit": effective_limit,
             "stop_words": requested_stop_words,
         },
@@ -405,7 +434,7 @@ async def calculate_token_frequencies(
             status=AnalysisStatus.PENDING,
         )
     )
-    task_manager.set_current_task("token-frequencies", task_info.id)
+    task_manager.set_current_task("token_frequencies", task_info.id)
 
     return {
         "state": "running",

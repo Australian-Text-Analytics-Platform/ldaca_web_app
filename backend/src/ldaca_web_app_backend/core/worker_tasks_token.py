@@ -5,17 +5,20 @@ Separated from `worker.py` to keep the worker module focused and smaller.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Dict, Optional
 
-from .analysis_helpers import safe_float, sanitize_stop_words
+from .analysis_helpers import sanitize_stop_words
 
 
 def run_token_frequencies_task(
     configure_worker_environment,
     user_id: str,
     workspace_id: str,
-    node_ids: list[str],
-    node_columns: Dict[str, str],
+    node_corpora: Dict[str, list[str]],
+    node_display_names: Dict[str, str],
+    artifact_dir: str,
+    artifact_prefix: str,
     token_limit: int = 10,
     stop_words: Optional[list[str]] = None,
     progress_callback: Optional[callable] = None,
@@ -27,8 +30,8 @@ def run_token_frequencies_task(
     - `TASK_REGISTRY["token_frequencies"]`
 
     Why:
-    - Computes token frequencies off the API thread and returns normalized
-      comparison payloads for one or two nodes.
+        - Computes token frequencies off the API thread and writes Parquet artifacts
+            for main-process lazy retrieval.
 
     Refactor note:
     - If wrapper indirection is removed, this function can be imported directly
@@ -39,25 +42,17 @@ def run_token_frequencies_task(
     try:
         import polars as pl
         import polars_text as pt
-        from ldaca_web_app_backend.core.workspace import workspace_manager
 
         print(f"[Worker] Starting token frequencies task for workspace {workspace_id}")
 
-        if progress_callback:
-            progress_callback(0.1, "Initializing workspace...")
-
-        workspace = workspace_manager.get_workspace(user_id, workspace_id)
-        if not workspace:
-            success = workspace_manager.set_current_workspace(user_id, workspace_id)
-            if success:
-                workspace = workspace_manager.get_workspace(user_id, workspace_id)
-        if not workspace:
-            raise ValueError(
-                f"Workspace {workspace_id} not found (worker process cannot access workspace)"
-            )
+        artifact_root = Path(artifact_dir)
+        artifact_root.mkdir(parents=True, exist_ok=True)
 
         if progress_callback:
-            progress_callback(0.2, "Loading node data...")
+            progress_callback(0.1, "Validating payload...")
+
+        if progress_callback:
+            progress_callback(0.2, "Preparing corpora...")
 
         requested_stop_words = sanitize_stop_words(stop_words)
         effective_limit = int(token_limit) if int(token_limit) > 0 else 10
@@ -70,38 +65,19 @@ def run_token_frequencies_task(
             MAX_SERVER_TOKEN_LIMIT,
         )
 
-        frames_dict: dict[str, object] = {}
-        node_display_names: dict[str, str] = {}
+        node_ids = list(node_corpora.keys())
+        if not node_ids:
+            raise ValueError("At least one corpus is required")
+        if len(node_ids) > 2:
+            raise ValueError("Maximum of 2 corpora can be compared")
 
         for i, node_id in enumerate(node_ids):
-            node = workspace_manager.get_node_from_workspace(
-                user_id, workspace_id, node_id
-            )
-            if not node:
-                raise ValueError(f"Node {node_id} not found")
-
-            node_data = getattr(node, "data", None)
-            if not isinstance(node_data, pl.LazyFrame):
-                raise ValueError(f"Node {node_id} data must be a LazyFrame")
-            node_name = getattr(node, "name", None) or node_id
-            node_display_names[node_id] = node_name
-
-            available_columns = list(node_data.collect_schema().names())
-
-            column_name = node_columns.get(node_id)
-            if not column_name:
-                raise ValueError(f"No column specified for node {node_id}")
-            if column_name not in available_columns:
-                raise ValueError(
-                    f"Column '{column_name}' not found in node {node_id}. Available columns: {available_columns}"
-                )
-
-            frames_dict[node_id] = node_data.collect()
+            node_name = node_display_names.get(node_id) or node_id
 
             if progress_callback:
                 progress_callback(
                     0.2 + 0.3 * (i + 1) / max(len(node_ids), 1),
-                    f"Prepared {node_name}",
+                    f"Prepared corpus for {node_name}",
                 )
 
         if progress_callback:
@@ -109,8 +85,11 @@ def run_token_frequencies_task(
 
         frequency_results: dict[str, dict[str, int]] = {}
         stats_df = None
-        for node_id, df in frames_dict.items():
-            series = df.get_column(node_columns[node_id])
+        for node_id in node_ids:
+            docs = node_corpora.get(node_id) or []
+            series = pl.Series(
+                "document", [str(v) if v is not None else "" for v in docs]
+            )
             frequency_results[node_id] = pt.token_frequencies(series)
 
         if len(node_ids) == 2:
@@ -122,71 +101,40 @@ def run_token_frequencies_task(
         if progress_callback:
             progress_callback(0.85, "Formatting results...")
 
-        response_data: dict[str, dict] = {}
+        node_artifacts: list[dict[str, Any]] = []
         for frame_key, freq_dict in frequency_results.items():
             sorted_tokens = sorted(freq_dict.items(), key=lambda x: x[1], reverse=True)
             filtered_tokens = [
                 (token, freq) for token, freq in sorted_tokens if freq and freq > 0
             ]
-            total_tokens = len(filtered_tokens)
+            token_rows = [
+                {"token": token, "frequency": int(freq)}
+                for token, freq in filtered_tokens
+            ]
+            token_path = (
+                artifact_root
+                / f"{artifact_prefix}_token_frequencies_{frame_key}.parquet"
+            )
+            pl.DataFrame(token_rows).with_columns([
+                pl.col("token").cast(pl.Utf8),
+                pl.col("frequency").cast(pl.Int64),
+            ]).lazy().sink_parquet(token_path)
             display_name = node_display_names.get(frame_key, frame_key)
-            response_data[frame_key] = {
-                "data": [
-                    {"token": token, "frequency": int(freq)}
-                    for token, freq in filtered_tokens
-                ],
-                "columns": ["token", "frequency"],
-                "metadata": {
-                    "applied_server_limit": None,
-                    "total_tokens_before_limit": total_tokens,
-                    "total_tokens_returned": total_tokens,
-                    "truncated": False,
-                    "token_limit": effective_limit,
-                    "node_id": frame_key,
-                    "display_name": display_name,
-                    "node_name": display_name,
-                },
-            }
+            node_artifacts.append({
+                "node_id": frame_key,
+                "node_name": display_name,
+                "token_parquet_path": str(token_path),
+            })
 
-        statistics_data = None
-        if (
-            len(node_ids) == 2
-            and stats_df is not None
-            and hasattr(stats_df, "is_empty")
-            and not stats_df.is_empty()
-        ):
-            statistics_data = []
-            for row in stats_df.iter_rows(named=True):
-                statistics_data.append({
-                    "token": row["token"],
-                    "freq_corpus_0": int(row["freq_corpus_0"]),
-                    "freq_corpus_1": int(row["freq_corpus_1"]),
-                    "expected_0": safe_float(row.get("expected_0")) or 0.0,
-                    "expected_1": safe_float(row.get("expected_1")) or 0.0,
-                    "corpus_0_total": int(row["corpus_0_total"]),
-                    "corpus_1_total": int(row["corpus_1_total"]),
-                    "percent_corpus_0": safe_float(row.get("percent_corpus_0")) or 0.0,
-                    "percent_corpus_1": safe_float(row.get("percent_corpus_1")) or 0.0,
-                    "percent_diff": safe_float(row.get("percent_diff")) or 0.0,
-                    "log_likelihood_llv": safe_float(row.get("log_likelihood_llv"))
-                    or 0.0,
-                    "bayes_factor_bic": safe_float(row.get("bayes_factor_bic")) or 0.0,
-                    "effect_size_ell": safe_float(row.get("effect_size_ell")) or 0.0,
-                    "relative_risk": safe_float(row.get("relative_risk"), default=None)
-                    if row.get("relative_risk") is not None
-                    else None,
-                    "log_ratio": safe_float(row.get("log_ratio"), default=None)
-                    if row.get("log_ratio") is not None
-                    else None,
-                    "odds_ratio": safe_float(row.get("odds_ratio"), default=None)
-                    if row.get("odds_ratio") is not None
-                    else None,
-                    "significance": str(row.get("significance")),
-                })
+        statistics_path: str | None = None
+        if len(node_ids) == 2 and stats_df is not None:
+            stats_path = artifact_root / f"{artifact_prefix}_token_statistics.parquet"
+            stats_df.lazy().sink_parquet(stats_path)
+            statistics_path = str(stats_path)
 
         analysis_params_dict = {
             "node_ids": list(node_ids),
-            "node_columns": dict(node_columns),
+            "node_columns": {},
             "token_limit": effective_limit,
             "server_limit": server_limit,
             "stop_words": requested_stop_words,
@@ -194,9 +142,12 @@ def run_token_frequencies_task(
 
         result_payload: Dict[str, Any] = {
             "state": "successful",
-            "message": f"Successfully calculated token frequencies for {len(frames_dict)} node(s)",
-            "data": response_data,
-            "statistics": statistics_data,
+            "message": f"Successfully calculated token frequencies for {len(node_ids)} node(s)",
+            "artifacts": {
+                "version": 1,
+                "nodes": node_artifacts,
+                "statistics_parquet_path": statistics_path,
+            },
             "token_limit": effective_limit,
             "analysis_params": analysis_params_dict,
             "metadata": {

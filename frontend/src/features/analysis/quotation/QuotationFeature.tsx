@@ -7,8 +7,6 @@ import { useWorkspaceActions } from '../../../hooks/useWorkspaceActions';
 import { useAuth } from '../../../hooks/useAuth';
 import { textApi } from '../../../api/text';
 import type { QuotationEngineConfig, QuotationEngineType, QuotationRequest, QuotationResultQuery } from '../../../api/text';
-import { getNodeInfo } from '../../../lib/nodeInfoCache';
-import { applySelectedColumnsToSnapshots } from '../../../hooks/useSchemaManagement';
 import useNodeColumnInfos from '../../../hooks/useNodeColumnInfos';
 import { useAnalysisLockState, useParameterChangeDetection } from '../../../hooks/useAnalysisLockState';
 import { useQuotationEngineDialogStore, useQuotationEngineConfigStore } from '../../../stores/quotationEngineStore';
@@ -39,7 +37,7 @@ import {
 import { ScrollArea } from '../../../components/ui/scroll-area';
 import { ArrowUpDown, Loader2, Search, Trash2, Unlink } from 'lucide-react';
 import { getAnalysisActionState } from '../common/analysisActionState';
-import { getNodeIdentifier, useAnalysisHydration } from '../common';
+import { getNodeIdentifier, restoreAnalysisLockFromRequest, useAnalysisHydration } from '../common';
 import {
   clearAnalysisTaskResults,
   collectTaskIds,
@@ -994,11 +992,6 @@ const QuotationFeature: React.FC = () => {
       setHasLoaded(true);
       try {
         const lockedSelections = activeSelections.filter((sel) => sel.nodeId === nodeId && sel.column);
-        const info = await getNodeInfo({ workspaceId: currentWorkspaceId!, nodeId, getAuthHeaders });
-        const name = info?.name || info?.data?.name || nodeId;
-        const columns = Array.isArray(info?.columns)
-          ? info.columns
-          : (Array.isArray(info?.data?.columns) ? info.data.columns : []);
         const columnMap = lockedSelections.reduce<Record<string, string | undefined>>(
           (acc, sel) => {
             acc[sel.nodeId] = sel.column;
@@ -1006,11 +999,16 @@ const QuotationFeature: React.FC = () => {
           },
           {}
         );
-        const normalizedSnapshots = applySelectedColumnsToSnapshots(
-          [{ id: nodeId, name: String(name), columns }],
-          columnMap
-        );
-        lockWithSnapshots(normalizedSnapshots);
+        await restoreAnalysisLockFromRequest({
+          workspaceId: currentWorkspaceId,
+          requestData: {
+            node_ids: [nodeId],
+            node_columns: columnMap,
+          },
+          getAuthHeaders,
+          lockWithSnapshots,
+          maxNodes: 1,
+        });
       } catch {
         /* ignore */
       }
@@ -1144,16 +1142,16 @@ const QuotationFeature: React.FC = () => {
     setShowMetadata(true);
 
     try {
-      const info = await getNodeInfo({ workspaceId: currentWorkspaceId!, nodeId, getAuthHeaders });
-      const name = info?.name || info?.data?.name || nodeId;
-      const columns = Array.isArray(info?.columns)
-        ? info.columns
-        : (Array.isArray(info?.data?.columns) ? info.data.columns : []);
-      const normalizedSnapshots = applySelectedColumnsToSnapshots(
-        [{ id: nodeId, name: String(name), columns }],
-        column ? { [nodeId]: column } : {}
-      );
-      lockWithSnapshots(normalizedSnapshots);
+      await restoreAnalysisLockFromRequest({
+        workspaceId: currentWorkspaceId,
+        requestData: {
+          node_ids: [nodeId],
+          node_columns: column ? { [nodeId]: column } : {},
+        },
+        getAuthHeaders,
+        lockWithSnapshots,
+        maxNodes: 1,
+      });
     } catch {
       /* ignore */
     }

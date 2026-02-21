@@ -61,18 +61,7 @@ async def get_task_result(
     task_id: str,
     current_user: dict = Depends(get_current_user),
 ) -> Any:
-    """Return stored task result, syncing with worker if still running.
-
-    Used by:
-    - generic task result retrieval endpoint consumers
-
-    Why:
-    - Bridges legacy in-memory task state with worker-backed completion updates.
-
-    Refactor note:
-    - Result envelope normalization duplicates logic in analysis-specific routes;
-      a shared response helper could reduce drift.
-    """
+    """Return stored task result, syncing with worker if still running."""
     user_id = current_user["id"]
     manager = get_task_manager(user_id, workspace_id)
 
@@ -85,18 +74,7 @@ async def get_task_result(
     if result is None:
         return {"state": "pending", "metadata": {"task_id": task_id}}
 
-    ret = result.to_json() if hasattr(result, "to_json") else result
-
-    # Standardize response envelope if missing
-    if isinstance(ret, dict) and "state" not in ret:
-        return {
-            "state": "successful",
-            "message": "Task complete",
-            "data": ret,
-            "metadata": {"task_id": task_id},
-        }
-
-    return ret
+    return result.to_json() if hasattr(result, "to_json") else result
 
 
 @router.post("/{workspace_id}/tasks/{task_id}/clear")

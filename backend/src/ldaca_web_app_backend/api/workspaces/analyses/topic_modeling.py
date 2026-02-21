@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
+from uuid import uuid4
 
 import polars as pl
 from fastapi import APIRouter, Depends, HTTPException
@@ -36,6 +38,43 @@ def _topic_submission_lock(user_id: str, workspace_id: str) -> asyncio.Lock:
         lock = asyncio.Lock()
         _TOPIC_SUBMISSION_LOCKS[key] = lock
     return lock
+
+
+def _prepare_topic_artifact_target(user_id: str, workspace_id: str) -> tuple[Path, str]:
+    workspace_artifacts_dir = workspace_manager.ensure_workspace_artifacts_dir(
+        user_id, workspace_id
+    )
+    if workspace_artifacts_dir is None:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    artifact_prefix = f"topic_modeling_{uuid4()}"
+    return workspace_artifacts_dir, artifact_prefix
+
+
+def _task_result_payload(task: AnalysisTask) -> dict:
+    if task.result is None:
+        return {}
+    payload = task.result.to_json()
+    if not isinstance(payload, dict):
+        return {}
+    return payload
+
+
+def _topic_artifacts_from_task(task: AnalysisTask) -> dict:
+    payload = _task_result_payload(task)
+    artifacts = payload.get("artifacts")
+    if not isinstance(artifacts, dict):
+        raise HTTPException(
+            status_code=404,
+            detail="Topic modeling artifacts are not available for this task",
+        )
+    node_artifacts = artifacts.get("nodes")
+    meanings_path = artifacts.get("topic_meanings_parquet_path")
+    if not isinstance(node_artifacts, list) or not isinstance(meanings_path, str):
+        raise HTTPException(
+            status_code=500,
+            detail="Topic modeling artifact manifest is invalid",
+        )
+    return artifacts
 
 
 @router.delete("/{workspace_id}/topic-modeling")
@@ -167,6 +206,9 @@ async def run_topic_modeling(
             # Non-fatal: proceed to submit a new task.
             pass
 
+        artifact_dir, artifact_prefix = _prepare_topic_artifact_target(
+            user_id, workspace_id
+        )
         worker_task = await tm.submit_task(
             user_id=user_id,
             workspace_id=workspace_id,
@@ -174,6 +216,8 @@ async def run_topic_modeling(
             task_args={
                 "corpora": corpora,
                 "node_infos": node_infos,
+                "artifact_dir": str(artifact_dir),
+                "artifact_prefix": artifact_prefix,
                 "min_topic_size": request.min_topic_size,
                 "use_ctfidf": request.use_ctfidf,
             },
@@ -197,7 +241,6 @@ async def run_topic_modeling(
         )
     )
     analysis_tm.set_current_task("topic_modeling", worker_task.id)
-
     return TopicModelingResponse(
         state="running",
         message="Topic Modeling analysis started",
@@ -303,33 +346,46 @@ async def topic_modeling_detach_options(
         `GET /workspaces/{id}/topic-modeling/tasks/{task_id}/detach-options`
 
     Why:
-    - Exposes cached snapshot metadata so users can choose output columns safely.
+    - Exposes artifact-backed node metadata so users can choose output columns safely.
     """
     user_id = current_user["id"]
     get_workspace_or_404(user_id, workspace_id)
 
     analysis_tm = get_task_manager(user_id, workspace_id)
-    task = analysis_tm.get_task(task_id)
+    task = await ensure_task_synced(user_id, workspace_id, task_id, analysis_tm)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
-
-    worker_tm = workspace_manager.get_task_manager(user_id, workspace_id)
-    cache_entries = worker_tm.list_topic_lazyframe_cache(task_id)
-    if not cache_entries:
+    if task.status != AnalysisStatus.COMPLETED:
         raise HTTPException(
-            status_code=404,
-            detail="No cached topic snapshot found for this task. Please rerun topic modeling.",
+            status_code=409,
+            detail="Topic modeling task is not completed",
         )
+
+    artifacts = _topic_artifacts_from_task(task)
+    node_artifacts = artifacts.get("nodes") or []
+
     nodes = []
-    for node_id, payload in cache_entries.items():
-        original_columns = list(payload.get("original_columns") or [])
-        disabled_columns = ["topic"] if "topic" in original_columns else []
+    for payload in node_artifacts:
+        if not isinstance(payload, dict):
+            continue
+        node_id = payload.get("node_id")
+        if not isinstance(node_id, str) or not node_id:
+            continue
+        source_node = workspace_manager.get_node_from_workspace(
+            user_id, workspace_id, node_id
+        )
+        if not source_node:
+            continue
+        source_data = getattr(source_node, "data", None)
+        if not isinstance(source_data, pl.LazyFrame):
+            continue
+        original_columns = list(source_data.collect_schema().names())
         nodes.append({
-            "node_id": node_id,
+            "node_id": source_node.id,
             "node_name": payload.get("node_name") or node_id,
             "text_column": payload.get("text_column"),
             "available_columns": original_columns,
-            "disabled_columns": disabled_columns,
+            "disabled_columns": [],
         })
 
     return TopicModelingDetachOptionsResponse(
@@ -350,66 +406,78 @@ async def detach_topic_modeling(
     request: TopicModelingDetachRequest,
     current_user: dict = Depends(get_current_user),
 ):
-    """Create detached nodes from cached topic-modeling outputs.
+    """Create detached nodes from artifact-backed topic-modeling outputs.
 
     Used by:
     - Frontend detach route:
         `POST /workspaces/{id}/topic-modeling/tasks/{task_id}/detach`
 
-    Why:
-    - Materializes user-selected columns and topic labels as reusable workspace
-        nodes without rerunning the model.
+        Why:
+        - Materializes user-selected columns and topic labels as reusable workspace
+            nodes without rerunning the model.
     """
     user_id = current_user["id"]
     get_workspace_or_404(user_id, workspace_id)
 
     analysis_tm = get_task_manager(user_id, workspace_id)
-    task = analysis_tm.get_task(task_id)
+    task = await ensure_task_synced(user_id, workspace_id, task_id, analysis_tm)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
+    if task.status != AnalysisStatus.COMPLETED:
+        raise HTTPException(
+            status_code=409,
+            detail="Topic modeling task is not completed",
+        )
 
-    worker_tm = workspace_manager.get_task_manager(user_id, workspace_id)
-    cache_entries = worker_tm.list_topic_lazyframe_cache(task_id)
-    meanings_cache = worker_tm.get_topic_meanings_cache(task_id)
-    if not cache_entries:
+    artifacts = _topic_artifacts_from_task(task)
+    node_artifacts = artifacts.get("nodes") or []
+    assignments_by_node_id = {
+        str(payload.get("node_id")): payload
+        for payload in node_artifacts
+        if isinstance(payload, dict) and payload.get("node_id")
+    }
+    meanings_path = Path(str(artifacts.get("topic_meanings_parquet_path")))
+    if not meanings_path.exists():
         raise HTTPException(
             status_code=404,
-            detail="No cached topic snapshot found for this task. Please rerun topic modeling.",
+            detail="Topic meanings artifact is missing",
         )
-    if not meanings_cache:
-        raise HTTPException(
-            status_code=404,
-            detail="No cached topic meanings found for this task. Please rerun topic modeling.",
-        )
+    meanings_lf = pl.scan_parquet(meanings_path)
 
-    meanings_lf = meanings_cache.get("lazyframe")
-    if not isinstance(meanings_lf, pl.LazyFrame):
-        raise HTTPException(
-            status_code=500,
-            detail="Cached topic meanings snapshot is invalid",
-        )
-
-    target_node_ids = request.node_ids or list(cache_entries.keys())
+    target_node_ids = request.node_ids or list(assignments_by_node_id.keys())
     if not target_node_ids:
         raise HTTPException(status_code=400, detail="No node IDs provided for detach")
 
     detached_nodes: list[dict[str, str]] = []
     for node_id in target_node_ids:
-        cache_payload = cache_entries.get(node_id)
-        if not cache_payload:
+        artifact_payload = assignments_by_node_id.get(node_id)
+        if not artifact_payload:
             raise HTTPException(
                 status_code=400,
-                detail=f"Node {node_id} is not available in cached topic snapshot",
+                detail=f"Node {node_id} is not available in topic artifact manifest",
             )
 
-        cached_lf = cache_payload.get("lazyframe")
-        if not isinstance(cached_lf, pl.LazyFrame):
+        assignments_path = Path(str(artifact_payload.get("assignments_parquet_path")))
+        if not assignments_path.exists():
             raise HTTPException(
-                status_code=500,
-                detail=f"Cached topic snapshot for node {node_id} is invalid",
+                status_code=404,
+                detail=f"Topic assignments artifact missing for node {node_id}",
+            )
+        assignments_lf = pl.scan_parquet(assignments_path)
+
+        source_node = workspace_manager.get_node_from_workspace(
+            user_id, workspace_id, node_id
+        )
+        if not source_node:
+            raise HTTPException(status_code=404, detail=f"Node {node_id} not found")
+        source_data = getattr(source_node, "data", None)
+        if not isinstance(source_data, pl.LazyFrame):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Node {node_id} data must be a LazyFrame",
             )
 
-        original_columns = list(cache_payload.get("original_columns") or [])
+        original_columns = list(source_data.collect_schema().names())
         selected_columns = list((request.selected_columns or {}).get(node_id) or [])
         if not selected_columns:
             raise HTTPException(
@@ -424,31 +492,27 @@ async def detach_topic_modeling(
                 detail=f"Invalid selected columns for node {node_id}: {invalid}",
             )
 
-        if "topic" in selected_columns:
-            raise HTTPException(
-                status_code=400,
-                detail="Original 'topic' column cannot be selected for topic detach",
-            )
-
         topic_column_name = _resolve_topic_column_name(
             request.topic_column_name or "topic",
             set(original_columns) | set(selected_columns),
         )
 
-        output_lf = cached_lf.select(
-            [pl.col(col) for col in selected_columns]
-            + [pl.col("_tm_topic").alias(topic_column_name)]
+        output_lf = (
+            source_data
+            .with_row_index("__row_nr__")
+            .join(assignments_lf, on="__row_nr__", how="left")
+            .select(
+                [pl.col(col) for col in selected_columns]
+                + [pl.col("_tm_topic").alias(topic_column_name)]
+            )
         )
 
-        source_node = workspace_manager.get_node_from_workspace(
-            user_id, workspace_id, node_id
-        )
         parents = [source_node] if source_node else []
         node_name = (
             (request.new_node_names or {}).get(node_id)
             if request.new_node_names
             else None
-        ) or f"{cache_payload.get('node_name') or node_id}_topic_detach"
+        ) or f"{artifact_payload.get('node_name') or node_id}_topic_detach"
 
         new_node = workspace_manager.add_node_to_workspace(
             user_id=user_id,
@@ -464,7 +528,7 @@ async def detach_topic_modeling(
                 detail=f"Failed to create detached node for {node_id}",
             )
 
-        text_column = cache_payload.get("text_column")
+        text_column = artifact_payload.get("text_column")
         if (
             text_column
             and hasattr(new_node, "set_metadata")

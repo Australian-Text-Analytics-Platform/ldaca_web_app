@@ -68,17 +68,41 @@ def _simulate_token_frequency_completion(workspace_id: str):
     """Run token frequencies synchronously and persist the result via TaskManager."""
 
     task_manager = get_task_manager("test", workspace_id)
-    task_ids = task_manager.get_current_task_ids("token-frequencies")
+    task_ids = task_manager.get_current_task_ids("token_frequencies")
     assert task_ids
     task = task_manager.get_task(task_ids[0])
     assert task is not None
 
     req = task.request.model_dump() if hasattr(task.request, "model_dump") else {}
+
+    node_ids = req.get("node_ids") or []
+    node_columns = req.get("node_columns") or {}
+    node_corpora: dict[str, list[str]] = {}
+    node_display_names: dict[str, str] = {}
+    for node_id in node_ids:
+        node = workspace_manager.get_node_from_workspace("test", workspace_id, node_id)
+        assert node is not None
+        node_data = getattr(node, "data", None)
+        assert node_data is not None
+        column_name = node_columns.get(node_id)
+        assert column_name
+        docs_df = node_data.select(column_name).collect()
+        node_corpora[node_id] = [
+            str(v) if v is not None else "" for v in docs_df[column_name].to_list()
+        ]
+        node_display_names[node_id] = str(getattr(node, "name", None) or node_id)
+
+    artifacts_dir = workspace_manager.ensure_workspace_artifacts_dir(
+        "test", workspace_id
+    )
+    assert artifacts_dir is not None
     worker_result = token_frequencies_task(
         user_id="test",
         workspace_id=workspace_id,
-        node_ids=req.get("node_ids") or [],
-        node_columns=req.get("node_columns") or {},
+        node_corpora=node_corpora,
+        node_display_names=node_display_names,
+        artifact_dir=str(artifacts_dir),
+        artifact_prefix=f"test_token_freq_{task.task_id}",
         token_limit=req.get("token_limit") or DEFAULT_TOKEN_LIMIT,
         stop_words=req.get("stop_words") or [],
     )
@@ -91,15 +115,7 @@ def _list_analysis_records(user_id: str, workspace_id: str, task: str | None = N
     task_manager = get_task_manager(user_id, workspace_id)
     tasks = task_manager.get_all_tasks()
     if task:
-        key_map = {
-            "token_frequencies": "token-frequencies",
-            "sequential_analysis": "sequential-analysis",
-            "topic_modeling": "topic-modeling",
-            "quotation": "quotation",
-            "concordance": "concordance",
-        }
-        tab_key = key_map.get(task, task)
-        task_ids = set(task_manager.get_current_task_ids(tab_key))
+        task_ids = set(task_manager.get_current_task_ids(task))
         tasks = [t for t in tasks if t.task_id in task_ids]
     tasks.sort(key=lambda t: t.updated_at or t.created_at)
 
@@ -170,7 +186,7 @@ class TestTokenFrequencyPersistence:
         _simulate_token_frequency_completion(workspace_id)
 
         task_id = await get_current_task_id(
-            authenticated_client, workspace_id, "token-frequencies"
+            authenticated_client, workspace_id, "token_frequencies"
         )
         assert task_id
         result_resp = await get_json(
@@ -204,9 +220,10 @@ class TestTokenFrequencyPersistence:
         saved_time = datetime.fromisoformat(record.saved_at)
         assert isinstance(saved_time, datetime)
 
-        # Validate result structure
-        assert "data" in record.result
-        assert isinstance(record.result["data"], dict)
+        # Validate persisted artifact manifest structure
+        assert "artifacts" in record.result
+        assert isinstance(record.result["artifacts"], dict)
+        assert isinstance(record.result["artifacts"].get("nodes"), list)
 
     async def test_token_frequency_defaults_limit_when_missing(
         self, authenticated_client, workspace_id, tiny_node_id, test_user
@@ -229,7 +246,7 @@ class TestTokenFrequencyPersistence:
 
         _simulate_token_frequency_completion(workspace_id)
         task_id = await get_current_task_id(
-            authenticated_client, workspace_id, "token-frequencies"
+            authenticated_client, workspace_id, "token_frequencies"
         )
         assert task_id
         result_resp = await get_json(
@@ -346,7 +363,7 @@ class TestTokenFrequencyPersistence:
 
         _simulate_token_frequency_completion(workspace_id)
         task_id = await get_current_task_id(
-            authenticated_client, workspace_id, "token-frequencies"
+            authenticated_client, workspace_id, "token_frequencies"
         )
         assert task_id
         result_resp = await get_json(
@@ -390,7 +407,7 @@ class TestTokenFrequencyPersistence:
         assert initial_response.status_code == 200
         assert initial_response.json().get("state") == "running"
         task_id = await get_current_task_id(
-            authenticated_client, workspace_id, "token-frequencies"
+            authenticated_client, workspace_id, "token_frequencies"
         )
         assert task_id
 
@@ -403,6 +420,8 @@ class TestTokenFrequencyPersistence:
         assert update_response.status_code == 200
         update_json = update_response.json()
         assert update_json == {"state": "successful", "message": "saved"}
+
+        _simulate_token_frequency_completion(workspace_id)
 
         current_result_response = await get_json(
             authenticated_client,
@@ -435,16 +454,7 @@ class TestTokenFrequencyPersistence:
         assert record.request["token_limit"] == 30
         assert "limit" not in record.request
         assert record.request.get("stop_words") == ["alpha", "beta"]
-        assert record.result.get("token_limit") == 30
-        assert record.result.get("stop_words") == ["alpha", "beta"]
-        assert record.result.get("metadata", {}).get("stop_words") == [
-            "alpha",
-            "beta",
-        ]
-        assert record.result.get("analysis_params", {}).get("stop_words") == [
-            "alpha",
-            "beta",
-        ]
+        assert "artifacts" in record.result
 
         clear_response = await post_json(
             authenticated_client,
@@ -461,9 +471,6 @@ class TestTokenFrequencyPersistence:
         record = analyses[0]
         assert record.request["token_limit"] == 30  # limit unchanged
         assert record.request.get("stop_words") == []
-        assert record.result.get("stop_words") == []
-        assert record.result.get("metadata", {}).get("stop_words") == []
-        assert record.result.get("analysis_params", {}).get("stop_words") == []
         current_result = (
             await get_json(
                 authenticated_client,
@@ -543,7 +550,7 @@ class TestSequentialAnalysisPersistence:
         assert len(analyses) == 1
         record = analyses[0]
         task_id = await get_current_task_id(
-            authenticated_client, workspace_id, "sequential-analysis"
+            authenticated_client, workspace_id, "sequential_analysis"
         )
         assert task_id
         assert record.task_id == task_id
@@ -573,7 +580,7 @@ class TestSequentialAnalysisPersistence:
         )
 
         task_id = await get_current_task_id(
-            authenticated_client, workspace_id, "sequential-analysis"
+            authenticated_client, workspace_id, "sequential_analysis"
         )
         assert task_id
         update_response = await post_json(
@@ -617,7 +624,7 @@ class TestSequentialAnalysisPersistence:
         )
 
         task_id = await get_current_task_id(
-            authenticated_client, workspace_id, "sequential-analysis"
+            authenticated_client, workspace_id, "sequential_analysis"
         )
         assert task_id
         invalid_response = await post_json(

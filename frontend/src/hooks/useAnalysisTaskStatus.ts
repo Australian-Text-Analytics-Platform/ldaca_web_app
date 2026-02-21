@@ -10,7 +10,6 @@ export interface AnalysisTaskStatus {
   tasks: TaskItem[];
   runningTask: TaskItem | null;
   queuedTask: TaskItem | null;
-  persistedTask: TaskItem | null;
   successfulTask: TaskItem | null;
   failedTask: TaskItem | null;
   cancelledTask: TaskItem | null;
@@ -36,18 +35,15 @@ export const useAnalysisTaskStatus = (taskType: string): AnalysisTaskStatus => {
       const normalized = (task?.state ?? '').toLowerCase();
       return PENDING_STATES.has(normalized);
     }) ?? null;
-  const persistedTask = sortedTasks.find((task) => task?.result_persisted) ?? null;
-  const successfulTask = persistedTask ?? sortedTasks.find((task) => task?.state === 'successful') ?? null;
+  const successfulTask = sortedTasks.find((task) => task?.state === 'successful') ?? null;
   const failedTask = sortedTasks.find((task) => task?.state === 'failed') ?? null;
   const cancelledTask = sortedTasks.find((task) => task?.state === 'cancelled') ?? null;
   const terminalTask =
-    sortedTasks.find((task) =>
-      Boolean(
-        task?.result_persisted ||
-          task?.state === 'successful' ||
-          task?.state === 'failed' ||
-          task?.state === 'cancelled'
-      )
+    sortedTasks.find(
+      (task) =>
+        task?.state === 'successful' ||
+        task?.state === 'failed' ||
+        task?.state === 'cancelled'
     ) ?? null;
 
   const activeCandidate = runningTask ?? queuedTask;
@@ -64,7 +60,6 @@ export const useAnalysisTaskStatus = (taskType: string): AnalysisTaskStatus => {
     tasks: sortedTasks,
     runningTask,
     queuedTask,
-    persistedTask,
     successfulTask,
     failedTask,
     cancelledTask,

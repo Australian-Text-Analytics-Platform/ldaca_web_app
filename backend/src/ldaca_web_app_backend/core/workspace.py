@@ -105,6 +105,14 @@ class WorkspaceManager:
         except Exception as exc:  # pragma: no cover
             print(f"Failed to set working directory to {path}: {exc}")
 
+    def _workspace_artifacts_dir_from_workspace_dir(self, workspace_dir: Path) -> Path:
+        """Return workspace-scoped analysis artifact directory.
+
+        Artifact files are transient analysis outputs and are intentionally kept
+        outside workspace payload files while still colocated with workspace data.
+        """
+        return workspace_dir / "data" / "artifacts"
+
     def _resolve_workspace_dir(
         self, user_id: str, workspace_id: str, workspace_name: str
     ) -> Path:
@@ -138,18 +146,7 @@ class WorkspaceManager:
 
     def set_current_workspace(self, user_id: str, workspace_id: Optional[str]) -> bool:
         if workspace_id is None:
-            cid, cws, _ = self._get_current_entry(user_id)
-            if cid and cws:
-                cws.set_metadata("modified_at", datetime.now().isoformat())
-                target_dir = self._resolve_workspace_dir(
-                    user_id=user_id,
-                    workspace_id=cid,
-                    workspace_name=cws.name,
-                )
-                self._attach_workspace_dir(cws, target_dir)
-                cws.save(target_dir)
-                self._set_cached_path(user_id, cid, target_dir)
-            self._current.pop(user_id, None)
+            self.unload_workspace(user_id, save=True)
             return True
         cid, cws, _ = self._get_current_entry(user_id)
         if cid == workspace_id and cws is not None:
@@ -182,6 +179,7 @@ class WorkspaceManager:
             "ws": new_ws,
             "path": current_path,
         }
+        self.ensure_workspace_artifacts_dir(user_id, workspace_id)
         return True
 
     def get_workspace(self, user_id: str, workspace_id: str) -> Optional[Any]:
@@ -192,6 +190,7 @@ class WorkspaceManager:
                 if cached:
                     self._attach_workspace_dir(cws, cached)
                     self._set_working_dir(cached)
+                    self.ensure_workspace_artifacts_dir(user_id, workspace_id)
             return cws
         if not self.set_current_workspace(user_id, workspace_id):
             return None
@@ -322,7 +321,46 @@ class WorkspaceManager:
             return cached
         return None
 
-    def unload_workspace(self, user_id: str, save: bool = True) -> bool:
+    def get_workspace_artifacts_dir(
+        self, user_id: str, workspace_id: str
+    ) -> Optional[Path]:
+        """Get workspace analysis artifact directory path (without creating it)."""
+        workspace_dir = self.get_workspace_dir(user_id, workspace_id)
+        if workspace_dir is None:
+            return None
+        return self._workspace_artifacts_dir_from_workspace_dir(workspace_dir)
+
+    def ensure_workspace_artifacts_dir(
+        self, user_id: str, workspace_id: str
+    ) -> Optional[Path]:
+        """Create workspace analysis artifact directory if missing.
+
+        Called on workspace load/switch to guarantee a dedicated transient
+        artifact location exists for background analysis tasks.
+        """
+        artifact_dir = self.get_workspace_artifacts_dir(user_id, workspace_id)
+        if artifact_dir is None:
+            return None
+        artifact_dir.mkdir(parents=True, exist_ok=True)
+        return artifact_dir
+
+    def clear_workspace_artifacts_dir(self, user_id: str, workspace_id: str) -> bool:
+        """Delete workspace analysis artifact directory if it exists.
+
+        Called on workspace unload to remove transient analysis artifacts.
+        """
+        artifact_dir = self.get_workspace_artifacts_dir(user_id, workspace_id)
+        if artifact_dir is None or not artifact_dir.exists():
+            return False
+        shutil.rmtree(artifact_dir, ignore_errors=True)
+        return True
+
+    def unload_workspace(
+        self,
+        user_id: str,
+        workspace_id: Optional[str] = None,
+        save: bool = True,
+    ) -> bool:
         """Unload current workspace object from memory, optionally persisting first.
 
         Used by:
@@ -334,6 +372,8 @@ class WorkspaceManager:
         cid, cws, _ = self._get_current_entry(user_id)
         if not cid or not cws:
             return False
+        if workspace_id is not None and workspace_id != cid:
+            return False
         if save:
             cws.set_metadata("modified_at", datetime.now().isoformat())
             target_dir = self._resolve_workspace_dir(
@@ -344,6 +384,7 @@ class WorkspaceManager:
             self._attach_workspace_dir(cws, target_dir)
             cws.save(target_dir)
             self._set_cached_path(user_id, cid, target_dir)
+        self.clear_workspace_artifacts_dir(user_id, cid)
         self._current.pop(user_id, None)
         return True
 

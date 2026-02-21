@@ -27,6 +27,8 @@ def run_topic_modeling_task(
     workspace_id: str,
     corpora: list[list[str]],
     node_infos: list[Dict[str, Any]],
+    artifact_dir: str,
+    artifact_prefix: str,
     min_topic_size: int = 5,
     use_ctfidf: bool = False,
     progress_callback: Optional[callable] = None,
@@ -37,13 +39,15 @@ def run_topic_modeling_task(
     - `core.worker.topic_modeling_task`
     - `TASK_REGISTRY["topic_modeling"]`
 
-    Why:
-    - Runs BERTopic embedding/modeling out-of-process and returns both user
-      payload and cache data for detach workflows.
+        Why:
+        - Runs BERTopic embedding/modeling out-of-process and returns an artifact
+            manifest (Parquet outputs) for main-process lazy retrieval/finalization.
     """
     configure_worker_environment()
 
     try:
+        from pathlib import Path
+
         import numpy as np
         import polars as pl
         from bertopic import BERTopic
@@ -52,6 +56,9 @@ def run_topic_modeling_task(
         print(
             f"[Worker {os.getpid()}] Starting topic modeling task for workspace {workspace_id}"
         )
+
+        artifact_root = Path(artifact_dir)
+        artifact_root.mkdir(parents=True, exist_ok=True)
 
         if len(corpora) != len(node_infos):
             raise ValueError(
@@ -76,12 +83,49 @@ def run_topic_modeling_task(
             all_docs = [doc for corpus in corpora for doc in corpus]
             corpus_sizes = [len(corpus) for corpus in corpora]
             if not all_docs:
+                topic_meanings_path = (
+                    artifact_root / f"{artifact_prefix}_topic_meanings.parquet"
+                )
+                pl.DataFrame(
+                    schema={"topic": pl.Int64, "topic_meaning": pl.Utf8}
+                ).lazy().sink_parquet(topic_meanings_path)
+
+                node_artifacts: list[dict[str, Any]] = []
+                for idx, corpus in enumerate(corpora):
+                    node_id = str(node_infos[idx]["node_id"])
+                    node_name = str(node_infos[idx].get("node_name") or node_id)
+                    text_column = str(node_infos[idx].get("text_column") or "")
+                    original_columns = list(
+                        node_infos[idx].get("original_columns") or []
+                    )
+                    assignments_path = (
+                        artifact_root
+                        / f"{artifact_prefix}_topic_assignments_{node_id}.parquet"
+                    )
+                    pl.DataFrame({
+                        "__row_nr__": list(range(len(corpus))),
+                        "_tm_topic": [],
+                    }).with_columns([
+                        pl.col("__row_nr__").cast(pl.Int64),
+                        pl.col("_tm_topic").cast(pl.Int64),
+                    ]).lazy().sink_parquet(assignments_path)
+                    node_artifacts.append({
+                        "node_id": node_id,
+                        "node_name": node_name,
+                        "text_column": text_column,
+                        "original_columns": original_columns,
+                        "assignments_parquet_path": str(assignments_path),
+                    })
+
                 return {
                     "topics": [],
                     "corpus_sizes": corpus_sizes,
                     "per_corpus_topic_counts": [],
-                    "assignments": [],
-                    "cache_payload": {"nodes": []},
+                    "artifacts": {
+                        "version": 1,
+                        "topic_meanings_parquet_path": str(topic_meanings_path),
+                        "nodes": node_artifacts,
+                    },
                     "meta": {},
                 }
 
@@ -91,10 +135,9 @@ def run_topic_modeling_task(
             random_state = 42
             embedding_model_name = "all-MiniLM-L6-v2"
 
-            # Build embeddings once for downstream cache + BERTopic fitting.
+            # Build embeddings once for BERTopic fitting.
             embedder = _get_embedder(embedding_model_name)
             all_embeddings = embedder.encode(all_docs, show_progress_bar=False)
-            embedding_rows = all_embeddings.tolist()
 
             # Reuse the same loaded embedder instance to avoid loading model
             # weights twice in a single task.
@@ -106,25 +149,39 @@ def run_topic_modeling_task(
             assigned_topics, _ = topic_model.fit_transform(all_docs, all_embeddings)
 
             assignments: list[list[int]] = []
-            cache_nodes: list[dict[str, Any]] = []
+            node_artifacts: list[dict[str, Any]] = []
             offset = 0
             for idx, corpus in enumerate(corpora):
                 size = len(corpus)
                 end = offset + size
                 corpus_topics = assigned_topics[offset:end]
-                corpus_embeddings = embedding_rows[offset:end]
                 normalized_topics = [
                     int(topic_id) if isinstance(topic_id, (int, np.integer)) else -1
                     for topic_id in corpus_topics
                 ]
                 assignments.append(normalized_topics)
-                cache_nodes.append({
-                    "node_id": node_infos[idx]["node_id"],
-                    "node_name": node_infos[idx]["node_name"],
-                    "text_column": node_infos[idx]["text_column"],
-                    "original_columns": node_infos[idx]["original_columns"],
-                    "embeddings": corpus_embeddings,
-                    "topics": normalized_topics,
+
+                node_id = str(node_infos[idx]["node_id"])
+                node_name = str(node_infos[idx].get("node_name") or node_id)
+                text_column = str(node_infos[idx].get("text_column") or "")
+                original_columns = list(node_infos[idx].get("original_columns") or [])
+                assignments_path = (
+                    artifact_root
+                    / f"{artifact_prefix}_topic_assignments_{node_id}.parquet"
+                )
+                pl.DataFrame({
+                    "__row_nr__": list(range(size)),
+                    "_tm_topic": normalized_topics,
+                }).with_columns([
+                    pl.col("__row_nr__").cast(pl.Int64),
+                    pl.col("_tm_topic").cast(pl.Int64),
+                ]).lazy().sink_parquet(assignments_path)
+                node_artifacts.append({
+                    "node_id": node_id,
+                    "node_name": node_name,
+                    "text_column": text_column,
+                    "original_columns": original_columns,
+                    "assignments_parquet_path": str(assignments_path),
                 })
                 offset = end
 
@@ -262,12 +319,26 @@ def run_topic_modeling_task(
                     "y": float(coords[i, 1]) if i < len(coords) else 0.0,
                 })
 
+            topic_meanings_path = (
+                artifact_root / f"{artifact_prefix}_topic_meanings.parquet"
+            )
+            pl.DataFrame(
+                {
+                    "topic": topic_ids,
+                    "topic_meaning": labels,
+                },
+                schema={"topic": pl.Int64, "topic_meaning": pl.Utf8},
+            ).lazy().sink_parquet(topic_meanings_path)
+
             return {
                 "topics": topic_payloads,
                 "corpus_sizes": corpus_sizes,
                 "per_corpus_topic_counts": per_corpus_topic_counts,
-                "assignments": assignments,
-                "cache_payload": {"nodes": cache_nodes},
+                "artifacts": {
+                    "version": 1,
+                    "topic_meanings_parquet_path": str(topic_meanings_path),
+                    "nodes": node_artifacts,
+                },
                 "meta": {
                     "native": True,
                     "engine": "bertopic",
@@ -293,7 +364,7 @@ def run_topic_modeling_task(
             "topics": tv["topics"],
             "corpus_sizes": tv["corpus_sizes"],
             "per_corpus_topic_counts": tv.get("per_corpus_topic_counts"),
-            "cache_payload": tv.get("cache_payload", {"nodes": []}),
+            "artifacts": tv.get("artifacts", {"version": 1, "nodes": []}),
             "meta": {**tv.get("meta", {}), "node_names": node_names},
         }
 

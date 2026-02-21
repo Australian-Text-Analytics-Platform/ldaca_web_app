@@ -1,3 +1,5 @@
+import { applySelectedColumnsToSnapshots, createNodeSnapshots } from '../../../hooks/useSchemaManagement';
+
 export const DEFAULT_TOKEN_LIMIT = 10;
 
 type ClampResult = {
@@ -70,3 +72,60 @@ export const formatNumber = (
 
 export const isNonEmptyString = (value: unknown): value is string =>
   typeof value === 'string' && value.trim().length > 0;
+
+export type AnalysisNodeColumnSelection = { nodeId: string; column: string };
+
+export interface ParsedAnalysisNodeRequest {
+  nodeIds: string[];
+  nodeColumns: Record<string, string>;
+  selections: AnalysisNodeColumnSelection[];
+}
+
+export const parseAnalysisNodeRequest = (
+  requestData: any,
+  maxNodes = 2
+): ParsedAnalysisNodeRequest => {
+  const nodeIds: string[] = Array.isArray(requestData?.node_ids)
+    ? requestData.node_ids
+        .slice(0, maxNodes)
+        .filter((id: unknown): id is string => typeof id === 'string' && id.trim().length > 0)
+    : [];
+
+  const nodeColumns: Record<string, string> =
+    requestData?.node_columns && typeof requestData.node_columns === 'object'
+      ? requestData.node_columns
+      : {};
+
+  const selections: AnalysisNodeColumnSelection[] = nodeIds.map((nodeId) => ({
+    nodeId,
+    column: nodeColumns[nodeId] || '',
+  }));
+
+  return { nodeIds, nodeColumns, selections };
+};
+
+export interface RestoreAnalysisLockFromRequestArgs {
+  workspaceId?: string | null;
+  requestData: any;
+  getAuthHeaders: () => Record<string, string>;
+  lockWithSnapshots: (snapshots: Array<{ id: string; name?: string; columns?: string[] }>) => void;
+  maxNodes?: number;
+}
+
+export const restoreAnalysisLockFromRequest = async ({
+  workspaceId,
+  requestData,
+  getAuthHeaders,
+  lockWithSnapshots,
+  maxNodes = 2,
+}: RestoreAnalysisLockFromRequestArgs): Promise<ParsedAnalysisNodeRequest> => {
+  const parsed = parseAnalysisNodeRequest(requestData, maxNodes);
+
+  if (workspaceId && parsed.nodeIds.length) {
+    const snapshots = await createNodeSnapshots(workspaceId, parsed.nodeIds, getAuthHeaders);
+    const normalizedSnapshots = applySelectedColumnsToSnapshots(snapshots, parsed.nodeColumns);
+    lockWithSnapshots(normalizedSnapshots);
+  }
+
+  return parsed;
+};

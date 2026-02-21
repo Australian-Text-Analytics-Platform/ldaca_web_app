@@ -10,7 +10,6 @@ import { useAuth } from '../../../hooks/useAuth';
 import { ConcordanceAnalysisRequest, ConcordanceAnalysisResponse, ConcordanceResultQuery, textApi } from '../../../api/text';
 import { httpRequest } from '../../../api/http';
 import { workspacesApi } from '../../../api/workspaces';
-import { getNodeInfo } from '../../../lib/nodeInfoCache';
 import { useAnalysisStore } from '../../../stores/analysisStore';
 import { useUIStore } from '../../../stores';
 import { useAnalysisLockState } from '../../../hooks/useAnalysisLockState';
@@ -29,13 +28,12 @@ import {
   TableRow,
 } from '../../../components/ui/table';
 import { ScrollArea } from '../../../components/ui/scroll-area';
-import { applySelectedColumnsToSnapshots } from '../../../hooks/useSchemaManagement';
 import { ANALYSIS_LOCKED_MESSAGE } from '../../../components/tabs/AnalysisLockedNotice';
 import AnalysisTaskBanner from '../../../components/tabs/AnalysisTaskBanner';
 import type { AnalysisTaskStatus } from '../../../hooks/useAnalysisTaskStatus';
 import useAnalysisTaskLifecycle, { type AnalysisTaskRefreshContext } from '../../../hooks/useAnalysisTaskLifecycle';
 import { getAnalysisActionState } from '../common/analysisActionState';
-import { useAnalysisHydration, useColorStackAllocator } from '../common';
+import { restoreAnalysisLockFromRequest, useAnalysisHydration, useColorStackAllocator } from '../common';
 import {
   clearAnalysisTaskArtifacts,
   collectTaskIds,
@@ -714,21 +712,13 @@ const ConcordanceFeature: React.FC = () => {
         }
 
         try {
-          const snaps: Array<{ id: string; name: string; columns: string[] }> = [];
-          for (const id of requestNodeIds) {
-            try {
-              const info = await getNodeInfo({ workspaceId: currentWorkspaceId!, nodeId: id, headers: authHeaders });
-              const name = info?.name || info?.data?.name || id;
-              const columns = Array.isArray(info?.columns)
-                ? info.columns
-                : (Array.isArray(info?.data?.columns) ? info.data.columns : []);
-              snaps.push({ id, name: String(name), columns });
-            } catch {
-              snaps.push({ id, name: id, columns: [] });
-            }
-          }
-          const normalizedSnapshots = applySelectedColumnsToSnapshots(snaps, nodeColumns);
-          lockWithSnapshots(normalizedSnapshots);
+          await restoreAnalysisLockFromRequest({
+            workspaceId: currentWorkspaceId,
+            requestData: { node_ids: requestNodeIds, node_columns: nodeColumns },
+            getAuthHeaders,
+            lockWithSnapshots,
+            maxNodes: 2,
+          });
         } catch {
           /* ignore */
         }
@@ -776,21 +766,13 @@ const ConcordanceFeature: React.FC = () => {
     setViewMode(hydratedMode);
 
     try {
-      const snaps: Array<{ id: string; name: string; columns: string[] }> = [];
-      for (const id of nodeIds) {
-        try {
-          const info = await getNodeInfo({ workspaceId: currentWorkspaceId!, nodeId: id, getAuthHeaders });
-          const name = info?.name || info?.data?.name || id;
-          const columns = Array.isArray(info?.columns)
-            ? info.columns
-            : (Array.isArray(info?.data?.columns) ? info.data.columns : []);
-          snaps.push({ id, name: String(name), columns });
-        } catch {
-          snaps.push({ id, name: id, columns: [] });
-        }
-      }
-      const normalizedSnapshots = applySelectedColumnsToSnapshots(snaps, node_columns);
-      lockWithSnapshots(normalizedSnapshots);
+      await restoreAnalysisLockFromRequest({
+        workspaceId: currentWorkspaceId,
+        requestData: req,
+        getAuthHeaders,
+        lockWithSnapshots,
+        maxNodes: 2,
+      });
     } catch {
       /* ignore */
     }

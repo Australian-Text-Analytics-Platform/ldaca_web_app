@@ -18,18 +18,42 @@ from ldaca_web_app_backend.core.workspace import workspace_manager
 
 def _simulate_token_frequency_completion(workspace_id: str):
     task_manager = get_task_manager("test", workspace_id)
-    task_ids = task_manager.get_current_task_ids("token-frequencies")
+    task_ids = task_manager.get_current_task_ids("token_frequencies")
     assert task_ids
     task = task_manager.get_task(task_ids[0])
     assert task is not None
     req = task.request.model_dump() if hasattr(task.request, "model_dump") else {}
+
+    node_ids = req.get("node_ids") or []
+    node_columns = req.get("node_columns") or {}
+    node_corpora: dict[str, list[str]] = {}
+    node_display_names: dict[str, str] = {}
+    for node_id in node_ids:
+        node = workspace_manager.get_node_from_workspace("test", workspace_id, node_id)
+        assert node is not None
+        node_data = getattr(node, "data", None)
+        assert node_data is not None
+        column_name = node_columns.get(node_id)
+        assert column_name
+        docs_df = node_data.select(column_name).collect()
+        node_corpora[node_id] = [
+            str(v) if v is not None else "" for v in docs_df[column_name].to_list()
+        ]
+        node_display_names[node_id] = str(getattr(node, "name", None) or node_id)
+
+    artifacts_dir = workspace_manager.ensure_workspace_artifacts_dir(
+        "test", workspace_id
+    )
+    assert artifacts_dir is not None
     worker_result = token_frequencies_task(
         user_id="test",
         workspace_id=workspace_id,
-        node_ids=req.get("node_ids") or [],
-        node_columns=req.get("node_columns") or {},
-        token_limit=req.get("token_limit") or DEFAULT_TOKEN_LIMIT,
+        node_corpora=node_corpora,
+        node_display_names=node_display_names,
         stop_words=req.get("stop_words") or [],
+        token_limit=req.get("token_limit") or DEFAULT_TOKEN_LIMIT,
+        artifact_dir=str(artifacts_dir),
+        artifact_prefix=f"test_token_freq_{task.task_id}",
     )
     task.complete(GenericAnalysisResult(worker_result))
     task_manager.save_task(task)
@@ -39,15 +63,7 @@ def _list_analysis_records(user_id: str, workspace_id: str, task: str | None = N
     task_manager = get_task_manager(user_id, workspace_id)
     tasks = task_manager.get_all_tasks()
     if task:
-        key_map = {
-            "token_frequencies": "token-frequencies",
-            "sequential_analysis": "sequential-analysis",
-            "topic_modeling": "topic-modeling",
-            "quotation": "quotation",
-            "concordance": "concordance",
-        }
-        tab_key = key_map.get(task, task)
-        task_ids = set(task_manager.get_current_task_ids(tab_key))
+        task_ids = set(task_manager.get_current_task_ids(task))
         tasks = [t for t in tasks if t.task_id in task_ids]
     tasks.sort(key=lambda t: t.updated_at or t.created_at)
 
@@ -169,7 +185,7 @@ class TestParametrizedAnalysisPersistence:
             assert result_data.get("metadata", {}).get("task_id")
             _simulate_token_frequency_completion(workspace_id)
             task_id = await _get_current_task_id(
-                authenticated_client, workspace_id, "token-frequencies"
+                authenticated_client, workspace_id, "token_frequencies"
             )
             assert task_id
             final = (
@@ -337,7 +353,7 @@ class TestAnalysisDataIntegrity:
 
         _simulate_token_frequency_completion(workspace_id)
         task_id = await _get_current_task_id(
-            authenticated_client, workspace_id, "token-frequencies"
+            authenticated_client, workspace_id, "token_frequencies"
         )
         assert task_id
         final = (
@@ -403,7 +419,7 @@ emoji test 🚀 🎉 💫"""
 
         _simulate_token_frequency_completion(workspace_id)
         task_id = await _get_current_task_id(
-            authenticated_client, workspace_id, "token-frequencies"
+            authenticated_client, workspace_id, "token_frequencies"
         )
         assert task_id
         final = (
@@ -462,7 +478,7 @@ emoji test 🚀 🎉 💫"""
 
         _simulate_token_frequency_completion(workspace_id)
         task_id = await _get_current_task_id(
-            authenticated_client, workspace_id, "token-frequencies"
+            authenticated_client, workspace_id, "token_frequencies"
         )
         assert task_id
         final = (

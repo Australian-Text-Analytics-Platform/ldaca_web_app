@@ -248,7 +248,7 @@ async def run_sequential_analysis(
     get_workspace_or_404(user_id, workspace_id)
 
     task_manager = get_task_manager(user_id, workspace_id)
-    existing_task_ids = task_manager.get_current_task_ids("sequential-analysis")
+    existing_task_ids = task_manager.get_current_task_ids("sequential_analysis")
     existing_task = (
         task_manager.get_task(existing_task_ids[0]) if existing_task_ids else None
     )
@@ -432,7 +432,7 @@ async def run_sequential_analysis(
             task.request = req_model
             task.complete(GenericAnalysisResult(result_payload))
             task_manager.save_task(task)
-            task_manager.set_current_task("sequential-analysis", task_id)
+            task_manager.set_current_task("sequential_analysis", task_id)
 
         return result_payload
 

@@ -3,8 +3,7 @@ import { getApiBase } from '@/api/env';
 
 export type TaskEventPayload =
   | { type: 'tasks_snapshot'; tasks?: any[] }
-  | { type: 'task_changed'; task?: any; result_persisted?: boolean; timestamp?: number }
-  | { type: 'analysis_saved'; task_type?: string; task_id?: string; timestamp?: number }
+  | { type: 'task_changed'; task?: any; timestamp?: number }
   | { type: 'analysis_save_failed'; task_type?: string; message?: string }
   | { type: 'task_update'; tasks?: any[] }
   | { type: 'error'; message?: string }

@@ -12,6 +12,7 @@ from __future__ import annotations
 from typing import Any, Optional
 from uuid import uuid4
 
+import polars as pl
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
@@ -53,6 +54,16 @@ class ConcordanceResultQuery(BaseModel):
     sort_order: Optional[str] = None
     show_metadata: Optional[bool] = None
     update_only: bool = False
+
+
+def _prepare_concordance_artifact_target(
+    user_id: str, workspace_id: str
+) -> tuple[str, str]:
+    artifact_dir = workspace_manager.ensure_workspace_artifacts_dir(
+        user_id, workspace_id
+    )
+    artifact_prefix = f"concordance_detach_{uuid4().hex}"
+    return str(artifact_dir), artifact_prefix
 
 
 def _apply_result_query_overrides(
@@ -275,22 +286,58 @@ async def detach_concordance(
     if not node:
         raise HTTPException(status_code=404, detail="Node not found")
 
+    node_data = getattr(node, "data", None)
+    if not isinstance(node_data, pl.LazyFrame):
+        raise HTTPException(
+            status_code=400, detail="Selected node data must be a LazyFrame"
+        )
+
+    if request.column not in node_data.collect_schema().names():
+        raise HTTPException(
+            status_code=400, detail=f"Column '{request.column}' not found"
+        )
+
+    corpus_df = (
+        node_data
+        .select(pl.col(request.column))
+        .filter(
+            pl
+            .col(request.column)
+            .cast(pl.Utf8, strict=False)
+            .str.strip_chars()
+            .str.len_chars()
+            .fill_null(0)
+            > 0
+        )
+        .collect()
+    )
+    node_corpus = [
+        str(value) if value is not None else ""
+        for value in corpus_df.get_column(request.column).to_list()
+    ]
+
+    artifact_dir, artifact_prefix = _prepare_concordance_artifact_target(
+        user_id, workspace_id
+    )
+
     try:
         task_info = await tm.submit_task(
             user_id=user_id,
             workspace_id=workspace_id,
             task_type="concordance_detach",
             task_args={
-                "node_id": node_id,
-                "column": request.column,
+                "node_corpus": node_corpus,
+                "parent_node_id": node_id,
+                "document_column": request.column,
                 "search_word": request.search_word,
                 "num_left_tokens": request.num_left_tokens,
                 "num_right_tokens": request.num_right_tokens,
                 "regex": request.regex,
                 "case_sensitive": request.case_sensitive,
                 "new_node_name": request.new_node_name,
+                "artifact_dir": artifact_dir,
+                "artifact_prefix": artifact_prefix,
             },
-            task_name=f"Detach Concordance: {request.search_word}",
         )
 
         return {

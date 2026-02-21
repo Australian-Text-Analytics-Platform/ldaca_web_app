@@ -21,7 +21,6 @@ import HelpIcon from '../../../components/help/HelpIcon';
 import { Play, Loader2, Trash2, Table2, Download, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Text } from '@visx/text';
 import { toast } from 'sonner';
-import { createNodeSnapshots, applySelectedColumnsToSnapshots } from '../../../hooks/useSchemaManagement';
 import { type NodeColumnSelection } from '../../../hooks/useAutoNodeColumns';
 import useNodeColumnInfos from '../../../hooks/useNodeColumnInfos';
 import { useUIStore } from '../../../stores';
@@ -33,6 +32,8 @@ import {
   toFiniteNumber,
   formatNumber,
   isNonEmptyString,
+  parseAnalysisNodeRequest,
+  restoreAnalysisLockFromRequest,
   useAnalysisHydration,
   useAnalysisLockMachine,
   useNodeColorPalette,
@@ -761,21 +762,7 @@ function TokenFrequencyFeature() {
           .filter((word: string) => word.length > 0);
       }
 
-      const nodeIds: string[] = Array.isArray(requestData.node_ids)
-        ? requestData.node_ids
-            .slice(0, 2)
-            .filter((id: any): id is string => typeof id === 'string' && id.trim().length > 0)
-        : [];
-
-      const nodeColumnsMap: Record<string, string> =
-        requestData.node_columns && typeof requestData.node_columns === 'object'
-          ? requestData.node_columns
-          : {};
-
-      const selections = nodeIds.map((nodeId) => ({
-        nodeId,
-        column: nodeColumnsMap[nodeId] || '',
-      }));
+      const { nodeIds, selections } = parseAnalysisNodeRequest(requestData, 2);
       setNodeColumnSelections(selections, { replace: true });
       setLastCompareNodeIds(nodeIds);
 
@@ -783,9 +770,13 @@ function TokenFrequencyFeature() {
       applyTokenLimitState(limitFromRequest ?? undefined);
       if (nodeIds.length && currentWorkspaceId) {
         try {
-          const snapshots = await createNodeSnapshots(currentWorkspaceId, nodeIds, getAuthHeaders);
-          const normalizedSnapshots = applySelectedColumnsToSnapshots(snapshots, nodeColumnsMap);
-          lockWithSnapshots(normalizedSnapshots);
+          await restoreAnalysisLockFromRequest({
+            workspaceId: currentWorkspaceId,
+            requestData,
+            getAuthHeaders,
+            lockWithSnapshots,
+            maxNodes: 2,
+          });
         } catch {
           /* ignore snapshot failures */
         }
@@ -1179,9 +1170,13 @@ function TokenFrequencyFeature() {
 
       try {
         if (request.node_ids.length) {
-          const snapshots = await createNodeSnapshots(currentWorkspaceId!, request.node_ids, getAuthHeaders);
-          const normalizedSnapshots = applySelectedColumnsToSnapshots(snapshots, nodeColumns);
-          lockWithSnapshots(normalizedSnapshots);
+          await restoreAnalysisLockFromRequest({
+            workspaceId: currentWorkspaceId,
+            requestData: request,
+            getAuthHeaders,
+            lockWithSnapshots,
+            maxNodes: 2,
+          });
         }
       } catch {
         /* ignore */
