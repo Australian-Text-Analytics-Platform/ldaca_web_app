@@ -3,8 +3,21 @@ import type { TaskItem } from '../stores/analysisStore';
 
 const PENDING_STATES = new Set(['pending', 'queued', 'submitted']);
 
+const normalizeTimestamp = (value: unknown): number => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string') {
+    const parsed = Date.parse(value);
+    if (!Number.isNaN(parsed)) {
+      return parsed;
+    }
+  }
+  return 0;
+};
+
 const getTaskTimestamp = (task?: TaskItem | null) =>
-  task?.updated_at ?? task?.finished_at ?? task?.started_at ?? task?.created_at ?? 0;
+  normalizeTimestamp(task?.updated_at ?? task?.finished_at ?? task?.started_at ?? task?.created_at ?? 0);
 
 export interface AnalysisTaskStatus {
   tasks: TaskItem[];
@@ -54,7 +67,12 @@ export const useAnalysisTaskStatus = (taskType: string): AnalysisTaskStatus => {
       : 'queued'
     : null;
   const bannerTaskId = activeCandidate?.task_id ?? null;
-  const bannerMessage = activeCandidate?.progress_message || activeCandidate?.message;
+  const bannerMessage =
+    typeof activeCandidate?.progress_message === 'string'
+      ? activeCandidate.progress_message
+      : typeof activeCandidate?.message === 'string'
+        ? activeCandidate.message
+        : undefined;
 
   return {
     tasks: sortedTasks,

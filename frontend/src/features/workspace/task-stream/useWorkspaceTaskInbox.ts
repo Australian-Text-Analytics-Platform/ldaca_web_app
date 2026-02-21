@@ -14,10 +14,23 @@ interface TaskMergeUpdate {
   task: Partial<TaskItem> & { task_id?: string };
 }
 
+const normalizeTimestamp = (value: unknown): number => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string') {
+    const parsed = Date.parse(value);
+    if (!Number.isNaN(parsed)) {
+      return parsed;
+    }
+  }
+  return 0;
+};
+
 const sortTasksByTime = (tasks: TaskItem[] = []) =>
   [...tasks].sort((a, b) => {
-    const tb = b?.finished_at ?? b?.started_at ?? b?.created_at ?? 0;
-    const ta = a?.finished_at ?? a?.started_at ?? a?.created_at ?? 0;
+    const tb = normalizeTimestamp(b?.finished_at ?? b?.started_at ?? b?.created_at ?? 0);
+    const ta = normalizeTimestamp(a?.finished_at ?? a?.started_at ?? a?.created_at ?? 0);
     return tb - ta;
   });
 

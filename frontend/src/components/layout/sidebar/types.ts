@@ -1,8 +1,14 @@
-export type SidebarTaskStatus = 'running' | 'successful' | 'failed' | 'cancelled';
+export type SidebarTaskStatus =
+  | 'pending'
+  | 'running'
+  | 'successful'
+  | 'failed'
+  | 'cancelled'
+  | string;
 
 export type SidebarTaskRecord = {
   task_id: string;
-  task_type: string;
+  task_type?: string;
   state?: SidebarTaskStatus;
   metadata?: {
     name?: string;
@@ -10,9 +16,9 @@ export type SidebarTaskRecord = {
     [key: string]: unknown;
   };
   message?: string;
-  created_at?: number;
-  started_at?: number;
-  finished_at?: number | null;
+  created_at?: number | string;
+  started_at?: number | string | null;
+  finished_at?: number | string | null;
   progress?: number;
   progress_message?: string;
 };

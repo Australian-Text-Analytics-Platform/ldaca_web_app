@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
-import type { ConcordanceResult } from '../api/models';
+import type { ConcordanceAnalysisResponse } from '../api/text';
+import type { NodeColumnSelection } from '../hooks/useAutoNodeColumns';
 
 export interface TaskItem {
   task_id: string;
@@ -17,11 +18,11 @@ export interface TaskItem {
 }
 
 export interface PendingConcordance {
-  result?: ConcordanceResult;
+  result?: ConcordanceAnalysisResponse;
   source?: string;
   searchWord?: string;
   selectedNodes?: Array<{ id?: string; [key: string]: unknown }>;
-  nodeColumnSelections?: Array<Record<string, unknown>>;
+  nodeColumnSelections?: NodeColumnSelection[];
   nodeColors?: Record<string, string>;
   autoRun?: boolean;
   timestamp?: number;

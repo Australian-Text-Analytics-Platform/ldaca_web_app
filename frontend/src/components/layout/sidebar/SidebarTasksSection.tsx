@@ -26,6 +26,19 @@ type SidebarTasksSectionProps = {
   onClearTask: (task: SidebarTaskRecord) => void;
 };
 
+const normalizeTimestamp = (value: unknown): number => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string') {
+    const parsed = Date.parse(value);
+    if (!Number.isNaN(parsed)) {
+      return parsed;
+    }
+  }
+  return 0;
+};
+
 const SidebarTasksSection: React.FC<SidebarTasksSectionProps> = ({
   tasks,
   isConnected,
@@ -39,8 +52,8 @@ const SidebarTasksSection: React.FC<SidebarTasksSectionProps> = ({
     ? tasks
         .slice()
         .sort((a, b) => {
-          const kb = b.finished_at ?? b.started_at ?? b.created_at ?? 0;
-          const ka = a.finished_at ?? a.started_at ?? a.created_at ?? 0;
+          const kb = normalizeTimestamp(b.finished_at ?? b.started_at ?? b.created_at ?? 0);
+          const ka = normalizeTimestamp(a.finished_at ?? a.started_at ?? a.created_at ?? 0);
           return kb - ka;
         })
     : [];

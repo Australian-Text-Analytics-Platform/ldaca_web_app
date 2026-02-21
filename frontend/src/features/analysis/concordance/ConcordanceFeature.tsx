@@ -511,7 +511,7 @@ const ConcordanceFeature: React.FC = () => {
     if (lastPendingConcordanceRef.current === pendingConcordance.timestamp) {
       return;
     }
-    lastPendingConcordanceRef.current = pendingConcordance.timestamp;
+    lastPendingConcordanceRef.current = pendingConcordance.timestamp ?? null;
 
     if (pendingConcordance.searchWord) {
       setSearchWord(pendingConcordance.searchWord);
@@ -538,10 +538,7 @@ const ConcordanceFeature: React.FC = () => {
     }
 
     if (pendingConcordance.nodeColumnSelections?.length) {
-      setNodeColumnSelections(
-        pendingConcordance.nodeColumnSelections.map((sel) => ({ ...sel })),
-        { replace: true }
-      );
+      setNodeColumnSelections(pendingConcordance.nodeColumnSelections, { replace: true });
     }
 
     if (pendingConcordance.nodeColors) {
