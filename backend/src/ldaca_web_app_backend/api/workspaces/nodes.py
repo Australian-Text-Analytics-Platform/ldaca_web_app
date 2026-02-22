@@ -31,7 +31,7 @@ from .analyses.text_column_prefs import (
     guess_text_column,
     persist_text_column_preference,
 )
-from .utils import get_node_or_404, get_node_with_data_or_400, update_workspace
+from .utils import update_workspace
 
 router = APIRouter(prefix="/workspaces", tags=["nodes"])
 
@@ -109,13 +109,6 @@ def _resolve_expression_column_name(request: ExpressionTransformRequest) -> str:
 def _is_string_list_dtype(dtype: Any) -> bool:
     """Return True when dtype is exactly a list of strings."""
     return dtype == pl.List(pl.String) or dtype == pl.List(pl.Utf8)
-
-
-def _get_active_workspace_or_404(user_id: str) -> tuple[str, Any]:
-    entry = workspace_manager._get_current_entry(user_id)
-    if not entry:
-        raise HTTPException(status_code=404, detail="No active workspace selected")
-    return entry[0], entry[1]
 
 
 def _build_filter_expression(
@@ -297,7 +290,7 @@ def _get_concat_nodes(user_id: str, node_ids: List[str]) -> List[Any]:
         raise HTTPException(
             status_code=400, detail="At least two node IDs are required"
         )
-    _, ws = _get_active_workspace_or_404(user_id)
+    ws = workspace_manager.get_current_workspace(user_id)
     nodes: List[Any] = []
     seen: set[str] = set()
     for raw_node_id in node_ids:
@@ -417,7 +410,7 @@ async def compute_column_preview(
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    _, data_obj = get_node_with_data_or_400(user_id, None, node_id)
+    data_obj = workspace_manager.get_current_workspace(user_id).nodes[node_id].data
 
     try:
         lazy_data = _unwrap_lazyframe(data_obj, purpose="Compute column preview")
@@ -468,7 +461,8 @@ async def compute_column_apply(
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    workspace_id, ws = _get_active_workspace_or_404(user_id)
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    ws = workspace_manager.get_current_workspace(user_id)
     node = ws.nodes[node_id]
     data_obj = node.data
     try:
@@ -533,7 +527,7 @@ async def get_node_info(
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    _, ws = _get_active_workspace_or_404(user_id)
+    ws = workspace_manager.get_current_workspace(user_id)
     node = ws.nodes[node_id]
     try:
         return node.info()
@@ -549,7 +543,7 @@ async def get_node_data(
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    _, ws = _get_active_workspace_or_404(user_id)
+    ws = workspace_manager.get_current_workspace(user_id)
     node = ws.nodes[node_id]
     data_obj = node.data
     try:
@@ -581,7 +575,7 @@ async def get_node_shape(
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    _, ws = _get_active_workspace_or_404(user_id)
+    ws = workspace_manager.get_current_workspace(user_id)
     node = ws.nodes[node_id]
     try:
         info = node.info()
@@ -600,7 +594,7 @@ async def get_column_unique_values(
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    _, ws = _get_active_workspace_or_404(user_id)
+    ws = workspace_manager.get_current_workspace(user_id)
     node = ws.nodes[node_id]
     data_obj = node.data
     try:
@@ -674,7 +668,7 @@ async def describe_column(
     from ...models import ColumnDescribeResponse
 
     user_id = current_user["id"]
-    _, ws = _get_active_workspace_or_404(user_id)
+    ws = workspace_manager.get_current_workspace(user_id)
     node = ws.nodes[node_id]
     data_obj = node.data
 
@@ -773,8 +767,8 @@ async def describe_column(
 @router.delete("/nodes/{node_id}")
 async def delete_node(node_id: str, current_user: dict = Depends(get_current_user)):
     user_id = current_user["id"]
-    workspace_id, _ = _get_active_workspace_or_404(user_id)
-    workspace = workspace_manager.get_workspace(user_id, workspace_id)
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    workspace = workspace_manager.get_current_workspace(user_id)
     if workspace is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
     success = workspace.remove_node(node_id)
@@ -799,14 +793,15 @@ async def convert_node(
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    workspace_id, _ = _get_active_workspace_or_404(user_id)
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
     valid_targets = {"lazyframe"}
     if target not in valid_targets:
         raise HTTPException(
             status_code=400,
             detail=f"Invalid target '{target}'. Must be one of: {', '.join(sorted(valid_targets))}",
         )
-    src_node, data = get_node_with_data_or_400(user_id, workspace_id, node_id)
+    src_node = workspace_manager.get_current_workspace(user_id).nodes[node_id]
+    data = src_node.data
     try:
         new_data = None
         doc_col: Optional[str] = None
@@ -857,8 +852,9 @@ async def reset_node_document_column(
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    workspace_id, _ = _get_active_workspace_or_404(user_id)
-    src_node, data = get_node_with_data_or_400(user_id, workspace_id, node_id)
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    src_node = workspace_manager.get_current_workspace(user_id).nodes[node_id]
+    data = src_node.data
     try:
         new_data = None
         lazyframe = _unwrap_lazyframe(data, purpose="Reset document column")
@@ -903,8 +899,8 @@ async def update_node_name(
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    workspace_id, _ = _get_active_workspace_or_404(user_id)
-    node = get_node_or_404(user_id, workspace_id, node_id)
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    node = workspace_manager.get_current_workspace(user_id).nodes[node_id]
     try:
         node.name = new_name
         update_workspace(user_id, workspace_id, best_effort=True)
@@ -924,9 +920,9 @@ async def copy_node(
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    workspace_id, _ = _get_active_workspace_or_404(user_id)
-    node = get_node_or_404(user_id, workspace_id, node_id)
-    workspace = workspace_manager.get_workspace(user_id, workspace_id)
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    node = workspace_manager.get_current_workspace(user_id).nodes[node_id]
+    workspace = workspace_manager.get_current_workspace(user_id)
     if workspace is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
 
@@ -969,14 +965,15 @@ async def filter_node(
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    workspace_id, _ = _get_active_workspace_or_404(user_id)
-    node, data_obj = get_node_with_data_or_400(user_id, workspace_id, node_id)
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    node = workspace_manager.get_current_workspace(user_id).nodes[node_id]
+    data_obj = node.data
     lazy_data = _unwrap_lazyframe(data_obj, purpose="Filter node")
     schema_map: dict[str, Any] = dict(lazy_data.collect_schema().items())
     filter_expr = _build_filter_expression(request, column_dtypes=schema_map)
     filtered_data = lazy_data.filter(filter_expr)
     new_node_name = request.new_node_name or f"{node.name}_filtered"
-    workspace = workspace_manager.get_workspace(user_id, workspace_id)
+    workspace = workspace_manager.get_current_workspace(user_id)
     if workspace is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
     new_node = Node(
@@ -1003,8 +1000,7 @@ async def filter_preview(
     current_user: dict = Depends(get_current_user),
 ) -> FilterPreviewResponse:
     user_id = current_user["id"]
-    workspace_id, _ = _get_active_workspace_or_404(user_id)
-    _, data_obj = get_node_with_data_or_400(user_id, workspace_id, node_id)
+    data_obj = workspace_manager.get_current_workspace(user_id).nodes[node_id].data
     lazy_data = _unwrap_lazyframe(data_obj, purpose="Filter preview")
 
     try:
@@ -1065,8 +1061,9 @@ async def slice_node(
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    workspace_id, _ = _get_active_workspace_or_404(user_id)
-    node, data_obj = get_node_with_data_or_400(user_id, workspace_id, node_id)
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    node = workspace_manager.get_current_workspace(user_id).nodes[node_id]
+    data_obj = node.data
     lazy_data = _unwrap_lazyframe(data_obj, purpose="Slice node")
     offset = int(request.offset or 0)
     length = request.length
@@ -1075,7 +1072,7 @@ async def slice_node(
     slice_args = f"offset={offset}"
     if length is not None:
         slice_args = f"{slice_args}, length={length}"
-    workspace = workspace_manager.get_workspace(user_id, workspace_id)
+    workspace = workspace_manager.get_current_workspace(user_id)
     if workspace is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
     new_node = Node(
@@ -1102,8 +1099,7 @@ async def slice_preview(
     current_user: dict = Depends(get_current_user),
 ) -> FilterPreviewResponse:
     user_id = current_user["id"]
-    workspace_id, _ = _get_active_workspace_or_404(user_id)
-    _, data_obj = get_node_with_data_or_400(user_id, workspace_id, node_id)
+    data_obj = workspace_manager.get_current_workspace(user_id).nodes[node_id].data
 
     offset = int(request.offset or 0)
     length = request.length if request.length is None else int(request.length)
@@ -1222,7 +1218,7 @@ async def concat_nodes(
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    workspace_id, _ = _get_active_workspace_or_404(user_id)
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
     try:
         nodes = _get_concat_nodes(user_id, request.node_ids)
         aligned_frames, _, _ = _validate_and_align_concat_nodes(nodes)
@@ -1234,7 +1230,7 @@ async def concat_nodes(
         else:
             operation_args = ", ".join(labels)
         operation_label = f"concat({operation_args})"
-        workspace = workspace_manager.get_workspace(user_id, workspace_id)
+        workspace = workspace_manager.get_current_workspace(user_id)
         if workspace is None:
             raise HTTPException(status_code=404, detail="Workspace not found")
         new_node = Node(
@@ -1265,20 +1261,10 @@ async def join_nodes_preview(
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    workspace_id, _ = _get_active_workspace_or_404(user_id)
     try:
-        left_node = get_node_or_404(
-            user_id,
-            workspace_id,
-            left_node_id,
-            detail=f"Left node '{left_node_id}' not found",
-        )
-        right_node = get_node_or_404(
-            user_id,
-            workspace_id,
-            right_node_id,
-            detail=f"Right node '{right_node_id}' not found",
-        )
+        workspace = workspace_manager.get_current_workspace(user_id)
+        left_node = workspace.nodes[left_node_id]
+        right_node = workspace.nodes[right_node_id]
 
         allowed_hows = {"inner", "left", "right", "full", "semi", "anti", "cross"}
         how_val = (how or "inner").lower()
@@ -1365,20 +1351,11 @@ async def join_nodes(
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    workspace_id, _ = _get_active_workspace_or_404(user_id)
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
     try:
-        left_node = get_node_or_404(
-            user_id,
-            workspace_id,
-            left_node_id,
-            detail=f"Left node '{left_node_id}' not found",
-        )
-        right_node = get_node_or_404(
-            user_id,
-            workspace_id,
-            right_node_id,
-            detail=f"Right node '{right_node_id}' not found",
-        )
+        workspace = workspace_manager.get_current_workspace(user_id)
+        left_node = workspace.nodes[left_node_id]
+        right_node = workspace.nodes[right_node_id]
         left_data = _unwrap_lazyframe(
             left_node.data, purpose="Join requires lazy left node"
         )
@@ -1399,9 +1376,7 @@ async def join_nodes(
                 right_data, left_on=left_on, right_on=right_on, how=how_val
             )
         node_name = new_node_name or f"{left_node.name}_join_{right_node.name}"
-        workspace = workspace_manager.get_workspace(user_id, workspace_id)
-        if workspace is None:
-            raise HTTPException(status_code=404, detail="Workspace not found")
+        workspace = workspace_manager.get_current_workspace(user_id)
         new_node = Node(
             data=joined_data,
             name=node_name,

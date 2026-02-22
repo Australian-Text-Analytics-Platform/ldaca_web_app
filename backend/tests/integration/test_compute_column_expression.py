@@ -38,8 +38,13 @@ async def test_compute_column_preview_adds_new_column(
 
     monkeypatch.setattr(
         nodes_api.workspace_manager,
-        "_get_current_entry",
-        lambda user_id: (workspace_id, dummy_ws),
+        "get_current_workspace_id",
+        lambda user_id: workspace_id,
+    )
+    monkeypatch.setattr(
+        nodes_api.workspace_manager,
+        "get_current_workspace",
+        lambda _user_id: dummy_ws,
     )
 
     response = await authenticated_client.post(
@@ -76,8 +81,13 @@ async def test_compute_column_apply_mutates_node(authenticated_client, monkeypat
 
     monkeypatch.setattr(
         nodes_api.workspace_manager,
-        "_get_current_entry",
-        lambda user_id: (workspace_id, dummy_ws),
+        "get_current_workspace_id",
+        lambda user_id: workspace_id,
+    )
+    monkeypatch.setattr(
+        nodes_api.workspace_manager,
+        "get_current_workspace",
+        lambda user_id: dummy_ws,
     )
     monkeypatch.setattr(
         nodes_api.workspace_manager,
@@ -93,11 +103,6 @@ async def test_compute_column_apply_mutates_node(authenticated_client, monkeypat
         nodes_api.workspace_manager,
         "_set_cached_path",
         lambda user_id, workspace_id, path: None,
-    )
-    monkeypatch.setattr(
-        nodes_api.workspace_manager,
-        "get_workspace",
-        lambda user_id, workspace_id: _DummyWorkspace(persist_calls),
     )
     response = await authenticated_client.post(
         "/api/workspaces/nodes/node-123/compute-column",

@@ -5,9 +5,10 @@ from ldaca_web_app_backend.core.workspace import workspace_manager
 
 @pytest.mark.asyncio
 async def test_quotation_clear_endpoint(authenticated_client):
+    workspace_obj = object()
     workspace_manager._current["test"] = {
-        "id": "test-workspace",
-        "ws": object(),
+        "wid": "test-workspace",
+        "workspace": workspace_obj,
         "path": None,
     }
 

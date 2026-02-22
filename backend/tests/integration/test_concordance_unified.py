@@ -48,7 +48,7 @@ def _clear_concordance_state(user_id: str, workspace_id: str):
 
 
 def _add_node(workspace_id: str, data: pl.LazyFrame, node_name: str):
-    workspace = workspace_manager.get_workspace("test", workspace_id)
+    workspace = workspace_manager.get_current_workspace("test")
     assert workspace is not None
     node = Node(
         data=data,

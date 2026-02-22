@@ -26,13 +26,13 @@ async def test_filter_preview_returns_paginated_rows(authenticated_client, monke
 
     monkeypatch.setattr(
         nodes_api.workspace_manager,
-        "_get_current_entry",
-        lambda user_id: (workspace_id, dummy_ws),
+        "get_current_workspace_id",
+        lambda user_id: workspace_id,
     )
     monkeypatch.setattr(
         nodes_api.workspace_manager,
-        "get_workspace",
-        lambda user_id, workspace_id: dummy_ws,
+        "get_current_workspace",
+        lambda user_id: dummy_ws,
     )
 
     response = await authenticated_client.post(
@@ -74,13 +74,13 @@ async def test_filter_preview_in_operator(authenticated_client, monkeypatch):
 
     monkeypatch.setattr(
         nodes_api.workspace_manager,
-        "_get_current_entry",
-        lambda user_id: (workspace_id, dummy_ws),
+        "get_current_workspace_id",
+        lambda user_id: workspace_id,
     )
     monkeypatch.setattr(
         nodes_api.workspace_manager,
-        "get_workspace",
-        lambda user_id, workspace_id: dummy_ws,
+        "get_current_workspace",
+        lambda user_id: dummy_ws,
     )
 
     response = await authenticated_client.post(
@@ -119,13 +119,13 @@ async def test_filter_preview_in_operator_with_null(authenticated_client, monkey
 
     monkeypatch.setattr(
         nodes_api.workspace_manager,
-        "_get_current_entry",
-        lambda user_id: (workspace_id, dummy_ws),
+        "get_current_workspace_id",
+        lambda user_id: workspace_id,
     )
     monkeypatch.setattr(
         nodes_api.workspace_manager,
-        "get_workspace",
-        lambda user_id, workspace_id: dummy_ws,
+        "get_current_workspace",
+        lambda user_id: dummy_ws,
     )
 
     response = await authenticated_client.post(
@@ -166,13 +166,13 @@ async def test_filter_preview_in_operator_matches_any_list_string_element(
 
     monkeypatch.setattr(
         nodes_api.workspace_manager,
-        "_get_current_entry",
-        lambda user_id: (workspace_id, dummy_ws),
+        "get_current_workspace_id",
+        lambda user_id: workspace_id,
     )
     monkeypatch.setattr(
         nodes_api.workspace_manager,
-        "get_workspace",
-        lambda user_id, workspace_id: dummy_ws,
+        "get_current_workspace",
+        lambda user_id: dummy_ws,
     )
 
     response = await authenticated_client.post(
@@ -213,13 +213,13 @@ async def test_filter_preview_list_string_in_does_not_match_null_rows(
 
     monkeypatch.setattr(
         nodes_api.workspace_manager,
-        "_get_current_entry",
-        lambda user_id: (workspace_id, dummy_ws),
+        "get_current_workspace_id",
+        lambda user_id: workspace_id,
     )
     monkeypatch.setattr(
         nodes_api.workspace_manager,
-        "get_workspace",
-        lambda user_id, workspace_id: dummy_ws,
+        "get_current_workspace",
+        lambda user_id: dummy_ws,
     )
 
     response = await authenticated_client.post(

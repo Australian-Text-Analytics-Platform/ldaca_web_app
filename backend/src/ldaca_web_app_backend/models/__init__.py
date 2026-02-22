@@ -179,10 +179,12 @@ class FileInfoResponse(BaseModel):
 class WorkspaceInfo(BaseModel):
     id: str
     name: str
-    created_at: str
-    modified_at: str
-    description: Optional[str] = None
-    total_nodes: int  # Updated to use latest ATAPWorkspace terminology
+    description: str = ""
+    created_at: Optional[str] = None
+    modified_at: Optional[str] = None
+    total_nodes: int
+    root_nodes: int
+    leaf_nodes: int
 
 
 class WorkspaceSummary(BaseModel):
@@ -196,14 +198,6 @@ class WorkspaceSummary(BaseModel):
     node_count: int = 0
     workspace_size_Byte: int = 0
     folder_name: Optional[str] = None
-
-
-class WorkspaceStats(BaseModel):
-    total_nodes: int
-    root_nodes: int
-    leaf_nodes: int
-    total_memory_mb: float
-    last_modified: str
 
 
 class WorkspaceCreateRequest(BaseModel):

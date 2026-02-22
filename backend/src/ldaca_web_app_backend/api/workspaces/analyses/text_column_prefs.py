@@ -129,7 +129,10 @@ def resolve_text_columns_for_nodes(
 
     requested = requested_node_columns or {}
     resolved: dict[str, str] = {}
-    workspace = workspace_manager.get_workspace(user_id, workspace_id)
+    if workspace_manager.get_current_workspace_id(user_id) != workspace_id:
+        if not workspace_manager.set_current_workspace(user_id, workspace_id):
+            raise HTTPException(status_code=404, detail="Workspace not found")
+    workspace = workspace_manager.get_current_workspace(user_id)
     if workspace is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
 

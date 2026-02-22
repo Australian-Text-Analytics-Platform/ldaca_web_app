@@ -6,12 +6,12 @@ docworkspace to keep the core library general-purpose.
 """
 
 import math
-from typing import Any, List, Optional, Tuple
+from typing import Any, List, Optional
 
 import polars as pl
 
 # Import API models
-from .api_models import ColumnSchema, ErrorResponse, NodeSummary, PaginatedData
+from .api_models import ColumnSchema, ErrorResponse, PaginatedData
 
 
 class DocWorkspaceAPIUtils:
@@ -75,30 +75,6 @@ class DocWorkspaceAPIUtils:
             )
             for col_name, polars_type in data_schema.items()
         ]
-
-    @staticmethod
-    def compute_node_shape(node: Any) -> Tuple[int, int]:
-        """Calculate node shape as `(rows, cols)` for LazyFrame-backed nodes."""
-        lazyframe = node.data
-        cols = lazyframe.collect_schema().len()
-        rows = int(lazyframe.select(pl.len()).collect().item())
-        return (rows, cols)
-
-    @staticmethod
-    def node_to_api_summary(node: Any) -> NodeSummary:
-        """Convert a Node to NodeSummary for API responses."""
-        node_info = node.info()
-        return NodeSummary(
-            id=node.id,
-            name=node.name,
-            operation=node.operation,
-            shape=DocWorkspaceAPIUtils.compute_node_shape(node),
-            columns=list(node_info.get("columns", [])),
-            schema=DocWorkspaceAPIUtils.get_node_schema_json_with_ldaca_dtype(node),
-            document=node.document,
-            parent_ids=[parent.id for parent in node.parents],
-            child_ids=[child.id for child in node.children],
-        )
 
     @staticmethod
     def get_paginated_node_rows(

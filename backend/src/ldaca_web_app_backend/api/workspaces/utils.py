@@ -4,7 +4,7 @@ import os
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional, Tuple
+from typing import Any, Optional
 
 import polars as pl
 from fastapi import HTTPException
@@ -29,8 +29,12 @@ def update_workspace(
     - Removes repeated save/update boilerplate from route handlers.
     """
     try:
-        if workspace is None and hasattr(workspace_manager, "get_workspace"):
-            workspace = workspace_manager.get_workspace(user_id, workspace_id)
+        if workspace is None:
+            current_workspace_id = workspace_manager.get_current_workspace_id(user_id)
+            if current_workspace_id != workspace_id:
+                if not workspace_manager.set_current_workspace(user_id, workspace_id):
+                    return None
+            workspace = workspace_manager.get_current_workspace(user_id)
 
         if workspace is None:
             return None
@@ -213,101 +217,10 @@ def stage_dataframe_as_lazy(
     return lazy_data
 
 
-def get_node_or_404(
-    user_id: str,
-    workspace_id: Optional[str],
-    node_id: str,
-    detail: Optional[str] = None,
-):
-    """Fetch node from workspace or raise 404.
-
-    Used by:
-    - workspace node and analysis endpoints
-
-    Why:
-    - Avoids repeated existence checks in route handlers.
-    """
-    if workspace_id is None:
-        current_entry = workspace_manager._get_current_entry(user_id)
-        if not current_entry:
-            raise HTTPException(status_code=404, detail="No active workspace selected")
-        workspace = current_entry[1]
-    else:
-        workspace = workspace_manager.get_workspace(user_id, workspace_id)
-        if workspace is None:
-            raise HTTPException(status_code=404, detail="Workspace not found")
-
-    node = workspace.nodes.get(node_id)
-    if node is None:
-        raise HTTPException(status_code=404, detail=detail or "Node not found")
-    return node
-
-
-def get_node_with_data_or_400(
-    user_id: str,
-    workspace_id: Optional[str],
-    node_id: str,
-    not_found_detail: Optional[str] = None,
-):
-    """Fetch node and enforce presence of attached data.
-
-    Used by:
-    - data-transforming workspace endpoints
-
-    Why:
-    - Centralizes validation of required node payload before processing.
-    """
-    node = get_node_or_404(user_id, workspace_id, node_id, detail=not_found_detail)
-    data = getattr(node, "data", None)
-    if data is None:
-        raise HTTPException(status_code=400, detail="Node has no data")
-    return node, data
-
-
-def get_workspace_or_404(
-    user_id: str,
-    workspace_id: str,
-    detail: Optional[str] = None,
-):
-    """Fetch workspace or raise 404.
-
-    Used by:
-    - workspace-scoped endpoints before filesystem/data operations
-
-    Why:
-    - Removes repeated null checks around workspace retrieval.
-    """
-    workspace = workspace_manager.get_workspace(user_id, workspace_id)
-    if not workspace:
-        raise HTTPException(status_code=404, detail=detail or "Workspace not found")
-    return workspace
-
-
-def _handle_operation_result(result: Any) -> Tuple[bool, str, Any]:  # exported
-    """Normalize operation return shape into `(success, message, object)`.
-
-    Used by:
-    - workspace node operation handlers
-
-    Why:
-    - Supports both tuple-style and object-only operation return conventions.
-    """
-    try:
-        if isinstance(result, tuple) and len(result) == 3:
-            return result  # (success, message, object)
-        return True, "ok", result
-    except Exception as e:  # pragma: no cover
-        return False, f"Unexpected result format: {e}", None
-
-
 __all__ = [
     "success",
     "running",
     "failed",
     "update_workspace",
-    "_handle_operation_result",
-    "get_node_or_404",
-    "get_node_with_data_or_400",
-    "get_workspace_or_404",
     "stage_dataframe_as_lazy",
 ]

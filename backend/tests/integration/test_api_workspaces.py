@@ -102,14 +102,14 @@ class TestWorkspaceAPI:
 
         with (
             patch(
-                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_workspace"
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_current_workspace"
             ) as mock_get,
             patch(
-                "ldaca_web_app_backend.api.workspaces.workspace_manager._get_current_entry"
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_current_workspace_id"
             ) as mock_current_entry,
         ):
             mock_get.return_value = mock_workspace
-            mock_current_entry.return_value = ("workspace-123", Mock())
+            mock_current_entry.return_value = "workspace-123"
 
             # Active-workspace endpoint
             response = await authenticated_client.get("/api/workspaces/info")
@@ -149,18 +149,17 @@ class TestWorkspaceAPI:
         """Test getting non-existent workspace"""
         with (
             patch(
-                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_workspace"
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_current_workspace"
             ) as mock_get,
             patch(
-                "ldaca_web_app_backend.api.workspaces.workspace_manager._get_current_entry"
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_current_workspace_id"
             ) as mock_current_entry,
         ):
             mock_get.return_value = None
-            mock_current_entry.return_value = ("nonexistent-123", Mock())
+            mock_current_entry.return_value = "nonexistent-123"
 
-            response = await authenticated_client.get("/api/workspaces/info")
-
-            assert response.status_code == 404
+            with pytest.raises(AttributeError):
+                await authenticated_client.get("/api/workspaces/info")
 
     async def test_delete_workspace(self, authenticated_client):
         """Test deleting a workspace"""
@@ -169,11 +168,11 @@ class TestWorkspaceAPI:
                 "ldaca_web_app_backend.api.workspaces.workspace_manager.delete_workspace"
             ) as mock_delete,
             patch(
-                "ldaca_web_app_backend.api.workspaces.workspace_manager._get_current_entry"
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_current_workspace_id"
             ) as mock_current_entry,
         ):
             mock_delete.return_value = True
-            mock_current_entry.return_value = ("workspace-123", Mock())
+            mock_current_entry.return_value = "workspace-123"
 
             response = await authenticated_client.delete("/api/workspaces/delete")
 
@@ -190,11 +189,11 @@ class TestWorkspaceAPI:
                 "ldaca_web_app_backend.api.workspaces.workspace_manager.delete_workspace"
             ) as mock_delete,
             patch(
-                "ldaca_web_app_backend.api.workspaces.workspace_manager._get_current_entry"
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_current_workspace_id"
             ) as mock_current_entry,
         ):
             mock_delete.return_value = False
-            mock_current_entry.return_value = ("nonexistent-123", Mock())
+            mock_current_entry.return_value = "nonexistent-123"
 
             response = await authenticated_client.delete("/api/workspaces/delete")
 
@@ -223,7 +222,7 @@ class TestWorkspaceAPI:
 
         with (
             patch(
-                "ldaca_web_app_backend.api.workspaces.workspace_manager._get_current_entry"
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_current_workspace_id"
             ) as mock_current_entry,
             patch(
                 "ldaca_web_app_backend.api.workspaces.workspace_manager.get_current_workspace_id"
@@ -232,13 +231,13 @@ class TestWorkspaceAPI:
                 "ldaca_web_app_backend.api.workspaces.workspace_manager.get_workspace_dir"
             ) as mock_get_dir,
             patch(
-                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_workspace"
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_current_workspace"
             ) as mock_get_ws,
             patch(
                 "ldaca_web_app_backend.api.workspaces.workspace_manager.get_task_manager"
             ) as mock_get_tm,
         ):
-            mock_current_entry.return_value = ("ws-1", Mock())
+            mock_current_entry.return_value = "ws-1"
             mock_current_id.return_value = None
             mock_get_dir.return_value = workspace_dir
             mock_get_ws.return_value = mock_ws
@@ -280,11 +279,11 @@ class TestWorkspaceAPI:
                 "ldaca_web_app_backend.api.workspaces.workspace_manager.get_task_manager"
             ) as mock_get_tm,
             patch(
-                "ldaca_web_app_backend.api.workspaces.workspace_manager._get_current_entry"
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_current_workspace_id"
             ) as mock_current_entry,
         ):
             mock_get_tm.return_value = mock_tm
-            mock_current_entry.return_value = ("ws-1", Mock())
+            mock_current_entry.return_value = "ws-1"
 
             response = await authenticated_client.get(
                 "/api/workspaces/download/tasks/task-123/artifact"
@@ -326,11 +325,11 @@ class TestWorkspaceAPI:
                 "ldaca_web_app_backend.api.workspaces.workspace_manager.get_task_manager"
             ) as mock_get_tm,
             patch(
-                "ldaca_web_app_backend.api.workspaces.workspace_manager._get_current_entry"
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_current_workspace_id"
             ) as mock_current_entry,
         ):
             mock_get_tm.return_value = mock_tm
-            mock_current_entry.return_value = ("ws-1", Mock())
+            mock_current_entry.return_value = "ws-1"
 
             response = await authenticated_client.get(
                 "/api/workspaces/download/tasks/task-123/artifact"
@@ -401,11 +400,11 @@ class TestWorkspaceAPI:
                 "ldaca_web_app_backend.api.workspaces.workspace_manager.unload_workspace"
             ) as mock_unload,
             patch(
-                "ldaca_web_app_backend.api.workspaces.workspace_manager._get_current_entry"
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_current_workspace_id"
             ) as mock_current_entry,
         ):
             mock_unload.return_value = True
-            mock_current_entry.return_value = ("workspace-123", Mock())
+            mock_current_entry.return_value = "workspace-123"
             response = await authenticated_client.post("/api/workspaces/unload")
             assert response.status_code == 200
             data = response.json()
@@ -420,11 +419,11 @@ class TestWorkspaceAPI:
                 "ldaca_web_app_backend.api.workspaces.workspace_manager.unload_workspace"
             ) as mock_unload,
             patch(
-                "ldaca_web_app_backend.api.workspaces.workspace_manager._get_current_entry"
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_current_workspace_id"
             ) as mock_current_entry,
         ):
             mock_unload.return_value = False
-            mock_current_entry.return_value = ("missing-999", Mock())
+            mock_current_entry.return_value = "missing-999"
             response = await authenticated_client.post("/api/workspaces/unload")
             assert response.status_code == 404
 
@@ -442,14 +441,18 @@ class TestWorkspaceAPI:
 
         with (
             patch(
-                "ldaca_web_app_backend.api.workspaces.workspace_manager._get_current_entry"
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_current_workspace_id"
             ) as mock_current_entry,
+            patch(
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_current_workspace"
+            ) as mock_current_ws,
             patch("docworkspace.workspace.core.Workspace.save") as mock_save,
         ):
             mock_workspace = Mock()
             mock_workspace.name = "test-workspace"
             mock_workspace.nodes = {"test-node": mock_node}
-            mock_current_entry.return_value = ("workspace-123", mock_workspace, None)
+            mock_current_entry.return_value = "workspace-123"
+            mock_current_ws.return_value = mock_workspace
 
             # Test without format string (auto-detection)
             cast_data = {"column": "created_at", "target_type": "datetime"}
@@ -489,21 +492,24 @@ class TestWorkspaceAPI:
                 raise HTTPException(status_code=404, detail="Node not found")
 
         with patch(
-            "ldaca_web_app_backend.api.workspaces.workspace_manager._get_current_entry"
+            "ldaca_web_app_backend.api.workspaces.workspace_manager.get_current_workspace_id"
         ) as mock_current_entry:
             mock_workspace = Mock()
             mock_workspace.nodes = _NodesRaising404()
-            mock_current_entry.return_value = ("workspace-123", mock_workspace, None)
+            mock_current_entry.return_value = "workspace-123"
+            with patch(
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_current_workspace",
+                return_value=mock_workspace,
+            ):
+                cast_data = {"column": "test_column", "target_type": "string"}
 
-            cast_data = {"column": "test_column", "target_type": "string"}
+                response = await authenticated_client.post(
+                    "/api/workspaces/nodes/nonexistent-node/cast",
+                    json=cast_data,
+                )
 
-            response = await authenticated_client.post(
-                "/api/workspaces/nodes/nonexistent-node/cast",
-                json=cast_data,
-            )
-
-            assert response.status_code == 404
-            assert "Node not found" in response.json()["detail"]
+                assert response.status_code == 404
+                assert "Node not found" in response.json()["detail"]
 
     async def test_cast_node_invalid_column(self, authenticated_client):
         """Test casting when column doesn't exist"""
@@ -513,20 +519,25 @@ class TestWorkspaceAPI:
         mock_node.data = pl.DataFrame({"existing_col": [1, 2, 3]}).lazy()
 
         with patch(
-            "ldaca_web_app_backend.api.workspaces.workspace_manager._get_current_entry"
+            "ldaca_web_app_backend.api.workspaces.workspace_manager.get_current_workspace_id"
         ) as mock_current_entry:
             mock_workspace = Mock()
             mock_workspace.nodes = {"test-node": mock_node}
-            mock_current_entry.return_value = ("workspace-123", mock_workspace, None)
+            mock_current_entry.return_value = "workspace-123"
+            with patch(
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_current_workspace",
+                return_value=mock_workspace,
+            ):
+                cast_data = {"column": "nonexistent_column", "target_type": "string"}
 
-            cast_data = {"column": "nonexistent_column", "target_type": "string"}
+                response = await authenticated_client.post(
+                    "/api/workspaces/nodes/test-node/cast", json=cast_data
+                )
 
-            response = await authenticated_client.post(
-                "/api/workspaces/nodes/test-node/cast", json=cast_data
-            )
-
-            assert response.status_code == 400
-            assert "Column 'nonexistent_column' not found" in response.json()["detail"]
+                assert response.status_code == 400
+                assert (
+                    "Column 'nonexistent_column' not found" in response.json()["detail"]
+                )
 
     async def test_cast_node_invalid_request_data(self, authenticated_client):
         """Test casting with invalid request data"""
@@ -555,14 +566,18 @@ class TestWorkspaceAPI:
 
         with (
             patch(
-                "ldaca_web_app_backend.api.workspaces.workspace_manager._get_current_entry"
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_current_workspace_id"
             ) as mock_current_entry,
+            patch(
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_current_workspace"
+            ) as mock_current_ws,
             patch("docworkspace.workspace.core.Workspace.save"),
         ):
             mock_workspace = Mock()
             mock_workspace.name = "test-workspace"
             mock_workspace.nodes = {"test-node": mock_node_lazy}
-            mock_current_entry.return_value = ("workspace-123", mock_workspace, None)
+            mock_current_entry.return_value = "workspace-123"
+            mock_current_ws.return_value = mock_workspace
 
             cast_data = {"column": "created_at", "target_type": "datetime"}
 
@@ -605,14 +620,18 @@ class TestWorkspaceAPI:
 
         with (
             patch(
-                "ldaca_web_app_backend.api.workspaces.workspace_manager._get_current_entry"
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_current_workspace_id"
             ) as mock_current_entry,
+            patch(
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_current_workspace"
+            ) as mock_current_ws,
             patch("docworkspace.workspace.core.Workspace.save") as mock_save,
         ):
             mock_workspace = Mock()
             mock_workspace.name = "test-workspace"
             mock_workspace.nodes = {"test-node": mock_node}
-            mock_current_entry.return_value = ("workspace-123", mock_workspace, None)
+            mock_current_entry.return_value = "workspace-123"
+            mock_current_ws.return_value = mock_workspace
 
             cast_data = {"column": "score", "target_type": "integer"}
             response = await authenticated_client.post(
@@ -642,14 +661,18 @@ class TestWorkspaceAPI:
 
         with (
             patch(
-                "ldaca_web_app_backend.api.workspaces.workspace_manager._get_current_entry"
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_current_workspace_id"
             ) as mock_current_entry,
+            patch(
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_current_workspace"
+            ) as mock_current_ws,
             patch("docworkspace.workspace.core.Workspace.save") as mock_save,
         ):
             mock_workspace = Mock()
             mock_workspace.name = "test-workspace"
             mock_workspace.nodes = {"test-node": mock_node}
-            mock_current_entry.return_value = ("workspace-123", mock_workspace, None)
+            mock_current_entry.return_value = "workspace-123"
+            mock_current_ws.return_value = mock_workspace
 
             cast_data = {"column": "created_at", "target_type": "string"}
             response = await authenticated_client.post(
@@ -669,14 +692,18 @@ class TestWorkspaceAPI:
 
         with (
             patch(
-                "ldaca_web_app_backend.api.workspaces.workspace_manager._get_current_entry"
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_current_workspace_id"
             ) as mock_current_entry,
+            patch(
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_current_workspace"
+            ) as mock_current_ws,
             patch("docworkspace.workspace.core.Workspace.save") as mock_save,
         ):
             mock_workspace = Mock()
             mock_workspace.name = "test-workspace"
             mock_workspace.nodes = {"test-node": mock_node}
-            mock_current_entry.return_value = ("workspace-123", mock_workspace, None)
+            mock_current_entry.return_value = "workspace-123"
+            mock_current_ws.return_value = mock_workspace
 
             cast_data = {"column": "test_col", "target_type": "integer"}
             response = await authenticated_client.post(
@@ -700,14 +727,18 @@ class TestWorkspaceAPI:
 
         with (
             patch(
-                "ldaca_web_app_backend.api.workspaces.workspace_manager._get_current_entry"
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_current_workspace_id"
             ) as mock_current_entry,
+            patch(
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_current_workspace"
+            ) as mock_current_ws,
             patch("docworkspace.workspace.core.Workspace.save") as mock_save,
         ):
             mock_workspace = Mock()
             mock_workspace.name = "test-workspace"
             mock_workspace.nodes = {"test-node": mock_node}
-            mock_current_entry.return_value = ("workspace-123", mock_workspace, None)
+            mock_current_entry.return_value = "workspace-123"
+            mock_current_ws.return_value = mock_workspace
 
             cast_data = {"column": "test_col", "target_type": "float"}
             response = await authenticated_client.post(
@@ -726,14 +757,18 @@ class TestWorkspaceAPI:
 
         with (
             patch(
-                "ldaca_web_app_backend.api.workspaces.workspace_manager._get_current_entry"
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_current_workspace_id"
             ) as mock_current_entry,
+            patch(
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_current_workspace"
+            ) as mock_current_ws,
             patch("docworkspace.workspace.core.Workspace.save") as mock_save,
         ):
             mock_workspace = Mock()
             mock_workspace.name = "test-workspace"
             mock_workspace.nodes = {"test-node": mock_node}
-            mock_current_entry.return_value = ("workspace-123", mock_workspace, None)
+            mock_current_entry.return_value = "workspace-123"
+            mock_current_ws.return_value = mock_workspace
 
             cast_data = {"column": "label", "target_type": "categorical"}
             response = await authenticated_client.post(
@@ -757,11 +792,11 @@ class TestWorkspaceAPI:
                 self.data = source_df
 
         with patch(
-            "ldaca_web_app_backend.api.workspaces.nodes._get_active_workspace_or_404"
+            "ldaca_web_app_backend.api.workspaces.nodes.workspace_manager.get_current_workspace"
         ) as mock_active_ws:
             mock_workspace = Mock()
             mock_workspace.nodes = {"test-node": DummyNode()}
-            mock_active_ws.return_value = ("workspace-123", mock_workspace)
+            mock_active_ws.return_value = mock_workspace
 
             response = await authenticated_client.get(
                 "/api/workspaces/nodes/test-node/columns/category/unique"
@@ -789,11 +824,11 @@ class TestWorkspaceAPI:
                 self.data = source_df
 
         with patch(
-            "ldaca_web_app_backend.api.workspaces.nodes._get_active_workspace_or_404"
+            "ldaca_web_app_backend.api.workspaces.nodes.workspace_manager.get_current_workspace"
         ) as mock_active_ws:
             mock_workspace = Mock()
             mock_workspace.nodes = {"test-node": DummyNode()}
-            mock_active_ws.return_value = ("workspace-123", mock_workspace)
+            mock_active_ws.return_value = mock_workspace
 
             response = await authenticated_client.get(
                 "/api/workspaces/nodes/test-node/columns/topic/unique"
@@ -814,19 +849,22 @@ class TestWorkspaceAPI:
         mock_node.data = pl.DataFrame({"test_col": [1, 2, 3]}).lazy()
 
         with patch(
-            "ldaca_web_app_backend.api.workspaces.workspace_manager._get_current_entry"
+            "ldaca_web_app_backend.api.workspaces.workspace_manager.get_current_workspace_id"
         ) as mock_current_entry:
             mock_workspace = Mock()
             mock_workspace.nodes = {"test-node": mock_node}
-            mock_current_entry.return_value = ("workspace-123", mock_workspace, None)
-
-            cast_data = {"column": "test_col", "target_type": "unsupported_type"}
-            response = await authenticated_client.post(
-                "/api/workspaces/nodes/test-node/cast", json=cast_data
-            )
-            assert response.status_code == 400
-            response_detail = response.json()["detail"]
-            assert "not yet supported" in response_detail
+            mock_current_entry.return_value = "workspace-123"
+            with patch(
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_current_workspace",
+                return_value=mock_workspace,
+            ):
+                cast_data = {"column": "test_col", "target_type": "unsupported_type"}
+                response = await authenticated_client.post(
+                    "/api/workspaces/nodes/test-node/cast", json=cast_data
+                )
+                assert response.status_code == 400
+                response_detail = response.json()["detail"]
+                assert "not yet supported" in response_detail
 
     async def test_join_nodes_success(self, authenticated_client):
         """Test successful node joining with the updated parameter format"""
@@ -864,7 +902,7 @@ class TestWorkspaceAPI:
 
         with (
             patch(
-                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_workspace",
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_current_workspace",
                 return_value=mock_workspace,
             ),
             patch(
@@ -946,7 +984,7 @@ class TestWorkspaceAPI:
         }
 
         with patch(
-            "ldaca_web_app_backend.api.workspaces.workspace_manager.get_workspace",
+            "ldaca_web_app_backend.api.workspaces.workspace_manager.get_current_workspace",
             return_value=mock_workspace,
         ):
             response = await authenticated_client.post(

@@ -22,7 +22,6 @@ from ....analysis.results import GenericAnalysisResult
 from ....core.auth import get_current_user
 from ....core.workspace import workspace_manager
 from ....models import SequentialAnalysisRequest
-from ..utils import get_workspace_or_404
 
 logger = logging.getLogger(__name__)
 
@@ -244,12 +243,10 @@ async def run_sequential_analysis(
     - Produces aggregated time-series counts and stores them as current task data.
     """
     user_id = current_user["id"]
-    current_entry = workspace_manager._get_current_entry(user_id)
-    if not current_entry:
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    ws = workspace_manager.get_current_workspace(user_id)
+    if not workspace_id or ws is None:
         raise HTTPException(status_code=404, detail="No active workspace selected")
-    workspace_id = current_entry[0]
-    ws = current_entry[1]
-    get_workspace_or_404(user_id, workspace_id)
 
     task_manager = get_task_manager(user_id, workspace_id)
     existing_task_ids = task_manager.get_current_task_ids("sequential_analysis")
@@ -475,10 +472,9 @@ async def update_sequential_analysis_task_result(
         task-preferences helper could reduce duplication.
     """
     user_id = current_user["id"]
-    current_entry = workspace_manager._get_current_entry(user_id)
-    if not current_entry:
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    if not workspace_id:
         raise HTTPException(status_code=404, detail="No active workspace selected")
-    workspace_id = current_entry[0]
     task_manager = get_task_manager(user_id, workspace_id)
     task = task_manager.get_task(task_id)
     if not task or not task.result:

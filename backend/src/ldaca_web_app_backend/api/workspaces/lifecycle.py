@@ -7,9 +7,9 @@ import shutil
 import tempfile
 import zipfile
 from pathlib import Path, PurePosixPath
-from typing import Any, Optional
+from typing import Optional
 
-from docworkspace import Workspace
+from docworkspace.workspace.core import Workspace
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 
@@ -21,22 +21,6 @@ from ..files import USER_TASK_SCOPE
 from .utils import update_workspace
 
 router = APIRouter(prefix="/workspaces", tags=["lifecycle"])
-
-
-def _workspace_info_payload(workspace: Workspace) -> dict[str, Any]:
-    summary = workspace.info_json()
-    return {
-        "id": workspace.id,
-        "name": workspace.name,
-        "description": workspace.get_metadata("description") or "",
-        "created_at": workspace.get_metadata("created_at") or "",
-        "modified_at": workspace.get_metadata("modified_at") or "",
-        "total_nodes": summary.get("total_nodes", 0),
-        "root_nodes": summary.get("root_nodes", 0),
-        "leaf_nodes": summary.get("leaf_nodes", 0),
-        "node_types": summary.get("node_types", {}),
-        "status_counts": summary.get("status_counts", {}),
-    }
 
 
 def _safe_download_name(name: str) -> str:
@@ -118,15 +102,9 @@ async def create_workspace(
         update_workspace(user_id, workspace_id, workspace)
         workspace_manager.set_current_workspace(user_id, workspace_id)
 
-        workspace_info = _workspace_info_payload(workspace)
-        return WorkspaceInfo(
-            id=workspace_id,
-            name=workspace_info["name"],
-            description=workspace_info.get("description", ""),
-            created_at=workspace_info.get("created_at", ""),
-            modified_at=workspace_info.get("modified_at", ""),
-            total_nodes=workspace_info.get("total_nodes", 0),
-        )
+        workspace_info = workspace.info_json()
+        workspace_info["id"] = workspace_id
+        return WorkspaceInfo(**workspace_info)
     except HTTPException:
         raise
     except Exception as e:
@@ -145,10 +123,7 @@ async def delete_workspace(
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    current_entry = workspace_manager._get_current_entry(user_id)
-    if not current_entry:
-        raise HTTPException(status_code=404, detail="No active workspace selected")
-    workspace_id = current_entry[0]
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
     success = workspace_manager.delete_workspace(user_id, workspace_id)
     if not success:
         raise HTTPException(status_code=404, detail="Workspace not found")
@@ -164,10 +139,7 @@ async def unload_workspace(
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    current_entry = workspace_manager._get_current_entry(user_id)
-    if not current_entry:
-        raise HTTPException(status_code=404, detail="No active workspace selected")
-    workspace_id = current_entry[0]
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
     existed = workspace_manager.unload_workspace(user_id, workspace_id, save=save)
     if not existed:
         raise HTTPException(status_code=404, detail="Workspace not found")
@@ -184,13 +156,8 @@ async def rename_workspace(
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    current_entry = workspace_manager._get_current_entry(user_id)
-    if not current_entry:
-        raise HTTPException(status_code=404, detail="No active workspace selected")
-    workspace_id = current_entry[0]
-    workspace = workspace_manager.get_workspace(user_id, workspace_id)
-    if not workspace:
-        raise HTTPException(status_code=404, detail="Workspace not found")
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    workspace = workspace_manager.get_current_workspace(user_id)
     try:
         is_valid, reason = validate_workspace_name(new_name)
         if not is_valid:
@@ -199,7 +166,7 @@ async def rename_workspace(
             )
         workspace.name = new_name
         update_workspace(user_id, workspace_id, workspace)
-        return _workspace_info_payload(workspace)
+        return workspace.info_json()
     except HTTPException:
         raise
     except Exception as e:
@@ -211,13 +178,8 @@ async def save_workspace(
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    current_entry = workspace_manager._get_current_entry(user_id)
-    if not current_entry:
-        raise HTTPException(status_code=404, detail="No active workspace selected")
-    workspace_id = current_entry[0]
-    ws = workspace_manager.get_workspace(user_id, workspace_id)
-    if not ws:
-        raise HTTPException(status_code=404, detail="Workspace not found")
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    ws = workspace_manager.get_current_workspace(user_id)
     try:
         update_workspace(user_id, workspace_id, ws)
         return {"state": "successful", "message": "Workspace saved"}
@@ -239,17 +201,12 @@ async def start_workspace_download(
       track progress and the UI stays responsive.
     """
     user_id = current_user["id"]
-    current_entry = workspace_manager._get_current_entry(user_id)
-    if not current_entry:
-        raise HTTPException(status_code=404, detail="No active workspace selected")
-    workspace_id = current_entry[0]
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    ws = workspace_manager.get_current_workspace(user_id)
 
     # Persist latest state if this is the current in-memory workspace
-    current_workspace_id = workspace_manager.get_current_workspace_id(user_id)
-    if current_workspace_id == workspace_id:
-        current_workspace = workspace_manager.get_workspace(user_id, workspace_id)
-        if current_workspace is not None:
-            update_workspace(user_id, workspace_id, current_workspace)
+    if workspace_manager.get_current_workspace_id(user_id) == workspace_id:
+        update_workspace(user_id, workspace_id, ws)
 
     # Verify workspace directory exists before submitting
     workspace_dir = workspace_manager.get_workspace_dir(user_id, workspace_id)
@@ -257,7 +214,6 @@ async def start_workspace_download(
         raise HTTPException(status_code=404, detail="Workspace not found")
 
     # Resolve a human-readable name for the task centre label
-    ws = workspace_manager.get_workspace(user_id, workspace_id)
     ws_name = ws.name if ws else workspace_id
 
     # Use USER_TASK_SCOPE so the download task appears in the unified
@@ -303,10 +259,9 @@ async def download_workspace_artifact(
       download to avoid unbounded disk usage.
     """
     user_id = current_user["id"]
-    current_entry = workspace_manager._get_current_entry(user_id)
-    if not current_entry:
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    if not workspace_id:
         raise HTTPException(status_code=404, detail="No active workspace selected")
-    workspace_id = current_entry[0]
 
     # Download tasks live under USER_TASK_SCOPE for unified SSE visibility.
     tm = workspace_manager.get_task_manager(user_id, USER_TASK_SCOPE)
@@ -522,13 +477,7 @@ async def save_workspace_as(
 
     """
     user_id = current_user["id"]
-    current_entry = workspace_manager._get_current_entry(user_id)
-    if not current_entry:
-        raise HTTPException(status_code=404, detail="No active workspace selected")
-    workspace_id = current_entry[0]
-    source = workspace_manager.get_workspace(user_id, workspace_id)
-    if not source:
-        raise HTTPException(status_code=404, detail="Workspace not found")
+    source = workspace_manager.get_current_workspace(user_id)
     try:
         new_id = generate_workspace_id()
         new_name = folder_name.replace(".json", "")
@@ -545,7 +494,7 @@ async def save_workspace_as(
         return {
             "state": "successful",
             "message": "Workspace cloned",
-            "new_workspace": _workspace_info_payload(new_ws),
+            "new_workspace": new_ws.info_json(),
         }
     except Exception as e:  # pragma: no cover
         raise HTTPException(
@@ -558,14 +507,8 @@ async def get_workspace_info(
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    current_entry = workspace_manager._get_current_entry(user_id)
-    if not current_entry:
-        raise HTTPException(status_code=404, detail="No active workspace selected")
-    workspace_id = current_entry[0]
-    workspace = workspace_manager.get_workspace(user_id, workspace_id)
-    if not workspace:
-        raise HTTPException(status_code=404, detail="Workspace not found")
-    return _workspace_info_payload(workspace)
+    workspace = workspace_manager.get_current_workspace(user_id)
+    return workspace.info_json()
 
 
 @router.get("/graph")
@@ -582,14 +525,8 @@ async def get_workspace_graph(
       graph configuration.
     """
     user_id = current_user["id"]
-    current_entry = workspace_manager._get_current_entry(user_id)
-    if not current_entry:
-        raise HTTPException(status_code=404, detail="No active workspace selected")
-    workspace_id = current_entry[0]
-    graph_data = workspace_manager.get_workspace_graph(user_id, workspace_id)
-    if not graph_data:
-        raise HTTPException(status_code=404, detail="Workspace not found")
-    return graph_data
+    workspace = workspace_manager.get_current_workspace(user_id)
+    return workspace.graph_json()
 
 
 @router.get("/nodes")
@@ -597,9 +534,6 @@ async def get_workspace_nodes(
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    current_entry = workspace_manager._get_current_entry(user_id)
-    if not current_entry:
-        raise HTTPException(status_code=404, detail="No active workspace selected")
-    workspace_id = current_entry[0]
-    summaries = workspace_manager.get_node_summaries(user_id, workspace_id)
-    return {"nodes": summaries}
+    workspace = workspace_manager.get_current_workspace(user_id)
+    graph_data = workspace.graph_json()
+    return {"nodes": graph_data.get("nodes", [])}

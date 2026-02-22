@@ -74,7 +74,7 @@ def _simulate_token_frequency_completion(workspace_id: str):
     assert task is not None
 
     req = task.request.model_dump() if hasattr(task.request, "model_dump") else {}
-    workspace = workspace_manager.get_workspace("test", workspace_id)
+    workspace = workspace_manager.get_current_workspace("test")
     assert workspace is not None
 
     node_ids = req.get("node_ids") or []
@@ -518,8 +518,13 @@ class TestSequentialAnalysisPersistence:
 
         monkeypatch.setattr(
             sequential_module.workspace_manager,
-            "_get_current_entry",
-            lambda *_args, **_kwargs: (workspace_id, dummy_workspace, None),
+            "get_current_workspace_id",
+            lambda *_args, **_kwargs: workspace_id,
+        )
+        monkeypatch.setattr(
+            sequential_module.workspace_manager,
+            "get_current_workspace",
+            lambda *_args, **_kwargs: dummy_workspace,
         )
 
         response = await post_json(
@@ -659,8 +664,13 @@ class TestSequentialAnalysisPersistence:
 
         monkeypatch.setattr(
             sequential_module.workspace_manager,
-            "_get_current_entry",
-            lambda *_args, **_kwargs: (workspace_id, dummy_workspace, None),
+            "get_current_workspace_id",
+            lambda *_args, **_kwargs: workspace_id,
+        )
+        monkeypatch.setattr(
+            sequential_module.workspace_manager,
+            "get_current_workspace",
+            lambda *_args, **_kwargs: dummy_workspace,
         )
 
         original_run = sequential_module._run_sequential_analysis
@@ -708,8 +718,13 @@ class TestSequentialAnalysisPersistence:
 
         monkeypatch.setattr(
             sequential_module.workspace_manager,
-            "_get_current_entry",
-            lambda *_args, **_kwargs: (workspace_id, dummy_workspace, None),
+            "get_current_workspace_id",
+            lambda *_args, **_kwargs: workspace_id,
+        )
+        monkeypatch.setattr(
+            sequential_module.workspace_manager,
+            "get_current_workspace",
+            lambda *_args, **_kwargs: dummy_workspace,
         )
 
         payload = {

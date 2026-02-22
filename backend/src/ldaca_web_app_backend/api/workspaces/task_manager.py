@@ -28,10 +28,9 @@ async def get_current_tasks(
     - Lets clients resolve latest task id(s) before fetching request/result.
     """
     user_id = current_user["id"]
-    current_entry = workspace_manager._get_current_entry(user_id)
-    if not current_entry:
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    if not workspace_id:
         raise HTTPException(status_code=404, detail="No active workspace selected")
-    workspace_id = current_entry[0]
     manager = get_task_manager(user_id, workspace_id)
     return {"task_ids": manager.get_current_task_ids(analysis)}
 
@@ -50,10 +49,9 @@ async def get_task_request(
     - Preserves reproducibility and UI state reconstruction from saved tasks.
     """
     user_id = current_user["id"]
-    current_entry = workspace_manager._get_current_entry(user_id)
-    if not current_entry:
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    if not workspace_id:
         raise HTTPException(status_code=404, detail="No active workspace selected")
-    workspace_id = current_entry[0]
     manager = get_task_manager(user_id, workspace_id)
     task = manager.get_task(task_id)
     if task is None:
@@ -69,10 +67,9 @@ async def get_task_result(
 ) -> Any:
     """Return stored task result, syncing with worker if still running."""
     user_id = current_user["id"]
-    current_entry = workspace_manager._get_current_entry(user_id)
-    if not current_entry:
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    if not workspace_id:
         raise HTTPException(status_code=404, detail="No active workspace selected")
-    workspace_id = current_entry[0]
     manager = get_task_manager(user_id, workspace_id)
 
     # Sync with worker if running using shared utility
@@ -101,10 +98,9 @@ async def clear_task(
     - Removes stale in-memory task entries without deleting analysis artifacts.
     """
     user_id = current_user["id"]
-    current_entry = workspace_manager._get_current_entry(user_id)
-    if not current_entry:
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    if not workspace_id:
         raise HTTPException(status_code=404, detail="No active workspace selected")
-    workspace_id = current_entry[0]
     manager = get_task_manager(user_id, workspace_id)
     task = manager.get_task(task_id)
     if task is None:

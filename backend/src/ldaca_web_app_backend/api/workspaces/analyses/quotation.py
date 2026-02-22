@@ -29,7 +29,6 @@ from ....models import (
     QuotationResultQuery,
 )
 from ....settings import settings
-from ..utils import get_node_with_data_or_400
 from . import quotation_core as qcore
 
 logger = logging.getLogger(__name__)
@@ -109,11 +108,10 @@ async def quotation_task_result(
     - Supports cheap preference-only reads and on-demand page recomputation.
     """
     user_id = current_user["id"]
-    current_entry = workspace_manager._get_current_entry(user_id)
-    if not current_entry:
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    ws = workspace_manager.get_current_workspace(user_id)
+    if not workspace_id or ws is None:
         raise HTTPException(status_code=404, detail="No active workspace selected")
-    workspace_id = current_entry[0]
-    ws = current_entry[1]
     task_manager = get_task_manager(user_id, workspace_id)
     task = task_manager.get_task(task_id)
     if not task or not task.result:
@@ -183,11 +181,10 @@ async def update_quotation_task_result(
       to a single internal read/update orchestrator.
     """
     user_id = current_user["id"]
-    current_entry = workspace_manager._get_current_entry(user_id)
-    if not current_entry:
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    ws = workspace_manager.get_current_workspace(user_id)
+    if not workspace_id or ws is None:
         raise HTTPException(status_code=404, detail="No active workspace selected")
-    workspace_id = current_entry[0]
-    ws = current_entry[1]
     task_manager = get_task_manager(user_id, workspace_id)
     task = task_manager.get_task(task_id)
     if not task or not task.result:
@@ -309,15 +306,14 @@ async def get_quotation(
     - Produces immediate result payload and persists it as current quotation task.
     """
     user_id = current_user["id"]
-    current_entry = workspace_manager._get_current_entry(user_id)
-    if not current_entry:
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    if not workspace_id:
         raise HTTPException(status_code=404, detail="No active workspace selected")
-    workspace_id = current_entry[0]
 
     task_manager = get_task_manager(user_id, workspace_id)
 
     try:
-        node, _node_data = get_node_with_data_or_400(user_id, workspace_id, node_id)
+        node = workspace_manager.get_current_workspace(user_id).nodes[node_id]
         engine = request.engine or QuotationEngineConfig()
 
         page, page_size = qcore.normalize_pagination(request.page, request.page_size)
@@ -412,11 +408,10 @@ async def detach_quotation(
     - Offloads potentially expensive extraction/materialization to worker tasks.
     """
     user_id = current_user["id"]
-    current_entry = workspace_manager._get_current_entry(user_id)
-    if not current_entry:
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    ws = workspace_manager.get_current_workspace(user_id)
+    if not workspace_id or ws is None:
         raise HTTPException(status_code=404, detail="No active workspace selected")
-    workspace_id = current_entry[0]
-    ws = current_entry[1]
     tm = workspace_manager.get_task_manager(user_id, workspace_id)
 
     try:

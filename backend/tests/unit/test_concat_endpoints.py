@@ -93,11 +93,14 @@ def fake_workspace_manager(monkeypatch: pytest.MonkeyPatch, sample_nodes):
             self.workspace = DummyWorkspace(nodes, self)
             self.add_calls: list[dict[str, object]] = []
 
-        def _get_current_entry(self, _user_id: str):
-            return (self.workspace_id, self.workspace, None)
-
-        def get_workspace(self, _user_id: str, _workspace_id: str):
+        def get_current_workspace(self, _user_id: str):
             return self.workspace
+
+        def get_current_workspace_id(self, _user_id: str):
+            return self.workspace_id
+
+        def get_current_workspace_path(self, _user_id: str):
+            return "workspace_path"
 
     manager = FakeWorkspaceManager(sample_nodes)
     monkeypatch.setattr(nodes_api, "workspace_manager", manager)

@@ -19,7 +19,6 @@ from docworkspace import Workspace  # type: ignore
 from docworkspace.workspace.io import read_workspace_metadata
 from ldaca_web_app_backend.models import WorkspaceSummary
 
-from .docworkspace_api import DocWorkspaceAPIUtils
 from .utils import (
     allocate_workspace_folder,
     ensure_display_folder_name,
@@ -38,14 +37,6 @@ class WorkspaceManager:
         self._paths: Dict[tuple[str, str], Path] = {}
 
     # ---------------- Core helpers ----------------
-    def _get_current_entry(
-        self, user_id: str
-    ) -> tuple[Optional[str], Optional[Any], Optional[Path]]:
-        entry = self._current.get(user_id)
-        if not entry:
-            return None, None, None
-        return entry.get("id"), entry.get("ws"), entry.get("path")
-
     def _path_key(self, user_id: str, workspace_id: str) -> tuple[str, str]:
         return (user_id, workspace_id)
 
@@ -138,18 +129,29 @@ class WorkspaceManager:
 
     # ---------------- Public API ----------------
     def get_current_workspace_id(self, user_id: str) -> Optional[str]:
-        cid, _, _ = self._get_current_entry(user_id)
-        return cid
+        entry = self._current.get(user_id)
+        if not entry:
+            return None
+        return entry.get("wid")
 
     def get_current_workspace(self, user_id: str) -> Optional[Any]:
-        _, ws, _ = self._get_current_entry(user_id)
-        return ws
+        entry = self._current.get(user_id)
+        if not entry:
+            return None
+        return entry.get("workspace")
+
+    def get_current_workspace_path(self, user_id: str) -> Optional[Path]:
+        entry = self._current.get(user_id)
+        if not entry:
+            return None
+        return entry.get("path")
 
     def set_current_workspace(self, user_id: str, workspace_id: Optional[str]) -> bool:
         if workspace_id is None:
             self.unload_workspace(user_id, save=True)
             return True
-        cid, cws, _ = self._get_current_entry(user_id)
+        cid = self.get_current_workspace_id(user_id)
+        cws = self.get_current_workspace(user_id)
         if cid == workspace_id and cws is not None:
             return True
         if cid is not None and cws is not None:
@@ -176,27 +178,12 @@ class WorkspaceManager:
             return False
         current_path = self._get_cached_path(user_id, workspace_id)
         self._current[user_id] = {
-            "id": workspace_id,
-            "ws": new_ws,
+            "wid": workspace_id,
+            "workspace": new_ws,
             "path": current_path,
         }
         self.ensure_workspace_artifacts_dir(user_id, workspace_id)
         return True
-
-    def get_workspace(self, user_id: str, workspace_id: str) -> Optional[Any]:
-        cid, cws, _ = self._get_current_entry(user_id)
-        if cid == workspace_id:
-            if cws is not None:
-                cached = self._get_cached_path(user_id, workspace_id)
-                if cached:
-                    self._attach_workspace_dir(cws, cached)
-                    self._set_working_dir(cached)
-                    self.ensure_workspace_artifacts_dir(user_id, workspace_id)
-            return cws
-        if not self.set_current_workspace(user_id, workspace_id):
-            return None
-        _, ws, _ = self._get_current_entry(user_id)
-        return ws
 
     def list_user_workspaces_summaries(self, user_id: str) -> list[dict[str, Any]]:
         summaries: list[dict[str, Any]] = []
@@ -226,7 +213,8 @@ class WorkspaceManager:
         return summaries
 
     def delete_workspace(self, user_id: str, workspace_id: str) -> bool:
-        cid, cws, _ = self._get_current_entry(user_id)
+        cid = self.get_current_workspace_id(user_id)
+        cws = self.get_current_workspace(user_id)
         if cid == workspace_id and cws is not None:
             try:
                 cws.set_metadata("modified_at", datetime.now().isoformat())
@@ -292,7 +280,8 @@ class WorkspaceManager:
             self._refresh_user_workspace_paths(user_id)
             cached = self._get_indexed_path(user_id, workspace_id)
         if cached and cached.exists():
-            cid, cws, _ = self._get_current_entry(user_id)
+            cid = self.get_current_workspace_id(user_id)
+            cws = self.get_current_workspace(user_id)
             if cid == workspace_id and cws is not None:
                 self._attach_workspace_dir(cws, cached)
             return cached
@@ -346,7 +335,8 @@ class WorkspaceManager:
         Why:
         - Enforces one-active-workspace-per-user memory policy.
         """
-        cid, cws, _ = self._get_current_entry(user_id)
+        cid = self.get_current_workspace_id(user_id)
+        cws = self.get_current_workspace(user_id)
         if not cid or not cws:
             return False
         if workspace_id is not None and workspace_id != cid:
@@ -365,22 +355,7 @@ class WorkspaceManager:
         self._current.pop(user_id, None)
         return True
 
-    # ---------------- Graph / info operations ----------------
-    def get_workspace_graph(
-        self, user_id: str, workspace_id: str
-    ) -> Optional[Dict[str, Any]]:
-        ws = self.get_workspace(user_id, workspace_id)
-        if ws is None:
-            return None
-        return ws.graph_json()
 
-    def get_node_summaries(self, user_id: str, workspace_id: str) -> list:
-        ws = self.get_workspace(user_id, workspace_id)
-        if ws is None:
-            return []
-        return [
-            DocWorkspaceAPIUtils.node_to_api_summary(node) for node in ws.nodes.values()
-        ]
-
+workspace_manager = WorkspaceManager()
 
 workspace_manager = WorkspaceManager()

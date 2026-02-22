@@ -40,11 +40,10 @@ async def delete_node_column(
     """Delete a column from a node's data (in-place)."""
 
     user_id = current_user["id"]
-    current_entry = workspace_manager._get_current_entry(user_id)
-    if not current_entry:
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    ws = workspace_manager.get_current_workspace(user_id)
+    if not workspace_id or ws is None:
         raise HTTPException(status_code=404, detail="No active workspace selected")
-    workspace_id = current_entry[0]
-    ws = current_entry[1]
     node = ws.nodes[node_id]
     data = node.data
     if not isinstance(data, pl.LazyFrame):
@@ -90,11 +89,10 @@ async def rename_node_column(
             detail="Request body must include a 'new_name' string field.",
         )
 
-    current_entry = workspace_manager._get_current_entry(user_id)
-    if not current_entry:
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    ws = workspace_manager.get_current_workspace(user_id)
+    if not workspace_id or ws is None:
         raise HTTPException(status_code=404, detail="No active workspace selected")
-    workspace_id = current_entry[0]
-    ws = current_entry[1]
     node = ws.nodes[node_id]
     data = node.data
     if not isinstance(data, pl.LazyFrame):
@@ -221,9 +219,6 @@ _configure_numba_threading()
 ## Topic modeling endpoints moved to analyses/topic_modeling.py
 
 
-## Concordance cache helpers moved; _handle_operation_result now imported from utils
-
-
 ## Lifecycle endpoints moved to lifecycle.py
 
 
@@ -245,10 +240,9 @@ async def add_node_to_workspace(
     lazy processing semantics.
     """
     user_id = current_user["id"]
-    current_entry = workspace_manager._get_current_entry(user_id)
-    if not current_entry:
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    if not workspace_id:
         raise HTTPException(status_code=404, detail="No active workspace selected")
-    workspace_id = current_entry[0]
 
     try:
         # Load data file
@@ -313,7 +307,10 @@ async def add_node_to_workspace(
             document_column=None,
         )
 
-        workspace = workspace_manager.get_workspace(user_id, workspace_id)
+        if workspace_manager.get_current_workspace_id(user_id) != workspace_id:
+            if not workspace_manager.set_current_workspace(user_id, workspace_id):
+                raise HTTPException(status_code=404, detail="Workspace not found")
+        workspace = workspace_manager.get_current_workspace(user_id)
         if workspace is None:
             raise HTTPException(status_code=404, detail="Workspace not found")
 
@@ -395,11 +392,10 @@ async def cast_node(
     """
     try:
         user_id = current_user["id"]
-        current_entry = workspace_manager._get_current_entry(user_id)
-        if not current_entry:
+        workspace_id = workspace_manager.get_current_workspace_id(user_id)
+        ws = workspace_manager.get_current_workspace(user_id)
+        if not workspace_id or ws is None:
             raise HTTPException(status_code=404, detail="No active workspace selected")
-        workspace_id = current_entry[0]
-        ws = current_entry[1]
 
         # Validate cast_data structure
         if not isinstance(cast_data, dict):
@@ -640,11 +636,10 @@ async def export_nodes(
     from fastapi.responses import StreamingResponse
 
     user_id = current_user["id"]
-    current_entry = workspace_manager._get_current_entry(user_id)
-    if not current_entry:
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    ws = workspace_manager.get_current_workspace(user_id)
+    if not workspace_id or ws is None:
         raise HTTPException(status_code=404, detail="No active workspace selected")
-    workspace_id = current_entry[0]
-    ws = current_entry[1]
     fmt = format.lower()
     supported = {"csv", "json", "parquet", "ipc", "ndjson"}
     if fmt not in supported:

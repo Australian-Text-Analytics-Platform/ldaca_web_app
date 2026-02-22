@@ -32,7 +32,7 @@ async def test_text_column_preference_persists_across_text_analyses(
     authenticated_client, workspace_id
 ):
     user_id = "test"
-    workspace = workspace_manager.get_workspace(user_id, workspace_id)
+    workspace = workspace_manager.get_current_workspace(user_id)
     assert workspace is not None
 
     node = Node(

@@ -92,10 +92,9 @@ async def clear_topic_modeling_results(
         aligned with backend task registries.
     """
     user_id = current_user["id"]
-    current_entry = workspace_manager._get_current_entry(user_id)
-    if not current_entry:
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    if not workspace_id:
         raise HTTPException(status_code=404, detail="No active workspace selected")
-    workspace_id = current_entry[0]
 
     task_manager = get_task_manager(user_id, workspace_id)
     current_id = task_manager.get_current_task_ids("topic_modeling")
@@ -127,11 +126,10 @@ async def run_topic_modeling(
         for progress/result polling.
     """
     user_id = current_user["id"]
-    current_entry = workspace_manager._get_current_entry(user_id)
-    if not current_entry:
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    ws = workspace_manager.get_current_workspace(user_id)
+    if not workspace_id or ws is None:
         raise HTTPException(status_code=404, detail="No active workspace selected")
-    workspace_id = current_entry[0]
-    ws = current_entry[1]
 
     if not request.node_ids:
         raise HTTPException(
@@ -274,10 +272,9 @@ async def topic_modeling_task_result(
     - Normalizes task lifecycle states into one response contract for UI polling.
     """
     user_id = current_user["id"]
-    current_entry = workspace_manager._get_current_entry(user_id)
-    if not current_entry:
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    if not workspace_id:
         raise HTTPException(status_code=404, detail="No active workspace selected")
-    workspace_id = current_entry[0]
 
     task = await ensure_task_synced(
         user_id, workspace_id, task_id, get_task_manager(user_id, workspace_id)
@@ -357,11 +354,10 @@ async def topic_modeling_detach_options(
     - Exposes artifact-backed node metadata so users can choose output columns safely.
     """
     user_id = current_user["id"]
-    current_entry = workspace_manager._get_current_entry(user_id)
-    if not current_entry:
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    ws = workspace_manager.get_current_workspace(user_id)
+    if not workspace_id or ws is None:
         raise HTTPException(status_code=404, detail="No active workspace selected")
-    workspace_id = current_entry[0]
-    ws = current_entry[1]
 
     analysis_tm = get_task_manager(user_id, workspace_id)
     task = await ensure_task_synced(user_id, workspace_id, task_id, analysis_tm)
@@ -427,11 +423,10 @@ async def detach_topic_modeling(
             nodes without rerunning the model.
     """
     user_id = current_user["id"]
-    current_entry = workspace_manager._get_current_entry(user_id)
-    if not current_entry:
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    ws = workspace_manager.get_current_workspace(user_id)
+    if not workspace_id or ws is None:
         raise HTTPException(status_code=404, detail="No active workspace selected")
-    workspace_id = current_entry[0]
-    ws = current_entry[1]
 
     analysis_tm = get_task_manager(user_id, workspace_id)
     task = await ensure_task_synced(user_id, workspace_id, task_id, analysis_tm)

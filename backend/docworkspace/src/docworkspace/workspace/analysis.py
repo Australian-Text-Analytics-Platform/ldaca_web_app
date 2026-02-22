@@ -20,6 +20,7 @@ def info_json(workspace: "Workspace") -> Dict[str, Any]:
     return {
         "name": workspace.name,
         "id": workspace.id,
+        "description": workspace.get_metadata("description") or "",
         "created_at": workspace.get_metadata("created_at"),
         "modified_at": workspace.get_metadata("modified_at"),
         "total_nodes": total_nodes,

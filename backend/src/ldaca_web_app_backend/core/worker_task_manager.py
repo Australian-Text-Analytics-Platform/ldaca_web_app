@@ -402,9 +402,15 @@ class WorkerTaskManager:
 
                         lazy_df = pl.scan_parquet(parquet_path)
 
-                        workspace = workspace_manager.get_workspace(
-                            user_id, workspace_id
-                        )
+                        if (
+                            workspace_manager.get_current_workspace_id(user_id)
+                            != workspace_id
+                        ):
+                            if not workspace_manager.set_current_workspace(
+                                user_id, workspace_id
+                            ):
+                                raise RuntimeError("Workspace not found")
+                        workspace = workspace_manager.get_current_workspace(user_id)
                         if workspace is None:
                             raise RuntimeError("Workspace not found")
 

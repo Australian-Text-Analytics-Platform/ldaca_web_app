@@ -23,7 +23,7 @@ def _simulate_token_frequency_completion(workspace_id: str):
     task = task_manager.get_task(task_ids[0])
     assert task is not None
     req = task.request.model_dump() if hasattr(task.request, "model_dump") else {}
-    workspace = workspace_manager.get_workspace("test", workspace_id)
+    workspace = workspace_manager.get_current_workspace("test")
     assert workspace is not None
 
     node_ids = req.get("node_ids") or []

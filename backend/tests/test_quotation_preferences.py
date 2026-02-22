@@ -36,9 +36,10 @@ def _prime_workspace_state():
         def set_metadata(self, key, value):
             self.metadata[key] = value
 
+    dummy_ws = DummyWorkspace(base_df)
     workspace_manager._current[USER_ID] = {  # type: ignore[attr-defined]
-        "id": WORKSPACE_ID,
-        "ws": DummyWorkspace(base_df),
+        "wid": WORKSPACE_ID,
+        "workspace": dummy_ws,
         "path": None,
     }
 
@@ -305,8 +306,8 @@ async def test_quotation_endpoint_recomputes_on_demand(
 
     base_df = pl.DataFrame({"text": ["alpha doc", "beta doc"]}).lazy()
     workspace_manager._current[USER_ID] = {
-        "id": WORKSPACE_ID,
-        "ws": DummyWorkspace(base_df),
+        "wid": WORKSPACE_ID,
+        "workspace": DummyWorkspace(base_df),
         "path": None,
     }
     # No workspace-level analysis bucket; TaskManager holds in-memory state.
@@ -347,6 +348,4 @@ async def test_quotation_endpoint_recomputes_on_demand(
     payload = response.json()
     assert payload["pagination"]["page"] == 2
     assert payload["data"][0]["quote"] == "beta"
-    assert recompute_called is True
-    assert recompute_called is True
     assert recompute_called is True

@@ -30,7 +30,7 @@ def test_add_node_preserves_document_metadata(settings_override):
 
         df = pl.DataFrame({"text": ["alpha", "beta"], "speaker": ["a", "b"]})
         lazy_df = df.lazy()
-        current_ws = workspace_manager.get_workspace("test", workspace_id)
+        current_ws = workspace_manager.get_current_workspace("test")
         assert current_ws is not None
         node = Node(
             data=lazy_df,

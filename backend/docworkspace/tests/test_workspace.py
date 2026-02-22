@@ -159,6 +159,7 @@ class TestWorkspace:
         assert summary["total_nodes"] == 4
         assert summary["root_nodes"] == 2
         assert summary["leaf_nodes"] == 2
+        assert "description" in summary
         assert "created_at" in summary
         assert "modified_at" in summary
 

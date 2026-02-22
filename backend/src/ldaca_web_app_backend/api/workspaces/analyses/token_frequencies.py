@@ -249,10 +249,9 @@ async def token_frequencies_task_result(
 ):
     """Return normalized token-frequency result payload for one task."""
     user_id = current_user["id"]
-    current_entry = workspace_manager._get_current_entry(user_id)
-    if not current_entry:
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    if not workspace_id:
         raise HTTPException(status_code=404, detail="No active workspace selected")
-    workspace_id = current_entry[0]
     task_manager = get_task_manager(user_id, workspace_id)
 
     task = await ensure_task_synced(user_id, workspace_id, task_id, task_manager)
@@ -276,10 +275,9 @@ async def update_token_frequencies_task_result(
 ):
     """Persist token-frequency preference overrides on an existing task."""
     user_id = current_user["id"]
-    current_entry = workspace_manager._get_current_entry(user_id)
-    if not current_entry:
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    if not workspace_id:
         raise HTTPException(status_code=404, detail="No active workspace selected")
-    workspace_id = current_entry[0]
     task_manager = get_task_manager(user_id, workspace_id)
     task = task_manager.get_task(task_id)
     if not task:
@@ -322,11 +320,10 @@ async def calculate_token_frequencies(
     """Submit token-frequency analysis as a worker-backed artifact-first task."""
 
     user_id = current_user["id"]
-    current_entry = workspace_manager._get_current_entry(user_id)
-    if not current_entry:
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    ws = workspace_manager.get_current_workspace(user_id)
+    if not workspace_id or ws is None:
         raise HTTPException(status_code=404, detail="No active workspace selected")
-    workspace_id = current_entry[0]
-    ws = current_entry[1]
     tm = workspace_manager.get_task_manager(user_id, workspace_id)
 
     try:

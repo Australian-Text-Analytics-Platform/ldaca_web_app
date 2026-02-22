@@ -22,7 +22,6 @@ from ....analysis.results import GenericAnalysisResult
 from ....core.auth import get_current_user
 from ....core.workspace import workspace_manager
 from ....models import ConcordanceAnalysisRequest, ConcordanceDetachRequest
-from ..utils import get_workspace_or_404
 from .concordance_core import (
     DEFAULT_CONCORDANCE_PAGE,
     DEFAULT_CONCORDANCE_PAGE_SIZE,
@@ -111,10 +110,9 @@ async def run_concordance(
         responses while using shared concordance response builders.
     """
     user_id = current_user["id"]
-    current_entry = workspace_manager._get_current_entry(user_id)
-    if not current_entry:
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    if not workspace_id:
         raise HTTPException(status_code=404, detail="No active workspace selected")
-    workspace_id = current_entry[0]
 
     task_manager = get_task_manager(user_id, workspace_id)
 
@@ -200,10 +198,9 @@ async def concordance_task_result(
             result-read helper that accepts normalized override input.
     """
     user_id = current_user["id"]
-    current_entry = workspace_manager._get_current_entry(user_id)
-    if not current_entry:
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    if not workspace_id:
         raise HTTPException(status_code=404, detail="No active workspace selected")
-    workspace_id = current_entry[0]
     task_manager = get_task_manager(user_id, workspace_id)
 
     task = task_manager.get_task(task_id)
@@ -241,10 +238,9 @@ async def concordance_task_result_post(
             one internal helper and keep only transport-layer differences.
     """
     user_id = current_user["id"]
-    current_entry = workspace_manager._get_current_entry(user_id)
-    if not current_entry:
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    if not workspace_id:
         raise HTTPException(status_code=404, detail="No active workspace selected")
-    workspace_id = current_entry[0]
     task_manager = get_task_manager(user_id, workspace_id)
     task = task_manager.get_task(task_id)
     if not task:
@@ -287,11 +283,10 @@ async def detach_concordance(
         for progress tracking.
     """
     user_id = current_user["id"]
-    current_entry = workspace_manager._get_current_entry(user_id)
-    if not current_entry:
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    ws = workspace_manager.get_current_workspace(user_id)
+    if not workspace_id or ws is None:
         raise HTTPException(status_code=404, detail="No active workspace selected")
-    workspace_id = current_entry[0]
-    ws = current_entry[1]
     tm = workspace_manager.get_task_manager(user_id, workspace_id)
     node = ws.nodes[node_id]
 

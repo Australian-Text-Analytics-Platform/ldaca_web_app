@@ -8,7 +8,7 @@ from ldaca_web_app_backend.core.workspace import workspace_manager
 async def test_concordance_detach_starts_task(authenticated_client, workspace_id):
     """Ensure detaching concordance starts a background task."""
     df = pl.DataFrame({"text": ["alpha beta", "beta gamma", "alpha gamma"]})
-    workspace = workspace_manager.get_workspace("test", workspace_id)
+    workspace = workspace_manager.get_current_workspace("test")
     assert workspace is not None
 
     node = Node(
