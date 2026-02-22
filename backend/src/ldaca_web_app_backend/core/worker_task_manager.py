@@ -7,6 +7,8 @@ that uses separate processes for heavy computational tasks.
 
 import asyncio
 import logging
+import multiprocessing as mp
+import queue as std_queue
 import time
 import uuid
 from concurrent.futures import Future
@@ -28,57 +30,6 @@ def _is_terminal_task_event(event: Dict[str, Any]) -> bool:
     state = str(task.get("state") or "").lower()
     return state in {"successful", "failed", "cancelled"}
 
-
-TASK_PROGRESS_MESSAGES = {
-    "topic_modeling": {
-        "loading": "Loading data...",
-        "processing": "Processing text data...",
-        "generating": "Generating topics...",
-        "finalizing": "Finalizing results...",
-    },
-    "concordance": {
-        "loading": "Loading data...",
-        "processing": "Searching text...",
-        "generating": "Compiling matches...",
-        "finalizing": "Formatting results...",
-    },
-    "token_frequencies": {
-        "loading": "Loading data...",
-        "processing": "Counting tokens...",
-        "generating": "Calculating statistics...",
-        "finalizing": "Formatting results...",
-    },
-    "concordance_detach": {
-        "loading": "Loading node data...",
-        "processing": "Computing concordance matches...",
-        "generating": "Joining with original data...",
-        "finalizing": "Creating new workspace node...",
-    },
-    "quotation_detach": {
-        "loading": "Loading node data...",
-        "processing": "Extracting quotations...",
-        "generating": "Structuring results...",
-        "finalizing": "Creating new workspace node...",
-    },
-    "ldaca_import": {
-        "loading": "Connecting to LDaCA...",
-        "processing": "Downloading and extracting...",
-        "generating": "Converting to DataFrame...",
-        "finalizing": "Saving to user data...",
-    },
-    "workspace_download": {
-        "loading": "Locating workspace...",
-        "processing": "Compressing workspace files...",
-        "generating": "Building ZIP archive...",
-        "finalizing": "Preparing download...",
-    },
-    "default": {
-        "loading": "Loading data...",
-        "processing": "Processing...",
-        "generating": "Analyzing...",
-        "finalizing": "Finalizing...",
-    },
-}
 
 ANALYSIS_TASK_TYPES = {
     "topic_modeling",
@@ -142,6 +93,8 @@ class WorkerTaskManager:
         self._tasks: Dict[str, TaskInfo] = {}
         self._lock = asyncio.Lock()
         self._progress_store: Dict[str, Dict[str, Any]] = {}  # task_id -> progress info
+        self._mp_manager = mp.Manager()
+        self._task_progress_queues: Dict[str, Any] = {}
 
         # Event bus for real-time updates
         self._subscribers: Dict[
@@ -250,36 +203,104 @@ class WorkerTaskManager:
             ),
         }
 
-    def _get_progress_status(
-        self, task_type: Optional[str], elapsed: float
-    ) -> Tuple[float, str]:
-        """Calculate progress and get message based on task type and elapsed time."""
-        messages = (
-            TASK_PROGRESS_MESSAGES.get(task_type, TASK_PROGRESS_MESSAGES["default"])
-            if task_type
-            else TASK_PROGRESS_MESSAGES["default"]
-        )
+    def _cleanup_progress_queue(self, task_id: str) -> None:
+        progress_queue = self._task_progress_queues.pop(task_id, None)
+        if progress_queue is None:
+            return
+        try:
+            close = getattr(progress_queue, "close", None)
+            if callable(close):
+                close()
+        except Exception:
+            pass
 
-        if elapsed < 10:
-            # Initial phase (0-20%)
-            estimated_progress = 0.2 * (elapsed / 10.0)
-            phase_message = messages["loading"]
-        elif elapsed < 30:
-            # Second phase (20-70%)
-            elapsed_in_phase = elapsed - 10
-            estimated_progress = 0.2 + 0.5 * (elapsed_in_phase / 20.0)
-            phase_message = messages["processing"]
-        elif elapsed < 60:
-            # Third phase (70-90%)
-            elapsed_in_phase = elapsed - 30
-            estimated_progress = 0.7 + 0.2 * (elapsed_in_phase / 30.0)
-            phase_message = messages["generating"]
-        else:
-            # Final phase (capped at 90%)
-            estimated_progress = 0.9
-            phase_message = messages["finalizing"]
+    async def _consume_worker_progress(
+        self,
+        task_info: TaskInfo,
+        user_id: str,
+        workspace_id: str,
+        progress_queue: Any,
+    ) -> None:
+        try:
+            while True:
+                if task_info.future.done():
+                    break
 
-        return estimated_progress, phase_message
+                try:
+                    payload = await asyncio.to_thread(progress_queue.get, True, 0.5)
+                except std_queue.Empty:
+                    continue
+                except Exception as exc:
+                    logger.debug(
+                        "Progress consumer stopped for task %s: %s",
+                        task_info.id,
+                        exc,
+                    )
+                    break
+
+                if not isinstance(payload, dict):
+                    continue
+
+                raw_progress = payload.get("progress")
+                message = payload.get("message")
+
+                try:
+                    progress_value = float(raw_progress)
+                except TypeError, ValueError:
+                    continue
+
+                message_value = str(message) if message is not None else ""
+                now = time.time()
+
+                self._progress_store[task_info.id] = {
+                    "progress": progress_value,
+                    "message": message_value,
+                    "updated_at": payload.get("timestamp", now),
+                    "source": "real",
+                }
+
+                task_info.progress = progress_value
+                task_info.progress_message = message_value
+
+                await self.emit(
+                    user_id,
+                    workspace_id,
+                    {
+                        "type": "task_changed",
+                        "task": self._serialize_task(task_info),
+                        "timestamp": now,
+                    },
+                )
+
+            while True:
+                try:
+                    payload = await asyncio.to_thread(progress_queue.get_nowait)
+                except std_queue.Empty:
+                    break
+                except Exception:
+                    break
+
+                if not isinstance(payload, dict):
+                    continue
+
+                raw_progress = payload.get("progress")
+                message = payload.get("message")
+                try:
+                    progress_value = float(raw_progress)
+                except TypeError, ValueError:
+                    continue
+
+                message_value = str(message) if message is not None else ""
+                self._progress_store[task_info.id] = {
+                    "progress": progress_value,
+                    "message": message_value,
+                    "updated_at": payload.get("timestamp", time.time()),
+                    "source": "real",
+                }
+                task_info.progress = progress_value
+                task_info.progress_message = message_value
+        finally:
+            self._cleanup_progress_queue(task_info.id)
 
     def _reconcile_task_progress(self, task_info: TaskInfo) -> None:
         """Reconcile one task's status and progress with the progress store.
@@ -295,31 +316,8 @@ class WorkerTaskManager:
         task_info.update_status()
         task_id = task_info.id
 
-        # Handle progress based on task status
-        if task_info.status == TaskStatus.RUNNING and task_info.started_at:
-            # For running tasks, simulate progress based on elapsed time
-            elapsed = time.time() - task_info.started_at
-            task_type = task_info.metadata.get("task_type")
-            estimated_progress, phase_message = self._get_progress_status(
-                task_type, elapsed
-            )
-
-            # Update or create progress info
-            if task_id not in self._progress_store:
-                self._progress_store[task_id] = {
-                    "progress": estimated_progress,
-                    "message": phase_message,
-                    "updated_at": time.time(),
-                }
-            else:
-                # Update progress if we don't have real progress data
-                progress_info = self._progress_store[task_id]
-                if progress_info["progress"] < estimated_progress:
-                    progress_info["progress"] = estimated_progress
-                    progress_info["message"] = phase_message
-                    progress_info["updated_at"] = time.time()
-
-        elif task_info.status in [
+        # Handle progress based on terminal task status
+        if task_info.status in [
             TaskStatus.SUCCESSFUL,
             TaskStatus.FAILED,
             TaskStatus.CANCELLED,
@@ -353,62 +351,11 @@ class WorkerTaskManager:
             # Use values from TaskInfo.update_status() for completed tasks
             pass  # task_info.progress and progress_message are already set by update_status()
         else:
-            # Use progress store for running tasks
+            # Use real progress store for running tasks
             if task_id in self._progress_store:
                 progress_info = self._progress_store[task_id]
                 task_info.progress = progress_info["progress"]
                 task_info.progress_message = progress_info["message"]
-
-    async def _progress_ticker(
-        self, task_info: TaskInfo, user_id: str, workspace_id: str
-    ):
-        """Emit periodic progress updates while a task is still running.
-
-        Used by:
-        - `submit_task` background ticker task
-
-        Why:
-        - Provides responsive UI progress feedback when worker callbacks are not
-          picklable across process boundaries.
-        """
-        try:
-            # Only run while task is not done
-            while not task_info.future.done():
-                # Update status first
-                task_info.update_status()
-                if task_info.status != TaskStatus.RUNNING or not task_info.started_at:
-                    break
-
-                # Simulate progress based on elapsed time
-                elapsed = time.time() - task_info.started_at
-                task_type = task_info.metadata.get("task_type")
-                estimated_progress, phase_message = self._get_progress_status(
-                    task_type, elapsed
-                )
-
-                # Update progress store and task_info
-                self._progress_store[task_info.id] = {
-                    "progress": estimated_progress,
-                    "message": phase_message,
-                    "updated_at": time.time(),
-                }
-                task_info.progress = estimated_progress
-                task_info.progress_message = phase_message
-
-                # Emit progress update
-                await self.emit(
-                    user_id,
-                    workspace_id,
-                    {
-                        "type": "task_changed",
-                        "task": self._serialize_task(task_info),
-                        "timestamp": time.time(),
-                    },
-                )
-
-                await asyncio.sleep(1.0)
-        except Exception as e:
-            logger.warning(f"Progress ticker stopped for task {task_info.id}: {e}")
 
     async def _monitor_task_completion(
         self, task_info: TaskInfo, user_id: str, workspace_id: str
@@ -558,6 +505,8 @@ class WorkerTaskManager:
                     "timestamp": time.time(),
                 },
             )
+        finally:
+            self._cleanup_progress_queue(task_info.id)
 
     async def _save_analysis_result(
         self,
@@ -622,18 +571,20 @@ class WorkerTaskManager:
         # Create task ID for progress tracking
         task_id = str(uuid.uuid4())
 
-        # Submit task to worker pool without progress callback
-        # Progress will be handled differently since callbacks can't be pickled
+        # Submit task to worker pool with process-safe progress queue
         worker_pool = get_worker_pool()
         if not worker_pool.is_running:
             worker_pool.start()
+
+        progress_queue = self._mp_manager.Queue()
 
         future = worker_pool.submit_task(
             task_func,
             user_id=user_id,
             workspace_id=workspace_id,
             **task_args,
-            progress_callback=None,  # Remove progress callback for now
+            progress_callback=None,
+            progress_queue=progress_queue,
         )
 
         task_info = TaskInfo(
@@ -655,7 +606,9 @@ class WorkerTaskManager:
             "progress": 0.0,
             "message": "Task submitted",
             "updated_at": time.time(),
+            "source": "real",
         }
+        self._task_progress_queues[task_id] = progress_queue
 
         async with self._lock:
             self._tasks[task_id] = task_info
@@ -664,8 +617,11 @@ class WorkerTaskManager:
         asyncio.create_task(
             self._monitor_task_completion(task_info, user_id, workspace_id)
         )
-        # Start progress ticker to emit periodic progress updates
-        asyncio.create_task(self._progress_ticker(task_info, user_id, workspace_id))
+        asyncio.create_task(
+            self._consume_worker_progress(
+                task_info, user_id, workspace_id, progress_queue
+            )
+        )
 
         # Emit task_changed event for initial submission
         logger.info(f"Emitting initial task_changed for task {task_info.id}")
@@ -861,6 +817,7 @@ class WorkerTaskManager:
             # Remove from tracking
             del self._tasks[task_id]
             self._progress_store.pop(task_id, None)
+            self._cleanup_progress_queue(task_id)
             return True
 
     async def clear_tasks(
@@ -894,6 +851,7 @@ class WorkerTaskManager:
                 del self._tasks[task_id]
                 # Clean up progress store
                 self._progress_store.pop(task_id, None)
+                self._cleanup_progress_queue(task_id)
                 count += 1
 
         return count
@@ -919,3 +877,4 @@ class WorkerTaskManager:
             for task_id in task_ids_to_remove:
                 del self._tasks[task_id]
                 self._progress_store.pop(task_id, None)
+                self._cleanup_progress_queue(task_id)

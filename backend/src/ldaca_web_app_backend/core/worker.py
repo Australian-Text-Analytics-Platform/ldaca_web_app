@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import time
 from concurrent.futures import Future, ProcessPoolExecutor
 from typing import Any, Dict, Optional
 
@@ -14,39 +15,103 @@ from .worker_tasks_token import run_token_frequencies_task
 from .worker_tasks_topic import run_topic_modeling_task
 
 
+def _build_progress_callback(
+    progress_queue: Optional[Any],
+    progress_callback: Optional[callable],
+) -> Optional[callable]:
+    if progress_queue is None and progress_callback is None:
+        return None
+
+    def _cb(progress: float, message: str) -> None:
+        payload = {
+            "progress": float(progress),
+            "message": str(message),
+            "timestamp": time.time(),
+        }
+
+        if progress_queue is not None:
+            try:
+                progress_queue.put_nowait(payload)
+            except Exception:
+                try:
+                    progress_queue.put(payload)
+                except Exception:
+                    pass
+
+        if progress_callback is not None:
+            try:
+                progress_callback(progress, message)
+            except Exception:
+                pass
+
+    return _cb
+
+
 def _configure_worker_environment() -> None:
     """Initialize worker process runtime environment."""
     os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 
+    try:
+        import importlib
+
+        tbb_available = False
+        try:
+            if importlib.util.find_spec("tbb"):
+                importlib.import_module("tbb")
+                tbb_available = True
+            elif importlib.util.find_spec("tbb4py"):
+                importlib.import_module("tbb4py")
+                tbb_available = True
+        except Exception:
+            tbb_available = False
+
+        if tbb_available:
+            os.environ.setdefault("NUMBA_THREADING_LAYER_PRIORITY", "tbb workqueue omp")
+            os.environ.setdefault("NUMBA_THREADING_LAYER", "tbb")
+        else:
+            os.environ.setdefault("NUMBA_THREADING_LAYER", "workqueue")
+            os.environ.setdefault("NUMBA_THREADING_LAYER_PRIORITY", "workqueue omp tbb")
+            os.environ.setdefault("NUMBA_NUM_THREADS", "1")
+    except Exception:
+        os.environ.setdefault("NUMBA_THREADING_LAYER", "workqueue")
+        os.environ.setdefault("NUMBA_THREADING_LAYER_PRIORITY", "workqueue omp tbb")
+        os.environ.setdefault("NUMBA_NUM_THREADS", "1")
+
 
 def ldaca_import_task(
-    file_path: str,
-    workspace_name: str,
     user_id: str,
-    file_info: Optional[Dict[str, Any]] = None,
+    workspace_id: str,
+    url: str,
+    filename: Optional[str] = None,
     progress_callback: Optional[callable] = None,
-    workspace_id: Optional[str] = None,
+    progress_queue: Optional[Any] = None,
 ) -> Dict[str, Any]:
+    cb = _build_progress_callback(progress_queue, progress_callback)
     return run_ldaca_import_task(
         _configure_worker_environment,
-        file_path,
-        workspace_name,
         user_id,
-        file_info,
+        workspace_id,
+        url,
+        filename,
+        cb,
     )
 
 
 def workspace_download_task(
     user_id: str,
     workspace_id: str,
-    workspace_name: str,
+    target_workspace_id: Optional[str] = None,
+    target_workspace_dir: Optional[str] = None,
     progress_callback: Optional[callable] = None,
+    progress_queue: Optional[Any] = None,
 ) -> Dict[str, Any]:
+    cb = _build_progress_callback(progress_queue, progress_callback)
     return run_workspace_download_task(
         _configure_worker_environment,
         user_id,
         workspace_id,
-        workspace_name,
+        target_workspace_dir,
+        cb,
     )
 
 
@@ -65,7 +130,9 @@ def concordance_detach_task(
     artifact_dir: str,
     artifact_prefix: str,
     progress_callback: Optional[callable] = None,
+    progress_queue: Optional[Any] = None,
 ) -> Dict[str, Any]:
+    cb = _build_progress_callback(progress_queue, progress_callback)
     return run_concordance_detach_task(
         _configure_worker_environment,
         node_corpus,
@@ -79,7 +146,7 @@ def concordance_detach_task(
         new_node_name,
         artifact_dir,
         artifact_prefix,
-        progress_callback,
+        cb,
     )
 
 
@@ -94,7 +161,9 @@ def quotation_detach_task(
     artifact_dir: str,
     artifact_prefix: str,
     progress_callback: Optional[callable] = None,
+    progress_queue: Optional[Any] = None,
 ) -> Dict[str, Any]:
+    cb = _build_progress_callback(progress_queue, progress_callback)
     return run_quotation_detach_task(
         _configure_worker_environment,
         node_corpus,
@@ -104,7 +173,7 @@ def quotation_detach_task(
         new_node_name,
         artifact_dir,
         artifact_prefix,
-        progress_callback,
+        cb,
     )
 
 
@@ -118,7 +187,9 @@ def topic_modeling_task(
     min_topic_size: int,
     use_ctfidf: bool,
     progress_callback: Optional[callable] = None,
+    progress_queue: Optional[Any] = None,
 ) -> Dict[str, Any]:
+    cb = _build_progress_callback(progress_queue, progress_callback)
     return run_topic_modeling_task(
         configure_worker_environment=_configure_worker_environment,
         user_id=user_id,
@@ -129,6 +200,7 @@ def topic_modeling_task(
         artifact_prefix=artifact_prefix,
         min_topic_size=min_topic_size,
         use_ctfidf=use_ctfidf,
+        progress_callback=cb,
     )
 
 
@@ -142,7 +214,9 @@ def token_frequencies_task(
     token_limit: int,
     stop_words: Optional[list[str]] = None,
     progress_callback: Optional[callable] = None,
+    progress_queue: Optional[Any] = None,
 ) -> Dict[str, Any]:
+    cb = _build_progress_callback(progress_queue, progress_callback)
     return run_token_frequencies_task(
         configure_worker_environment=_configure_worker_environment,
         user_id=user_id,
@@ -153,6 +227,7 @@ def token_frequencies_task(
         artifact_prefix=artifact_prefix,
         token_limit=token_limit,
         stop_words=stop_words,
+        progress_callback=cb,
     )
 
 

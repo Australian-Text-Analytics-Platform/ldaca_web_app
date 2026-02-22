@@ -144,36 +144,27 @@ def _configure_numba_threading():
         should converge to one shared helper.
     """
     try:
-        # Check if TBB is available to Numba
+        import importlib
+
+        # Presence in THREADING_LAYER_PRIORITY is only a preference list, not
+        # evidence that the TBB runtime is installed/usable.
+        numba_available = bool(importlib.util.find_spec("numba"))
         tbb_available = False
-        try:
-            import importlib
+        tbb_import_error: Exception | None = None
 
-            numba_spec = importlib.util.find_spec("numba")
-            if not numba_spec:
-                raise ImportError
-            importlib.import_module("numba")  # type: ignore
-            from numba import config  # type: ignore  # noqa: F401
-
-            # Check if TBB is in Numba's available threading layers
-            available_layers = getattr(config, "THREADING_LAYER_PRIORITY", [])
-            if isinstance(available_layers, (list, tuple)):
-                tbb_available = "tbb" in available_layers
-            elif isinstance(available_layers, str):
-                tbb_available = "tbb" in available_layers
-
-            # Also try importing TBB directly as a secondary check
-            if not tbb_available:
-                # Detect TBB without importing if possible
-                tbb_spec = importlib.util.find_spec("tbb")
-                if tbb_spec:
+        if numba_available:
+            try:
+                if importlib.util.find_spec("tbb"):
+                    importlib.import_module("tbb")
                     tbb_available = True
+                elif importlib.util.find_spec("tbb4py"):
+                    importlib.import_module("tbb4py")
+                    tbb_available = True
+            except Exception as exc:  # pragma: no cover - environment dependent
+                tbb_import_error = exc
+                tbb_available = False
 
-        except ImportError, AttributeError:
-            # Numba not available, fall back to safe mode
-            pass
-
-        if tbb_available:
+        if numba_available and tbb_available:
             # Use TBB if available (thread-safe for concurrent access)
             os.environ.setdefault("NUMBA_THREADING_LAYER_PRIORITY", "tbb workqueue omp")
             os.environ.setdefault("NUMBA_THREADING_LAYER", "tbb")
@@ -192,9 +183,18 @@ def _configure_numba_threading():
             # Only set num threads if not already set to avoid conflicts
             if "NUMBA_NUM_THREADS" not in os.environ:
                 os.environ["NUMBA_NUM_THREADS"] = "1"
-            print(
-                "INFO: Numba: Using workqueue threading layer (single-threaded for safety)"
-            )
+            if not numba_available:
+                print(
+                    "INFO: Numba: numba not detected; using workqueue defaults for safety"
+                )
+            elif tbb_import_error is not None:
+                print(
+                    f"INFO: Numba: TBB detected but not importable ({tbb_import_error}); using workqueue fallback"
+                )
+            else:
+                print(
+                    "INFO: Numba: TBB not installed; using workqueue threading layer (single-threaded fallback)"
+                )
 
     except Exception as e:
         # Final fallback - basic workqueue setup
@@ -731,6 +731,7 @@ async def export_nodes(
 # ============================================================================
 
 
+# ============================================================================
 # ============================================================================
 # ============================================================================
 # ============================================================================
