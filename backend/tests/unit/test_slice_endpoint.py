@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from types import SimpleNamespace
-
 import polars as pl
 import pytest
 from ldaca_web_app_backend.api.workspaces import nodes as nodes_api
@@ -14,13 +12,35 @@ from ldaca_web_app_backend.models import SliceRequest
 class DummyNode:
     """Lightweight node stub used for slice endpoint tests."""
 
-    def __init__(self, node_id: str, data: pl.LazyFrame, name: str) -> None:
-        self.id = node_id
-        self.node_id = node_id
+    def __init__(
+        self,
+        node_id: str | None = None,
+        data: pl.LazyFrame | None = None,
+        name: str | None = None,
+        workspace: object | None = None,
+        operation: str | None = None,
+        parents: list["DummyNode"] | None = None,
+        **_kwargs,
+    ) -> None:
+        manager = getattr(workspace, "_manager", None)
+        generated_index = len(getattr(manager, "add_calls", []))
+        generated_id = node_id or f"generated_{generated_index}"
+        self.id = generated_id
+        self.node_id = generated_id
         self.name = name
         self.data = data
-        self.operation = None
-        self.parents: list[DummyNode] = []
+        self.operation = operation
+        self.parents: list[DummyNode] = parents or []
+
+
+class DummyWorkspace:
+    def __init__(self, nodes: dict[str, DummyNode], manager: "FakeWorkspaceManager"):
+        self.nodes = nodes
+        self._manager = manager
+
+    def add_node(self, node: DummyNode):
+        self.nodes[node.id] = node
+        self._manager.add_calls.append({"node": node})
 
 
 class FakeWorkspaceManager:
@@ -29,26 +49,14 @@ class FakeWorkspaceManager:
     def __init__(self, nodes: dict[str, DummyNode]) -> None:
         self.nodes = nodes
         self.workspace_id = "ws1"
-        self.workspace = SimpleNamespace(nodes=self.nodes)
+        self.workspace = DummyWorkspace(self.nodes, self)
         self.add_calls: list[dict[str, object]] = []
 
     def _get_current_entry(self, _user_id: str):
         return (self.workspace_id, self.workspace, None)
 
-    def get_node_from_workspace(self, _user_id: str, _workspace_id: str, node_id: str):
-        return self.nodes.get(node_id)
-
-    def add_node_to_workspace(self, **kwargs):
-        new_id = f"generated_{len(self.add_calls)}"
-        new_node = DummyNode(
-            node_id=new_id,
-            data=kwargs["data"],
-            name=kwargs.get("node_name") or new_id,
-        )
-        new_node.operation = kwargs.get("operation")
-        new_node.parents = kwargs.get("parents", [])
-        self.add_calls.append({"kwargs": kwargs, "node": new_node})
-        return new_node
+    def get_workspace(self, _user_id: str, _workspace_id: str):
+        return self.workspace
 
     def save_workspace(self, _user_id: str, _workspace_id: str) -> None:
         pass
@@ -63,6 +71,7 @@ def fake_workspace_manager(monkeypatch: pytest.MonkeyPatch):
     original_node = DummyNode("node_base", df.lazy(), "base_node")
     manager = FakeWorkspaceManager({"node_base": original_node})
     monkeypatch.setattr(nodes_api, "workspace_manager", manager)
+    monkeypatch.setattr(nodes_api, "Node", DummyNode)
     monkeypatch.setattr(workspace_utils, "workspace_manager", manager)
     return manager
 

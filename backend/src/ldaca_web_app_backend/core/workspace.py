@@ -15,8 +15,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-import polars as pl
-from docworkspace import Node, Workspace  # type: ignore
+from docworkspace import Workspace  # type: ignore
+from docworkspace.workspace.io import read_workspace_metadata
+from ldaca_web_app_backend.models import WorkspaceSummary
 
 from .docworkspace_api import DocWorkspaceAPIUtils
 from .utils import (
@@ -197,9 +198,8 @@ class WorkspaceManager:
         _, ws, _ = self._get_current_entry(user_id)
         return ws
 
-    def list_user_workspaces_summaries(self, user_id: str) -> Dict[str, Dict[str, Any]]:
-        summaries: Dict[str, Dict[str, Any]] = {}
-        cid, cws, _ = self._get_current_entry(user_id)
+    def list_user_workspaces_summaries(self, user_id: str) -> list[dict[str, Any]]:
+        summaries: list[dict[str, Any]] = []
         # Active refresh point: called when Data Loader opens and when user presses refresh.
         self._refresh_user_workspace_paths(user_id)
 
@@ -210,42 +210,19 @@ class WorkspaceManager:
         ]
 
         for wid, workspace_dir in user_workspace_items:
-            if wid == cid and cws is not None:
-                target = cws
-            else:
-                try:
-                    target = Workspace.load(workspace_dir)
-                    updated_dir = ensure_display_folder_name(workspace_dir, target.name)
-                    self._attach_workspace_dir(target, updated_dir)
-                    self._set_cached_path(user_id, wid, updated_dir)
-                except Exception:
-                    target = None
-            if not target:
-                continue
             try:
-                summary = target.summary()
-                cached_path = workspace_dir
-                workspace_size_Byte = 0
-                try:
-                    for file_path in cached_path.rglob("*"):
-                        if file_path.is_file():
-                            workspace_size_Byte += file_path.stat().st_size
-                except Exception:
-                    workspace_size_Byte = 0
-                summaries[wid] = {
-                    "id": wid,
-                    "name": getattr(target, "name", wid),
-                    "description": target.get_metadata("description") or "",
-                    "created_at": target.get_metadata("created_at") or "",
-                    "modified_at": target.get_metadata("modified_at") or "",
-                    "node_count": summary.get("total_nodes"),
-                    "workspace_size_Byte": workspace_size_Byte,
-                    "folder_name": cached_path.name,
-                }
+                metadata = read_workspace_metadata(workspace_dir)["workspace_metadata"]
+                summary = WorkspaceSummary(**metadata)
+                summaries.append(summary.model_dump())
+                continue
             except Exception:
-                summaries[wid] = {"id": wid, "error": "summary_failed"}
-            if wid != cid:
-                del target
+                pass
+
+            try:
+                ws = Workspace.load(workspace_dir)
+                summaries.append(ws.info_json())
+            except Exception:
+                continue
         return summaries
 
     def delete_workspace(self, user_id: str, workspace_id: str) -> bool:
@@ -388,79 +365,6 @@ class WorkspaceManager:
         self._current.pop(user_id, None)
         return True
 
-    # ---------------- Node operations ----------------
-    def add_node_to_workspace(
-        self,
-        user_id: str,
-        workspace_id: str,
-        data: pl.LazyFrame,
-        node_name: str,
-        operation: str = "manual_add",
-        parents: Optional[list[Any]] = None,
-    ) -> Optional[Any]:
-        ws = self.get_workspace(user_id, workspace_id)
-        if ws is None:
-            return None
-        try:
-            node = Node(
-                data=data,
-                name=node_name,
-                workspace=ws,
-                parents=parents or [],
-                operation=operation,
-            )
-            ws.set_metadata("modified_at", datetime.now().isoformat())
-            target_dir = self._resolve_workspace_dir(
-                user_id=user_id,
-                workspace_id=workspace_id,
-                workspace_name=ws.name,
-            )
-            self._attach_workspace_dir(ws, target_dir)
-            ws.save(target_dir)
-            self._set_cached_path(user_id, workspace_id, target_dir)
-            return node
-        except Exception as e:  # pragma: no cover
-            print(f"Error creating node: {e}")
-            return None
-
-    def get_node_from_workspace(
-        self, user_id: str, workspace_id: str, node_id: str
-    ) -> Optional[Any]:
-        ws = self.get_workspace(user_id, workspace_id)
-        if ws is None:
-            return None
-        return ws.get_node(node_id)
-
-    def delete_node_from_workspace(
-        self, user_id: str, workspace_id: str, node_id: str
-    ) -> bool:
-        ws = self.get_workspace(user_id, workspace_id)
-        if ws is None:
-            return False
-        success = ws.remove_node(node_id)
-        if success:
-            try:
-                workspace_dir = self.get_workspace_dir(user_id, workspace_id)
-                if workspace_dir is not None:
-                    # Current workspace persistence stores node payloads as
-                    # Polars binary blobs under data/<node_id>.plbin.
-                    for suffix in (".plbin", ".lazy"):
-                        candidate = workspace_dir / "data" / f"{node_id}{suffix}"
-                        if candidate.exists():
-                            candidate.unlink()
-            except Exception:
-                pass
-            ws.set_metadata("modified_at", datetime.now().isoformat())
-            target_dir = self._resolve_workspace_dir(
-                user_id=user_id,
-                workspace_id=workspace_id,
-                workspace_name=ws.name,
-            )
-            self._attach_workspace_dir(ws, target_dir)
-            ws.save(target_dir)
-            self._set_cached_path(user_id, workspace_id, target_dir)
-        return success
-
     # ---------------- Graph / info operations ----------------
     def get_workspace_graph(
         self, user_id: str, workspace_id: str
@@ -468,13 +372,7 @@ class WorkspaceManager:
         ws = self.get_workspace(user_id, workspace_id)
         if ws is None:
             return None
-        # Always use backend utility to produce API graph (no core monkey patching)
-        graph = DocWorkspaceAPIUtils.workspace_to_ui_graph_payload(ws)
-        if hasattr(graph, "model_dump"):
-            return graph.model_dump()
-        if hasattr(graph, "dict"):
-            return graph.dict()  # type: ignore
-        return graph  # type: ignore
+        return ws.graph_json()
 
     def get_node_summaries(self, user_id: str, workspace_id: str) -> list:
         ws = self.get_workspace(user_id, workspace_id)
@@ -484,26 +382,5 @@ class WorkspaceManager:
             DocWorkspaceAPIUtils.node_to_api_summary(node) for node in ws.nodes.values()
         ]
 
-    def get_workspace_info(
-        self, user_id: str, workspace_id: str
-    ) -> Optional[Dict[str, Any]]:
-        ws = self.get_workspace(user_id, workspace_id)
-        if ws is None:
-            return None
-        summary = ws.info_json()
-        return {
-            "id": workspace_id,
-            "name": ws.name,
-            "description": ws.get_metadata("description") or "",
-            "created_at": ws.get_metadata("created_at") or "",
-            "modified_at": ws.get_metadata("modified_at") or "",
-            "total_nodes": summary["total_nodes"],
-            "root_nodes": summary["root_nodes"],
-            "leaf_nodes": summary["leaf_nodes"],
-            "node_types": summary["node_types"],
-            "status_counts": summary["status_counts"],
-        }
 
-
-# Global singleton
 workspace_manager = WorkspaceManager()

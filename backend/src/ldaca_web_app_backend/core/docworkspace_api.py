@@ -11,16 +11,7 @@ from typing import Any, List, Optional, Tuple
 import polars as pl
 
 # Import API models
-from .api_models import (
-    ColumnSchema,
-    ErrorResponse,
-    NodeSummary,
-    PaginatedData,
-    ReactFlowEdge,
-    ReactFlowNode,
-    WorkspaceGraph,
-    WorkspaceInfo,
-)
+from .api_models import ColumnSchema, ErrorResponse, NodeSummary, PaginatedData
 
 
 class DocWorkspaceAPIUtils:
@@ -139,64 +130,6 @@ class DocWorkspaceAPIUtils:
             columns=node_columns,
             schema=DocWorkspaceAPIUtils.get_node_schema_json_with_ldaca_dtype(node),
         )
-
-    @staticmethod
-    def workspace_to_ui_graph_payload(workspace: Any) -> WorkspaceGraph:
-        """Convert workspace graph objects to React Flow-compatible payloads.
-
-        Used by:
-        - `WorkspaceManager.get_workspace_graph`
-
-        Why:
-        - Centralizes graph serialization and layout defaults.
-        """
-        nodes = []
-        edges = []
-
-        # Create React Flow nodes
-        for node_id, node in workspace.nodes.items():
-            shape = DocWorkspaceAPIUtils.compute_node_shape(node)
-            node_info = node.info()
-
-            react_node = ReactFlowNode(
-                id=node_id,
-                type="customNode",
-                data={
-                    "label": node.name,
-                    "shape": shape,
-                    "columns": list(node_info.get("columns", [])),
-                    "document": node.document,
-                },
-                connectable=True,
-            )
-            nodes.append(react_node)
-
-        # Create React Flow edges from parent-child relationships
-        edge_id = 0
-        for node_id, node in workspace.nodes.items():
-            for parent in node.parents:
-                edge = ReactFlowEdge(
-                    id=f"edge-{edge_id}",
-                    source=parent.id,
-                    target=node_id,
-                    type="smoothstep",
-                    animated=False,
-                )
-                edges.append(edge)
-                edge_id += 1
-
-        # Create workspace info
-        workspace_info = WorkspaceInfo(
-            id=workspace.id,
-            name=workspace.name,
-            total_nodes=len(workspace.nodes),
-            root_nodes=len(workspace.get_root_nodes()),
-            leaf_nodes=len(workspace.get_leaf_nodes()),
-            created_at=getattr(workspace, "created_at", None),
-            modified_at=getattr(workspace, "modified_at", None),
-        )
-
-        return WorkspaceGraph(nodes=nodes, edges=edges, workspace_info=workspace_info)
 
 
 def exception_to_error_response(error: Exception) -> ErrorResponse:

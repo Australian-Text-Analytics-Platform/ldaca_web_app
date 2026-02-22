@@ -52,49 +52,6 @@ class PaginatedData(BaseModel):
     data_schema: List[ColumnSchema] = Field(default_factory=list, alias="schema")
 
 
-class ReactFlowNode(BaseModel):
-    """React Flow compatible node representation."""
-
-    id: str
-    type: str = "customNode"
-    position: Dict[str, float] = Field(default_factory=lambda: {"x": 0, "y": 0})
-    data: Dict[str, Any]
-    connectable: bool = True
-
-
-class ReactFlowEdge(BaseModel):
-    """React Flow compatible edge representation."""
-
-    id: str
-    source: str
-    target: str
-    type: str = "smoothstep"
-    animated: bool = False
-    markerEnd: Dict[str, Any] = Field(
-        default_factory=lambda: {"type": "arrowclosed", "width": 20, "height": 20}
-    )
-
-
-class WorkspaceInfo(BaseModel):
-    """Workspace metadata information."""
-
-    id: str
-    name: str
-    total_nodes: int
-    root_nodes: int
-    leaf_nodes: int
-    created_at: Optional[str] = None
-    modified_at: Optional[str] = None
-
-
-class WorkspaceGraph(BaseModel):
-    """Complete workspace graph for React Flow."""
-
-    nodes: List[ReactFlowNode]
-    edges: List[ReactFlowEdge]
-    workspace_info: WorkspaceInfo
-
-
 class ErrorResponse(BaseModel):
     """Standard error response format."""
 
@@ -122,5 +79,4 @@ class OperationResult(BaseModel):
 # - these aliases currently have no in-repo consumers; remove if annotation usage
 #   remains absent to reduce dead declarations.
 NodeResponse = Union[NodeSummary, ErrorResponse]
-WorkspaceResponse = Union[WorkspaceGraph, ErrorResponse]
 DataResponse = Union[PaginatedData, ErrorResponse]

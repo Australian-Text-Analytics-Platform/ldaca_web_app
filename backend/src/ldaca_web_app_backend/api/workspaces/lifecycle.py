@@ -6,9 +6,8 @@ import re
 import shutil
 import tempfile
 import zipfile
-from datetime import datetime
 from pathlib import Path, PurePosixPath
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 from docworkspace import Workspace
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
@@ -17,14 +16,27 @@ from fastapi.responses import StreamingResponse
 from ...core.auth import get_current_user
 from ...core.utils import generate_workspace_id, validate_workspace_name
 from ...core.workspace import workspace_manager
-from ...models import WorkspaceCreateRequest, WorkspaceInfo, WorkspaceSummaryList
+from ...models import WorkspaceCreateRequest, WorkspaceInfo, WorkspaceSummary
 from ..files import USER_TASK_SCOPE
-from .analyses.token_frequencies import (
-    _unwrap_task_manager_result as unwrap_task_manager_result,
-)
 from .utils import update_workspace
 
 router = APIRouter(prefix="/workspaces", tags=["lifecycle"])
+
+
+def _workspace_info_payload(workspace: Workspace) -> dict[str, Any]:
+    summary = workspace.info_json()
+    return {
+        "id": workspace.id,
+        "name": workspace.name,
+        "description": workspace.get_metadata("description") or "",
+        "created_at": workspace.get_metadata("created_at") or "",
+        "modified_at": workspace.get_metadata("modified_at") or "",
+        "total_nodes": summary.get("total_nodes", 0),
+        "root_nodes": summary.get("root_nodes", 0),
+        "leaf_nodes": summary.get("leaf_nodes", 0),
+        "node_types": summary.get("node_types", {}),
+        "status_counts": summary.get("status_counts", {}),
+    }
 
 
 def _safe_download_name(name: str) -> str:
@@ -41,7 +53,7 @@ def _safe_member_path(name: str) -> PurePosixPath:
     return path
 
 
-@router.get("/", response_model=WorkspaceSummaryList)
+@router.get("/", response_model=list[WorkspaceSummary])
 async def list_workspaces(current_user: dict = Depends(get_current_user)):
     """List all persisted workspaces visible to the current user.
 
@@ -53,7 +65,7 @@ async def list_workspaces(current_user: dict = Depends(get_current_user)):
     """
     user_id = current_user["id"]
     summaries = workspace_manager.list_user_workspaces_summaries(user_id)
-    return {"workspaces": list(summaries.values())}
+    return summaries
 
 
 @router.get("/current")
@@ -100,19 +112,13 @@ async def create_workspace(
         raise HTTPException(status_code=400, detail=f"Invalid workspace name: {reason}")
     try:
         workspace = Workspace(name=request.name)
-        workspace_id = generate_workspace_id()
-        workspace.id = workspace_id
-        now = datetime.now().isoformat()
+        workspace_id = workspace.id
         workspace.set_metadata("description", request.description or "")
-        workspace.set_metadata("created_at", now)
-        workspace.set_metadata("modified_at", now)
 
         update_workspace(user_id, workspace_id, workspace)
         workspace_manager.set_current_workspace(user_id, workspace_id)
 
-        workspace_info = workspace_manager.get_workspace_info(user_id, workspace_id)
-        if not workspace_info:
-            raise HTTPException(status_code=500, detail="Failed to get workspace info")
+        workspace_info = _workspace_info_payload(workspace)
         return WorkspaceInfo(
             id=workspace_id,
             name=workspace_info["name"],
@@ -193,12 +199,7 @@ async def rename_workspace(
             )
         workspace.name = new_name
         update_workspace(user_id, workspace_id, workspace)
-        info = workspace_manager.get_workspace_info(user_id, workspace_id)
-        if not info:
-            raise HTTPException(
-                status_code=500, detail="Failed to fetch updated workspace info"
-            )
-        return info
+        return _workspace_info_payload(workspace)
     except HTTPException:
         raise
     except Exception as e:
@@ -380,7 +381,11 @@ async def upload_workspace_zip(
     if not file_bytes:
         raise HTTPException(status_code=400, detail="Uploaded file is empty")
 
-    existing_ids = set(workspace_manager.list_user_workspaces_summaries(user_id).keys())
+    existing_ids = {
+        item.get("id")
+        for item in workspace_manager.list_user_workspaces_summaries(user_id)
+        if item.get("id")
+    }
 
     try:
         with tempfile.TemporaryDirectory(prefix="workspace_zip_") as temp_dir:
@@ -480,8 +485,12 @@ async def upload_workspace_zip(
 
             workspace_manager._refresh_user_workspace_paths(user_id)
 
-        summary = workspace_manager.list_user_workspaces_summaries(user_id).get(
-            workspace_id,
+        summary = next(
+            (
+                item
+                for item in workspace_manager.list_user_workspaces_summaries(user_id)
+                if item.get("id") == workspace_id
+            ),
             {
                 "id": workspace_id,
                 "name": workspace_name,
@@ -533,11 +542,10 @@ async def save_workspace_as(
 
         update_workspace(user_id, new_id, new_ws)
         workspace_manager.set_current_workspace(user_id, new_id)
-        info = workspace_manager.get_workspace_info(user_id, new_id)
         return {
             "state": "successful",
             "message": "Workspace cloned",
-            "new_workspace": info,
+            "new_workspace": _workspace_info_payload(new_ws),
         }
     except Exception as e:  # pragma: no cover
         raise HTTPException(
@@ -554,27 +562,24 @@ async def get_workspace_info(
     if not current_entry:
         raise HTTPException(status_code=404, detail="No active workspace selected")
     workspace_id = current_entry[0]
-    info = workspace_manager.get_workspace_info(user_id, workspace_id)
-    if not info:
+    workspace = workspace_manager.get_workspace(user_id, workspace_id)
+    if not workspace:
         raise HTTPException(status_code=404, detail="Workspace not found")
-    return info
+    return _workspace_info_payload(workspace)
 
 
 @router.get("/graph")
 async def get_workspace_graph(
     current_user: dict = Depends(get_current_user),
 ):
-    """Return graph payload enriched with latest analysis snapshots.
+    """Return workspace graph payload.
 
     Used by:
     - frontend graph canvas initialization and refresh
 
     Why:
-    - Combines structural graph data with latest analysis state for one roundtrip.
-
-    Refactor note:
-    - Latest-analysis enrichment logic could move to a shared graph assembler to
-      reduce route-level orchestration.
+    - Exposes the workspace's native graph JSON; frontend owns view-specific
+      graph configuration.
     """
     user_id = current_user["id"]
     current_entry = workspace_manager._get_current_entry(user_id)
@@ -584,29 +589,6 @@ async def get_workspace_graph(
     graph_data = workspace_manager.get_workspace_graph(user_id, workspace_id)
     if not graph_data:
         raise HTTPException(status_code=404, detail="Workspace not found")
-    try:  # enrichment with latest analyses
-        from ....analysis.manager import get_task_manager
-
-        task_manager = get_task_manager(user_id, workspace_id)
-        latest: Dict[str, Any] = {}
-        for analysis, task_id in task_manager.store.current_task_ids.items():
-            task = task_manager.get_task(task_id)
-            if task is None:
-                continue
-            raw_result = getattr(task, "result", None)
-            if hasattr(raw_result, "to_json"):
-                raw_result = raw_result.to_json()
-
-            unwrapped_result = unwrap_task_manager_result(raw_result)
-            latest[str(analysis)] = {
-                "task": str(analysis),
-                "saved_at": getattr(task, "updated_at", None),
-                "request": getattr(task, "request", None),
-                "result": unwrapped_result,
-            }
-        graph_data["latest_analysis"] = latest
-    except Exception:
-        pass
     return graph_data
 
 

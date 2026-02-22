@@ -74,13 +74,15 @@ def _simulate_token_frequency_completion(workspace_id: str):
     assert task is not None
 
     req = task.request.model_dump() if hasattr(task.request, "model_dump") else {}
+    workspace = workspace_manager.get_workspace("test", workspace_id)
+    assert workspace is not None
 
     node_ids = req.get("node_ids") or []
     node_columns = req.get("node_columns") or {}
     node_corpora: dict[str, list[str]] = {}
     node_display_names: dict[str, str] = {}
     for node_id in node_ids:
-        node = workspace_manager.get_node_from_workspace("test", workspace_id, node_id)
+        node = workspace.nodes.get(node_id)
         assert node is not None
         node_data = getattr(node, "data", None)
         assert node_data is not None
@@ -748,7 +750,7 @@ class TestWorkspaceGraphEnrichment:
         assert response.status_code == 200
         graph_data = response.json()
         assert "edges" in graph_data and "nodes" in graph_data
-        assert "workspace_info" in graph_data
+        assert "workspace_info" not in graph_data
         # latest_analysis is no longer provided by the graph endpoint
         assert "latest_analysis" not in graph_data
 
@@ -778,7 +780,7 @@ class TestWorkspaceGraphEnrichment:
         assert response.status_code == 200
         graph_data = response.json()
         assert "edges" in graph_data and "nodes" in graph_data
-        assert "workspace_info" in graph_data
+        assert "workspace_info" not in graph_data
         # Graph no longer surfaces latest_analysis; rely on TaskManager queries instead
 
     async def test_graph_includes_multiple_analyses(
@@ -807,7 +809,7 @@ class TestWorkspaceGraphEnrichment:
         assert response.status_code == 200
         graph_data = response.json()
         assert "edges" in graph_data and "nodes" in graph_data
-        assert "workspace_info" in graph_data
+        assert "workspace_info" not in graph_data
 
 
 @pytest.mark.anyio

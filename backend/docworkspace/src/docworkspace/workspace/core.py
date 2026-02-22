@@ -13,6 +13,7 @@ Import path backwards compatibility is preserved via the original
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional
 
@@ -27,13 +28,18 @@ class Workspace:
     def __init__(
         self,
         name: Optional[str] = None,
+        workspace_id: Optional[str] = None,
+        created_at: Optional[str] = None,
+        modified_at: Optional[str] = None,
     ) -> None:
-        self.id = str(uuid.uuid4())
+        now = datetime.now().isoformat()
+
+        self.id = workspace_id or str(uuid.uuid4())
         self.name = name or f"workspace_{self.id[:8]}"
         self.nodes: Dict[str, Node] = {}
         self.description: str = ""
-        self.created_at: Optional[str] = None
-        self.modified_at: Optional[str] = None
+        self.created_at: Optional[str] = created_at or now
+        self.modified_at: Optional[str] = modified_at or now
         self.analysis: Any = None  # Placeholder for analysis storage/manager
 
     # Node management -------------------------------------------------

@@ -7,6 +7,7 @@ from pathlib import Path
 from uuid import uuid4
 
 import polars as pl
+from docworkspace import Node
 from fastapi import APIRouter, Depends, HTTPException
 
 from ....analysis.implementations.topic_modeling import (
@@ -23,7 +24,7 @@ from ....models import (
     TopicModelingRequest,
     TopicModelingResponse,
 )
-from ..utils import ensure_task_synced
+from ..utils import ensure_task_synced, update_workspace
 from .text_column_prefs import resolve_text_columns_for_nodes
 
 router = APIRouter(prefix="/workspaces", tags=["topic-modeling"])
@@ -526,19 +527,14 @@ async def detach_topic_modeling(
             else None
         ) or f"{artifact_payload.get('node_name') or node_id}_topic_detach"
 
-        new_node = workspace_manager.add_node_to_workspace(
-            user_id=user_id,
-            workspace_id=workspace_id,
+        new_node = Node(
             data=output_lf,
-            node_name=node_name,
+            name=node_name,
+            workspace=ws,
             operation="topic_modeling_detach",
             parents=parents,
         )
-        if not new_node:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to create detached node for {node_id}",
-            )
+        ws.add_node(new_node)
 
         text_column = artifact_payload.get("text_column")
         if (
@@ -552,25 +548,22 @@ async def detach_topic_modeling(
                 pass
 
         meanings_node_name = f"{node_name}_topic_meanings"
-        meanings_node = workspace_manager.add_node_to_workspace(
-            user_id=user_id,
-            workspace_id=workspace_id,
+        meanings_node = Node(
             data=meanings_lf,
-            node_name=meanings_node_name,
+            name=meanings_node_name,
+            workspace=ws,
             operation="topic_modeling_meanings_detach",
             parents=[new_node],
         )
-        if not meanings_node:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to create topic meanings node for {node_id}",
-            )
+        ws.add_node(meanings_node)
 
         detached_nodes.append({
             "source_node_id": node_id,
             "new_node_id": new_node.id,
             "topic_meanings_node_id": meanings_node.id,
         })
+
+    update_workspace(user_id, workspace_id, ws)
 
     return TopicModelingDetachResponse(
         state="successful",

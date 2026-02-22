@@ -21,17 +21,18 @@ class TestWorkspaceAPI:
         with patch(
             "ldaca_web_app_backend.api.workspaces.workspace_manager.list_user_workspaces_summaries"
         ) as mock_get:
-            mock_get.return_value = {}
+            mock_get.return_value = []
             response = await authenticated_client.get("/api/workspaces/")
             if response.status_code != 200:
                 pytest.fail(response.text)
             data = response.json()
-            assert data["workspaces"] == []
+            assert isinstance(data, list)
+            assert len(data) == 0
 
     async def test_list_workspaces_with_data(self, authenticated_client):
         """Test listing workspaces when user has workspaces"""
-        mock_summaries = {
-            "abc123": {
+        mock_summaries = [
+            {
                 "id": "abc123",
                 "name": "Test Workspace 1",
                 "description": "Test description",
@@ -42,7 +43,7 @@ class TestWorkspaceAPI:
                 "leaf_nodes": 1,
                 "node_types": {"DataFrame": 1},
             }
-        }
+        ]
         with patch(
             "ldaca_web_app_backend.api.workspaces.workspace_manager.list_user_workspaces_summaries"
         ) as mock_get:
@@ -50,37 +51,21 @@ class TestWorkspaceAPI:
             response = await authenticated_client.get("/api/workspaces/")
             assert response.status_code == 200
             data = response.json()
-            assert len(data["workspaces"]) == 1
-            workspace = data["workspaces"][0]
-            assert workspace["id"] == "abc123"
-            assert workspace["node_count"] == 1
+            assert len(data) == 1
+            assert data[0]["id"] == "abc123"
+            assert data[0]["node_count"] == 1
 
     async def test_create_workspace(self, authenticated_client):
         """Test creating a new workspace"""
         # Mock workspace_manager methods for create flow
         with (
-            patch(
-                "ldaca_web_app_backend.api.workspaces.lifecycle.generate_workspace_id"
-            ) as mock_generate_workspace_id,
             patch("docworkspace.workspace.core.Workspace.save") as mock_save,
             patch(
                 "ldaca_web_app_backend.api.workspaces.workspace_manager.set_current_workspace"
             ) as mock_set_current,
-            patch(
-                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_workspace_info"
-            ) as mock_info,
         ):
-            mock_generate_workspace_id.return_value = "new-workspace-123"
             mock_save.return_value = None
             mock_set_current.return_value = True
-            mock_info.return_value = {
-                "id": "new-workspace-123",
-                "name": "New Workspace",
-                "description": "New test workspace",
-                "created_at": "2024-01-01T00:00:00Z",
-                "modified_at": "2024-01-01T00:00:00Z",
-                "total_nodes": 0,
-            }
 
             payload = {"name": "New Workspace", "description": "New test workspace"}
 
@@ -88,36 +73,42 @@ class TestWorkspaceAPI:
 
             assert response.status_code == 200
             data = response.json()
-            assert data["id"] == "new-workspace-123"
+            assert isinstance(data["id"], str)
+            assert data["id"]
             assert data["name"] == "New Workspace"
             assert data["description"] == "New test workspace"
             assert data["total_nodes"] == 0  # Use latest docworkspace terminology
 
     async def test_get_workspace_info(self, authenticated_client):
         """Test getting specific workspace information"""
-        # Mock workspace_manager.get_workspace_info to return proper data
-        mock_workspace_info = {
-            "id": "workspace-123",
-            "name": "Test Workspace",
+        mock_workspace = Mock()
+        mock_workspace.id = "workspace-123"
+        mock_workspace.name = "Test Workspace"
+        mock_workspace.get_metadata.side_effect = lambda key: {
             "description": "Test description",
             "created_at": "2024-01-01T00:00:00Z",
             "modified_at": "2024-01-01T12:00:00Z",
+        }.get(key)
+        mock_workspace.info_json.return_value = {
+            "id": "workspace-123",
+            "name": "Test Workspace",
             "total_nodes": 5,
             "root_nodes": 2,
             "leaf_nodes": 3,
             "node_types": {"DataFrame": 3, "LazyFrame": 2},
             "status_counts": {"lazy": 1, "materialized": 4},
+            "metadata_keys": ["description", "created_at", "modified_at"],
         }
 
         with (
             patch(
-                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_workspace_info"
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_workspace"
             ) as mock_get,
             patch(
                 "ldaca_web_app_backend.api.workspaces.workspace_manager._get_current_entry"
             ) as mock_current_entry,
         ):
-            mock_get.return_value = mock_workspace_info
+            mock_get.return_value = mock_workspace
             mock_current_entry.return_value = ("workspace-123", Mock())
 
             # Active-workspace endpoint
@@ -158,7 +149,7 @@ class TestWorkspaceAPI:
         """Test getting non-existent workspace"""
         with (
             patch(
-                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_workspace_info"
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_workspace"
             ) as mock_get,
             patch(
                 "ldaca_web_app_backend.api.workspaces.workspace_manager._get_current_entry"
@@ -378,13 +369,13 @@ class TestWorkspaceAPI:
             ) as mock_refresh,
         ):
             mock_summaries.side_effect = [
-                {},
-                {
-                    "imported-id": {
+                [],
+                [
+                    {
                         "id": "imported-id",
                         "name": "Imported Workspace",
                     }
-                },
+                ],
             ]
             mock_resolve.return_value = target_dir
             mock_refresh.return_value = None
@@ -864,25 +855,27 @@ class TestWorkspaceAPI:
             "type": "data",
         }
 
+        mock_workspace = Mock()
+        mock_workspace.nodes = {
+            "left-node-id": left_node,
+            "right-node-id": right_node,
+        }
+        mock_workspace.add_node = Mock()
+
         with (
             patch(
-                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_node_from_workspace"
-            ) as mock_get_node,
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_workspace",
+                return_value=mock_workspace,
+            ),
             patch(
-                "ldaca_web_app_backend.api.workspaces.workspace_manager.add_node_to_workspace",
+                "ldaca_web_app_backend.api.workspaces.nodes.Node",
                 return_value=joined_node,
             ),
+            patch(
+                "ldaca_web_app_backend.api.workspaces.nodes.update_workspace",
+                return_value=None,
+            ),
         ):
-            # Configure node retrieval
-            def get_node_side_effect(use_id, workspace_id, node_id):
-                if node_id == "left-node-id":
-                    return left_node
-                elif node_id == "right-node-id":
-                    return right_node
-                return None
-
-            mock_get_node.side_effect = get_node_side_effect
-
             # Test join with the new parameter format (matching frontend)
             response = await authenticated_client.post(
                 "/api/workspaces/nodes/join",
@@ -946,20 +939,16 @@ class TestWorkspaceAPI:
 
         left_node = DummyNode(left_lazy, "left_node")
         right_node = DummyNode(right_lazy, "right_node")
+        mock_workspace = Mock()
+        mock_workspace.nodes = {
+            "left-node-id": left_node,
+            "right-node-id": right_node,
+        }
 
         with patch(
-            "ldaca_web_app_backend.api.workspaces.workspace_manager.get_node_from_workspace"
-        ) as mock_get_node:
-
-            def _side_effect(_, __, node_id):
-                if node_id == "left-node-id":
-                    return left_node
-                if node_id == "right-node-id":
-                    return right_node
-                return None
-
-            mock_get_node.side_effect = _side_effect
-
+            "ldaca_web_app_backend.api.workspaces.workspace_manager.get_workspace",
+            return_value=mock_workspace,
+        ):
             response = await authenticated_client.post(
                 "/api/workspaces/nodes/join/preview",
                 params={

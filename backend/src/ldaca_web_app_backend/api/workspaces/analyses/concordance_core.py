@@ -160,10 +160,13 @@ def resolve_node_sources(
     node_sources: dict[str, dict[str, Any]] = {}
     label_to_node_map: dict[str, str] = {}
     node_labels: dict[str, str] = {}
+    workspace = workspace_manager.get_workspace(user_id, workspace_id)
+    if workspace is None:
+        raise HTTPException(status_code=404, detail="Workspace not found")
 
     for node_id in node_ids:
-        node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
-        if not node:
+        node = workspace.nodes.get(node_id)
+        if node is None:
             continue
         node_label = getattr(node, "name", None) or node_id
         label_to_node_map[node_label] = node_id

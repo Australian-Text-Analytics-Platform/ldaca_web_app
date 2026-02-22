@@ -27,8 +27,10 @@ export type SidebarNodeShape = [number | null, number | null];
 
 export type SidebarWorkspaceNode = {
   id: string;
+  name?: string;
   label?: string;
   type?: string;
+  operation?: string;
   data?: {
     nodeName?: string;
     label?: string;

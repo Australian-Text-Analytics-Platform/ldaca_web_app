@@ -13,6 +13,7 @@ import time
 import uuid
 from concurrent.futures import Future
 from dataclasses import dataclass, field
+from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional, Set, Tuple
 
@@ -385,6 +386,7 @@ class WorkerTaskManager:
                 if task_type in ["concordance_detach", "quotation_detach"]:
                     try:
                         import polars as pl
+                        from docworkspace import Node
 
                         from .workspace import workspace_manager
 
@@ -400,17 +402,34 @@ class WorkerTaskManager:
 
                         lazy_df = pl.scan_parquet(parquet_path)
 
-                        parent_node = workspace_manager.get_node_from_workspace(
-                            user_id, workspace_id, parent_id
+                        workspace = workspace_manager.get_workspace(
+                            user_id, workspace_id
                         )
+                        if workspace is None:
+                            raise RuntimeError("Workspace not found")
 
-                        new_node = workspace_manager.add_node_to_workspace(
-                            user_id=user_id,
-                            workspace_id=workspace_id,
+                        parent_node = workspace.nodes.get(parent_id)
+
+                        new_node = Node(
                             data=lazy_df,
-                            node_name=new_node_name,
+                            name=new_node_name,
+                            workspace=workspace,
                             operation=task_type,
                             parents=[parent_node] if parent_node else [],
+                        )
+                        workspace.add_node(new_node)
+                        workspace.set_metadata(
+                            "modified_at", datetime.now().isoformat()
+                        )
+                        target_dir = workspace_manager._resolve_workspace_dir(
+                            user_id=user_id,
+                            workspace_id=workspace_id,
+                            workspace_name=workspace.name,
+                        )
+                        workspace_manager._attach_workspace_dir(workspace, target_dir)
+                        workspace.save(target_dir)
+                        workspace_manager._set_cached_path(
+                            user_id, workspace_id, target_dir
                         )
 
                         if new_node and doc_col and hasattr(new_node, "set_metadata"):
@@ -419,21 +438,18 @@ class WorkerTaskManager:
                             except Exception:
                                 pass
 
-                        if new_node:
-                            result_persisted = True
-                            await self.emit(
-                                user_id,
-                                workspace_id,
-                                {
-                                    "type": "workspace_updated",
-                                    "task_type": task_type,
-                                    "task_id": task_info.id,
-                                    "new_node_id": new_node.id,
-                                    "timestamp": time.time(),
-                                },
-                            )
-                        else:
-                            raise RuntimeError("Failed to add node to workspace")
+                        result_persisted = True
+                        await self.emit(
+                            user_id,
+                            workspace_id,
+                            {
+                                "type": "workspace_updated",
+                                "task_type": task_type,
+                                "task_id": task_info.id,
+                                "new_node_id": new_node.id,
+                                "timestamp": time.time(),
+                            },
+                        )
 
                     except Exception as detach_err:
                         logger.error(

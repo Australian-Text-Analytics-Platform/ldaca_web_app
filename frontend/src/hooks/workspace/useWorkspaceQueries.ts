@@ -23,17 +23,14 @@ const logGraphDebug = (result: any) => {
   console.log('API response structure:', {
     nodes: result?.nodes?.length || 0,
     edges: result?.edges?.length || 0,
-    workspace_info: !!result?.workspace_info,
   });
 
   if (result?.nodes && result.nodes.length > 0) {
     const sampleNode = result.nodes[0];
     console.log('Sample node structure:', {
       id: sampleNode.id,
-      type: sampleNode.type,
-      position: sampleNode.position,
-      dataKeys: Object.keys(sampleNode.data || {}),
-      sampleData: sampleNode.data,
+      name: sampleNode.name,
+      operation: sampleNode.operation,
     });
   }
 };

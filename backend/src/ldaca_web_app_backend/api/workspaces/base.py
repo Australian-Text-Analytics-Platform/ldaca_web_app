@@ -9,6 +9,7 @@ import logging
 import os
 
 import polars as pl
+from docworkspace import Node
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 
 from ...core.auth import get_current_user
@@ -312,18 +313,18 @@ async def add_node_to_workspace(
             document_column=None,
         )
 
-        # Create node name from filename
-        node = workspace_manager.add_node_to_workspace(
-            user_id=user_id,
-            workspace_id=workspace_id,
-            data=lazy_data,
-            node_name=node_name,
-        )
+        workspace = workspace_manager.get_workspace(user_id, workspace_id)
+        if workspace is None:
+            raise HTTPException(status_code=404, detail="Workspace not found")
 
-        if not node:
-            raise HTTPException(
-                status_code=500, detail="Failed to add node to workspace"
-            )
+        node = Node(
+            data=lazy_data,
+            name=node_name,
+            workspace=workspace,
+            operation="manual_add",
+        )
+        workspace.add_node(node)
+        update_workspace(user_id, workspace_id, workspace)
 
         # Return node info
         return node.info()

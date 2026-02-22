@@ -80,7 +80,7 @@ const SidebarNodesSection: React.FC<SidebarNodesSectionProps> = ({
       <div className="space-y-2 pr-1">
         {nodes.length ? (
           nodes.map((node) => {
-            const name = node?.data?.nodeName || node?.data?.label || node?.label || '';
+            const name = node?.data?.nodeName || node?.data?.label || node?.label || node?.name || '';
             const shape = formatShapeLabel(node);
             const checked = selectedNodeIds?.includes(node.id);
             const copyNameValue = name && name.length > 0 ? name : node.id;

@@ -23,13 +23,15 @@ def _simulate_token_frequency_completion(workspace_id: str):
     task = task_manager.get_task(task_ids[0])
     assert task is not None
     req = task.request.model_dump() if hasattr(task.request, "model_dump") else {}
+    workspace = workspace_manager.get_workspace("test", workspace_id)
+    assert workspace is not None
 
     node_ids = req.get("node_ids") or []
     node_columns = req.get("node_columns") or {}
     node_corpora: dict[str, list[str]] = {}
     node_display_names: dict[str, str] = {}
     for node_id in node_ids:
-        node = workspace_manager.get_node_from_workspace("test", workspace_id, node_id)
+        node = workspace.nodes.get(node_id)
         assert node is not None
         node_data = getattr(node, "data", None)
         assert node_data is not None

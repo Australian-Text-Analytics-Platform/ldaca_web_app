@@ -12,14 +12,23 @@ from ldaca_web_app_backend.models import ConcatPreviewRequest, ConcatRequest
 
 class DummyNode:
     def __init__(
-        self, node_id: str, data: pl.LazyFrame, name: str | None = None
+        self,
+        node_id: str | None = None,
+        data: pl.LazyFrame | None = None,
+        name: str | None = None,
+        workspace: object | None = None,
+        operation: str | None = None,
+        parents: list["DummyNode"] | None = None,
+        **_kwargs,
     ) -> None:
-        self.node_id = node_id
-        self.name = name or node_id
+        generated_id = node_id or f"generated_{len(getattr(workspace, 'nodes', {}))}"
+        self.id = generated_id
+        self.node_id = generated_id
+        self.name = name or generated_id
         self.data = data
         self.columns = list(self._schema.keys())
-        self.operation = None
-        self.parents = []
+        self.operation = operation
+        self.parents = parents or []
 
     @property
     def _schema(self) -> dict[str, pl.DataType]:
@@ -67,38 +76,32 @@ def sample_nodes() -> dict[str, DummyNode]:
 @pytest.fixture
 def fake_workspace_manager(monkeypatch: pytest.MonkeyPatch, sample_nodes):
     class DummyWorkspace:
-        def __init__(self, nodes: dict[str, DummyNode]) -> None:
+        def __init__(
+            self, nodes: dict[str, DummyNode], manager: "FakeWorkspaceManager"
+        ) -> None:
             self.nodes = nodes
+            self._manager = manager
+
+        def add_node(self, node: DummyNode):
+            self.nodes[node.node_id] = node
+            self._manager.add_calls.append({"node": node})
 
     class FakeWorkspaceManager:
         def __init__(self, nodes: dict[str, DummyNode]) -> None:
             self.nodes = nodes
             self.workspace_id = "ws1"
-            self.workspace = DummyWorkspace(nodes)
+            self.workspace = DummyWorkspace(nodes, self)
             self.add_calls: list[dict[str, object]] = []
 
         def _get_current_entry(self, _user_id: str):
             return (self.workspace_id, self.workspace, None)
 
-        def get_node_from_workspace(
-            self, user_id: str, workspace_id: str, node_id: str
-        ):
-            return self.nodes.get(node_id)
-
-        def add_node_to_workspace(self, **kwargs):
-            node_name = kwargs.get("node_name") or f"concat_{len(self.add_calls)}"
-            new_node = DummyNode(
-                node_id=f"generated_{len(self.add_calls)}",
-                data=kwargs["data"],
-                name=node_name,
-            )
-            new_node.operation = kwargs.get("operation")
-            new_node.parents = kwargs.get("parents", [])
-            self.add_calls.append({"kwargs": kwargs, "node": new_node})
-            return new_node
+        def get_workspace(self, _user_id: str, _workspace_id: str):
+            return self.workspace
 
     manager = FakeWorkspaceManager(sample_nodes)
     monkeypatch.setattr(nodes_api, "workspace_manager", manager)
+    monkeypatch.setattr(nodes_api, "Node", DummyNode)
     monkeypatch.setattr(workspace_utils, "workspace_manager", manager)
     return manager
 
@@ -145,11 +148,9 @@ async def test_concat_creation_happy_path(fake_workspace_manager, sample_nodes):
     assert result["columns"] == ["id", "name", "value"]
 
     assert len(fake_workspace_manager.add_calls) == 1
-    add_kwargs = fake_workspace_manager.add_calls[0]["kwargs"]
-    assert add_kwargs["operation"].startswith("concat(")
-    assert add_kwargs["parents"] == [sample_nodes["node_a"], sample_nodes["node_b"]]
-
     new_node = fake_workspace_manager.add_calls[0]["node"]
+    assert new_node.operation.startswith("concat(")
+    assert new_node.parents == [sample_nodes["node_a"], sample_nodes["node_b"]]
     collected = new_node.data.collect()
     assert collected.shape == (4, 3)
     assert collected.columns == ["id", "name", "value"]

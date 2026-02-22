@@ -116,11 +116,10 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
     );
 
     return workspaceGraph.nodes.map((node: any, index: number) => {
-      const rawNodeType = node.data?.nodeType || node.data?.dataType || node.data?.type || node.type || '';
+      const rawNodeType = node.type || '';
       const dataType = rawNodeType || 'unknown';
-      const columns = Array.isArray(node.data?.columns) ? node.data.columns : [];
+      const columns: string[] = [];
       const isLazyNode = Boolean(
-        node.data?.lazy ||
         (typeof rawNodeType === 'string' && rawNodeType.toLowerCase().includes('lazyframe'))
       );
 
@@ -128,15 +127,10 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
         id: node.id,
         nodeType: rawNodeType,
         isLazy: isLazyNode,
-        documentColumn: node.data?.documentColumn,
+        operation: node.operation,
       });
 
-      const backendShape = node.data?.shape;
       const shape: WorkspaceNodeShape = [null, null];
-      if (backendShape && Array.isArray(backendShape) && backendShape.length === 2) {
-        shape[0] = typeof backendShape[0] === 'number' ? backendShape[0] : null;
-        shape[1] = typeof backendShape[1] === 'number' ? backendShape[1] : null;
-      }
 
       const position = positions.get(node.id) || { x: index * 320, y: 50 };
 
@@ -147,18 +141,14 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
         data: {
           node: {
             node_id: node.id,
-            name: node.data?.nodeName || node.data?.label || `Node ${index + 1}`,
+            name: node.name || `Node ${index + 1}`,
             shape,
             columns,
             preview: [],
-            is_text_data: Boolean(node.data?.dataType?.includes('Doc')),
+            is_text_data: false,
             data_type: dataType,
-            document_column: node.data?.documentColumn || null,
-            column_schema: node.data?.schema
-              ? Object.fromEntries(
-                  node.data.schema.map((col: any) => [col.name, col.js_type])
-                )
-              : {},
+            document_column: null,
+            column_schema: {},
           },
           isMultiSelected:
             (selectedNodeIds?.length || 0) > 1 && Boolean(selectedNodeIds?.includes?.(node.id)),
@@ -180,7 +170,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
       return [];
     }
     return workspaceGraph.edges.map((edge: any, index: number) => ({
-      id: edge.id || `edge-${index}`,
+      id: `edge-${edge.source}-${edge.target}-${index}`,
       source: edge.source,
       target: edge.target,
       type: 'default',

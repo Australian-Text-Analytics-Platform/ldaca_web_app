@@ -1,5 +1,6 @@
 import polars as pl
 import pytest
+from docworkspace import Node
 from ldaca_web_app_backend.core.workspace import workspace_manager
 
 
@@ -7,15 +8,17 @@ from ldaca_web_app_backend.core.workspace import workspace_manager
 async def test_concordance_detach_starts_task(authenticated_client, workspace_id):
     """Ensure detaching concordance starts a background task."""
     df = pl.DataFrame({"text": ["alpha beta", "beta gamma", "alpha gamma"]})
+    workspace = workspace_manager.get_workspace("test", workspace_id)
+    assert workspace is not None
 
-    node = workspace_manager.add_node_to_workspace(
-        user_id="test",  # provided by authenticated_client fixture
-        workspace_id=workspace_id,
+    node = Node(
         data=df.lazy(),
-        node_name="text_node",
+        name="text_node",
+        workspace=workspace,
         operation="test_add",
         parents=[],
     )
+    workspace.add_node(node)
     assert node is not None
 
     # Act: call detach endpoint

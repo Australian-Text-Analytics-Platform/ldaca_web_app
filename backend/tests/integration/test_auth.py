@@ -91,11 +91,9 @@ class TestAuthenticatedEndpoints:
         response = await authenticated_client.get("/api/workspaces/")
         assert response.status_code == 200
 
-        # Should return workspace data structure
+        # Should return workspace list
         data = response.json()
-        assert isinstance(data, dict)
-        assert "workspaces" in data
-        assert isinstance(data["workspaces"], list)
+        assert isinstance(data, list)
 
 
 class TestAuthenticationModes:

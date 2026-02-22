@@ -4,7 +4,7 @@ from datetime import datetime
 from unittest.mock import patch
 
 import polars as pl
-from docworkspace import Workspace
+from docworkspace import Node, Workspace
 from ldaca_web_app_backend.core.utils import generate_workspace_id
 from ldaca_web_app_backend.core.workspace import workspace_manager
 
@@ -30,19 +30,19 @@ def test_add_node_preserves_document_metadata(settings_override):
 
         df = pl.DataFrame({"text": ["alpha", "beta"], "speaker": ["a", "b"]})
         lazy_df = df.lazy()
-        node = workspace_manager.add_node_to_workspace(
-            user_id="test",
-            workspace_id=workspace_id,
+        current_ws = workspace_manager.get_workspace("test", workspace_id)
+        assert current_ws is not None
+        node = Node(
             data=lazy_df,
-            node_name="lazy_node",
+            name="lazy_node",
+            workspace=current_ws,
             operation="test_add",
             parents=[],
         )
+        current_ws.add_node(node)
 
         assert node is not None, "Node creation with LazyFrame should succeed"
         node.document = "text"
-        current_ws = workspace_manager.get_workspace("test", workspace_id)
-        assert current_ws is not None
         current_ws.set_metadata("modified_at", datetime.now().isoformat())
         target_dir = workspace_manager._resolve_workspace_dir(
             user_id="test",
@@ -55,9 +55,7 @@ def test_add_node_preserves_document_metadata(settings_override):
         assert node.document == "text"
 
         try:
-            fetched = workspace_manager.get_node_from_workspace(
-                "test", workspace_id, node.id
-            )
+            fetched = current_ws.nodes.get(node.id)
             assert fetched is not None
             assert fetched.document == "text"
         finally:

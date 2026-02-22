@@ -231,11 +231,14 @@ def get_node_or_404(
         current_entry = workspace_manager._get_current_entry(user_id)
         if not current_entry:
             raise HTTPException(status_code=404, detail="No active workspace selected")
-        ws = current_entry[1]
-        node = ws.nodes[node_id]
+        workspace = current_entry[1]
     else:
-        node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
-    if not node:
+        workspace = workspace_manager.get_workspace(user_id, workspace_id)
+        if workspace is None:
+            raise HTTPException(status_code=404, detail="Workspace not found")
+
+    node = workspace.nodes.get(node_id)
+    if node is None:
         raise HTTPException(status_code=404, detail=detail or "Node not found")
     return node
 

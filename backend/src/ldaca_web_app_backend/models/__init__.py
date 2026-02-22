@@ -198,12 +198,6 @@ class WorkspaceSummary(BaseModel):
     folder_name: Optional[str] = None
 
 
-class WorkspaceSummaryList(BaseModel):
-    """Workspace-list response payload for list-workspaces endpoint."""
-
-    workspaces: List[WorkspaceSummary]
-
-
 class WorkspaceStats(BaseModel):
     total_nodes: int
     root_nodes: int
@@ -527,39 +521,6 @@ class ErrorResponse(BaseModel):
     error: str
     detail: str
     status_code: int
-
-
-class ReactFlowNode(BaseModel):
-    id: str
-    type: str
-    position: Dict[str, float]  # {"x": float, "y": float}
-    data: Dict[str, Any]
-    style: Optional[Dict[str, Any]] = None
-
-
-class ReactFlowEdge(BaseModel):
-    id: str
-    source: str
-    target: str
-    type: str
-    animated: bool = False
-    style: Optional[Dict[str, Any]] = None
-    markerEnd: Optional[Dict[str, Any]] = None
-    data: Optional[Dict[str, Any]] = None
-
-
-class WorkspaceGraphInfo(BaseModel):
-    id: str
-    name: str
-    total_nodes: int
-    root_nodes: int
-    leaf_nodes: int
-
-
-class WorkspaceGraph(BaseModel):
-    nodes: List[ReactFlowNode]
-    edges: List[ReactFlowEdge]
-    workspace_info: WorkspaceGraphInfo
 
 
 # =============================================================================

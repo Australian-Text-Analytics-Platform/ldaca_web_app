@@ -11,6 +11,7 @@ from datetime import datetime
 from typing import Any, List, Optional
 
 import polars as pl
+from docworkspace import Node
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ...core.auth import get_current_user
@@ -773,9 +774,12 @@ async def describe_column(
 async def delete_node(node_id: str, current_user: dict = Depends(get_current_user)):
     user_id = current_user["id"]
     workspace_id, _ = _get_active_workspace_or_404(user_id)
-    success = workspace_manager.delete_node_from_workspace(
-        user_id, workspace_id, node_id
-    )
+    workspace = workspace_manager.get_workspace(user_id, workspace_id)
+    if workspace is None:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    success = workspace.remove_node(node_id)
+    if success:
+        update_workspace(user_id, workspace_id)
     if not success:
         raise HTTPException(status_code=404, detail="Node not found")
     return {"state": "successful", "message": "Node deleted successfully"}
@@ -939,16 +943,15 @@ async def copy_node(
 
     try:
         new_name = _unique_copy_name(getattr(node, "name", node_id))
-        new_node = workspace_manager.add_node_to_workspace(
-            user_id=user_id,
-            workspace_id=workspace_id,
+        new_node = Node(
             data=node.data,
-            node_name=new_name,
+            name=new_name,
+            workspace=workspace,
             operation=f"copy({getattr(node, 'name', node_id)})",
             parents=[node],
         )
-        if not new_node:
-            raise HTTPException(status_code=500, detail="Failed to copy node")
+        workspace.add_node(new_node)
+        update_workspace(user_id, workspace_id)
         try:
             return new_node.info()
         except Exception:
@@ -973,14 +976,17 @@ async def filter_node(
     filter_expr = _build_filter_expression(request, column_dtypes=schema_map)
     filtered_data = lazy_data.filter(filter_expr)
     new_node_name = request.new_node_name or f"{node.name}_filtered"
-    new_node = workspace_manager.add_node_to_workspace(
-        user_id=user_id,
-        workspace_id=workspace_id,
+    workspace = workspace_manager.get_workspace(user_id, workspace_id)
+    if workspace is None:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    new_node = Node(
         data=filtered_data,
-        node_name=new_node_name,
+        name=new_node_name,
+        workspace=workspace,
         operation=f"filter({node.name})",
         parents=[node],
     )
+    workspace.add_node(new_node)
     update_workspace(user_id, workspace_id)
     return {
         "node_name": new_node.name,
@@ -1069,14 +1075,17 @@ async def slice_node(
     slice_args = f"offset={offset}"
     if length is not None:
         slice_args = f"{slice_args}, length={length}"
-    new_node = workspace_manager.add_node_to_workspace(
-        user_id=user_id,
-        workspace_id=workspace_id,
+    workspace = workspace_manager.get_workspace(user_id, workspace_id)
+    if workspace is None:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    new_node = Node(
         data=sliced_data,
-        node_name=new_node_name,
+        name=new_node_name,
+        workspace=workspace,
         operation=f"slice({node.name}, {slice_args})",
         parents=[node],
     )
+    workspace.add_node(new_node)
     update_workspace(user_id, workspace_id)
     return {
         "node_name": new_node.name,
@@ -1225,14 +1234,18 @@ async def concat_nodes(
         else:
             operation_args = ", ".join(labels)
         operation_label = f"concat({operation_args})"
-        new_node = workspace_manager.add_node_to_workspace(
-            user_id=user_id,
-            workspace_id=workspace_id,
+        workspace = workspace_manager.get_workspace(user_id, workspace_id)
+        if workspace is None:
+            raise HTTPException(status_code=404, detail="Workspace not found")
+        new_node = Node(
             data=concat_lazy,
-            node_name=node_name,
+            name=node_name,
+            workspace=workspace,
             operation=operation_label,
             parents=nodes,
         )
+        workspace.add_node(new_node)
+        update_workspace(user_id, workspace_id)
         return new_node.info()
     except HTTPException:
         raise
@@ -1386,14 +1399,18 @@ async def join_nodes(
                 right_data, left_on=left_on, right_on=right_on, how=how_val
             )
         node_name = new_node_name or f"{left_node.name}_join_{right_node.name}"
-        new_node = workspace_manager.add_node_to_workspace(
-            user_id=user_id,
-            workspace_id=workspace_id,
+        workspace = workspace_manager.get_workspace(user_id, workspace_id)
+        if workspace is None:
+            raise HTTPException(status_code=404, detail="Workspace not found")
+        new_node = Node(
             data=joined_data,
-            node_name=node_name,
+            name=node_name,
+            workspace=workspace,
             operation=f"join({left_node.name}, {right_node.name})",
             parents=[left_node, right_node],
         )
+        workspace.add_node(new_node)
+        update_workspace(user_id, workspace_id)
         return new_node.info()
     except HTTPException:
         raise

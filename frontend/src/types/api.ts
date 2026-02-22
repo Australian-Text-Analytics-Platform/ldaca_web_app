@@ -66,30 +66,18 @@ export interface NodeDataResponse {
 // Graph Types
 export interface GraphNode {
   id: string;
-  type: string;
-  position: { x: number; y: number };
-  data: {
-    id: string;
-    name: string;
-    info: NodeInfo;
-    onDelete?: (nodeId: string) => void;
-    onRename?: (nodeId: string, newName: string) => void;
-    onSelect?: (nodeId: string) => void;
-  };
+  name: string;
+  operation: string;
 }
 
 export interface GraphEdge {
-  id: string;
   source: string;
   target: string;
-  type?: string;
-  animated?: boolean;
 }
 
 export interface WorkspaceGraphResponse {
   nodes: GraphNode[];
   edges: GraphEdge[];
-  workspace_info: WorkspaceInfo;
 }
 
 // Operation Types

@@ -2,6 +2,7 @@ from types import SimpleNamespace
 
 import polars as pl
 import pytest
+from docworkspace import Node
 from ldaca_web_app_backend.analysis.manager import get_task_manager
 from ldaca_web_app_backend.core.workspace import workspace_manager
 
@@ -31,10 +32,10 @@ async def test_text_column_preference_persists_across_text_analyses(
     authenticated_client, workspace_id
 ):
     user_id = "test"
+    workspace = workspace_manager.get_workspace(user_id, workspace_id)
+    assert workspace is not None
 
-    node = workspace_manager.add_node_to_workspace(
-        user_id=user_id,
-        workspace_id=workspace_id,
+    node = Node(
         data=pl.DataFrame({
             "text_a": [
                 "alpha from column a",
@@ -47,10 +48,12 @@ async def test_text_column_preference_persists_across_text_analyses(
                 "epsilon from column b",
             ],
         }).lazy(),
-        node_name="dual_text_node",
+        name="dual_text_node",
+        workspace=workspace,
         operation="test_setup",
         parents=[],
     )
+    workspace.add_node(node)
 
     assert node is not None
 
@@ -63,9 +66,7 @@ async def test_text_column_preference_persists_across_text_analyses(
     )
     assert token_response.status_code == 200, token_response.text
 
-    refreshed = workspace_manager.get_node_from_workspace(
-        user_id, workspace_id, node.id
-    )
+    refreshed = workspace.nodes.get(node.id)
     assert refreshed is not None
     metadata = getattr(refreshed, "metadata", {}) or {}
     assert isinstance(metadata, dict)
@@ -86,9 +87,7 @@ async def test_text_column_preference_persists_across_text_analyses(
     )
     assert concordance_response.status_code == 200, concordance_response.text
 
-    refreshed = workspace_manager.get_node_from_workspace(
-        user_id, workspace_id, node.id
-    )
+    refreshed = workspace.nodes.get(node.id)
     assert refreshed is not None
     metadata = getattr(refreshed, "metadata", {}) or {}
     assert isinstance(metadata, dict)

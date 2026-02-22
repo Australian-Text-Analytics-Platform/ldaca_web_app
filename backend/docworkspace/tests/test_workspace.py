@@ -159,7 +159,8 @@ class TestWorkspace:
         assert summary["total_nodes"] == 4
         assert summary["root_nodes"] == 2
         assert summary["leaf_nodes"] == 2
-        assert "LazyFrame" in summary["node_types"]
+        assert "created_at" in summary
+        assert "modified_at" in summary
 
     def test_workspace_iteration(self, workspace, sample_df):
         """Test iterating over workspace nodes."""
@@ -412,7 +413,7 @@ class TestWorkspaceGraphOperations:
 
         assert "nodes" in graph_data
         assert "edges" in graph_data
-        assert "workspace_info" in graph_data
+        assert "workspace_info" not in graph_data
 
         # Check node data structure
         if graph_data["nodes"]:
@@ -420,10 +421,7 @@ class TestWorkspaceGraphOperations:
             required_fields = [
                 "id",
                 "name",
-                "type",
                 "operation",
-                "parent_count",
-                "child_count",
             ]
             for field in required_fields:
                 assert field in node_data
@@ -523,14 +521,9 @@ class TestWorkspaceGraphOperations:
         assert workspace.get_metadata("modified_at") == "2024-03-02T00:00:00Z"
         assert workspace.get_metadata("nonexistent") is None
 
-        # Check info_json includes metadata
+        # info_json now focuses on structural node counts only
         summary = workspace.info_json()
-        assert "metadata_keys" in summary
-        assert set(summary["metadata_keys"]) == {
-            "description",
-            "created_at",
-            "modified_at",
-        }
+        assert "metadata_keys" not in summary
 
     def test_workspace_boolean_and_len_operations(self):
         """Test workspace boolean evaluation and length operations."""

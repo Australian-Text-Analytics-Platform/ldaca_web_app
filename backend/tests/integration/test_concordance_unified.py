@@ -3,6 +3,7 @@ import time
 
 import polars as pl
 import pytest
+from docworkspace import Node
 from ldaca_web_app_backend.analysis.manager import get_task_manager
 from ldaca_web_app_backend.api.workspaces.analyses.concordance import (
     DEFAULT_CONCORDANCE_PAGE_SIZE,
@@ -46,6 +47,20 @@ def _clear_concordance_state(user_id: str, workspace_id: str):
     task_manager.clear_all()
 
 
+def _add_node(workspace_id: str, data: pl.LazyFrame, node_name: str):
+    workspace = workspace_manager.get_workspace("test", workspace_id)
+    assert workspace is not None
+    node = Node(
+        data=data,
+        name=node_name,
+        workspace=workspace,
+        operation="test_setup",
+        parents=[],
+    )
+    workspace.add_node(node)
+    return node
+
+
 async def _get_current_task_id(client, workspace_id: str, analysis: str):
     response = await client.get("/api/workspaces/" + analysis + "/current")
     if response.status_code != 200:
@@ -69,14 +84,7 @@ async def test_concordance_single_node_roundtrip(authenticated_client, workspace
         ],
         "speaker": ["A", "B", "C"],
     })
-    node = workspace_manager.add_node_to_workspace(
-        user_id="test",
-        workspace_id=workspace_id,
-        data=df.lazy(),
-        node_name="single_text_node",
-        operation="test_setup",
-        parents=[],
-    )
+    node = _add_node(workspace_id, df.lazy(), "single_text_node")
     if hasattr(node, "set_metadata"):
         node.set_metadata("text_column", "text")
     assert node is not None
@@ -206,24 +214,10 @@ async def test_concordance_multi_node_combined(authenticated_client, workspace_i
         "speaker": ["R1", "R2", "R3"],
     })
 
-    left_node = workspace_manager.add_node_to_workspace(
-        user_id="test",
-        workspace_id=workspace_id,
-        data=df_left.lazy(),
-        node_name="left_docs",
-        operation="test_setup",
-        parents=[],
-    )
+    left_node = _add_node(workspace_id, df_left.lazy(), "left_docs")
     if hasattr(left_node, "set_metadata"):
         left_node.set_metadata("text_column", "text")
-    right_node = workspace_manager.add_node_to_workspace(
-        user_id="test",
-        workspace_id=workspace_id,
-        data=df_right.lazy(),
-        node_name="right_docs",
-        operation="test_setup",
-        parents=[],
-    )
+    right_node = _add_node(workspace_id, df_right.lazy(), "right_docs")
     if hasattr(right_node, "set_metadata"):
         right_node.set_metadata("text_column", "text")
 
@@ -296,24 +290,10 @@ async def test_concordance_combined_toggle_after_separated_request(
         "speaker": ["R1", "R2", "R3"],
     })
 
-    left_node = workspace_manager.add_node_to_workspace(
-        user_id="test",
-        workspace_id=workspace_id,
-        data=df_left.lazy(),
-        node_name="left_docs",
-        operation="test_setup",
-        parents=[],
-    )
+    left_node = _add_node(workspace_id, df_left.lazy(), "left_docs")
     if hasattr(left_node, "set_metadata"):
         left_node.set_metadata("text_column", "text")
-    right_node = workspace_manager.add_node_to_workspace(
-        user_id="test",
-        workspace_id=workspace_id,
-        data=df_right.lazy(),
-        node_name="right_docs",
-        operation="test_setup",
-        parents=[],
-    )
+    right_node = _add_node(workspace_id, df_right.lazy(), "right_docs")
     if hasattr(right_node, "set_metadata"):
         right_node.set_metadata("text_column", "text")
 
@@ -376,24 +356,10 @@ async def test_concordance_combined_handles_mismatched_columns(
         "word_count": [200, 150],
     })
 
-    left_node = workspace_manager.add_node_to_workspace(
-        user_id="test",
-        workspace_id=workspace_id,
-        data=left_df.lazy(),
-        node_name="left_docs",
-        operation="test_setup",
-        parents=[],
-    )
+    left_node = _add_node(workspace_id, left_df.lazy(), "left_docs")
     if hasattr(left_node, "set_metadata"):
         left_node.set_metadata("text_column", "text")
-    right_node = workspace_manager.add_node_to_workspace(
-        user_id="test",
-        workspace_id=workspace_id,
-        data=right_df.lazy(),
-        node_name="right_docs",
-        operation="test_setup",
-        parents=[],
-    )
+    right_node = _add_node(workspace_id, right_df.lazy(), "right_docs")
     if hasattr(right_node, "set_metadata"):
         right_node.set_metadata("text_column", "text")
 
