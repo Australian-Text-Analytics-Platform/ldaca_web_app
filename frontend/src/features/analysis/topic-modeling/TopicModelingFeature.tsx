@@ -155,7 +155,7 @@ const TopicModelingFeature: React.FC = () => {
       fetchCurrentTaskId: async () => {
         const headers = getAuthHeaders();
         const current = (await textApi.getAnalysisCurrent(
-          'topic-modeling',
+          'topic_modeling',
           headers
         )) as any;
         const taskId = Array.isArray(current?.task_ids) ? current.task_ids[0] : null;
@@ -910,7 +910,7 @@ const TopicModelingFeature: React.FC = () => {
 
   const { hydrateFromServer } = useAnalysisHydration({
     workspaceId: currentWorkspaceId,
-    analysisKey: 'topic-modeling',
+    analysisKey: 'topic_modeling',
     getAuthHeaders,
     onTaskIdResolved: setLocalTopicModelingTaskId,
     fetchRequest: fetchTopicRequest,

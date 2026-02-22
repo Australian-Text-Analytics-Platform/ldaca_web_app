@@ -216,7 +216,7 @@ const SequentialAnalysisFeature: React.FC = () => {
       fetchCurrentTaskId: async () => {
         const headers = getAuthHeaders();
         const current = (await textApi.getAnalysisCurrent(
-          'sequential-analysis',
+          'sequential_analysis',
           headers
         )) as any;
         const taskId = Array.isArray(current?.task_ids) ? current.task_ids[0] : null;
@@ -929,7 +929,7 @@ const handleUpdateResults = async () => {
 
   const { hydrateFromServer } = useAnalysisHydration({
     workspaceId: currentWorkspaceId,
-    analysisKey: 'sequential-analysis',
+    analysisKey: 'sequential_analysis',
     getAuthHeaders,
     onTaskIdResolved: setLocalSequentialTaskId,
     fetchRequest: fetchSequentialRequest,

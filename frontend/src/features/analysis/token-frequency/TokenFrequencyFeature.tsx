@@ -260,7 +260,7 @@ function TokenFrequencyFeature() {
     const inflight = (async () => {
       try {
         const headers = getAuthHeaders();
-        const current = await textApi.getAnalysisCurrent('token-frequencies', headers) as any;
+        const current = await textApi.getAnalysisCurrent('token_frequencies', headers) as any;
         const taskId = Array.isArray(current?.task_ids) ? current.task_ids[0] : null;
         if (typeof taskId === 'string' && taskId.trim().length > 0) {
           setLocalTokenFrequencyTaskId(taskId);
@@ -829,7 +829,7 @@ function TokenFrequencyFeature() {
   >(
     {
       workspaceId: currentWorkspaceId,
-      analysisKey: 'token-frequencies',
+      analysisKey: 'token_frequencies',
       getAuthHeaders,
       onTaskIdResolved: setLocalTokenFrequencyTaskId,
       fetchRequest: fetchCurrentRequest,
