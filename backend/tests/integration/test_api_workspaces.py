@@ -163,27 +163,57 @@ class TestWorkspaceAPI:
 
     async def test_delete_workspace(self, authenticated_client):
         """Test deleting a workspace"""
-        with (
-            patch(
-                "ldaca_web_app_backend.api.workspaces.workspace_manager.delete_workspace"
-            ) as mock_delete,
-            patch(
-                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_current_workspace_id"
-            ) as mock_current_entry,
-        ):
+        with patch(
+            "ldaca_web_app_backend.api.workspaces.workspace_manager.delete_workspace"
+        ) as mock_delete:
             mock_delete.return_value = True
-            mock_current_entry.return_value = "workspace-123"
 
-            response = await authenticated_client.delete("/api/workspaces/delete")
+            response = await authenticated_client.delete(
+                "/api/workspaces/delete",
+                params={"workspace_id": "workspace-123"},
+            )
 
             assert response.status_code == 200
             data = response.json()
             assert data["state"] == "successful"
             assert data["message"] == "Workspace workspace-123 deleted successfully"
-            # Contract: success removed; deletion returns message only
+            assert data["id"] == "workspace-123"
+            mock_delete.assert_called_once_with("test", "workspace-123")
 
     async def test_delete_workspace_not_found(self, authenticated_client):
         """Test deleting non-existent workspace"""
+        with patch(
+            "ldaca_web_app_backend.api.workspaces.workspace_manager.delete_workspace"
+        ) as mock_delete:
+            mock_delete.return_value = False
+
+            response = await authenticated_client.delete(
+                "/api/workspaces/delete",
+                params={"workspace_id": "nonexistent-123"},
+            )
+
+            assert response.status_code == 404
+
+    async def test_delete_workspace_requires_workspace_id(self, authenticated_client):
+        """Delete endpoint requires explicit workspace_id."""
+        response = await authenticated_client.delete("/api/workspaces/delete")
+        assert response.status_code == 422
+
+    async def test_delete_workspace_rejects_blank_workspace_id(
+        self, authenticated_client
+    ):
+        """Delete endpoint rejects empty workspace_id values."""
+        response = await authenticated_client.delete(
+            "/api/workspaces/delete",
+            params={"workspace_id": "   "},
+        )
+        assert response.status_code == 400
+        assert response.json()["detail"] == "workspace_id is required"
+
+    async def test_delete_workspace_targets_explicit_id_not_current(
+        self, authenticated_client
+    ):
+        """Deleting workspace B should target B even when A is loaded."""
         with (
             patch(
                 "ldaca_web_app_backend.api.workspaces.workspace_manager.delete_workspace"
@@ -192,12 +222,16 @@ class TestWorkspaceAPI:
                 "ldaca_web_app_backend.api.workspaces.workspace_manager.get_current_workspace_id"
             ) as mock_current_entry,
         ):
-            mock_delete.return_value = False
-            mock_current_entry.return_value = "nonexistent-123"
+            mock_current_entry.return_value = "workspace-a"
+            mock_delete.return_value = True
 
-            response = await authenticated_client.delete("/api/workspaces/delete")
+            response = await authenticated_client.delete(
+                "/api/workspaces/delete",
+                params={"workspace_id": "workspace-b"},
+            )
 
-            assert response.status_code == 404
+            assert response.status_code == 200
+            mock_delete.assert_called_once_with("test", "workspace-b")
 
     async def test_download_workspace_zip(self, authenticated_client, tmp_path):
         """Workspace download kickoff submits task under USER_TASK_SCOPE."""

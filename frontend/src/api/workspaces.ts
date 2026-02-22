@@ -4,7 +4,7 @@ export const workspacesApi = {
   list: (headers: Record<string,string> = {}) => get<any>('/workspaces/', headers).then(r => r.workspaces || r),
   create: (name: string, description = '', headers: Record<string,string> = {}) => post('/workspaces/', { name, description }, headers),
   info: (id: string, headers: Record<string,string> = {}) => get(`/workspaces/info`, headers),
-  delete: (id: string, headers: Record<string,string> = {}) => del(`/workspaces/delete`, headers),
+  delete: (id: string, headers: Record<string,string> = {}) => del(`/workspaces/delete`, headers, { workspace_id: id }),
   uploadZip: (file: File, headers: Record<string,string> = {}) => { const fd = new FormData(); fd.append('file', file); return httpRequest('/workspaces/upload', { method: 'POST', formData: fd, headers }); },
   downloadZip: (headers: Record<string,string> = {}) => httpRequest<Blob>(`/workspaces/download`, { method: 'GET', headers, expectBlob: true }),
   startDownloadTask: (headers: Record<string,string> = {}) => post<{ state: string; message: string; metadata: { task_id: string; task_scope: string } }>(`/workspaces/download`, {}, headers),

@@ -241,8 +241,6 @@ const ConcordanceFeature: React.FC = () => {
       const candidateIds = [
         node.id,
         (node as any)?.node_id,
-        node.data?.id,
-        node.data?.node_id,
       ].map((val) => (typeof val === 'string' ? val : null)).filter(Boolean) as string[];
       const primaryId = candidateIds[0] ?? `node-${idx}`;
       const assigned = nodeColors[primaryId] || defaultPalette[idx % defaultPalette.length];
@@ -251,10 +249,8 @@ const ConcordanceFeature: React.FC = () => {
         primaryId,
         node.name,
         (node as any)?.name,
-        node.data?.name,
         node.label,
         (node as any)?.label,
-        node.data?.label,
       ].forEach((value) => {
         if (typeof value === 'string' && value.trim()) {
           variants.add(value);

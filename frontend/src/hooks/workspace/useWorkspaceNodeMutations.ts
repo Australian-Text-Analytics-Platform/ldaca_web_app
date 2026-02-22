@@ -116,12 +116,18 @@ export const useWorkspaceNodeMutations = ({
   });
 
   const deleteWorkspaceMutation = useMutation({
-    mutationFn: (workspaceId: string) => workspacesApi.delete(workspaceId, authHeaders),
+    mutationFn: (workspaceId: string) => {
+      if (!workspaceId?.trim()) {
+        throw new Error('workspaceId is required');
+      }
+      return workspacesApi.delete(workspaceId, authHeaders);
+    },
     onMutate: () => {
       startOperation('deleteWorkspace');
     },
-    onSuccess: (_data, workspaceId) => {
-      if (currentWorkspaceId && workspaceId === currentWorkspaceId) {
+    onSuccess: (data: any, workspaceId) => {
+      const deletedWorkspaceId = data?.id ?? workspaceId;
+      if (currentWorkspaceId && deletedWorkspaceId === currentWorkspaceId) {
         setCurrentWorkspaceId(null);
         clearSelection();
       }

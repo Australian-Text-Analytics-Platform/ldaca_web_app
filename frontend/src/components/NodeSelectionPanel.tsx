@@ -95,9 +95,7 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
   });
 
   const formatShape = (node: WorkspaceNodeLike): string => {
-    const rawShape =
-      (node.data?.shape as [number | null, number | null] | undefined) ||
-      ((node as { shape?: [number | null, number | null] }).shape ?? null);
+    const rawShape = (node.shape as [number | null, number | null] | undefined) ?? null;
     if (!rawShape) {
       return '—';
     }

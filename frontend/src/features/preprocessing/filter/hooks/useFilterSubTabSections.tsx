@@ -193,14 +193,14 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
         const normalizedDataType = normalizeTypeName(rawType ?? 'unknown');
         columns.push({ name: colName, dataType: normalizedDataType });
       });
-    } else if (selectedNode?.data?.schema) {
-      Object.keys(selectedNode.data.schema).forEach((colName) => {
+    } else if (selectedNode?.schema) {
+      Object.keys(selectedNode.schema as Record<string, unknown>).forEach((colName) => {
         columns.push({ name: colName, dataType: 'string' });
       });
     }
 
     return columns;
-  }, [nodeData?.columns, nodeData?.dtypes, selectedNode?.data?.schema]);
+  }, [nodeData?.columns, nodeData?.dtypes, selectedNode?.schema]);
 
   const hasSelection = Boolean(selectedNodeId);
   const hasSchema = availableColumns.length > 0;
@@ -351,8 +351,8 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
   }, [conditions, currentWorkspaceId, selectedNodeId, categoricalOptions, getCategoricalKey, ensureCategoricalOptions]);
 
   useEffect(() => {
-    if (selectedNode?.data?.name) {
-      setNewNodeName(`${selectedNode.data.name}_filtered`);
+    if (selectedNode?.name) {
+      setNewNodeName(`${selectedNode.name}_filtered`);
     } else if (!selectedNodeId) {
       setNewNodeName('');
     }

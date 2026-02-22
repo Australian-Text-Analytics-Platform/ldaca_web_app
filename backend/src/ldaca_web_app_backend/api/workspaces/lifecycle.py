@@ -120,16 +120,19 @@ async def create_workspace(
 
 @router.delete("/delete")
 async def delete_workspace(
+    workspace_id: str,
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    if not workspace_id.strip():
+        raise HTTPException(status_code=400, detail="workspace_id is required")
     success = workspace_manager.delete_workspace(user_id, workspace_id)
     if not success:
         raise HTTPException(status_code=404, detail="Workspace not found")
     return {
         "state": "successful",
         "message": f"Workspace {workspace_id} deleted successfully",
+        "id": workspace_id,
     }
 
 

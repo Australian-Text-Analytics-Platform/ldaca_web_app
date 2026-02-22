@@ -15,8 +15,6 @@ import { useWorkspaceActions } from '@/hooks/useWorkspaceActions';
 import { useWorkspaceData } from '@/hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '@/hooks/useWorkspaceSelection';
 import { useWorkspaceStatus } from '@/hooks/useWorkspaceStatus';
-import type { NodeShape as WorkspaceNodeShape } from '../../../../types';
-
 import { computeDagreLayout } from '../services/graphLayout';
 
 const EDGE_STROKE = '#0f172a';
@@ -116,18 +114,26 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
     );
 
     return workspaceGraph.nodes.map((node: any, index: number) => {
-      const rawNodeType = node.type || '';
-      const dataType = rawNodeType || 'unknown';
-      const columns: string[] = [];
-      const isLazyNode = Boolean(
-        (typeof rawNodeType === 'string' && rawNodeType.toLowerCase().includes('lazyframe'))
-      );
+      const columns = Array.isArray(node.columns)
+        ? node.columns.map((column: unknown) => String(column))
+        : [];
+
+      const columnSchema =
+        node.schema && typeof node.schema === 'object'
+          ? Object.entries(node.schema as Record<string, unknown>).reduce<Record<string, string>>((acc, [key, value]) => {
+              acc[key] = String(value);
+              return acc;
+            }, {})
+          : {};
+
+      const documentColumn = typeof node.document === 'string' && node.document.trim().length > 0
+        ? node.document
+        : null;
 
       dlog('WorkspaceGraphView: Raw node data (condensed):', {
         id: node.id,
-        nodeType: rawNodeType,
-        isLazy: isLazyNode,
         operation: node.operation,
+        columns: columns.length,
       });
 
         const rawShape = Array.isArray((node as { shape?: unknown }).shape)
@@ -151,13 +157,14 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
           node: {
             node_id: node.id,
             name: node.name || `Node ${index + 1}`,
-              shape: parsedShape,
+            shape: parsedShape,
             columns,
             preview: [],
-            is_text_data: false,
-            data_type: dataType,
-            document_column: null,
-            column_schema: {},
+            is_text_data: Boolean(documentColumn),
+            data_type: 'LazyFrame',
+            document: documentColumn,
+            document_column: documentColumn,
+            column_schema: columnSchema,
           },
           isMultiSelected:
             (selectedNodeIds?.length || 0) > 1 && Boolean(selectedNodeIds?.includes?.(node.id)),

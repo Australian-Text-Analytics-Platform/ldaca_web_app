@@ -178,8 +178,6 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
         const identifier =
           node.id ||
           node.node_id ||
-          (node.data?.id as string | undefined) ||
-          (node.data?.node_id as string | undefined) ||
           `node-${idx}`;
         return identifier === selectedNodeId;
       });
@@ -196,8 +194,6 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     return (
       first.id ||
       first.node_id ||
-      (first.data?.id as string | undefined) ||
-      (first.data?.node_id as string | undefined) ||
       null
     );
   }, [effectiveNodes]);

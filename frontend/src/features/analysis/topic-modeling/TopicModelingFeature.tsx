@@ -407,7 +407,7 @@ const TopicModelingFeature: React.FC = () => {
             node.id,
             {
               id: node.id,
-              name: String(node.name || node.data?.name || node.id),
+              name: String(node.name || node.id),
               columns: Array.isArray(node.columns)
                 ? node.columns.filter((col): col is string => typeof col === 'string')
                 : [],
