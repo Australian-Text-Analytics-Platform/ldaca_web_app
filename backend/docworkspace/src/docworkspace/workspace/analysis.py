@@ -1,6 +1,6 @@
-"""Analysis & summary helpers split from monolithic workspace.py.
+"""Workspace analysis helpers.
 
-`summary` now returns richer information required by existing tests and API:
+`info_json` returns structured workspace information required by tests and API:
  - total_nodes, root_nodes, leaf_nodes
  - node_types counts, status_counts (lazy/eager)
  - metadata_keys from workspace metadata
@@ -8,13 +8,13 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict
+from typing import TYPE_CHECKING, Any, Dict, List
 
 if TYPE_CHECKING:  # pragma: no cover
     from .core import Workspace
 
 
-def summary(workspace: "Workspace", json: bool = False) -> Dict[str, Any]:
+def info_json(workspace: "Workspace") -> Dict[str, Any]:
     total_nodes = len(workspace.nodes)
     root_nodes = len(workspace.get_root_nodes())
     leaf_nodes = len(workspace.get_leaf_nodes())
@@ -35,8 +35,31 @@ def summary(workspace: "Workspace", json: bool = False) -> Dict[str, Any]:
     }
 
 
-def info(workspace: "Workspace", json: bool = False) -> Dict[str, Any]:
-    return summary(workspace, json=json)
+def graph_json(workspace: "Workspace") -> Dict[str, object]:
+    nodes_payload: List[Dict[str, object]] = []
+    edges_payload: List[Dict[str, str]] = []
+    for node in workspace.nodes.values():
+        nodes_payload.append({
+            "id": node.id,
+            "name": node.name,
+            "type": type(node.data).__name__,
+            "operation": node.operation or "load",
+            "parent_count": len(node.parents),
+            "child_count": len(node.children),
+        })
+        for child in node.children:
+            edges_payload.append({"source": node.id, "target": child.id})
+    return {
+        "nodes": nodes_payload,
+        "edges": edges_payload,
+        "workspace_info": {
+            "id": workspace.id,
+            "name": workspace.name,
+            "total_nodes": len(workspace.nodes),
+            "root_nodes": len(workspace.get_root_nodes()),
+            "leaf_nodes": len(workspace.get_leaf_nodes()),
+        },
+    }
 
 
-__all__ = ["summary", "info"]
+__all__ = ["info_json", "graph_json"]

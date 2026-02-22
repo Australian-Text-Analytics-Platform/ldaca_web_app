@@ -67,7 +67,7 @@ class TestNode:
     def test_node_slice(self, sample_df):
         """Test slicing a Node."""
         node = Node(sample_df.lazy(), "test_node")
-        sliced = node.slice(slice(0, 2))
+        sliced = node.slice(0, 2)
 
         assert len(sliced.parents) == 1
         assert sliced.parents[0] == node
@@ -89,20 +89,6 @@ class TestNode:
         assert node1 in merged.parents
         assert node2 in merged.parents
         assert merged.data.collect_schema().len() == 3  # key, value1, value2
-
-    def test_node_materialize(self, sample_lazy_df):
-        """Test materializing a lazy Node."""
-        node = Node(sample_lazy_df, "test_node")
-
-        # Before materializing
-        assert isinstance(node.data, pl.LazyFrame)
-
-        # Materialize
-        result = node.materialize()
-
-        # After materializing
-        assert result is node  # Should return self
-        assert isinstance(node.data, pl.LazyFrame)
 
     def test_node_attribute_delegation(self, sample_df):
         """Test that Node delegates attributes to the underlying data."""
@@ -129,7 +115,6 @@ class TestNode:
         assert info["operation"] == "load"
         assert info["shape"] == (3, 2)
         assert info["document"] is None
-        assert info["lazy"] is True
         # Schema should be a dict of column name -> string type
         assert isinstance(info["schema"], dict)
         assert len(info["schema"]) == 2

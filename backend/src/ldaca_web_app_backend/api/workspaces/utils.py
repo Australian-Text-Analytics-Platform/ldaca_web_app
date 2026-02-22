@@ -2,6 +2,7 @@
 
 import os
 import re
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional, Tuple
 
@@ -10,6 +11,59 @@ from fastapi import HTTPException
 
 from ...analysis.models import AnalysisStatus
 from ...core.workspace import workspace_manager
+
+
+def update_workspace(
+    user_id: str,
+    workspace_id: str,
+    workspace: Any | None = None,
+    *,
+    best_effort: bool = False,
+) -> Path | None:
+    """Persist workspace metadata/path updates through one shared code path.
+
+    Used by:
+    - workspace lifecycle, node, and analysis endpoints after mutations
+
+    Why:
+    - Removes repeated save/update boilerplate from route handlers.
+    """
+    try:
+        if workspace is None and hasattr(workspace_manager, "get_workspace"):
+            workspace = workspace_manager.get_workspace(user_id, workspace_id)
+
+        if workspace is None:
+            return None
+
+        has_resolver = all(
+            hasattr(workspace_manager, attr)
+            for attr in [
+                "_resolve_workspace_dir",
+                "_attach_workspace_dir",
+                "_set_cached_path",
+            ]
+        )
+
+        if not has_resolver:
+            legacy_save = getattr(workspace_manager, "save_workspace", None)
+            if callable(legacy_save):
+                legacy_save(user_id, workspace_id)
+            return None
+
+        workspace.set_metadata("modified_at", datetime.now().isoformat())
+        target_dir = workspace_manager._resolve_workspace_dir(
+            user_id=user_id,
+            workspace_id=workspace_id,
+            workspace_name=workspace.name,
+        )
+        workspace_manager._attach_workspace_dir(workspace, target_dir)
+        workspace.save(target_dir)
+        workspace_manager._set_cached_path(user_id, workspace_id, target_dir)
+        return target_dir
+    except Exception:
+        if best_effort:
+            return None
+        raise
 
 
 async def ensure_task_synced(
@@ -237,6 +291,7 @@ __all__ = [
     "success",
     "running",
     "failed",
+    "update_workspace",
     "_handle_operation_result",
     "get_node_or_404",
     "get_node_with_data_or_400",

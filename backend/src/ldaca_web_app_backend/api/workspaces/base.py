@@ -7,7 +7,6 @@ All business logic is handled by the DocWorkspace library itself.
 
 import logging
 import os
-from datetime import datetime
 
 import polars as pl
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
@@ -17,8 +16,12 @@ from ...core.auth import get_current_user
 # Note: DocWorkspace API helpers are not used directly in this HTTP layer
 from ...core.utils import get_user_data_folder, load_data_file
 from ...core.workspace import workspace_manager
-from ...core.workspace_node_data_ops import NodeDataError, drop_column, rename_column
-from .utils import get_node_or_404, get_node_with_data_or_400, stage_dataframe_as_lazy
+from .utils import (
+    get_node_or_404,
+    get_node_with_data_or_400,
+    stage_dataframe_as_lazy,
+    update_workspace,
+)
 
 # (No direct model imports needed after modularization)
 # Removed unused concordance cache import (clearing handled in analyses module)
@@ -43,30 +46,25 @@ async def delete_node_column(
 
     user_id = current_user["id"]
     node, data = get_node_with_data_or_400(user_id, workspace_id, node_id)
+    if not isinstance(data, pl.LazyFrame):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Node data must be lazy (LazyFrame). Received '{type(data).__name__}'."
+            ),
+        )
 
     try:
-        node.data = drop_column(data, column_name)  # type: ignore[assignment]
+        node.data = data.drop([column_name])
         try:
             node.operation += f"\ndrop_column({column_name})"
         except Exception:  # pragma: no cover - non-critical history update
             pass
         try:
-            workspace = workspace_manager.get_workspace(user_id, workspace_id)
-            if workspace is not None:
-                workspace.set_metadata("modified_at", datetime.now().isoformat())
-                target_dir = workspace_manager._resolve_workspace_dir(
-                    user_id=user_id,
-                    workspace_id=workspace_id,
-                    workspace_name=workspace.name,
-                )
-                workspace_manager._attach_workspace_dir(workspace, target_dir)
-                workspace.save(target_dir)
-                workspace_manager._set_cached_path(user_id, workspace_id, target_dir)
+            update_workspace(user_id, workspace_id, best_effort=True)
         except Exception:
             pass
         return node.info()
-    except NodeDataError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=str(exc))
     except Exception as exc:  # pragma: no cover - defensive
         raise HTTPException(
             status_code=500,
@@ -93,33 +91,28 @@ async def rename_node_column(
         )
 
     node, data = get_node_with_data_or_400(user_id, workspace_id, node_id)
+    if not isinstance(data, pl.LazyFrame):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Node data must be lazy (LazyFrame). Received '{type(data).__name__}'."
+            ),
+        )
 
     trimmed_name = new_name.strip()
 
     try:
-        node.data = rename_column(data, column_name, trimmed_name)  # type: ignore[assignment]
+        node.data = data.rename({column_name: trimmed_name})
         if trimmed_name != column_name:
             try:
                 node.operation += f"\nrename_column({column_name}->{trimmed_name})"
             except Exception:  # pragma: no cover
                 pass
         try:
-            workspace = workspace_manager.get_workspace(user_id, workspace_id)
-            if workspace is not None:
-                workspace.set_metadata("modified_at", datetime.now().isoformat())
-                target_dir = workspace_manager._resolve_workspace_dir(
-                    user_id=user_id,
-                    workspace_id=workspace_id,
-                    workspace_name=workspace.name,
-                )
-                workspace_manager._attach_workspace_dir(workspace, target_dir)
-                workspace.save(target_dir)
-                workspace_manager._set_cached_path(user_id, workspace_id, target_dir)
+            update_workspace(user_id, workspace_id, best_effort=True)
         except Exception:
             pass
         return node.info()
-    except NodeDataError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=str(exc))
     except Exception as exc:  # pragma: no cover
         raise HTTPException(
             status_code=500,
@@ -574,17 +567,7 @@ async def cast_node(
 
             # Save workspace to disk
             # Ensure current workspace is persisted after casting
-            workspace = workspace_manager.get_workspace(user_id, workspace_id)
-            if workspace is not None:
-                workspace.set_metadata("modified_at", datetime.now().isoformat())
-                target_dir = workspace_manager._resolve_workspace_dir(
-                    user_id=user_id,
-                    workspace_id=workspace_id,
-                    workspace_name=workspace.name,
-                )
-                workspace_manager._attach_workspace_dir(workspace, target_dir)
-                workspace.save(target_dir)
-                workspace_manager._set_cached_path(user_id, workspace_id, target_dir)
+            update_workspace(user_id, workspace_id)
             # Get new data type for response
             new_schema = casted_lazy.collect_schema()
             new_type = str(new_schema[column_name])
@@ -731,6 +714,7 @@ async def export_nodes(
 # ============================================================================
 
 
+# ============================================================================
 # ============================================================================
 # ============================================================================
 # ============================================================================

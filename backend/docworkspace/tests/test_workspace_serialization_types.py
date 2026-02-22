@@ -20,11 +20,11 @@ def test_workspace_save_load_preserves_types(tmp_path):
     ws.add_node(Node(data=lazy, name="lazy"))
 
     out_file = tmp_path / "workspace_save.json"
-    ws.save(out_file, format="json")
+    ws.save(out_file)
 
     assert out_file.exists(), "Serialized workspace file not created"
 
-    ws2 = Workspace.load(out_file, format="json")
+    ws2 = Workspace.load(out_file)
 
     # Collect types by node name
     type_map = {n.name: type(n.data).__name__ for n in ws2.nodes.values()}
@@ -37,24 +37,20 @@ def test_workspace_save_load_preserves_types(tmp_path):
     assert df_node.data.select(pl.col("a")).collect().to_series().to_list() == [1, 2, 3]
 
 
-def test_workspace_binary_not_implemented(tmp_path):
+def test_workspace_save_load_no_format_argument(tmp_path):
     ws = Workspace(name="bin_ws")
     ws.add_node(Node(data=pl.DataFrame({"x": [1]}).lazy(), name="df"))
 
-    with pytest.raises(NotImplementedError):
+    # API no longer accepts a format argument.
+    with pytest.raises(TypeError):
         ws.save(tmp_path / "ws.bin", format="binary")
 
-    # Create a dummy json file to attempt binary deserialize and confirm error
     dummy = tmp_path / "ws.json"
     dummy.write_text(
         json.dumps({
-            "format": "json",
-            "id": "x",
-            "name": "n",
-            "metadata": {},
-            "nodes": {},
-            "relationships": [],
+            "workspace_metadata": {"id": "x", "name": "n"},
+            "nodes": [],
         })
     )
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(TypeError):
         Workspace.load(dummy, format="binary")

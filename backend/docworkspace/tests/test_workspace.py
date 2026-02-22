@@ -142,8 +142,8 @@ class TestWorkspace:
         with pytest.raises(ValueError):
             workspace.set_metadata("project", "test")
 
-    def test_workspace_summary(self, workspace, sample_df):
-        """Test workspace summary."""
+    def test_workspace_info_json(self, workspace, sample_df):
+        """Test workspace info_json payload."""
         # Create some nodes
         root1 = workspace.add_node(
             Node(data=sample_df.lazy(), name="root1", workspace=workspace)
@@ -154,7 +154,7 @@ class TestWorkspace:
         root1.filter(pl.col("value") > 1)
         root2.filter(pl.col("value") > 2)
 
-        summary = workspace.summary()
+        summary = workspace.info_json()
 
         assert summary["total_nodes"] == 4
         assert summary["root_nodes"] == 2
@@ -305,46 +305,10 @@ class TestWorkspaceSerialization:
             # After serialization, lazy frames should remain lazy
             assert isinstance(loaded_lazy.data, pl.LazyFrame)
 
-    def test_load_from_dict(self):
-        """Test loading workspace from dictionary (for API compatibility)."""
-        # Create a workspace and export to new format
-        workspace = Workspace("test")
-        df = pl.DataFrame({"a": [1, 2, 3]})
-        node = workspace.add_node(
-            Node(data=df.lazy(), name="test_df", workspace=workspace)
-        )
-        workspace.set_metadata("description", "dict workspace")
-        workspace.set_metadata("created_at", "2024-02-01T00:00:00Z")
-        workspace.set_metadata("modified_at", "2024-02-02T00:00:00Z")
-
-        # Create workspace dict using new serialization format
-        workspace_dict = {
-            "workspace_metadata": {
-                "id": workspace.id,
-                "name": workspace.name,
-                "version": 1,
-                "description": workspace.get_metadata("description"),
-                "created_at": workspace.get_metadata("created_at"),
-                "modified_at": workspace.get_metadata("modified_at"),
-            },
-            "nodes": [],
-        }
-
-        # Convert nodes using new format
-        for _, node in workspace.nodes.items():
-            node_payload = node.serialize()
-            node_payload["node_metadata"]["parents"] = [p.id for p in node.parents]
-            workspace_dict["nodes"].append(node_payload)
-
-        # Load from dict
-        loaded = Workspace.load(workspace_dict)
-
-        assert loaded.name == workspace.name
-        assert len(loaded.nodes) == 1
-        assert loaded.get_node_by_name("test_df") is not None
-        assert loaded.get_metadata("description") == "dict workspace"
-        assert loaded.get_metadata("created_at") == "2024-02-01T00:00:00Z"
-        assert loaded.get_metadata("modified_at") == "2024-02-02T00:00:00Z"
+    def test_load_from_dict_rejected(self):
+        """Workspace.load should accept path-like values only."""
+        with pytest.raises(TypeError):
+            Workspace.load({"workspace_metadata": {}, "nodes": []})
 
     def test_workspace_serialized_file_structure(self, populated_workspace):
         """Validate on-disk JSON structure contains expected envelope keys.
@@ -444,7 +408,7 @@ class TestWorkspaceGraphOperations:
 
     def test_workspace_graph_structure(self, complex_workspace):
         """Test the generic graph structure generation."""
-        graph_data = complex_workspace.graph()
+        graph_data = complex_workspace.graph_json()
 
         assert "nodes" in graph_data
         assert "edges" in graph_data
@@ -463,18 +427,6 @@ class TestWorkspaceGraphOperations:
             ]
             for field in required_fields:
                 assert field in node_data
-
-    def test_visualize_graph(self, complex_workspace):
-        """Test graph visualization."""
-        visualization = complex_workspace.visualize_graph()
-
-        assert isinstance(visualization, str)
-        assert "Workspace:" in visualization
-        assert "Graph Info:" in visualization
-
-        # Should contain node information
-        for node in complex_workspace.nodes.values():
-            assert node.name in visualization
 
     def test_workspace_with_initial_data_loading(self):
         """Test explicit initial data loading after creating an empty workspace."""
@@ -571,8 +523,8 @@ class TestWorkspaceGraphOperations:
         assert workspace.get_metadata("modified_at") == "2024-03-02T00:00:00Z"
         assert workspace.get_metadata("nonexistent") is None
 
-        # Check summary includes metadata
-        summary = workspace.summary()
+        # Check info_json includes metadata
+        summary = workspace.info_json()
         assert "metadata_keys" in summary
         assert set(summary["metadata_keys"]) == {
             "description",
@@ -631,3 +583,32 @@ class TestWorkspaceGraphOperations:
         # Child should now be materialized
         remaining_node = list(workspace.nodes.values())[0]
         assert isinstance(remaining_node.data, pl.LazyFrame)
+
+    def test_remove_node_rewires_child_to_all_parents(self):
+        """Deleting an intermediate node should preserve lineage via parent inheritance."""
+        workspace = Workspace("rewire_test")
+
+        df_left = pl.DataFrame({"id": [1, 2], "left": [10, 20]})
+        df_right = pl.DataFrame({"id": [1, 2], "right": [30, 40]})
+
+        node_b = workspace.add_node(Node(df_left.lazy(), "B"))
+        node_c = workspace.add_node(Node(df_right.lazy(), "C"))
+
+        node_a = node_b.join(node_c, on="id", how="inner")
+        node_d = node_a.filter(pl.col("id") > 0)
+
+        assert node_a in node_b.children
+        assert node_a in node_c.children
+        assert node_b in node_a.parents
+        assert node_c in node_a.parents
+        assert node_d in node_a.children
+        assert node_a in node_d.parents
+
+        assert workspace.remove_node(node_a.id) is True
+
+        assert node_d in node_b.children
+        assert node_d in node_c.children
+        assert node_b in node_d.parents
+        assert node_c in node_d.parents
+        assert node_a not in node_d.parents
+        assert node_a not in workspace.nodes.values()

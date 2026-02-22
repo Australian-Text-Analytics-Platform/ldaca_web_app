@@ -30,7 +30,7 @@ from .analyses.text_column_prefs import (
     guess_text_column,
     persist_text_column_preference,
 )
-from .utils import get_node_or_404, get_node_with_data_or_400
+from .utils import get_node_or_404, get_node_with_data_or_400, update_workspace
 
 router = APIRouter(prefix="/workspaces", tags=["nodes"])
 
@@ -89,41 +89,6 @@ def _sanitize_column_alias(label: str) -> str:
     if not sanitized:
         return "computed_column"
     return sanitized[:120]
-
-
-def _persist_workspace(user_id: str, workspace_id: str) -> None:
-    if not hasattr(workspace_manager, "get_workspace"):
-        legacy_save = getattr(workspace_manager, "save_workspace", None)
-        if callable(legacy_save):
-            legacy_save(user_id, workspace_id)
-        return
-
-    workspace = workspace_manager.get_workspace(user_id, workspace_id)
-    if workspace is None:
-        return
-
-    if not all(
-        hasattr(workspace_manager, attr)
-        for attr in [
-            "_resolve_workspace_dir",
-            "_attach_workspace_dir",
-            "_set_cached_path",
-        ]
-    ):
-        legacy_save = getattr(workspace_manager, "save_workspace", None)
-        if callable(legacy_save):
-            legacy_save(user_id, workspace_id)
-        return
-
-    workspace.set_metadata("modified_at", datetime.now().isoformat())
-    target_dir = workspace_manager._resolve_workspace_dir(
-        user_id=user_id,
-        workspace_id=workspace_id,
-        workspace_name=workspace.name,
-    )
-    workspace_manager._attach_workspace_dir(workspace, target_dir)
-    workspace.save(target_dir)
-    workspace_manager._set_cached_path(user_id, workspace_id, target_dir)
 
 
 def _resolve_expression_column_name(request: ExpressionTransformRequest) -> str:
@@ -543,7 +508,7 @@ async def compute_column_apply(
 
     try:
         node.data = updated_data
-        _persist_workspace(user_id, workspace_id)
+        update_workspace(user_id, workspace_id)
     except Exception as exc:
         raise HTTPException(
             status_code=500,
@@ -864,9 +829,7 @@ async def convert_node(
             src_node.operation += "\n" + operation_name
         except Exception:
             pass
-        workspace = workspace_manager.get_workspace(user_id, workspace_id)
-        if workspace is not None:
-            _persist_workspace(user_id, workspace_id)
+        update_workspace(user_id, workspace_id)
         return src_node.info()
     except HTTPException:
         raise
@@ -914,9 +877,7 @@ async def reset_node_document_column(
             src_node.operation = "reset_document"
         except Exception:
             pass
-        workspace = workspace_manager.get_workspace(user_id, workspace_id)
-        if workspace is not None:
-            _persist_workspace(user_id, workspace_id)
+        update_workspace(user_id, workspace_id)
         return src_node.info()
     except HTTPException:
         raise
@@ -935,12 +896,7 @@ async def update_node_name(
     node = get_node_or_404(user_id, workspace_id, node_id)
     try:
         node.name = new_name
-        workspace = workspace_manager.get_workspace(user_id, workspace_id)
-        if workspace is not None:
-            try:
-                _persist_workspace(user_id, workspace_id)
-            except Exception:
-                pass
+        update_workspace(user_id, workspace_id, best_effort=True)
         try:
             return node.info()
         except Exception:
@@ -1018,7 +974,7 @@ async def filter_node(
         operation=f"filter({node.name})",
         parents=[node],
     )
-    _persist_workspace(user_id, workspace_id)
+    update_workspace(user_id, workspace_id)
     return {
         "node_name": new_node.name,
         "node_id": new_node.id,
@@ -1114,7 +1070,7 @@ async def slice_node(
         operation=f"slice({node.name}, {slice_args})",
         parents=[node],
     )
-    _persist_workspace(user_id, workspace_id)
+    update_workspace(user_id, workspace_id)
     return {
         "node_name": new_node.name,
         "node_id": new_node.id,

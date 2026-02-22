@@ -90,7 +90,7 @@ class TestLazyFlowIntegration:
         workspace.add_node(lazy_node)
 
         # Get workspace info
-        workspace_info = workspace.info()
+        workspace_info = workspace.info_json()
 
         # Check that workspace tracks lazy state of nodes
         assert isinstance(workspace_info, dict)

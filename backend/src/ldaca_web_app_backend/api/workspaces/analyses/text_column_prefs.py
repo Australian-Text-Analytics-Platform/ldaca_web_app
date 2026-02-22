@@ -9,13 +9,13 @@ Why:
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Any
 
 import polars as pl
 from fastapi import HTTPException
 
 from ....core.workspace import workspace_manager
+from ..utils import update_workspace
 
 COMMON_TEXT_COLUMN_CANDIDATES = ("document", "text", "content", "body", "message")
 
@@ -147,17 +147,7 @@ def resolve_text_columns_for_nodes(
 
     if persist_preference:
         try:
-            workspace = workspace_manager.get_workspace(user_id, workspace_id)
-            if workspace is not None:
-                workspace.set_metadata("modified_at", datetime.now().isoformat())
-                target_dir = workspace_manager._resolve_workspace_dir(
-                    user_id=user_id,
-                    workspace_id=workspace_id,
-                    workspace_name=workspace.name,
-                )
-                workspace_manager._attach_workspace_dir(workspace, target_dir)
-                workspace.save(target_dir)
-                workspace_manager._set_cached_path(user_id, workspace_id, target_dir)
+            update_workspace(user_id, workspace_id, best_effort=True)
         except Exception:
             # Best-effort only.
             pass

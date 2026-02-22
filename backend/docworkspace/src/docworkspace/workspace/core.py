@@ -4,8 +4,7 @@ Split from the former monolithic workspace.py. This module is intentionally
 focused only on core graph/data responsibilities. Complementary concerns:
 
  - serialization: workspace/io.py
- - analysis & summary: workspace/analysis.py
- - graph views / visualization: workspace/graph_views.py
+ - analysis & graph JSON views: workspace/analysis.py
 
 Import path backwards compatibility is preserved via the original
 `docworkspace.workspace` shim that re-exports Workspace.
@@ -65,12 +64,31 @@ class Workspace:
         if node_id not in self.nodes:
             return False
         node = self.nodes[node_id]
-        if materialize_children:
-            for child in node.children.copy():
-                child.materialize()
-        for parent in node.parents:
+        parent_nodes = node.parents.copy()
+        child_nodes = node.children.copy()
+
+        # `materialize_children` is retained for compatibility but no-op because
+        # Node data is always represented as LazyFrame.
+        _ = materialize_children
+
+        # Rewire graph so children inherit the removed node's parents.
+        for child in child_nodes:
+            if node in child.parents:
+                child.parents.remove(node)
+            for parent in parent_nodes:
+                if parent is child:
+                    continue
+                if child not in parent.children:
+                    parent.children.append(child)
+                if parent not in child.parents:
+                    child.parents.append(parent)
+
+        for parent in parent_nodes:
             if node in parent.children:
                 parent.children.remove(node)
+
+        node.parents = []
+        node.children = []
         del self.nodes[node_id]
 
         # Best-effort cleanup for on-disk persisted node payloads.
@@ -160,60 +178,30 @@ class Workspace:
     def __bool__(self) -> bool:
         return True
 
-    # Backward-compatible helpers (serialize/deserialize & summaries) ----
-    def save(self, path: Any, format: str = "json") -> Any:  # pragma: no cover
-        """Persist workspace to disk (json only)."""
-        from pathlib import Path as _P
-
+    # Persistence helpers ------------------------------------------------
+    def save(self, path: str | Path) -> str | Path:  # pragma: no cover
+        """Persist workspace to disk."""
         from .io import write_workspace
 
-        if format == "binary":
-            raise NotImplementedError("Binary workspace serialization not implemented")
-        if format != "json":
-            raise ValueError(f"Unsupported format: {format}")
-        if isinstance(path, (str, _P)):
-            write_workspace(self, path)
-            return path
-        raise TypeError("Path must be str or Path for save")
+        write_workspace(self, path)
+        return path
 
     @classmethod
-    def load(cls, path: Any, format: str = "json") -> "Workspace":  # pragma: no cover
-        """Load workspace from disk path or from serialized dictionary."""
-        from pathlib import Path as _P
+    def load(cls, path: str | Path) -> "Workspace":  # pragma: no cover
+        """Load workspace from disk path."""
+        from .io import read_workspace
 
-        from .io import deserialize_workspace, read_workspace
+        return read_workspace(path)
 
-        if format == "binary":
-            raise NotImplementedError(
-                "Binary workspace deserialization not implemented"
-            )
-        if format != "json":
-            raise ValueError(f"Unsupported format: {format}")
-        if isinstance(path, (str, _P)):
-            return read_workspace(path)
-        if isinstance(path, dict):
-            return deserialize_workspace(path, format=format)
-        raise TypeError("Unsupported input for load (expect path or dict)")
+    def info_json(self) -> Dict[str, Any]:  # pragma: no cover
+        from .analysis import info_json
 
-    def summary(self, json: bool = False) -> Dict[str, Any]:  # pragma: no cover
-        from .analysis import summary
+        return info_json(self)
 
-        return summary(self, json=json)
+    def graph_json(self) -> Dict[str, Any]:  # pragma: no cover
+        from .analysis import graph_json
 
-    def info(self, json: bool = False) -> Dict[str, Any]:  # pragma: no cover
-        from .analysis import info
-
-        return info(self, json=json)
-
-    def graph(self) -> Dict[str, Any]:  # pragma: no cover
-        from .graph_views import graph
-
-        return graph(self)
-
-    def visualize_graph(self) -> str:  # pragma: no cover
-        from .graph_views import visualize_graph
-
-        return visualize_graph(self)
+        return graph_json(self)
 
 
 __all__ = ["Workspace"]

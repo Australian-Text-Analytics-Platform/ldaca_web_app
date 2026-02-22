@@ -22,6 +22,7 @@ from ..files import USER_TASK_SCOPE
 from .analyses.token_frequencies import (
     _unwrap_task_manager_result as unwrap_task_manager_result,
 )
+from .utils import update_workspace
 
 router = APIRouter(prefix="/workspaces", tags=["lifecycle"])
 
@@ -38,19 +39,6 @@ def _safe_member_path(name: str) -> PurePosixPath:
     if any(part in {"", "."} for part in path.parts):
         raise HTTPException(status_code=400, detail="Invalid zip entry path")
     return path
-
-
-def _persist_workspace(user_id: str, workspace_id: str, workspace: Workspace) -> Path:
-    workspace.set_metadata("modified_at", datetime.now().isoformat())
-    target_dir = workspace_manager._resolve_workspace_dir(
-        user_id=user_id,
-        workspace_id=workspace_id,
-        workspace_name=workspace.name,
-    )
-    workspace_manager._attach_workspace_dir(workspace, target_dir)
-    workspace.save(target_dir)
-    workspace_manager._set_cached_path(user_id, workspace_id, target_dir)
-    return target_dir
 
 
 @router.get("/")
@@ -119,7 +107,7 @@ async def create_workspace(
         workspace.set_metadata("created_at", now)
         workspace.set_metadata("modified_at", now)
 
-        _persist_workspace(user_id, workspace_id, workspace)
+        update_workspace(user_id, workspace_id, workspace)
         workspace_manager.set_current_workspace(user_id, workspace_id)
 
         workspace_info = workspace_manager.get_workspace_info(user_id, workspace_id)
@@ -201,7 +189,7 @@ async def rename_workspace(
                 status_code=400, detail=f"Invalid workspace name: {reason}"
             )
         workspace.name = new_name
-        _persist_workspace(user_id, workspace_id, workspace)
+        update_workspace(user_id, workspace_id, workspace)
         info = workspace_manager.get_workspace_info(user_id, workspace_id)
         if not info:
             raise HTTPException(
@@ -223,7 +211,7 @@ async def save_workspace(
     if not ws:
         raise HTTPException(status_code=404, detail="Workspace not found")
     try:
-        _persist_workspace(user_id, workspace_id, ws)
+        update_workspace(user_id, workspace_id, ws)
         return {"state": "successful", "message": "Workspace saved"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to save workspace: {e}")
@@ -249,7 +237,7 @@ async def start_workspace_download(
     if current_workspace_id == workspace_id:
         current_workspace = workspace_manager.get_workspace(user_id, workspace_id)
         if current_workspace is not None:
-            _persist_workspace(user_id, workspace_id, current_workspace)
+            update_workspace(user_id, workspace_id, current_workspace)
 
     # Verify workspace directory exists before submitting
     workspace_dir = workspace_manager.get_workspace_dir(user_id, workspace_id)
@@ -524,7 +512,7 @@ async def save_workspace_as(
         new_ws.id = new_id
         new_ws.name = new_name
 
-        _persist_workspace(user_id, new_id, new_ws)
+        update_workspace(user_id, new_id, new_ws)
         workspace_manager.set_current_workspace(user_id, new_id)
         info = workspace_manager.get_workspace_info(user_id, new_id)
         return {
