@@ -214,7 +214,10 @@ def stage_dataframe_as_lazy(
 
 
 def get_node_or_404(
-    user_id: str, workspace_id: str, node_id: str, detail: Optional[str] = None
+    user_id: str,
+    workspace_id: Optional[str],
+    node_id: str,
+    detail: Optional[str] = None,
 ):
     """Fetch node from workspace or raise 404.
 
@@ -224,7 +227,14 @@ def get_node_or_404(
     Why:
     - Avoids repeated existence checks in route handlers.
     """
-    node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
+    if workspace_id is None:
+        current_entry = workspace_manager._get_current_entry(user_id)
+        if not current_entry:
+            raise HTTPException(status_code=404, detail="No active workspace selected")
+        ws = current_entry[1]
+        node = ws.nodes[node_id]
+    else:
+        node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
     if not node:
         raise HTTPException(status_code=404, detail=detail or "Node not found")
     return node
@@ -232,7 +242,7 @@ def get_node_or_404(
 
 def get_node_with_data_or_400(
     user_id: str,
-    workspace_id: str,
+    workspace_id: Optional[str],
     node_id: str,
     not_found_detail: Optional[str] = None,
 ):

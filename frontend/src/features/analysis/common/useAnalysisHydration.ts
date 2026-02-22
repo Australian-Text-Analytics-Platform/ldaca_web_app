@@ -99,7 +99,7 @@ export function useAnalysisHydration<TRequest = unknown, TResult = unknown, TPre
           taskId = await resolveTaskId();
         } else if (analysisKey && getAuthHeaders && workspaceId) {
           try {
-            const current = await textApi.getAnalysisCurrent(workspaceId, analysisKey, getAuthHeaders()) as any;
+            const current = await textApi.getAnalysisCurrent(analysisKey, getAuthHeaders()) as any;
             const currentTaskId = Array.isArray(current?.task_ids) ? current.task_ids[0] : null;
             taskId = typeof currentTaskId === 'string' && currentTaskId.trim().length > 0 ? currentTaskId : null;
           } catch {

@@ -260,7 +260,7 @@ function TokenFrequencyFeature() {
     const inflight = (async () => {
       try {
         const headers = getAuthHeaders();
-        const current = await textApi.getAnalysisCurrent(currentWorkspaceId, 'token-frequencies', headers) as any;
+        const current = await textApi.getAnalysisCurrent('token-frequencies', headers) as any;
         const taskId = Array.isArray(current?.task_ids) ? current.task_ids[0] : null;
         if (typeof taskId === 'string' && taskId.trim().length > 0) {
           setLocalTokenFrequencyTaskId(taskId);
@@ -618,19 +618,19 @@ function TokenFrequencyFeature() {
         payload.stop_words = prefs.stop_words;
       }
       if (Object.keys(payload).length === 0) return;
-      await textApi.postTokenFrequenciesTaskResult(currentWorkspaceId, taskId, payload, getAuthHeaders());
+      await textApi.postTokenFrequenciesTaskResult(taskId, payload, getAuthHeaders());
     },
     [currentWorkspaceId, getAuthHeaders, resolveTokenFrequencyTaskId]
   );
 
   const fetchCurrentRequest = useCallback(async (taskId?: string | null) => {
     if (!currentWorkspaceId || !taskId) return null;
-    return textApi.getTaskRequest(currentWorkspaceId, taskId, getAuthHeaders());
+    return textApi.getTaskRequest(taskId, getAuthHeaders());
   }, [currentWorkspaceId, getAuthHeaders]);
 
   const fetchCurrentResult = useCallback(async (taskId?: string | null) => {
     if (!currentWorkspaceId || !taskId) return null;
-    return textApi.getTokenFrequenciesTaskResult(currentWorkspaceId, taskId, getAuthHeaders());
+    return textApi.getTokenFrequenciesTaskResult(taskId, getAuthHeaders());
   }, [currentWorkspaceId, getAuthHeaders]);
 
   const refreshCurrentTokenFrequencyResult = useCallback(async () => {
@@ -643,7 +643,7 @@ function TokenFrequencyFeature() {
       if (!taskId) {
         return null;
       }
-      const response = await textApi.getTokenFrequenciesTaskResult(currentWorkspaceId, taskId, getAuthHeaders());
+      const response = await textApi.getTokenFrequenciesTaskResult(taskId, getAuthHeaders());
       const typedResponse = response as TokenFrequencyResponse | null;
       if (typedResponse) {
         setResults(typedResponse);
@@ -1152,7 +1152,7 @@ function TokenFrequencyFeature() {
         stop_words: stopWordsArray,
       };
 
-      const response = await textApi.tokenFrequencies(currentWorkspaceId, request, getAuthHeaders());
+      const response = await textApi.tokenFrequencies(request, getAuthHeaders());
       setResults(response);
       const responseTaskId = (response as any)?.metadata?.task_id;
       if (typeof responseTaskId === 'string' && responseTaskId.trim()) {
@@ -1217,7 +1217,7 @@ function TokenFrequencyFeature() {
         await Promise.all(
           Array.from(taskIds).map(async (taskId) => {
             try {
-              await workspacesApi.cancelTasks(currentWorkspaceId, { task_id: taskId }, headers);
+              await workspacesApi.cancelTasks({ task_id: taskId }, headers);
             } catch (error) {
               console.warn('Failed to cancel token frequency task before clearing', { taskId, error });
             }
@@ -1226,7 +1226,7 @@ function TokenFrequencyFeature() {
         await Promise.all(
           Array.from(taskIds).map(async (taskId) => {
             try {
-              await workspacesApi.clearTasks(currentWorkspaceId, { task_id: taskId }, headers);
+              await workspacesApi.clearTasks({ task_id: taskId }, headers);
             } catch (error) {
               console.warn('Failed to clear token frequency task from task manager', { taskId, error });
             }
@@ -1237,7 +1237,7 @@ function TokenFrequencyFeature() {
       try {
         if (taskIds.size > 0) {
           await Promise.all(
-            Array.from(taskIds).map((taskId) => textApi.clearTask(currentWorkspaceId, taskId, headers))
+            Array.from(taskIds).map((taskId) => textApi.clearTask(taskId, headers))
           );
         }
       } catch (error) {

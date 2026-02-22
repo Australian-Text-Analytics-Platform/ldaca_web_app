@@ -29,7 +29,7 @@ from ....models import (
     QuotationResultQuery,
 )
 from ....settings import settings
-from ..utils import get_node_with_data_or_400, get_workspace_or_404
+from ..utils import get_node_with_data_or_400
 from . import quotation_core as qcore
 
 logger = logging.getLogger(__name__)
@@ -91,9 +91,8 @@ def _prepare_quotation_artifact_target(
     return str(artifact_dir), artifact_prefix
 
 
-@router.get("/{workspace_id}/quotation/tasks/{task_id}/result")
+@router.get("/quotation/tasks/{task_id}/result")
 async def quotation_task_result(
-    workspace_id: str,
     task_id: str,
     page: Optional[int] = None,
     page_size: Optional[int] = None,
@@ -110,6 +109,11 @@ async def quotation_task_result(
     - Supports cheap preference-only reads and on-demand page recomputation.
     """
     user_id = current_user["id"]
+    current_entry = workspace_manager._get_current_entry(user_id)
+    if not current_entry:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+    workspace_id = current_entry[0]
+    ws = current_entry[1]
     task_manager = get_task_manager(user_id, workspace_id)
     task = task_manager.get_task(task_id)
     if not task or not task.result:
@@ -137,8 +141,9 @@ async def quotation_task_result(
         except Exception:
             return base_result
 
-        node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
-        if not node:
+        try:
+            node = ws.nodes[node_id]
+        except Exception:
             return base_result
 
         normalized_page, normalized_size = qcore.normalize_pagination(
@@ -159,9 +164,8 @@ async def quotation_task_result(
     return base_result
 
 
-@router.post("/{workspace_id}/quotation/tasks/{task_id}/result")
+@router.post("/quotation/tasks/{task_id}/result")
 async def update_quotation_task_result(
-    workspace_id: str,
     task_id: str,
     query: QuotationResultQuery,
     current_user: dict = Depends(get_current_user),
@@ -179,6 +183,11 @@ async def update_quotation_task_result(
       to a single internal read/update orchestrator.
     """
     user_id = current_user["id"]
+    current_entry = workspace_manager._get_current_entry(user_id)
+    if not current_entry:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+    workspace_id = current_entry[0]
+    ws = current_entry[1]
     task_manager = get_task_manager(user_id, workspace_id)
     task = task_manager.get_task(task_id)
     if not task or not task.result:
@@ -245,8 +254,9 @@ async def update_quotation_task_result(
     except Exception as exc:  # pragma: no cover
         raise HTTPException(status_code=400, detail=f"Invalid engine config: {exc}")
 
-    node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
-    if not node:
+    try:
+        node = ws.nodes[node_id]
+    except Exception:
         raise HTTPException(status_code=404, detail="Node not found")
 
     normalized_page, normalized_size = qcore.normalize_pagination(
@@ -284,9 +294,8 @@ async def update_quotation_task_result(
     return updated_result
 
 
-@router.post("/{workspace_id}/nodes/{node_id}/quotation")
+@router.post("/nodes/{node_id}/quotation")
 async def get_quotation(
-    workspace_id: str,
     node_id: str,
     request: QuotationRequest,
     current_user: dict = Depends(get_current_user),
@@ -300,7 +309,10 @@ async def get_quotation(
     - Produces immediate result payload and persists it as current quotation task.
     """
     user_id = current_user["id"]
-    get_workspace_or_404(user_id, workspace_id)
+    current_entry = workspace_manager._get_current_entry(user_id)
+    if not current_entry:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+    workspace_id = current_entry[0]
 
     task_manager = get_task_manager(user_id, workspace_id)
 
@@ -385,9 +397,8 @@ async def get_quotation(
         raise HTTPException(status_code=500, detail=f"Internal server error: {exc}")
 
 
-@router.post("/{workspace_id}/nodes/{node_id}/quotation/detach")
+@router.post("/nodes/{node_id}/quotation/detach")
 async def detach_quotation(
-    workspace_id: str,
     node_id: str,
     request: QuotationDetachRequest,
     current_user: dict = Depends(get_current_user),
@@ -401,10 +412,16 @@ async def detach_quotation(
     - Offloads potentially expensive extraction/materialization to worker tasks.
     """
     user_id = current_user["id"]
+    current_entry = workspace_manager._get_current_entry(user_id)
+    if not current_entry:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+    workspace_id = current_entry[0]
+    ws = current_entry[1]
     tm = workspace_manager.get_task_manager(user_id, workspace_id)
 
-    node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
-    if not node:
+    try:
+        node = ws.nodes[node_id]
+    except Exception:
         raise HTTPException(status_code=404, detail="Node not found")
 
     try:

@@ -136,7 +136,10 @@ export const useWorkspaceNodeMutations = ({
   });
 
   const saveWorkspaceMutation = useMutation({
-    mutationFn: () => workspacesApi.save(ensureWorkspaceSelected(), authHeaders),
+    mutationFn: () => {
+      ensureWorkspaceSelected();
+      return workspacesApi.save(authHeaders);
+    },
     onMutate: () => startOperation('saveWorkspace'),
     onSuccess: () => {
       endOperation('saveWorkspace');
@@ -148,14 +151,17 @@ export const useWorkspaceNodeMutations = ({
   });
 
   const saveWorkspaceAsMutation = useMutation({
-    mutationFn: (filename: string) => workspacesApi.saveAs(ensureWorkspaceSelected(), filename, authHeaders),
+    mutationFn: (filename: string) => {
+      ensureWorkspaceSelected();
+      return workspacesApi.saveAs(filename, authHeaders);
+    },
     onMutate: () => startOperation('saveWorkspaceAs'),
     onSuccess: (data: any) => {
       const newWorkspace = data?.new_workspace;
       if (newWorkspace) {
         queryClient.setQueryData(queryKeys.workspaces, (old: any) => {
           if (!old) return [newWorkspace];
-          const exists = old.some((workspace: any) => workspace.workspace_id === newWorkspace.workspace_id);
+          const exists = old.some((workspace: any) => workspace.id === newWorkspace.id);
           return exists ? old : [...old, newWorkspace];
         });
       } else {
@@ -170,7 +176,10 @@ export const useWorkspaceNodeMutations = ({
   });
 
   const updateWorkspaceNameMutation = useMutation({
-    mutationFn: (newName: string) => workspacesApi.updateName(ensureWorkspaceSelected(), newName, authHeaders),
+    mutationFn: (newName: string) => {
+      ensureWorkspaceSelected();
+      return workspacesApi.updateName(newName, authHeaders);
+    },
     onMutate: () => startOperation('updateWorkspaceName'),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.workspaces });
@@ -185,7 +194,7 @@ export const useWorkspaceNodeMutations = ({
 
   const renameNodeMutation = useMutation({
     mutationFn: ({ workspaceId, nodeId, newName }: { workspaceId: string; nodeId: string; newName: string }) =>
-      nodesApi.rename(workspaceId, nodeId, newName, authHeaders),
+      nodesApi.rename(nodeId, newName, authHeaders),
     onMutate: () => {
       startOperation('renameNode');
     },
@@ -203,7 +212,7 @@ export const useWorkspaceNodeMutations = ({
 
   const copyNodeMutation = useMutation({
     mutationFn: ({ workspaceId, nodeId }: { workspaceId: string; nodeId: string }) =>
-      nodesApi.copy(workspaceId, nodeId, authHeaders),
+      nodesApi.copy(nodeId, authHeaders),
     onMutate: () => {
       startOperation('copyNode');
     },
@@ -222,7 +231,7 @@ export const useWorkspaceNodeMutations = ({
 
   const deleteNodeMutation = useMutation({
     mutationFn: ({ workspaceId, nodeId }: { workspaceId: string; nodeId: string }) =>
-      nodesApi.delete(workspaceId, nodeId, authHeaders),
+      nodesApi.delete(nodeId, authHeaders),
     onMutate: () => {
       startOperation('deleteNode');
     },
@@ -251,12 +260,7 @@ export const useWorkspaceNodeMutations = ({
       workspaceId: string;
       filename: string;
     }) =>
-      nodesApi.createFromFile(
-        workspaceId,
-        filename,
-        undefined,
-        authHeaders,
-      ),
+      nodesApi.createFromFile(filename, undefined, authHeaders),
     onMutate: () => {
       startOperation('createNode');
     },
@@ -299,7 +303,7 @@ export const useWorkspaceNodeMutations = ({
         how: joinType as 'inner' | 'left' | 'right' | 'full' | 'semi' | 'anti' | 'cross',
         new_node_name: newNodeName,
       };
-      return nodesApi.join(workspaceId, request as any, authHeaders);
+      return nodesApi.join(request as any, authHeaders);
     },
     onMutate: async () => {
       startOperation('joinNodes');
@@ -348,7 +352,7 @@ export const useWorkspaceNodeMutations = ({
 
   const concatNodesMutation = useMutation({
     mutationFn: ({ workspaceId, nodeIds, newNodeName }: { workspaceId: string; nodeIds: string[]; newNodeName?: string }) =>
-      nodesApi.concat(workspaceId, { node_ids: nodeIds, new_node_name: newNodeName }, authHeaders),
+      nodesApi.concat({ node_ids: nodeIds, new_node_name: newNodeName }, authHeaders),
     onMutate: async () => {
       startOperation('concatNodes');
       let previousNodeIds: string[] = [];
@@ -396,7 +400,7 @@ export const useWorkspaceNodeMutations = ({
 
   const filterNodeMutation = useMutation({
     mutationFn: ({ workspaceId, nodeId, request }: { workspaceId: string; nodeId: string; request: FilterRequest }) =>
-      nodesApi.filter(workspaceId, nodeId, request, authHeaders),
+      nodesApi.filter(nodeId, request, authHeaders),
     onMutate: () => {
       startOperation('filterNode');
     },
@@ -414,7 +418,7 @@ export const useWorkspaceNodeMutations = ({
 
   const computeColumnMutation = useMutation({
     mutationFn: ({ workspaceId, nodeId, request }: { workspaceId: string; nodeId: string; request: ExpressionTransformRequest }) =>
-      nodesApi.computeColumn(workspaceId, nodeId, request, authHeaders),
+      nodesApi.computeColumn(nodeId, request, authHeaders),
     onMutate: () => {
       startOperation('computeColumn');
     },
@@ -436,7 +440,7 @@ export const useWorkspaceNodeMutations = ({
 
   const sliceNodeMutation = useMutation({
     mutationFn: ({ workspaceId, nodeId, request }: { workspaceId: string; nodeId: string; request: SliceRequest }) =>
-      nodesApi.slice(workspaceId, nodeId, request, authHeaders),
+      nodesApi.slice(nodeId, request, authHeaders),
     onMutate: () => {
       startOperation('sliceNode');
     },
@@ -454,7 +458,7 @@ export const useWorkspaceNodeMutations = ({
 
   const castNodeMutation = useMutation({
     mutationFn: ({ nodeId, column, targetType, format }: { nodeId: string; column: string; targetType: string; format?: string }) =>
-      nodesApi.cast(ensureWorkspaceSelected(), nodeId, { column, target_type: targetType, format }, authHeaders),
+      nodesApi.cast(nodeId, { column, target_type: targetType, format }, authHeaders),
     onMutate: () => {
       startOperation('castNode');
     },
@@ -473,7 +477,7 @@ export const useWorkspaceNodeMutations = ({
 
   const renameColumnMutation = useMutation({
     mutationFn: ({ nodeId, column, newName }: { nodeId: string; column: string; newName: string }) =>
-      nodesApi.renameColumn(ensureWorkspaceSelected(), nodeId, column, newName, authHeaders),
+      nodesApi.renameColumn(nodeId, column, newName, authHeaders),
     onMutate: () => {
       startOperation('renameColumn');
     },
@@ -495,7 +499,7 @@ export const useWorkspaceNodeMutations = ({
 
   const deleteColumnMutation = useMutation({
     mutationFn: ({ nodeId, column }: { nodeId: string; column: string }) =>
-      nodesApi.deleteColumn(ensureWorkspaceSelected(), nodeId, column, authHeaders),
+      nodesApi.deleteColumn(nodeId, column, authHeaders),
     onMutate: () => {
       startOperation('deleteColumn');
     },
@@ -553,19 +557,19 @@ export const useWorkspaceNodeMutations = ({
     concatNodes: (nodeIds: string[], newNodeName?: string) =>
       concatNodesMutation.mutateAsync({ workspaceId: ensureWorkspaceSelected(), nodeIds, newNodeName }),
     concatPreview: (nodeIds: string[], page = 1, pageSize = 10) =>
-      nodesApi.concatPreview(ensureWorkspaceSelected(), { node_ids: nodeIds }, page, pageSize, authHeaders),
+      nodesApi.concatPreview({ node_ids: nodeIds }, page, pageSize, authHeaders),
     filterNode: (nodeId: string, request: FilterRequest) =>
       filterNodeMutation.mutateAsync({ workspaceId: ensureWorkspaceSelected(), nodeId, request }),
     filterPreview: (nodeId: string, request: FilterRequest, page = 1, pageSize = 10) =>
-      nodesApi.filterPreview(ensureWorkspaceSelected(), nodeId, request, page, pageSize, authHeaders),
+      nodesApi.filterPreview(nodeId, request, page, pageSize, authHeaders),
     sliceNode: (nodeId: string, request: SliceRequest) =>
       sliceNodeMutation.mutateAsync({ workspaceId: ensureWorkspaceSelected(), nodeId, request }),
     slicePreview: (nodeId: string, request: SliceRequest, page = 1, pageSize = 10) =>
-      nodesApi.slicePreview(ensureWorkspaceSelected(), nodeId, request, page, pageSize, authHeaders),
+      nodesApi.slicePreview(nodeId, request, page, pageSize, authHeaders),
     computeColumn: (nodeId: string, request: ExpressionTransformRequest) =>
       computeColumnMutation.mutateAsync({ workspaceId: ensureWorkspaceSelected(), nodeId, request }),
     computeColumnPreview: (nodeId: string, request: ExpressionTransformRequest) =>
-      nodesApi.computeColumnPreview(ensureWorkspaceSelected(), nodeId, request, authHeaders),
+      nodesApi.computeColumnPreview(nodeId, request, authHeaders),
     castColumn: (nodeId: string, column: string, targetType: string, format?: string) =>
       castNodeMutation.mutateAsync({ nodeId, column, targetType, format }),
     renameColumn: (nodeId: string, column: string, newName: string) =>

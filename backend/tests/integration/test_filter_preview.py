@@ -3,6 +3,14 @@ import pytest
 from ldaca_web_app_backend.api.workspaces import nodes as nodes_api
 
 
+class DummyWorkspace:
+    def __init__(self, nodes):
+        self.nodes = nodes
+
+    def get_node(self, node_id):
+        return self.nodes.get(node_id)
+
+
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_filter_preview_returns_paginated_rows(authenticated_client, monkeypatch):
@@ -13,14 +21,22 @@ async def test_filter_preview_returns_paginated_rows(authenticated_client, monke
             self.data = df.lazy()
             self.name = "sample"
 
+    workspace_id = "ws-any"
+    dummy_ws = DummyWorkspace({"node456": DummyNode()})
+
     monkeypatch.setattr(
         nodes_api.workspace_manager,
-        "get_node_from_workspace",
-        lambda user_id, workspace_id, node_id: DummyNode(),
+        "_get_current_entry",
+        lambda user_id: (workspace_id, dummy_ws),
+    )
+    monkeypatch.setattr(
+        nodes_api.workspace_manager,
+        "get_workspace",
+        lambda user_id, workspace_id: dummy_ws,
     )
 
     response = await authenticated_client.post(
-        "/api/workspaces/ws123/nodes/node456/filter/preview",
+        "/api/workspaces/nodes/node456/filter/preview",
         params={"page": 1, "page_size": 2},
         json={
             "conditions": [
@@ -53,14 +69,22 @@ async def test_filter_preview_in_operator(authenticated_client, monkeypatch):
             self.data = df.lazy()
             self.name = "sample"
 
+    workspace_id = "ws-any"
+    dummy_ws = DummyWorkspace({"node456": DummyNode()})
+
     monkeypatch.setattr(
         nodes_api.workspace_manager,
-        "get_node_from_workspace",
-        lambda user_id, workspace_id, node_id: DummyNode(),
+        "_get_current_entry",
+        lambda user_id: (workspace_id, dummy_ws),
+    )
+    monkeypatch.setattr(
+        nodes_api.workspace_manager,
+        "get_workspace",
+        lambda user_id, workspace_id: dummy_ws,
     )
 
     response = await authenticated_client.post(
-        "/api/workspaces/ws123/nodes/node456/filter/preview",
+        "/api/workspaces/nodes/node456/filter/preview",
         params={"page": 1, "page_size": 10},
         json={
             "conditions": [
@@ -90,14 +114,22 @@ async def test_filter_preview_in_operator_with_null(authenticated_client, monkey
             self.data = df.lazy()
             self.name = "sample"
 
+    workspace_id = "ws-any"
+    dummy_ws = DummyWorkspace({"node456": DummyNode()})
+
     monkeypatch.setattr(
         nodes_api.workspace_manager,
-        "get_node_from_workspace",
-        lambda user_id, workspace_id, node_id: DummyNode(),
+        "_get_current_entry",
+        lambda user_id: (workspace_id, dummy_ws),
+    )
+    monkeypatch.setattr(
+        nodes_api.workspace_manager,
+        "get_workspace",
+        lambda user_id, workspace_id: dummy_ws,
     )
 
     response = await authenticated_client.post(
-        "/api/workspaces/ws123/nodes/node456/filter/preview",
+        "/api/workspaces/nodes/node456/filter/preview",
         params={"page": 1, "page_size": 10},
         json={
             "conditions": [
@@ -129,14 +161,22 @@ async def test_filter_preview_in_operator_matches_any_list_string_element(
             self.data = df.lazy()
             self.name = "sample"
 
+    workspace_id = "ws-any"
+    dummy_ws = DummyWorkspace({"node456": DummyNode()})
+
     monkeypatch.setattr(
         nodes_api.workspace_manager,
-        "get_node_from_workspace",
-        lambda user_id, workspace_id, node_id: DummyNode(),
+        "_get_current_entry",
+        lambda user_id: (workspace_id, dummy_ws),
+    )
+    monkeypatch.setattr(
+        nodes_api.workspace_manager,
+        "get_workspace",
+        lambda user_id, workspace_id: dummy_ws,
     )
 
     response = await authenticated_client.post(
-        "/api/workspaces/ws123/nodes/node456/filter/preview",
+        "/api/workspaces/nodes/node456/filter/preview",
         params={"page": 1, "page_size": 10},
         json={
             "conditions": [
@@ -168,14 +208,22 @@ async def test_filter_preview_list_string_in_does_not_match_null_rows(
             self.data = df.lazy()
             self.name = "sample"
 
+    workspace_id = "ws-any"
+    dummy_ws = DummyWorkspace({"node456": DummyNode()})
+
     monkeypatch.setattr(
         nodes_api.workspace_manager,
-        "get_node_from_workspace",
-        lambda user_id, workspace_id, node_id: DummyNode(),
+        "_get_current_entry",
+        lambda user_id: (workspace_id, dummy_ws),
+    )
+    monkeypatch.setattr(
+        nodes_api.workspace_manager,
+        "get_workspace",
+        lambda user_id, workspace_id: dummy_ws,
     )
 
     response = await authenticated_client.post(
-        "/api/workspaces/ws123/nodes/node456/filter/preview",
+        "/api/workspaces/nodes/node456/filter/preview",
         params={"page": 1, "page_size": 10},
         json={
             "conditions": [

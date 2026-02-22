@@ -22,10 +22,16 @@ def _prime_workspace_state():
     class DummyWorkspace:
         def __init__(self, df):
             self._df = df
+            self.nodes = {
+                "node-1": SimpleNamespace(id="node-1", name="node-1", data=self._df)
+            }
             self.metadata = {}
 
         def get_node(self, node_id):
-            return SimpleNamespace(id=node_id, data=self._df)
+            return self.nodes.get(
+                node_id,
+                SimpleNamespace(id=node_id, name=node_id, data=self._df),
+            )
 
         def set_metadata(self, key, value):
             self.metadata[key] = value
@@ -110,7 +116,7 @@ async def test_update_context_length_persists_preference(
 ):
     task_id = seeded_quotation_analysis
     response = await authenticated_client.post(
-        f"/api/workspaces/{WORKSPACE_ID}/quotation/tasks/{task_id}/result",
+        f"/api/workspaces/quotation/tasks/{task_id}/result",
         json={"context_length": 42},
     )
     assert response.status_code == 200
@@ -139,14 +145,14 @@ async def test_update_context_length_clamps_bounds(authenticated_client):
 
     try:
         high_response = await authenticated_client.post(
-            f"/api/workspaces/{WORKSPACE_ID}/quotation/tasks/{task_id}/result",
+            f"/api/workspaces/quotation/tasks/{task_id}/result",
             json={"context_length": 99999},
         )
         assert high_response.status_code == 200
         assert high_response.json()["data"]["context_length"] == 2000
 
         low_response = await authenticated_client.post(
-            f"/api/workspaces/{WORKSPACE_ID}/quotation/tasks/{task_id}/result",
+            f"/api/workspaces/quotation/tasks/{task_id}/result",
             json={"context_length": -5},
         )
         assert low_response.status_code == 200
@@ -191,7 +197,7 @@ async def test_quotation_current_result_respects_page_params(
         fake_compute,
     )
     response = await authenticated_client.get(
-        f"/api/workspaces/{WORKSPACE_ID}/quotation/tasks/{task_id}/result",
+        f"/api/workspaces/quotation/tasks/{task_id}/result",
         params={"page": 2, "page_size": 1},
     )
     assert response.status_code == 200
@@ -229,7 +235,7 @@ async def test_update_quotation_current_result_returns_page_payload(
         fake_compute,
     )
     response = await authenticated_client.post(
-        f"/api/workspaces/{WORKSPACE_ID}/quotation/tasks/{task_id}/result",
+        f"/api/workspaces/quotation/tasks/{task_id}/result",
         json={"page": 2, "page_size": 1},
     )
     assert response.status_code == 200
@@ -270,7 +276,7 @@ async def test_quotation_current_result_returns_all_quotes_for_document_page(
     )
 
     response = await authenticated_client.get(
-        f"/api/workspaces/{WORKSPACE_ID}/quotation/tasks/{task_id}/result",
+        f"/api/workspaces/quotation/tasks/{task_id}/result",
         params={"page": 1, "page_size": 1},
     )
     assert response.status_code == 200
@@ -287,9 +293,15 @@ async def test_quotation_endpoint_recomputes_on_demand(
     class DummyWorkspace:
         def __init__(self, df):
             self._df = df
+            self.nodes = {
+                "node-1": SimpleNamespace(id="node-1", name="node-1", data=self._df)
+            }
 
         def get_node(self, node_id):
-            return SimpleNamespace(id=node_id, data=self._df, name=node_id)
+            return self.nodes.get(
+                node_id,
+                SimpleNamespace(id=node_id, data=self._df, name=node_id),
+            )
 
     base_df = pl.DataFrame({"text": ["alpha doc", "beta doc"]}).lazy()
     workspace_manager._current[USER_ID] = {
@@ -327,7 +339,7 @@ async def test_quotation_endpoint_recomputes_on_demand(
     )
 
     response = await authenticated_client.post(
-        f"/api/workspaces/{WORKSPACE_ID}/nodes/node-1/quotation",
+        "/api/workspaces/nodes/node-1/quotation",
         json={"column": "text", "page": 2, "page_size": 1},
     )
 

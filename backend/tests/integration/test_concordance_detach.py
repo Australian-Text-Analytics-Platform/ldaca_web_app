@@ -20,7 +20,7 @@ async def test_concordance_detach_starts_task(authenticated_client, workspace_id
 
     # Act: call detach endpoint
     resp = await authenticated_client.post(
-        f"/api/workspaces/{workspace_id}/nodes/{node.id}/concordance/detach",
+        f"/api/workspaces/nodes/{node.id}/concordance/detach",
         json={
             "node_id": node.id,
             "column": "text",

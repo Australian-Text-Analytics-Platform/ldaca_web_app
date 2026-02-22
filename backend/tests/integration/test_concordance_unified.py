@@ -24,9 +24,7 @@ async def _wait_for_concordance_result(
     last_payload = None
 
     while time.monotonic() < deadline:
-        resp = await client.get(
-            f"/api/workspaces/{workspace_id}/concordance/tasks/{task_id}/result"
-        )
+        resp = await client.get(f"/api/workspaces/concordance/tasks/{task_id}/result")
         if resp.status_code != 200:
             await asyncio.sleep(poll_interval)
             continue
@@ -49,7 +47,7 @@ def _clear_concordance_state(user_id: str, workspace_id: str):
 
 
 async def _get_current_task_id(client, workspace_id: str, analysis: str):
-    response = await client.get(f"/api/workspaces/{workspace_id}/{analysis}/current")
+    response = await client.get("/api/workspaces/" + analysis + "/current")
     if response.status_code != 200:
         return None
     payload = response.json()
@@ -95,7 +93,7 @@ async def test_concordance_single_node_roundtrip(authenticated_client, workspace
     }
 
     resp = await authenticated_client.post(
-        f"/api/workspaces/{workspace_id}/concordance",
+        "/api/workspaces/concordance",
         json=request_payload,
     )
     assert resp.status_code == 200, resp.text
@@ -129,7 +127,7 @@ async def test_concordance_single_node_roundtrip(authenticated_client, workspace
 
     # Current request should surface the persisted request
     current_req = await authenticated_client.get(
-        f"/api/workspaces/{workspace_id}/tasks/{task_id}/request"
+        f"/api/workspaces/tasks/{task_id}/request"
     )
     assert current_req.status_code == 200
     current_req_payload = current_req.json()
@@ -160,7 +158,7 @@ async def test_concordance_single_node_roundtrip(authenticated_client, workspace
 
     # Request a smaller page size via POST (non-persistent override)
     current_res_post = await authenticated_client.post(
-        f"/api/workspaces/{workspace_id}/concordance/tasks/{task_id}/result",
+        f"/api/workspaces/concordance/tasks/{task_id}/result",
         json={"node_id": node.id, "page_size": 1},
     )
     assert current_res_post.status_code == 200
@@ -176,7 +174,7 @@ async def test_concordance_single_node_roundtrip(authenticated_client, workspace
 
     # Request the second page explicitly using node_id and page_number alias
     page_two = await authenticated_client.post(
-        f"/api/workspaces/{workspace_id}/concordance/tasks/{task_id}/result",
+        f"/api/workspaces/concordance/tasks/{task_id}/result",
         json={"node_id": node.id, "page_number": 2, "page_size": 1},
     )
     assert page_two.status_code == 200
@@ -241,7 +239,7 @@ async def test_concordance_multi_node_combined(authenticated_client, workspace_i
     }
 
     resp = await authenticated_client.post(
-        f"/api/workspaces/{workspace_id}/concordance",
+        "/api/workspaces/concordance",
         json=request_payload,
     )
     assert resp.status_code == 200, resp.text
@@ -264,7 +262,7 @@ async def test_concordance_multi_node_combined(authenticated_client, workspace_i
 
     # Request both nodes with a smaller page size override
     narrowed = await authenticated_client.post(
-        f"/api/workspaces/{workspace_id}/concordance/tasks/{task_id}/result",
+        f"/api/workspaces/concordance/tasks/{task_id}/result",
         json={"page_size": 1, "page": 1},
     )
     assert narrowed.status_code == 200
@@ -274,7 +272,7 @@ async def test_concordance_multi_node_combined(authenticated_client, workspace_i
 
     # Second page request applies to both nodes equally
     paged = await authenticated_client.post(
-        f"/api/workspaces/{workspace_id}/concordance/tasks/{task_id}/result",
+        f"/api/workspaces/concordance/tasks/{task_id}/result",
         json={"page": 2, "page_size": 1},
     )
     assert paged.status_code == 200
@@ -331,7 +329,7 @@ async def test_concordance_combined_toggle_after_separated_request(
     }
 
     resp = await authenticated_client.post(
-        f"/api/workspaces/{workspace_id}/concordance",
+        "/api/workspaces/concordance",
         json=request_payload,
     )
     assert resp.status_code == 200, resp.text
@@ -349,7 +347,7 @@ async def test_concordance_combined_toggle_after_separated_request(
     assert result_payload.get("combinable") is True
 
     combined_toggle = await authenticated_client.post(
-        f"/api/workspaces/{workspace_id}/concordance/tasks/{task_id}/result",
+        f"/api/workspaces/concordance/tasks/{task_id}/result",
         json={"combined": True, "page": 1, "page_size": 2},
     )
     assert combined_toggle.status_code == 200
@@ -411,7 +409,7 @@ async def test_concordance_combined_handles_mismatched_columns(
     }
 
     resp = await authenticated_client.post(
-        f"/api/workspaces/{workspace_id}/concordance",
+        "/api/workspaces/concordance",
         json=request_payload,
     )
     assert resp.status_code == 200, resp.text
@@ -430,7 +428,7 @@ async def test_concordance_combined_handles_mismatched_columns(
     assert "__COMBINED__" in result_payload["data"]
 
     combined_attempt = await authenticated_client.post(
-        f"/api/workspaces/{workspace_id}/concordance/tasks/{task_id}/result",
+        f"/api/workspaces/concordance/tasks/{task_id}/result",
         json={"combined": True, "page": 1, "page_size": 1},
     )
     assert combined_attempt.status_code == 200

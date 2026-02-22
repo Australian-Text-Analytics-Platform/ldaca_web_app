@@ -110,6 +110,13 @@ def _is_string_list_dtype(dtype: Any) -> bool:
     return dtype == pl.List(pl.String) or dtype == pl.List(pl.Utf8)
 
 
+def _get_active_workspace_or_404(user_id: str) -> tuple[str, Any]:
+    entry = workspace_manager._get_current_entry(user_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+    return entry[0], entry[1]
+
+
 def _build_filter_expression(
     request: FilterRequest,
     column_dtypes: Optional[dict[str, Any]] = None,
@@ -284,13 +291,12 @@ def _get_node_display_name(node: Any) -> str:
     return "node"
 
 
-def _get_concat_nodes(
-    user_id: str, workspace_id: str, node_ids: List[str]
-) -> List[Any]:
+def _get_concat_nodes(user_id: str, node_ids: List[str]) -> List[Any]:
     if not node_ids:
         raise HTTPException(
             status_code=400, detail="At least two node IDs are required"
         )
+    _, ws = _get_active_workspace_or_404(user_id)
     nodes: List[Any] = []
     seen: set[str] = set()
     for raw_node_id in node_ids:
@@ -302,12 +308,7 @@ def _get_concat_nodes(
                 status_code=400,
                 detail=f"Duplicate node id '{node_id}' provided",
             )
-        node = get_node_or_404(
-            user_id,
-            workspace_id,
-            node_id,
-            detail=f"Node '{node_id}' not found in workspace",
-        )
+        node = ws.nodes[node_id]
         nodes.append(node)
         seen.add(node_id)
     if len(nodes) < 2:
@@ -406,17 +407,16 @@ def _derive_concat_node_name(nodes: List[Any], desired_name: Optional[str]) -> s
 
 
 @router.post(
-    "/{workspace_id}/nodes/{node_id}/compute-column/preview",
+    "/nodes/{node_id}/compute-column/preview",
     response_model=ExpressionPreviewResponse,
 )
 async def compute_column_preview(
-    workspace_id: str,
     node_id: str,
     request: ExpressionTransformRequest,
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    _, data_obj = get_node_with_data_or_400(user_id, workspace_id, node_id)
+    _, data_obj = get_node_with_data_or_400(user_id, None, node_id)
 
     try:
         lazy_data = _unwrap_lazyframe(data_obj, purpose="Compute column preview")
@@ -458,17 +458,18 @@ async def compute_column_preview(
 
 
 @router.post(
-    "/{workspace_id}/nodes/{node_id}/compute-column",
+    "/nodes/{node_id}/compute-column",
     response_model=ExpressionApplyResponse,
 )
 async def compute_column_apply(
-    workspace_id: str,
     node_id: str,
     request: ExpressionTransformRequest,
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    node, data_obj = get_node_with_data_or_400(user_id, workspace_id, node_id)
+    workspace_id, ws = _get_active_workspace_or_404(user_id)
+    node = ws.nodes[node_id]
+    data_obj = node.data
     try:
         lazy_data = _unwrap_lazyframe(data_obj, purpose="Compute column apply")
         columns, _ = _extract_lazy_schema(lazy_data)
@@ -525,28 +526,31 @@ async def compute_column_apply(
     )
 
 
-@router.get("/{workspace_id}/nodes/{node_id}")
+@router.get("/nodes/{node_id}")
 async def get_node_info(
-    workspace_id: str, node_id: str, current_user: dict = Depends(get_current_user)
+    node_id: str,
+    current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    node = get_node_or_404(user_id, workspace_id, node_id)
+    _, ws = _get_active_workspace_or_404(user_id)
+    node = ws.nodes[node_id]
     try:
         return node.info()
     except Exception as e:  # pragma: no cover
         raise HTTPException(status_code=500, detail=f"Failed to get node info: {e}")
 
 
-@router.get("/{workspace_id}/nodes/{node_id}/data")
+@router.get("/nodes/{node_id}/data")
 async def get_node_data(
-    workspace_id: str,
     node_id: str,
     page: int = 1,
     page_size: int = 20,
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    node, data_obj = get_node_with_data_or_400(user_id, workspace_id, node_id)
+    _, ws = _get_active_workspace_or_404(user_id)
+    node = ws.nodes[node_id]
+    data_obj = node.data
     try:
         lazyframe = _unwrap_lazyframe(data_obj, purpose="Get node data")
         df = lazyframe.collect()
@@ -570,12 +574,14 @@ async def get_node_data(
         raise HTTPException(status_code=500, detail=f"Failed to get node data: {e}")
 
 
-@router.get("/{workspace_id}/nodes/{node_id}/shape")
+@router.get("/nodes/{node_id}/shape")
 async def get_node_shape(
-    workspace_id: str, node_id: str, current_user: dict = Depends(get_current_user)
+    node_id: str,
+    current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    node = get_node_or_404(user_id, workspace_id, node_id)
+    _, ws = _get_active_workspace_or_404(user_id)
+    node = ws.nodes[node_id]
     try:
         info = node.info()
         return {"shape": info["shape"]}
@@ -586,15 +592,16 @@ async def get_node_shape(
         )
 
 
-@router.get("/{workspace_id}/nodes/{node_id}/columns/{column_name}/unique")
+@router.get("/nodes/{node_id}/columns/{column_name}/unique")
 async def get_column_unique_values(
-    workspace_id: str,
     node_id: str,
     column_name: str,
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
-    _, data_obj = get_node_with_data_or_400(user_id, workspace_id, node_id)
+    _, ws = _get_active_workspace_or_404(user_id)
+    node = ws.nodes[node_id]
+    data_obj = node.data
     try:
         lazyframe = _unwrap_lazyframe(data_obj, purpose="Get unique column values")
         schema = lazyframe.collect_schema()
@@ -656,9 +663,8 @@ async def get_column_unique_values(
         )
 
 
-@router.get("/{workspace_id}/nodes/{node_id}/columns/{column_name}/describe")
+@router.get("/nodes/{node_id}/columns/{column_name}/describe")
 async def describe_column(
-    workspace_id: str,
     node_id: str,
     column_name: str,
     current_user: dict = Depends(get_current_user),
@@ -667,7 +673,9 @@ async def describe_column(
     from ...models import ColumnDescribeResponse
 
     user_id = current_user["id"]
-    _, data_obj = get_node_with_data_or_400(user_id, workspace_id, node_id)
+    _, ws = _get_active_workspace_or_404(user_id)
+    node = ws.nodes[node_id]
+    data_obj = node.data
 
     try:
         lazyframe = _unwrap_lazyframe(data_obj, purpose="Describe column")
@@ -761,11 +769,10 @@ async def describe_column(
         )
 
 
-@router.delete("/{workspace_id}/nodes/{node_id}")
-async def delete_node(
-    workspace_id: str, node_id: str, current_user: dict = Depends(get_current_user)
-):
+@router.delete("/nodes/{node_id}")
+async def delete_node(node_id: str, current_user: dict = Depends(get_current_user)):
     user_id = current_user["id"]
+    workspace_id, _ = _get_active_workspace_or_404(user_id)
     success = workspace_manager.delete_node_from_workspace(
         user_id, workspace_id, node_id
     )
@@ -774,9 +781,8 @@ async def delete_node(
     return {"state": "successful", "message": "Node deleted successfully"}
 
 
-@router.post("/{workspace_id}/nodes/{node_id}/convert")
+@router.post("/nodes/{node_id}/convert")
 async def convert_node(
-    workspace_id: str,
     node_id: str,
     target: str = Query(
         ...,
@@ -789,6 +795,7 @@ async def convert_node(
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
+    workspace_id, _ = _get_active_workspace_or_404(user_id)
     valid_targets = {"lazyframe"}
     if target not in valid_targets:
         raise HTTPException(
@@ -839,14 +846,14 @@ async def convert_node(
         raise HTTPException(status_code=500, detail=f"Conversion failed: {e}")
 
 
-@router.post("/{workspace_id}/nodes/{node_id}/reset-document")
+@router.post("/nodes/{node_id}/reset-document")
 async def reset_node_document_column(
-    workspace_id: str,
     node_id: str,
     document_column: Optional[str] = None,
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
+    workspace_id, _ = _get_active_workspace_or_404(user_id)
     src_node, data = get_node_with_data_or_400(user_id, workspace_id, node_id)
     try:
         new_data = None
@@ -885,14 +892,14 @@ async def reset_node_document_column(
         raise HTTPException(status_code=500, detail=f"Reset document failed: {e}")
 
 
-@router.put("/{workspace_id}/nodes/{node_id}/name")
+@router.put("/nodes/{node_id}/name")
 async def update_node_name(
-    workspace_id: str,
     node_id: str,
     new_name: str,
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
+    workspace_id, _ = _get_active_workspace_or_404(user_id)
     node = get_node_or_404(user_id, workspace_id, node_id)
     try:
         node.name = new_name
@@ -907,13 +914,13 @@ async def update_node_name(
         raise HTTPException(status_code=500, detail=f"Failed to rename node: {e}")
 
 
-@router.post("/{workspace_id}/nodes/{node_id}/copy")
+@router.post("/nodes/{node_id}/copy")
 async def copy_node(
-    workspace_id: str,
     node_id: str,
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
+    workspace_id, _ = _get_active_workspace_or_404(user_id)
     node = get_node_or_404(user_id, workspace_id, node_id)
     workspace = workspace_manager.get_workspace(user_id, workspace_id)
     if workspace is None:
@@ -952,14 +959,14 @@ async def copy_node(
         raise HTTPException(status_code=500, detail=f"Failed to copy node: {e}")
 
 
-@router.post("/{workspace_id}/nodes/{node_id}/filter")
+@router.post("/nodes/{node_id}/filter")
 async def filter_node(
-    workspace_id: str,
     node_id: str,
     request: FilterRequest,
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
+    workspace_id, _ = _get_active_workspace_or_404(user_id)
     node, data_obj = get_node_with_data_or_400(user_id, workspace_id, node_id)
     lazy_data = _unwrap_lazyframe(data_obj, purpose="Filter node")
     schema_map: dict[str, Any] = dict(lazy_data.collect_schema().items())
@@ -981,9 +988,8 @@ async def filter_node(
     }
 
 
-@router.post("/{workspace_id}/nodes/{node_id}/filter/preview")
+@router.post("/nodes/{node_id}/filter/preview")
 async def filter_preview(
-    workspace_id: str,
     node_id: str,
     request: FilterRequest,
     page: int = Query(1, ge=1),
@@ -991,6 +997,7 @@ async def filter_preview(
     current_user: dict = Depends(get_current_user),
 ) -> FilterPreviewResponse:
     user_id = current_user["id"]
+    workspace_id, _ = _get_active_workspace_or_404(user_id)
     _, data_obj = get_node_with_data_or_400(user_id, workspace_id, node_id)
     lazy_data = _unwrap_lazyframe(data_obj, purpose="Filter preview")
 
@@ -1045,14 +1052,14 @@ async def filter_preview(
     }
 
 
-@router.post("/{workspace_id}/nodes/{node_id}/slice")
+@router.post("/nodes/{node_id}/slice")
 async def slice_node(
-    workspace_id: str,
     node_id: str,
     request: SliceRequest,
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
+    workspace_id, _ = _get_active_workspace_or_404(user_id)
     node, data_obj = get_node_with_data_or_400(user_id, workspace_id, node_id)
     lazy_data = _unwrap_lazyframe(data_obj, purpose="Slice node")
     offset = int(request.offset or 0)
@@ -1077,9 +1084,8 @@ async def slice_node(
     }
 
 
-@router.post("/{workspace_id}/nodes/{node_id}/slice/preview")
+@router.post("/nodes/{node_id}/slice/preview")
 async def slice_preview(
-    workspace_id: str,
     node_id: str,
     request: SliceRequest,
     page: int = Query(1, ge=1),
@@ -1087,6 +1093,7 @@ async def slice_preview(
     current_user: dict = Depends(get_current_user),
 ) -> FilterPreviewResponse:
     user_id = current_user["id"]
+    workspace_id, _ = _get_active_workspace_or_404(user_id)
     _, data_obj = get_node_with_data_or_400(user_id, workspace_id, node_id)
 
     offset = int(request.offset or 0)
@@ -1136,9 +1143,8 @@ async def slice_preview(
     }
 
 
-@router.post("/{workspace_id}/nodes/concat/preview")
+@router.post("/nodes/concat/preview")
 async def concat_nodes_preview(
-    workspace_id: str,
     request: ConcatPreviewRequest,
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=500),
@@ -1146,7 +1152,7 @@ async def concat_nodes_preview(
 ):
     user_id = current_user["id"]
     try:
-        nodes = _get_concat_nodes(user_id, workspace_id, request.node_ids)
+        nodes = _get_concat_nodes(user_id, request.node_ids)
         aligned_frames, columns, dtypes = _validate_and_align_concat_nodes(nodes)
         concat_lazy = pl.concat(aligned_frames, how="vertical")
         total_rows = _calculate_concat_row_count(aligned_frames)
@@ -1201,15 +1207,15 @@ async def concat_nodes_preview(
         ) from exc
 
 
-@router.post("/{workspace_id}/nodes/concat")
+@router.post("/nodes/concat")
 async def concat_nodes(
-    workspace_id: str,
     request: ConcatRequest,
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
+    workspace_id, _ = _get_active_workspace_or_404(user_id)
     try:
-        nodes = _get_concat_nodes(user_id, workspace_id, request.node_ids)
+        nodes = _get_concat_nodes(user_id, request.node_ids)
         aligned_frames, _, _ = _validate_and_align_concat_nodes(nodes)
         concat_lazy = pl.concat(aligned_frames, how="vertical")
         node_name = _derive_concat_node_name(nodes, request.new_node_name)
@@ -1234,9 +1240,8 @@ async def concat_nodes(
         raise HTTPException(status_code=500, detail=f"Concat failed: {exc}")
 
 
-@router.post("/{workspace_id}/nodes/join/preview")
+@router.post("/nodes/join/preview")
 async def join_nodes_preview(
-    workspace_id: str,
     left_node_id: str,
     right_node_id: str,
     left_on: Optional[str] = None,
@@ -1247,6 +1252,7 @@ async def join_nodes_preview(
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
+    workspace_id, _ = _get_active_workspace_or_404(user_id)
     try:
         left_node = get_node_or_404(
             user_id,
@@ -1335,9 +1341,8 @@ async def join_nodes_preview(
         raise HTTPException(status_code=500, detail=f"Join preview failed: {e}")
 
 
-@router.post("/{workspace_id}/nodes/join")
+@router.post("/nodes/join")
 async def join_nodes(
-    workspace_id: str,
     left_node_id: str,
     right_node_id: str,
     left_on: str,
@@ -1347,6 +1352,7 @@ async def join_nodes(
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
+    workspace_id, _ = _get_active_workspace_or_404(user_id)
     try:
         left_node = get_node_or_404(
             user_id,

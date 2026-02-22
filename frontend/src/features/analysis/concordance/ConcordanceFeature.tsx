@@ -314,7 +314,6 @@ const ConcordanceFeature: React.FC = () => {
       fetchCurrentTaskId: async () => {
         const headers = getAuthHeaders();
         const current = (await textApi.getAnalysisCurrent(
-          currentWorkspaceId,
           'concordance',
           headers
         )) as any;
@@ -339,7 +338,7 @@ const ConcordanceFeature: React.FC = () => {
         return null;
       }
       const response = await httpRequest<ConcordanceAnalysisResponse>(
-        `/workspaces/${currentWorkspaceId}/concordance/tasks/${taskId}/result`,
+        `/workspaces/concordance/tasks/${taskId}/result`,
         { method: 'GET', headers, params: sanitizeResultParams(queryOverrides) }
       );
       const typedResponse = response as ConcordanceAnalysisResponse | null;
@@ -365,7 +364,7 @@ const ConcordanceFeature: React.FC = () => {
     if (!taskId) {
       return null;
     }
-    const response = await textApi.postConcordanceTaskResult(currentWorkspaceId, taskId, body, headers) as ConcordanceAnalysisResponse;
+    const response = await textApi.postConcordanceTaskResult(taskId, body, headers) as ConcordanceAnalysisResponse;
     if (response) {
       setResults(response);
     }
@@ -701,7 +700,7 @@ const ConcordanceFeature: React.FC = () => {
           request.sort_by = requestedSortBy;
         }
 
-        response = await textApi.concordance(currentWorkspaceId, request, authHeaders);
+        response = await textApi.concordance(request, authHeaders);
         setResults(response);
         const responseTaskId = (response as any)?.metadata?.task_id;
         if (typeof responseTaskId === 'string' && responseTaskId.trim().length > 0) {
@@ -784,12 +783,12 @@ const ConcordanceFeature: React.FC = () => {
 
   const fetchConcordanceRequest = async (taskId?: string | null) => {
     if (!currentWorkspaceId || !taskId) return null;
-    return textApi.getTaskRequest(currentWorkspaceId, taskId, getAuthHeaders());
+    return textApi.getTaskRequest(taskId, getAuthHeaders());
   };
 
   const fetchConcordanceResult = async (taskId?: string | null) => {
     if (!currentWorkspaceId || !taskId) return null;
-    return textApi.getConcordanceTaskResult(currentWorkspaceId, taskId, getAuthHeaders());
+    return textApi.getConcordanceTaskResult(taskId, getAuthHeaders());
   };
 
   const { hydrateFromServer } = useAnalysisHydration({
@@ -837,11 +836,11 @@ const ConcordanceFeature: React.FC = () => {
         workspaceId: currentWorkspaceId,
         taskIds,
         cancelTask: (workspaceId, taskId) =>
-          workspacesApi.cancelTasks(workspaceId, { task_id: taskId }, headers),
+          workspacesApi.cancelTasks({ task_id: taskId }, headers),
         clearManagerTask: (workspaceId, taskId) =>
-          workspacesApi.clearTasks(workspaceId, { task_id: taskId }, headers),
+          workspacesApi.clearTasks({ task_id: taskId }, headers),
         clearAnalysisTask: (workspaceId, taskId) =>
-          textApi.clearTask(workspaceId, taskId, headers),
+          textApi.clearTask(taskId, headers),
         warnContext: 'concordance',
       });
     }

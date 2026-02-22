@@ -177,12 +177,31 @@ class FileInfoResponse(BaseModel):
 
 
 class WorkspaceInfo(BaseModel):
-    workspace_id: str
+    id: str
     name: str
     created_at: str
     modified_at: str
     description: Optional[str] = None
     total_nodes: int  # Updated to use latest ATAPWorkspace terminology
+
+
+class WorkspaceSummary(BaseModel):
+    """Summary metadata for a workspace row in list responses."""
+
+    id: str
+    name: str
+    description: str = ""
+    created_at: str = ""
+    modified_at: str = ""
+    node_count: int = 0
+    workspace_size_Byte: int = 0
+    folder_name: Optional[str] = None
+
+
+class WorkspaceSummaryList(BaseModel):
+    """Workspace-list response payload for list-workspaces endpoint."""
+
+    workspaces: List[WorkspaceSummary]
 
 
 class WorkspaceStats(BaseModel):

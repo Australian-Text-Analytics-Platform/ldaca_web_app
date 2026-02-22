@@ -18,10 +18,8 @@ from ...core.workspace import workspace_manager
 router = APIRouter(prefix="/workspaces", tags=["workspace-tasks"])
 
 
-@router.get("/{workspace_id}/tasks")
-async def list_workspace_tasks(
-    workspace_id: str, current_user: dict = Depends(get_current_user)
-):
+@router.get("/tasks")
+async def list_workspace_tasks(current_user: dict = Depends(get_current_user)):
     """List worker tasks for a workspace.
 
     Used by:
@@ -31,6 +29,10 @@ async def list_workspace_tasks(
     - Exposes normalized task state for cancellation/clear operations.
     """
     user_id = current_user["id"]
+    current_entry = workspace_manager._get_current_entry(user_id)
+    if not current_entry:
+        raise ValueError("No active workspace selected")
+    workspace_id = current_entry[0]
     tm = workspace_manager.get_task_manager(user_id, workspace_id)
     data = await tm.list()
     return {
@@ -40,9 +42,8 @@ async def list_workspace_tasks(
     }
 
 
-@router.post("/{workspace_id}/tasks/cancel")
+@router.post("/tasks/cancel")
 async def cancel_workspace_tasks(
-    workspace_id: str,
     task_type: Optional[str] = None,
     task_id: Optional[str] = None,
     current_user: dict = Depends(get_current_user),
@@ -56,6 +57,10 @@ async def cancel_workspace_tasks(
     - Supports both granular and bulk task interruption from one endpoint.
     """
     user_id = current_user["id"]
+    current_entry = workspace_manager._get_current_entry(user_id)
+    if not current_entry:
+        raise ValueError("No active workspace selected")
+    workspace_id = current_entry[0]
     tm = workspace_manager.get_task_manager(user_id, workspace_id)
     if task_id:
         ok = await tm.cancel_task(task_id)
@@ -72,9 +77,8 @@ async def cancel_workspace_tasks(
     }
 
 
-@router.post("/{workspace_id}/tasks/clear")
+@router.post("/tasks/clear")
 async def clear_workspace_tasks(
-    workspace_id: str,
     task_type: Optional[str] = None,
     task_id: Optional[str] = None,
     current_user: dict = Depends(get_current_user),
@@ -96,6 +100,10 @@ async def clear_workspace_tasks(
             reduce repeated payload construction.
     """
     user_id = current_user["id"]
+    current_entry = workspace_manager._get_current_entry(user_id)
+    if not current_entry:
+        raise ValueError("No active workspace selected")
+    workspace_id = current_entry[0]
     tm = workspace_manager.get_task_manager(user_id, workspace_id)
 
     if task_id:

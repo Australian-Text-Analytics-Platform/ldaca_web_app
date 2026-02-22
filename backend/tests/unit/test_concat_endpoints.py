@@ -66,10 +66,19 @@ def sample_nodes() -> dict[str, DummyNode]:
 
 @pytest.fixture
 def fake_workspace_manager(monkeypatch: pytest.MonkeyPatch, sample_nodes):
+    class DummyWorkspace:
+        def __init__(self, nodes: dict[str, DummyNode]) -> None:
+            self.nodes = nodes
+
     class FakeWorkspaceManager:
         def __init__(self, nodes: dict[str, DummyNode]) -> None:
             self.nodes = nodes
+            self.workspace_id = "ws1"
+            self.workspace = DummyWorkspace(nodes)
             self.add_calls: list[dict[str, object]] = []
+
+        def _get_current_entry(self, _user_id: str):
+            return (self.workspace_id, self.workspace, None)
 
         def get_node_from_workspace(
             self, user_id: str, workspace_id: str, node_id: str
@@ -99,7 +108,7 @@ async def test_concat_preview_success(fake_workspace_manager, sample_nodes):
     request = ConcatPreviewRequest(node_ids=["node_a", "node_b"])
 
     result = await nodes_api.concat_nodes_preview(
-        "ws1", request, page=1, page_size=2, current_user={"id": "user"}
+        request, page=1, page_size=2, current_user={"id": "user"}
     )
 
     assert result["columns"] == ["id", "name", "value"]
@@ -117,7 +126,7 @@ async def test_concat_preview_schema_mismatch(fake_workspace_manager):
 
     with pytest.raises(HTTPException) as excinfo:
         await nodes_api.concat_nodes_preview(
-            "ws1", request, page=1, page_size=2, current_user={"id": "user"}
+            request, page=1, page_size=2, current_user={"id": "user"}
         )
 
     assert excinfo.value.status_code == 400
@@ -128,7 +137,7 @@ async def test_concat_preview_schema_mismatch(fake_workspace_manager):
 async def test_concat_creation_happy_path(fake_workspace_manager, sample_nodes):
     request = ConcatRequest(node_ids=["node_a", "node_b"], new_node_name="Combined")
 
-    result = await nodes_api.concat_nodes("ws1", request, current_user={"id": "user"})
+    result = await nodes_api.concat_nodes(request, current_user={"id": "user"})
 
     # ensure conversion returns meaningful structure
     assert result["name"] == "Combined"

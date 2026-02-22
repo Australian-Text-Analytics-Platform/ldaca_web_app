@@ -233,7 +233,7 @@ class WorkspaceManager:
                 except Exception:
                     workspace_size_Byte = 0
                 summaries[wid] = {
-                    "workspace_id": wid,
+                    "id": wid,
                     "name": getattr(target, "name", wid),
                     "description": target.get_metadata("description") or "",
                     "created_at": target.get_metadata("created_at") or "",
@@ -243,7 +243,7 @@ class WorkspaceManager:
                     "folder_name": cached_path.name,
                 }
             except Exception:
-                summaries[wid] = {"workspace_id": wid, "error": "summary_failed"}
+                summaries[wid] = {"id": wid, "error": "summary_failed"}
             if wid != cid:
                 del target
         return summaries
@@ -490,9 +490,9 @@ class WorkspaceManager:
         ws = self.get_workspace(user_id, workspace_id)
         if ws is None:
             return None
-        summary = ws.summary()
+        summary = ws.info_json()
         return {
-            "workspace_id": workspace_id,
+            "id": workspace_id,
             "name": ws.name,
             "description": ws.get_metadata("description") or "",
             "created_at": ws.get_metadata("created_at") or "",

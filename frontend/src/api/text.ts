@@ -116,38 +116,38 @@ export interface TopicModelingDetachResponse {
 }
 
 export const textApi = {
-  concordance: (ws: string, req: ConcordanceAnalysisRequest, headers: Record<string,string> = {}) => post<ConcordanceAnalysisResponse>(`/workspaces/${ws}/concordance`, req, headers),
-  concordanceDetach: (ws: string, node: string, req: ConcordanceDetachRequest, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/nodes/${node}/concordance/detach`, req, headers),
-  getConcordanceTaskResult: (ws: string, taskId: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/concordance/tasks/${taskId}/result`, { method: 'GET', headers }),
-  postConcordanceTaskResult: (ws: string, taskId: string, body: ConcordanceResultQuery, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/concordance/tasks/${taskId}/result`, body, headers),
+  concordance: (req: ConcordanceAnalysisRequest, headers: Record<string,string> = {}) => post<ConcordanceAnalysisResponse>(`/workspaces/concordance`, req, headers),
+  concordanceDetach: (node: string, req: ConcordanceDetachRequest, headers: Record<string,string> = {}) => post(`/workspaces/nodes/${node}/concordance/detach`, req, headers),
+  getConcordanceTaskResult: (taskId: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/concordance/tasks/${taskId}/result`, { method: 'GET', headers }),
+  postConcordanceTaskResult: (taskId: string, body: ConcordanceResultQuery, headers: Record<string,string> = {}) => post(`/workspaces/concordance/tasks/${taskId}/result`, body, headers),
 
   // Quotation
-  quotation: (ws: string, node: string, req: QuotationRequest, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/nodes/${node}/quotation`, req, headers),
-  quotationDetach: (ws: string, node: string, req: QuotationDetachRequest, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/nodes/${node}/quotation/detach`, req, headers),
-  getQuotationTaskResult: (ws: string, taskId: string, headers: Record<string,string> = {}, params?: QuotationResultQuery) => httpRequest(`/workspaces/${ws}/quotation/tasks/${taskId}/result`, { method: 'GET', headers, params }),
-  postQuotationTaskResult: (ws: string, taskId: string, body: QuotationResultQuery, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/quotation/tasks/${taskId}/result`, body, headers),
+  quotation: (node: string, req: QuotationRequest, headers: Record<string,string> = {}) => post(`/workspaces/nodes/${node}/quotation`, req, headers),
+  quotationDetach: (node: string, req: QuotationDetachRequest, headers: Record<string,string> = {}) => post(`/workspaces/nodes/${node}/quotation/detach`, req, headers),
+  getQuotationTaskResult: (taskId: string, headers: Record<string,string> = {}, params?: QuotationResultQuery) => httpRequest(`/workspaces/quotation/tasks/${taskId}/result`, { method: 'GET', headers, params }),
+  postQuotationTaskResult: (taskId: string, body: QuotationResultQuery, headers: Record<string,string> = {}) => post(`/workspaces/quotation/tasks/${taskId}/result`, body, headers),
 
   // Sequential analysis
-  sequentialAnalysis: (ws: string, node: string, req: SequentialAnalysisRequest, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/nodes/${node}/sequential-analysis`, req, headers),
-  postSequentialAnalysisTaskResult: (ws: string, taskId: string, body: Record<string,unknown>, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/sequential-analysis/tasks/${taskId}/result`, body, headers),
+  sequentialAnalysis: (node: string, req: SequentialAnalysisRequest, headers: Record<string,string> = {}) => post(`/workspaces/nodes/${node}/sequential-analysis`, req, headers),
+  postSequentialAnalysisTaskResult: (taskId: string, body: Record<string,unknown>, headers: Record<string,string> = {}) => post(`/workspaces/sequential-analysis/tasks/${taskId}/result`, body, headers),
 
   // Token Frequency
-  tokenFrequencies: (ws: string, req: TokenFrequencyRequest, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/token-frequencies`, req, headers),
+  tokenFrequencies: (req: TokenFrequencyRequest, headers: Record<string,string> = {}) => post(`/workspaces/token-frequencies`, req, headers),
   defaultStopWords: (headers: Record<string,string> = {}) => get<{ stopwords?: string[]; error?: string }>('/text/default-stop-words', headers),
-  getTokenFrequenciesTaskResult: (ws: string, taskId: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/token-frequencies/tasks/${taskId}/result`, { method: 'GET', headers }),
-  postTokenFrequenciesTaskResult: (ws: string, taskId: string, reqUpdate: any, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/token-frequencies/tasks/${taskId}/result`, reqUpdate, headers),
+  getTokenFrequenciesTaskResult: (taskId: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/token-frequencies/tasks/${taskId}/result`, { method: 'GET', headers }),
+  postTokenFrequenciesTaskResult: (taskId: string, reqUpdate: any, headers: Record<string,string> = {}) => post(`/workspaces/token-frequencies/tasks/${taskId}/result`, reqUpdate, headers),
 
   // Topic Modeling
-  topicModeling: (ws: string, req: TopicModelingRequest, headers: Record<string, string> = {}) => post(`/workspaces/${ws}/topic-modeling`, req, headers),
-  getTopicModelingTaskResult: (ws: string, taskId: string, headers: Record<string, string> = {}) => httpRequest<TopicModelingResponse>(`/workspaces/${ws}/topic-modeling/tasks/${taskId}/result`, { method: 'GET', headers }),
-  getTopicModelingDetachOptions: (ws: string, taskId: string, headers: Record<string, string> = {}) =>
-    httpRequest<TopicModelingDetachOptionsResponse>(`/workspaces/${ws}/topic-modeling/tasks/${taskId}/detach-options`, { method: 'GET', headers }),
-  topicModelingDetach: (ws: string, taskId: string, req: TopicModelingDetachRequest, headers: Record<string, string> = {}) =>
-    post<TopicModelingDetachResponse>(`/workspaces/${ws}/topic-modeling/tasks/${taskId}/detach`, req, headers),
+  topicModeling: (req: TopicModelingRequest, headers: Record<string, string> = {}) => post(`/workspaces/topic-modeling`, req, headers),
+  getTopicModelingTaskResult: (taskId: string, headers: Record<string, string> = {}) => httpRequest<TopicModelingResponse>(`/workspaces/topic-modeling/tasks/${taskId}/result`, { method: 'GET', headers }),
+  getTopicModelingDetachOptions: (taskId: string, headers: Record<string, string> = {}) =>
+    httpRequest<TopicModelingDetachOptionsResponse>(`/workspaces/topic-modeling/tasks/${taskId}/detach-options`, { method: 'GET', headers }),
+  topicModelingDetach: (taskId: string, req: TopicModelingDetachRequest, headers: Record<string, string> = {}) =>
+    post<TopicModelingDetachResponse>(`/workspaces/topic-modeling/tasks/${taskId}/detach`, req, headers),
 
-  getAnalysisCurrent: (ws: string, analysis: string, headers: Record<string, string> = {}) => httpRequest(`/workspaces/${ws}/${analysis}/current`, { method: 'GET', headers }),
-  getTaskRequest: (ws: string, taskId: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/tasks/${taskId}/request`, { method: 'GET', headers }),
-  getTaskResult: (ws: string, taskId: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/${ws}/tasks/${taskId}/result`, { method: 'GET', headers }),
-  clearTask: (ws: string, taskId: string, headers: Record<string,string> = {}) => post(`/workspaces/${ws}/tasks/${taskId}/clear`, {}, headers),
+  getAnalysisCurrent: (analysis: string, headers: Record<string, string> = {}) => httpRequest(`/workspaces/${analysis}/current`, { method: 'GET', headers }),
+  getTaskRequest: (taskId: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/tasks/${taskId}/request`, { method: 'GET', headers }),
+  getTaskResult: (taskId: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/tasks/${taskId}/result`, { method: 'GET', headers }),
+  clearTask: (taskId: string, headers: Record<string,string> = {}) => post(`/workspaces/tasks/${taskId}/clear`, {}, headers),
 
 };

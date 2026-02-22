@@ -253,7 +253,7 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
       });
 
       try {
-        const response = await nodesApi.uniqueValues(currentWorkspaceId, selectedNodeId, column);
+        const response = await nodesApi.uniqueValues(selectedNodeId, column);
         const rawValues: unknown[] = Array.isArray(response?.unique_values) ? response.unique_values : [];
         const includeNullOption = dataType === 'categorical';
         const hasNullFromResponse = includeNullOption && Boolean(response?.has_null);
@@ -611,7 +611,7 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     if (!selectedNodeId || !currentWorkspaceId) return;
     
     try {
-      const describeData = await nodesApi.describeColumn(currentWorkspaceId, selectedNodeId, column);
+      const describeData = await nodesApi.describeColumn(selectedNodeId, column);
       
       setConditions(prev => prev.map(c => {
         if (c.id !== conditionId) return c;
@@ -653,7 +653,7 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     if (!selectedNodeId || !currentWorkspaceId) return;
 
     try {
-      const describeData = await nodesApi.describeColumn(currentWorkspaceId, selectedNodeId, column);
+      const describeData = await nodesApi.describeColumn(selectedNodeId, column);
 
       setConditions(prev => prev.map(c => {
         if (c.id !== conditionId) return c;

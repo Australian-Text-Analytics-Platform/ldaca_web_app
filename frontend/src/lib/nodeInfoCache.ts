@@ -78,7 +78,7 @@ export async function getNodeInfo(options: NodeInfoRequestOptions): Promise<Node
 
   const headers = resolveHeaders(options);
   const request = nodesApi
-    .info(workspaceId, nodeId, headers)
+    .info(nodeId, headers)
     .then((info) => finalize(key, info))
     .catch((error) => handleFailure(key, error));
 

@@ -4,8 +4,7 @@ from concurrent.futures import Future
 
 import pytest
 from ldaca_web_app_backend.analysis.manager import get_task_manager
-from ldaca_web_app_backend.core.worker_task_manager import (TaskInfo,
-                                                            WorkerTaskManager)
+from ldaca_web_app_backend.core.worker_task_manager import TaskInfo, WorkerTaskManager
 
 
 @pytest.mark.asyncio
@@ -18,25 +17,23 @@ async def test_task_manager_endpoints_roundtrip(authenticated_client, workspace_
     manager.set_current_task("token-frequencies", task_id)
     manager.update_task(task_id, {"state": "successful", "data": {}})
 
-    resp = await authenticated_client.get(
-        f"/api/workspaces/{workspace_id}/token-frequencies/current"
-    )
+    resp = await authenticated_client.get("/api/workspaces/token-frequencies/current")
     assert resp.status_code == 200
     payload = resp.json()
     assert payload["task_ids"] == [task_id]
 
     req_resp = await authenticated_client.get(
-        f"/api/workspaces/{workspace_id}/tasks/{task_id}/request"
+        f"/api/workspaces/tasks/{task_id}/request"
     )
     assert req_resp.status_code == 200
 
     result_resp = await authenticated_client.get(
-        f"/api/workspaces/{workspace_id}/tasks/{task_id}/result"
+        f"/api/workspaces/tasks/{task_id}/result"
     )
     assert result_resp.status_code == 200
 
     clear_resp = await authenticated_client.post(
-        f"/api/workspaces/{workspace_id}/tasks/{task_id}/clear"
+        f"/api/workspaces/tasks/{task_id}/clear"
     )
     assert clear_resp.status_code == 200
 

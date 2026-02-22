@@ -17,7 +17,7 @@ from fastapi.responses import StreamingResponse
 from ...core.auth import get_current_user
 from ...core.utils import generate_workspace_id, validate_workspace_name
 from ...core.workspace import workspace_manager
-from ...models import WorkspaceCreateRequest, WorkspaceInfo
+from ...models import WorkspaceCreateRequest, WorkspaceInfo, WorkspaceSummaryList
 from ..files import USER_TASK_SCOPE
 from .analyses.token_frequencies import (
     _unwrap_task_manager_result as unwrap_task_manager_result,
@@ -41,7 +41,7 @@ def _safe_member_path(name: str) -> PurePosixPath:
     return path
 
 
-@router.get("/")
+@router.get("/", response_model=WorkspaceSummaryList)
 async def list_workspaces(current_user: dict = Depends(get_current_user)):
     """List all persisted workspaces visible to the current user.
 
@@ -60,7 +60,7 @@ async def list_workspaces(current_user: dict = Depends(get_current_user)):
 async def get_current_workspace(current_user: dict = Depends(get_current_user)):
     user_id = current_user["id"]
     current_workspace_id = workspace_manager.get_current_workspace_id(user_id)
-    return {"current_workspace_id": current_workspace_id}
+    return {"id": current_workspace_id}
 
 
 @router.post("/current")
@@ -79,7 +79,7 @@ async def set_current_workspace(
     success = workspace_manager.set_current_workspace(user_id, workspace_id)
     if not success and workspace_id is not None:
         raise HTTPException(status_code=404, detail="Workspace not found")
-    return {"state": "successful", "current_workspace_id": workspace_id}
+    return {"state": "successful", "id": workspace_id}
 
 
 @router.post("/", response_model=WorkspaceInfo)
@@ -114,7 +114,7 @@ async def create_workspace(
         if not workspace_info:
             raise HTTPException(status_code=500, detail="Failed to get workspace info")
         return WorkspaceInfo(
-            workspace_id=workspace_id,
+            id=workspace_id,
             name=workspace_info["name"],
             description=workspace_info.get("description", ""),
             created_at=workspace_info.get("created_at", ""),
@@ -134,11 +134,15 @@ async def create_workspace(
         )
 
 
-@router.delete("/{workspace_id}")
+@router.delete("/delete")
 async def delete_workspace(
-    workspace_id: str, current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
+    current_entry = workspace_manager._get_current_entry(user_id)
+    if not current_entry:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+    workspace_id = current_entry[0]
     success = workspace_manager.delete_workspace(user_id, workspace_id)
     if not success:
         raise HTTPException(status_code=404, detail="Workspace not found")
@@ -148,37 +152,36 @@ async def delete_workspace(
     }
 
 
-@router.post("/{workspace_id}/unload")
+@router.post("/unload")
 async def unload_workspace(
-    workspace_id: str, save: bool = True, current_user: dict = Depends(get_current_user)
+    save: bool = True,
+    current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
+    current_entry = workspace_manager._get_current_entry(user_id)
+    if not current_entry:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+    workspace_id = current_entry[0]
     existed = workspace_manager.unload_workspace(user_id, workspace_id, save=save)
     if not existed:
         raise HTTPException(status_code=404, detail="Workspace not found")
     return {
         "state": "successful",
         "message": f"Workspace {workspace_id} unloaded",
-        "workspace_id": workspace_id,
+        "id": workspace_id,
     }
 
 
-@router.get("/{workspace_id}")
-async def get_workspace(
-    workspace_id: str, current_user: dict = Depends(get_current_user)
-):
-    user_id = current_user["id"]
-    info = workspace_manager.get_workspace_info(user_id, workspace_id)
-    if not info:
-        raise HTTPException(status_code=404, detail="Workspace not found")
-    return info
-
-
-@router.put("/{workspace_id}/name")
+@router.put("/name")
 async def rename_workspace(
-    workspace_id: str, new_name: str, current_user: dict = Depends(get_current_user)
+    new_name: str,
+    current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
+    current_entry = workspace_manager._get_current_entry(user_id)
+    if not current_entry:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+    workspace_id = current_entry[0]
     workspace = workspace_manager.get_workspace(user_id, workspace_id)
     if not workspace:
         raise HTTPException(status_code=404, detail="Workspace not found")
@@ -202,11 +205,15 @@ async def rename_workspace(
         raise HTTPException(status_code=500, detail=f"Failed to rename workspace: {e}")
 
 
-@router.post("/{workspace_id}/save")
+@router.post("/save")
 async def save_workspace(
-    workspace_id: str, current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
+    current_entry = workspace_manager._get_current_entry(user_id)
+    if not current_entry:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+    workspace_id = current_entry[0]
     ws = workspace_manager.get_workspace(user_id, workspace_id)
     if not ws:
         raise HTTPException(status_code=404, detail="Workspace not found")
@@ -217,9 +224,9 @@ async def save_workspace(
         raise HTTPException(status_code=500, detail=f"Failed to save workspace: {e}")
 
 
-@router.post("/{workspace_id}/download")
+@router.post("/download")
 async def start_workspace_download(
-    workspace_id: str, current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
 ):
     """Start a background task to package the workspace as a ZIP archive.
 
@@ -231,6 +238,10 @@ async def start_workspace_download(
       track progress and the UI stays responsive.
     """
     user_id = current_user["id"]
+    current_entry = workspace_manager._get_current_entry(user_id)
+    if not current_entry:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+    workspace_id = current_entry[0]
 
     # Persist latest state if this is the current in-memory workspace
     current_workspace_id = workspace_manager.get_current_workspace_id(user_id)
@@ -276,9 +287,8 @@ async def start_workspace_download(
     }
 
 
-@router.get("/{workspace_id}/download/tasks/{task_id}/artifact")
+@router.get("/download/tasks/{task_id}/artifact")
 async def download_workspace_artifact(
-    workspace_id: str,
     task_id: str,
     current_user: dict = Depends(get_current_user),
 ):
@@ -292,6 +302,10 @@ async def download_workspace_artifact(
       download to avoid unbounded disk usage.
     """
     user_id = current_user["id"]
+    current_entry = workspace_manager._get_current_entry(user_id)
+    if not current_entry:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+    workspace_id = current_entry[0]
 
     # Download tasks live under USER_TASK_SCOPE for unified SSE visibility.
     tm = workspace_manager.get_task_manager(user_id, USER_TASK_SCOPE)
@@ -469,7 +483,7 @@ async def upload_workspace_zip(
         summary = workspace_manager.list_user_workspaces_summaries(user_id).get(
             workspace_id,
             {
-                "workspace_id": workspace_id,
+                "id": workspace_id,
                 "name": workspace_name,
             },
         )
@@ -484,9 +498,10 @@ async def upload_workspace_zip(
         )
 
 
-@router.post("/{workspace_id}/save-as")
+@router.post("/save-as")
 async def save_workspace_as(
-    workspace_id: str, folder_name: str, current_user: dict = Depends(get_current_user)
+    folder_name: str,
+    current_user: dict = Depends(get_current_user),
 ):
     """Clone a workspace into a new id/name and persist it as a separate copy.
 
@@ -498,6 +513,10 @@ async def save_workspace_as(
 
     """
     user_id = current_user["id"]
+    current_entry = workspace_manager._get_current_entry(user_id)
+    if not current_entry:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+    workspace_id = current_entry[0]
     source = workspace_manager.get_workspace(user_id, workspace_id)
     if not source:
         raise HTTPException(status_code=404, detail="Workspace not found")
@@ -526,20 +545,24 @@ async def save_workspace_as(
         )
 
 
-@router.get("/{workspace_id}/info")
+@router.get("/info")
 async def get_workspace_info(
-    workspace_id: str, current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
+    current_entry = workspace_manager._get_current_entry(user_id)
+    if not current_entry:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+    workspace_id = current_entry[0]
     info = workspace_manager.get_workspace_info(user_id, workspace_id)
     if not info:
         raise HTTPException(status_code=404, detail="Workspace not found")
     return info
 
 
-@router.get("/{workspace_id}/graph")
+@router.get("/graph")
 async def get_workspace_graph(
-    workspace_id: str, current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
 ):
     """Return graph payload enriched with latest analysis snapshots.
 
@@ -554,6 +577,10 @@ async def get_workspace_graph(
       reduce route-level orchestration.
     """
     user_id = current_user["id"]
+    current_entry = workspace_manager._get_current_entry(user_id)
+    if not current_entry:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+    workspace_id = current_entry[0]
     graph_data = workspace_manager.get_workspace_graph(user_id, workspace_id)
     if not graph_data:
         raise HTTPException(status_code=404, detail="Workspace not found")
@@ -583,10 +610,14 @@ async def get_workspace_graph(
     return graph_data
 
 
-@router.get("/{workspace_id}/nodes")
+@router.get("/nodes")
 async def get_workspace_nodes(
-    workspace_id: str, current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
+    current_entry = workspace_manager._get_current_entry(user_id)
+    if not current_entry:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+    workspace_id = current_entry[0]
     summaries = workspace_manager.get_node_summaries(user_id, workspace_id)
     return {"nodes": summaries}

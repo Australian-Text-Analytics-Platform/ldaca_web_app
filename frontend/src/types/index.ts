@@ -83,7 +83,7 @@ export type TabType = 'data-loader' | 'analysis' | 'export';
 
 // Workspace management types
 export interface WorkspaceInfo {
-  workspace_id: string;
+  id: string;
   name: string;
   created_at: string;
   modified_at: string;

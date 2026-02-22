@@ -65,7 +65,7 @@ export const useWorkspaceQueries = ({
       ? queryKeys.workspaceGraph(currentWorkspaceId)
       : ['workspaces', 'graph'],
     queryFn: async () => {
-      const result = await workspacesApi.graph(currentWorkspaceId!, authHeaders);
+      const result = await workspacesApi.graph(authHeaders);
       logGraphDebug(result);
       return result;
     },
@@ -83,7 +83,7 @@ export const useWorkspaceQueries = ({
     ),
     queryFn: () => {
       const { currentPage, pageSize } = getPaginationForNode(selectedNodeId);
-      return nodesApi.data(currentWorkspaceId!, selectedNodeId!, currentPage, pageSize, authHeaders);
+      return nodesApi.data(selectedNodeId!, currentPage, pageSize, authHeaders);
     },
     enabled: isAuthenticated && !!currentWorkspaceId && !!selectedNodeId,
     staleTime: 30 * 1000,
@@ -91,7 +91,7 @@ export const useWorkspaceQueries = ({
 
   const workspaces = workspacesQuery.data || [];
   const currentWorkspace =
-    workspaces.find((workspace: any) => workspace.workspace_id === currentWorkspaceId) || null;
+    workspaces.find((workspace: any) => workspace.id === currentWorkspaceId) || null;
   const workspaceGraph = graphQuery.data || null;
 
   const nodes = workspaceGraph?.nodes || [];

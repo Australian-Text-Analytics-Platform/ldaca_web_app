@@ -60,16 +60,12 @@ class Workspace:
         move_children_recursive(node)
         return node
 
-    def remove_node(self, node_id: str, materialize_children: bool = False) -> bool:
+    def remove_node(self, node_id: str) -> bool:
         if node_id not in self.nodes:
             return False
         node = self.nodes[node_id]
         parent_nodes = node.parents.copy()
         child_nodes = node.children.copy()
-
-        # `materialize_children` is retained for compatibility but no-op because
-        # Node data is always represented as LazyFrame.
-        _ = materialize_children
 
         # Rewire graph so children inherit the removed node's parents.
         for child in child_nodes:

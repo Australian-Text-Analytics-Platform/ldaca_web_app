@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import polars as pl
 import pytest
 from ldaca_web_app_backend.api.workspaces import nodes as nodes_api
@@ -26,7 +28,12 @@ class FakeWorkspaceManager:
 
     def __init__(self, nodes: dict[str, DummyNode]) -> None:
         self.nodes = nodes
+        self.workspace_id = "ws1"
+        self.workspace = SimpleNamespace(nodes=self.nodes)
         self.add_calls: list[dict[str, object]] = []
+
+    def _get_current_entry(self, _user_id: str):
+        return (self.workspace_id, self.workspace, None)
 
     def get_node_from_workspace(self, _user_id: str, _workspace_id: str, node_id: str):
         return self.nodes.get(node_id)
@@ -65,7 +72,7 @@ async def test_slice_node_with_offset_and_length(fake_workspace_manager):
     request = SliceRequest(offset=1, length=2, new_node_name="subset_rows")
 
     result = await nodes_api.slice_node(
-        "ws1", "node_base", request, current_user={"id": "user"}
+        "node_base", request, current_user={"id": "user"}
     )
 
     assert result["node_name"] == "subset_rows"
@@ -85,7 +92,7 @@ async def test_slice_node_without_length_uses_tail(fake_workspace_manager):
     request = SliceRequest(offset=3)
 
     result = await nodes_api.slice_node(
-        "ws1", "node_base", request, current_user={"id": "user"}
+        "node_base", request, current_user={"id": "user"}
     )
 
     assert result["node_name"] == "base_node_sliced"
@@ -104,7 +111,6 @@ async def test_slice_preview_respects_offset_and_length(fake_workspace_manager):
     request = SliceRequest(offset=1, length=3)
 
     preview = await nodes_api.slice_preview(
-        "ws1",
         "node_base",
         request,
         page=1,
@@ -119,7 +125,6 @@ async def test_slice_preview_respects_offset_and_length(fake_workspace_manager):
     assert [row["value"] for row in preview["data"]] == [2, 3]
 
     preview_page_two = await nodes_api.slice_preview(
-        "ws1",
         "node_base",
         request,
         page=2,

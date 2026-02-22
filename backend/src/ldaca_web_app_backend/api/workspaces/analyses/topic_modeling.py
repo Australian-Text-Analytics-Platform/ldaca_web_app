@@ -23,7 +23,7 @@ from ....models import (
     TopicModelingRequest,
     TopicModelingResponse,
 )
-from ..utils import ensure_task_synced, get_workspace_or_404
+from ..utils import ensure_task_synced
 from .text_column_prefs import resolve_text_columns_for_nodes
 
 router = APIRouter(prefix="/workspaces", tags=["topic-modeling"])
@@ -77,9 +77,8 @@ def _topic_artifacts_from_task(task: AnalysisTask) -> dict:
     return artifacts
 
 
-@router.delete("/{workspace_id}/topic-modeling")
+@router.delete("/topic-modeling")
 async def clear_topic_modeling_results(
-    workspace_id: str,
     current_user: dict = Depends(get_current_user),
 ):
     """Clear stored topic-modeling task state for a workspace.
@@ -92,7 +91,10 @@ async def clear_topic_modeling_results(
         aligned with backend task registries.
     """
     user_id = current_user["id"]
-    get_workspace_or_404(user_id, workspace_id)
+    current_entry = workspace_manager._get_current_entry(user_id)
+    if not current_entry:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+    workspace_id = current_entry[0]
 
     task_manager = get_task_manager(user_id, workspace_id)
     current_id = task_manager.get_current_task_ids("topic_modeling")
@@ -109,9 +111,8 @@ async def clear_topic_modeling_results(
     }
 
 
-@router.post("/{workspace_id}/topic-modeling", response_model=TopicModelingResponse)
+@router.post("/topic-modeling", response_model=TopicModelingResponse)
 async def run_topic_modeling(
-    workspace_id: str,
     request: TopicModelingRequest,
     current_user: dict = Depends(get_current_user),
 ):
@@ -125,7 +126,11 @@ async def run_topic_modeling(
         for progress/result polling.
     """
     user_id = current_user["id"]
-    get_workspace_or_404(user_id, workspace_id)
+    current_entry = workspace_manager._get_current_entry(user_id)
+    if not current_entry:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+    workspace_id = current_entry[0]
+    ws = current_entry[1]
 
     if not request.node_ids:
         raise HTTPException(
@@ -143,8 +148,9 @@ async def run_topic_modeling(
     corpora: list[list[str]] = []
     node_infos: list[dict[str, object]] = []
     for node_id in request.node_ids:
-        node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
-        if not node:
+        try:
+            node = ws.nodes[node_id]
+        except Exception:
             raise HTTPException(status_code=404, detail=f"Node {node_id} not found")
 
         node_data = getattr(node, "data", None)
@@ -250,11 +256,10 @@ async def run_topic_modeling(
 
 
 @router.get(
-    "/{workspace_id}/topic-modeling/tasks/{task_id}/result",
+    "/topic-modeling/tasks/{task_id}/result",
     response_model=TopicModelingResponse,
 )
 async def topic_modeling_task_result(
-    workspace_id: str,
     task_id: str,
     current_user: dict = Depends(get_current_user),
 ):
@@ -268,7 +273,10 @@ async def topic_modeling_task_result(
     - Normalizes task lifecycle states into one response contract for UI polling.
     """
     user_id = current_user["id"]
-    get_workspace_or_404(user_id, workspace_id)
+    current_entry = workspace_manager._get_current_entry(user_id)
+    if not current_entry:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+    workspace_id = current_entry[0]
 
     task = await ensure_task_synced(
         user_id, workspace_id, task_id, get_task_manager(user_id, workspace_id)
@@ -331,11 +339,10 @@ def _resolve_topic_column_name(base_name: str, existing_columns: set[str]) -> st
 
 
 @router.get(
-    "/{workspace_id}/topic-modeling/tasks/{task_id}/detach-options",
+    "/topic-modeling/tasks/{task_id}/detach-options",
     response_model=TopicModelingDetachOptionsResponse,
 )
 async def topic_modeling_detach_options(
-    workspace_id: str,
     task_id: str,
     current_user: dict = Depends(get_current_user),
 ):
@@ -349,7 +356,11 @@ async def topic_modeling_detach_options(
     - Exposes artifact-backed node metadata so users can choose output columns safely.
     """
     user_id = current_user["id"]
-    get_workspace_or_404(user_id, workspace_id)
+    current_entry = workspace_manager._get_current_entry(user_id)
+    if not current_entry:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+    workspace_id = current_entry[0]
+    ws = current_entry[1]
 
     analysis_tm = get_task_manager(user_id, workspace_id)
     task = await ensure_task_synced(user_id, workspace_id, task_id, analysis_tm)
@@ -371,10 +382,9 @@ async def topic_modeling_detach_options(
         node_id = payload.get("node_id")
         if not isinstance(node_id, str) or not node_id:
             continue
-        source_node = workspace_manager.get_node_from_workspace(
-            user_id, workspace_id, node_id
-        )
-        if not source_node:
+        try:
+            source_node = ws.nodes[node_id]
+        except Exception:
             continue
         source_data = getattr(source_node, "data", None)
         if not isinstance(source_data, pl.LazyFrame):
@@ -397,11 +407,10 @@ async def topic_modeling_detach_options(
 
 
 @router.post(
-    "/{workspace_id}/topic-modeling/tasks/{task_id}/detach",
+    "/topic-modeling/tasks/{task_id}/detach",
     response_model=TopicModelingDetachResponse,
 )
 async def detach_topic_modeling(
-    workspace_id: str,
     task_id: str,
     request: TopicModelingDetachRequest,
     current_user: dict = Depends(get_current_user),
@@ -417,7 +426,11 @@ async def detach_topic_modeling(
             nodes without rerunning the model.
     """
     user_id = current_user["id"]
-    get_workspace_or_404(user_id, workspace_id)
+    current_entry = workspace_manager._get_current_entry(user_id)
+    if not current_entry:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+    workspace_id = current_entry[0]
+    ws = current_entry[1]
 
     analysis_tm = get_task_manager(user_id, workspace_id)
     task = await ensure_task_synced(user_id, workspace_id, task_id, analysis_tm)
@@ -465,10 +478,9 @@ async def detach_topic_modeling(
             )
         assignments_lf = pl.scan_parquet(assignments_path)
 
-        source_node = workspace_manager.get_node_from_workspace(
-            user_id, workspace_id, node_id
-        )
-        if not source_node:
+        try:
+            source_node = ws.nodes[node_id]
+        except Exception:
             raise HTTPException(status_code=404, detail=f"Node {node_id} not found")
         source_data = getattr(source_node, "data", None)
         if not isinstance(source_data, pl.LazyFrame):

@@ -8,14 +8,14 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from ...analysis.manager import get_task_manager
 from ...core.auth import get_current_user
+from ...core.workspace import workspace_manager
 from .utils import ensure_task_synced
 
 router = APIRouter(prefix="/workspaces", tags=["analysis-task-manager"])
 
 
-@router.get("/{workspace_id}/{analysis}/current")
+@router.get("/{analysis}/current")
 async def get_current_tasks(
-    workspace_id: str,
     analysis: str,
     current_user: dict = Depends(get_current_user),
 ) -> dict[str, list[str]]:
@@ -28,13 +28,16 @@ async def get_current_tasks(
     - Lets clients resolve latest task id(s) before fetching request/result.
     """
     user_id = current_user["id"]
+    current_entry = workspace_manager._get_current_entry(user_id)
+    if not current_entry:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+    workspace_id = current_entry[0]
     manager = get_task_manager(user_id, workspace_id)
     return {"task_ids": manager.get_current_task_ids(analysis)}
 
 
-@router.get("/{workspace_id}/tasks/{task_id}/request")
+@router.get("/tasks/{task_id}/request")
 async def get_task_request(
-    workspace_id: str,
     task_id: str,
     current_user: dict = Depends(get_current_user),
 ) -> Any:
@@ -47,6 +50,10 @@ async def get_task_request(
     - Preserves reproducibility and UI state reconstruction from saved tasks.
     """
     user_id = current_user["id"]
+    current_entry = workspace_manager._get_current_entry(user_id)
+    if not current_entry:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+    workspace_id = current_entry[0]
     manager = get_task_manager(user_id, workspace_id)
     task = manager.get_task(task_id)
     if task is None:
@@ -55,14 +62,17 @@ async def get_task_request(
     return request.model_dump() if hasattr(request, "model_dump") else request
 
 
-@router.get("/{workspace_id}/tasks/{task_id}/result")
+@router.get("/tasks/{task_id}/result")
 async def get_task_result(
-    workspace_id: str,
     task_id: str,
     current_user: dict = Depends(get_current_user),
 ) -> Any:
     """Return stored task result, syncing with worker if still running."""
     user_id = current_user["id"]
+    current_entry = workspace_manager._get_current_entry(user_id)
+    if not current_entry:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+    workspace_id = current_entry[0]
     manager = get_task_manager(user_id, workspace_id)
 
     # Sync with worker if running using shared utility
@@ -77,9 +87,8 @@ async def get_task_result(
     return result.to_json() if hasattr(result, "to_json") else result
 
 
-@router.post("/{workspace_id}/tasks/{task_id}/clear")
+@router.post("/tasks/{task_id}/clear")
 async def clear_task(
-    workspace_id: str,
     task_id: str,
     current_user: dict = Depends(get_current_user),
 ) -> dict[str, str]:
@@ -92,6 +101,10 @@ async def clear_task(
     - Removes stale in-memory task entries without deleting analysis artifacts.
     """
     user_id = current_user["id"]
+    current_entry = workspace_manager._get_current_entry(user_id)
+    if not current_entry:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+    workspace_id = current_entry[0]
     manager = get_task_manager(user_id, workspace_id)
     task = manager.get_task(task_id)
     if task is None:

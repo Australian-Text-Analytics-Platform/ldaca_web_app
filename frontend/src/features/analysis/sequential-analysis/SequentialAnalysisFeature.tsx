@@ -102,7 +102,7 @@ const UniqueValueCount: React.FC<UniqueValueCountProps> = ({ workspaceId, nodeId
   
   const { data, isLoading, error } = useQuery({
     queryKey: ['columnUniqueValues', workspaceId, nodeId, columnName],
-  queryFn: () => nodesApi.uniqueValues(workspaceId, nodeId, columnName, getAuthHeaders()),
+  queryFn: () => nodesApi.uniqueValues(nodeId, columnName, getAuthHeaders()),
     enabled: !!workspaceId && !!nodeId && !!columnName,
   });
 
@@ -216,7 +216,6 @@ const SequentialAnalysisFeature: React.FC = () => {
       fetchCurrentTaskId: async () => {
         const headers = getAuthHeaders();
         const current = (await textApi.getAnalysisCurrent(
-          currentWorkspaceId,
           'sequential-analysis',
           headers
         )) as any;
@@ -384,7 +383,7 @@ const handleAnalyze = async () => {
       setIsAnalyzing(true);
       const authHeaders = getAuthHeaders();
       const headers = Object.keys(authHeaders).length > 0 ? authHeaders as Record<string, string> : {};
-      const result = await textApi.sequentialAnalysis(currentWorkspaceId, nodeIdForAnalysis, request, headers);
+      const result = await textApi.sequentialAnalysis(nodeIdForAnalysis, request, headers);
       const taskIdFromResponse =
         (result as any)?.metadata?.task_id ??
         (result as any)?.metadata?.taskId ??
@@ -453,7 +452,7 @@ const handleUpdateResults = async () => {
         workspaceId: currentWorkspaceId,
         taskIds: collectTaskIds([localSequentialTaskId, taskId]),
         clearAnalysisTask: (workspaceId, id) =>
-          textApi.clearTask(workspaceId, id, getAuthHeaders()),
+          textApi.clearTask(id, getAuthHeaders()),
         warnContext: 'sequential-analysis',
       });
     }
@@ -469,7 +468,7 @@ const handleUpdateResults = async () => {
         workspaceId: currentWorkspaceId,
         taskIds: collectTaskIds([localSequentialTaskId, taskId]),
         clearAnalysisTask: (workspaceId, id) =>
-          textApi.clearTask(workspaceId, id, getAuthHeaders()),
+          textApi.clearTask(id, getAuthHeaders()),
         warnContext: 'sequential-analysis',
       });
     }
@@ -500,7 +499,7 @@ const handleUpdateResults = async () => {
       if (!taskId) {
         return;
       }
-      await textApi.postSequentialAnalysisTaskResult(currentWorkspaceId, taskId, { chart_type: value }, headers);
+      await textApi.postSequentialAnalysisTaskResult(taskId, { chart_type: value }, headers);
     } catch (error) {
       console.error('Failed to update sequential analysis chart type:', error);
     }
@@ -915,7 +914,7 @@ const handleUpdateResults = async () => {
   const fetchSequentialRequest = useCallback(
     async (taskId?: string | null) => {
       if (!currentWorkspaceId || !taskId) return null;
-      return textApi.getTaskRequest(currentWorkspaceId, taskId, getAuthHeaders());
+      return textApi.getTaskRequest(taskId, getAuthHeaders());
     },
     [currentWorkspaceId, getAuthHeaders]
   );
@@ -923,7 +922,7 @@ const handleUpdateResults = async () => {
   const fetchSequentialResult = useCallback(
     async (taskId?: string | null) => {
       if (!currentWorkspaceId || !taskId) return null;
-      return textApi.getTaskResult(currentWorkspaceId, taskId, getAuthHeaders());
+      return textApi.getTaskResult(taskId, getAuthHeaders());
     },
     [currentWorkspaceId, getAuthHeaders]
   );

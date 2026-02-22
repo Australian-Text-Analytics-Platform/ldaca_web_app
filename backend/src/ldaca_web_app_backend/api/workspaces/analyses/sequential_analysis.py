@@ -22,7 +22,7 @@ from ....analysis.results import GenericAnalysisResult
 from ....core.auth import get_current_user
 from ....core.workspace import workspace_manager
 from ....models import SequentialAnalysisRequest
-from ..utils import get_node_with_data_or_400, get_workspace_or_404
+from ..utils import get_workspace_or_404
 
 logger = logging.getLogger(__name__)
 
@@ -229,9 +229,8 @@ def _run_sequential_analysis(
     return result_df
 
 
-@router.post("/{workspace_id}/nodes/{node_id}/sequential-analysis")
+@router.post("/nodes/{node_id}/sequential-analysis")
 async def run_sequential_analysis(
-    workspace_id: str,
     node_id: str,
     request: SequentialAnalysisRequest,
     current_user: dict = Depends(get_current_user),
@@ -245,6 +244,11 @@ async def run_sequential_analysis(
     - Produces aggregated time-series counts and stores them as current task data.
     """
     user_id = current_user["id"]
+    current_entry = workspace_manager._get_current_entry(user_id)
+    if not current_entry:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+    workspace_id = current_entry[0]
+    ws = current_entry[1]
     get_workspace_or_404(user_id, workspace_id)
 
     task_manager = get_task_manager(user_id, workspace_id)
@@ -272,7 +276,13 @@ async def run_sequential_analysis(
             pass
 
     try:
-        node, node_data = get_node_with_data_or_400(user_id, workspace_id, node_id)
+        try:
+            node = ws.nodes[node_id]
+        except Exception:
+            raise HTTPException(status_code=404, detail="Node not found")
+        node_data = getattr(node, "data", None)
+        if node_data is None:
+            raise HTTPException(status_code=400, detail="Node has no data")
 
         if not isinstance(node_data, pl.LazyFrame):
             raise HTTPException(
@@ -446,9 +456,8 @@ async def run_sequential_analysis(
         raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
 
 
-@router.post("/{workspace_id}/sequential-analysis/tasks/{task_id}/result")
+@router.post("/sequential-analysis/tasks/{task_id}/result")
 async def update_sequential_analysis_task_result(
-    workspace_id: str,
     task_id: str,
     updates: dict | None,
     current_user: dict = Depends(get_current_user),
@@ -466,6 +475,10 @@ async def update_sequential_analysis_task_result(
         task-preferences helper could reduce duplication.
     """
     user_id = current_user["id"]
+    current_entry = workspace_manager._get_current_entry(user_id)
+    if not current_entry:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+    workspace_id = current_entry[0]
     task_manager = get_task_manager(user_id, workspace_id)
     task = task_manager.get_task(task_id)
     if not task or not task.result:

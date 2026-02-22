@@ -31,31 +31,31 @@ class TestLazyFlowIntegration:
         }).lazy()
 
     def test_node_info_includes_lazy_field(self, sample_dataframe):
-        """Test that Node.info() method includes lazy field"""
+        """Test that Node.info() returns basic node metadata."""
         # Create node with regular DataFrame
         node = Node(sample_dataframe.lazy(), name="test_node")
         info = node.info()
 
-        # Check that info includes lazy field and reflects lazy-by-default contract
+        # Check that info contains expected basic metadata
         assert isinstance(info, dict)
-        assert "lazy" in info
-        assert info["lazy"] is True  # Nodes always store lazy data internally
+        assert info["name"] == "test_node"
+        assert info["columns"] == ["id", "name", "age", "salary"]
 
     def test_lazy_node_info(self, lazy_dataframe):
-        """Test that lazy DataFrames are properly identified"""
+        """Test that node info is exposed for lazy-backed nodes."""
         # Create node with lazy DataFrame
         lazy_node = Node(lazy_dataframe, name="lazy_test")
         info = lazy_node.info()
 
-        # Check that lazy field correctly indicates lazy state
+        # Check that info contains expected metadata
         assert isinstance(info, dict)
-        assert "lazy" in info
-        assert info["lazy"] is True  # Lazy DataFrame should be identified as lazy
+        assert info["name"] == "lazy_test"
+        assert set(info["columns"]) == {"id", "department", "budget"}
 
     def test_lazy_operations_preserve_lazy_state(
         self, sample_dataframe, lazy_dataframe
     ):
-        """Test that operations on lazy DataFrames preserve lazy state"""
+        """Test that operations on lazy nodes produce valid node info."""
         regular_node = Node(sample_dataframe.lazy(), name="regular")
         lazy_node = Node(lazy_dataframe, name="lazy")
 
@@ -63,20 +63,19 @@ class TestLazyFlowIntegration:
         joined_node = regular_node.join(lazy_node, on="id", how="inner")
         joined_info = joined_node.info()
 
-        # The result should indicate whether it's lazy or not
-        assert "lazy" in joined_info
-        # After join, the result might be materialized (implementation dependent)
+        assert joined_info["operation"] == "join(inner)"
+        assert "columns" in joined_info
 
     def test_filter_operation_lazy_preservation(self, lazy_dataframe):
-        """Test that filter operations preserve lazy state when appropriate"""
+        """Test that filter operations expose expected metadata."""
         lazy_node = Node(lazy_dataframe, name="lazy_filter_test")
 
         # Apply filter operation
         filtered_node = lazy_node.filter(pl.col("budget") > 100000)
         filtered_info = filtered_node.info()
 
-        # Check that lazy state information is available
-        assert "lazy" in filtered_info
+        assert filtered_info["operation"] == "filter"
+        assert "columns" in filtered_info
 
     def test_workspace_lazy_node_handling(self, sample_dataframe, lazy_dataframe):
         """Test that workspace properly handles lazy nodes"""
@@ -97,13 +96,9 @@ class TestLazyFlowIntegration:
         # The exact structure depends on implementation, but it should handle lazy nodes
 
     def test_lazy_state_after_collect(self, lazy_dataframe):
-        """Test that lazy state changes after collect() operation"""
+        """Test that node info remains valid after collect and re-wrap."""
         # Create lazy node
         lazy_node = Node(lazy_dataframe, name="lazy_collect_test")
-        lazy_info = lazy_node.info()
-
-        # Verify it starts as lazy
-        assert lazy_info["lazy"] is True
 
         # Force collection by accessing data
         collected_data = lazy_node.data.collect()
@@ -112,5 +107,5 @@ class TestLazyFlowIntegration:
         collected_node = Node(collected_data.lazy(), name="collected")
         collected_info = collected_node.info()
 
-        # Nodes wrap collected data back into lazy form, so flag remains True
-        assert collected_info["lazy"] is True
+        assert collected_info["name"] == "collected"
+        assert set(collected_info["columns"]) == {"id", "department", "budget"}

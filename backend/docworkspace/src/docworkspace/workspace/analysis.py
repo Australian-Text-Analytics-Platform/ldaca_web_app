@@ -24,8 +24,8 @@ def info_json(workspace: "Workspace") -> Dict[str, Any]:
         node_types[t] = node_types.get(t, 0) + 1
     status_counts = {"lazy": total_nodes, "eager": 0}
     return {
-        "workspace": workspace.name,
-        "workspace_id": workspace.id,
+        "name": workspace.name,
+        "id": workspace.id,
         "total_nodes": total_nodes,
         "root_nodes": root_nodes,
         "leaf_nodes": leaf_nodes,

@@ -114,12 +114,23 @@ def write_workspace(workspace: "Workspace", path: Union[str, Path]) -> None:
         pass
 
 
+def read_workspace_metadata(path: Union[str, Path]) -> Dict[str, Any]:
+    """Load and return the workspace metadata dictionary from metadata.json.
+
+    This helper only reads/parses the JSON metadata file and does not attempt
+    to load any node data payload files.
+    """
+
+    target = _resolve_metadata_path(Path(path))
+    with target.open("r", encoding="utf-8") as f:
+        return json.load(f)
+
+
 def read_workspace(path: Union[str, Path]) -> "Workspace":
     from .core import Workspace
 
     target = _resolve_metadata_path(Path(path))
-    with target.open("r", encoding="utf-8") as f:
-        data = json.load(f)
+    data = read_workspace_metadata(path)
 
     ws_meta = data.get("workspace_metadata", {})
     workspace = Workspace(name=ws_meta.get("name", "restored_workspace"))
@@ -175,5 +186,6 @@ def read_workspace(path: Union[str, Path]) -> "Workspace":
 
 __all__ = [
     "write_workspace",
+    "read_workspace_metadata",
     "read_workspace",
 ]

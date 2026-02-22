@@ -10,9 +10,10 @@ class _DummyNode:
 
 
 class _DummyWorkspace:
-    def __init__(self, persist_calls: dict[str, int]):
+    def __init__(self, persist_calls: dict[str, int], nodes=None):
         self.name = "ws"
         self._persist_calls = persist_calls
+        self.nodes = nodes or {}
 
     def set_metadata(self, *_args, **_kwargs):
         return None
@@ -32,20 +33,17 @@ async def test_compute_column_preview_adds_new_column(
         "Total Count": [5, 6, 7],
     })
     node = _DummyNode(frame)
+    workspace_id = "ws-alpha"
+    dummy_ws = _DummyWorkspace({"count": 0}, nodes={"node-123": node})
 
     monkeypatch.setattr(
         nodes_api.workspace_manager,
-        "get_node_from_workspace",
-        lambda user_id, workspace_id, node_id: node,
-    )
-    monkeypatch.setattr(
-        nodes_api.workspace_manager,
-        "get_workspace",
-        lambda user_id, workspace_id: _DummyWorkspace({"count": 0}),
+        "_get_current_entry",
+        lambda user_id: (workspace_id, dummy_ws),
     )
 
     response = await authenticated_client.post(
-        "/api/workspaces/ws-alpha/nodes/node-123/compute-column/preview",
+        "/api/workspaces/nodes/node-123/compute-column/preview",
         json={
             "expression": 'A + "Total Count"',
             "preview_limit": 2,
@@ -72,12 +70,14 @@ async def test_compute_column_apply_mutates_node(authenticated_client, monkeypat
         "B": [3, 4],
     })
     node = _DummyNode(frame)
+    workspace_id = "ws-alpha"
     persist_calls = {"count": 0}
+    dummy_ws = _DummyWorkspace(persist_calls, nodes={"node-123": node})
 
     monkeypatch.setattr(
         nodes_api.workspace_manager,
-        "get_node_from_workspace",
-        lambda user_id, workspace_id, node_id: node,
+        "_get_current_entry",
+        lambda user_id: (workspace_id, dummy_ws),
     )
     monkeypatch.setattr(
         nodes_api.workspace_manager,
@@ -100,7 +100,7 @@ async def test_compute_column_apply_mutates_node(authenticated_client, monkeypat
         lambda user_id, workspace_id: _DummyWorkspace(persist_calls),
     )
     response = await authenticated_client.post(
-        "/api/workspaces/ws-alpha/nodes/node-123/compute-column",
+        "/api/workspaces/nodes/node-123/compute-column",
         json={
             "expression": "A + B",
             "new_column_name": "A_plus_B",

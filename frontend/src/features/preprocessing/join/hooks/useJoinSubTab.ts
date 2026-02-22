@@ -273,7 +273,6 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
     pageSize: number;
   }) => {
     const response = await nodesApi.joinPreview(
-      request.workspaceId,
       {
         left_node_id: request.leftNodeId,
         right_node_id: request.rightNodeId,

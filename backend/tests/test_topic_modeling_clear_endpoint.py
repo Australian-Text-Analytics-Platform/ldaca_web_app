@@ -6,9 +6,7 @@ from ldaca_web_app_backend.analysis.results import GenericAnalysisResult
 
 @pytest.mark.asyncio
 async def test_clear_topic_modeling_results_success(authenticated_client, workspace_id):
-    response = await authenticated_client.delete(
-        f"/api/workspaces/{workspace_id}/topic-modeling"
-    )
+    response = await authenticated_client.delete("/api/workspaces/topic-modeling")
 
     assert response.status_code == 200
     assert response.json() == {
@@ -51,7 +49,7 @@ async def test_topic_modeling_result_returns_payload(
     )
 
     response = await authenticated_client.get(
-        f"/api/workspaces/{workspace_id}/topic-modeling/tasks/{task_id}/result"
+        f"/api/workspaces/topic-modeling/tasks/{task_id}/result"
     )
 
     assert response.status_code == 200

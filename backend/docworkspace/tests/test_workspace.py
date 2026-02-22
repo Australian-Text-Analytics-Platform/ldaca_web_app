@@ -563,8 +563,8 @@ class TestWorkspaceGraphOperations:
         assert node1 in nodes_from_iter
         assert node2 in nodes_from_iter
 
-    def test_remove_node_with_materialization(self):
-        """Test node removal with child materialization."""
+    def test_remove_node_keeps_lazy_child(self):
+        """Test node removal keeps remaining child node lazy."""
         workspace = Workspace("remove_test")
 
         # Create parent and child nodes
@@ -575,12 +575,11 @@ class TestWorkspaceGraphOperations:
         assert isinstance(child.data, pl.LazyFrame)
         assert len(workspace.nodes) == 2
 
-        # Remove parent with materialization
-        removed = workspace.remove_node(parent.id, materialize_children=True)
+        removed = workspace.remove_node(parent.id)
 
         assert removed is True
         assert len(workspace.nodes) == 1
-        # Child should now be materialized
+        # Child should still be lazy
         remaining_node = list(workspace.nodes.values())[0]
         assert isinstance(remaining_node.data, pl.LazyFrame)
 

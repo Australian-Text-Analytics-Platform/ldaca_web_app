@@ -102,7 +102,7 @@ def _stub_task_manager(monkeypatch):
 
 
 async def _get_current_task_id(client, workspace_id: str, analysis: str):
-    response = await client.get(f"/api/workspaces/{workspace_id}/{analysis}/current")
+    response = await client.get("/api/workspaces/" + analysis + "/current")
     if response.status_code != 200:
         return None
     payload = response.json()
@@ -168,7 +168,7 @@ class TestParametrizedAnalysisPersistence:
 
         # When: We call the analysis endpoint
         response = await authenticated_client.post(
-            f"/api/workspaces/{workspace_id}/{analysis_config['endpoint']}",
+            f"/api/workspaces/{analysis_config['endpoint']}",
             json=request_payload,
         )
 
@@ -190,7 +190,7 @@ class TestParametrizedAnalysisPersistence:
             assert task_id
             final = (
                 await authenticated_client.get(
-                    f"/api/workspaces/{workspace_id}/token-frequencies/tasks/{task_id}/result"
+                    f"/api/workspaces/token-frequencies/tasks/{task_id}/result"
                 )
             ).json()
             assert final.get("state") == "successful"
@@ -280,7 +280,7 @@ class TestAnalysisErrorHandling:
 
         # When: We call the endpoint
         response = await authenticated_client.post(
-            f"/api/workspaces/{workspace_id}/token-frequencies", json=base_request
+            "/api/workspaces/token-frequencies", json=base_request
         )
 
         # Then: The response indicates the appropriate error
@@ -321,7 +321,7 @@ class TestAnalysisErrorHandling:
 
         # When: We call the endpoint
         response = await authenticated_client.post(
-            f"/api/workspaces/{workspace_id}/token-frequencies", json=incomplete_request
+            "/api/workspaces/token-frequencies", json=incomplete_request
         )
 
         # Then: The response indicates validation error
@@ -344,7 +344,7 @@ class TestAnalysisDataIntegrity:
 
         # When: We call the endpoint
         response = await authenticated_client.post(
-            f"/api/workspaces/{workspace_id}/token-frequencies", json=request_payload
+            "/api/workspaces/token-frequencies", json=request_payload
         )
 
         assert response.status_code == 200
@@ -358,7 +358,7 @@ class TestAnalysisDataIntegrity:
         assert task_id
         final = (
             await authenticated_client.get(
-                f"/api/workspaces/{workspace_id}/token-frequencies/tasks/{task_id}/result"
+                f"/api/workspaces/token-frequencies/tasks/{task_id}/result"
             )
         ).json()
         expected_limit = DEFAULT_TOKEN_LIMIT
@@ -398,7 +398,7 @@ emoji test 🚀 🎉 💫"""
 
         # Add the unicode file as a node
         node_response = await authenticated_client.post(
-            f"/api/workspaces/{workspace_id}/nodes", params={"filename": "unicode.csv"}
+            "/api/workspaces/nodes", params={"filename": "unicode.csv"}
         )
         assert node_response.status_code == 200
         unicode_node_id = node_response.json()["id"]
@@ -410,7 +410,7 @@ emoji test 🚀 🎉 💫"""
         }
 
         response = await authenticated_client.post(
-            f"/api/workspaces/{workspace_id}/token-frequencies", json=request_payload
+            "/api/workspaces/token-frequencies", json=request_payload
         )
 
         # Then: Task starts successfully
@@ -424,7 +424,7 @@ emoji test 🚀 🎉 💫"""
         assert task_id
         final = (
             await authenticated_client.get(
-                f"/api/workspaces/{workspace_id}/token-frequencies/tasks/{task_id}/result"
+                f"/api/workspaces/token-frequencies/tasks/{task_id}/result"
             )
         ).json()
         assert final.get("state") == "successful"
@@ -458,7 +458,7 @@ emoji test 🚀 🎉 💫"""
 
         # Add the large file as a node
         node_response = await authenticated_client.post(
-            f"/api/workspaces/{workspace_id}/nodes", params={"filename": "large.csv"}
+            "/api/workspaces/nodes", params={"filename": "large.csv"}
         )
         assert node_response.status_code == 200
         large_node_id = node_response.json()["id"]
@@ -470,7 +470,7 @@ emoji test 🚀 🎉 💫"""
         }
 
         response = await authenticated_client.post(
-            f"/api/workspaces/{workspace_id}/token-frequencies", json=request_payload
+            "/api/workspaces/token-frequencies", json=request_payload
         )
 
         # Then: The analysis handles large data correctly
@@ -483,7 +483,7 @@ emoji test 🚀 🎉 💫"""
         assert task_id
         final = (
             await authenticated_client.get(
-                f"/api/workspaces/{workspace_id}/token-frequencies/tasks/{task_id}/result"
+                f"/api/workspaces/token-frequencies/tasks/{task_id}/result"
             )
         ).json()
         assert final.get("state") == "successful"

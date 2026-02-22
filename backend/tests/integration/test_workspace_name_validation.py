@@ -19,10 +19,10 @@ async def test_rename_workspace_rejects_invalid_name(test_client):
         json={"name": "Valid Name", "description": ""},
     )
     assert create.status_code == 200
-    workspace_id = create.json()["workspace_id"]
+    workspace_id = create.json()["id"]
 
     resp = await test_client.put(
-        f"/api/workspaces/{workspace_id}/name",
+        "/api/workspaces/name",
         params={"new_name": "Bad/Name"},
     )
     assert resp.status_code == 400

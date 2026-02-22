@@ -21,7 +21,7 @@ export interface ApiError {
 
 // Workspace Types
 export interface WorkspaceInfo {
-  workspace_id: string;
+  id: string;
   name: string;
   description: string;  
   created_at: string;

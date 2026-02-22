@@ -24,7 +24,7 @@ from ....core.analysis_helpers import sanitize_stop_words
 from ....core.auth import get_current_user
 from ....core.workspace import workspace_manager
 from ....models import TokenFrequencyRequest, TokenFrequencyResponse
-from ..utils import ensure_task_synced, get_workspace_or_404
+from ..utils import ensure_task_synced
 from .text_column_prefs import resolve_text_columns_for_nodes
 
 router = APIRouter(prefix="/workspaces")
@@ -242,14 +242,17 @@ def _rebuild_token_result(task: AnalysisTask) -> dict:
     }
 
 
-@router.get("/{workspace_id}/token-frequencies/tasks/{task_id}/result")
+@router.get("/token-frequencies/tasks/{task_id}/result")
 async def token_frequencies_task_result(
-    workspace_id: str,
     task_id: str,
     current_user: dict = Depends(get_current_user),
 ):
     """Return normalized token-frequency result payload for one task."""
     user_id = current_user["id"]
+    current_entry = workspace_manager._get_current_entry(user_id)
+    if not current_entry:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+    workspace_id = current_entry[0]
     task_manager = get_task_manager(user_id, workspace_id)
 
     task = await ensure_task_synced(user_id, workspace_id, task_id, task_manager)
@@ -265,15 +268,18 @@ async def token_frequencies_task_result(
     return _rebuild_token_result(task)
 
 
-@router.post("/{workspace_id}/token-frequencies/tasks/{task_id}/result")
+@router.post("/token-frequencies/tasks/{task_id}/result")
 async def update_token_frequencies_task_result(
-    workspace_id: str,
     task_id: str,
     updates: dict | None,
     current_user: dict = Depends(get_current_user),
 ):
     """Persist token-frequency preference overrides on an existing task."""
     user_id = current_user["id"]
+    current_entry = workspace_manager._get_current_entry(user_id)
+    if not current_entry:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+    workspace_id = current_entry[0]
     task_manager = get_task_manager(user_id, workspace_id)
     task = task_manager.get_task(task_id)
     if not task:
@@ -304,19 +310,23 @@ async def update_token_frequencies_task_result(
 
 
 @router.post(
-    "/{workspace_id}/token-frequencies",
+    "/token-frequencies",
     response_model=TokenFrequencyResponse,
     summary="Calculate token frequencies for selected nodes",
     description="Calculate and compare token frequencies across one or two nodes using polars-text",
 )
 async def calculate_token_frequencies(
-    workspace_id: str,
     request: TokenFrequencyRequest,
     current_user: dict = Depends(get_current_user),
 ):
     """Submit token-frequency analysis as a worker-backed artifact-first task."""
 
     user_id = current_user["id"]
+    current_entry = workspace_manager._get_current_entry(user_id)
+    if not current_entry:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+    workspace_id = current_entry[0]
+    ws = current_entry[1]
     tm = workspace_manager.get_task_manager(user_id, workspace_id)
 
     try:
@@ -355,10 +365,6 @@ async def calculate_token_frequencies(
             status_code=400, detail="token_limit must be a positive integer"
         )
 
-    get_workspace_or_404(
-        user_id, workspace_id, detail=f"Workspace {workspace_id} not found"
-    )
-
     validated_columns = resolve_text_columns_for_nodes(
         user_id=user_id,
         workspace_id=workspace_id,
@@ -370,8 +376,9 @@ async def calculate_token_frequencies(
     node_corpora: dict[str, list[str]] = {}
     node_display_names: dict[str, str] = {}
     for node_id in request.node_ids:
-        node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
-        if not node:
+        try:
+            node = ws.nodes[node_id]
+        except Exception:
             raise HTTPException(status_code=404, detail=f"Node {node_id} not found")
 
         node_data = getattr(node, "data", None)

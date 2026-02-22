@@ -16,12 +16,7 @@ from ...core.auth import get_current_user
 # Note: DocWorkspace API helpers are not used directly in this HTTP layer
 from ...core.utils import get_user_data_folder, load_data_file
 from ...core.workspace import workspace_manager
-from .utils import (
-    get_node_or_404,
-    get_node_with_data_or_400,
-    stage_dataframe_as_lazy,
-    update_workspace,
-)
+from .utils import stage_dataframe_as_lazy, update_workspace
 
 # (No direct model imports needed after modularization)
 # Removed unused concordance cache import (clearing handled in analyses module)
@@ -35,9 +30,8 @@ router = APIRouter(prefix="/workspaces", tags=["workspace"])
 logger = logging.getLogger(__name__)
 
 
-@router.delete("/{workspace_id}/nodes/{node_id}/columns/{column_name}")
+@router.delete("/nodes/{node_id}/columns/{column_name}")
 async def delete_node_column(
-    workspace_id: str,
     node_id: str,
     column_name: str,
     current_user: dict = Depends(get_current_user),
@@ -45,7 +39,13 @@ async def delete_node_column(
     """Delete a column from a node's data (in-place)."""
 
     user_id = current_user["id"]
-    node, data = get_node_with_data_or_400(user_id, workspace_id, node_id)
+    current_entry = workspace_manager._get_current_entry(user_id)
+    if not current_entry:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+    workspace_id = current_entry[0]
+    ws = current_entry[1]
+    node = ws.nodes[node_id]
+    data = node.data
     if not isinstance(data, pl.LazyFrame):
         raise HTTPException(
             status_code=400,
@@ -72,9 +72,8 @@ async def delete_node_column(
         ) from exc
 
 
-@router.put("/{workspace_id}/nodes/{node_id}/columns/{column_name}")
+@router.put("/nodes/{node_id}/columns/{column_name}")
 async def rename_node_column(
-    workspace_id: str,
     node_id: str,
     column_name: str,
     payload: dict = Body(...),
@@ -90,7 +89,13 @@ async def rename_node_column(
             detail="Request body must include a 'new_name' string field.",
         )
 
-    node, data = get_node_with_data_or_400(user_id, workspace_id, node_id)
+    current_entry = workspace_manager._get_current_entry(user_id)
+    if not current_entry:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+    workspace_id = current_entry[0]
+    ws = current_entry[1]
+    node = ws.nodes[node_id]
+    data = node.data
     if not isinstance(data, pl.LazyFrame):
         raise HTTPException(
             status_code=400,
@@ -221,9 +226,8 @@ _configure_numba_threading()
 ## Lifecycle endpoints moved to lifecycle.py
 
 
-@router.post("/{workspace_id}/nodes")
+@router.post("/nodes")
 async def add_node_to_workspace(
-    workspace_id: str,
     filename: str,
     mode: str = Query(
         "LazyFrame",
@@ -240,6 +244,10 @@ async def add_node_to_workspace(
     lazy processing semantics.
     """
     user_id = current_user["id"]
+    current_entry = workspace_manager._get_current_entry(user_id)
+    if not current_entry:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+    workspace_id = current_entry[0]
 
     try:
         # Load data file
@@ -363,9 +371,8 @@ async def add_node_to_workspace(
 ## Concordance detail endpoint moved to analyses/concordance.py
 
 
-@router.post("/{workspace_id}/nodes/{node_id}/cast")
+@router.post("/nodes/{node_id}/cast")
 async def cast_node(
-    workspace_id: str,
     node_id: str,
     cast_data: dict,
     current_user: dict = Depends(get_current_user),
@@ -387,6 +394,11 @@ async def cast_node(
     """
     try:
         user_id = current_user["id"]
+        current_entry = workspace_manager._get_current_entry(user_id)
+        if not current_entry:
+            raise HTTPException(status_code=404, detail="No active workspace selected")
+        workspace_id = current_entry[0]
+        ws = current_entry[1]
 
         # Validate cast_data structure
         if not isinstance(cast_data, dict):
@@ -414,7 +426,8 @@ async def cast_node(
             )
 
         # Get node using shared helper (guarantees data presence)
-        node, current_df = get_node_with_data_or_400(user_id, workspace_id, node_id)
+        node = ws.nodes[node_id]
+        current_df = node.data
 
         if isinstance(current_df, pl.LazyFrame):
             lazyframe = current_df
@@ -608,9 +621,8 @@ async def cast_node(
         )
 
 
-@router.get("/{workspace_id}/export")
+@router.get("/export")
 async def export_nodes(
-    workspace_id: str,
     node_ids: str,  # comma separated list
     format: str = "csv",
     current_user: dict = Depends(get_current_user),
@@ -627,6 +639,11 @@ async def export_nodes(
     from fastapi.responses import StreamingResponse
 
     user_id = current_user["id"]
+    current_entry = workspace_manager._get_current_entry(user_id)
+    if not current_entry:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+    workspace_id = current_entry[0]
+    ws = current_entry[1]
     fmt = format.lower()
     supported = {"csv", "json", "parquet", "ipc", "ndjson"}
     if fmt not in supported:
@@ -658,9 +675,7 @@ async def export_nodes(
 
     exported: list[tuple[str, bytes]] = []
     for nid in ids:
-        node = get_node_or_404(
-            user_id, workspace_id, nid, detail=f"Node '{nid}' not found"
-        )
+        node = ws.nodes[nid]
         df = node_to_df(node)
         buf = io.BytesIO()
         # Dispatch by format

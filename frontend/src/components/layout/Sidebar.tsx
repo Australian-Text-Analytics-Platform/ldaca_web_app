@@ -317,7 +317,7 @@ const Sidebar: React.FC = () => {
         await filesApi.cancelTasks({ task_id: task.task_id }, getAuthHeaders());
       } else {
         if (!currentWorkspaceId) return;
-        await workspacesApi.cancelTasks(currentWorkspaceId, { task_id: task.task_id }, getAuthHeaders());
+        await workspacesApi.cancelTasks({ task_id: task.task_id }, getAuthHeaders());
       }
       setTasks((prev) =>
         prev.map((item) =>
@@ -336,7 +336,7 @@ const Sidebar: React.FC = () => {
         await filesApi.clearTasks({ task_id: task.task_id }, getAuthHeaders());
       } else {
         if (!currentWorkspaceId) return;
-        await workspacesApi.clearTasks(currentWorkspaceId, { task_id: task.task_id }, getAuthHeaders());
+        await workspacesApi.clearTasks({ task_id: task.task_id }, getAuthHeaders());
       }
       setTasks((prev) => prev.filter((item) => item.task_id !== task.task_id));
     } catch (error) {

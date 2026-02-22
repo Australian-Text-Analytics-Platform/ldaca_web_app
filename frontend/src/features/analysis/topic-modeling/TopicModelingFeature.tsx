@@ -155,7 +155,6 @@ const TopicModelingFeature: React.FC = () => {
       fetchCurrentTaskId: async () => {
         const headers = getAuthHeaders();
         const current = (await textApi.getAnalysisCurrent(
-          currentWorkspaceId,
           'topic-modeling',
           headers
         )) as any;
@@ -186,13 +185,13 @@ const TopicModelingFeature: React.FC = () => {
 
     try {
       fetchingTaskIdRef.current = resolvedTaskId;
-      const rr = await textApi.getTopicModelingTaskResult(currentWorkspaceId, resolvedTaskId, getAuthHeaders());
+      const rr = await textApi.getTopicModelingTaskResult(resolvedTaskId, getAuthHeaders());
       if (!rr) return;
 
       // Ensure lock snapshot + node-column selections are restored from task request,
       // so Topic Modeling matches other tabs on tab re-entry.
       try {
-        const reqPayload = await textApi.getTaskRequest(currentWorkspaceId, resolvedTaskId, getAuthHeaders());
+        const reqPayload = await textApi.getTaskRequest(resolvedTaskId, getAuthHeaders());
         const req = (reqPayload as any)?.data ?? reqPayload;
         const nodeIds: string[] = Array.isArray(req?.node_ids)
           ? req.node_ids
@@ -431,7 +430,7 @@ const TopicModelingFeature: React.FC = () => {
         use_ctfidf: useCtTfidf,
       };
 
-      const res = await textApi.topicModeling(currentWorkspaceId, req, getAuthHeaders());
+      const res = await textApi.topicModeling(req, getAuthHeaders());
       setResultSafely(res);
 
       if (res.state === 'running') {
@@ -466,7 +465,7 @@ const TopicModelingFeature: React.FC = () => {
 
     try {
       setIsDetachLoading(true);
-      const resp = await textApi.getTopicModelingDetachOptions(currentWorkspaceId, taskId, getAuthHeaders());
+      const resp = await textApi.getTopicModelingDetachOptions(taskId, getAuthHeaders());
       const nodes = resp?.data?.nodes ?? [];
       setDetachNodeOptions(nodes);
       const initialSelections: Record<string, string[]> = {};
@@ -517,7 +516,7 @@ const TopicModelingFeature: React.FC = () => {
         node_ids: nodeIds,
         selected_columns: selectedDetachColumns,
       };
-      const resp = await textApi.topicModelingDetach(currentWorkspaceId, taskId, payload, getAuthHeaders());
+      const resp = await textApi.topicModelingDetach(taskId, payload, getAuthHeaders());
       if (resp?.state !== 'successful') {
         throw new Error(resp?.message || 'Topic detach failed');
       }
@@ -901,12 +900,12 @@ const TopicModelingFeature: React.FC = () => {
 
   const fetchTopicRequest = async (taskId?: string | null) => {
     if (!currentWorkspaceId || !taskId) return null;
-    return textApi.getTaskRequest(currentWorkspaceId, taskId, getAuthHeaders());
+    return textApi.getTaskRequest(taskId, getAuthHeaders());
   };
 
   const fetchTopicResult = async (taskId?: string | null) => {
     if (!currentWorkspaceId || !taskId) return null;
-    return textApi.getTopicModelingTaskResult(currentWorkspaceId, taskId, getAuthHeaders());
+    return textApi.getTopicModelingTaskResult(taskId, getAuthHeaders());
   };
 
   const { hydrateFromServer } = useAnalysisHydration({
@@ -1101,11 +1100,11 @@ const TopicModelingFeature: React.FC = () => {
                         workspaceId: currentWorkspaceId,
                         taskIds: allTaskIds,
                         cancelTask: (workspaceId, taskId) =>
-                          workspacesApi.cancelTasks(workspaceId, { task_id: taskId }, headers),
+                          workspacesApi.cancelTasks({ task_id: taskId }, headers),
                         clearManagerTask: (workspaceId, taskId) =>
-                          workspacesApi.clearTasks(workspaceId, { task_id: taskId }, headers),
+                          workspacesApi.clearTasks({ task_id: taskId }, headers),
                         clearAnalysisTask: (workspaceId, taskId) =>
-                          textApi.clearTask(workspaceId, taskId, headers),
+                          textApi.clearTask(taskId, headers),
                         warnContext: 'topic-modeling',
                       });
                     } finally {

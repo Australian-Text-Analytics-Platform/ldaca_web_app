@@ -119,7 +119,7 @@ export const useWorkspaceInternal = () => {
         unifiedRequest.sort_by = request.sort_by;
       }
 
-      return textApi.concordance(workspaceId, unifiedRequest, authHeaders);
+      return textApi.concordance(unifiedRequest, authHeaders);
     },
     onMutate: () => startOperation('concordance'),
     onSuccess: () => {
@@ -140,7 +140,7 @@ export const useWorkspaceInternal = () => {
       workspaceId: string;
       nodeId: string;
       request: ConcordanceDetachRequest;
-    }) => textApi.concordanceDetach(workspaceId, nodeId, request as any, authHeaders),
+    }) => textApi.concordanceDetach(nodeId, request as any, authHeaders),
     onMutate: () => startOperation('detachConcordance'),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(variables.workspaceId) });
@@ -161,7 +161,7 @@ export const useWorkspaceInternal = () => {
       workspaceId: string;
       nodeId: string;
       request: QuotationRequest;
-    }) => textApi.quotation(workspaceId, nodeId, request as any, authHeaders),
+    }) => textApi.quotation(nodeId, request as any, authHeaders),
     onMutate: () => startOperation('quotation'),
     onSuccess: () => {
       endOperation('quotation');
@@ -181,7 +181,7 @@ export const useWorkspaceInternal = () => {
       workspaceId: string;
       nodeId: string;
       request: QuotationDetachRequest;
-    }) => textApi.quotationDetach(workspaceId, nodeId, request as any, authHeaders),
+    }) => textApi.quotationDetach(nodeId, request as any, authHeaders),
     onMutate: () => startOperation('detachQuotation'),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(variables.workspaceId) });

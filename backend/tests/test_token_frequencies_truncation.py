@@ -58,7 +58,7 @@ def _simulate_token_frequency_completion(workspace_id: str):
 
 
 async def _get_current_task_id(client, workspace_id: str, analysis: str):
-    response = await client.get(f"/api/workspaces/{workspace_id}/{analysis}/current")
+    response = await client.get("/api/workspaces/" + analysis + "/current")
     if response.status_code != 200:
         return None
     payload = response.json()
@@ -111,7 +111,7 @@ async def test_token_frequencies_full_table_and_metadata(
     node_ids: list[str] = []
     for csv_file in (file_a, file_b):
         resp = await authenticated_client.post(
-            f"/api/workspaces/{workspace_id}/nodes",
+            "/api/workspaces/nodes",
             params={"filename": csv_file.name},
         )
         assert resp.status_code == 200, resp.text
@@ -124,7 +124,7 @@ async def test_token_frequencies_full_table_and_metadata(
     }
 
     response = await authenticated_client.post(
-        f"/api/workspaces/{workspace_id}/token-frequencies",
+        "/api/workspaces/token-frequencies",
         json=payload,
     )
     assert response.status_code == 200, response.text
@@ -138,7 +138,7 @@ async def test_token_frequencies_full_table_and_metadata(
     )
     assert task_id
     result_response = await authenticated_client.get(
-        f"/api/workspaces/{workspace_id}/token-frequencies/tasks/{task_id}/result"
+        f"/api/workspaces/token-frequencies/tasks/{task_id}/result"
     )
     assert result_response.status_code == 200
     data = result_response.json()

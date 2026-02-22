@@ -374,7 +374,7 @@ async def workspace_id(authenticated_client):
         json={"name": "test_workspace", "description": "Test workspace for analysis"},
     )
     assert response.status_code == 200
-    workspace_id = response.json()["workspace_id"]
+    workspace_id = response.json()["id"]
 
     try:
         yield workspace_id
@@ -460,7 +460,7 @@ def timeline_csv_file(test_user):
 async def tiny_node_id(authenticated_client, workspace_id, tiny_text_file):
     """Add a tiny node to the workspace and return its ID."""
     response = await authenticated_client.post(
-        f"/api/workspaces/{workspace_id}/nodes",
+        "/api/workspaces/nodes",
         params={"filename": tiny_text_file.name},
     )
     assert response.status_code == 200
@@ -473,7 +473,7 @@ async def tiny_node_id(authenticated_client, workspace_id, tiny_text_file):
 async def sample_node_id(authenticated_client, workspace_id, sample_text_file):
     """Add a sample node to the workspace and return its ID."""
     response = await authenticated_client.post(
-        f"/api/workspaces/{workspace_id}/nodes",
+        "/api/workspaces/nodes",
         params={"filename": sample_text_file.name},
     )
     assert response.status_code == 200
@@ -486,7 +486,7 @@ async def sample_node_id(authenticated_client, workspace_id, sample_text_file):
 async def timeline_node_id(authenticated_client, workspace_id, timeline_csv_file):
     """Add a timeline-friendly node to the workspace and return its ID."""
     response = await authenticated_client.post(
-        f"/api/workspaces/{workspace_id}/nodes",
+        "/api/workspaces/nodes",
         params={"filename": timeline_csv_file.name},
     )
     assert response.status_code == 200

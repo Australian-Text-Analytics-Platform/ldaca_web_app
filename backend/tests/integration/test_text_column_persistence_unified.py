@@ -55,7 +55,7 @@ async def test_text_column_preference_persists_across_text_analyses(
     assert node is not None
 
     token_response = await authenticated_client.post(
-        f"/api/workspaces/{workspace_id}/token-frequencies",
+        "/api/workspaces/token-frequencies",
         json={
             "node_ids": [node.id],
             "node_columns": {node.id: "text_a"},
@@ -72,7 +72,7 @@ async def test_text_column_preference_persists_across_text_analyses(
     assert metadata.get("text_column") == "text_a"
 
     concordance_response = await authenticated_client.post(
-        f"/api/workspaces/{workspace_id}/concordance",
+        "/api/workspaces/concordance",
         json={
             "node_ids": [node.id],
             "node_columns": {node.id: "text_b"},
@@ -95,7 +95,7 @@ async def test_text_column_preference_persists_across_text_analyses(
     assert metadata.get("text_column") == "text_b"
 
     topic_response = await authenticated_client.post(
-        f"/api/workspaces/{workspace_id}/topic-modeling",
+        "/api/workspaces/topic-modeling",
         json={
             "node_ids": [node.id],
             "node_columns": {},

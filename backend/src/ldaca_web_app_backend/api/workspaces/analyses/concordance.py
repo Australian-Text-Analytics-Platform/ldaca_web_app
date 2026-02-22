@@ -96,9 +96,8 @@ def _apply_result_query_overrides(
     return normalized_request
 
 
-@router.post("/{workspace_id}/concordance")
+@router.post("/concordance")
 async def run_concordance(
-    workspace_id: str,
     request: ConcordanceAnalysisRequest,
     current_user: dict = Depends(get_current_user),
 ):
@@ -112,7 +111,10 @@ async def run_concordance(
         responses while using shared concordance response builders.
     """
     user_id = current_user["id"]
-    get_workspace_or_404(user_id, workspace_id)
+    current_entry = workspace_manager._get_current_entry(user_id)
+    if not current_entry:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+    workspace_id = current_entry[0]
 
     task_manager = get_task_manager(user_id, workspace_id)
 
@@ -179,9 +181,8 @@ async def run_concordance(
         raise HTTPException(status_code=500, detail=f"Failed to run concordance: {exc}")
 
 
-@router.get("/{workspace_id}/concordance/tasks/{task_id}/result")
+@router.get("/concordance/tasks/{task_id}/result")
 async def concordance_task_result(
-    workspace_id: str,
     task_id: str,
     query: ConcordanceResultQuery = Depends(),
     current_user: dict = Depends(get_current_user),
@@ -199,6 +200,10 @@ async def concordance_task_result(
             result-read helper that accepts normalized override input.
     """
     user_id = current_user["id"]
+    current_entry = workspace_manager._get_current_entry(user_id)
+    if not current_entry:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+    workspace_id = current_entry[0]
     task_manager = get_task_manager(user_id, workspace_id)
 
     task = task_manager.get_task(task_id)
@@ -215,9 +220,8 @@ async def concordance_task_result(
     return build_concordance_response(user_id, workspace_id, normalized_request)
 
 
-@router.post("/{workspace_id}/concordance/tasks/{task_id}/result")
+@router.post("/concordance/tasks/{task_id}/result")
 async def concordance_task_result_post(
-    workspace_id: str,
     task_id: str,
     query: ConcordanceResultQuery,
     current_user: dict = Depends(get_current_user),
@@ -237,6 +241,10 @@ async def concordance_task_result_post(
             one internal helper and keep only transport-layer differences.
     """
     user_id = current_user["id"]
+    current_entry = workspace_manager._get_current_entry(user_id)
+    if not current_entry:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+    workspace_id = current_entry[0]
     task_manager = get_task_manager(user_id, workspace_id)
     task = task_manager.get_task(task_id)
     if not task:
@@ -262,9 +270,8 @@ async def concordance_task_result_post(
     return build_concordance_response(user_id, workspace_id, normalized_request)
 
 
-@router.post("/{workspace_id}/nodes/{node_id}/concordance/detach")
+@router.post("/nodes/{node_id}/concordance/detach")
 async def detach_concordance(
-    workspace_id: str,
     node_id: str,
     request: ConcordanceDetachRequest,
     current_user: dict = Depends(get_current_user),
@@ -280,11 +287,13 @@ async def detach_concordance(
         for progress tracking.
     """
     user_id = current_user["id"]
+    current_entry = workspace_manager._get_current_entry(user_id)
+    if not current_entry:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+    workspace_id = current_entry[0]
+    ws = current_entry[1]
     tm = workspace_manager.get_task_manager(user_id, workspace_id)
-
-    node = workspace_manager.get_node_from_workspace(user_id, workspace_id, node_id)
-    if not node:
-        raise HTTPException(status_code=404, detail="Node not found")
+    node = ws.nodes[node_id]
 
     node_data = getattr(node, "data", None)
     if not isinstance(node_data, pl.LazyFrame):

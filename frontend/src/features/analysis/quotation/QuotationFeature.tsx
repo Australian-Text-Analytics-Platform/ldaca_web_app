@@ -431,7 +431,7 @@ const QuotationFeature: React.FC = () => {
       candidateIds: [localQuotationTaskId],
       fetchCurrentTaskId: async () => {
         const headers = getAuthHeaders();
-        const current = (await textApi.getAnalysisCurrent(currentWorkspaceId, 'quotation', headers)) as any;
+        const current = (await textApi.getAnalysisCurrent('quotation', headers)) as any;
         const taskId = Array.isArray(current?.task_ids) ? current.task_ids[0] : null;
         return typeof taskId === 'string' && taskId.trim().length > 0 ? taskId : null;
       },
@@ -444,7 +444,6 @@ const QuotationFeature: React.FC = () => {
     const taskId = await resolveQuotationTaskId();
     if (!taskId) return;
     await textApi.postQuotationTaskResult(
-      currentWorkspaceId,
       taskId,
       { context_length: value, update_only: true },
       getAuthHeaders()
@@ -924,7 +923,6 @@ const QuotationFeature: React.FC = () => {
         return null;
       }
       const response = await textApi.postQuotationTaskResult(
-        currentWorkspaceId,
         taskId,
         payload,
         getAuthHeaders()
@@ -1186,12 +1184,12 @@ const QuotationFeature: React.FC = () => {
 
   const fetchQuotationRequest = async (taskId?: string | null) => {
     if (!currentWorkspaceId || !taskId) return null;
-    return textApi.getTaskRequest(currentWorkspaceId, taskId, getAuthHeaders());
+    return textApi.getTaskRequest(taskId, getAuthHeaders());
   };
 
   const fetchQuotationResult = async (taskId?: string | null) => {
     if (!currentWorkspaceId || !taskId) return null;
-    return textApi.getQuotationTaskResult(currentWorkspaceId, taskId, getAuthHeaders());
+    return textApi.getQuotationTaskResult(taskId, getAuthHeaders());
   };
 
   const { hydrateFromServer } = useAnalysisHydration({
@@ -1393,7 +1391,7 @@ const QuotationFeature: React.FC = () => {
                         workspaceId: currentWorkspaceId,
                         taskIds,
                         clearAnalysisTask: (workspaceId, taskId) =>
-                          textApi.clearTask(workspaceId, taskId, getAuthHeaders()),
+                          textApi.clearTask(taskId, getAuthHeaders()),
                         warnContext: 'quotation',
                       });
                     } finally {

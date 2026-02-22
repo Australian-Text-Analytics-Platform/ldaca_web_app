@@ -52,7 +52,7 @@ const ExportFeature: React.FC = () => {
     try {
   const params = new URLSearchParams({ node_ids: nodeIds.join(','), format: 'csv' });
   const apiBase = getApiBase();
-  const resp = await fetch(`${apiBase}/workspaces/${currentWorkspaceId}/export?` + params.toString(), {
+  const resp = await fetch(`${apiBase}/workspaces/export?` + params.toString(), {
         headers: getAuthHeaders(),
       });
       if (!resp.ok) throw new Error('Export failed');
@@ -84,7 +84,7 @@ const ExportFeature: React.FC = () => {
     try {
       const params = new URLSearchParams({ node_ids: id, format });
       const apiBase = getApiBase();
-      const resp = await fetch(`${apiBase}/workspaces/${currentWorkspaceId}/export?` + params.toString(), {
+      const resp = await fetch(`${apiBase}/workspaces/export?` + params.toString(), {
         headers: getAuthHeaders(),
       });
       if (!resp.ok) throw new Error('Download failed');

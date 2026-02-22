@@ -34,7 +34,7 @@ async def get_json(client: AsyncClient, path: str):
 
 async def get_current_task_id(client: AsyncClient, workspace_id: str, analysis: str):
     """Fetch the current task id for a given analysis tab."""
-    response = await client.get(f"/api/workspaces/{workspace_id}/{analysis}/current")
+    response = await client.get("/api/workspaces/" + analysis + "/current")
     if response.status_code != 200:
         return None
     payload = response.json()
@@ -172,7 +172,7 @@ class TestTokenFrequencyPersistence:
         # When: We call the token frequencies endpoint
         response = await post_json(
             authenticated_client,
-            f"/api/workspaces/{workspace_id}/token-frequencies",
+            "/api/workspaces/token-frequencies",
             request_payload,
         )
 
@@ -191,7 +191,7 @@ class TestTokenFrequencyPersistence:
         assert task_id
         result_resp = await get_json(
             authenticated_client,
-            f"/api/workspaces/{workspace_id}/token-frequencies/tasks/{task_id}/result",
+            f"/api/workspaces/token-frequencies/tasks/{task_id}/result",
         )
         assert result_resp.status_code == 200
         final_result = result_resp.json()
@@ -236,7 +236,7 @@ class TestTokenFrequencyPersistence:
 
         response = await post_json(
             authenticated_client,
-            f"/api/workspaces/{workspace_id}/token-frequencies",
+            "/api/workspaces/token-frequencies",
             request_payload,
         )
 
@@ -251,7 +251,7 @@ class TestTokenFrequencyPersistence:
         assert task_id
         result_resp = await get_json(
             authenticated_client,
-            f"/api/workspaces/{workspace_id}/token-frequencies/tasks/{task_id}/result",
+            f"/api/workspaces/token-frequencies/tasks/{task_id}/result",
         )
         final_result = result_resp.json()
         assert final_result.get("token_limit") == DEFAULT_TOKEN_LIMIT
@@ -291,14 +291,14 @@ class TestTokenFrequencyPersistence:
         # When: We call the endpoint twice
         first_resp = await post_json(
             authenticated_client,
-            f"/api/workspaces/{workspace_id}/token-frequencies",
+            "/api/workspaces/token-frequencies",
             first_request,
         )
         assert first_resp.status_code == 200
 
         second_resp = await post_json(
             authenticated_client,
-            f"/api/workspaces/{workspace_id}/token-frequencies",
+            "/api/workspaces/token-frequencies",
             second_request,
         )
         assert second_resp.status_code == 200
@@ -326,7 +326,7 @@ class TestTokenFrequencyPersistence:
         # When: We call the token frequencies endpoint
         response = await post_json(
             authenticated_client,
-            f"/api/workspaces/{workspace_id}/token-frequencies",
+            "/api/workspaces/token-frequencies",
             request_payload,
         )
 
@@ -351,7 +351,7 @@ class TestTokenFrequencyPersistence:
         # When: We call the token frequencies endpoint
         response = await post_json(
             authenticated_client,
-            f"/api/workspaces/{workspace_id}/token-frequencies",
+            "/api/workspaces/token-frequencies",
             request_payload,
         )
 
@@ -368,7 +368,7 @@ class TestTokenFrequencyPersistence:
         assert task_id
         result_resp = await get_json(
             authenticated_client,
-            f"/api/workspaces/{workspace_id}/token-frequencies/tasks/{task_id}/result",
+            f"/api/workspaces/token-frequencies/tasks/{task_id}/result",
         )
         final_result = result_resp.json()
         assert_successful_result(final_result)
@@ -401,7 +401,7 @@ class TestTokenFrequencyPersistence:
 
         initial_response = await post_json(
             authenticated_client,
-            f"/api/workspaces/{workspace_id}/token-frequencies",
+            "/api/workspaces/token-frequencies",
             initial_request,
         )
         assert initial_response.status_code == 200
@@ -414,7 +414,7 @@ class TestTokenFrequencyPersistence:
         update_payload = {"token_limit": 30, "stop_words": ["alpha", "beta"]}
         update_response = await post_json(
             authenticated_client,
-            f"/api/workspaces/{workspace_id}/token-frequencies/tasks/{task_id}/result",
+            f"/api/workspaces/token-frequencies/tasks/{task_id}/result",
             update_payload,
         )
         assert update_response.status_code == 200
@@ -425,7 +425,7 @@ class TestTokenFrequencyPersistence:
 
         current_result_response = await get_json(
             authenticated_client,
-            f"/api/workspaces/{workspace_id}/token-frequencies/tasks/{task_id}/result",
+            f"/api/workspaces/token-frequencies/tasks/{task_id}/result",
         )
         assert current_result_response.status_code == 200
         updated_result = current_result_response.json()
@@ -458,7 +458,7 @@ class TestTokenFrequencyPersistence:
 
         clear_response = await post_json(
             authenticated_client,
-            f"/api/workspaces/{workspace_id}/token-frequencies/tasks/{task_id}/result",
+            f"/api/workspaces/token-frequencies/tasks/{task_id}/result",
             {"stop_words": []},
         )
         assert clear_response.status_code == 200
@@ -474,7 +474,7 @@ class TestTokenFrequencyPersistence:
         current_result = (
             await get_json(
                 authenticated_client,
-                f"/api/workspaces/{workspace_id}/token-frequencies/tasks/{task_id}/result",
+                f"/api/workspaces/token-frequencies/tasks/{task_id}/result",
             )
         ).json()
         assert current_result.get("token_limit") == 30
@@ -512,16 +512,17 @@ class TestSequentialAnalysisPersistence:
             "category": ["alpha", "alpha", "beta"],
         })
         dummy_node = SimpleNamespace(data=dummy_df.lazy())
+        dummy_workspace = SimpleNamespace(nodes={node_id: dummy_node})
 
         monkeypatch.setattr(
-            sequential_module,
-            "get_node_with_data_or_400",
-            lambda *_args, **_kwargs: (dummy_node, dummy_node.data),
+            sequential_module.workspace_manager,
+            "_get_current_entry",
+            lambda *_args, **_kwargs: (workspace_id, dummy_workspace, None),
         )
 
         response = await post_json(
             client,
-            f"/api/workspaces/{workspace_id}/nodes/{node_id}/sequential-analysis",
+            f"/api/workspaces/nodes/{node_id}/sequential-analysis",
             request_payload,
         )
 
@@ -558,7 +559,7 @@ class TestSequentialAnalysisPersistence:
 
         current_result_response = await post_json(
             authenticated_client,
-            f"/api/workspaces/{workspace_id}/sequential-analysis/tasks/{task_id}/result",
+            f"/api/workspaces/sequential-analysis/tasks/{task_id}/result",
             {},
         )
         assert current_result_response.status_code == 200
@@ -585,7 +586,7 @@ class TestSequentialAnalysisPersistence:
         assert task_id
         update_response = await post_json(
             authenticated_client,
-            f"/api/workspaces/{workspace_id}/sequential-analysis/tasks/{task_id}/result",
+            f"/api/workspaces/sequential-analysis/tasks/{task_id}/result",
             {"chart_type": "bar"},
         )
         assert update_response.status_code == 200
@@ -598,7 +599,7 @@ class TestSequentialAnalysisPersistence:
 
         current_result_response = await post_json(
             authenticated_client,
-            f"/api/workspaces/{workspace_id}/sequential-analysis/tasks/{task_id}/result",
+            f"/api/workspaces/sequential-analysis/tasks/{task_id}/result",
             {},
         )
         assert current_result_response.status_code == 200
@@ -629,7 +630,7 @@ class TestSequentialAnalysisPersistence:
         assert task_id
         invalid_response = await post_json(
             authenticated_client,
-            f"/api/workspaces/{workspace_id}/sequential-analysis/tasks/{task_id}/result",
+            f"/api/workspaces/sequential-analysis/tasks/{task_id}/result",
             {"chart_type": "scatter"},
         )
         assert invalid_response.status_code == 400
@@ -648,15 +649,16 @@ class TestSequentialAnalysisPersistence:
 
         dummy_df = pl.DataFrame({"score": [0, 5, 10, 15]})
         dummy_node = SimpleNamespace(data=dummy_df.lazy())
+        dummy_workspace = SimpleNamespace(nodes={timeline_node_id: dummy_node})
 
         from ldaca_web_app_backend.api.workspaces.analyses import (
             sequential_analysis as sequential_module,
         )
 
         monkeypatch.setattr(
-            sequential_module,
-            "get_node_with_data_or_400",
-            lambda *_args, **_kwargs: (dummy_node, dummy_node.data),
+            sequential_module.workspace_manager,
+            "_get_current_entry",
+            lambda *_args, **_kwargs: (workspace_id, dummy_workspace, None),
         )
 
         original_run = sequential_module._run_sequential_analysis
@@ -677,7 +679,7 @@ class TestSequentialAnalysisPersistence:
 
         response = await post_json(
             authenticated_client,
-            f"/api/workspaces/{workspace_id}/nodes/{timeline_node_id}/sequential-analysis",
+            f"/api/workspaces/nodes/{timeline_node_id}/sequential-analysis",
             payload,
         )
 
@@ -696,15 +698,16 @@ class TestSequentialAnalysisPersistence:
 
         dummy_df = pl.DataFrame({"score": [0, 5, 10]})
         dummy_node = SimpleNamespace(data=dummy_df.lazy())
+        dummy_workspace = SimpleNamespace(nodes={timeline_node_id: dummy_node})
 
         from ldaca_web_app_backend.api.workspaces.analyses import (
             sequential_analysis as sequential_module,
         )
 
         monkeypatch.setattr(
-            sequential_module,
-            "get_node_with_data_or_400",
-            lambda *_args, **_kwargs: (dummy_node, dummy_node.data),
+            sequential_module.workspace_manager,
+            "_get_current_entry",
+            lambda *_args, **_kwargs: (workspace_id, dummy_workspace, None),
         )
 
         payload = {
@@ -715,7 +718,7 @@ class TestSequentialAnalysisPersistence:
 
         response = await post_json(
             authenticated_client,
-            f"/api/workspaces/{workspace_id}/nodes/{timeline_node_id}/sequential-analysis",
+            f"/api/workspaces/nodes/{timeline_node_id}/sequential-analysis",
             payload,
         )
 
@@ -739,9 +742,7 @@ class TestWorkspaceGraphEnrichment:
         # Given: A workspace with no analyses
 
         # When: We get the workspace graph
-        response = await get_json(
-            authenticated_client, f"/api/workspaces/{workspace_id}/graph"
-        )
+        response = await get_json(authenticated_client, "/api/workspaces/graph")
 
         # Then: The response includes latest_analysis as empty dict
         assert response.status_code == 200
@@ -763,7 +764,7 @@ class TestWorkspaceGraphEnrichment:
 
         await post_json(
             authenticated_client,
-            f"/api/workspaces/{workspace_id}/token-frequencies",
+            "/api/workspaces/token-frequencies",
             request_payload,
         )
 
@@ -771,9 +772,7 @@ class TestWorkspaceGraphEnrichment:
         _simulate_token_frequency_completion(workspace_id)
 
         # When: We get the workspace graph
-        response = await get_json(
-            authenticated_client, f"/api/workspaces/{workspace_id}/graph"
-        )
+        response = await get_json(authenticated_client, "/api/workspaces/graph")
 
         # Then: The response includes the analysis in latest_analysis
         assert response.status_code == 200
@@ -794,7 +793,7 @@ class TestWorkspaceGraphEnrichment:
 
         await post_json(
             authenticated_client,
-            f"/api/workspaces/{workspace_id}/token-frequencies",
+            "/api/workspaces/token-frequencies",
             tf_request,
         )
 
@@ -802,9 +801,7 @@ class TestWorkspaceGraphEnrichment:
         # For now, just verify the structure supports multiple analyses
 
         # When: We get the workspace graph
-        response = await get_json(
-            authenticated_client, f"/api/workspaces/{workspace_id}/graph"
-        )
+        response = await get_json(authenticated_client, "/api/workspaces/graph")
 
         # Then: The latest_analysis structure can hold multiple analysis types
         assert response.status_code == 200
@@ -830,7 +827,7 @@ class TestAnalysisPersistenceEdgeCases:
         # When: We call the endpoint with invalid data
         await post_json(
             authenticated_client,
-            f"/api/workspaces/{workspace_id}/token-frequencies",
+            "/api/workspaces/token-frequencies",
             invalid_request,
         )
 
@@ -846,21 +843,33 @@ class TestAnalysisPersistenceEdgeCases:
         ws1_response = await post_json(
             authenticated_client, "/api/workspaces/", {"name": "workspace_1"}
         )
-        ws1_id = ws1_response.json()["workspace_id"]
+        ws1_id = ws1_response.json()["id"]
 
         ws2_response = await post_json(
             authenticated_client, "/api/workspaces/", {"name": "workspace_2"}
         )
-        ws2_id = ws2_response.json()["workspace_id"]
+        ws2_id = ws2_response.json()["id"]
+
+        # Explicitly switch active workspace to ws1 before adding/running ws1 analysis
+        switch_ws1 = await authenticated_client.post(
+            "/api/workspaces/current", params={"workspace_id": ws1_id}
+        )
+        assert switch_ws1.status_code == 200
 
         # Add nodes to both workspaces
         node1_response = await authenticated_client.post(
-            f"/api/workspaces/{ws1_id}/nodes", params={"filename": tiny_text_file.name}
+            "/api/workspaces/nodes", params={"filename": tiny_text_file.name}
         )
         node1_id = node1_response.json()["id"]  # Changed from node_id to id
 
+        # Switch active workspace to ws2 before adding/running ws2 analysis
+        switch_ws2 = await authenticated_client.post(
+            "/api/workspaces/current", params={"workspace_id": ws2_id}
+        )
+        assert switch_ws2.status_code == 200
+
         node2_response = await authenticated_client.post(
-            f"/api/workspaces/{ws2_id}/nodes", params={"filename": tiny_text_file.name}
+            "/api/workspaces/nodes", params={"filename": tiny_text_file.name}
         )
         node2_id = node2_response.json()["id"]  # Changed from node_id to id
 
@@ -877,9 +886,15 @@ class TestAnalysisPersistenceEdgeCases:
             "stop_words": ["beta"],
         }
 
+        # Switch back to ws1 before submitting ws1 analysis
+        switch_ws1_again = await authenticated_client.post(
+            "/api/workspaces/current", params={"workspace_id": ws1_id}
+        )
+        assert switch_ws1_again.status_code == 200
+
         ws1_response_payload = await post_json(
             authenticated_client,
-            f"/api/workspaces/{ws1_id}/token-frequencies",
+            "/api/workspaces/token-frequencies",
             ws1_payload,
         )
         assert ws1_response_payload.status_code == 200
@@ -887,9 +902,15 @@ class TestAnalysisPersistenceEdgeCases:
         assert ws1_result.get("state") == "running"
         assert ws1_result.get("metadata", {}).get("task_id")
 
+        # Switch to ws2 before submitting ws2 analysis
+        switch_ws2_again = await authenticated_client.post(
+            "/api/workspaces/current", params={"workspace_id": ws2_id}
+        )
+        assert switch_ws2_again.status_code == 200
+
         ws2_response_payload = await post_json(
             authenticated_client,
-            f"/api/workspaces/{ws2_id}/token-frequencies",
+            "/api/workspaces/token-frequencies",
             ws2_payload,
         )
         assert ws2_response_payload.status_code == 200
@@ -908,11 +929,6 @@ class TestAnalysisPersistenceEdgeCases:
             print(f"DEBUG: ws1_id: {ws1_id}")
             print(f"DEBUG: ws2_id: {ws2_id}")
             print(f"DEBUG: test_user: {test_user}")
-            from ldaca_web_app_backend.core.workspace import workspace_manager
-
-            print(
-                f"DEBUG: analysis_state keys: {list(workspace_manager._analysis_state.keys())}"
-            )
 
         assert len(ws1_analyses) == 1
         assert len(ws2_analyses) == 1
@@ -952,7 +968,7 @@ class TestAnalysisPersistencePerformance:
 
             response = await post_json(
                 authenticated_client,
-                f"/api/workspaces/{workspace_id}/token-frequencies",
+                "/api/workspaces/token-frequencies",
                 request_payload,
             )
 

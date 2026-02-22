@@ -65,7 +65,7 @@ const formatTimestamp = (value?: number | string | null): string => {
 };
 
 const getWorkspaceId = (workspace: Record<string, any>): string | null =>
-  workspace?.workspace_id || workspace?.id || workspace?.unique_id || null;
+  workspace?.id || workspace?.unique_id || null;
 
 export const DataLoaderFeature: React.FC = () => {
   const queryClient = useQueryClient();
@@ -299,7 +299,7 @@ export const DataLoaderFeature: React.FC = () => {
   const handleDownloadWorkspaceZip = async (workspaceId: string, workspaceName: string) => {
     try {
       setDownloadingWorkspaceId(workspaceId);
-      const response = await workspacesApi.startDownloadTask(workspaceId, authHeaders);
+      const response = await workspacesApi.startDownloadTask(authHeaders);
       const taskId = response?.metadata?.task_id;
       if (!taskId) throw new Error('No task ID returned');
       setPendingDownloads((prev) => ({ ...prev, [workspaceId]: { taskId, workspaceName } }));
@@ -330,7 +330,7 @@ export const DataLoaderFeature: React.FC = () => {
         // Fetch the artifact and trigger browser download
         (async () => {
           try {
-            const blob = await workspacesApi.downloadTaskArtifact(workspaceId, taskId, authHeaders);
+            const blob = await workspacesApi.downloadTaskArtifact(taskId, authHeaders);
             const objectUrl = URL.createObjectURL(blob);
             const anchor = document.createElement('a');
             anchor.href = objectUrl;
