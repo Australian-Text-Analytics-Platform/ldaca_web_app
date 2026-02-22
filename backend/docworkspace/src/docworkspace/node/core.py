@@ -161,18 +161,8 @@ class Node:
         return child
 
     def rename(self, mapping: Any, *, strict: bool = True) -> "Node":
-        """Rename columns using Polars semantics and return a child node.
-
-        Mirrors ``polars.LazyFrame.rename`` while preserving DocWorkspace lineage.
-        """
-        result = self.data.rename(mapping, strict=strict)
-        child = Node(
-            data=result,
-            name=f"rename_{self.name}",
-            workspace=self.workspace,
-            parents=[self],
-            operation="rename",
-        )
+        """Rename columns in-place using Polars semantics and return this node."""
+        self.data = self.data.rename(mapping, strict=strict)
 
         if self.document:
             new_document = self.document
@@ -188,9 +178,9 @@ class Node:
                 except Exception:
                     # Keep original document metadata when mapping function fails.
                     pass
-            child.document = new_document
+            self.document = new_document
 
-        return child
+        return self
 
     # ------------------------------------------------------------------
     # Properties

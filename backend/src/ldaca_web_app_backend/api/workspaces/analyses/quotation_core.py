@@ -12,7 +12,7 @@ from ....models import QuotationEngineConfig, QuotationEngineType
 DEFAULT_CONTEXT_LENGTH = 20
 MAX_CONTEXT_LENGTH = 2000
 DEFAULT_PAGE_SIZE = 100
-DEFAULT_SORT_ORDER = "asc"
+DEFAULT_DESCENDING = True
 
 
 def normalize_context_length(value: Any) -> int:
@@ -412,9 +412,8 @@ async def compute_on_demand_page(
     page: int,
     page_size: int,
     sort_by: Optional[str],
-    sort_order: str,
+    descending: bool,
     compute_quote_dataframe_fn,
-    normalize_sort_order_fn,
 ) -> Dict[str, Any]:
     """Compute one on-demand quotation page from source node data.
 
@@ -442,12 +441,11 @@ async def compute_on_demand_page(
         )
 
     effective_sort_by = sort_by if sort_by and sort_by in available_columns else None
-    normalized_sort_order = normalize_sort_order_fn(sort_order)
 
     if effective_sort_by:
         lazy_df = lazy_df.sort(
             pl.col(effective_sort_by),
-            descending=normalized_sort_order == "desc",
+            descending=descending,
         )
 
     total_source_rows = lazy_df.select(pl.len()).collect().item()
@@ -480,7 +478,7 @@ async def compute_on_demand_page(
         },
         "sorting": {
             "sort_by": effective_sort_by,
-            "sort_order": normalized_sort_order,
+            "descending": descending,
         },
         "column": column,
     }

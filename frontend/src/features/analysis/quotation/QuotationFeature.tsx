@@ -59,7 +59,7 @@ interface QuotationResultState {
   };
   sorting: {
     sort_by?: string | null;
-    sort_order: 'asc' | 'desc';
+    descending: boolean;
   };
   column: string;
 }
@@ -516,7 +516,7 @@ const QuotationFeature: React.FC = () => {
     currentPage: number;
     pageSize: number;
     sortBy?: string;
-    sortOrder: 'asc' | 'desc';
+    descending: boolean;
   }>>({});
   // Deprecated per-node loading indicator; rely on DataView-like UX
   const [nodeDetaching, setNodeDetaching] = useState<Record<string, boolean>>({});
@@ -536,7 +536,7 @@ const QuotationFeature: React.FC = () => {
       currentPage: 1,
       pageSize: DEFAULT_PAGE_SIZE,
       sortBy: undefined,
-      sortOrder: 'asc' as const,
+      descending: false,
     };
     const engineSnapshot = resolvedEnginePayload;
     const engineUrl = engineSnapshot.type === 'remote' && engineSnapshot.isValid
@@ -547,7 +547,7 @@ const QuotationFeature: React.FC = () => {
       page: state.currentPage,
       page_size: state.pageSize,
       sort_by: state.sortBy ?? null,
-      sort_order: state.sortOrder,
+      descending: state.descending,
       engine_type: engineSnapshot.type,
       engine_url: engineUrl,
     } as Record<string, unknown>;
@@ -792,10 +792,10 @@ const QuotationFeature: React.FC = () => {
     };
 
     const rawSorting = (result?.sorting || {}) as Record<string, unknown>;
-    const sortOrder: 'asc' | 'desc' = rawSorting.sort_order === 'desc' ? 'desc' : 'asc';
+    const descending = typeof rawSorting.descending === 'boolean' ? rawSorting.descending : false;
     const sorting = {
       sort_by: (rawSorting.sort_by ?? null) as string | null | undefined,
-      sort_order: sortOrder,
+      descending,
     };
 
     return {
@@ -816,7 +816,7 @@ const QuotationFeature: React.FC = () => {
         currentPage: normalized.pagination.page,
         pageSize: normalized.pagination.page_size,
         sortBy: normalized.sorting.sort_by ?? undefined,
-        sortOrder: normalized.sorting.sort_order,
+        descending: normalized.sorting.descending,
       },
     }));
     return normalized;
@@ -828,7 +828,7 @@ const QuotationFeature: React.FC = () => {
       page?: number;
       pageSize?: number;
       sortBy?: string;
-      sortOrder?: 'asc' | 'desc';
+      descending?: boolean;
       columnOverride?: string;
     },
   ) => {
@@ -841,13 +841,13 @@ const QuotationFeature: React.FC = () => {
       currentPage: 1,
       pageSize: DEFAULT_PAGE_SIZE,
       sortBy: undefined,
-      sortOrder: 'asc' as const,
+      descending: false,
     };
 
     const page = overrides?.page ?? state.currentPage ?? 1;
     const pageSize = overrides?.pageSize ?? state.pageSize ?? DEFAULT_PAGE_SIZE;
     const sortBy = overrides?.sortBy ?? state.sortBy;
-    const sortOrder: 'asc' | 'desc' = overrides?.sortOrder ?? state.sortOrder ?? 'asc';
+    const descending: boolean = overrides?.descending ?? state.descending ?? false;
 
     const enginePayload = buildEngineRequest();
     if (!enginePayload) {
@@ -864,7 +864,7 @@ const QuotationFeature: React.FC = () => {
       page,
       page_size: pageSize,
       sort_by: sortBy ?? undefined,
-      sort_order: sortOrder,
+      descending,
       engine: engineConfigForRequest,
     };
 
@@ -879,7 +879,7 @@ const QuotationFeature: React.FC = () => {
           page: requestPayload.page,
           page_size: requestPayload.page_size,
           sort_by: requestPayload.sort_by ?? null,
-          sort_order: requestPayload.sort_order,
+          descending: requestPayload.descending,
           engine_type: engineConfigForRequest.type,
           engine_url: engineConfigForRequest.type === 'remote' ? (engineConfigForRequest.url ?? '') : null,
         },
@@ -907,14 +907,14 @@ const QuotationFeature: React.FC = () => {
       currentPage: 1,
       pageSize: DEFAULT_PAGE_SIZE,
       sortBy: undefined,
-      sortOrder: 'asc' as const,
+      descending: false,
     };
 
     const payload: QuotationResultQuery = {
       page: overrides.page ?? state.currentPage ?? 1,
       page_size: overrides.page_size ?? state.pageSize ?? DEFAULT_PAGE_SIZE,
       sort_by: overrides.sort_by ?? state.sortBy ?? null,
-      sort_order: overrides.sort_order ?? state.sortOrder ?? 'asc',
+      descending: overrides.descending ?? state.descending ?? false,
     };
 
     try {
@@ -964,7 +964,7 @@ const QuotationFeature: React.FC = () => {
           page: normalized.pagination.page,
           page_size: normalized.pagination.page_size,
           sort_by: normalized.sorting.sort_by ?? null,
-          sort_order: normalized.sorting.sort_order,
+          descending: normalized.sorting.descending,
         } as Record<string, unknown>;
       });
 
@@ -1059,15 +1059,15 @@ const QuotationFeature: React.FC = () => {
       currentPage: 1,
       pageSize: DEFAULT_PAGE_SIZE,
       sortBy: undefined,
-      sortOrder: 'asc' as const,
+      descending: false,
     };
     const isSame = state.sortBy === column;
-    const nextOrder: 'asc' | 'desc' = isSame && state.sortOrder === 'asc' ? 'desc' : 'asc';
+    const nextDescending: boolean = isSame ? !state.descending : false;
     if (!isLocked || !hasLoaded) {
       const outcome = await fetchQuotations(nodeId, {
         page: 1,
         sortBy: column,
-        sortOrder: nextOrder,
+        descending: nextDescending,
       });
       if (outcome) {
         setLockedRequestParams(outcome.request);
@@ -1078,7 +1078,7 @@ const QuotationFeature: React.FC = () => {
     await updateStoredQuotationResult({
       page: 1,
       sort_by: column,
-      sort_order: nextOrder,
+      descending: nextDescending,
     });
   };
 
@@ -1177,7 +1177,7 @@ const QuotationFeature: React.FC = () => {
       page: normalized.pagination.page,
       page_size: normalized.pagination.page_size,
       sort_by: normalized.sorting.sort_by ?? null,
-      sort_order: normalized.sorting.sort_order,
+      descending: normalized.sorting.descending,
     }));
     setHasLoaded(true);
   };

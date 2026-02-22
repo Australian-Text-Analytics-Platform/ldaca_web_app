@@ -11,14 +11,14 @@ export interface ConcordanceMetadata {
 export interface ConcordanceRequest { column: string; search_word: string; num_left_tokens?: number; num_right_tokens?: number; regex?: boolean; case_sensitive?: boolean; sort_by?: string; }
 export interface ConcordanceDetachRequest { node_id: string; column: string; search_word: string; num_left_tokens?: number; num_right_tokens?: number; regex?: boolean; case_sensitive?: boolean; new_node_name?: string; }
 export interface ConcordanceAnalysisRequest { node_ids: string[]; node_columns: Record<string,string>; search_word: string; num_left_tokens?: number; num_right_tokens?: number; regex?: boolean; case_sensitive?: boolean; sort_by?: string; combined?: boolean; }
-export interface ConcordanceResultQuery { node_id?: string; combined?: boolean; page?: number; page_number?: number; page_size?: number; sort_by?: string; sort_order?: 'asc' | 'desc'; show_metadata?: boolean; update_only?: boolean; }
+export interface ConcordanceResultQuery { node_id?: string; combined?: boolean; page?: number; page_number?: number; page_size?: number; sort_by?: string; descending?: boolean; show_metadata?: boolean; update_only?: boolean; }
 export interface ConcordanceResultEntry {
   data: any[];
   columns: string[];
   metadata?: ConcordanceMetadata;
   total_matches?: number;
   pagination: { page: number; page_size: number; total_pages?: number; has_next: boolean; has_prev: boolean; };
-  sorting: { sort_by?: string; sort_order: 'asc' | 'desc'; };
+  sorting: { sort_by?: string; descending: boolean; };
 }
 export interface ConcordanceAnalysisResponse {
   state: 'running' | 'successful' | 'failed' | 'cancelled';
@@ -30,13 +30,13 @@ export interface ConcordanceAnalysisResponse {
 }
 export type QuotationEngineType = 'local' | 'remote';
 export interface QuotationEngineConfig { type: QuotationEngineType; url?: string | null; }
-export interface QuotationRequest { column: string; page?: number; page_size?: number; sort_by?: string | null; sort_order?: 'asc' | 'desc'; engine?: QuotationEngineConfig; }
+export interface QuotationRequest { column: string; page?: number; page_size?: number; sort_by?: string | null; descending?: boolean; engine?: QuotationEngineConfig; }
 export interface QuotationDetachRequest { node_id: string; column: string; new_node_name?: string; engine?: QuotationEngineConfig; }
 export interface QuotationResultQuery {
   page?: number;
   page_size?: number;
   sort_by?: string | null;
-  sort_order?: 'asc' | 'desc';
+  descending?: boolean;
   context_length?: number;
   update_only?: boolean;
 }

@@ -92,12 +92,12 @@ async def rename_node_column(
     trimmed_name = new_name.strip()
 
     try:
-        renamed_node = node.rename({column_name: trimmed_name})
+        node.rename({column_name: trimmed_name})
         try:
             update_workspace(user_id, workspace_id, best_effort=True)
         except Exception:
             pass
-        return renamed_node.info()
+        return node.info()
     except Exception as exc:  # pragma: no cover
         raise HTTPException(
             status_code=500,

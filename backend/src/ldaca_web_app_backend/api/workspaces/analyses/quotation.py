@@ -15,7 +15,6 @@ from ....analysis.implementations.quotation import (
 )
 from ....analysis.manager import get_task_manager
 from ....analysis.results import GenericAnalysisResult
-from ....core.analysis_helpers import normalize_sort_order as _normalize_sort_order
 from ....core.auth import get_current_user
 from ....core.services.quotation_client import (
     QuotationServiceError,
@@ -35,6 +34,7 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_CONTEXT_LENGTH = qcore.DEFAULT_CONTEXT_LENGTH
 DEFAULT_PAGE_SIZE = qcore.DEFAULT_PAGE_SIZE
+DEFAULT_DESCENDING = qcore.DEFAULT_DESCENDING
 
 
 async def _compute_on_demand_page(
@@ -45,7 +45,7 @@ async def _compute_on_demand_page(
     page: int,
     page_size: int,
     sort_by: Optional[str],
-    sort_order: str,
+    descending: bool,
 ) -> dict[str, Any]:
     """Compute paged quotation payloads via shared quotation-core helper.
 
@@ -71,9 +71,8 @@ async def _compute_on_demand_page(
         page=page,
         page_size=page_size,
         sort_by=sort_by,
-        sort_order=sort_order,
+        descending=descending,
         compute_quote_dataframe_fn=compute_quote_dataframe_fn,
-        normalize_sort_order_fn=_normalize_sort_order,
     )
 
 
@@ -96,7 +95,7 @@ async def quotation_task_result(
     page: Optional[int] = None,
     page_size: Optional[int] = None,
     sort_by: Optional[str] = None,
-    sort_order: Optional[str] = None,
+    descending: Optional[bool] = None,
     current_user: dict = Depends(get_current_user),
 ):
     """Return stored quotation result, optionally recomputed for new page params.
@@ -124,7 +123,7 @@ async def quotation_task_result(
         else task.request.dict()
     )
 
-    if any(v is not None for v in (page, page_size, sort_by, sort_order)):
+    if any(v is not None for v in (page, page_size, sort_by, descending)):
         node_id = req_dict.get("node_id")
         column = req_dict.get("column")
         if not node_id or not column:
@@ -156,7 +155,7 @@ async def quotation_task_result(
             page=normalized_page,
             page_size=normalized_size,
             sort_by=sort_by or None,
-            sort_order=_normalize_sort_order(sort_order),
+            descending=descending if descending is not None else DEFAULT_DESCENDING,
         )
 
     return base_result
@@ -213,7 +212,7 @@ async def update_quotation_task_result(
     needs_pagination = (
         any(
             value is not None
-            for value in (query.page, query.page_size, query.sort_by, query.sort_order)
+            for value in (query.page, query.page_size, query.sort_by, query.descending)
         )
         and not query.update_only
     )
@@ -268,7 +267,9 @@ async def update_quotation_task_result(
         page=normalized_page,
         page_size=normalized_size,
         sort_by=query.sort_by or None,
-        sort_order=_normalize_sort_order(query.sort_order),
+        descending=(
+            query.descending if query.descending is not None else DEFAULT_DESCENDING
+        ),
     )
 
     updated_result = {**page_payload, "preferences": preferences}
@@ -279,7 +280,9 @@ async def update_quotation_task_result(
             task.request.page = normalized_page
             task.request.page_size = normalized_size
             task.request.sort_by = query.sort_by or None
-            task.request.sort_order = _normalize_sort_order(query.sort_order)
+            task.request.descending = (
+                query.descending if query.descending is not None else DEFAULT_DESCENDING
+            )
 
         task_manager.save_task(task)
     except Exception as exc:  # pragma: no cover
@@ -325,7 +328,7 @@ async def get_quotation(
             page=page,
             page_size=page_size,
             sort_by=request.sort_by or None,
-            sort_order=_normalize_sort_order(request.sort_order),
+            descending=request.descending,
         )
 
         context_length_pref = DEFAULT_CONTEXT_LENGTH
@@ -352,7 +355,7 @@ async def get_quotation(
             page=page,
             page_size=page_size,
             sort_by=request.sort_by or None,
-            sort_order=_normalize_sort_order(request.sort_order),
+            descending=request.descending,
             context_length=context_length_pref,
         )
 
@@ -418,6 +421,40 @@ async def detach_quotation(
         node = ws.nodes[node_id]
     except Exception:
         raise HTTPException(status_code=404, detail="Node not found")
+
+    node_data = getattr(node, "data", None)
+    if not isinstance(node_data, pl.LazyFrame):
+        raise HTTPException(
+            status_code=400, detail="Selected node data must be a LazyFrame"
+        )
+
+    if request.column not in node_data.collect_schema().names():
+        raise HTTPException(
+            status_code=400, detail=f"Column '{request.column}' not found"
+        )
+
+    corpus_df = (
+        node_data
+        .select(pl.col(request.column))
+        .filter(
+            pl
+            .col(request.column)
+            .cast(pl.Utf8, strict=False)
+            .str.strip_chars()
+            .str.len_chars()
+            .fill_null(0)
+            > 0
+        )
+        .collect()
+    )
+    node_corpus = [
+        str(value) if value is not None else ""
+        for value in corpus_df.get_column(request.column).to_list()
+    ]
+
+    artifact_dir, artifact_prefix = _prepare_quotation_artifact_target(
+        user_id, workspace_id
+    )
 
     try:
         task_info = await tm.submit_task(

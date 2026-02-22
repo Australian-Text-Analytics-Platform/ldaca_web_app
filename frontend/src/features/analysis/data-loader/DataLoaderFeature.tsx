@@ -161,7 +161,11 @@ export const DataLoaderFeature: React.FC = () => {
 
   const currentWorkspace = workspaces.find((ws: any) => getWorkspaceId(ws) === currentWorkspaceId) || null;
 
-  const nodeCount = workspaceGraph?.nodes?.length ?? currentWorkspace?.dataframe_count ?? currentWorkspace?.node_count ?? 0;
+  const nodeCount =
+    workspaceGraph?.nodes?.length ??
+    currentWorkspace?.total_nodes ??
+    currentWorkspace?.dataframe_count ??
+    0;
 
   const handleCreateWorkspace = async () => {
     const trimmed = newWorkspaceName.trim();
@@ -603,7 +607,7 @@ export const DataLoaderFeature: React.FC = () => {
                       <div>
                         <div className="font-medium text-foreground">{workspace.name || workspaceId}</div>
                         <div className="text-xs text-muted-foreground">
-                          Updated {formatTimestamp(workspace.modified_at || workspace.updated_at)} | {workspace.dataframe_count ?? workspace.node_count ?? 0} nodes | Size {formatBytes(Number(workspace.workspace_size_Byte || 0))}
+                          Updated {formatTimestamp(workspace.modified_at || workspace.updated_at)} | {workspace.total_nodes ?? workspace.dataframe_count ?? 0} nodes | Size {formatBytes(Number(workspace.workspace_size_Byte || 0))}
                         </div>
                       </div>
                       <div className="flex flex-wrap gap-2">

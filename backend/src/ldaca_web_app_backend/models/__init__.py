@@ -195,7 +195,9 @@ class WorkspaceSummary(BaseModel):
     description: str = ""
     created_at: str = ""
     modified_at: str = ""
-    node_count: int = 0
+    total_nodes: int = 0
+    root_nodes: int = 0
+    leaf_nodes: int = 0
     workspace_size_Byte: int = 0
     folder_name: Optional[str] = None
 
@@ -370,7 +372,7 @@ class ConcordanceAnalysisRequest(BaseModel):
     combined: bool = False  # if true, backend builds a combined view across nodes
     # Sorting parameters
     sort_by: Optional[str] = None  # column name to sort by
-    sort_order: Optional[str] = None  # "asc" or "desc"
+    descending: bool = True
 
     model_config = ConfigDict(extra="forbid")
 
@@ -415,7 +417,7 @@ class QuotationRequest(BaseModel):
     page_size: int = 50
     # Sorting parameters
     sort_by: Optional[str] = None  # column name to sort by
-    sort_order: str = "asc"  # "asc" or "desc"
+    descending: bool = True
     engine: Optional[QuotationEngineConfig] = None
 
     model_config = ConfigDict(extra="forbid")
@@ -434,7 +436,7 @@ class QuotationResultQuery(BaseModel):
     page: Optional[int] = None
     page_size: Optional[int] = None
     sort_by: Optional[str] = None
-    sort_order: Optional[str] = None
+    descending: Optional[bool] = None
     context_length: Optional[int] = None
     update_only: bool = False
 

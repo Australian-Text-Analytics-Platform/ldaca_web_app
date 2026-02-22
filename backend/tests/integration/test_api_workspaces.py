@@ -38,7 +38,7 @@ class TestWorkspaceAPI:
                 "description": "Test description",
                 "created_at": "2024-01-01T00:00:00Z",
                 "modified_at": "2024-01-01T12:00:00Z",
-                "node_count": 1,
+                "total_nodes": 1,
                 "root_nodes": 1,
                 "leaf_nodes": 1,
                 "node_types": {"DataFrame": 1},
@@ -53,7 +53,7 @@ class TestWorkspaceAPI:
             data = response.json()
             assert len(data) == 1
             assert data[0]["id"] == "abc123"
-            assert data[0]["node_count"] == 1
+            assert data[0]["total_nodes"] == 1
 
     async def test_create_workspace(self, authenticated_client):
         """Test creating a new workspace"""
@@ -552,16 +552,15 @@ class TestWorkspaceAPI:
     async def test_rename_node_column_delegates_to_node_rename(
         self, authenticated_client
     ):
-        """Rename endpoint should delegate to Node.rename and return child info."""
+        """Rename endpoint should delegate to in-place Node.rename and return node info."""
         mock_node = Mock()
-        renamed_node = Mock()
-        renamed_node.info.return_value = {
-            "id": "renamed-node-id",
+        mock_node.info.return_value = {
+            "id": "node-1",
             "name": "rename_original",
             "operation": "rename",
             "columns": ["renamed_col"],
         }
-        mock_node.rename.return_value = renamed_node
+        mock_node.rename.return_value = mock_node
 
         mock_workspace = Mock()
         mock_workspace.nodes = {"node-1": mock_node}
@@ -588,7 +587,7 @@ class TestWorkspaceAPI:
 
         assert response.status_code == 200
         body = response.json()
-        assert body["id"] == "renamed-node-id"
+        assert body["id"] == "node-1"
         mock_node.rename.assert_called_once_with({"original_col": "renamed_col"})
 
     async def test_rename_node_column_missing_node_returns_404(

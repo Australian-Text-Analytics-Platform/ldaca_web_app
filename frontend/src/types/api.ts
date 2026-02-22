@@ -68,6 +68,7 @@ export interface GraphNode {
   id: string;
   name: string;
   operation: string;
+  shape?: [number, number] | [number | null, number | null] | number[];
 }
 
 export interface GraphEdge {

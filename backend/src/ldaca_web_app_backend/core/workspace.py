@@ -19,11 +19,8 @@ from docworkspace import Workspace  # type: ignore
 from docworkspace.workspace.io import read_workspace_metadata
 from ldaca_web_app_backend.models import WorkspaceSummary
 
-from .utils import (
-    allocate_workspace_folder,
-    ensure_display_folder_name,
-    get_user_workspace_folder,
-)
+from .utils import (allocate_workspace_folder, ensure_display_folder_name,
+                    get_user_workspace_folder)
 
 
 class WorkspaceManager:
@@ -196,20 +193,39 @@ class WorkspaceManager:
             if uid == user_id and path.exists()
         ]
 
+        def _workspace_size_bytes(workspace_dir: Path) -> int:
+            total = 0
+            for file_path in workspace_dir.rglob("*"):
+                if not file_path.is_file():
+                    continue
+                try:
+                    total += file_path.stat().st_size
+                except Exception:
+                    continue
+            return total
+
         for wid, workspace_dir in user_workspace_items:
-            try:
-                metadata = read_workspace_metadata(workspace_dir)["workspace_metadata"]
-                summary = WorkspaceSummary(**metadata)
-                summaries.append(summary.model_dump())
-                continue
-            except Exception:
-                pass
+            workspace_size_byte = _workspace_size_bytes(workspace_dir)
+            folder_name = workspace_dir.name
 
             try:
                 ws = Workspace.load(workspace_dir)
-                summaries.append(ws.info_json())
+                summary_payload = WorkspaceSummary(**ws.info_json()).model_dump()
+                summary_payload["workspace_size_Byte"] = workspace_size_byte
+                summary_payload["workspace_size_byte"] = workspace_size_byte
+                summary_payload["folder_name"] = folder_name
+                summaries.append(summary_payload)
             except Exception:
-                continue
+                try:
+                    metadata = read_workspace_metadata(workspace_dir)[
+                        "workspace_metadata"
+                    ]
+                    summary_payload = WorkspaceSummary(**metadata).model_dump()
+                    summary_payload["workspace_size_Byte"] = workspace_size_byte
+                    summary_payload["folder_name"] = folder_name
+                    summaries.append(summary_payload)
+                except Exception:
+                    continue
         return summaries
 
     def delete_workspace(self, user_id: str, workspace_id: str) -> bool:
@@ -249,7 +265,8 @@ class WorkspaceManager:
         - Lazy import avoids cycles but obscures typing; introducing a protocol or
             factory module could reduce import indirection.
         """
-        from ldaca_web_app_backend.core.worker_task_manager import WorkerTaskManager
+        from ldaca_web_app_backend.core.worker_task_manager import \
+            WorkerTaskManager
 
         key = (user_id, workspace_id)
         tm = self._task_managers.get(key)
@@ -357,5 +374,5 @@ class WorkspaceManager:
 
 
 workspace_manager = WorkspaceManager()
-
+workspace_manager = WorkspaceManager()
 workspace_manager = WorkspaceManager()

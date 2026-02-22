@@ -131,7 +131,7 @@ async def test_concordance_single_node_roundtrip(authenticated_client, workspace
         )
         == DEFAULT_CONCORDANCE_PAGE_SIZE
     )
-    assert result_payload["analysis_params"].get("sort_order", "asc") == "asc"
+    assert result_payload["analysis_params"].get("descending", True) is True
 
     # Current request should surface the persisted request
     current_req = await authenticated_client.get(
@@ -144,7 +144,7 @@ async def test_concordance_single_node_roundtrip(authenticated_client, workspace
     assert "page" not in current_req_payload
     assert "page_size" not in current_req_payload
     assert "sort_by" not in current_req_payload
-    assert "sort_order" not in current_req_payload
+    assert "descending" not in current_req_payload
     assert "pagination" not in current_req_payload
 
     task_manager = get_task_manager("test", workspace_id)

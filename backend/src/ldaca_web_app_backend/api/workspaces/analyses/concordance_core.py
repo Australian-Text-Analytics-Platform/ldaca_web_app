@@ -8,7 +8,6 @@ from typing import Any, Optional
 import polars as pl
 from fastapi import HTTPException
 
-from ....core.analysis_helpers import normalize_sort_order as _normalize_sort_order
 from ....core.workspace import workspace_manager
 
 CORE_CONCORDANCE_COLUMNS = {
@@ -23,13 +22,13 @@ CORE_CONCORDANCE_COLUMNS = {
 
 DEFAULT_CONCORDANCE_PAGE = 1
 DEFAULT_CONCORDANCE_PAGE_SIZE = 20
-DEFAULT_CONCORDANCE_SORT_ORDER = "asc"
+DEFAULT_CONCORDANCE_DESCENDING = True
 
 _REQUEST_EXCLUDE_KEYS = {
     "page",
     "page_size",
     "sort_by",
-    "sort_order",
+    "descending",
     "pagination",
 }
 
@@ -200,7 +199,7 @@ def compute_concordance_page(
     page: int,
     page_size: int,
     sort_by: Optional[str],
-    sort_order: Optional[str],
+    descending: bool,
     node_label: Optional[str] = None,
 ) -> dict[str, Any]:
     """Compute one concordance page for a single node source.
@@ -220,7 +219,7 @@ def compute_concordance_page(
         try:
             schema = base_lf.collect_schema()
             if sort_by in schema and sort_by not in CORE_CONCORDANCE_COLUMNS:
-                base_lf = base_lf.sort(sort_by, descending=(sort_order == "desc"))
+                base_lf = base_lf.sort(sort_by, descending=descending)
                 effective_sort_by = sort_by
         except Exception:
             pass
@@ -261,7 +260,7 @@ def compute_concordance_page(
         },
         "sorting": {
             "sort_by": effective_sort_by,
-            "sort_order": sort_order or DEFAULT_CONCORDANCE_SORT_ORDER,
+            "descending": descending,
         },
     }
 
@@ -292,7 +291,7 @@ def empty_concordance_page(page: int, page_size: int) -> dict[str, Any]:
             "has_next": False,
             "has_prev": page > 1,
         },
-        "sorting": {"sort_by": None, "sort_order": DEFAULT_CONCORDANCE_SORT_ORDER},
+        "sorting": {"sort_by": None, "descending": DEFAULT_CONCORDANCE_DESCENDING},
     }
 
 
@@ -306,7 +305,7 @@ def collect_interleaved_combined(
     page: int,
     page_size: int,
     sort_by: Optional[str],
-    sort_order: Optional[str],
+    descending: bool,
     left_label: Optional[str] = None,
     right_label: Optional[str] = None,
 ) -> dict[str, Any]:
@@ -325,7 +324,7 @@ def collect_interleaved_combined(
         page=page,
         page_size=page_size,
         sort_by=sort_by,
-        sort_order=sort_order,
+        descending=descending,
         node_label=left_label,
     )
     right_result = compute_concordance_page(
@@ -335,7 +334,7 @@ def collect_interleaved_combined(
         page=page,
         page_size=page_size,
         sort_by=sort_by,
-        sort_order=sort_order,
+        descending=descending,
         node_label=right_label,
     )
 
@@ -410,7 +409,7 @@ def collect_interleaved_combined(
         },
         "sorting": {
             "sort_by": effective_sort_by,
-            "sort_order": sort_order or DEFAULT_CONCORDANCE_SORT_ORDER,
+            "descending": descending,
         },
     }
 
@@ -434,7 +433,7 @@ def build_concordance_response(
     page = int(request.get("page") or DEFAULT_CONCORDANCE_PAGE)
     page_size = int(request.get("page_size") or DEFAULT_CONCORDANCE_PAGE_SIZE)
     sort_by = request.get("sort_by")
-    sort_order = _normalize_sort_order(request.get("sort_order"))
+    descending = bool(request.get("descending", DEFAULT_CONCORDANCE_DESCENDING))
     combined = bool(request.get("combined"))
 
     node_ids = request.get("node_ids") or []
@@ -459,7 +458,7 @@ def build_concordance_response(
                     page=page,
                     page_size=page_size,
                     sort_by=sort_by,
-                    sort_order=sort_order,
+                    descending=descending,
                     left_label=left_src.get("label"),
                     right_label=right_src.get("label"),
                 )
@@ -481,7 +480,7 @@ def build_concordance_response(
                     page=page,
                     page_size=page_size,
                     sort_by=sort_by,
-                    sort_order=sort_order,
+                    descending=descending,
                     node_label=src.get("label"),
                 )
                 all_rows.extend(node_result["data"])
@@ -517,7 +516,7 @@ def build_concordance_response(
                     "has_next": page < max_total_source_pages,
                     "has_prev": page > 1,
                 },
-                "sorting": {"sort_by": sort_by, "sort_order": sort_order},
+                "sorting": {"sort_by": sort_by, "descending": descending},
             }
         combinable = len(node_ids) > 1
     else:
@@ -532,7 +531,7 @@ def build_concordance_response(
                 page=page,
                 page_size=page_size,
                 sort_by=sort_by,
-                sort_order=sort_order,
+                descending=descending,
                 node_label=src.get("label"),
             )
         combinable = len(node_ids) > 1

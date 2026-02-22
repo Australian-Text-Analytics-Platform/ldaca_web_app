@@ -47,7 +47,7 @@ class QuotationRequest(BaseAnalysisRequest):
     page: Optional[int] = 1
     page_size: Optional[int] = 50
     sort_by: Optional[str] = None
-    sort_order: Optional[str] = "asc"
+    descending: Optional[bool] = True
     context_length: Optional[int] = None
 
 

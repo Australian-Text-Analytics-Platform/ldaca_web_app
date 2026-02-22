@@ -76,7 +76,7 @@ export interface Workspace {
   description?: string;
   created_at: string;
   updated_at: string;
-  node_count: number;
+  total_nodes: number;
 }
 
 export type TabType = 'data-loader' | 'analysis' | 'export';
@@ -88,6 +88,7 @@ export interface WorkspaceInfo {
   created_at: string;
   modified_at: string;
   description?: string;
+  total_nodes?: number;
   dataframe_count: number;
   is_saved: boolean;
 }

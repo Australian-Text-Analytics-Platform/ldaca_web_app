@@ -50,7 +50,7 @@ class ConcordanceResultQuery(BaseModel):
     page_number: Optional[int] = None
     page_size: Optional[int] = None
     sort_by: Optional[str] = None
-    sort_order: Optional[str] = None
+    descending: Optional[bool] = None
     show_metadata: Optional[bool] = None
     update_only: bool = False
 
@@ -85,8 +85,8 @@ def _apply_result_query_overrides(
         normalized_request["page_size"] = query.page_size
     if query.sort_by is not None:
         normalized_request["sort_by"] = query.sort_by
-    if query.sort_order is not None:
-        normalized_request["sort_order"] = query.sort_order
+    if query.descending is not None:
+        normalized_request["descending"] = query.descending
     if query.combined is not None:
         if query.combined:
             normalized_request["combined"] = True
@@ -163,8 +163,7 @@ async def run_concordance(
         normalized_request.setdefault("page_size", DEFAULT_CONCORDANCE_PAGE_SIZE)
         if request.sort_by:
             normalized_request["sort_by"] = request.sort_by
-        if request.sort_order:
-            normalized_request["sort_order"] = request.sort_order
+        normalized_request["descending"] = request.descending
         if request.combined:
             normalized_request["combined"] = True
 

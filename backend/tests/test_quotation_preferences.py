@@ -68,7 +68,7 @@ def _seed_paginated_analysis(rows: List[Dict[str, Any]], context_length: int = 1
             "has_next": len(rows) > 1,
             "has_prev": False,
         },
-        "sorting": {"sort_by": None, "sort_order": "asc"},
+        "sorting": {"sort_by": None, "descending": True},
         "preferences": {"context_length": context_length},
     }
 

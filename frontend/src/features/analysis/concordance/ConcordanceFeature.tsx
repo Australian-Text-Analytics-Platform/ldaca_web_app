@@ -275,7 +275,7 @@ const ConcordanceFeature: React.FC = () => {
     currentPage: number;
     pageSize: number;
     sortBy: string;
-    sortOrder: 'asc' | 'desc';
+    descending: boolean;
   }>>({});
   
   // Individual node loading states for pagination/sorting (separate from main search)
@@ -585,7 +585,7 @@ const ConcordanceFeature: React.FC = () => {
     targetNodeId?: string,
     forceMode?: 'separated' | 'combined',
     overrideSortBy?: string,
-    overrideSortOrder?: 'asc' | 'desc',
+    overrideDescending?: boolean,
     allowWhenLocked: boolean = false
   ) => {
     if (!currentWorkspaceId) return;
@@ -626,7 +626,7 @@ const ConcordanceFeature: React.FC = () => {
           currentPage: 1,
           pageSize: globalPageSize,
           sortBy: '',
-          sortOrder: 'asc' as 'asc' | 'desc',
+          descending: false,
         };
       }
       if (resetPage && (!targetNodeId || targetNodeId === nodeId)) {
@@ -666,7 +666,7 @@ const ConcordanceFeature: React.FC = () => {
         const overrides: ConcordanceResultQuery = {
           combined: isCombinedQuery,
           sort_by: (overrideSortBy ?? firstNodePagination.sortBy) || undefined,
-          sort_order: overrideSortOrder ?? firstNodePagination.sortOrder,
+          descending: overrideDescending ?? firstNodePagination.descending,
         };
 
         if (isCombinedQuery) {
@@ -952,11 +952,11 @@ const ConcordanceFeature: React.FC = () => {
       currentPage: 1,
       pageSize: globalPageSize,
       sortBy: '',
-      sortOrder: 'asc' as 'asc' | 'desc'
+      descending: false,
     };
 
     const isSameColumn = currentNodePagination.sortBy === columnName;
-    const newSortOrder = isSameColumn ? (currentNodePagination.sortOrder === 'asc' ? 'desc' : 'asc') : 'asc';
+    const newDescending = isSameColumn ? !currentNodePagination.descending : false;
 
     setNodePagination(prev => ({
       ...prev,
@@ -964,7 +964,7 @@ const ConcordanceFeature: React.FC = () => {
         ...currentNodePagination,
         currentPage: 1, // reset to first page on new sort
         sortBy: columnName,
-        sortOrder: newSortOrder
+        descending: newDescending
       }
     }));
 
@@ -980,7 +980,7 @@ const ConcordanceFeature: React.FC = () => {
         const overrides: ConcordanceResultQuery = {
           node_id: targetNodeId,
           sort_by: columnName,
-          sort_order: newSortOrder,
+          descending: newDescending,
           page: 1,
           page_size: pageSize,
         };
@@ -996,7 +996,7 @@ const ConcordanceFeature: React.FC = () => {
       currentPage: 1,
       pageSize: globalPageSize,
       sortBy: '',
-      sortOrder: 'asc' as 'asc' | 'desc'
+      descending: false,
     };
 
     setNodePagination(prev => ({
@@ -1020,7 +1020,7 @@ const ConcordanceFeature: React.FC = () => {
           page: newPage,
           page_size: currentNodePagination.pageSize,
           sort_by: currentNodePagination.sortBy || undefined,
-          sort_order: currentNodePagination.sortOrder,
+          descending: currentNodePagination.descending,
         };
         await updateStoredResult(overrides);
       } finally {
@@ -1154,9 +1154,9 @@ const ConcordanceFeature: React.FC = () => {
   };
 
   const SortableHeader: React.FC<{ columnKey: string; label: string; paginationKey: string; requestNodeId: string }> = ({ columnKey, label, paginationKey, requestNodeId }) => {
-    const nodeState = nodePagination[paginationKey] || { sortBy: '', sortOrder: 'asc' as 'asc' | 'desc' };
+    const nodeState = nodePagination[paginationKey] || { sortBy: '', descending: false };
     const isSorted = nodeState.sortBy === columnKey;
-    const sortIcon = isSorted ? (nodeState.sortOrder === 'asc' ? '▲' : '▼') : '▲▼';
+    const sortIcon = isSorted ? (nodeState.descending ? '▼' : '▲') : '▲▼';
     
     return (
       <TableHead 

@@ -16,7 +16,7 @@ from ldaca_web_app_backend.api.workspaces.analyses.concordance_core import (
             "search_word": "example",
             "page": 3,
             "page_size": 25,
-            "sort_order": "desc",
+            "descending": False,
             "pagination": {"page": 3},
             "regex": False,
             "case_sensitive": None,
@@ -32,7 +32,13 @@ def test_sanitize_request_excludes_pagination_keys(raw_request):
         "search_word": "example",
         "regex": False,
     }
-    for excluded in ("page", "page_size", "sort_by", "sort_order", "pagination"):
+    for excluded in (
+        "page",
+        "page_size",
+        "sort_by",
+        "descending",
+        "pagination",
+    ):
         assert excluded not in sanitized
 
 

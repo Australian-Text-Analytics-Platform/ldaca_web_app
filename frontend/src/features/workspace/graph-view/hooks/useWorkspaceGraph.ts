@@ -130,7 +130,16 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
         operation: node.operation,
       });
 
-      const shape: WorkspaceNodeShape = [null, null];
+        const rawShape = Array.isArray((node as { shape?: unknown }).shape)
+          ? ((node as { shape?: unknown[] }).shape as unknown[])
+          : null;
+        const parsedShape: [number | null, number | null] =
+          rawShape && rawShape.length >= 2
+            ? [
+                typeof rawShape[0] === 'number' ? rawShape[0] : null,
+                typeof rawShape[1] === 'number' ? rawShape[1] : null,
+              ]
+            : [null, null];
 
       const position = positions.get(node.id) || { x: index * 320, y: 50 };
 
@@ -142,7 +151,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
           node: {
             node_id: node.id,
             name: node.name || `Node ${index + 1}`,
-            shape,
+              shape: parsedShape,
             columns,
             preview: [],
             is_text_data: false,

@@ -364,8 +364,6 @@ Workspace(name=None, data=None, data_name=None, csv_lazy=True, **csv_kwargs)
 - `NodeSummary` - API-friendly node representation
 - `WorkspaceGraph` - React Flow compatible graph
 - `PaginatedData` - Paginated data response
-- `ErrorResponse` - Standard error format
-- `OperationResult` - Operation result wrapper
 
 #### Utilities
 
