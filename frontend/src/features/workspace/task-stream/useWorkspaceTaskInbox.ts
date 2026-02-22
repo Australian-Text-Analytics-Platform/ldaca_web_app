@@ -45,6 +45,57 @@ const buildTaskMap = (tasks: TaskItem[] = []) => {
   return map;
 };
 
+const TAB_ASSOCIATED_TASK_TYPES = new Set([
+  'token_frequencies',
+  'concordance',
+  'topic_modeling',
+  'quotation',
+]);
+
+const NON_TERMINAL_STATES = new Set(['pending', 'queued', 'submitted', 'running']);
+const TERMINAL_STATES = new Set(['successful', 'failed', 'cancelled']);
+
+const normalizeState = (value: unknown): string => String(value ?? '').toLowerCase();
+
+const mergeTaskMonotonic = (existing: TaskItem | undefined, incoming: TaskItem): TaskItem => {
+  if (!existing) {
+    return incoming;
+  }
+
+  const existingState = normalizeState(existing.state);
+  const incomingState = normalizeState(incoming.state);
+  const existingIsTerminal = TERMINAL_STATES.has(existingState);
+  const incomingIsTerminal = TERMINAL_STATES.has(incomingState);
+
+  // Never regress the same task_id from terminal back to a non-terminal state.
+  if (existingIsTerminal && NON_TERMINAL_STATES.has(incomingState)) {
+    return {
+      ...incoming,
+      state: existing.state,
+      finished_at: existing.finished_at ?? incoming.finished_at,
+      progress:
+        typeof existing.progress === 'number' && existing.progress > (incoming.progress ?? 0)
+          ? existing.progress
+          : incoming.progress,
+      progress_message:
+        String(incoming.progress_message ?? '').trim().length > 0
+          ? incoming.progress_message
+          : existing.progress_message,
+      message:
+        String(incoming.message ?? '').trim().length > 0
+          ? incoming.message
+          : existing.message,
+    };
+  }
+
+  // If incoming is terminal and existing is not, prefer terminal fields immediately.
+  if (!existingIsTerminal && incomingIsTerminal) {
+    return incoming;
+  }
+
+  return incoming;
+};
+
 const mergeTaskUpdates = (
   previousTasks: TaskItem[] = [],
   updates: TaskMergeUpdate[] = [],
@@ -66,18 +117,11 @@ const mergeTaskUpdates = (
       ...task,
     } as TaskItem;
 
-    nextMap.set(task.task_id, merged);
+    nextMap.set(task.task_id, mergeTaskMonotonic(existing, merged));
   });
 
   return sortTasksByTime(Array.from(nextMap.values()));
 };
-
-const TAB_ASSOCIATED_TASK_TYPES = new Set([
-  'token_frequencies',
-  'concordance',
-  'topic_modeling',
-  'quotation',
-]);
 
 const TERMINAL_TASK_STATES = new Set(['successful', 'failed', 'cancelled']);
 

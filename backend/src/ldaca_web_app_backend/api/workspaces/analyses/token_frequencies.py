@@ -15,9 +15,8 @@ from uuid import uuid4
 import polars as pl
 from fastapi import APIRouter, Depends, HTTPException
 
-from ....analysis.implementations.token_frequency import (
-    TokenFrequencyRequest as AnalysisTokenFrequencyRequest,
-)
+from ....analysis.implementations.token_frequency import \
+    TokenFrequencyRequest as AnalysisTokenFrequencyRequest
 from ....analysis.manager import get_task_manager
 from ....analysis.models import AnalysisStatus, AnalysisTask
 from ....core.analysis_helpers import sanitize_stop_words
@@ -255,15 +254,33 @@ async def token_frequencies_task_result(
     task_manager = get_task_manager(user_id, workspace_id)
 
     task = await ensure_task_synced(user_id, workspace_id, task_id, task_manager)
-    if not task or not task.result:
+    if not task:
         return None
-    if task.status == AnalysisStatus.RUNNING:
+
+    if task.status in (AnalysisStatus.PENDING, AnalysisStatus.RUNNING):
         return {
             "state": "running",
             "message": "Token frequency analysis is still running",
             "data": None,
             "metadata": {"task_id": task_id},
         }
+
+    if task.status == AnalysisStatus.FAILED:
+        return {
+            "state": "failed",
+            "message": task.error or "Token frequency analysis failed",
+            "data": None,
+            "metadata": {"task_id": task_id},
+        }
+
+    if not task.result:
+        return {
+            "state": "running",
+            "message": "Token frequency analysis is finalizing",
+            "data": None,
+            "metadata": {"task_id": task_id},
+        }
+
     return _rebuild_token_result(task)
 
 
@@ -435,7 +452,7 @@ async def calculate_token_frequencies(
             user_id=user_id,
             workspace_id=workspace_id,
             request=analysis_request,
-            status=AnalysisStatus.PENDING,
+            status=AnalysisStatus.RUNNING,
         )
     )
     task_manager.set_current_task("token_frequencies", task_info.id)

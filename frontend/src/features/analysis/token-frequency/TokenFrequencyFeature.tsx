@@ -227,6 +227,7 @@ function TokenFrequencyFeature() {
   const resolveTokenTaskInflightRef = useRef<Promise<string | null> | null>(null);
   const hydratedOnceRef = useRef(false);
   const previousWorkspaceIdRef = useRef<string | null>(null);
+  const successfulTaskRefreshRef = useRef<string | null>(null);
 
   const resolveTokenFrequencyTaskId = useCallback(async (): Promise<string | null> => {
     if (!currentWorkspaceId) {
@@ -719,6 +720,28 @@ function TokenFrequencyFeature() {
     fallbackRunningBanner: tokenFrequencyFallbackBanner,
     onRefresh: handleTokenFrequencyTaskRefresh,
   });
+
+  const tokenSuccessfulTask = tokenFrequencyTaskStatus.successfulTask;
+
+  useEffect(() => {
+    if (!isActiveTab) {
+      return;
+    }
+
+    const successfulTaskId = tokenSuccessfulTask?.task_id ?? null;
+    if (!successfulTaskId) {
+      return;
+    }
+
+    if (successfulTaskRefreshRef.current === successfulTaskId) {
+      return;
+    }
+
+    successfulTaskRefreshRef.current = successfulTaskId;
+    setIsAnalyzing(false);
+    setLocalTokenFrequencyTaskId((prev) => (prev === successfulTaskId ? null : prev));
+    void refreshCurrentTokenFrequencyResult();
+  }, [isActiveTab, refreshCurrentTokenFrequencyResult, tokenSuccessfulTask]);
 
   const hasActiveTask = Boolean(
     localTokenFrequencyTaskId ||

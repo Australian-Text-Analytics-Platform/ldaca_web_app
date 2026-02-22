@@ -5,10 +5,7 @@ import pytest
 from ldaca_web_app_backend.analysis.manager import get_task_manager
 from ldaca_web_app_backend.analysis.results import GenericAnalysisResult
 from ldaca_web_app_backend.api.workspaces.analyses.token_frequencies import (
-    DEFAULT_TOKEN_LIMIT,
-    MAX_SERVER_TOKEN_LIMIT,
-    SERVER_LIMIT_MULTIPLIER,
-)
+    DEFAULT_TOKEN_LIMIT, MAX_SERVER_TOKEN_LIMIT, SERVER_LIMIT_MULTIPLIER)
 from ldaca_web_app_backend.core.utils import get_user_data_folder
 from ldaca_web_app_backend.core.worker import token_frequencies_task
 from ldaca_web_app_backend.core.workspace import workspace_manager
@@ -133,6 +130,18 @@ async def test_token_frequencies_full_table_and_metadata(
     start_payload = response.json()
     assert start_payload.get("state") == "running"
     assert start_payload.get("metadata", {}).get("task_id")
+
+    running_task_id = await _get_current_task_id(
+        authenticated_client, workspace_id, "token_frequencies"
+    )
+    assert running_task_id
+    running_result_response = await authenticated_client.get(
+        f"/api/workspaces/token-frequencies/tasks/{running_task_id}/result"
+    )
+    assert running_result_response.status_code == 200
+    running_payload = running_result_response.json()
+    assert running_payload.get("state") == "running"
+    assert running_payload.get("metadata", {}).get("task_id") == running_task_id
 
     _simulate_token_frequency_completion(workspace_id)
     task_id = await _get_current_task_id(

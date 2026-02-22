@@ -379,6 +379,20 @@ class WorkerTaskManager:
             # Update task status
             task_info.update_status()
 
+            # Emit terminal completion immediately so UI can transition out of
+            # running state even if downstream result persistence is slow.
+            # A final task_changed is still emitted below with result_persisted.
+            await self.emit(
+                user_id,
+                workspace_id,
+                {
+                    "type": "task_changed",
+                    "task": self._serialize_task(task_info),
+                    "result_persisted": False,
+                    "timestamp": time.time(),
+                },
+            )
+
             if task_info.status == TaskStatus.SUCCESSFUL:
                 task_type = task_info.metadata.get("task_type")
 

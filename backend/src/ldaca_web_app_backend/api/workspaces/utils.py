@@ -95,8 +95,15 @@ async def ensure_task_synced(
     if not task:
         return None
 
-    # Check against string or Enum to be safe
-    is_running = task.status == "running" or task.status == AnalysisStatus.RUNNING
+    # Check against string or Enum to be safe.
+    # Pending tasks can already exist in analysis storage while the worker task
+    # is actively running, so both states should be sync-eligible.
+    is_running = task.status in {
+        "running",
+        "pending",
+        AnalysisStatus.RUNNING,
+        AnalysisStatus.PENDING,
+    }
 
     if is_running:
         worker_tm = workspace_manager.get_task_manager(user_id, workspace_id)
