@@ -73,6 +73,90 @@ class TestNode:
         assert sliced.parents[0] == node
         assert sliced.data.collect().height == 2
 
+    def test_node_drop_creates_child_and_drops_column(self, sample_df):
+        """Dropping columns returns a child node with updated schema."""
+        workspace = Workspace("test_workspace")
+        node = Node(sample_df.lazy(), "test_node", workspace)
+
+        dropped = node.drop("value")
+
+        assert dropped is not node
+        assert len(dropped.parents) == 1
+        assert dropped.parents[0] == node
+        assert dropped in node.children
+        assert "value" not in dropped.data.collect_schema().names()
+
+    def test_node_drop_clears_document_when_document_column_removed(self):
+        """Dropping the document column clears document metadata on child."""
+        workspace = Workspace("test_workspace")
+        node = Node(
+            pl.DataFrame({"text": ["a", "b"], "value": [1, 2]}).lazy(),
+            "test_node",
+            workspace,
+        )
+        node.document = "text"
+
+        dropped = node.drop("text")
+
+        assert dropped.document is None
+
+    def test_node_drop_preserves_document_when_other_column_removed(self):
+        """Dropping a non-document column preserves child document metadata."""
+        workspace = Workspace("test_workspace")
+        node = Node(
+            pl.DataFrame({"text": ["a", "b"], "value": [1, 2]}).lazy(),
+            "test_node",
+            workspace,
+        )
+        node.document = "text"
+
+        dropped = node.drop("value")
+
+        assert dropped.document == "text"
+
+    def test_node_rename_creates_child_and_renames_column(self, sample_df):
+        """Renaming columns returns a child node with updated schema."""
+        workspace = Workspace("test_workspace")
+        node = Node(sample_df.lazy(), "test_node", workspace)
+
+        renamed = node.rename({"value": "score"})
+
+        assert renamed is not node
+        assert len(renamed.parents) == 1
+        assert renamed.parents[0] == node
+        assert renamed in node.children
+        columns = renamed.data.collect_schema().names()
+        assert "score" in columns
+        assert "value" not in columns
+
+    def test_node_rename_updates_document_metadata(self):
+        """Renaming the document column updates child document metadata."""
+        workspace = Workspace("test_workspace")
+        node = Node(
+            pl.DataFrame({"text": ["a", "b"], "value": [1, 2]}).lazy(),
+            "test_node",
+            workspace,
+        )
+        node.document = "text"
+
+        renamed = node.rename({"text": "content"})
+
+        assert renamed.document == "content"
+
+    def test_node_rename_preserves_document_when_other_column_renamed(self):
+        """Renaming a non-document column preserves child document metadata."""
+        workspace = Workspace("test_workspace")
+        node = Node(
+            pl.DataFrame({"text": ["a", "b"], "value": [1, 2]}).lazy(),
+            "test_node",
+            workspace,
+        )
+        node.document = "text"
+
+        renamed = node.rename({"value": "score"})
+
+        assert renamed.document == "text"
+
     def test_node_join(self):
         """Test joining two Nodes."""
         df1 = pl.DataFrame({"key": ["A", "B"], "value1": [1, 2]})

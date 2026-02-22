@@ -1,21 +1,15 @@
-"""
-FastAPI utilities for DocWorkspace integration.
+"""DocWorkspace data-type and schema conversion utilities for FastAPI."""
 
-This module contains API-specific functionality that was moved from
-docworkspace to keep the core library general-purpose.
-"""
-
-import math
-from typing import Any, List, Optional
+from typing import Any, List
 
 import polars as pl
 
 # Import API models
-from .api_models import ColumnSchema, ErrorResponse, PaginatedData
+from .api_models import ColumnSchema
 
 
-class DocWorkspaceAPIUtils:
-    """Utility class for FastAPI integration with DocWorkspace."""
+class DocWorkspaceDataTypeUtils:
+    """Utilities for DocWorkspace dtype mapping and schema serialization."""
 
     @staticmethod
     def polars_dtype_to_ldaca_dtype(polars_dtype: pl.DataType) -> str:
@@ -71,47 +65,9 @@ class DocWorkspaceAPIUtils:
             ColumnSchema(
                 name=col_name,
                 dtype=str(polars_type),
-                js_type=DocWorkspaceAPIUtils.polars_dtype_to_ldaca_dtype(polars_type),
+                js_type=DocWorkspaceDataTypeUtils.polars_dtype_to_ldaca_dtype(
+                    polars_type
+                ),
             )
             for col_name, polars_type in data_schema.items()
         ]
-
-    @staticmethod
-    def get_paginated_node_rows(
-        node: Any,
-        page: int = 1,
-        page_size: int = 100,
-        columns: Optional[List[str]] = None,
-    ) -> PaginatedData:
-        """Get paginated rows from a LazyFrame-backed node."""
-        data_obj = node.data
-        total_rows = int(data_obj.select(pl.len()).collect().item())
-        total_pages = math.ceil(total_rows / page_size) if total_rows > 0 else 0
-        start_idx = (page - 1) * page_size
-
-        sliced_df = data_obj.slice(start_idx, page_size).collect()
-        data_list = sliced_df.to_dicts()
-        node_columns = columns or list(data_obj.collect_schema().names())
-
-        return PaginatedData(
-            data=data_list,
-            pagination={
-                "page": page,
-                "page_size": page_size,
-                "total_rows": total_rows,
-                "total_pages": total_pages,
-                "has_next": page < total_pages,
-                "has_previous": page > 1,
-            },
-            columns=node_columns,
-            schema=DocWorkspaceAPIUtils.get_node_schema_json_with_ldaca_dtype(node),
-        )
-
-
-def exception_to_error_response(error: Exception) -> ErrorResponse:
-    """Convert exceptions into standardized API error payloads."""
-    return ErrorResponse(
-        error=type(error).__name__,
-        message=str(error),
-        details={"exception_type": type(error).__name__},
-    )

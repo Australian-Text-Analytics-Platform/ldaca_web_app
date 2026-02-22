@@ -23,8 +23,8 @@ from .api.workspaces import router as workspaces_router
 
 # Ensure DocWorkspace API conversion utilities are available at startup.
 # Note: this import no longer auto-applies monkey patches; extension hooks are
-# explicit in `core.docworkspace_api`.
-from .core import docworkspace_api  # noqa: F401
+# explicit in `core.docworkspace_data_types`.
+from .core import docworkspace_data_types  # noqa: F401
 from .db import cleanup_expired_sessions, init_db
 from .settings import settings
 

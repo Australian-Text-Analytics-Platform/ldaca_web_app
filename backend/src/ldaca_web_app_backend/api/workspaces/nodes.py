@@ -27,10 +27,6 @@ from ...models import (
     FilterRequest,
     SliceRequest,
 )
-from .analyses.text_column_prefs import (
-    guess_text_column,
-    persist_text_column_preference,
-)
 from .utils import update_workspace
 
 router = APIRouter(prefix="/workspaces", tags=["nodes"])
@@ -256,22 +252,6 @@ def _unwrap_lazyframe(data: Any, *, purpose: str) -> pl.LazyFrame:
         status_code=500,
         detail=f"{purpose} requires lazy node data but received {type(data).__name__}",
     )
-
-
-def _set_text_column(node: Any, text_column: Optional[str]) -> None:
-    """Persist a node text-column preference when available.
-
-    Used by:
-    - `convert_node`
-    - `reset_node_document_column`
-
-    Why:
-    - Delegates metadata persistence to the shared text-column helper so node
-      operations and analysis routes stay aligned.
-    """
-    if text_column is None:
-        return
-    persist_text_column_preference(node, text_column)
 
 
 def _get_node_display_name(node: Any) -> str:
@@ -578,8 +558,7 @@ async def get_node_shape(
     ws = workspace_manager.get_current_workspace(user_id)
     node = ws.nodes[node_id]
     try:
-        info = node.info()
-        return {"shape": info["shape"]}
+        return {"shape": node.shape}
     except Exception as e:  # pragma: no cover
         raise HTTPException(
             status_code=500,
@@ -606,25 +585,20 @@ async def get_column_unique_values(
             raise HTTPException(
                 status_code=404, detail=f"Column '{column_name}' not found"
             )
-        df = lazyframe.collect()
         try:
             if _is_string_list_dtype(schema_map.get(column_name)):
-                exploded_series = df.select(
-                    pl.col(column_name).explode().alias(column_name)
-                ).to_series()
-                raw_values = exploded_series.to_list()
+                unique_df = (
+                    lazyframe
+                    .select(pl.col(column_name).explode().alias(column_name))
+                    .unique(maintain_order=True)
+                    .collect()
+                )
+                raw_values = unique_df.get_column(column_name).to_list()
                 has_null = any(value is None for value in raw_values)
 
-                deduped_values: list[str] = []
-                seen_values: set[str] = set()
-                for value in raw_values:
-                    if value is None:
-                        continue
-                    text_value = str(value)
-                    if text_value in seen_values:
-                        continue
-                    seen_values.add(text_value)
-                    deduped_values.append(text_value)
+                deduped_values = [
+                    str(value) for value in raw_values if value is not None
+                ]
 
                 unique_count = len(deduped_values) + (1 if has_null else 0)
                 return {
@@ -634,9 +608,13 @@ async def get_column_unique_values(
                     "has_null": has_null,
                 }
 
-            column_series = df.select(pl.col(column_name)).to_series()
-            unique_series = column_series.unique()
-            raw_values = unique_series.to_list()
+            unique_df = (
+                lazyframe
+                .select(pl.col(column_name).alias(column_name))
+                .unique(maintain_order=True)
+                .collect()
+            )
+            raw_values = unique_df.get_column(column_name).to_list()
             has_null = any(value is None for value in raw_values)
             non_null_values = [value for value in raw_values if value is not None]
             return {
@@ -779,119 +757,6 @@ async def delete_node(node_id: str, current_user: dict = Depends(get_current_use
     return {"state": "successful", "message": "Node deleted successfully"}
 
 
-@router.post("/nodes/{node_id}/convert")
-async def convert_node(
-    node_id: str,
-    target: str = Query(
-        ...,
-        description="Target type: lazyframe",
-    ),
-    document_column: Optional[str] = Query(
-        None,
-        description="Document column (auto-detected if not specified)",
-    ),
-    current_user: dict = Depends(get_current_user),
-):
-    user_id = current_user["id"]
-    workspace_id = workspace_manager.get_current_workspace_id(user_id)
-    valid_targets = {"lazyframe"}
-    if target not in valid_targets:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid target '{target}'. Must be one of: {', '.join(sorted(valid_targets))}",
-        )
-    src_node = workspace_manager.get_current_workspace(user_id).nodes[node_id]
-    data = src_node.data
-    try:
-        new_data = None
-        doc_col: Optional[str] = None
-        operation_name = f"convert_to_{target}"
-        if target == "lazyframe":
-            lazyframe = _unwrap_lazyframe(data, purpose="Convert to LazyFrame")
-            doc_col = document_column or guess_text_column(
-                available_columns=list(lazyframe.collect_schema().keys())
-            )
-            if doc_col:
-                schema = lazyframe.collect_schema()
-                if doc_col not in schema:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Document column '{doc_col}' not found in node.",
-                    )
-                if schema[doc_col] not in (pl.Utf8, pl.String):
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Column '{doc_col}' is not a string column",
-                    )
-            new_data = lazyframe
-        if new_data is None:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Unsupported data type for conversion: {type(data).__name__}",
-            )
-        src_node.data = new_data  # type: ignore[assignment]
-        _set_text_column(src_node, doc_col if target == "lazyframe" else None)
-        try:
-            src_node.operation += "\n" + operation_name
-        except Exception:
-            pass
-        update_workspace(user_id, workspace_id)
-        return src_node.info()
-    except HTTPException:
-        raise
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Conversion failed: {e}")
-
-
-@router.post("/nodes/{node_id}/reset-document")
-async def reset_node_document_column(
-    node_id: str,
-    document_column: Optional[str] = None,
-    current_user: dict = Depends(get_current_user),
-):
-    user_id = current_user["id"]
-    workspace_id = workspace_manager.get_current_workspace_id(user_id)
-    src_node = workspace_manager.get_current_workspace(user_id).nodes[node_id]
-    data = src_node.data
-    try:
-        new_data = None
-        lazyframe = _unwrap_lazyframe(data, purpose="Reset document column")
-        target_col = document_column or guess_text_column(
-            available_columns=list(lazyframe.collect_schema().keys())
-        )
-        if not target_col:
-            raise HTTPException(
-                status_code=400,
-                detail="Unable to auto-detect document column; please provide document_column",
-            )
-        schema = lazyframe.collect_schema()
-        if target_col not in schema:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Document column '{target_col}' not found in schema",
-            )
-        if schema[target_col] not in (pl.Utf8, pl.String):
-            raise HTTPException(
-                status_code=400,
-                detail=f"Column '{target_col}' is not a string column",
-            )
-        new_data = lazyframe
-        src_node.data = new_data  # type: ignore[assignment]
-        _set_text_column(src_node, target_col)
-        try:
-            src_node.operation = "reset_document"
-        except Exception:
-            pass
-        update_workspace(user_id, workspace_id)
-        return src_node.info()
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Reset document failed: {e}")
-
-
 @router.put("/nodes/{node_id}/name")
 async def update_node_name(
     node_id: str,
@@ -914,8 +779,8 @@ async def update_node_name(
         raise HTTPException(status_code=500, detail=f"Failed to rename node: {e}")
 
 
-@router.post("/nodes/{node_id}/copy")
-async def copy_node(
+@router.post("/nodes/{node_id}/clone")
+async def clone_node(
     node_id: str,
     current_user: dict = Depends(get_current_user),
 ):
@@ -926,24 +791,26 @@ async def copy_node(
     if workspace is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
 
-    def _unique_copy_name(original: str) -> str:
+    def _unique_clone_name(original: str) -> str:
         base = original or node_id
-        candidate = f"{base}_copy"
+        candidate = f"{base}_clone"
         existing = {getattr(n, "name", None) for n in workspace.nodes.values()}
         if candidate not in existing:
             return candidate
         suffix = 2
-        while f"{base}_copy_{suffix}" in existing:
+        while f"{base}_clone_{suffix}" in existing:
             suffix += 1
-        return f"{base}_copy_{suffix}"
+        return f"{base}_clone_{suffix}"
 
     try:
-        new_name = _unique_copy_name(getattr(node, "name", node_id))
+        source_lazy = _unwrap_lazyframe(node.data, purpose="Clone node")
+        cloned_lazy = source_lazy.clone()
+        new_name = _unique_clone_name(getattr(node, "name", node_id))
         new_node = Node(
-            data=node.data,
+            data=cloned_lazy,
             name=new_name,
             workspace=workspace,
-            operation=f"copy({getattr(node, 'name', node_id)})",
+            operation=f"clone({getattr(node, 'name', node_id)})",
             parents=[node],
         )
         workspace.add_node(new_node)
@@ -955,7 +822,7 @@ async def copy_node(
     except HTTPException:
         raise
     except Exception as e:  # pragma: no cover
-        raise HTTPException(status_code=500, detail=f"Failed to copy node: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to clone node: {e}")
 
 
 @router.post("/nodes/{node_id}/filter")

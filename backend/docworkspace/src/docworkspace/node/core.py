@@ -131,6 +131,67 @@ class Node:
             operation="slice",
         )
 
+    def drop(
+        self,
+        columns: Any,
+        *more_columns: Any,
+        strict: bool = True,
+    ) -> "Node":
+        """Drop columns using Polars semantics and return a child node.
+
+        Mirrors ``polars.LazyFrame.drop`` while preserving DocWorkspace lineage.
+        """
+        result = self.data.drop(columns, *more_columns, strict=strict)
+        child = Node(
+            data=result,
+            name=f"drop_{self.name}",
+            workspace=self.workspace,
+            parents=[self],
+            operation="drop",
+        )
+
+        if self.document:
+            before_names = set(self.data.collect_schema().names())
+            after_names = set(result.collect_schema().names())
+            if self.document in before_names and self.document not in after_names:
+                child.document = None
+            else:
+                child.document = self.document
+
+        return child
+
+    def rename(self, mapping: Any, *, strict: bool = True) -> "Node":
+        """Rename columns using Polars semantics and return a child node.
+
+        Mirrors ``polars.LazyFrame.rename`` while preserving DocWorkspace lineage.
+        """
+        result = self.data.rename(mapping, strict=strict)
+        child = Node(
+            data=result,
+            name=f"rename_{self.name}",
+            workspace=self.workspace,
+            parents=[self],
+            operation="rename",
+        )
+
+        if self.document:
+            new_document = self.document
+            if isinstance(mapping, dict) and self.document in mapping:
+                mapped_value = mapping[self.document]
+                if isinstance(mapped_value, str):
+                    new_document = mapped_value
+            elif callable(mapping):
+                try:
+                    mapped_value = mapping(self.document)
+                    if isinstance(mapped_value, str):
+                        new_document = mapped_value
+                except Exception:
+                    # Keep original document metadata when mapping function fails.
+                    pass
+            child.document = new_document
+
+        return child
+
     # ------------------------------------------------------------------
     # Properties
     # ------------------------------------------------------------------

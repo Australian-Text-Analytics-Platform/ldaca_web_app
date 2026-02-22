@@ -15,14 +15,14 @@
 **Answer:**
 
 - `api/` — FastAPI routers (workspaces, files, analyses).
-- `core/` — orchestration helpers (`workspace_manager`, `docworkspace_api`, task manager).
+- `core/` — orchestration helpers (`workspace_manager`, `docworkspace_data_types`, task manager).
 - `settings.py` — Pydantic settings loaded from environment variables.
 
 ## 3) Data flow
 
 **Question:** *How does a request become a workspace node?*
 
-**Answer:** The router parses the request, calls DocWorkspace helpers, and serializes the resulting node through `DocWorkspaceAPIUtils` before returning JSON to the frontend.
+**Answer:** The router parses the request, calls DocWorkspace helpers, and serializes the resulting node through `DocWorkspaceDataTypeUtils` before returning JSON to the frontend.
 
 ## 4) Lazy contract
 

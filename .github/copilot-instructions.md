@@ -1,8 +1,8 @@
 ## LDaCA Monorepo AI Guide (Web App & Desktop)
 
-- The platform includes `docframe` (Polars-based), `docworkspace` (lazy workspace graph), and the FastAPI + React app (`backend`, `frontend`, `src-tauri`). Preserve document-column metadata end-to-end because the UI renders what `DocWorkspaceAPIUtils` serializes.
+- The platform includes `docframe` (Polars-based), `docworkspace` (lazy workspace graph), and the FastAPI + React app (`backend`, `frontend`, `src-tauri`). Preserve document-column metadata end-to-end because the UI renders what `DocWorkspaceDataTypeUtils` serializes.
 - `docframe` and `docworkspace` are lazy-first: wrap text tables in `DocDataFrame`/`DocLazyFrame`, route new data through `stage_dataframe_as_lazy`, and avoid eager collection except at I/O edges.
-- FastAPI routers live under `backend/src/ldaca_web_app_backend/api` and must expose only `/api/...` routes; keep routers thin adapters and serialize via `DocWorkspaceAPIUtils`.
+- FastAPI routers live under `backend/src/ldaca_web_app_backend/api` and must expose only `/api/...` routes; keep routers thin adapters and serialize via `DocWorkspaceDataTypeUtils`.
 - Background analyses always use `WorkerTaskManager` and return `state` plus `metadata.task_id` so the Task Manager can poll/cancel.
 - Config comes from `.env` via `config.py` (no hardcoded secrets). Backend dev run: `uv run uvicorn ldaca_web_app_backend.main:app --reload --port 8001` with `PYTHONPATH=src`.
 - Frontend assumes the backend at `/api` and uses `VITE_BACKEND_API_BASE` or auto-detection; avoid `localhost` literals (Binder/Colab proxy).

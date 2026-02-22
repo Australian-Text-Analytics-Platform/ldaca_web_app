@@ -483,6 +483,140 @@ class TestWorkspaceAPI:
             # Verify the node data was updated (mock_node.data should be modified)
             assert mock_node.data is not None
 
+    async def test_delete_node_column_delegates_to_node_drop(
+        self, authenticated_client
+    ):
+        """Delete-column endpoint should delegate to Node.drop and return child info."""
+        mock_node = Mock()
+        dropped_node = Mock()
+        dropped_node.info.return_value = {
+            "id": "new-node-id",
+            "name": "drop_original",
+            "operation": "drop",
+            "columns": ["text"],
+        }
+        mock_node.drop.return_value = dropped_node
+
+        mock_workspace = Mock()
+        mock_workspace.nodes = {"node-1": mock_node}
+
+        with (
+            patch(
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_current_workspace_id"
+            ) as mock_current_entry,
+            patch(
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_current_workspace"
+            ) as mock_current_ws,
+            patch(
+                "ldaca_web_app_backend.api.workspaces.base.update_workspace"
+            ) as mock_update,
+        ):
+            mock_current_entry.return_value = "workspace-123"
+            mock_current_ws.return_value = mock_workspace
+            mock_update.return_value = None
+
+            response = await authenticated_client.delete(
+                "/api/workspaces/nodes/node-1/columns/value"
+            )
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["id"] == "new-node-id"
+        mock_node.drop.assert_called_once_with("value")
+
+    async def test_delete_node_column_missing_node_returns_404(
+        self, authenticated_client
+    ):
+        """Delete-column endpoint should return 404 for unknown node id."""
+        mock_workspace = Mock()
+        mock_workspace.nodes = {}
+
+        with (
+            patch(
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_current_workspace_id"
+            ) as mock_current_entry,
+            patch(
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_current_workspace"
+            ) as mock_current_ws,
+        ):
+            mock_current_entry.return_value = "workspace-123"
+            mock_current_ws.return_value = mock_workspace
+
+            response = await authenticated_client.delete(
+                "/api/workspaces/nodes/missing-node/columns/value"
+            )
+
+        assert response.status_code == 404
+        assert "not found" in response.json()["detail"].lower()
+
+    async def test_rename_node_column_delegates_to_node_rename(
+        self, authenticated_client
+    ):
+        """Rename endpoint should delegate to Node.rename and return child info."""
+        mock_node = Mock()
+        renamed_node = Mock()
+        renamed_node.info.return_value = {
+            "id": "renamed-node-id",
+            "name": "rename_original",
+            "operation": "rename",
+            "columns": ["renamed_col"],
+        }
+        mock_node.rename.return_value = renamed_node
+
+        mock_workspace = Mock()
+        mock_workspace.nodes = {"node-1": mock_node}
+
+        with (
+            patch(
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_current_workspace_id"
+            ) as mock_current_entry,
+            patch(
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_current_workspace"
+            ) as mock_current_ws,
+            patch(
+                "ldaca_web_app_backend.api.workspaces.base.update_workspace"
+            ) as mock_update,
+        ):
+            mock_current_entry.return_value = "workspace-123"
+            mock_current_ws.return_value = mock_workspace
+            mock_update.return_value = None
+
+            response = await authenticated_client.put(
+                "/api/workspaces/nodes/node-1/columns/original_col",
+                json={"new_name": "renamed_col"},
+            )
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["id"] == "renamed-node-id"
+        mock_node.rename.assert_called_once_with({"original_col": "renamed_col"})
+
+    async def test_rename_node_column_missing_node_returns_404(
+        self, authenticated_client
+    ):
+        """Rename endpoint should return 404 for unknown node id."""
+        mock_workspace = Mock()
+        mock_workspace.nodes = {}
+
+        with (
+            patch(
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_current_workspace_id"
+            ) as mock_current_entry,
+            patch(
+                "ldaca_web_app_backend.api.workspaces.workspace_manager.get_current_workspace"
+            ) as mock_current_ws,
+        ):
+            mock_current_entry.return_value = "workspace-123"
+            mock_current_ws.return_value = mock_workspace
+
+            response = await authenticated_client.put(
+                "/api/workspaces/nodes/missing-node/columns/original_col",
+                json={"new_name": "renamed_col"},
+            )
+
+        assert response.status_code == 404
+        assert "not found" in response.json()["detail"].lower()
+
     async def test_cast_node_not_found(self, authenticated_client):
         """Test casting when node doesn't exist"""
         from fastapi import HTTPException

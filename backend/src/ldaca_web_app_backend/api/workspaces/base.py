@@ -37,34 +37,25 @@ async def delete_node_column(
     column_name: str,
     current_user: dict = Depends(get_current_user),
 ):
-    """Delete a column from a node's data (in-place)."""
+    """Delete a column from a node by delegating to DocWorkspace Node.drop."""
 
     user_id = current_user["id"]
     workspace_id = workspace_manager.get_current_workspace_id(user_id)
     ws = workspace_manager.get_current_workspace(user_id)
     if not workspace_id or ws is None:
         raise HTTPException(status_code=404, detail="No active workspace selected")
-    node = ws.nodes[node_id]
-    data = node.data
-    if not isinstance(data, pl.LazyFrame):
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                f"Node data must be lazy (LazyFrame). Received '{type(data).__name__}'."
-            ),
-        )
+
+    node = ws.nodes.get(node_id)
+    if node is None:
+        raise HTTPException(status_code=404, detail=f"Node '{node_id}' not found")
 
     try:
-        node.data = data.drop([column_name])
-        try:
-            node.operation += f"\ndrop_column({column_name})"
-        except Exception:  # pragma: no cover - non-critical history update
-            pass
+        dropped_node = node.drop(column_name)
         try:
             update_workspace(user_id, workspace_id, best_effort=True)
         except Exception:
             pass
-        return node.info()
+        return dropped_node.info()
     except Exception as exc:  # pragma: no cover - defensive
         raise HTTPException(
             status_code=500,
@@ -79,7 +70,7 @@ async def rename_node_column(
     payload: dict = Body(...),
     current_user: dict = Depends(get_current_user),
 ):
-    """Rename a column within a node's data (in-place)."""
+    """Rename a column by delegating to DocWorkspace Node.rename."""
 
     user_id = current_user["id"]
     new_name = payload.get("new_name") if isinstance(payload, dict) else None
@@ -93,30 +84,20 @@ async def rename_node_column(
     ws = workspace_manager.get_current_workspace(user_id)
     if not workspace_id or ws is None:
         raise HTTPException(status_code=404, detail="No active workspace selected")
-    node = ws.nodes[node_id]
-    data = node.data
-    if not isinstance(data, pl.LazyFrame):
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                f"Node data must be lazy (LazyFrame). Received '{type(data).__name__}'."
-            ),
-        )
+
+    node = ws.nodes.get(node_id)
+    if node is None:
+        raise HTTPException(status_code=404, detail=f"Node '{node_id}' not found")
 
     trimmed_name = new_name.strip()
 
     try:
-        node.data = data.rename({column_name: trimmed_name})
-        if trimmed_name != column_name:
-            try:
-                node.operation += f"\nrename_column({column_name}->{trimmed_name})"
-            except Exception:  # pragma: no cover
-                pass
+        renamed_node = node.rename({column_name: trimmed_name})
         try:
             update_workspace(user_id, workspace_id, best_effort=True)
         except Exception:
             pass
-        return node.info()
+        return renamed_node.info()
     except Exception as exc:  # pragma: no cover
         raise HTTPException(
             status_code=500,
