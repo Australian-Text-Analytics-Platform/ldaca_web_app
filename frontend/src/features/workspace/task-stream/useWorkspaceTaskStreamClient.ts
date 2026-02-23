@@ -43,28 +43,34 @@ const buildUrl = (workspaceId: string | null) => {
   return `${baseUrl}/tasks/stream`;
 };
 
+const parseSseFrame = (frame: string, onMessage: (message: TaskEventPayload) => void) => {
+  if (!frame.trim()) return;
+
+  const dataLines = frame
+    .split(/\r?\n/)
+    .map((line) => line.replace(/\r$/, ''))
+    .filter((line) => /^data:\s?/.test(line))
+    .map((line) => line.replace(/^data:\s?/, ''));
+
+  if (!dataLines.length) return;
+
+  const raw = dataLines.join('\n');
+  if (!raw.trim()) return;
+
+  try {
+    const parsed = JSON.parse(raw) as TaskEventPayload;
+    onMessage(parsed);
+  } catch (error) {
+    console.warn('Failed to parse SSE payload', raw, error);
+  }
+};
+
 const parseSseFrames = (buffer: string, onMessage: (message: TaskEventPayload) => void) => {
-  const frames = buffer.split('\n\n');
+  const frames = buffer.split(/\r?\n\r?\n/);
   const remainder = frames.pop() ?? '';
 
   for (const frame of frames) {
-    if (!frame.trim()) continue;
-    const dataLines = frame
-      .split('\n')
-      .filter((line) => line.startsWith('data: '))
-      .map((line) => line.slice(6));
-
-    if (!dataLines.length) continue;
-
-    const raw = dataLines.join('\n');
-    if (!raw.trim()) continue;
-
-    try {
-      const parsed = JSON.parse(raw) as TaskEventPayload;
-      onMessage(parsed);
-    } catch (error) {
-      console.warn('Failed to parse SSE payload', raw, error);
-    }
+    parseSseFrame(frame, onMessage);
   }
 
   return remainder;
@@ -157,7 +163,13 @@ export const useWorkspaceTaskStreamClient = (
       try {
         while (active) {
           const { done, value } = await reader.read();
-          if (done) break;
+          if (done) {
+            // Flush any final frame even when the stream ends without
+            // a trailing blank-line delimiter.
+            parseSseFrame(buffer, invokeOnEvent);
+            buffer = '';
+            break;
+          }
           buffer += decoder.decode(value, { stream: true });
           buffer = parseSseFrames(buffer, invokeOnEvent);
         }

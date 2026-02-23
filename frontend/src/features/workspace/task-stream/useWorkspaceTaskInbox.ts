@@ -1,5 +1,6 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { workspacesApi } from '@/api/workspaces';
 import { useAuth } from '@/hooks/useAuth';
 import { useAnalysisStore } from '@/stores/analysisStore';
 import { queryKeys } from '@/lib/queryKeys';
@@ -124,6 +125,13 @@ const mergeTaskUpdates = (
 };
 
 const TERMINAL_TASK_STATES = new Set(['successful', 'failed', 'cancelled']);
+const NON_TERMINAL_TASK_STATES = new Set(['pending', 'queued', 'submitted', 'running']);
+
+const isSafariBrowser = () => {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent.toLowerCase();
+  return ua.includes('safari') && !ua.includes('chrome') && !ua.includes('chromium') && !ua.includes('android');
+};
 
 const shouldRefreshGraphFallback = (task?: TaskItem | null) => {
   if (!task?.task_type || !task?.state) {
@@ -141,6 +149,7 @@ export const useWorkspaceTaskInbox = (
   const queryClient = useQueryClient();
   const { getAuthHeaders } = useAuth();
   const setTasks = useAnalysisStore((state) => state.setTasks);
+  const tasks = useAnalysisStore((state) => state.tasks);
   const [transientError, setTransientError] = useState<string | null>(null);
 
   const handlePayload = useCallback(
@@ -241,6 +250,82 @@ export const useWorkspaceTaskInbox = (
     getAuthHeaders,
     onEvent: handlePayload,
   });
+
+  const hasNonTerminalWorkspaceTasks = useMemo(() => {
+    if (!workspaceId || !Array.isArray(tasks)) return false;
+    return tasks.some((task) => {
+      const state = String(task?.state ?? '').toLowerCase();
+      if (!NON_TERMINAL_TASK_STATES.has(state)) return false;
+
+      const metadata = (task as any)?.metadata as Record<string, unknown> | undefined;
+      const taskWorkspaceId =
+        typeof (task as any)?.workspace_id === 'string'
+          ? (task as any).workspace_id
+          : typeof metadata?.workspace_id === 'string'
+            ? metadata.workspace_id
+            : null;
+
+      return taskWorkspaceId === workspaceId;
+    });
+  }, [tasks, workspaceId]);
+
+  useEffect(() => {
+    if (!workspaceId || !hasNonTerminalWorkspaceTasks) {
+      return;
+    }
+
+    const safari = isSafariBrowser();
+    const lastEvent = clientState.lastEventTimestamp ?? 0;
+    const eventStale = lastEvent > 0 && Date.now() - lastEvent > 10_000;
+    const shouldReconcile = safari || clientState.status !== 'open' || eventStale;
+
+    if (!shouldReconcile) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const reconcile = async () => {
+      try {
+        const response: any = await workspacesApi.listTasks(getAuthHeaders());
+        const incomingTasks = Array.isArray(response)
+          ? response
+          : Array.isArray(response?.data)
+            ? response.data
+          : Array.isArray(response?.tasks)
+            ? response.tasks
+            : [];
+
+        if (!cancelled && incomingTasks.length > 0) {
+          setTasks((prevTasks: TaskItem[]) =>
+            mergeTaskUpdates(
+              prevTasks,
+              incomingTasks.map((task: any) => ({ task }))
+            )
+          );
+        }
+      } catch {
+        // best-effort reconciliation; stream remains primary
+      }
+    };
+
+    void reconcile();
+    const intervalId = window.setInterval(() => {
+      void reconcile();
+    }, 2000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [
+    clientState.lastEventTimestamp,
+    clientState.status,
+    getAuthHeaders,
+    hasNonTerminalWorkspaceTasks,
+    setTasks,
+    workspaceId,
+  ]);
 
   return transientError
     ? {

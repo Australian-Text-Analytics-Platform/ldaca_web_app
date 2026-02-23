@@ -225,6 +225,8 @@ function TokenFrequencyFeature() {
     taskId: null,
   });
   const resolveTokenTaskInflightRef = useRef<Promise<string | null> | null>(null);
+  const fetchTokenResultInflightRef = useRef<string | null>(null);
+  const tokenResultRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hydratedOnceRef = useRef(false);
   const previousWorkspaceIdRef = useRef<string | null>(null);
   const successfulTaskRefreshRef = useRef<string | null>(null);
@@ -634,16 +636,25 @@ function TokenFrequencyFeature() {
     return textApi.getTokenFrequenciesTaskResult(taskId, getAuthHeaders());
   }, [currentWorkspaceId, getAuthHeaders]);
 
-  const refreshCurrentTokenFrequencyResult = useCallback(async () => {
+  const refreshCurrentTokenFrequencyResult = useCallback(async (taskIdOverride?: string | null) => {
     if (!currentWorkspaceId) {
       return null;
     }
 
     try {
-      const taskId = await resolveTokenFrequencyTaskId();
+      const taskId =
+        typeof taskIdOverride === 'string' && taskIdOverride.trim().length > 0
+          ? taskIdOverride
+          : await resolveTokenFrequencyTaskId();
       if (!taskId) {
         return null;
       }
+
+      if (fetchTokenResultInflightRef.current === taskId) {
+        return null;
+      }
+
+      fetchTokenResultInflightRef.current = taskId;
       const response = await textApi.getTokenFrequenciesTaskResult(taskId, getAuthHeaders());
       const typedResponse = response as TokenFrequencyResponse | null;
       if (typedResponse) {
@@ -653,8 +664,34 @@ function TokenFrequencyFeature() {
     } catch (error) {
       console.error('Failed to refresh token frequency results automatically', error);
       return null;
+    } finally {
+      fetchTokenResultInflightRef.current = null;
     }
   }, [currentWorkspaceId, getAuthHeaders, resolveTokenFrequencyTaskId, setResults]);
+
+  const refreshTokenResultUntilTerminal = useCallback(
+    async (taskId: string | null, maxAttempts = 8) => {
+      if (!taskId) {
+        return null;
+      }
+
+      for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+        const refreshed = await refreshCurrentTokenFrequencyResult(taskId);
+        const state = refreshed?.state ?? null;
+
+        if (state === 'successful' || state === 'failed' || state === 'cancelled') {
+          return refreshed;
+        }
+
+        await new Promise<void>((resolve) => {
+          tokenResultRetryTimerRef.current = setTimeout(() => resolve(), 250);
+        });
+      }
+
+      return null;
+    },
+    [refreshCurrentTokenFrequencyResult]
+  );
 
   const tokenFrequencyFallbackBanner = useCallback(
     (status: AnalysisTaskStatus) => {
@@ -683,6 +720,14 @@ function TokenFrequencyFeature() {
         return;
       }
 
+      if (!isActiveTab) {
+        return;
+      }
+
+      if (context.taskState !== 'successful' && context.taskState !== 'failed') {
+        return;
+      }
+
       const currentState = results?.state;
       const isTerminalState =
         currentState === 'successful' ||
@@ -693,7 +738,7 @@ function TokenFrequencyFeature() {
         return;
       }
 
-      const refreshed = await refreshCurrentTokenFrequencyResult();
+      const refreshed = await refreshTokenResultUntilTerminal(context.taskId ?? null);
       if (!refreshed && context.reason === 'terminal' && context.taskState === 'failed') {
         setResults({
           state: 'failed',
@@ -703,10 +748,11 @@ function TokenFrequencyFeature() {
       }
 
       if (context.reason === 'terminal' && context.taskId) {
+        resolvedTokenTaskIdRef.current = { workspaceId: currentWorkspaceId, taskId: context.taskId };
         setLocalTokenFrequencyTaskId((prev) => (prev === context.taskId ? null : prev));
       }
     },
-    [refreshCurrentTokenFrequencyResult, results, setResults]
+    [currentWorkspaceId, isActiveTab, refreshTokenResultUntilTerminal, results, setResults]
   );
 
   const {
@@ -739,9 +785,18 @@ function TokenFrequencyFeature() {
 
     successfulTaskRefreshRef.current = successfulTaskId;
     setIsAnalyzing(false);
+    resolvedTokenTaskIdRef.current = { workspaceId: currentWorkspaceId, taskId: successfulTaskId };
     setLocalTokenFrequencyTaskId((prev) => (prev === successfulTaskId ? null : prev));
-    void refreshCurrentTokenFrequencyResult();
-  }, [isActiveTab, refreshCurrentTokenFrequencyResult, tokenSuccessfulTask]);
+    void refreshTokenResultUntilTerminal(successfulTaskId);
+  }, [currentWorkspaceId, isActiveTab, refreshTokenResultUntilTerminal, tokenSuccessfulTask]);
+
+  useEffect(() => {
+    return () => {
+      if (tokenResultRetryTimerRef.current) {
+        clearTimeout(tokenResultRetryTimerRef.current);
+      }
+    };
+  }, []);
 
   const hasActiveTask = Boolean(
     localTokenFrequencyTaskId ||
