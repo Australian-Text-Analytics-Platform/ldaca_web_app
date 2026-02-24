@@ -454,7 +454,9 @@ async def calculate_token_frequencies(
         # concurrent requests that both passed the earlier unlocked check.
         try:
             if await tm.any_running(
-                task_type="token_frequencies", user_id=user_id, workspace_id=workspace_id
+                task_type="token_frequencies",
+                user_id=user_id,
+                workspace_id=workspace_id,
             ):
                 latest = await tm.latest_by_type(
                     "token_frequencies", user_id=user_id, workspace_id=workspace_id
