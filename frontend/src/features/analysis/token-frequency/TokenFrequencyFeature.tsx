@@ -7,7 +7,6 @@ import { useWorkspaceActions } from '../../../hooks/useWorkspaceActions';
 import { useAnalysisTaskStatus } from '../../../hooks/useAnalysisTaskStatus';
 import { useAutoNodeColumns } from '../../../hooks/useAutoNodeColumns';
 import { useNodeColumnInfos } from '../../../hooks/useNodeColumnInfos';
-import AnalysisTaskBanner from '../../../components/tabs/AnalysisTaskBanner';
 import {
   parseAnalysisNodeRequest,
 } from '../common';
@@ -304,15 +303,6 @@ const TokenFrequencyFeature = () => {
 
   return (
     <div className="space-y-6">
-      {(isAnalyzing || Boolean(tokenFrequencyTaskStatus.runningTask)) && (
-        <AnalysisTaskBanner
-          analysisName="Token frequency"
-          status={tokenFrequencyTaskStatus.runningTask?.state === 'queued' ? 'queued' : 'running'}
-          taskId={tokenFrequencyTaskStatus.runningTask?.task_id ?? localTokenFrequencyTaskId}
-          message="Running token frequency analysis…"
-        />
-      )}
-
       <TokenFrequencyParameterPanel
         panelSelectedNodes={selectedNodes as any[]}
         effectiveNodeColumnSelections={effectiveNodeColumnSelections}
@@ -334,6 +324,8 @@ const TokenFrequencyFeature = () => {
 
       <TokenFrequencyResultsPanel
         results={results}
+        isRunning={isAnalyzing || Boolean(tokenFrequencyTaskStatus.runningTask)}
+        runningTask={tokenFrequencyTaskStatus.runningTask}
         stopWords={stopWords}
         onStopWordsChange={setStopWords}
         onStopWordsApply={handleApplyStopWords}

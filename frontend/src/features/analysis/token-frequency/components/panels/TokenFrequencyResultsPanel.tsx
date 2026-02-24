@@ -1,57 +1,79 @@
+import React from 'react';
+import type { TokenFrequencyResponse } from '@/api/text';
 import HelpIcon from '@/components/help/HelpIcon';
-import { Badge } from '@/components/ui/badge';
+import { AnalysisCardLayout } from '@/features/analysis/common/components/AnalysisCardLayout';
+import { AnalysisRunningStateCard } from '@/features/analysis/common/components/AnalysisRunningStateCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, RotateCcw, Wand2 } from 'lucide-react';
-import type { TokenFrequencyResponse } from '@/api/text';
+import { Wand2 } from 'lucide-react';
 import type { NodeResultView, NormalizedNodeResult } from '../../tokenFrequencyAdapters';
 import { TokenFrequencySingleTokenSection } from '../results/TokenFrequencySingleTokenSection';
 import { TokenFrequencyUnifiedTokenSection } from '../results/TokenFrequencyUnifiedTokenSection';
-import { AnalysisCardLayout } from '../../../common/components/AnalysisCardLayout';
+
+type RunningTask = {
+  task_id: string;
+  state?: string;
+  message?: string;
+  progress?: number;
+  progress_message?: string;
+};
 
 type TokenFrequencyResultsPanelProps = {
   results: TokenFrequencyResponse | null;
+  isRunning: boolean;
+  runningTask?: RunningTask | null;
+
   stopWords: string;
-  onStopWordsChange: (value: string) => void;
+  onStopWordsChange: React.Dispatch<React.SetStateAction<string>>;
   onStopWordsApply: () => void;
   isLoadingStopWords: boolean;
   onFillDefaultStopWords: () => void;
+
   tokenLimitInput: string;
   onTokenLimitInputChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onTokenLimitBlur: () => void;
   onTokenLimitKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => void;
   tokenLimitError: string | null;
   isApplyingTokenLimit: boolean;
+
   appliedStopCount: number;
+
   normalizedNodeResults: NormalizedNodeResult[];
   nodeDisplayResults: NodeResultView[];
   lastCompareNodeIds: string[];
   appliedStopSet: Set<string>;
   effectiveTokenLimit: number;
   defaultTokenLimit: number;
+
   computeDisplayName: (nodeId: string, fallbackKey?: string) => string;
   getColorForNode: (nodeId: string, index?: number) => string;
+
   onDownloadWordCloud: (nodeKey: string, displayName: string) => void;
   onTokenClick: (token: string) => void;
   onTokenRightClick: (token: string, event?: React.MouseEvent) => void;
+
   unifiedCloudWidth: number;
   unifiedCloudHeight: number;
   unifiedCloudContainerRef: React.RefObject<HTMLDivElement | null>;
   registerWordCloudRef: (nodeKey: string, element: SVGSVGElement | null) => void;
-  onDownloadFrequencyCsv: (label: string, rows: any[]) => void;
-  sortedStatistics: any[];
+
   statsSortColumn: string;
   statsSortDirection: 'asc' | 'desc';
   onToggleStatsSort: (column: string) => void;
+  sortedStatistics: Array<{ token: string; frequency: number; zscore: number }>;
+  statsRowsPerPage: number;
   statsPage: number;
   onStatsPageChange: (page: number) => void;
-  statsRowsPerPage: number;
   onStatsRowsPerPageChange: (rows: number) => void;
+
+  onDownloadFrequencyCsv: (label: string, rows: unknown[]) => void;
 };
 
 export const TokenFrequencyResultsPanel = ({
   results,
+  isRunning,
+  runningTask,
   stopWords,
   onStopWordsChange,
   onStopWordsApply,
@@ -79,136 +101,168 @@ export const TokenFrequencyResultsPanel = ({
   unifiedCloudHeight,
   unifiedCloudContainerRef,
   registerWordCloudRef,
-  onDownloadFrequencyCsv,
-  sortedStatistics,
   statsSortColumn,
   statsSortDirection,
   onToggleStatsSort,
+  sortedStatistics,
+  statsRowsPerPage,
   statsPage,
   onStatsPageChange,
-  statsRowsPerPage,
   onStatsRowsPerPageChange,
+  onDownloadFrequencyCsv,
 }: TokenFrequencyResultsPanelProps) => {
-  if (!results) {
+  const isRunningState = isRunning;
+  const isFailedState = results?.state === 'failed' && !isRunningState;
+  const isSuccessfulState = results?.state === 'successful' && !isRunningState;
+
+  if (!isRunningState && !results) {
     return null;
   }
 
-  if (results.state === 'failed') {
-    return (
-      <AnalysisCardLayout
-        title={<span className="text-destructive">Token Frequency Analysis Failed</span>}
-        tone="error"
-      >
-          <p className="text-sm text-muted-foreground">{results.message || 'Analysis failed to complete.'}</p>
-      </AnalysisCardLayout>
-    );
-  }
-
-  if (results.state !== 'successful') {
-    return null;
-  }
+  const runningMessage =
+    runningTask?.progress_message || runningTask?.message || 'Running token frequency analysis…';
+  const runningTaskId = runningTask?.task_id;
+  const runningProgress = typeof runningTask?.progress === 'number' ? runningTask.progress : null;
+  const cardTone: 'default' | 'error' = isFailedState ? 'error' : 'default';
 
   return (
     <AnalysisCardLayout
-      title={
-        <>
-          Results
-          <Badge variant="outline">{normalizedNodeResults.length} node{normalizedNodeResults.length === 1 ? '' : 's'}</Badge>
-        </>
-      }
-      help={{ targetKey: 'analysis.token-frequency.results', label: 'Token frequency results' }}
+      title="Token Frequency Results"
+      tone={cardTone}
+      help={{
+        targetKey: 'analysis.token-frequency.results',
+        label: 'Token frequency results',
+        tooltip: 'Shows running progress, failures, and final token frequency outputs.',
+      }}
     >
-      <div className="space-y-6">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Label htmlFor="token-limit-input">Token limit</Label>
-              <HelpIcon targetKey="analysis.token-frequency.token-limit" label="Token limit" />
+      {isRunningState ? (
+        <AnalysisRunningStateCard message={runningMessage} taskId={runningTaskId} progress={runningProgress} />
+      ) : null}
+
+      {isFailedState ? (
+        <p className="text-sm text-muted-foreground">{results?.message || 'Analysis failed to complete.'}</p>
+      ) : null}
+
+      {isSuccessfulState && results ? (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-4">
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor="stop-words">Stop words ({appliedStopCount})</Label>
+                <HelpIcon
+                  targetKey="analysis.token-frequency.stop-words"
+                  label="Stop words"
+                  tooltip="Words entered here are removed from all displayed token frequencies."
+                />
+              </div>
+              <Input
+                id="stop-words"
+                value={stopWords}
+                onChange={(event) => onStopWordsChange(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    onStopWordsApply();
+                  }
+                }}
+                placeholder="the, and, of"
+                disabled={isLoadingStopWords}
+              />
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={onStopWordsApply}
+                  disabled={isLoadingStopWords}
+                >
+                  Apply Stop Words
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={onFillDefaultStopWords}
+                  disabled={isLoadingStopWords}
+                >
+                  Fill Default
+                </Button>
+              </div>
             </div>
-            <Input
-              id="token-limit-input"
-              value={tokenLimitInput}
-              onChange={onTokenLimitInputChange}
-              onBlur={onTokenLimitBlur}
-              onKeyDown={onTokenLimitKeyDown}
-              inputMode="numeric"
-              aria-invalid={!!tokenLimitError}
-              disabled={isApplyingTokenLimit}
-            />
-            {tokenLimitError ? <p className="text-xs text-destructive">{tokenLimitError}</p> : null}
+
+            <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-4">
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor="token-limit">Token display limit</Label>
+                <HelpIcon
+                  targetKey="analysis.token-frequency.token-limit"
+                  label="Token display limit"
+                  tooltip="Limits the number of top tokens shown per table after filtering."
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="token-limit"
+                  type="number"
+                  min={1}
+                  value={tokenLimitInput}
+                  onChange={onTokenLimitInputChange}
+                  onBlur={onTokenLimitBlur}
+                  onKeyDown={onTokenLimitKeyDown}
+                />
+                <Button type="button" variant="outline" size="sm" onClick={onTokenLimitBlur} disabled={isApplyingTokenLimit}>
+                  <Wand2 className="mr-1 h-3.5 w-3.5" />
+                  Apply
+                </Button>
+              </div>
+              {tokenLimitError ? (
+                <p className="text-xs text-destructive">{tokenLimitError}</p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Currently displaying top {effectiveTokenLimit} tokens per table (default: {defaultTokenLimit}).
+                </p>
+              )}
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Label htmlFor="stop-words-input">Stop words</Label>
-              <HelpIcon targetKey="analysis.token-frequency.stop-words" label="Stop words" />
-            </div>
-            <Input
-              id="stop-words-input"
-              value={stopWords}
-              onChange={(event) => onStopWordsChange(event.target.value)}
-              onBlur={onStopWordsApply}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  event.preventDefault();
-                  onStopWordsApply();
-                }
-              }}
-            />
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" onClick={onFillDefaultStopWords} disabled={isLoadingStopWords}>
-                {isLoadingStopWords ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
-                Default stop words
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => { onStopWordsChange(''); onStopWordsApply(); }}>
-                <RotateCcw className="mr-2 h-4 w-4" />
-                Clear stop words
-              </Button>
-            </div>
-            {appliedStopCount > 0 && (
-              <p className="text-xs text-muted-foreground">Filtering out {appliedStopCount} stop word{appliedStopCount === 1 ? '' : 's'}.</p>
-            )}
-          </div>
+          <TokenFrequencySingleTokenSection
+            nodeDisplayResults={nodeDisplayResults}
+            getColorForNode={getColorForNode}
+            onTokenClick={onTokenClick}
+            onTokenRightClick={onTokenRightClick}
+            onDownloadFrequencyCsv={onDownloadFrequencyCsv}
+            onDownloadWordCloud={onDownloadWordCloud}
+            registerWordCloudRef={registerWordCloudRef}
+          />
+
+          <TokenFrequencyUnifiedTokenSection
+            normalizedNodeResults={normalizedNodeResults}
+            nodeDisplayResults={nodeDisplayResults}
+            lastCompareNodeIds={lastCompareNodeIds}
+            statistics={null}
+            appliedStopSet={appliedStopSet}
+            statsSortColumn={statsSortColumn}
+            statsSortDirection={statsSortDirection}
+            onToggleStatsSort={onToggleStatsSort}
+            effectiveTokenLimit={effectiveTokenLimit}
+            defaultTokenLimit={defaultTokenLimit}
+            computeDisplayName={computeDisplayName}
+            getColorForNode={getColorForNode}
+            onDownloadWordCloud={onDownloadWordCloud}
+            onTokenClick={onTokenClick}
+            onTokenRightClick={onTokenRightClick}
+            unifiedCloudWidth={unifiedCloudWidth}
+            unifiedCloudHeight={unifiedCloudHeight}
+            unifiedCloudContainerRef={unifiedCloudContainerRef}
+            registerWordCloudRef={registerWordCloudRef}
+            sortedStatistics={sortedStatistics}
+            statsRowsPerPage={statsRowsPerPage}
+            onStatsRowsPerPageChange={onStatsRowsPerPageChange}
+            statsPage={statsPage}
+            onStatsPageChange={onStatsPageChange}
+            onDownloadFrequencyCsv={onDownloadFrequencyCsv}
+          />
         </div>
-
-        <TokenFrequencySingleTokenSection
-          nodeDisplayResults={nodeDisplayResults}
-          getColorForNode={getColorForNode}
-          onTokenClick={onTokenClick}
-          onTokenRightClick={onTokenRightClick}
-          onDownloadWordCloud={onDownloadWordCloud}
-          onDownloadFrequencyCsv={onDownloadFrequencyCsv}
-          registerWordCloudRef={registerWordCloudRef}
-        />
-
-        <TokenFrequencyUnifiedTokenSection
-          normalizedNodeResults={normalizedNodeResults}
-          nodeDisplayResults={nodeDisplayResults}
-          lastCompareNodeIds={lastCompareNodeIds}
-          statistics={results.statistics}
-          appliedStopSet={appliedStopSet}
-          effectiveTokenLimit={effectiveTokenLimit}
-          defaultTokenLimit={defaultTokenLimit}
-          computeDisplayName={computeDisplayName}
-          getColorForNode={getColorForNode}
-          onDownloadWordCloud={onDownloadWordCloud}
-          onTokenClick={onTokenClick}
-          onTokenRightClick={onTokenRightClick}
-          unifiedCloudWidth={unifiedCloudWidth}
-          unifiedCloudHeight={unifiedCloudHeight}
-          unifiedCloudContainerRef={unifiedCloudContainerRef}
-          registerWordCloudRef={registerWordCloudRef}
-          sortedStatistics={sortedStatistics}
-          statsSortColumn={statsSortColumn}
-          statsSortDirection={statsSortDirection}
-          onToggleStatsSort={onToggleStatsSort}
-          statsPage={statsPage}
-          onStatsPageChange={onStatsPageChange}
-          statsRowsPerPage={statsRowsPerPage}
-          onStatsRowsPerPageChange={onStatsRowsPerPageChange}
-          onDownloadFrequencyCsv={onDownloadFrequencyCsv}
-        />
-      </div>
+      ) : null}
     </AnalysisCardLayout>
   );
 };
