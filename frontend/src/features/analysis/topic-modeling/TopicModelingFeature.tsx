@@ -578,6 +578,7 @@ const TopicModelingFeature: React.FC = () => {
       {shouldShowResultsPanel && (
         <TopicModelingResultsPanel
           topicWaitingBanner={topicWaitingBanner}
+          runningTask={topicRunningTask}
           error={error}
           result={result}
           topics={topics}

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Button } from '../../../../../components/ui/button';
+import { Progress } from '../../../../../components/ui/progress';
 import { Loader2 } from 'lucide-react';
 import { TopicModelingBubbleChartSection } from '../results/TopicModelingBubbleChartSection';
 import { TopicModelingDetachDialog } from '../results/TopicModelingDetachDialog';
@@ -7,6 +8,12 @@ import { AnalysisCardLayout } from '../../../common/components/AnalysisCardLayou
 
 type Props = {
   topicWaitingBanner: { status: 'running' | 'queued'; taskId: string | null; message?: string } | null;
+  runningTask?: {
+    task_id: string;
+    state?: string;
+    message?: string;
+    progress?: number;
+  } | null;
   result: any;
   error?: string | null;
   topics: any[];
@@ -32,6 +39,7 @@ type Props = {
 
 export function TopicModelingResultsPanel({
   topicWaitingBanner,
+  runningTask,
   error,
   result,
   topics,
@@ -55,7 +63,11 @@ export function TopicModelingResultsPanel({
   handleDetachConfirm,
 }: Props) {
   const isRunningState = Boolean(topicWaitingBanner) || result?.state === 'running';
-  const runningMessage = topicWaitingBanner?.message || result?.message || 'Task running';
+  const runningMessage = runningTask?.message || topicWaitingBanner?.message || result?.message || 'Task running';
+  const runningTaskId = runningTask?.task_id || topicWaitingBanner?.taskId;
+  const runningProgress = typeof runningTask?.progress === 'number'
+    ? Math.max(0, Math.min(100, runningTask.progress))
+    : null;
   const isFailedState = result?.state === 'failed' && !isRunningState;
   const isErrorState = Boolean(error) && result?.state !== 'failed' && !isRunningState;
   const isSuccessfulState = result?.state === 'successful' && !isRunningState;
@@ -77,15 +89,27 @@ export function TopicModelingResultsPanel({
         help={helperConfig}
       >
         {isRunningState ? (
-          <div className="flex items-center gap-3 rounded-md border border-amber-300/60 bg-amber-50/60 p-4 text-amber-900">
-            <Loader2 className="h-5 w-5 animate-spin" />
-            <div className="space-y-0.5 text-sm">
-              <p className="font-medium">Task running</p>
-              <p className="text-amber-800/90">{runningMessage}</p>
-              {topicWaitingBanner?.taskId ? (
-                <p className="text-xs text-amber-800/80">Task ID: {topicWaitingBanner.taskId}</p>
-              ) : null}
+          <div className="space-y-3 rounded-md border border-amber-300/60 bg-amber-50/60 p-4 text-amber-900">
+            <div className="flex items-center gap-3">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              <div className="space-y-0.5 text-sm">
+                <p className="font-medium">Task running</p>
+                <p className="text-amber-800/90">{runningMessage}</p>
+                {runningTaskId ? (
+                  <p className="text-xs text-amber-800/80">Task ID: {runningTaskId}</p>
+                ) : null}
+              </div>
             </div>
+
+            {runningProgress !== null ? (
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-xs text-amber-900/90">
+                  <span>Progress</span>
+                  <span>{Math.round(runningProgress)}%</span>
+                </div>
+                <Progress value={runningProgress} className="h-2 bg-amber-100" />
+              </div>
+            ) : null}
           </div>
         ) : null}
 
