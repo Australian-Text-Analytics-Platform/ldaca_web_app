@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
 import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '../../../hooks/useWorkspaceSelection';
 import { useAuth } from '../../../hooks/useAuth';
@@ -10,28 +9,10 @@ import { workspacesApi } from '../../../api/workspaces';
 import { useAnalysisStore } from '../../../stores/analysisStore';
 import { useUIStore } from '../../../stores';
 import useNodeColumnInfos from '../../../hooks/useNodeColumnInfos';
-import { Button } from '../../../components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '../../../components/ui/alert-dialog';
-import { Input } from '../../../components/ui/input';
-import { Checkbox } from '../../../components/ui/checkbox';
-import HelpIcon from '../../../components/help/HelpIcon';
-import { AlertTriangle, Loader2, Play, Scan, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '../../../lib/queryKeys';
 import { applySelectedColumnsToSnapshots } from '../../../hooks/useSchemaManagement';
-import { ANALYSIS_LOCKED_MESSAGE } from '../../../components/tabs/AnalysisLockedNotice';
-import AnalysisTaskBanner from '../../../components/tabs/AnalysisTaskBanner';
 import type { AnalysisTaskStatus } from '../../../hooks/useAnalysisTaskStatus';
 import useAnalysisTaskLifecycle, { type AnalysisTaskRefreshContext } from '../../../hooks/useAnalysisTaskLifecycle';
 import { getAnalysisActionState } from '../common/analysisActionState';
@@ -52,6 +33,8 @@ import type {
   TopicModelingDetachNodeOption,
   TopicModelingDetachRequest,
 } from '../../../api/text';
+import { TopicModelingParameterPanel } from './components/panels/TopicModelingParameterPanel';
+import { TopicModelingResultsPanel } from './components/panels/TopicModelingResultsPanel';
 interface TopicModelingTopic { id: number; label: string; size: number[]; total_size: number; x: number; y: number; }
 interface TopicModelingResponse { state?: 'running' | 'successful' | 'failed' | 'cancelled'; message?: string; data?: { topics: TopicModelingTopic[]; corpus_sizes?: number[] }; metadata?: { task_id?: string; [k: string]: any } }
 interface ZoomDomain { xMin: number; xMax: number; yMin: number; yMax: number; }
@@ -88,7 +71,6 @@ const TopicModelingFeature: React.FC = () => {
     activeNodeIds,
     activeNodeColumnSelections,
     panelSelectedNodes,
-    displayNodeCount,
   } = useAnalysisLockMachine({
     allowedDataTypes: ['string'],
     maxNodes: 2,
@@ -726,8 +708,8 @@ const TopicModelingFeature: React.FC = () => {
     const l = 0.2126*r + 0.7152*g + 0.0722*b;
     return l > 160 ? '#1e293b' : '#ffffff';
   };
-  const renderSizeComposition = (sizes: number[], total: number) => {
-    if (corpusCount === 0) return null;
+  const renderSizeComposition = (sizes: number[] | undefined, total?: number | null) => {
+    if (corpusCount === 0 || !sizes) return null;
     if (sizes.length === 1) {
       const color = getPanelColor(0, fallbackPrimaryColor);
       const fg = getReadableTextColor(color);
@@ -981,329 +963,114 @@ const TopicModelingFeature: React.FC = () => {
     }
   }, [result, setIsLocked]);
 
+  const handleClear = async () => {
+    if (!currentWorkspaceId) return;
+    setIsClearing(true);
+    const taskIds = collectTaskIds([
+      (result as any)?.metadata?.task_id,
+      localTopicModelingTaskId,
+      topicTaskStatus.activeTaskId,
+      topicRunningTask?.task_id,
+      topicSuccessfulTask?.task_id,
+      topicFailedTask?.task_id,
+    ]);
+    try {
+      const headers = getAuthHeaders();
+      const resolvedTaskId = await resolveTopicModelingTaskId();
+      const allTaskIds = collectTaskIds([
+        ...taskIds,
+        resolvedTaskId,
+      ]);
+
+      await clearAnalysisTaskArtifacts({
+        workspaceId: currentWorkspaceId,
+        taskIds: allTaskIds,
+        cancelTask: (_workspaceId, taskId) =>
+          workspacesApi.cancelTasks({ task_id: taskId }, headers),
+        clearManagerTask: (_workspaceId, taskId) =>
+          workspacesApi.clearTasks({ task_id: taskId }, headers),
+        clearAnalysisTask: (_workspaceId, taskId) =>
+          textApi.clearTask(taskId, headers),
+        warnContext: 'topic-modeling',
+      });
+    } finally {
+      setIsClearing(false);
+      setResultSafely(null);
+      unlockSelection();
+      setIsLocked(false);
+      setIsRunning(false);
+      runningRef.current = false;
+      setLocalTopicModelingTaskId(null);
+      lastFetchedRef.current = { taskId: null, state: null };
+      setNodeColumnSelections([], { replace: true, persist: false });
+      recomputeAutoColumns();
+      setTasks((prev: any[]) =>
+        Array.isArray(prev)
+          ? pruneTasksById(
+              prev,
+              collectTaskIds([
+                (result as any)?.metadata?.task_id,
+                localTopicModelingTaskId,
+                topicTaskStatus.activeTaskId,
+                topicRunningTask?.task_id,
+                topicSuccessfulTask?.task_id,
+                topicFailedTask?.task_id,
+              ])
+            )
+          : prev
+      );
+    }
+  };
+
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader className="space-y-0 pb-4">
-          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                Topic Modeling (BERTopic)
-                <HelpIcon
-                  targetKey="analysis.topic-modeling.parameters"
-                  label="Topic modeling parameters"
-                  tooltip="Choose nodes, topic size, and embedding options before running the model."
-                />
-              </CardTitle>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-6 pt-0">
-            <NodeSelectionPanel
-              selectedNodes={panelSelectedNodes}
-              nodeColumnSelections={effectiveNodeColumnSelections}
-              onColumnChange={handleColumnChange}
-              nodeColors={nodeColors}
-              onColorChange={handleColorChange}
-              getNodeColumns={getColumnInfos}
-              defaultPalette={defaultPalette}
-              maxCompare={2}
-              className="border border-dashed border-muted-foreground/40 rounded-lg bg-muted/30 p-4"
-              originalCount={displayNodeCount}
-              disabled={!!isLocked}
-              showShape
-              showColorPicker
-              locked={!!isLocked}
-              allowedDataTypes={['string']}
-              lockedMessage={ANALYSIS_LOCKED_MESSAGE}
-            />
+      <TopicModelingParameterPanel
+        selectedNodes={panelSelectedNodes}
+        nodeColumnSelections={effectiveNodeColumnSelections}
+        onColumnChange={handleColumnChange}
+        nodeColors={nodeColors}
+        onNodeColorChange={handleColorChange}
+        defaultPalette={defaultPalette}
+        isLocked={!!isLocked}
+        getNodeColumns={getColumnInfos}
+        actionState={actionState}
+        minTopicSize={minTopicSize}
+        onMinTopicSizeChange={setMinTopicSize}
+        useCtTfidf={useCtTfidf}
+        onUseCtTfidfChange={setUseCtTfidf}
+        isRunning={isRunning}
+        isClearing={isClearing}
+        onRun={handleRun}
+        onClear={handleClear}
+        hasMissingColumns={panelHasMissingColumns}
+        error={error}
+        resultState={result?.state}
+        resultMessage={result?.message}
+      />
 
-            <div className="grid gap-4 md:grid-cols-2 md:items-end">
-              <div className="space-y-2 md:max-w-xs">
-                <div className="flex items-center gap-2">
-                  <label htmlFor="minTopicSize" className="text-sm font-medium text-foreground">
-                    Min Topic Size
-                  </label>
-                  <HelpIcon targetKey="analysis.topic-modeling.min-topic-size" label="Minimum topic size" />
-                </div>
-                <Input
-                  id="minTopicSize"
-                  type="number"
-                  min={2}
-                  value={minTopicSize}
-                  onChange={e=>setMinTopicSize(parseInt(e.target.value, 10) || 10)}
-                  disabled={!!isLocked}
-                  className="md:w-40"
-                />
-              </div>
-              <div className="flex items-start gap-3 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/40 p-3">
-                <Checkbox
-                  id="useCtTfidf"
-                  checked={useCtTfidf}
-                  onCheckedChange={checked=>setUseCtTfidf(checked === true)}
-                  disabled={!!isLocked}
-                />
-                <div className="flex items-center gap-2">
-                  <label htmlFor="useCtTfidf" className="text-sm leading-tight text-muted-foreground">
-                    Use c-TF-IDF embeddings
-                  </label>
-                  <HelpIcon targetKey="analysis.topic-modeling.ctfidf-toggle" label="c-TF-IDF toggle" />
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap gap-3">
-              <Button
-                type="button"
-                className="w-full sm:w-auto"
-                onClick={handleRun}
-                disabled={actionState.runDisabled || panelHasMissingColumns}
-              >
-                {isRunning ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Running...
-                  </>
-                ) : (
-                  <>
-                    <Play className="mr-2 h-4 w-4" />
-                    Run Topic Modeling
-                  </>
-                )}
-              </Button>
-
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="destructive"
-                  className="w-full sm:w-auto"
-                  onClick={async () => {
-                    if (!currentWorkspaceId) return;
-                    setIsClearing(true);
-                    const taskIds = collectTaskIds([
-                      (result as any)?.metadata?.task_id,
-                      localTopicModelingTaskId,
-                      topicTaskStatus.activeTaskId,
-                      topicRunningTask?.task_id,
-                      topicSuccessfulTask?.task_id,
-                      topicFailedTask?.task_id,
-                    ]);
-                    try {
-                      const headers = getAuthHeaders();
-                      const resolvedTaskId = await resolveTopicModelingTaskId();
-                      const allTaskIds = collectTaskIds([
-                        ...taskIds,
-                        resolvedTaskId,
-                      ]);
-
-                      await clearAnalysisTaskArtifacts({
-                        workspaceId: currentWorkspaceId,
-                        taskIds: allTaskIds,
-                        cancelTask: (workspaceId, taskId) =>
-                          workspacesApi.cancelTasks({ task_id: taskId }, headers),
-                        clearManagerTask: (workspaceId, taskId) =>
-                          workspacesApi.clearTasks({ task_id: taskId }, headers),
-                        clearAnalysisTask: (workspaceId, taskId) =>
-                          textApi.clearTask(taskId, headers),
-                        warnContext: 'topic-modeling',
-                      });
-                    } finally {
-                      setIsClearing(false);
-                      setResultSafely(null);
-                      unlockSelection();
-                      setIsLocked(false);
-                      setIsRunning(false);
-                      runningRef.current = false;
-                      setLocalTopicModelingTaskId(null);
-                      lastFetchedRef.current = { taskId: null, state: null };
-                      setNodeColumnSelections([], { replace: true, persist: false });
-                      recomputeAutoColumns();
-                      setTasks((prev: any[]) =>
-                        Array.isArray(prev)
-                          ? pruneTasksById(
-                              prev,
-                              collectTaskIds([
-                                (result as any)?.metadata?.task_id,
-                                localTopicModelingTaskId,
-                                topicTaskStatus.activeTaskId,
-                                topicRunningTask?.task_id,
-                                topicSuccessfulTask?.task_id,
-                                topicFailedTask?.task_id,
-                              ])
-                            )
-                          : prev
-                      );
-                    }
-                  }}
-                  disabled={actionState.clearDisabled || isClearing}
-                >
-                  {isClearing ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Clearing…
-                    </>
-                  ) : (
-                    <>
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Clear Results
-                    </>
-                  )}
-                </Button>
-                <HelpIcon targetKey="analysis.topic-modeling.clear-results" label="Clear results" />
-              </div>
-            </div>
-
-            {error && result?.state !== 'failed' && (
-              <p className="text-sm font-medium text-destructive">{error}</p>
-            )}
-            {result && result.state === 'failed' && (
-              <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
-                <AlertTriangle className="mt-0.5 h-4 w-4" />
-                <p>{result.message || 'Topic modeling failed'}</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-          {topicWaitingBanner && (
-            <AnalysisTaskBanner
-              analysisName="Topic Modeling"
-              status={topicWaitingBanner.status}
-              taskId={topicWaitingBanner.taskId}
-              message={topicWaitingBanner.message}
-              className="mt-4"
-            />
-          )}
-
-        {result && result.state === 'successful' && (
-          <Card ref={containerRef}>
-            <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  Topics ({topics.length})
-                  <HelpIcon
-                    targetKey="analysis.topic-modeling.results"
-                    label="Topic modeling results"
-                    tooltip="Explore topics, bubble sizes, and labels; colors blend by the first vs second dataset share."
-                  />
-                </CardTitle>
-              </div>
-              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full sm:w-auto"
-                  onClick={() => void openDetachDialog()}
-                  disabled={isDetachLoading || isDetaching}
-                >
-                  {isDetachLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Loading Detach…
-                    </>
-                  ) : (
-                    'Detach'
-                  )}
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="relative w-full overflow-hidden rounded-lg border border-muted-foreground/30 bg-background" ref={chartRef}>
-                <button
-                  type="button"
-                  className="react-flow__controls-button absolute top-2 right-2 z-20 border border-border bg-white/90"
-                  onClick={handleResetZoom}
-                  disabled={isAtGlobalZoom}
-                  title="Reset zoom to global view"
-                  aria-label="Reset zoom to global view"
-                  style={{ opacity: isAtGlobalZoom ? 0.5 : 1 }}
-                >
-                  <Scan className="h-4 w-4" />
-                </button>
-                {bubbleElements}
-                {tooltip.topic && (
-                  <div
-                    className="pointer-events-none absolute z-10 max-w-xs rounded-md border border-border bg-card p-3 text-xs shadow-lg"
-                    style={{ left: tooltip.x, top: tooltip.y }}
-                  >
-                    <div className="text-sm font-semibold">Topic {tooltip.topic.id}</div>
-                    <div className="mt-1 wrap-break-word text-[10px] leading-snug text-muted-foreground">{tooltip.topic.label}</div>
-                    <div className="mt-2">{renderSizeComposition(tooltip.topic.size, tooltip.topic.total_size)}</div>
-                  </div>
-                )}
-              </div>
-              <div className="grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
-                {topics.slice(0,10).map(t=> {
-                  const isHovered = hoveredTopicId === t.id;
-                  return (
-                    <div
-                      key={t.id}
-                      className={`rounded-lg border border-border bg-muted/50 p-3 transition-shadow ${isHovered ? 'ring-2 ring-primary shadow-md' : ''}`}
-                      onMouseEnter={()=>setHoveredTopicId(t.id)}
-                      onMouseLeave={()=>setHoveredTopicId(null)}
-                    >
-                      <div className="font-medium text-foreground">Topic {t.id}</div>
-                      <div className="truncate text-xs text-muted-foreground" title={t.label}>{t.label}</div>
-                      <div className="mt-2">{renderSizeComposition(t.size, t.total_size)}</div>
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-      <AlertDialog open={detachDialogOpen} onOpenChange={setDetachDialogOpen}>
-        <AlertDialogContent className="max-w-3xl">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Detach Topic Results</AlertDialogTitle>
-            <AlertDialogDescription>
-              Select metadata columns to include with the detached topic column. Existing source <code>topic</code> columns are shown but cannot be selected.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-
-          <div className="max-h-[60vh] space-y-4 overflow-y-auto pr-1">
-            {detachNodeOptions.map((node) => (
-              <div key={node.node_id} className="rounded-md border p-3">
-                <div className="mb-2 text-sm font-semibold text-foreground">{node.node_name}</div>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  {node.available_columns.map((column) => {
-                    const disabled = (node.disabled_columns || []).includes(column);
-                    const checked = (selectedDetachColumns[node.node_id] || []).includes(column);
-                    return (
-                      <label key={`${node.node_id}-${column}`} className={`flex items-center gap-2 text-sm ${disabled ? 'opacity-60' : ''}`}>
-                        <Checkbox
-                          checked={checked}
-                          onCheckedChange={(value) => toggleDetachColumn(node.node_id, column, value === true)}
-                          disabled={disabled || isDetaching}
-                        />
-                        <span>{column}{disabled ? ' (disabled)' : ''}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDetaching}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(e) => {
-                e.preventDefault();
-                void handleDetachConfirm();
-              }}
-              disabled={isDetaching}
-            >
-              {isDetaching ? (
-                <span className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" />Detaching…</span>
-              ) : (
-                'Detach'
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <TopicModelingResultsPanel
+        topicWaitingBanner={topicWaitingBanner}
+        result={result}
+        topics={topics}
+        containerRef={containerRef}
+        isDetachLoading={isDetachLoading}
+        isDetaching={isDetaching}
+        openDetachDialog={openDetachDialog}
+        chartRef={chartRef}
+        handleResetZoom={handleResetZoom}
+        isAtGlobalZoom={isAtGlobalZoom}
+        bubbleElements={bubbleElements}
+        tooltip={tooltip}
+        renderSizeComposition={renderSizeComposition}
+        hoveredTopicId={hoveredTopicId}
+        setHoveredTopicId={setHoveredTopicId}
+        detachDialogOpen={detachDialogOpen}
+        setDetachDialogOpen={setDetachDialogOpen}
+        detachNodeOptions={detachNodeOptions}
+        selectedDetachColumns={selectedDetachColumns}
+        toggleDetachColumn={toggleDetachColumn}
+        handleDetachConfirm={handleDetachConfirm}
+      />
       </div>
   );
 };
