@@ -16,8 +16,18 @@ const normalizeTimestamp = (value: unknown): number => {
   return 0;
 };
 
-const getTaskTimestamp = (task?: TaskItem | null) =>
-  normalizeTimestamp(task?.updated_at ?? task?.finished_at ?? task?.started_at ?? task?.created_at ?? 0);
+const getTaskTimestamp = (task?: TaskItem | null) => {
+  const anyTask = task as (TaskItem & { __event_timestamp?: unknown }) | undefined | null;
+  return normalizeTimestamp(anyTask?.__event_timestamp) ||
+    normalizeTimestamp(task?.updated_at ?? task?.finished_at ?? task?.started_at ?? task?.created_at ?? 0);
+};
+
+const getTaskEventSequence = (task?: TaskItem | null) => {
+  const anyTask = task as (TaskItem & { __event_sequence?: unknown }) | undefined | null;
+  return typeof anyTask?.__event_sequence === 'number' && Number.isFinite(anyTask.__event_sequence)
+    ? anyTask.__event_sequence
+    : 0;
+};
 
 export interface AnalysisTaskStatus {
   tasks: TaskItem[];
@@ -40,7 +50,13 @@ export const useAnalysisTaskStatus = (taskType: string): AnalysisTaskStatus => {
     ? tasks.filter((task) => task?.task_type === taskType)
     : ([] as TaskItem[]);
 
-  const sortedTasks = filteredTasks.slice().sort((a, b) => getTaskTimestamp(b) - getTaskTimestamp(a));
+  const sortedTasks = filteredTasks.slice().sort((a, b) => {
+    const tsDelta = getTaskTimestamp(b) - getTaskTimestamp(a);
+    if (tsDelta !== 0) {
+      return tsDelta;
+    }
+    return getTaskEventSequence(b) - getTaskEventSequence(a);
+  });
 
   const runningTask = sortedTasks.find((task) => task?.state === 'running') ?? null;
   const queuedTask =
@@ -59,7 +75,13 @@ export const useAnalysisTaskStatus = (taskType: string): AnalysisTaskStatus => {
         task?.state === 'cancelled'
     ) ?? null;
 
-  const activeCandidate = runningTask ?? queuedTask;
+  const latestTask = sortedTasks[0] ?? null;
+  const latestState = (latestTask?.state ?? '').toLowerCase();
+  const activeCandidate = latestTask
+    ? latestState === 'running' || PENDING_STATES.has(latestState)
+      ? latestTask
+      : null
+    : null;
   const activeTaskId = activeCandidate?.task_id ?? null;
   const bannerStatus: 'running' | 'queued' | null = activeCandidate
     ? activeCandidate.state === 'running'

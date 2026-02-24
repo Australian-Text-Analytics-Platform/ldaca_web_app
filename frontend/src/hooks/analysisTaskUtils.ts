@@ -123,7 +123,9 @@ export const clearAnalysisTaskArtifacts = async ({
     ids.map(async (taskId) => {
       await runTaskOperation(cancelTask, workspaceId, taskId, 'cancel', warnContext);
       await runTaskOperation(clearManagerTask, workspaceId, taskId, 'clear manager', warnContext);
-      await runTaskOperation(clearAnalysisTask, workspaceId, taskId, 'clear analysis', warnContext);
+      if (!clearManagerTask) {
+        await runTaskOperation(clearAnalysisTask, workspaceId, taskId, 'clear analysis', warnContext);
+      }
     })
   );
 };

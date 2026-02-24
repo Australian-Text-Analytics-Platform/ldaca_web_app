@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { workspacesApi } from '@/api/workspaces';
 import { useAuth } from '@/hooks/useAuth';
 import { useAnalysisStore } from '@/stores/analysisStore';
 import { queryKeys } from '@/lib/queryKeys';
@@ -13,7 +12,14 @@ import {
 
 interface TaskMergeUpdate {
   task: Partial<TaskItem> & { task_id?: string };
+  eventTimestamp?: number;
+  eventSequence?: number;
 }
+
+type InternalTask = TaskItem & {
+  __event_timestamp?: number;
+  __event_sequence?: number;
+};
 
 const normalizeTimestamp = (value: unknown): number => {
   if (typeof value === 'number' && Number.isFinite(value)) {
@@ -30,8 +36,12 @@ const normalizeTimestamp = (value: unknown): number => {
 
 const sortTasksByTime = (tasks: TaskItem[] = []) =>
   [...tasks].sort((a, b) => {
-    const tb = normalizeTimestamp(b?.finished_at ?? b?.started_at ?? b?.created_at ?? 0);
-    const ta = normalizeTimestamp(a?.finished_at ?? a?.started_at ?? a?.created_at ?? 0);
+    const tb = normalizeTimestamp(
+      (b as InternalTask)?.__event_timestamp ?? b?.finished_at ?? b?.started_at ?? b?.created_at ?? 0
+    );
+    const ta = normalizeTimestamp(
+      (a as InternalTask)?.__event_timestamp ?? a?.finished_at ?? a?.started_at ?? a?.created_at ?? 0
+    );
     return tb - ta;
   });
 
@@ -53,12 +63,19 @@ const TAB_ASSOCIATED_TASK_TYPES = new Set([
   'quotation',
 ]);
 
-const NON_TERMINAL_STATES = new Set(['pending', 'queued', 'submitted', 'running']);
 const TERMINAL_STATES = new Set(['successful', 'failed', 'cancelled']);
 
 const normalizeState = (value: unknown): string => String(value ?? '').toLowerCase();
 
-const mergeTaskMonotonic = (existing: TaskItem | undefined, incoming: TaskItem): TaskItem => {
+const getEventTimestamp = (task: TaskItem | undefined): number =>
+  normalizeTimestamp((task as InternalTask | undefined)?.__event_timestamp ?? 0);
+
+const getEventSequence = (task: TaskItem | undefined): number => {
+  const value = (task as InternalTask | undefined)?.__event_sequence;
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+};
+
+const chooseByEventOrder = (existing: TaskItem | undefined, incoming: TaskItem): TaskItem => {
   if (!existing) {
     return incoming;
   }
@@ -68,30 +85,33 @@ const mergeTaskMonotonic = (existing: TaskItem | undefined, incoming: TaskItem):
   const existingIsTerminal = TERMINAL_STATES.has(existingState);
   const incomingIsTerminal = TERMINAL_STATES.has(incomingState);
 
-  // Never regress the same task_id from terminal back to a non-terminal state.
-  if (existingIsTerminal && NON_TERMINAL_STATES.has(incomingState)) {
-    return {
-      ...incoming,
-      state: existing.state,
-      finished_at: existing.finished_at ?? incoming.finished_at,
-      progress:
-        typeof existing.progress === 'number' && existing.progress > (incoming.progress ?? 0)
-          ? existing.progress
-          : incoming.progress,
-      progress_message:
-        String(incoming.progress_message ?? '').trim().length > 0
-          ? incoming.progress_message
-          : existing.progress_message,
-      message:
-        String(incoming.message ?? '').trim().length > 0
-          ? incoming.message
-          : existing.message,
-    };
+  // State machine guard: never regress a task_id from terminal back to non-terminal,
+  // even if events are delivered out of order.
+  if (existingIsTerminal && !incomingIsTerminal) {
+    return existing;
+  }
+  if (incomingIsTerminal && !existingIsTerminal) {
+    return incoming;
   }
 
-  // If incoming is terminal and existing is not, prefer terminal fields immediately.
-  if (!existingIsTerminal && incomingIsTerminal) {
+  const existingTs = getEventTimestamp(existing);
+  const incomingTs = getEventTimestamp(incoming);
+
+  if (incomingTs > existingTs) {
     return incoming;
+  }
+
+  if (incomingTs < existingTs) {
+    return existing;
+  }
+
+  const existingSeq = getEventSequence(existing);
+  const incomingSeq = getEventSequence(incoming);
+  if (incomingSeq > existingSeq) {
+    return incoming;
+  }
+  if (incomingSeq < existingSeq) {
+    return existing;
   }
 
   return incoming;
@@ -109,29 +129,30 @@ const mergeTaskUpdates = (
   const previousMap = buildTaskMap(previousTasks);
   const nextMap = options.replaceAll ? new Map<string, TaskItem>() : new Map(previousMap);
 
-  updates.forEach(({ task }) => {
+  updates.forEach(({ task, eventTimestamp, eventSequence }) => {
     if (!task || !task.task_id) return;
 
     const existing = nextMap.get(task.task_id) ?? previousMap.get(task.task_id);
-    const merged: TaskItem = {
+    const merged: InternalTask = {
       ...existing,
       ...task,
-    } as TaskItem;
+      __event_timestamp:
+        typeof eventTimestamp === 'number' && Number.isFinite(eventTimestamp)
+          ? eventTimestamp
+          : getEventTimestamp(existing),
+      __event_sequence:
+        typeof eventSequence === 'number' && Number.isFinite(eventSequence)
+          ? eventSequence
+          : getEventSequence(existing),
+    } as InternalTask;
 
-    nextMap.set(task.task_id, mergeTaskMonotonic(existing, merged));
+    nextMap.set(task.task_id, chooseByEventOrder(existing, merged));
   });
 
   return sortTasksByTime(Array.from(nextMap.values()));
 };
 
 const TERMINAL_TASK_STATES = new Set(['successful', 'failed', 'cancelled']);
-const NON_TERMINAL_TASK_STATES = new Set(['pending', 'queued', 'submitted', 'running']);
-
-const isSafariBrowser = () => {
-  if (typeof navigator === 'undefined') return false;
-  const ua = navigator.userAgent.toLowerCase();
-  return ua.includes('safari') && !ua.includes('chrome') && !ua.includes('chromium') && !ua.includes('android');
-};
 
 const shouldRefreshGraphFallback = (task?: TaskItem | null) => {
   if (!task?.task_type || !task?.state) {
@@ -149,8 +170,13 @@ export const useWorkspaceTaskInbox = (
   const queryClient = useQueryClient();
   const { getAuthHeaders } = useAuth();
   const setTasks = useAnalysisStore((state) => state.setTasks);
-  const tasks = useAnalysisStore((state) => state.tasks);
   const [transientError, setTransientError] = useState<string | null>(null);
+  const eventSequenceRef = useRef(0);
+
+  const nextEventSequence = () => {
+    eventSequenceRef.current += 1;
+    return eventSequenceRef.current;
+  };
 
   const handlePayload = useCallback(
     (payload: TaskEventPayload) => {
@@ -181,10 +207,17 @@ export const useWorkspaceTaskInbox = (
         }
         case 'tasks_snapshot': {
           if (Array.isArray(payload.tasks)) {
+            const seq = nextEventSequence();
+            const eventTimestamp = normalizeTimestamp((payload as any)?.timestamp);
             setTasks((prevTasks: TaskItem[]) =>
               mergeTaskUpdates(
                 prevTasks,
-                payload.tasks.map((task: any) => ({ task }))
+                payload.tasks.map((task: any) => ({
+                  task,
+                  eventTimestamp,
+                  eventSequence: seq,
+                })),
+                { replaceAll: true }
               )
             );
           }
@@ -192,10 +225,14 @@ export const useWorkspaceTaskInbox = (
         }
         case 'task_changed': {
           if (payload.task) {
+            const seq = nextEventSequence();
+            const eventTimestamp = normalizeTimestamp((payload as any)?.timestamp);
             setTasks((prevTasks: TaskItem[]) =>
               mergeTaskUpdates(prevTasks, [
                 {
                   task: payload.task as TaskItem,
+                  eventTimestamp,
+                  eventSequence: seq,
                 },
               ])
             );
@@ -223,10 +260,16 @@ export const useWorkspaceTaskInbox = (
         }
         case 'task_update': {
           if (Array.isArray(payload.tasks)) {
+            const seq = nextEventSequence();
+            const eventTimestamp = normalizeTimestamp((payload as any)?.timestamp);
             setTasks((prevTasks: TaskItem[]) =>
               mergeTaskUpdates(
                 prevTasks,
-                payload.tasks.map((task: any) => ({ task }))
+                payload.tasks.map((task: any) => ({
+                  task,
+                  eventTimestamp,
+                  eventSequence: seq,
+                }))
               )
             );
           }
@@ -250,82 +293,6 @@ export const useWorkspaceTaskInbox = (
     getAuthHeaders,
     onEvent: handlePayload,
   });
-
-  const hasNonTerminalWorkspaceTasks = useMemo(() => {
-    if (!workspaceId || !Array.isArray(tasks)) return false;
-    return tasks.some((task) => {
-      const state = String(task?.state ?? '').toLowerCase();
-      if (!NON_TERMINAL_TASK_STATES.has(state)) return false;
-
-      const metadata = (task as any)?.metadata as Record<string, unknown> | undefined;
-      const taskWorkspaceId =
-        typeof (task as any)?.workspace_id === 'string'
-          ? (task as any).workspace_id
-          : typeof metadata?.workspace_id === 'string'
-            ? metadata.workspace_id
-            : null;
-
-      return taskWorkspaceId === workspaceId;
-    });
-  }, [tasks, workspaceId]);
-
-  useEffect(() => {
-    if (!workspaceId || !hasNonTerminalWorkspaceTasks) {
-      return;
-    }
-
-    const safari = isSafariBrowser();
-    const lastEvent = clientState.lastEventTimestamp ?? 0;
-    const eventStale = lastEvent > 0 && Date.now() - lastEvent > 10_000;
-    const shouldReconcile = safari || clientState.status !== 'open' || eventStale;
-
-    if (!shouldReconcile) {
-      return;
-    }
-
-    let cancelled = false;
-
-    const reconcile = async () => {
-      try {
-        const response: any = await workspacesApi.listTasks(getAuthHeaders());
-        const incomingTasks = Array.isArray(response)
-          ? response
-          : Array.isArray(response?.data)
-            ? response.data
-          : Array.isArray(response?.tasks)
-            ? response.tasks
-            : [];
-
-        if (!cancelled && incomingTasks.length > 0) {
-          setTasks((prevTasks: TaskItem[]) =>
-            mergeTaskUpdates(
-              prevTasks,
-              incomingTasks.map((task: any) => ({ task }))
-            )
-          );
-        }
-      } catch {
-        // best-effort reconciliation; stream remains primary
-      }
-    };
-
-    void reconcile();
-    const intervalId = window.setInterval(() => {
-      void reconcile();
-    }, 2000);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(intervalId);
-    };
-  }, [
-    clientState.lastEventTimestamp,
-    clientState.status,
-    getAuthHeaders,
-    hasNonTerminalWorkspaceTasks,
-    setTasks,
-    workspaceId,
-  ]);
 
   return transientError
     ? {

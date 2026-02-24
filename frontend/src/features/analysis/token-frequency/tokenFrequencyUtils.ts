@@ -42,40 +42,20 @@ export const buildSelectionNameKey = (
 
 export const deriveBackendTokenLimit = (results?: TokenFrequencyResponse | null): number | null => {
   if (!results) return null;
-  const params = results.analysis_params ?? {};
-  const metadata = results.metadata ?? {};
-  const candidates = [
-    results.token_limit,
-    (params as any).token_limit,
-    (metadata as any).token_limit,
-    (results as any).limit,
-    (params as any).limit,
-    (metadata as any).limit,
-  ];
-
-  for (const candidate of candidates) {
-    if (typeof candidate === 'number' && Number.isFinite(candidate)) {
-      return candidate;
-    }
-  }
-  return null;
+  const candidate =
+    results.token_limit ??
+    (results.analysis_params as any)?.token_limit ??
+    (results.metadata as any)?.token_limit;
+  return typeof candidate === 'number' && Number.isFinite(candidate) ? candidate : null;
 };
 
 export const deriveBackendStopWords = (results?: TokenFrequencyResponse | null): string[] | null => {
   if (!results) return null;
-  const candidates = [
-    Array.isArray(results.stop_words) ? results.stop_words : null,
-    Array.isArray(results.metadata?.stop_words) ? results.metadata.stop_words : null,
-    Array.isArray(results.analysis_params?.stop_words) ? results.analysis_params.stop_words : null,
-  ];
-
-  for (const candidate of candidates) {
-    if (Array.isArray(candidate)) {
-      return candidate.map((item) => String(item));
-    }
-  }
-
-  return null;
+  const candidate =
+    (Array.isArray(results.stop_words) ? results.stop_words : null) ??
+    (Array.isArray(results.analysis_params?.stop_words) ? results.analysis_params.stop_words : null) ??
+    (Array.isArray(results.metadata?.stop_words) ? results.metadata.stop_words : null);
+  return Array.isArray(candidate) ? candidate.map((item) => String(item)) : null;
 };
 
 export const deriveBackendStopWordsKey = (results?: TokenFrequencyResponse | null): string => {

@@ -8,6 +8,7 @@ Artifact-first implementation:
 
 from __future__ import annotations
 
+import asyncio
 import math
 from pathlib import Path
 from uuid import uuid4
@@ -15,8 +16,9 @@ from uuid import uuid4
 import polars as pl
 from fastapi import APIRouter, Depends, HTTPException
 
-from ....analysis.implementations.token_frequency import \
-    TokenFrequencyRequest as AnalysisTokenFrequencyRequest
+from ....analysis.implementations.token_frequency import (
+    TokenFrequencyRequest as AnalysisTokenFrequencyRequest,
+)
 from ....analysis.manager import get_task_manager
 from ....analysis.models import AnalysisStatus, AnalysisTask
 from ....core.analysis_helpers import sanitize_stop_words
@@ -28,9 +30,50 @@ from .text_column_prefs import resolve_text_columns_for_nodes
 
 router = APIRouter(prefix="/workspaces")
 
+_TOKEN_FREQ_SUBMISSION_LOCKS: dict[tuple[str, str], asyncio.Lock] = {}
+
+
+def _token_freq_submission_lock(user_id: str, workspace_id: str) -> asyncio.Lock:
+    key = (user_id, workspace_id)
+    lock = _TOKEN_FREQ_SUBMISSION_LOCKS.get(key)
+    if lock is None:
+        lock = asyncio.Lock()
+        _TOKEN_FREQ_SUBMISSION_LOCKS[key] = lock
+    return lock
+
+
 DEFAULT_TOKEN_LIMIT = 10
 SERVER_LIMIT_MULTIPLIER = 5
 MAX_SERVER_TOKEN_LIMIT = 5000
+
+
+@router.delete("/token-frequencies")
+async def clear_token_frequencies(
+    current_user=Depends(get_current_user),
+):
+    """Clear Token Frequency analysis state for a workspace.
+
+    Mirrors topic-modeling clear behavior by removing the currently tracked
+    analysis task link for the token frequency tab.
+    """
+    user_id = current_user["id"]
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    if not workspace_id:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+
+    task_manager = get_task_manager(user_id, workspace_id)
+    current_ids = task_manager.get_current_task_ids("token_frequencies")
+    if current_ids:
+        task_manager.clear_task(current_ids[0])
+
+    worker_tm = workspace_manager.get_task_manager(user_id, workspace_id)
+    if current_ids:
+        await worker_tm.clear_task(current_ids[0])
+
+    return {
+        "state": "successful",
+        "message": "Token frequencies cleared successfully.",
+    }
 
 
 def _unwrap_task_manager_result(raw_result):
@@ -343,22 +386,6 @@ async def calculate_token_frequencies(
         raise HTTPException(status_code=404, detail="No active workspace selected")
     tm = workspace_manager.get_task_manager(user_id, workspace_id)
 
-    try:
-        if await tm.any_running(
-            task_type="token_frequencies", user_id=user_id, workspace_id=workspace_id
-        ):
-            latest = await tm.latest_by_type(
-                "token_frequencies", user_id=user_id, workspace_id=workspace_id
-            )
-            return {
-                "state": "running",
-                "message": "Token frequency analysis already running",
-                "data": None,
-                "metadata": {"task_id": latest.id if latest else None},
-            }
-    except Exception:
-        pass
-
     if not request.node_ids:
         raise HTTPException(
             status_code=400, detail="At least one node ID must be provided"
@@ -420,23 +447,44 @@ async def calculate_token_frequencies(
         node_display_names[node_id] = str(getattr(node, "name", None) or node_id)
 
     requested_stop_words = sanitize_stop_words(request.stop_words)
-    artifact_dir, artifact_prefix = _prepare_token_artifact_target(
-        user_id, workspace_id
-    )
 
-    task_info = await tm.submit_task(
-        user_id=user_id,
-        workspace_id=workspace_id,
-        task_type="token_frequencies",
-        task_args={
-            "node_corpora": node_corpora,
-            "node_display_names": node_display_names,
-            "artifact_dir": str(artifact_dir),
-            "artifact_prefix": artifact_prefix,
-            "token_limit": effective_limit,
-            "stop_words": requested_stop_words,
-        },
-    )
+    submission_lock = _token_freq_submission_lock(user_id, workspace_id)
+    async with submission_lock:
+        # Re-check inside lock to prevent duplicate submissions from
+        # concurrent requests that both passed the earlier unlocked check.
+        try:
+            if await tm.any_running(
+                task_type="token_frequencies", user_id=user_id, workspace_id=workspace_id
+            ):
+                latest = await tm.latest_by_type(
+                    "token_frequencies", user_id=user_id, workspace_id=workspace_id
+                )
+                return {
+                    "state": "running",
+                    "message": "Token frequency analysis already running",
+                    "data": None,
+                    "metadata": {"task_id": latest.id if latest else None},
+                }
+        except Exception:
+            pass
+
+        artifact_dir, artifact_prefix = _prepare_token_artifact_target(
+            user_id, workspace_id
+        )
+
+        task_info = await tm.submit_task(
+            user_id=user_id,
+            workspace_id=workspace_id,
+            task_type="token_frequencies",
+            task_args={
+                "node_corpora": node_corpora,
+                "node_display_names": node_display_names,
+                "artifact_dir": str(artifact_dir),
+                "artifact_prefix": artifact_prefix,
+                "token_limit": effective_limit,
+                "stop_words": requested_stop_words,
+            },
+        )
 
     analysis_request = AnalysisTokenFrequencyRequest(
         node_ids=request.node_ids,

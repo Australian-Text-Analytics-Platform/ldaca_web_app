@@ -148,6 +148,6 @@ export const textApi = {
   getAnalysisCurrent: (analysis: string, headers: Record<string, string> = {}) => httpRequest(`/workspaces/${analysis}/current`, { method: 'GET', headers }),
   getTaskRequest: (taskId: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/tasks/${taskId}/request`, { method: 'GET', headers }),
   getTaskResult: (taskId: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/tasks/${taskId}/result`, { method: 'GET', headers }),
-  clearTask: (taskId: string, headers: Record<string,string> = {}) => post(`/workspaces/tasks/${taskId}/clear`, {}, headers),
+  clearTask: (taskId: string, headers: Record<string,string> = {}) => post(`/workspaces/tasks/clear?task_id=${encodeURIComponent(taskId)}`, {}, headers),
 
 };

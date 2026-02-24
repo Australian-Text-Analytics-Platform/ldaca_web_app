@@ -21,7 +21,7 @@ describe('tokenFrequencyUtils', () => {
     expect(deriveBackendTokenLimit(result)).toBe(42);
   });
 
-  it('deriveBackendStopWords returns stop words from metadata/analysis params when present', () => {
+  it('deriveBackendStopWords prefers analysis params over metadata when top-level is absent', () => {
     const result: TokenFrequencyResponse = {
       state: 'successful',
       data: null,
@@ -29,7 +29,7 @@ describe('tokenFrequencyUtils', () => {
       analysis_params: { stop_words: ['ignored'] },
     };
 
-    expect(deriveBackendStopWords(result)).toEqual(['the', 'and']);
+    expect(deriveBackendStopWords(result)).toEqual(['ignored']);
   });
 
   it('deriveBackendStopWordsKey normalizes and joins stop words deterministically', () => {
