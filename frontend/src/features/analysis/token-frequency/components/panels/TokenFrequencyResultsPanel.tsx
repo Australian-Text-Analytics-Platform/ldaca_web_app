@@ -1,7 +1,6 @@
 import HelpIcon from '@/components/help/HelpIcon';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, RotateCcw, Wand2 } from 'lucide-react';
@@ -9,6 +8,7 @@ import type { TokenFrequencyResponse } from '@/api/text';
 import type { NodeResultView, NormalizedNodeResult } from '../../tokenFrequencyAdapters';
 import { TokenFrequencySingleTokenSection } from '../results/TokenFrequencySingleTokenSection';
 import { TokenFrequencyUnifiedTokenSection } from '../results/TokenFrequencyUnifiedTokenSection';
+import { AnalysisCardLayout } from '../../../common/components/AnalysisCardLayout';
 
 type TokenFrequencyResultsPanelProps = {
   results: TokenFrequencyResponse | null;
@@ -95,14 +95,12 @@ export const TokenFrequencyResultsPanel = ({
 
   if (results.state === 'failed') {
     return (
-      <Card className="border-destructive/50">
-        <CardHeader>
-          <CardTitle className="text-destructive">Token Frequency Analysis Failed</CardTitle>
-        </CardHeader>
-        <CardContent>
+      <AnalysisCardLayout
+        title={<span className="text-destructive">Token Frequency Analysis Failed</span>}
+        tone="error"
+      >
           <p className="text-sm text-muted-foreground">{results.message || 'Analysis failed to complete.'}</p>
-        </CardContent>
-      </Card>
+      </AnalysisCardLayout>
     );
   }
 
@@ -111,15 +109,16 @@ export const TokenFrequencyResultsPanel = ({
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+    <AnalysisCardLayout
+      title={
+        <>
           Results
           <Badge variant="outline">{normalizedNodeResults.length} node{normalizedNodeResults.length === 1 ? '' : 's'}</Badge>
-          <HelpIcon targetKey="analysis.token-frequency.results" label="Token frequency results" />
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6">
+        </>
+      }
+      help={{ targetKey: 'analysis.token-frequency.results', label: 'Token frequency results' }}
+    >
+      <div className="space-y-6">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div className="space-y-2">
             <div className="flex items-center gap-2">
@@ -209,7 +208,7 @@ export const TokenFrequencyResultsPanel = ({
           onStatsRowsPerPageChange={onStatsRowsPerPageChange}
           onDownloadFrequencyCsv={onDownloadFrequencyCsv}
         />
-      </CardContent>
-    </Card>
+      </div>
+    </AnalysisCardLayout>
   );
 };

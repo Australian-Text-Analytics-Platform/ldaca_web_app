@@ -69,7 +69,7 @@ type Params = {
   queryClient: { invalidateQueries: (params: { queryKey: readonly unknown[] }) => Promise<unknown> };
 };
 
-export function useTopicModelingTaskActions({
+export function useTopicModelingTaskFlow({
   currentWorkspaceId,
   panelNodeIds,
   panelSelectedNodes,

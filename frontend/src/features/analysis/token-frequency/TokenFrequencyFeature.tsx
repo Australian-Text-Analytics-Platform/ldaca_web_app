@@ -329,6 +329,7 @@ const TokenFrequencyFeature = () => {
         onClearResults={handleClearResults}
         hasIncompleteSelections={hasIncompleteSelections}
         appliedStopCount={appliedStopSet.size}
+        hasResults={Boolean(results)}
       />
 
       <TokenFrequencyResultsPanel

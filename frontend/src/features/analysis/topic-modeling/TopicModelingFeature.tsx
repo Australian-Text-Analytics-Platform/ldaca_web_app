@@ -21,12 +21,9 @@ import {
 import { resolveAnalysisTaskId } from '../../../hooks/analysisTaskUtils';
 import { TopicModelingParameterPanel } from './components/panels/TopicModelingParameterPanel';
 import { TopicModelingResultsPanel } from './components/panels/TopicModelingResultsPanel';
-import { useTopicModelingTaskActions } from './hooks/useTopicModelingTaskActions';
+import { useTopicModelingTaskFlow } from './hooks/useTopicModelingTaskFlow';
 import { useTopicModelingZoomBrush } from './hooks/useTopicModelingZoomBrush';
-import {
-  getReadableTextColor,
-  interpolateColor,
-} from './topicModelingAdapters';
+import { useTopicModelingBubbleChart } from './hooks/useTopicModelingBubbleChart';
 interface TopicModelingTopic { id: number; label: string; size: number[]; total_size: number; x: number; y: number; }
 interface TopicModelingResponse { state?: 'running' | 'successful' | 'failed' | 'cancelled'; message?: string; data?: { topics: TopicModelingTopic[]; corpus_sizes?: number[] }; metadata?: { task_id?: string; [k: string]: any } }
 
@@ -342,7 +339,7 @@ const TopicModelingFeature: React.FC = () => {
     setDetachDialogOpen,
     detachNodeOptions,
     selectedDetachColumns,
-  } = useTopicModelingTaskActions({
+  } = useTopicModelingTaskFlow({
     currentWorkspaceId,
     panelNodeIds,
     panelSelectedNodes,
@@ -400,141 +397,27 @@ const TopicModelingFeature: React.FC = () => {
     setTooltip,
   });
 
-  const fallbackPrimaryColor = defaultPalette[0] ?? '#2563eb';
-  const fallbackSecondaryColor = defaultPalette[1] ?? '#dc2626';
-
-  const getPanelColor = (index: number, fallback: string) => {
-    const nodeId = panelNodeIds[index];
-    if (nodeId) {
-      return nodeColors[nodeId] || defaultPalette[index] || fallback;
-    }
-    return fallback;
-  };
-
-  const renderSizeComposition = (sizes: number[] | undefined, total?: number | null) => {
-    if (corpusCount === 0 || !sizes) return null;
-    if (sizes.length === 1) {
-      const color = getPanelColor(0, fallbackPrimaryColor);
-      const fg = getReadableTextColor(color);
-      return (
-        <span className="inline-flex items-center gap-1">
-          <span style={{ background: color, color: fg }} className="px-1.5 py-0.5 rounded text-[10px] font-medium">{sizes[0]}</span>
-          <span className="text-[10px] text-gray-500">= {total}</span>
-        </span>
-      );
-    }
-    // Two corpora: show N + M = Z boxes with colors
-    const colorA = getPanelColor(0, fallbackPrimaryColor);
-    const colorB = getPanelColor(1, fallbackSecondaryColor);
-    const fgA = getReadableTextColor(colorA);
-    const fgB = getReadableTextColor(colorB);
-    return (
-      <span className="inline-flex items-center gap-1 flex-wrap">
-        <span style={{ background: colorA, color: fgA }} className="px-1.5 py-0.5 rounded text-[10px] font-medium">{sizes[0]}</span>
-        <span className="text-[10px] text-gray-500">+</span>
-        <span style={{ background: colorB, color: fgB }} className="px-1.5 py-0.5 rounded text-[10px] font-medium">{sizes[1]}</span>
-        <span className="text-[10px] text-gray-500">= {total}</span>
-      </span>
-    );
-  };
-
-  // Layout bubbles simply using returned coordinates scaled
-  const bubbleElements = (() => {
-    if(!topics.length || !activeDomain) return null;
-    const width=chartWidth;
-    const height=chartHeight;
-    const scaleX = (x:number)=> ( (x - activeDomain.xMin)/(activeDomain.xMax-activeDomain.xMin || 1) )*(width-2*chartPadding)+chartPadding;
-    const scaleY = (y:number)=> ( (y - activeDomain.yMin)/(activeDomain.yMax-activeDomain.yMin || 1) )*(height-2*chartPadding)+chartPadding;
-    const maxSize = Math.max(...topics.map(t=>t.total_size));
-    const brushDisplay = brushRect
-      ? {
-          x: Math.min(brushRect.startX, brushRect.currentX),
-          y: Math.min(brushRect.startY, brushRect.currentY),
-          width: Math.abs(brushRect.currentX - brushRect.startX),
-          height: Math.abs(brushRect.currentY - brushRect.startY),
-        }
-      : null;
-    return (
-      <svg
-        ref={chartSvgRef}
-        width={width}
-        height={height}
-        className="border rounded bg-white block w-full"
-        role="img"
-        aria-label="Topic bubble chart"
-        style={{ cursor: isBrushing ? 'grabbing' : 'crosshair' }}
-        onMouseDown={handleBrushStart}
-        onMouseMove={handleBrushMove}
-        onMouseUp={handleBrushEnd}
-        onMouseLeave={()=>{
-          if (isBrushing) {
-            handleBrushEnd();
-            return;
-          }
-          setHoveredTopicId(null);
-          setTooltip(t=>({...t,topic:null}));
-        }}
-      >
-        {topics.map((t)=>{
-          const sizes = t.size || [];
-            const prop = (corpusCount===2 && (t.total_size>0)) ? (sizes[0]/t.total_size) : 0.5;
-            const colorA = getPanelColor(0, fallbackPrimaryColor);
-            const colorB = getPanelColor(1, fallbackSecondaryColor);
-            const fill = interpolateColor(colorA, colorB, prop);
-            const r = 10 + 40 * Math.sqrt(t.total_size / (maxSize || 1));
-            const cx = scaleX(t.x); const cy = scaleY(t.y);
-            const isHovered = hoveredTopicId === t.id;
-            return (
-              <g
-                key={t.id}
-                transform={`translate(${cx},${cy})`}
-                onMouseEnter={(e)=>{
-                  if (isBrushing) return;
-                  setHoveredTopicId(t.id);
-                  const bbox = (chartRef.current?.getBoundingClientRect());
-                  if (bbox) {
-                    setTooltip({
-                      x: e.clientX - bbox.left + 12,
-                      y: e.clientY - bbox.top + 12,
-                      topic: t
-                    });
-                  }
-                }}
-                onMouseMove={(e)=>{
-                  if (isBrushing) return;
-                  if(!chartRef.current) return;
-                  const bbox = chartRef.current.getBoundingClientRect();
-                  setTooltip(tp=> tp.topic && tp.topic.id===t.id ? { x: e.clientX - bbox.left + 12, y: e.clientY - bbox.top + 12, topic: t } : tp);
-                }}
-                onMouseLeave={()=>{
-                  if (isBrushing) return;
-                  setHoveredTopicId(null);
-                  setTooltip(tp=> ({...tp, topic:null}));
-                }}
-              >
-                <circle r={r} fill={fill} fillOpacity={isHovered?0.92:0.7} stroke={isHovered? '#1d4ed8':'#334155'} strokeWidth={isHovered?2:1} />
-                <text textAnchor="middle" dy={4} fontSize={12} className="pointer-events-none select-none" fill="#1e293b">
-                  {`T${t.id}`}
-                </text>
-              </g>
-            );
-        })}
-        {brushDisplay && (
-          <rect
-            x={brushDisplay.x}
-            y={brushDisplay.y}
-            width={brushDisplay.width}
-            height={brushDisplay.height}
-            fill="rgba(37, 99, 235, 0.12)"
-            stroke="rgba(37, 99, 235, 0.8)"
-            strokeWidth={1.5}
-            strokeDasharray="4 3"
-            pointerEvents="none"
-          />
-        )}
-      </svg>
-    );
-  })();
+  const { bubbleElements, renderSizeComposition } = useTopicModelingBubbleChart({
+    topics,
+    activeDomain,
+    chartWidth,
+    chartHeight,
+    chartPadding,
+    brushRect,
+    chartSvgRef,
+    chartRef,
+    isBrushing,
+    handleBrushStart,
+    handleBrushMove,
+    handleBrushEnd,
+    hoveredTopicId,
+    setHoveredTopicId,
+    setTooltip,
+    corpusCount,
+    panelNodeIds,
+    nodeColors,
+    defaultPalette,
+  });
 
   const applyHydratedRequest = async (requestPayload: unknown) => {
     const req = (requestPayload as any)?.data ?? requestPayload;
@@ -666,6 +549,8 @@ const TopicModelingFeature: React.FC = () => {
     }
   }, [result, setIsLocked]);
 
+  const shouldShowResultsPanel = Boolean(topicWaitingBanner || result || error);
+
   return (
     <div className="space-y-6">
       <TopicModelingParameterPanel
@@ -687,34 +572,35 @@ const TopicModelingFeature: React.FC = () => {
         onRun={handleRun}
         onClear={handleClear}
         hasMissingColumns={panelHasMissingColumns}
-        error={error}
         resultState={result?.state}
-        resultMessage={result?.message}
       />
 
-      <TopicModelingResultsPanel
-        topicWaitingBanner={topicWaitingBanner}
-        result={result}
-        topics={topics}
-        containerRef={containerRef}
-        isDetachLoading={isDetachLoading}
-        isDetaching={isDetaching}
-        openDetachDialog={openDetachDialog}
-        chartRef={chartRef}
-        handleResetZoom={handleResetZoom}
-        isAtGlobalZoom={isAtGlobalZoom}
-        bubbleElements={bubbleElements}
-        tooltip={tooltip}
-        renderSizeComposition={renderSizeComposition}
-        hoveredTopicId={hoveredTopicId}
-        setHoveredTopicId={setHoveredTopicId}
-        detachDialogOpen={detachDialogOpen}
-        setDetachDialogOpen={setDetachDialogOpen}
-        detachNodeOptions={detachNodeOptions}
-        selectedDetachColumns={selectedDetachColumns}
-        toggleDetachColumn={toggleDetachColumn}
-        handleDetachConfirm={handleDetachConfirm}
-      />
+      {shouldShowResultsPanel && (
+        <TopicModelingResultsPanel
+          topicWaitingBanner={topicWaitingBanner}
+          error={error}
+          result={result}
+          topics={topics}
+          containerRef={containerRef}
+          isDetachLoading={isDetachLoading}
+          isDetaching={isDetaching}
+          openDetachDialog={openDetachDialog}
+          chartRef={chartRef}
+          handleResetZoom={handleResetZoom}
+          isAtGlobalZoom={isAtGlobalZoom}
+          bubbleElements={bubbleElements}
+          tooltip={tooltip}
+          renderSizeComposition={renderSizeComposition}
+          hoveredTopicId={hoveredTopicId}
+          setHoveredTopicId={setHoveredTopicId}
+          detachDialogOpen={detachDialogOpen}
+          setDetachDialogOpen={setDetachDialogOpen}
+          detachNodeOptions={detachNodeOptions}
+          selectedDetachColumns={selectedDetachColumns}
+          toggleDetachColumn={toggleDetachColumn}
+          handleDetachConfirm={handleDetachConfirm}
+        />
+      )}
       </div>
   );
 };

@@ -1,0 +1,249 @@
+import React from 'react';
+import { getReadableTextColor, interpolateColor, type ZoomDomain } from '../topicModelingAdapters';
+
+type TopicModelingTopic = {
+  id: number;
+  label: string;
+  size: number[];
+  total_size: number;
+  x: number;
+  y: number;
+};
+
+type BrushRect = {
+  startX: number;
+  startY: number;
+  currentX: number;
+  currentY: number;
+};
+
+type TooltipState = {
+  x: number;
+  y: number;
+  topic: TopicModelingTopic | null;
+};
+
+type Params = {
+  topics: TopicModelingTopic[];
+  activeDomain: ZoomDomain | null;
+  chartWidth: number;
+  chartHeight: number;
+  chartPadding: number;
+  brushRect: BrushRect | null;
+  chartSvgRef: React.RefObject<SVGSVGElement | null>;
+  chartRef: React.RefObject<HTMLDivElement | null>;
+  isBrushing: boolean;
+  handleBrushStart: (event: React.MouseEvent<SVGSVGElement>) => void;
+  handleBrushMove: (event: React.MouseEvent<SVGSVGElement>) => void;
+  handleBrushEnd: () => void;
+  hoveredTopicId: number | null;
+  setHoveredTopicId: React.Dispatch<React.SetStateAction<number | null>>;
+  setTooltip: React.Dispatch<React.SetStateAction<TooltipState>>;
+  corpusCount: number;
+  panelNodeIds: string[];
+  nodeColors: Record<string, string>;
+  defaultPalette: string[];
+};
+
+export function useTopicModelingBubbleChart({
+  topics,
+  activeDomain,
+  chartWidth,
+  chartHeight,
+  chartPadding,
+  brushRect,
+  chartSvgRef,
+  chartRef,
+  isBrushing,
+  handleBrushStart,
+  handleBrushMove,
+  handleBrushEnd,
+  hoveredTopicId,
+  setHoveredTopicId,
+  setTooltip,
+  corpusCount,
+  panelNodeIds,
+  nodeColors,
+  defaultPalette,
+}: Params) {
+  const fallbackPrimaryColor = defaultPalette[0] ?? '#2563eb';
+  const fallbackSecondaryColor = defaultPalette[1] ?? '#dc2626';
+
+  const getPanelColor = React.useCallback(
+    (index: number, fallback: string) => {
+      const nodeId = panelNodeIds[index];
+      if (nodeId) {
+        return nodeColors[nodeId] || defaultPalette[index] || fallback;
+      }
+      return fallback;
+    },
+    [panelNodeIds, nodeColors, defaultPalette]
+  );
+
+  const renderSizeComposition = React.useCallback(
+    (sizes: number[] | undefined, total?: number | null) => {
+      if (corpusCount === 0 || !sizes) return null;
+      if (sizes.length === 1) {
+        const color = getPanelColor(0, fallbackPrimaryColor);
+        const fg = getReadableTextColor(color);
+        return (
+          <span className="inline-flex items-center gap-1">
+            <span style={{ background: color, color: fg }} className="px-1.5 py-0.5 rounded text-[10px] font-medium">{sizes[0]}</span>
+            <span className="text-[10px] text-gray-500">= {total}</span>
+          </span>
+        );
+      }
+
+      const colorA = getPanelColor(0, fallbackPrimaryColor);
+      const colorB = getPanelColor(1, fallbackSecondaryColor);
+      const fgA = getReadableTextColor(colorA);
+      const fgB = getReadableTextColor(colorB);
+      return (
+        <span className="inline-flex items-center gap-1 flex-wrap">
+          <span style={{ background: colorA, color: fgA }} className="px-1.5 py-0.5 rounded text-[10px] font-medium">{sizes[0]}</span>
+          <span className="text-[10px] text-gray-500">+</span>
+          <span style={{ background: colorB, color: fgB }} className="px-1.5 py-0.5 rounded text-[10px] font-medium">{sizes[1]}</span>
+          <span className="text-[10px] text-gray-500">= {total}</span>
+        </span>
+      );
+    },
+    [corpusCount, getPanelColor, fallbackPrimaryColor, fallbackSecondaryColor]
+  );
+
+  const bubbleElements = React.useMemo(() => {
+    if (!topics.length || !activeDomain) return null;
+
+    const width = chartWidth;
+    const height = chartHeight;
+    const scaleX = (x: number) => ((x - activeDomain.xMin) / (activeDomain.xMax - activeDomain.xMin || 1)) * (width - 2 * chartPadding) + chartPadding;
+    const scaleY = (y: number) => ((y - activeDomain.yMin) / (activeDomain.yMax - activeDomain.yMin || 1)) * (height - 2 * chartPadding) + chartPadding;
+    const maxSize = Math.max(...topics.map((topic) => topic.total_size));
+
+    const brushDisplay = brushRect
+      ? {
+          x: Math.min(brushRect.startX, brushRect.currentX),
+          y: Math.min(brushRect.startY, brushRect.currentY),
+          width: Math.abs(brushRect.currentX - brushRect.startX),
+          height: Math.abs(brushRect.currentY - brushRect.startY),
+        }
+      : null;
+
+    return (
+      <svg
+        ref={chartSvgRef}
+        width={width}
+        height={height}
+        className="border rounded bg-white block w-full"
+        role="img"
+        aria-label="Topic bubble chart"
+        style={{ cursor: isBrushing ? 'grabbing' : 'crosshair' }}
+        onMouseDown={handleBrushStart}
+        onMouseMove={handleBrushMove}
+        onMouseUp={handleBrushEnd}
+        onMouseLeave={() => {
+          if (isBrushing) {
+            handleBrushEnd();
+            return;
+          }
+          setHoveredTopicId(null);
+          setTooltip((previous) => ({ ...previous, topic: null }));
+        }}
+      >
+        {topics.map((topic) => {
+          const sizes = topic.size || [];
+          const proportion = corpusCount === 2 && topic.total_size > 0 ? sizes[0] / topic.total_size : 0.5;
+          const colorA = getPanelColor(0, fallbackPrimaryColor);
+          const colorB = getPanelColor(1, fallbackSecondaryColor);
+          const fill = interpolateColor(colorA, colorB, proportion);
+          const radius = 10 + 40 * Math.sqrt(topic.total_size / (maxSize || 1));
+          const cx = scaleX(topic.x);
+          const cy = scaleY(topic.y);
+          const isHovered = hoveredTopicId === topic.id;
+
+          return (
+            <g
+              key={topic.id}
+              transform={`translate(${cx},${cy})`}
+              onMouseEnter={(event) => {
+                if (isBrushing) return;
+                setHoveredTopicId(topic.id);
+                const bounds = chartRef.current?.getBoundingClientRect();
+                if (bounds) {
+                  setTooltip({
+                    x: event.clientX - bounds.left + 12,
+                    y: event.clientY - bounds.top + 12,
+                    topic,
+                  });
+                }
+              }}
+              onMouseMove={(event) => {
+                if (isBrushing || !chartRef.current) return;
+                const bounds = chartRef.current.getBoundingClientRect();
+                setTooltip((previous) =>
+                  previous.topic && previous.topic.id === topic.id
+                    ? { x: event.clientX - bounds.left + 12, y: event.clientY - bounds.top + 12, topic }
+                    : previous
+                );
+              }}
+              onMouseLeave={() => {
+                if (isBrushing) return;
+                setHoveredTopicId(null);
+                setTooltip((previous) => ({ ...previous, topic: null }));
+              }}
+            >
+              <circle
+                r={radius}
+                fill={fill}
+                fillOpacity={isHovered ? 0.92 : 0.7}
+                stroke={isHovered ? '#1d4ed8' : '#334155'}
+                strokeWidth={isHovered ? 2 : 1}
+              />
+              <text textAnchor="middle" dy={4} fontSize={12} className="pointer-events-none select-none" fill="#1e293b">
+                {`T${topic.id}`}
+              </text>
+            </g>
+          );
+        })}
+
+        {brushDisplay && (
+          <rect
+            x={brushDisplay.x}
+            y={brushDisplay.y}
+            width={brushDisplay.width}
+            height={brushDisplay.height}
+            fill="rgba(37, 99, 235, 0.12)"
+            stroke="rgba(37, 99, 235, 0.8)"
+            strokeWidth={1.5}
+            strokeDasharray="4 3"
+            pointerEvents="none"
+          />
+        )}
+      </svg>
+    );
+  }, [
+    topics,
+    activeDomain,
+    chartWidth,
+    chartHeight,
+    chartPadding,
+    brushRect,
+    chartSvgRef,
+    isBrushing,
+    handleBrushStart,
+    handleBrushMove,
+    handleBrushEnd,
+    setHoveredTopicId,
+    setTooltip,
+    corpusCount,
+    getPanelColor,
+    fallbackPrimaryColor,
+    fallbackSecondaryColor,
+    hoveredTopicId,
+    chartRef,
+  ]);
+
+  return {
+    bubbleElements,
+    renderSizeComposition,
+  };
+}
