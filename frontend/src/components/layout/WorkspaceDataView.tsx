@@ -1,9 +1,7 @@
-import { memo } from 'react';
-
 import { WorkspaceDataTableFeature } from '@/features/workspace/data-view';
 
-export const WorkspaceDataView = memo(() => {
+export const WorkspaceDataView = () => {
   return <WorkspaceDataTableFeature />;
-});
+};
 
 WorkspaceDataView.displayName = 'WorkspaceDataView';

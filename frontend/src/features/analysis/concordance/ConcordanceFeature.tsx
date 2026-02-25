@@ -33,7 +33,13 @@ import AnalysisTaskBanner from '../../../components/tabs/AnalysisTaskBanner';
 import type { AnalysisTaskStatus } from '../../../hooks/useAnalysisTaskStatus';
 import useAnalysisTaskLifecycle, { type AnalysisTaskRefreshContext } from '../../../hooks/useAnalysisTaskLifecycle';
 import { getAnalysisActionState } from '../common/analysisActionState';
-import { restoreAnalysisLockFromRequest, useAnalysisHydration, useColorStackAllocator } from '../common';
+import {
+  hasLockedParameterDiff,
+  restoreAnalysisLockFromRequest,
+  useAnalysisHydration,
+  useColorStackAllocator,
+} from '../common';
+import { useAnalysisServerRequestLock } from '../common';
 import {
   clearAnalysisTaskArtifacts,
   collectTaskIds,
@@ -154,12 +160,18 @@ const ConcordanceFeature: React.FC = () => {
   });
 
   const { getAuthHeaders } = useAuth();
+  const { hasServerRequest, serverRequest } = useAnalysisServerRequestLock({
+    analysisType: 'concordance_analysis',
+    workspaceId: currentWorkspaceId,
+    getAuthHeaders,
+  });
   const pendingConcordance = useAnalysisStore((state) => state.pendingConcordance);
   const clearPendingConcordance = useAnalysisStore((state) => state.clearPendingConcordance);
   const setTasks = useAnalysisStore((state) => state.setTasks);
 
   const {
     isLocked,
+    setIsLocked,
     lockWithSnapshots,
     unlockSelection,
     nodeColumnSelections,
@@ -177,6 +189,10 @@ const ConcordanceFeature: React.FC = () => {
     enableHeuristicGuess: false,
   });
   const [searchWord, setSearchWord] = useState('');
+
+  useEffect(() => {
+    setIsLocked(hasServerRequest);
+  }, [hasServerRequest, setIsLocked]);
   const [numLeftTokens, setNumLeftTokens] = useState(10);
   const [numRightTokens, setNumRightTokens] = useState(10);
   const [regex, setRegex] = useState(false);
@@ -201,14 +217,14 @@ const ConcordanceFeature: React.FC = () => {
 
   // Color management & view mode
   // Use stack-based allocator for automatic color assignment
-  const stackPalette = React.useMemo(() => DEFAULT_PALETTE.slice(0, 6), []);
+  const stackPalette = DEFAULT_PALETTE.slice(0, 6);
   const { nodeColors: stackColors } = useColorStackAllocator({
     colors: stackPalette, // Use first six palette colors in stack order
     activeNodeIds: activeNodeIds,
   });
   const [manualColors, setManualColors] = useState<Record<string,string>>({});
   // Merge stack-allocated and manually set colors
-  const nodeColors = React.useMemo(() => {
+  const nodeColors = (() => {
     const merged: Record<string, string> = {};
     // Start with stack-allocated colors
     Object.entries(stackColors).forEach(([id, color]) => {
@@ -227,7 +243,7 @@ const ConcordanceFeature: React.FC = () => {
       }
     });
     return merged;
-  }, [stackColors, manualColors, activeNodeIds]);
+  })();
   const defaultPalette = DEFAULT_PALETTE;
   const [viewMode, setViewMode] = useState<'separated'|'combined'>('separated');
   const [combinedPage, setCombinedPage] = useState(1);
@@ -429,6 +445,36 @@ const ConcordanceFeature: React.FC = () => {
     concordanceTaskStatus.terminalTask?.task_id ||
     concordanceTaskStatus.tasks.length > 0
   );
+
+  const hasLockedParameterChanges = hasLockedParameterDiff({
+    isLocked,
+    serverRequest: (serverRequest as Record<string, unknown> | null) ?? null,
+    currentParams: {
+      search_word: searchWord,
+      num_left_tokens: numLeftTokens,
+      num_right_tokens: numRightTokens,
+      regex,
+      case_sensitive: caseSensitive,
+    },
+    getServerParams: (request) => ({
+      search_word: typeof request.search_word === 'string' ? request.search_word : '',
+      num_left_tokens:
+        typeof request.num_left_tokens === 'number'
+          ? request.num_left_tokens
+          : typeof request.num_tokens_left === 'number'
+            ? request.num_tokens_left
+            : 5,
+      num_right_tokens:
+        typeof request.num_right_tokens === 'number'
+          ? request.num_right_tokens
+          : typeof request.num_tokens_right === 'number'
+            ? request.num_tokens_right
+            : 5,
+      regex: typeof request.regex === 'boolean' ? request.regex : false,
+      case_sensitive: typeof request.case_sensitive === 'boolean' ? request.case_sensitive : false,
+    }),
+  });
+
   const actionState = getAnalysisActionState({
     hasWorkspace: Boolean(currentWorkspaceId),
     hasSelection: panelSelectedNodes.length > 0,
@@ -436,6 +482,7 @@ const ConcordanceFeature: React.FC = () => {
     hasResults: Boolean(results),
     isBusy: isSearching,
     hasActiveTask,
+    allowRunWhenLocked: hasLockedParameterChanges,
   });
 
   useEffect(() => {

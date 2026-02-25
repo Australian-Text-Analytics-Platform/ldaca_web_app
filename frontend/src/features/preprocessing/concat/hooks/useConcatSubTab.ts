@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useState } from 'react';
 
 import type { NodeColumnSelection, WorkspaceNodeLike } from '../../../../components/NodeSelectionPanel';
 import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
@@ -241,28 +241,28 @@ export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult
   const [newNodeName, setNewNodeName] = useState('');
   const [isConcatenating, setIsConcatenating] = useState(false);
 
-  const workspaceNodeMap = useMemo(() => buildWorkspaceNodeMap(workspaceNodes), [workspaceNodes]);
+  const workspaceNodeMap = buildWorkspaceNodeMap(workspaceNodes);
 
-  const uniqueNodeIds = useMemo(() => dedupeNodeIds(selectedNodeIds), [selectedNodeIds]);
-  const concatNodeIds = useMemo(() => uniqueNodeIds.slice(0, MAX_CONCAT_NODES), [uniqueNodeIds]);
+  const uniqueNodeIds = dedupeNodeIds(selectedNodeIds);
+  const concatNodeIds = uniqueNodeIds.slice(0, MAX_CONCAT_NODES);
   const concatOriginalCount = uniqueNodeIds.length;
 
-  const concatSelectedNodes = useMemo<WorkspaceNodeLike[]>(() => {
+  const concatSelectedNodes: WorkspaceNodeLike[] = (() => {
     return concatNodeIds
       .map((nodeId) => workspaceNodeMap.get(nodeId))
       .filter((node): node is WorkspaceNodeLike => Boolean(node));
-  }, [concatNodeIds, workspaceNodeMap]);
+  })();
 
-  const concatNodeSummaries = useMemo(() => buildConcatNodeSummaries(concatSelectedNodes), [concatSelectedNodes]);
+  const concatNodeSummaries = buildConcatNodeSummaries(concatSelectedNodes);
 
-  const concatAnalysis = useMemo(() => analyzeSchema(concatNodeSummaries), [concatNodeSummaries]);
+  const concatAnalysis = analyzeSchema(concatNodeSummaries);
 
-  const statusVariant: 'warning' | 'error' | null = useMemo(() => {
+  const statusVariant: 'warning' | 'error' | null = (() => {
     if (concatAnalysis.ready || !concatAnalysis.issues) return null;
     return concatAnalysis.mismatches.length > 0 ? 'error' : 'warning';
-  }, [concatAnalysis.ready, concatAnalysis.issues, concatAnalysis.mismatches.length]);
+  })();
 
-  const autoConcatName = useMemo(() => {
+  const autoConcatName = (() => {
     if (!concatAnalysis.summaries.length) return '';
     const labels = concatAnalysis.summaries
       .map((summary) => summary.displayName || summary.nodeId)
@@ -273,21 +273,21 @@ export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult
     }
     const shortened = `${labels.slice(0, 3).join(', ')}, …`;
     return `Stack(${shortened})`;
-  }, [concatAnalysis.summaries]);
+  })();
 
-  const concatUsedNodeIds = useMemo(() => concatAnalysis.summaries.map((summary) => summary.nodeId), [concatAnalysis.summaries]);
+  const concatUsedNodeIds = concatAnalysis.summaries.map((summary) => summary.nodeId);
 
-  const concatPreviewRequest = useMemo(() => {
+  const concatPreviewRequest = (() => {
     if (!concatAnalysis.ready) return null;
     return { nodeIds: concatUsedNodeIds } satisfies ConcatPreviewRequestPayload;
-  }, [concatAnalysis.ready, concatUsedNodeIds]);
+  })();
 
-  const concatPreviewSignature = useMemo(() => {
+  const concatPreviewSignature = (() => {
     if (!concatPreviewRequest) return 'concat-preview-disabled';
     return concatPreviewRequest.nodeIds.join('|');
-  }, [concatPreviewRequest]);
+  })();
 
-  const concatPreviewFetcher = useCallback(async ({
+  const concatPreviewFetcher = async ({
     request,
     page,
     pageSize,
@@ -302,7 +302,7 @@ export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult
       columns: Array.isArray(response?.columns) ? response.columns : [],
       pagination: response?.pagination ?? null,
     };
-  }, [concatPreview]);
+  };
 
   const {
     data: concatPreviewData,
@@ -321,31 +321,31 @@ export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult
     fetcher: concatPreviewFetcher,
   });
 
-  const concatPreviewColumnsToRender = useMemo(() => {
+  const concatPreviewColumnsToRender = (() => {
     if (concatPreviewColumns.length > 0) return concatPreviewColumns;
     if (concatPreviewData.length > 0 && typeof concatPreviewData[0] === 'object' && concatPreviewData[0] !== null) {
       return Object.keys(concatPreviewData[0]);
     }
     return [];
-  }, [concatPreviewColumns, concatPreviewData]);
+  })();
 
-  const handleConcatPreviewPrev = useCallback(() => {
+  const handleConcatPreviewPrev = () => {
     if (concatPreviewPagination?.has_prev && !concatPreviewLoading) {
       setConcatPreviewPage(Math.max(1, concatPreviewPage - 1));
     }
-  }, [concatPreviewPagination, concatPreviewLoading, concatPreviewPage, setConcatPreviewPage]);
+  };
 
-  const handleConcatPreviewNext = useCallback(() => {
+  const handleConcatPreviewNext = () => {
     if (concatPreviewPagination?.has_next && !concatPreviewLoading) {
       setConcatPreviewPage(concatPreviewPage + 1);
     }
-  }, [concatPreviewPagination, concatPreviewLoading, concatPreviewPage, setConcatPreviewPage]);
+  };
 
-  const handleConcatPreviewPageSizeChange = useCallback((size: number) => {
+  const handleConcatPreviewPageSizeChange = (size: number) => {
     if (!Number.isNaN(size)) {
       setConcatPreviewPageSize(size);
     }
-  }, [setConcatPreviewPageSize]);
+  };
 
   const readyMessage = concatAnalysis.summaries.length < 2
     ? 'Select at least two data blocks to generate a stack preview.'
@@ -354,7 +354,7 @@ export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult
   const applyDisabled =
     !concatAnalysis.ready || !currentWorkspaceId || isConcatenating || isLoading.operations;
 
-  const handleApplyConcat = useCallback(async () => {
+  const handleApplyConcat = async () => {
     if (!concatAnalysis.ready) {
       onAlert(concatAnalysis.issues || 'Select at least two compatible data blocks to stack.');
       return;
@@ -375,7 +375,7 @@ export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult
     } finally {
       setIsConcatenating(false);
     }
-  }, [autoConcatName, concatAnalysis, concatNodes, newNodeName, onAlert]);
+  };
 
   const selectionPanel: ConcatSelectionPanelConfig = {
     selectedNodes: concatSelectedNodes,

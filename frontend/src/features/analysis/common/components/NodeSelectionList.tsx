@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import type { WorkspaceNodeLike } from '../nodeSelectionTypes';
@@ -43,12 +43,10 @@ export const NodeSelectionList: React.FC<NodeSelectionListProps> = ({
   className,
   cardClassName,
 }) => {
-  const derivedNodeIds = useMemo(() => {
-    if (nodeIds && nodeIds.length === nodes.length) {
-      return nodeIds;
-    }
-    return nodes.map((node, index) => getNodeIdentifier(node, index));
-  }, [nodeIds, nodes]);
+  const derivedNodeIds =
+    nodeIds && nodeIds.length === nodes.length
+      ? nodeIds
+      : nodes.map((node, index) => getNodeIdentifier(node, index));
 
   if (!nodes.length) {
     return emptyState ? <>{emptyState}</> : null;

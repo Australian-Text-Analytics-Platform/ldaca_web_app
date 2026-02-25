@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '../../../hooks/useWorkspaceSelection';
 import { useAuth } from '../../../hooks/useAuth';
@@ -12,6 +12,7 @@ import type { AnalysisTaskStatus } from '../../../hooks/useAnalysisTaskStatus';
 import useAnalysisTaskLifecycle, { type AnalysisTaskRefreshContext } from '../../../hooks/useAnalysisTaskLifecycle';
 import { getAnalysisActionState } from '../common/analysisActionState';
 import {
+  hasLockedParameterDiff,
   getNodeIdentifier,
   restoreAnalysisLockFromRequest,
   useAnalysisHydration,
@@ -22,6 +23,7 @@ import { resolveAnalysisTaskId } from '../../../hooks/analysisTaskUtils';
 import { TopicModelingParameterPanel } from './components/panels/TopicModelingParameterPanel';
 import { TopicModelingResultsPanel } from './components/panels/TopicModelingResultsPanel';
 import { useTopicModelingTaskFlow } from './hooks/useTopicModelingTaskFlow';
+import { useAnalysisServerRequestLock } from '../common';
 import { useTopicModelingZoomBrush } from './hooks/useTopicModelingZoomBrush';
 import { useTopicModelingBubbleChart } from './hooks/useTopicModelingBubbleChart';
 interface TopicModelingTopic { id: number; label: string; size: number[]; total_size: number; x: number; y: number; }
@@ -34,6 +36,20 @@ const TopicModelingFeature: React.FC = () => {
   const { currentWorkspaceId } = useWorkspaceData();
   const { getAuthHeaders } = useAuth();
   const queryClient = useQueryClient();
+  const { hasServerRequest, serverRequest } = useAnalysisServerRequestLock({
+    analysisType: 'topic_modeling',
+    workspaceId: currentWorkspaceId,
+    getAuthHeaders,
+  });
+
+  const typedServerRequest = serverRequest as
+    | {
+        node_ids?: string[];
+        node_columns?: Record<string, string>;
+        use_ctfidf?: boolean;
+        min_topic_size?: number;
+      }
+    | null;
   const currentView = useUIStore((state) => state.currentView);
   const isActiveTab = currentView === 'topic-modeling';
   const setTasks = useAnalysisStore((state: any) => state.setTasks);
@@ -90,7 +106,7 @@ const TopicModelingFeature: React.FC = () => {
     setLocalTopicModelingTaskId(null);
   }, [currentWorkspaceId]);
 
-  const resolveTopicModelingTaskId = useCallback(async (): Promise<string | null> => {
+  const resolveTopicModelingTaskId = async (): Promise<string | null> => {
     if (!currentWorkspaceId) return null;
 
     return resolveAnalysisTaskId({
@@ -113,9 +129,9 @@ const TopicModelingFeature: React.FC = () => {
       },
       onResolved: setLocalTopicModelingTaskId,
     });
-  }, [currentWorkspaceId, localTopicModelingTaskId, getAuthHeaders]);
+  };
 
-  const fetchTopicModelingResult = useCallback(async (taskId: string | null, expectedState: 'successful' | 'failed') => {
+  const fetchTopicModelingResult = async (taskId: string | null, expectedState: 'successful' | 'failed') => {
     if (!isActiveTab) return;
     if (!currentWorkspaceId) return;
     const resolvedTaskId = taskId ?? await resolveTopicModelingTaskId();
@@ -175,13 +191,11 @@ const TopicModelingFeature: React.FC = () => {
       setResultSafely(processedResult);
 
       if (processedResult.state === 'successful') {
-        setIsLocked(true);
         setIsRunning(false);
         runningRef.current = false;
         setError(null);
         lastFetchedRef.current = { taskId: resolvedTaskId ?? null, state: 'successful' };
       } else if (processedResult.state === 'failed') {
-        setIsLocked(true);
         setIsRunning(false);
         runningRef.current = false;
         setError(processedResult.message || 'Topic modeling failed');
@@ -192,7 +206,7 @@ const TopicModelingFeature: React.FC = () => {
     } finally {
       fetchingTaskIdRef.current = null;
     }
-  }, [isActiveTab, currentWorkspaceId, resolveTopicModelingTaskId, getAuthHeaders, setIsLocked]);
+  };
 
   const topicFallbackBanner = (status: AnalysisTaskStatus) => {
     if (result?.state !== 'running') {
@@ -204,7 +218,7 @@ const TopicModelingFeature: React.FC = () => {
     };
   };
 
-  const handleTopicTaskRefresh = useCallback(async (context: AnalysisTaskRefreshContext) => {
+  const handleTopicTaskRefresh = async (context: AnalysisTaskRefreshContext) => {
     if (context.reason !== 'terminal') {
       return;
     }
@@ -215,7 +229,7 @@ const TopicModelingFeature: React.FC = () => {
       return;
     }
     await fetchTopicModelingResult(context.taskId ?? null, context.taskState);
-  }, [isActiveTab, fetchTopicModelingResult]);
+  };
 
   const {
     status: topicTaskStatus,
@@ -245,14 +259,6 @@ const TopicModelingFeature: React.FC = () => {
     .map((node, idx) => getNodeIdentifier(node, idx) || activeNodeIds[idx])
     .filter((id): id is string => Boolean(id));
   const panelNodeIdsKey = panelNodeIds.join('|');
-  const actionState = getAnalysisActionState({
-    hasWorkspace: Boolean(currentWorkspaceId),
-    hasSelection: panelNodeIds.length > 0,
-    isLocked,
-    hasResults: Boolean(result),
-    isBusy: isRunning,
-    hasActiveTask,
-  });
 
   // Observe container width for responsive sizing
   useEffect(()=>{
@@ -270,7 +276,7 @@ const TopicModelingFeature: React.FC = () => {
   },[]);
 
   const defaultPalette = DEFAULT_PALETTE;
-  const stackPalette = React.useMemo(() => DEFAULT_PALETTE.slice(0, 6), []);
+  const stackPalette = DEFAULT_PALETTE.slice(0, 6);
 
   // Use stack-based allocator for automatic color assignment
   const stackActiveNodeIds = panelNodeIds.slice(0, 2); // Topic modeling uses first 2 nodes from panel
@@ -279,7 +285,7 @@ const TopicModelingFeature: React.FC = () => {
     activeNodeIds: stackActiveNodeIds,
   });
   // Merge stack-allocated and manually set colors
-  const nodeColors = React.useMemo(() => {
+  const nodeColors = (() => {
     const merged: Record<string, string> = {};
     // Start with stack-allocated colors
     Object.entries(stackColors).forEach(([id, color]) => {
@@ -298,7 +304,7 @@ const TopicModelingFeature: React.FC = () => {
       }
     });
     return merged;
-  }, [stackColors, manualColors, stackActiveNodeIds, panelNodeIds]);
+  })();
 
   const effectiveNodeColumnSelections = isLocked ? activeNodeColumnSelections : nodeColumnSelections;
 
@@ -310,6 +316,29 @@ const TopicModelingFeature: React.FC = () => {
   const panelHasMissingColumns = panelNodeIds.some((nodeId) => {
     const selection = effectiveNodeColumnSelections.find((sel) => sel.nodeId === nodeId);
     return !selection || !selection.column;
+  });
+
+  const hasLockedParameterChanges = hasLockedParameterDiff({
+    isLocked,
+    serverRequest: typedServerRequest,
+    currentParams: {
+      use_ctfidf: Boolean(useCtTfidf),
+      min_topic_size: Number(minTopicSize),
+    },
+    getServerParams: (request) => ({
+      use_ctfidf: Boolean(request.use_ctfidf),
+      min_topic_size: Number(request.min_topic_size),
+    }),
+  });
+
+  const actionState = getAnalysisActionState({
+    hasWorkspace: Boolean(currentWorkspaceId),
+    hasSelection: panelNodeIds.length > 0,
+    isLocked,
+    hasResults: Boolean(result),
+    isBusy: isRunning,
+    hasActiveTask,
+    allowRunWhenLocked: hasLockedParameterChanges,
   });
 
   // Color assignment now handled by stack allocator - no auto-fill effect needed
@@ -349,7 +378,6 @@ const TopicModelingFeature: React.FC = () => {
     useCtTfidf,
     getAuthHeaders,
     lockWithSnapshots,
-    setIsLocked,
     setIsRunning,
     runningRef,
     setError,
@@ -373,10 +401,7 @@ const TopicModelingFeature: React.FC = () => {
   const topics: TopicModelingTopic[] = result?.data?.topics || [];
   const corpusCount = result?.data?.corpus_sizes?.length || 0;
   const chartPadding = 40;
-  const chartHeight = React.useMemo(
-    () => Math.min(520, Math.max(320, Math.round(chartWidth * 0.55))),
-    [chartWidth]
-  );
+  const chartHeight = Math.min(520, Math.max(320, Math.round(chartWidth * 0.55)));
 
   const {
     activeDomain,
@@ -449,7 +474,6 @@ const TopicModelingFeature: React.FC = () => {
     if (!resultPayload) return;
     const resStatus = (resultPayload as any)?.state;
     setResultSafely(resultPayload as any);
-    setIsLocked(true);
 
     if (resStatus === 'running') {
       if (!resultRef.current || resultRef.current.state !== 'successful') {
@@ -501,6 +525,10 @@ const TopicModelingFeature: React.FC = () => {
 
   // React to task state changes for running state management
   useEffect(() => {
+    setIsLocked(hasServerRequest);
+  }, [hasServerRequest, setIsLocked]);
+
+  useEffect(() => {
     if (!topicModelingTasks.length) {
       if (runningRef.current) {
         setIsRunning(false);
@@ -510,7 +538,6 @@ const TopicModelingFeature: React.FC = () => {
     }
 
     if (topicRunningTask) {
-      setIsLocked(true);
       setIsRunning(true);
       runningRef.current = true;
     } else if (!topicFailedTask) {
@@ -521,12 +548,10 @@ const TopicModelingFeature: React.FC = () => {
     }
 
     if (topicSuccessfulTask?.task_id) {
-      setIsLocked(true);
       setIsRunning(false);
       runningRef.current = false;
       void fetchTopicModelingResult(topicSuccessfulTask.task_id, 'successful');
     } else if (topicFailedTask?.task_id) {
-      setIsLocked(true);
       setIsRunning(false);
       runningRef.current = false;
       void fetchTopicModelingResult(topicFailedTask.task_id, 'failed');
@@ -537,17 +562,7 @@ const TopicModelingFeature: React.FC = () => {
     topicSuccessfulTask,
     topicFailedTask,
     fetchTopicModelingResult,
-    setIsLocked,
   ]);
-
-  // If result failed, keep the panel locked and run disabled until cleared
-  useEffect(() => {
-  if (result && result.state === 'failed') {
-      setIsLocked(true);
-      setIsRunning(false);
-      runningRef.current = false;
-    }
-  }, [result, setIsLocked]);
 
   const shouldShowResultsPanel = Boolean(topicWaitingBanner || result || error);
 

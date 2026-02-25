@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { textApi, type TokenFrequencyResponse } from '../../../api/text';
 import { useAuth } from '../../../hooks/useAuth';
 import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
@@ -8,6 +8,9 @@ import { useAnalysisTaskStatus } from '../../../hooks/useAnalysisTaskStatus';
 import { useAutoNodeColumns } from '../../../hooks/useAutoNodeColumns';
 import { useNodeColumnInfos } from '../../../hooks/useNodeColumnInfos';
 import {
+  hasLockedParameterDiff,
+  normalizeCommaSeparatedWords,
+  normalizeRequestStopWords,
   parseAnalysisNodeRequest,
 } from '../common';
 import {
@@ -22,6 +25,7 @@ import { buildSelectionNameById, deriveBackendStopWordsKey, deriveBackendTokenLi
 import { downloadFrequencyRowsAsCsv, downloadWordCloudSvgAsPng } from './tokenFrequencyExport';
 import { useTokenFrequencyPreferences } from './hooks/useTokenFrequencyPreferences';
 import { useTokenFrequencyTaskFlow } from './hooks/useTokenFrequencyTaskFlow';
+import { useAnalysisServerRequestLock } from '../common';
 import { TokenFrequencyParameterPanel } from './components/panels/TokenFrequencyParameterPanel';
 import { TokenFrequencyResultsPanel } from './components/panels/TokenFrequencyResultsPanel';
 import { useAnalysisStore } from '../../../stores/analysisStore';
@@ -36,6 +40,11 @@ const PALETTE = ['#3b82f6', '#ef4444', '#10b981', '#a855f7', '#f59e0b'];
 const TokenFrequencyFeature = () => {
   const { getAuthHeaders } = useAuth();
   const { currentWorkspace } = useWorkspaceData();
+  const { hasServerRequest, serverRequest } = useAnalysisServerRequestLock({
+    analysisType: 'token_frequencies',
+    workspaceId: currentWorkspace?.id ?? null,
+    getAuthHeaders,
+  });
   const { selectedNodes } = useWorkspaceSelection();
   const { selectNodes } = useWorkspaceActions();
   const currentView = useUIStore((state) => state.currentView);
@@ -91,19 +100,19 @@ const TokenFrequencyFeature = () => {
     setNodeColors((prev) => ({ ...next, ...prev }));
   }, [selectedNodes.map((node) => node.id).join('|')]);
 
-  const getColorForNode = useCallback((nodeId: string, index = 0) => {
+  const getColorForNode = (nodeId: string, index = 0) => {
     return nodeColors[nodeId] ?? PALETTE[index % PALETTE.length];
-  }, [nodeColors]);
+  };
 
-  const setNodeColor = useCallback((nodeId: string, color: string) => {
+  const setNodeColor = (nodeId: string, color: string) => {
     setNodeColors((prev) => ({ ...prev, [nodeId]: color }));
-  }, []);
+  };
 
-  const resolveTaskId = useCallback(async () => {
+  const resolveTaskId = async () => {
     if (localTokenFrequencyTaskId) return localTokenFrequencyTaskId;
     if (tokenFrequencyTaskStatus.activeTaskId) return tokenFrequencyTaskStatus.activeTaskId;
     return null;
-  }, [localTokenFrequencyTaskId, tokenFrequencyTaskStatus.activeTaskId]);
+  };
 
   const backendTokenLimit = deriveBackendTokenLimit(results);
   const backendStopWordsKey = deriveBackendStopWordsKey(results);
@@ -138,13 +147,13 @@ const TokenFrequencyFeature = () => {
 
   const lockedNodeNameMap = isLocked ? buildSelectionNameById(selectedNodes as any, selectedNodes as any) : {};
 
-  const nodeIdToName = useMemo(() => {
+  const nodeIdToName = (() => {
     const map: Record<string, string> = {};
     selectedNodes.forEach((node: any) => {
       map[node.id] = node.name || node.label || node.id;
     });
     return map;
-  }, [selectedNodes]);
+  })();
 
   const { handleAnalyze, handleClearResults, handleTokenClick, handleTokenRightClick } = useTokenFrequencyTaskFlow({
     currentWorkspaceId,
@@ -162,13 +171,12 @@ const TokenFrequencyFeature = () => {
     setIsAnalyzing,
     analyzingRef,
     setResultsSafely: setResults,
-    setIsLocked,
     setLastCompareNodeIds,
     setAppliedStopSet,
     setStopWords,
     resetPreferenceUiState,
     setTasks,
-    unlockSelection: () => setIsLocked(false),
+    unlockSelection: () => undefined,
     getAuthHeaders,
     lockWithSnapshots: () => undefined,
     resolveTokenFrequencyTaskId: resolveTaskId,
@@ -200,7 +208,6 @@ const TokenFrequencyFeature = () => {
           applyTokenLimitState(typeof requestData?.token_limit === 'number' ? requestData.token_limit : null);
 
           setResults(hydrated);
-          setIsLocked(true);
           if (Array.isArray(hydrated.stop_words)) {
             const normalizedStops = hydrated.stop_words
               .map((word) => String(word).trim().toLowerCase())
@@ -236,11 +243,11 @@ const TokenFrequencyFeature = () => {
     ...lockedNodeNameMap,
   };
 
-  const computeDisplayName = useCallback((nodeId: string, fallbackKey?: string) => {
+  const computeDisplayName = (nodeId: string, fallbackKey?: string) => {
     if (displayNameMap[nodeId]) return displayNameMap[nodeId];
     if (nodeIdToName[nodeId]) return nodeIdToName[nodeId];
     return fallbackKey || nodeId || 'Unknown node';
-  }, [displayNameMap, nodeIdToName]);
+  };
 
   const analysisNodeIds = computeAnalysisNodeIds(
     (results?.analysis_params as Record<string, unknown> | null | undefined)?.node_ids,
@@ -261,7 +268,7 @@ const TokenFrequencyFeature = () => {
     wordCloudRefs.current[nodeKey] = element;
   }, []);
 
-  const handleDownloadWordCloud = useCallback((nodeKey: string, displayName: string) => {
+  const handleDownloadWordCloud = (nodeKey: string, displayName: string) => {
     const svg = wordCloudRefs.current[nodeKey];
     if (!svg) return;
     downloadWordCloudSvgAsPng(svg, {
@@ -269,17 +276,17 @@ const TokenFrequencyFeature = () => {
       fallbackKey: nodeKey,
       scale: 3,
     });
-  }, []);
+  };
 
-  const handleDownloadFrequencyCsv = useCallback((label: string, rows: any[]) => {
+  const handleDownloadFrequencyCsv = (label: string, rows: any[]) => {
     downloadFrequencyRowsAsCsv(label, rows);
-  }, []);
+  };
 
-  const handleApplyStopWords = useCallback(() => {
+  const handleApplyStopWords = () => {
     applyStopSetFromText(stopWords);
-  }, [applyStopSetFromText, stopWords]);
+  };
 
-  const handleToggleStatsSort = useCallback((column: string) => {
+  const handleToggleStatsSort = (column: string) => {
     if (statsSortColumn === column) {
       setStatsSortDirection((direction) => (direction === 'asc' ? 'desc' : 'asc'));
     } else {
@@ -287,13 +294,36 @@ const TokenFrequencyFeature = () => {
       setStatsSortDirection(column === 'token' ? 'asc' : 'desc');
     }
     setStatsPage(1);
-  }, [statsSortColumn]);
+  };
 
   const hasIncompleteSelections = effectiveNodeColumnSelections.some((selection) => !selection.column);
   const displayNodeCount = selectedNodes.length;
-  const handleColumnChange = useCallback((nodeId: string, column: string) => {
+  const typedServerRequest = serverRequest as
+    | {
+        node_ids?: string[];
+        node_columns?: Record<string, string>;
+        stop_words?: string[];
+      }
+    | null;
+
+  const hasLockedParameterChanges = hasLockedParameterDiff({
+    isLocked,
+    serverRequest: typedServerRequest,
+    currentParams: {
+      stop_words: normalizeCommaSeparatedWords(stopWords),
+    },
+    getServerParams: (request) => ({
+      stop_words: normalizeRequestStopWords(request.stop_words),
+    }),
+  });
+
+  const handleColumnChange = (nodeId: string, column: string) => {
     setNodeColumnSelection(nodeId, column);
-  }, [setNodeColumnSelection]);
+  };
+
+  useEffect(() => {
+    setIsLocked(hasServerRequest);
+  }, [hasServerRequest]);
 
   const { getColumnInfos } = useNodeColumnInfos({
     workspaceId: currentWorkspaceId,
@@ -313,7 +343,14 @@ const TokenFrequencyFeature = () => {
         isLocked={isLocked}
         getNodeColumns={getColumnInfos as any}
         displayNodeCount={displayNodeCount}
-        actionState={{ runDisabled: selectedNodes.length === 0 || isAnalyzing, clearDisabled: !results && !isAnalyzing }}
+        actionState={{
+          runDisabled:
+            selectedNodes.length === 0 ||
+            isAnalyzing ||
+            hasIncompleteSelections ||
+            (isLocked && !hasLockedParameterChanges),
+          clearDisabled: !results && !isAnalyzing,
+        }}
         isAnalyzing={isAnalyzing}
         onAnalyze={handleAnalyze}
         onClearResults={handleClearResults}

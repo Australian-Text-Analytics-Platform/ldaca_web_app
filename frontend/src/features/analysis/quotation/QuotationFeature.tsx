@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
 import { ANALYSIS_LOCKED_MESSAGE } from '../../../components/tabs/AnalysisLockedNotice';
 import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
@@ -8,7 +8,7 @@ import { useAuth } from '../../../hooks/useAuth';
 import { textApi } from '../../../api/text';
 import type { QuotationEngineConfig, QuotationEngineType, QuotationRequest, QuotationResultQuery } from '../../../api/text';
 import useNodeColumnInfos from '../../../hooks/useNodeColumnInfos';
-import { useAnalysisLockState, useParameterChangeDetection } from '../../../hooks/useAnalysisLockState';
+import { useAnalysisLockState } from '../../../hooks/useAnalysisLockState';
 import { useQuotationEngineDialogStore, useQuotationEngineConfigStore } from '../../../stores/quotationEngineStore';
 import { Button } from '../../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
@@ -37,7 +37,14 @@ import {
 import { ScrollArea } from '../../../components/ui/scroll-area';
 import { ArrowUpDown, Loader2, Search, Trash2, Unlink } from 'lucide-react';
 import { getAnalysisActionState } from '../common/analysisActionState';
-import { getNodeIdentifier, restoreAnalysisLockFromRequest, useAnalysisHydration } from '../common';
+import {
+  getNodeIdentifier,
+  getServerEngineConfig,
+  hasLockedParameterDiff,
+  restoreAnalysisLockFromRequest,
+  useAnalysisHydration,
+  useAnalysisServerRequestLock,
+} from '../common';
 import {
   clearAnalysisTaskResults,
   collectTaskIds,
@@ -256,9 +263,15 @@ const QuotationFeature: React.FC = () => {
   const { currentWorkspaceId, nodeData } = useWorkspaceData();
   const { quotationSearch, detachQuotation } = useWorkspaceActions();
   const { getAuthHeaders } = useAuth();
+  const { hasServerRequest, serverRequest } = useAnalysisServerRequestLock({
+    analysisType: 'quotation_analysis',
+    workspaceId: currentWorkspaceId,
+    getAuthHeaders,
+  });
 
   const {
     isLocked,
+    setIsLocked,
     lockWithSnapshots,
     unlockSelection,
     lockedNodesSnapshot,
@@ -290,7 +303,6 @@ const QuotationFeature: React.FC = () => {
   const [hasLoaded, setHasLoaded] = useState(false);
   const [isLoadingQuotations, setIsLoadingQuotations] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
-  const [lockedRequestParams, setLockedRequestParams] = useState<Record<string, unknown> | null>(null);
   const [contextLengthInput, setContextLengthInput] = useState(String(DEFAULT_CONTEXT_LENGTH));
   const [contextLength, setContextLength] = useState(DEFAULT_CONTEXT_LENGTH);
   const [contextLengthError, setContextLengthError] = useState<string | null>(null);
@@ -307,6 +319,10 @@ const QuotationFeature: React.FC = () => {
   const activeSelections = isLocked ? activeNodeColumnSelections : nodeColumnSelections;
 
   const displayedNodes = panelSelectedNodes.slice(0, 1);
+
+  useEffect(() => {
+    setIsLocked(hasServerRequest);
+  }, [hasServerRequest, setIsLocked]);
 
   const originalColumnsByNode = (() => {
     const map: Record<string, string[]> = {};
@@ -522,42 +538,28 @@ const QuotationFeature: React.FC = () => {
   const [nodeDetaching, setNodeDetaching] = useState<Record<string, boolean>>({});
   const [resultsByNode, setResultsByNode] = useState<Record<string, QuotationResultState>>({});
 
-  const currentRequestParams = (() => {
-    const targetNode = (isLocked && lockedNodesSnapshot.length ? lockedNodesSnapshot[0] : displayedNodes[0]) as any;
-    if (!targetNode) {
-      return {} as Record<string, unknown>;
-    }
-    const nodeId = getNodeIdentifier(targetNode, 0);
-    const selection = activeSelections.find((sel) => sel.nodeId === nodeId);
-    if (!selection?.column) {
-      return {} as Record<string, unknown>;
-    }
-    const state = nodeState[nodeId] || {
-      currentPage: 1,
-      pageSize: DEFAULT_PAGE_SIZE,
-      sortBy: undefined,
-      descending: false,
-    };
-    const engineSnapshot = resolvedEnginePayload;
-    const engineUrl = engineSnapshot.type === 'remote' && engineSnapshot.isValid
-      ? engineSnapshot.normalizedUrl
-      : null;
-    return {
-      column: selection.column,
-      page: state.currentPage,
-      page_size: state.pageSize,
-      sort_by: state.sortBy ?? null,
-      descending: state.descending,
-      engine_type: engineSnapshot.type,
-      engine_url: engineUrl,
-    } as Record<string, unknown>;
-  })();
-
-  const hasParamsChanged = useParameterChangeDetection<Record<string, unknown>>(
+  const hasParamsChanged = hasLockedParameterDiff({
     isLocked,
-    currentRequestParams,
-    lockedRequestParams
-  );
+    serverRequest: (serverRequest as Record<string, unknown> | null) ?? null,
+    currentParams: {
+      engine_type: resolvedEnginePayload.type,
+      engine_url:
+        resolvedEnginePayload.type === 'remote' && resolvedEnginePayload.isValid
+          ? resolvedEnginePayload.normalizedUrl
+          : null,
+    },
+    getServerParams: (request) => {
+      const { type: serverEngineType, url: serverEngineUrl } = getServerEngineConfig(
+        request,
+        (url) => normalizeRemoteUrl(url).normalized
+      );
+
+      return {
+        engine_type: serverEngineType,
+        engine_url: serverEngineType === 'remote' ? (serverEngineUrl || null) : null,
+      };
+    },
+  });
 
   const actionState = getAnalysisActionState({
     hasWorkspace: Boolean(currentWorkspaceId),
@@ -576,8 +578,7 @@ const QuotationFeature: React.FC = () => {
       }
       const nodeId = getNodeIdentifier(sourceNode, 0);
       const selection = activeSelections.find((sel) => sel.nodeId === nodeId);
-      const fallbackColumn = typeof lockedRequestParams?.column === 'string' ? lockedRequestParams.column : undefined;
-      const column = selection?.column || fallbackColumn;
+      const column = selection?.column;
       if (!column) {
         return null;
       }
@@ -935,38 +936,6 @@ const QuotationFeature: React.FC = () => {
       applyContextLengthPreferenceFromResult(response);
       const normalized = updateResultState(nodeId, column, response);
       setHasLoaded(true);
-      setLockedRequestParams((prev) => {
-        const engineSnapshot = (() => {
-          if (prev?.engine_type) {
-            return {
-              engine_type: prev.engine_type,
-              engine_url: prev.engine_url ?? null,
-            };
-          }
-          if (resolvedEnginePayload.type === 'remote') {
-            const url = resolvedEnginePayload.isValid
-              ? resolvedEnginePayload.normalizedUrl
-              : resolvedEnginePayload.rawUrl;
-            return {
-              engine_type: 'remote' as const,
-              engine_url: url,
-            };
-          }
-          return {
-            engine_type: 'local' as const,
-            engine_url: null,
-          };
-        })();
-
-        return {
-          ...engineSnapshot,
-          column,
-          page: normalized.pagination.page,
-          page_size: normalized.pagination.page_size,
-          sort_by: normalized.sorting.sort_by ?? null,
-          descending: normalized.sorting.descending,
-        } as Record<string, unknown>;
-      });
 
       return normalized;
     } catch (error: any) {
@@ -1010,7 +979,6 @@ const QuotationFeature: React.FC = () => {
       } catch {
         /* ignore */
       }
-      setLockedRequestParams(outcome.request);
     } finally {
       setIsLoadingQuotations(false);
     }
@@ -1064,14 +1032,11 @@ const QuotationFeature: React.FC = () => {
     const isSame = state.sortBy === column;
     const nextDescending: boolean = isSame ? !state.descending : false;
     if (!isLocked || !hasLoaded) {
-      const outcome = await fetchQuotations(nodeId, {
+      await fetchQuotations(nodeId, {
         page: 1,
         sortBy: column,
         descending: nextDescending,
       });
-      if (outcome) {
-        setLockedRequestParams(outcome.request);
-      }
       return;
     }
 
@@ -1113,10 +1078,6 @@ const QuotationFeature: React.FC = () => {
     const nodeId = requestData?.node_id || requestData?.nodeId;
     const column = requestData?.column || '';
     const reqEngine = (requestData?.engine ?? null) as QuotationEngineConfig | null;
-    let hydratedEngine: EngineRequestPayload =
-      resolvedEnginePayload.type === 'remote' && resolvedEnginePayload.isValid
-        ? { type: 'remote', url: resolvedEnginePayload.normalizedUrl }
-        : { type: 'local' };
 
     if (!nodeId) {
       return;
@@ -1127,12 +1088,10 @@ const QuotationFeature: React.FC = () => {
       if (trimmed.length) {
         const { normalized, valid } = normalizeRemoteUrl(trimmed);
         const appliedUrl = valid ? normalized : trimmed;
-        hydratedEngine = { type: 'remote', url: appliedUrl };
         updateRemoteUrl(appliedUrl);
         setEngineConfigStore({ type: 'remote', url: appliedUrl });
       }
     } else if (reqEngine?.type === 'local') {
-      hydratedEngine = { type: 'local' };
       setEngineConfigStore({ type: 'local' });
     }
 
@@ -1154,11 +1113,6 @@ const QuotationFeature: React.FC = () => {
       /* ignore */
     }
 
-    setLockedRequestParams((prev) => ({
-      ...prev,
-      engine_type: hydratedEngine.type,
-      engine_url: hydratedEngine.type === 'remote' ? hydratedEngine.url : null,
-    }));
   };
 
   const applyHydratedResult = async (resultPayload: unknown) => {
@@ -1170,15 +1124,7 @@ const QuotationFeature: React.FC = () => {
     if (!nodeId) return;
 
     applyContextLengthPreferenceFromResult(res);
-    const normalized = updateResultState(nodeId, column, res);
-    setLockedRequestParams((prev) => ({
-      ...prev,
-      column: normalized.column,
-      page: normalized.pagination.page,
-      page_size: normalized.pagination.page_size,
-      sort_by: normalized.sorting.sort_by ?? null,
-      descending: normalized.sorting.descending,
-    }));
+    updateResultState(nodeId, column, res);
     setHasLoaded(true);
   };
 
@@ -1400,7 +1346,6 @@ const QuotationFeature: React.FC = () => {
                       setHasLoaded(false);
                       setResultsByNode({});
                       setNodeState({});
-                      setLockedRequestParams(null);
                       unlockSelection();
                       setNodeColumnSelections([], { replace: true, persist: false });
                       recomputeAutoColumns();

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 import { nodesApi } from '../../../../api/nodes';
 import type { NodeColumnSelection, WorkspaceNodeLike } from '../../../../components/NodeSelectionPanel';
@@ -110,31 +110,31 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
   const [isJoining, setIsJoining] = useState(false);
   const joinNameAutofillRef = useRef('');
 
-  const workspaceNodeMap = useMemo(() => buildWorkspaceNodeMap(workspaceNodes), [workspaceNodes]);
+  const workspaceNodeMap = buildWorkspaceNodeMap(workspaceNodes);
 
-  const uniqueSelectedNodeIds = useMemo(() => dedupeNodeIds(selectedNodeIds), [selectedNodeIds]);
-  const joinNodeIds = useMemo(() => uniqueSelectedNodeIds.slice(0, MAX_JOIN_NODES), [uniqueSelectedNodeIds]);
+  const uniqueSelectedNodeIds = dedupeNodeIds(selectedNodeIds);
+  const joinNodeIds = uniqueSelectedNodeIds.slice(0, MAX_JOIN_NODES);
   const joinOriginalCount = uniqueSelectedNodeIds.length;
 
-  const joinSelectedNodes = useMemo(() => {
+  const joinSelectedNodes = (() => {
     return joinNodeIds
       .map((nodeId) => workspaceNodeMap.get(nodeId))
       .filter((node): node is WorkspaceNodeLike => Boolean(node));
-  }, [joinNodeIds, workspaceNodeMap]);
+  })();
 
-  const getNodeColumnsForJoin = useCallback((nodeId: string): string[] => {
+  const getNodeColumnsForJoin = (nodeId: string): string[] => {
     const node = workspaceNodeMap.get(nodeId);
     return extractNodeColumns(node);
-  }, [workspaceNodeMap]);
+  };
 
-  const columnLabelFn = useCallback((node: WorkspaceNodeLike) => {
+  const columnLabelFn = (node: WorkspaceNodeLike) => {
     const nodeId = getNodeKey(node);
     if (nodeId === joinLeftNodeId) return 'Left column:';
     if (nodeId === joinRightNodeId) return 'Right column:';
     return 'Join column:';
-  }, [joinLeftNodeId, joinRightNodeId]);
+  };
 
-  const joinNodeSelections = useMemo<NodeColumnSelection[]>(() => {
+  const joinNodeSelections: NodeColumnSelection[] = (() => {
     const selections: NodeColumnSelection[] = [];
     if (joinLeftNodeId) {
       selections.push({ nodeId: joinLeftNodeId, column: joinLeftColumn });
@@ -143,23 +143,23 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
       selections.push({ nodeId: joinRightNodeId, column: joinRightColumn });
     }
     return selections;
-  }, [joinLeftNodeId, joinLeftColumn, joinRightNodeId, joinRightColumn]);
+  })();
 
-  const joinNodeColors = useMemo(() => {
+  const joinNodeColors = (() => {
     const colors: Record<string, string> = {};
     if (joinLeftNodeId) colors[joinLeftNodeId] = DEFAULT_JOIN_PALETTE[0] ?? '#2563eb';
     if (joinRightNodeId) colors[joinRightNodeId] = DEFAULT_JOIN_PALETTE[1] ?? '#dc2626';
     return colors;
-  }, [joinLeftNodeId, joinRightNodeId]);
+  })();
 
   const needsColumns = joinType !== 'cross';
 
-  const sharedColumns = useMemo(() => {
+  const sharedColumns = (() => {
     if (!joinLeftNodeId || !joinRightNodeId) return [] as string[];
     const leftColumns = getNodeColumnsForJoin(joinLeftNodeId);
     const rightColumns = getNodeColumnsForJoin(joinRightNodeId);
     return leftColumns.filter((column) => rightColumns.includes(column));
-  }, [joinLeftNodeId, joinRightNodeId, getNodeColumnsForJoin]);
+  })();
 
   const joinConfigReady = Boolean(
     joinLeftNodeId &&
@@ -168,7 +168,7 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
       (!needsColumns || (joinLeftColumn && joinRightColumn)),
   );
 
-  const joinConfigIssues = useMemo(() => {
+  const joinConfigIssues = (() => {
     if (!joinLeftNodeId || !joinRightNodeId) {
       return 'Pick two nodes to configure a join.';
     }
@@ -182,9 +182,9 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
       return 'No matching column names detected. Select compatible columns manually or rename them to match.';
     }
     return '';
-  }, [joinLeftNodeId, joinRightNodeId, needsColumns, joinLeftColumn, joinRightColumn, sharedColumns]);
+  })();
 
-  const joinStatusMessage = useMemo(() => {
+  const joinStatusMessage = (() => {
     if (joinConfigReady) {
       const leftNode = workspaceNodeMap.get(joinLeftNodeId);
       const rightNode = workspaceNodeMap.get(joinRightNodeId);
@@ -194,14 +194,11 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
       return `Ready to run a ${joinType} join between ${deriveNodeLabel(leftNode)} and ${deriveNodeLabel(rightNode)}.`;
     }
     return joinConfigIssues || 'Configure the join to preview results.';
-  }, [joinConfigReady, needsColumns, workspaceNodeMap, joinLeftNodeId, joinRightNodeId, joinLeftColumn, joinRightColumn, joinType, joinConfigIssues]);
+  })();
 
-  const currentJoinTypeInfo = useMemo(
-    () => JOIN_TYPE_OPTIONS.find((option) => option.value === joinType),
-    [joinType],
-  );
+  const currentJoinTypeInfo = JOIN_TYPE_OPTIONS.find((option) => option.value === joinType);
 
-  const autoJoinName = useMemo(() => {
+  const autoJoinName = (() => {
     if (!joinLeftNodeId || !joinRightNodeId || joinLeftNodeId === joinRightNodeId) return '';
     const leftNode = workspaceNodeMap.get(joinLeftNodeId);
     const rightNode = workspaceNodeMap.get(joinRightNodeId);
@@ -209,7 +206,7 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
     const rightName = deriveNodeLabel(rightNode);
     if (!leftName || !rightName) return '';
     return `${leftName}_${joinType}_join_${rightName}`.replace(/\s+/g, '_');
-  }, [joinLeftNodeId, joinRightNodeId, joinType, workspaceNodeMap]);
+  })();
 
   useEffect(() => {
     joinNameAutofillRef.current = autoJoinName || '';
@@ -240,7 +237,7 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
     setJoinRightColumn((prev) => (prev && rightColumns.includes(prev) ? prev : common[0] ?? rightColumns[0] ?? ''));
   }, [joinLeftNodeId, joinRightNodeId, joinType, getNodeColumnsForJoin]);
 
-  const joinPreviewRequest = useMemo<JoinPreviewRequestPayload | null>(() => {
+  const joinPreviewRequest: JoinPreviewRequestPayload | null = (() => {
     if (!currentWorkspaceId || !joinConfigReady) return null;
     return {
       workspaceId: currentWorkspaceId,
@@ -250,9 +247,9 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
       rightOn: needsColumns ? joinRightColumn : undefined,
       joinType,
     };
-  }, [currentWorkspaceId, joinConfigReady, joinLeftNodeId, joinRightNodeId, needsColumns, joinLeftColumn, joinRightColumn, joinType]);
+  })();
 
-  const joinPreviewSignature = useMemo(() => {
+  const joinPreviewSignature = (() => {
     if (!joinPreviewRequest) return 'join-preview-disabled';
     return JSON.stringify({
       leftNodeId: joinPreviewRequest.leftNodeId,
@@ -261,9 +258,9 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
       rightOn: joinPreviewRequest.rightOn ?? null,
       joinType: joinPreviewRequest.joinType,
     });
-  }, [joinPreviewRequest]);
+  })();
 
-  const joinPreviewFetcher = useCallback(async ({
+  const joinPreviewFetcher = async ({
     request,
     page,
     pageSize,
@@ -289,7 +286,7 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
       columns: Array.isArray(response?.columns) ? response.columns : [],
       pagination: response?.pagination ?? null,
     };
-  }, []);
+  };
 
   const {
     data: joinPreviewData,
@@ -308,43 +305,43 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
     fetcher: joinPreviewFetcher,
   });
 
-  const joinPreviewColumnsToRender = useMemo(() => {
+  const joinPreviewColumnsToRender = (() => {
     if (joinPreviewColumns.length > 0) return joinPreviewColumns;
     if (joinPreviewData.length > 0 && typeof joinPreviewData[0] === 'object' && joinPreviewData[0] !== null) {
       return Object.keys(joinPreviewData[0]);
     }
     return [];
-  }, [joinPreviewColumns, joinPreviewData]);
+  })();
 
-  const handleJoinPreviewPrev = useCallback(() => {
+  const handleJoinPreviewPrev = () => {
     if (joinPreviewPagination?.has_prev && !joinPreviewLoading) {
       setJoinPreviewPage(Math.max(1, joinPreviewPage - 1));
     }
-  }, [joinPreviewPagination, joinPreviewLoading, joinPreviewPage, setJoinPreviewPage]);
+  };
 
-  const handleJoinPreviewNext = useCallback(() => {
+  const handleJoinPreviewNext = () => {
     if (joinPreviewPagination?.has_next && !joinPreviewLoading) {
       setJoinPreviewPage(joinPreviewPage + 1);
     }
-  }, [joinPreviewPagination, joinPreviewLoading, joinPreviewPage, setJoinPreviewPage]);
+  };
 
-  const handleJoinPreviewPageSizeChange = useCallback((size: number) => {
+  const handleJoinPreviewPageSizeChange = (size: number) => {
     setJoinPreviewPageSize(size);
-  }, [setJoinPreviewPageSize]);
+  };
 
   const readyMessage = joinConfigIssues || 'Select two nodes and configure the join to view a preview.';
 
-  const handleJoinColumnChange = useCallback((nodeId: string, column: string) => {
+  const handleJoinColumnChange = (nodeId: string, column: string) => {
     if (nodeId === joinLeftNodeId) {
       setJoinLeftColumn(column);
     } else if (nodeId === joinRightNodeId) {
       setJoinRightColumn(column);
     }
-  }, [joinLeftNodeId, joinRightNodeId]);
+  };
 
-  const handleJoinColorChange = useCallback(() => undefined, []);
+  const handleJoinColorChange = () => undefined;
 
-  const handleApplyJoin = useCallback(async () => {
+  const handleApplyJoin = async () => {
     if (!joinConfigReady) {
       onAlert('Please select two different nodes and matching columns to join.');
       return;
@@ -361,7 +358,7 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
     } finally {
       setIsJoining(false);
     }
-  }, [joinConfigReady, needsColumns, joinLeftColumn, joinRightColumn, joinNewNodeName, joinNodes, joinLeftNodeId, joinRightNodeId, joinType, onAlert]);
+  };
 
   const selectionPanel: JoinSelectionPanelConfig = {
     selectedNodes: joinSelectedNodes,
@@ -381,20 +378,20 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
     },
   };
 
-  const sharedColumnsNotice = useMemo(() => {
+  const sharedColumnsNotice = (() => {
     if (!needsColumns) return null;
     if (!joinLeftNodeId || !joinRightNodeId || joinLeftNodeId === joinRightNodeId) return null;
     return sharedColumns.length > 0
       ? describeSharedColumns(sharedColumns.length, sharedColumns)
       : 'No matching column names detected. Select compatible columns manually.';
-  }, [needsColumns, joinLeftNodeId, joinRightNodeId, sharedColumns]);
+  })();
 
   const applyDisabled =
     !joinConfigReady || !currentWorkspaceId || isJoining || isLoading.operations;
 
-  const handleSetJoinType = useCallback((value: JoinType) => {
+  const handleSetJoinType = (value: JoinType) => {
     setJoinType(value);
-  }, []);
+  };
 
   return {
     selectionPanel,

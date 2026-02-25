@@ -9,6 +9,7 @@ import {
   collectTaskIds,
   pruneTasksById,
 } from '../../../../hooks/analysisTaskUtils';
+import { analysisServerRequestLockQueryKey } from '../../common';
 
 type NodeSelection = {
   id?: string;
@@ -45,7 +46,6 @@ type Params = {
   useCtTfidf: boolean;
   getAuthHeaders: () => Record<string, string>;
   lockWithSnapshots: (snapshots: Array<{ id: string; name: string; columns: string[] }>) => void;
-  setIsLocked: (value: boolean) => void;
   setIsRunning: (value: boolean) => void;
   runningRef: React.MutableRefObject<boolean>;
   setError: (value: string | null) => void;
@@ -79,7 +79,6 @@ export function useTopicModelingTaskFlow({
   useCtTfidf,
   getAuthHeaders,
   lockWithSnapshots,
-  setIsLocked,
   setIsRunning,
   runningRef,
   setError,
@@ -152,7 +151,6 @@ export function useTopicModelingTaskFlow({
 
       const normalizedSnapshots = applySelectedColumnsToSnapshots(lockSnapshots, nodeColumns);
       lockWithSnapshots(normalizedSnapshots);
-      setIsLocked(true);
 
       const req: TopicModelingRequest = {
         node_ids: requestNodeIds,
@@ -163,11 +161,11 @@ export function useTopicModelingTaskFlow({
 
       const res = await textApi.topicModeling(req, getAuthHeaders());
       setResultSafely(res as TopicModelingResponseLike);
+      await queryClient.invalidateQueries({ queryKey: analysisServerRequestLockQueryKey('topic_modeling', currentWorkspaceId) });
 
       if (res.state === 'failed') {
         setIsRunning(false);
         runningRef.current = false;
-        setIsLocked(false);
       }
 
       if (res.state !== 'successful' && res.state !== 'running') {
@@ -190,10 +188,10 @@ export function useTopicModelingTaskFlow({
     effectiveNodeColumnSelections,
     panelSelectedNodes,
     lockWithSnapshots,
-    setIsLocked,
     minTopicSize,
     useCtTfidf,
     getAuthHeaders,
+    queryClient,
   ]);
 
   const openDetachDialog = useCallback(async () => {
@@ -310,7 +308,6 @@ export function useTopicModelingTaskFlow({
       setIsClearing(false);
       setResultSafely(null);
       unlockSelection();
-      setIsLocked(false);
       setIsRunning(false);
       runningRef.current = false;
       setLocalTopicModelingTaskId(null);
@@ -332,6 +329,7 @@ export function useTopicModelingTaskFlow({
             )
           : prev
       );
+      void queryClient.invalidateQueries({ queryKey: analysisServerRequestLockQueryKey('topic_modeling', currentWorkspaceId) });
     }
   }, [
     currentWorkspaceId,
@@ -345,7 +343,6 @@ export function useTopicModelingTaskFlow({
     resolveTopicModelingTaskId,
     setResultSafely,
     unlockSelection,
-    setIsLocked,
     setIsRunning,
     runningRef,
     setLocalTopicModelingTaskId,
@@ -353,6 +350,7 @@ export function useTopicModelingTaskFlow({
     setNodeColumnSelections,
     recomputeAutoColumns,
     setTasks,
+    queryClient,
   ]);
 
   return {

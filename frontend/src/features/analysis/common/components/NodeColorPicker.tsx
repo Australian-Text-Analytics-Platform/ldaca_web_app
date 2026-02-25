@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -24,17 +24,14 @@ export const NodeColorPicker: React.FC<NodeColorPickerProps> = ({
     setHexInput(color.toUpperCase());
   }, [color]);
 
-  const handleHexChange = useCallback(
-    (value: string) => {
-      const trimmed = value.trim().toUpperCase();
-      const normalized = trimmed.startsWith('#') ? trimmed : `#${trimmed}`;
-      setHexInput(normalized);
-      if (/^#[0-9A-F]{6}$/.test(normalized)) {
-        onChange(normalized);
-      }
-    },
-    [onChange]
-  );
+  const handleHexChange = (value: string) => {
+    const trimmed = value.trim().toUpperCase();
+    const normalized = trimmed.startsWith('#') ? trimmed : `#${trimmed}`;
+    setHexInput(normalized);
+    if (/^#[0-9A-F]{6}$/.test(normalized)) {
+      onChange(normalized);
+    }
+  };
 
   return (
     <DropdownMenu>

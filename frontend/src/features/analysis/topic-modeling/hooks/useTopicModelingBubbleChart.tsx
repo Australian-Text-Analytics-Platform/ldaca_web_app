@@ -45,6 +45,20 @@ type Params = {
   defaultPalette: string[];
 };
 
+const resolvePanelColor = (
+  index: number,
+  fallback: string,
+  panelNodeIds: string[],
+  nodeColors: Record<string, string>,
+  defaultPalette: string[]
+) => {
+  const nodeId = panelNodeIds[index];
+  if (nodeId) {
+    return nodeColors[nodeId] || defaultPalette[index] || fallback;
+  }
+  return fallback;
+};
+
 export function useTopicModelingBubbleChart({
   topics,
   activeDomain,
@@ -69,46 +83,32 @@ export function useTopicModelingBubbleChart({
   const fallbackPrimaryColor = defaultPalette[0] ?? '#2563eb';
   const fallbackSecondaryColor = defaultPalette[1] ?? '#dc2626';
 
-  const getPanelColor = React.useCallback(
-    (index: number, fallback: string) => {
-      const nodeId = panelNodeIds[index];
-      if (nodeId) {
-        return nodeColors[nodeId] || defaultPalette[index] || fallback;
-      }
-      return fallback;
-    },
-    [panelNodeIds, nodeColors, defaultPalette]
-  );
-
-  const renderSizeComposition = React.useCallback(
-    (sizes: number[] | undefined, total?: number | null) => {
-      if (corpusCount === 0 || !sizes) return null;
-      if (sizes.length === 1) {
-        const color = getPanelColor(0, fallbackPrimaryColor);
-        const fg = getReadableTextColor(color);
-        return (
-          <span className="inline-flex items-center gap-1">
-            <span style={{ background: color, color: fg }} className="px-1.5 py-0.5 rounded text-[10px] font-medium">{sizes[0]}</span>
-            <span className="text-[10px] text-gray-500">= {total}</span>
-          </span>
-        );
-      }
-
-      const colorA = getPanelColor(0, fallbackPrimaryColor);
-      const colorB = getPanelColor(1, fallbackSecondaryColor);
-      const fgA = getReadableTextColor(colorA);
-      const fgB = getReadableTextColor(colorB);
+  const renderSizeComposition = (sizes: number[] | undefined, total?: number | null) => {
+    if (corpusCount === 0 || !sizes) return null;
+    if (sizes.length === 1) {
+      const color = resolvePanelColor(0, fallbackPrimaryColor, panelNodeIds, nodeColors, defaultPalette);
+      const fg = getReadableTextColor(color);
       return (
-        <span className="inline-flex items-center gap-1 flex-wrap">
-          <span style={{ background: colorA, color: fgA }} className="px-1.5 py-0.5 rounded text-[10px] font-medium">{sizes[0]}</span>
-          <span className="text-[10px] text-gray-500">+</span>
-          <span style={{ background: colorB, color: fgB }} className="px-1.5 py-0.5 rounded text-[10px] font-medium">{sizes[1]}</span>
+        <span className="inline-flex items-center gap-1">
+          <span style={{ background: color, color: fg }} className="px-1.5 py-0.5 rounded text-[10px] font-medium">{sizes[0]}</span>
           <span className="text-[10px] text-gray-500">= {total}</span>
         </span>
       );
-    },
-    [corpusCount, getPanelColor, fallbackPrimaryColor, fallbackSecondaryColor]
-  );
+    }
+
+    const colorA = resolvePanelColor(0, fallbackPrimaryColor, panelNodeIds, nodeColors, defaultPalette);
+    const colorB = resolvePanelColor(1, fallbackSecondaryColor, panelNodeIds, nodeColors, defaultPalette);
+    const fgA = getReadableTextColor(colorA);
+    const fgB = getReadableTextColor(colorB);
+    return (
+      <span className="inline-flex items-center gap-1 flex-wrap">
+        <span style={{ background: colorA, color: fgA }} className="px-1.5 py-0.5 rounded text-[10px] font-medium">{sizes[0]}</span>
+        <span className="text-[10px] text-gray-500">+</span>
+        <span style={{ background: colorB, color: fgB }} className="px-1.5 py-0.5 rounded text-[10px] font-medium">{sizes[1]}</span>
+        <span className="text-[10px] text-gray-500">= {total}</span>
+      </span>
+    );
+  };
 
   const bubbleElements = React.useMemo(() => {
     if (!topics.length || !activeDomain) return null;
@@ -152,8 +152,8 @@ export function useTopicModelingBubbleChart({
         {topics.map((topic) => {
           const sizes = topic.size || [];
           const proportion = corpusCount === 2 && topic.total_size > 0 ? sizes[0] / topic.total_size : 0.5;
-          const colorA = getPanelColor(0, fallbackPrimaryColor);
-          const colorB = getPanelColor(1, fallbackSecondaryColor);
+          const colorA = resolvePanelColor(0, fallbackPrimaryColor, panelNodeIds, nodeColors, defaultPalette);
+          const colorB = resolvePanelColor(1, fallbackSecondaryColor, panelNodeIds, nodeColors, defaultPalette);
           const fill = interpolateColor(colorA, colorB, proportion);
           const radius = 10 + 40 * Math.sqrt(topic.total_size / (maxSize || 1));
           const cx = scaleX(topic.x);
@@ -235,11 +235,13 @@ export function useTopicModelingBubbleChart({
     setHoveredTopicId,
     setTooltip,
     corpusCount,
-    getPanelColor,
     fallbackPrimaryColor,
     fallbackSecondaryColor,
     hoveredTopicId,
     chartRef,
+    panelNodeIds,
+    nodeColors,
+    defaultPalette,
   ]);
 
   return {

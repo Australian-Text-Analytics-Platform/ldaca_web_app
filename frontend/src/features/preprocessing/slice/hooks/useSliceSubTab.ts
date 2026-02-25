@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { SliceRequest as SliceRequestPayload, FilterPreviewResponse } from '../../../../api/nodes';
 import type { NodeColumnSelection, WorkspaceNodeLike } from '../../../../components/NodeSelectionPanel';
 import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
@@ -121,18 +121,18 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
   const [isSlicing, setIsSlicing] = useState(false);
   const [lastResult, setLastResult] = useState<SliceHistory | null>(null);
 
-  const workspaceNodeMap = useMemo(() => buildWorkspaceNodeMap(workspaceNodes), [workspaceNodes]);
+  const workspaceNodeMap = buildWorkspaceNodeMap(workspaceNodes);
 
-  const activeNode = useMemo<WorkspaceNodeLike | null>(() => {
+  const activeNode = (() => {
     if (selectedNode) return selectedNode;
     if (!selectedNodeId) return null;
     return workspaceNodeMap.get(selectedNodeId) ?? null;
-  }, [selectedNode, selectedNodeId, workspaceNodeMap]);
+  })() as WorkspaceNodeLike | null;
 
-  const selectedNodeLabel = useMemo(() => {
+  const selectedNodeLabel = (() => {
     if (!selectedNodeId) return '';
     return deriveNodeLabel(activeNode) || selectedNodeId;
-  }, [activeNode, selectedNodeId]);
+  })();
 
   useEffect(() => {
     setInlineError(null);
@@ -154,15 +154,11 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
     setInlineError(null);
   }, [selectedNodeId, selectedNodeLabel]);
 
-  const sliceSelectedNodesForPanel = useMemo<WorkspaceNodeLike[]>(() => (activeNode ? [activeNode] : []), [activeNode]);
+  const sliceSelectedNodesForPanel = activeNode ? [activeNode] : [];
 
-  const sliceNodeSelections = useMemo<NodeColumnSelection[]>(() => (
-    selectedNodeId ? [{ nodeId: selectedNodeId, column: '' }] : []
-  ), [selectedNodeId]);
+  const sliceNodeSelections: NodeColumnSelection[] = selectedNodeId ? [{ nodeId: selectedNodeId, column: '' }] : [];
 
-  const sliceNodeColors = useMemo(() => (
-    selectedNodeId ? { [selectedNodeId]: DEFAULT_PALETTE[0] } : {}
-  ), [selectedNodeId]);
+  const sliceNodeColors = selectedNodeId ? { [selectedNodeId]: DEFAULT_PALETTE[0] } : {};
 
   const hasSelection = Boolean(selectedNodeId);
 
@@ -176,7 +172,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
     lengthNumber === null || (Number.isInteger(lengthNumber) && lengthNumber >= 0);
   const lengthValue = lengthNumber === null ? undefined : lengthNumber;
 
-  const rangeSummary = useMemo(() => {
+  const rangeSummary = (() => {
     if (!hasSelection) {
       return 'Select a node to configure slicing.';
     }
@@ -194,9 +190,9 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
     }
     const endRow = offsetNumber + lengthValue - 1;
     return `Rows ${offsetNumber}–${endRow} inclusive (${lengthValue} total).`;
-  }, [hasSelection, offsetNumber, offsetValid, lengthValid, lengthValue]);
+  })();
 
-  const lastResultSummary = useMemo(() => {
+  const lastResultSummary = (() => {
     if (!lastResult) {
       return 'Adjust parameters and add to workspace to create a sliced node.';
     }
@@ -208,7 +204,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
     }
     const endRow = lastResult.offset + lastResult.length - 1;
     return `Last slice “${lastResult.nodeName}” (rows ${lastResult.offset}–${endRow}).`;
-  }, [lastResult]);
+  })();
 
   const previewReady = hasSelection && offsetValid && lengthValid;
 
@@ -217,7 +213,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
     payload: SliceRequestPayload;
   }
 
-  const slicePreviewRequest = useMemo<SlicePreviewRequest | null>(() => {
+  const slicePreviewRequest: SlicePreviewRequest | null = (() => {
     if (!previewReady || !selectedNodeId) {
       return null;
     }
@@ -226,14 +222,14 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
       nodeId: selectedNodeId,
       payload,
     };
-  }, [previewReady, selectedNodeId, offsetNumber, lengthValue]);
+  })();
 
-  const previewSignature = useMemo(() => {
+  const previewSignature = (() => {
     if (!slicePreviewRequest) return 'slice-preview-disabled';
     return `${slicePreviewRequest.nodeId}::${JSON.stringify(slicePreviewRequest.payload)}`;
-  }, [slicePreviewRequest]);
+  })();
 
-  const previewFetcher = useCallback(async ({
+  const previewFetcher = async ({
     request,
     page,
     pageSize,
@@ -248,7 +244,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
       columns: Array.isArray(response?.columns) ? response.columns : [],
       pagination: (response?.pagination as PreviewPagination) ?? null,
     };
-  }, [slicePreview]);
+  };
 
   const {
     data: previewData,
@@ -269,17 +265,17 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
 
   const currentPreviewPage = previewPagination?.page ?? previewPage;
 
-  const handlePreviewPrev = useCallback(() => {
+  const handlePreviewPrev = () => {
     if (previewPagination?.has_prev && !previewLoading) {
       setPreviewPage(Math.max(1, currentPreviewPage - 1));
     }
-  }, [previewPagination, previewLoading, currentPreviewPage, setPreviewPage]);
+  };
 
-  const handlePreviewNext = useCallback(() => {
+  const handlePreviewNext = () => {
     if (previewPagination?.has_next && !previewLoading) {
       setPreviewPage(currentPreviewPage + 1);
     }
-  }, [previewPagination, previewLoading, currentPreviewPage, setPreviewPage]);
+  };
 
   const previewReadyMessage = !hasSelection
     ? 'Select a node to preview sliced rows.'
@@ -288,7 +284,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
   const applyDisabled =
     !hasSelection || !offsetValid || !lengthValid || isSlicing || isLoading.operations;
 
-  const applySlice = useCallback(async () => {
+  const applySlice = async () => {
     if (!selectedNodeId) {
       setInlineError('Select a node to slice.');
       return;
@@ -337,7 +333,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
     } finally {
       setIsSlicing(false);
     }
-  }, [lengthValid, lengthValue, newNodeName, offsetNumber, offsetValid, onAlert, selectedNodeId, selectedNodeLabel, sliceNode]);
+  };
 
   return {
     selectionPanel: {

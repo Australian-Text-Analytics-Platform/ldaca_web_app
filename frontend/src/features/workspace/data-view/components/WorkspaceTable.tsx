@@ -206,7 +206,7 @@ export function WorkspaceTable({
     return result;
   }, [columns, sanitizedData]);
 
-  const toggleColumnWidth = useCallback((columnId: string) => {
+  const toggleColumnWidth = (columnId: string) => {
     setExpandedColumns((prev) => {
       if (prev[columnId]) {
         const { [columnId]: _removed, ...rest } = prev;
@@ -214,7 +214,7 @@ export function WorkspaceTable({
       }
       return { ...prev, [columnId]: true };
     });
-  }, []);
+  };
 
   const performCast = useCallback(
     async (column: string, targetType: string, format?: string) => {
@@ -279,7 +279,7 @@ export function WorkspaceTable({
     [datetimeModal, performCast]
   );
 
-  const beginRename = useCallback((column: string) => {
+  const beginRename = (column: string) => {
     setRenameState({ column, value: column });
     setTimeout(() => {
       const input = renameInputRefs.current[column];
@@ -288,11 +288,11 @@ export function WorkspaceTable({
         input.select();
       }
     }, 20);
-  }, []);
+  };
 
-  const updateRenameDraft = useCallback((column: string, nextValue: string) => {
+  const updateRenameDraft = (column: string, nextValue: string) => {
     setRenameState((prev) => (prev && prev.column === column ? { column, value: nextValue } : prev));
-  }, []);
+  };
 
   const setColumnBusy = useCallback((column: string, active: boolean) => {
     setColumnActionLoading((prev) => {
@@ -357,16 +357,13 @@ export function WorkspaceTable({
     [renameState, onRenameColumn, columns, onRefreshSchema, applySchema, setColumnBusy]
   );
 
-  const requestDeleteColumn = useCallback(
-    async (column: string) => {
-      if (!onDeleteColumn) {
-        return;
-      }
-      setColumnToDelete(column);
-      setDeleteColumnDialogOpen(true);
-    },
-    [onDeleteColumn]
-  );
+  const requestDeleteColumn = async (column: string) => {
+    if (!onDeleteColumn) {
+      return;
+    }
+    setColumnToDelete(column);
+    setDeleteColumnDialogOpen(true);
+  };
 
   const confirmDeleteColumn = useCallback(async () => {
     if (!columnToDelete || !onDeleteColumn) {

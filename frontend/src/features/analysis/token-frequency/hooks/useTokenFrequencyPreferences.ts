@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { TokenFrequencyResponse } from '@/api/text';
 import { textApi } from '@/api/text';
 import { clampDisplayTokenLimit, DEFAULT_TOKEN_LIMIT, toFiniteNumber } from '../../common';
@@ -32,7 +32,7 @@ export const useTokenFrequencyPreferences = ({
   const [tokenLimitError, setTokenLimitError] = useState<string | null>(null);
   const [isApplyingTokenLimit, setIsApplyingTokenLimit] = useState(false);
 
-  const applyTokenLimitState = useCallback((rawLimit: number | null | undefined) => {
+  const applyTokenLimitState = (rawLimit: number | null | undefined) => {
     const target = typeof rawLimit === 'number' && Number.isFinite(rawLimit) && rawLimit > 0
       ? rawLimit
       : DEFAULT_TOKEN_LIMIT;
@@ -41,7 +41,7 @@ export const useTokenFrequencyPreferences = ({
     setTokenLimitOverride(inputLimit);
     setTokenLimitInput(String(inputLimit));
     setTokenLimitError(null);
-  }, [maxTokenLimitInput]);
+  };
 
   useEffect(() => {
     const backendLimit =
@@ -81,86 +81,80 @@ export const useTokenFrequencyPreferences = ({
     return DEFAULT_TOKEN_LIMIT;
   })();
 
-  const persistTokenPreferences = useCallback(
-    async (prefs: { token_limit?: number; stop_words?: string[] }) => {
-      if (!currentWorkspaceId) return;
-      const taskId = await resolveTokenFrequencyTaskId();
-      if (!taskId) return;
+  const persistTokenPreferences = async (prefs: { token_limit?: number; stop_words?: string[] }) => {
+    if (!currentWorkspaceId) return;
+    const taskId = await resolveTokenFrequencyTaskId();
+    if (!taskId) return;
 
-      const payload: Record<string, any> = {};
-      if (prefs.token_limit !== undefined) {
-        payload.token_limit = Math.min(
-          clampDisplayTokenLimit(prefs.token_limit).limit,
-          maxTokenLimitInput
-        );
+    const payload: Record<string, any> = {};
+    if (prefs.token_limit !== undefined) {
+      payload.token_limit = Math.min(
+        clampDisplayTokenLimit(prefs.token_limit).limit,
+        maxTokenLimitInput
+      );
+    }
+    if (prefs.stop_words !== undefined) {
+      payload.stop_words = prefs.stop_words;
+    }
+    if (Object.keys(payload).length === 0) return;
+
+    await textApi.postTokenFrequenciesTaskResult(taskId, payload, getAuthHeaders());
+  };
+
+  const updateResultsPreferencesLocally = (prefs: { tokenLimit?: number; stopWords?: string[] }) => {
+    setResults((prev) => {
+      if (!prev) return prev;
+
+      const metadata = { ...(((prev as any)?.metadata) ?? {}) } as Record<string, any>;
+      const analysisParams = { ...(prev.analysis_params ?? {}) } as Record<string, any>;
+
+      let nextTokenLimit: number | undefined;
+      const existingTokenLimit =
+        typeof prev.token_limit === 'number' && Number.isFinite(prev.token_limit)
+          ? prev.token_limit
+          : undefined;
+      if (prefs.tokenLimit !== undefined) {
+        nextTokenLimit = prefs.tokenLimit;
+      } else {
+        nextTokenLimit = existingTokenLimit;
       }
-      if (prefs.stop_words !== undefined) {
-        payload.stop_words = prefs.stop_words;
+
+      if (nextTokenLimit !== undefined && Number.isFinite(nextTokenLimit)) {
+        const { limit: normalizedLimit } = clampDisplayTokenLimit(nextTokenLimit);
+        const inputLimit = Math.min(normalizedLimit, maxTokenLimitInput);
+        metadata.token_limit = inputLimit;
+        analysisParams.token_limit = inputLimit;
+        nextTokenLimit = inputLimit;
       }
-      if (Object.keys(payload).length === 0) return;
 
-      await textApi.postTokenFrequenciesTaskResult(taskId, payload, getAuthHeaders());
-    },
-    [currentWorkspaceId, getAuthHeaders, maxTokenLimitInput, resolveTokenFrequencyTaskId]
-  );
+      delete metadata.limit;
+      delete analysisParams.limit;
 
-  const updateResultsPreferencesLocally = useCallback(
-    (prefs: { tokenLimit?: number; stopWords?: string[] }) => {
-      setResults((prev) => {
-        if (!prev) return prev;
+      const stopWordsArray =
+        prefs.stopWords !== undefined
+          ? prefs.stopWords
+          : Array.isArray(prev.stop_words)
+          ? prev.stop_words
+          : Array.isArray(metadata.stop_words)
+          ? metadata.stop_words
+          : [];
 
-        const metadata = { ...(((prev as any)?.metadata) ?? {}) } as Record<string, any>;
-        const analysisParams = { ...(prev.analysis_params ?? {}) } as Record<string, any>;
+      metadata.stop_words = stopWordsArray;
+      analysisParams.stop_words = stopWordsArray;
 
-        let nextTokenLimit: number | undefined;
-        const existingTokenLimit =
-          typeof prev.token_limit === 'number' && Number.isFinite(prev.token_limit)
-            ? prev.token_limit
-            : undefined;
-        if (prefs.tokenLimit !== undefined) {
-          nextTokenLimit = prefs.tokenLimit;
-        } else {
-          nextTokenLimit = existingTokenLimit;
-        }
+      return {
+        ...prev,
+        token_limit: nextTokenLimit ?? undefined,
+        analysis_params: analysisParams,
+        metadata,
+        stop_words: stopWordsArray,
+        message: prev.message,
+        state: prev.state,
+      } as TokenFrequencyResponse;
+    });
+  };
 
-        if (nextTokenLimit !== undefined && Number.isFinite(nextTokenLimit)) {
-          const { limit: normalizedLimit } = clampDisplayTokenLimit(nextTokenLimit);
-          const inputLimit = Math.min(normalizedLimit, maxTokenLimitInput);
-          metadata.token_limit = inputLimit;
-          analysisParams.token_limit = inputLimit;
-          nextTokenLimit = inputLimit;
-        }
-
-        delete metadata.limit;
-        delete analysisParams.limit;
-
-        const stopWordsArray =
-          prefs.stopWords !== undefined
-            ? prefs.stopWords
-            : Array.isArray(prev.stop_words)
-            ? prev.stop_words
-            : Array.isArray(metadata.stop_words)
-            ? metadata.stop_words
-            : [];
-
-        metadata.stop_words = stopWordsArray;
-        analysisParams.stop_words = stopWordsArray;
-
-        return {
-          ...prev,
-          token_limit: nextTokenLimit ?? undefined,
-          analysis_params: analysisParams,
-          metadata,
-          stop_words: stopWordsArray,
-          message: prev.message,
-          state: prev.state,
-        } as TokenFrequencyResponse;
-      });
-    },
-    [maxTokenLimitInput, setResults]
-  );
-
-  const applyTokenLimitWithValidation = useCallback(async () => {
+  const applyTokenLimitWithValidation = async () => {
     const parsed = toFiniteNumber(tokenLimitInput);
     if (parsed === null) {
       setTokenLimitError('Enter a whole number greater than zero.');
@@ -198,42 +192,28 @@ export const useTokenFrequencyPreferences = ({
     } finally {
       setIsApplyingTokenLimit(false);
     }
-  }, [
-    applyTokenLimitState,
-    effectiveTokenLimit,
-    maxTokenLimitInput,
-    persistTokenPreferences,
-    results,
-    tokenLimitInput,
-    updateResultsPreferencesLocally,
-  ]);
+  };
 
-  const saveStopWordsToBackend = useCallback(
-    async (words: string[]) => {
-      try {
-        await persistTokenPreferences({ stop_words: words });
-        updateResultsPreferencesLocally({ stopWords: words });
-      } catch (error) {
-        console.warn('Failed to save stop words', error);
-      }
-    },
-    [persistTokenPreferences, updateResultsPreferencesLocally]
-  );
+  const saveStopWordsToBackend = async (words: string[]) => {
+    try {
+      await persistTokenPreferences({ stop_words: words });
+      updateResultsPreferencesLocally({ stopWords: words });
+    } catch (error) {
+      console.warn('Failed to save stop words', error);
+    }
+  };
 
-  const applyStopSetFromText = useCallback(
-    (text: string) => {
-      const words = text
-        .split(',')
-        .map((word) => word.trim().toLowerCase())
-        .filter(Boolean);
-      setStopWords(words.join(', '));
-      setAppliedStopSet(new Set(words));
-      void saveStopWordsToBackend(words);
-    },
-    [saveStopWordsToBackend]
-  );
+  const applyStopSetFromText = (text: string) => {
+    const words = text
+      .split(',')
+      .map((word) => word.trim().toLowerCase())
+      .filter(Boolean);
+    setStopWords(words.join(', '));
+    setAppliedStopSet(new Set(words));
+    void saveStopWordsToBackend(words);
+  };
 
-  const handleTokenLimitInputChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleTokenLimitInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const raw = event.target.value;
 
     if (!raw) {
@@ -254,20 +234,20 @@ export const useTokenFrequencyPreferences = ({
 
     setTokenLimitInput(raw);
     if (tokenLimitError) setTokenLimitError(null);
-  }, [maxTokenLimitInput, tokenLimitError]);
+  };
 
-  const handleTokenLimitBlur = useCallback(() => {
+  const handleTokenLimitBlur = () => {
     void applyTokenLimitWithValidation();
-  }, [applyTokenLimitWithValidation]);
+  };
 
-  const handleTokenLimitKeyDown = useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleTokenLimitKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter') {
       event.preventDefault();
       void applyTokenLimitWithValidation();
     }
-  }, [applyTokenLimitWithValidation]);
+  };
 
-  const handleFillDefaultStopWords = useCallback(async () => {
+  const handleFillDefaultStopWords = async () => {
     setIsLoadingStopWords(true);
     try {
       const response = await textApi.defaultStopWords(getAuthHeaders());
@@ -284,11 +264,11 @@ export const useTokenFrequencyPreferences = ({
     } finally {
       setIsLoadingStopWords(false);
     }
-  }, [applyStopSetFromText, getAuthHeaders]);
+  };
 
-  const resetPreferenceUiState = useCallback(() => {
+  const resetPreferenceUiState = () => {
     setTokenLimitError(null);
-  }, []);
+  };
 
   return {
     stopWords,

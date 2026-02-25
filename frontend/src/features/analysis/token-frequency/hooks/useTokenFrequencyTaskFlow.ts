@@ -1,4 +1,3 @@
-import { useCallback } from 'react';
 import { toast } from 'sonner';
 import { textApi, type TokenFrequencyRequest, type TokenFrequencyResponse } from '@/api/text';
 import { workspacesApi } from '@/api/workspaces';
@@ -27,7 +26,6 @@ type UseTokenFrequencyTaskFlowParams = {
   setIsAnalyzing: React.Dispatch<React.SetStateAction<boolean>>;
   analyzingRef: React.MutableRefObject<boolean>;
   setResultsSafely: (value: any) => void;
-  setIsLocked: React.Dispatch<React.SetStateAction<boolean>>;
   setLastCompareNodeIds: React.Dispatch<React.SetStateAction<string[]>>;
   setAppliedStopSet: React.Dispatch<React.SetStateAction<Set<string>>>;
   setStopWords: React.Dispatch<React.SetStateAction<string>>;
@@ -61,7 +59,6 @@ export const useTokenFrequencyTaskFlow = ({
   setIsAnalyzing,
   analyzingRef,
   setResultsSafely,
-  setIsLocked,
   setLastCompareNodeIds,
   setAppliedStopSet,
   setStopWords,
@@ -78,7 +75,7 @@ export const useTokenFrequencyTaskFlow = ({
   getColorForNode,
   lastFetchedRef,
 }: UseTokenFrequencyTaskFlowParams) => {
-  const handleAnalyze = useCallback(async () => {
+  const handleAnalyze = async () => {
     if (!currentWorkspaceId || selectedNodes.length === 0) {
       return;
     }
@@ -128,8 +125,6 @@ export const useTokenFrequencyTaskFlow = ({
         /* best effort lock */
       }
 
-      setIsLocked(true);
-
       const response = await textApi.tokenFrequencies(request, getAuthHeaders());
       setResultsSafely(response);
 
@@ -151,7 +146,6 @@ export const useTokenFrequencyTaskFlow = ({
       if (response.state === 'failed') {
         setIsAnalyzing(false);
         analyzingRef.current = false;
-        setIsLocked(false);
       }
     } catch (error) {
       console.error('Error calculating token frequencies:', error);
@@ -164,25 +158,9 @@ export const useTokenFrequencyTaskFlow = ({
       setIsAnalyzing(false);
       analyzingRef.current = false;
     }
-  }, [
-    analyzingRef,
-    currentWorkspaceId,
-    effectiveNodeColumnSelections,
-    getAuthHeaders,
-    lastFetchedRef,
-    lockWithSnapshots,
-    selectedNodes,
-    setAppliedStopSet,
-    setIsAnalyzing,
-    setIsLocked,
-    setLastCompareNodeIds,
-    setLocalTokenFrequencyTaskId,
-    setResultsSafely,
-    setStopWords,
-    stopWords,
-  ]);
+  };
 
-  const handleClearResults = useCallback(async () => {
+  const handleClearResults = async () => {
     if (currentWorkspaceId) {
       const taskIds = collectTaskIds([
         (results as any)?.metadata?.task_id,
@@ -214,7 +192,6 @@ export const useTokenFrequencyTaskFlow = ({
     setLocalTokenFrequencyTaskId(null);
     lastFetchedRef.current = { taskId: null, state: null };
     unlockSelection();
-    setIsLocked(false);
     setIsAnalyzing(false);
     analyzingRef.current = false;
     setLastCompareNodeIds([]);
@@ -234,29 +211,9 @@ export const useTokenFrequencyTaskFlow = ({
           )
         : prev
     );
-  }, [
-    analyzingRef,
-    currentWorkspaceId,
-    getAuthHeaders,
-    lastFetchedRef,
-    localTokenFrequencyTaskId,
-    resetPreferenceUiState,
-    resolveTokenFrequencyTaskId,
-    results,
-    setIsAnalyzing,
-    setIsLocked,
-    setLastCompareNodeIds,
-    setLocalTokenFrequencyTaskId,
-    setResultsSafely,
-    setTasks,
-    tokenFrequencyTaskStatus.activeTaskId,
-    tokenFrequencyTaskStatus.failedTask?.task_id,
-    tokenFrequencyTaskStatus.runningTask?.task_id,
-    tokenFrequencyTaskStatus.successfulTask?.task_id,
-    unlockSelection,
-  ]);
+  };
 
-  const handleTokenClick = useCallback((token: string) => {
+  const handleTokenClick = (token: string) => {
     const trimmedToken = token?.toString() ?? '';
     const analysisParams = (results?.analysis_params ?? null) as TokenFrequencyAnalysisParams | null;
 
@@ -317,21 +274,9 @@ export const useTokenFrequencyTaskFlow = ({
     });
 
     setCurrentView('concordance');
-  }, [
-    effectiveNodeColumnSelections,
-    getColorForNode,
-    lastCompareNodeIds,
-    lockedNodeNameMap,
-    nodeColors,
-    nodeIdToName,
-    results?.analysis_params,
-    selectNodes,
-    selectedNodes,
-    setCurrentView,
-    setPendingConcordance,
-  ]);
+  };
 
-  const handleTokenRightClick = useCallback((token: string, event?: React.MouseEvent) => {
+  const handleTokenRightClick = (token: string, event?: React.MouseEvent) => {
     if (event) event.preventDefault();
     const tokenNormalized = token.trim().toLowerCase();
     const current = stopWords
@@ -344,7 +289,7 @@ export const useTokenFrequencyTaskFlow = ({
       setStopWords(updated);
       applyStopSetFromText(updated);
     }
-  }, [applyStopSetFromText, setStopWords, stopWords]);
+  };
 
   return {
     handleAnalyze,

@@ -175,7 +175,7 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
   }>>({});
   const [optionSearchQueries, setOptionSearchQueries] = useState<Record<string, string>>({});
 
-  const availableColumns = useMemo(() => {
+  const availableColumns = (() => {
     const columns: ConditionColumnOption[] = [];
     const dtypes =
       nodeData?.dtypes && typeof nodeData.dtypes === 'object'
@@ -200,14 +200,14 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     }
 
     return columns;
-  }, [nodeData?.columns, nodeData?.dtypes, selectedNode?.schema]);
+  })();
 
   const hasSelection = Boolean(selectedNodeId);
   const hasSchema = availableColumns.length > 0;
   const isSchemaLoading = hasSelection && !hasSchema && (isLoading.nodeData || isLoading.graph);
   const isConfigDisabled = !hasSelection || !hasSchema;
 
-  const workspaceNodeMap = useMemo(() => {
+  const workspaceNodeMap = (() => {
     const map = new Map<string, WorkspaceNodeLike>();
     workspaceNodes.forEach((node: WorkspaceNodeLike) => {
       const key = (node.id as string | undefined) ?? ((node as Record<string, unknown>).node_id as string | undefined);
@@ -216,13 +216,14 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
       }
     });
     return map;
-  }, [workspaceNodes]);
+    return map;
+  })();
 
-  const filterSelectedNodesForPanel = useMemo<WorkspaceNodeLike[]>(() => {
+  const filterSelectedNodesForPanel = (() => {
     if (!selectedNodeId) return [];
     const node = workspaceNodeMap.get(selectedNodeId);
     return node ? [node] : [];
-  }, [selectedNodeId, workspaceNodeMap]);
+  })();
 
   const getCategoricalKey = useCallback(
     (column: string) => `${currentWorkspaceId ?? 'none'}::${selectedNodeId ?? 'none'}::${column}`,
@@ -310,22 +311,17 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     [currentWorkspaceId, selectedNodeId, getCategoricalKey]
   );
 
-  const filterDefaultPalette = useMemo(
-    () => ['#2563eb', '#dc2626', '#16a34a', '#f97316', '#d946ef', '#0ea5e9'],
-    [],
-  );
+  const filterDefaultPalette = ['#2563eb', '#dc2626', '#16a34a', '#f97316', '#d946ef', '#0ea5e9'];
 
-  const filterNodeColors = useMemo(() => {
+  const filterNodeColors = (() => {
     if (!selectedNodeId) return {} as Record<string, string>;
     return { [selectedNodeId]: filterDefaultPalette[0] ?? '#2563eb' };
-  }, [selectedNodeId, filterDefaultPalette]);
+  })();
 
-  const filterNodeSelections = useMemo<NodeColumnSelection[]>(() => (
-    selectedNodeId ? [{ nodeId: selectedNodeId, column: '' }] : []
-  ), [selectedNodeId]);
+  const filterNodeSelections: NodeColumnSelection[] = selectedNodeId ? [{ nodeId: selectedNodeId, column: '' }] : [];
 
-  const handleFilterColorChange = useCallback(() => undefined, []);
-  const handleFilterColumnChange = useCallback(() => undefined, []);
+  const handleFilterColorChange = () => undefined;
+  const handleFilterColumnChange = () => undefined;
 
   useEffect(() => {
     setCategoricalOptions({});
@@ -358,20 +354,20 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     }
   }, [selectedNode, selectedNodeId]);
 
-  const previewRequest = useMemo(() => {
+  const previewRequest = (() => {
     if (!conditions.length) return null;
     return buildFilterRequestPayload(conditions, logic);
-  }, [conditions, logic]);
+  })();
 
-  const previewRequestSignature = useMemo(() => {
+  const previewRequestSignature = (() => {
     if (!previewRequest) return '';
     const baseSignature = JSON.stringify(previewRequest);
     return selectedNodeId ? `${selectedNodeId}::${baseSignature}` : baseSignature;
-  }, [previewRequest, selectedNodeId]);
+  })();
 
   const previewReady = hasSelection && conditions.length > 0 && conditions.every(isConditionComplete);
 
-  const filterPreviewRequest = useMemo(() => {
+  const filterPreviewRequest = (() => {
     if (!previewReady || !selectedNodeId || !previewRequest) {
       return null;
     }
@@ -379,9 +375,9 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
       nodeId: selectedNodeId,
       payload: previewRequest,
     };
-  }, [previewReady, selectedNodeId, previewRequest]);
+  })();
 
-  const filterPreviewFetcher = useCallback(async ({
+  const filterPreviewFetcher = async ({
     request,
     page,
     pageSize,
@@ -398,7 +394,7 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
       columns: Array.isArray(response?.columns) ? response.columns : [],
       pagination: response?.pagination ?? null,
     };
-  }, [filterPreview]);
+  };
 
   const {
     data: previewData,
@@ -416,29 +412,29 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     fetcher: filterPreviewFetcher,
   });
 
-  const previewColumnsToRender = useMemo(() => {
+  const previewColumnsToRender = (() => {
     if (previewColumns.length > 0) return previewColumns;
     if (previewData.length > 0 && typeof previewData[0] === 'object' && previewData[0] !== null) {
       return Object.keys(previewData[0]);
     }
     return [];
-  }, [previewColumns, previewData]);
+  })();
 
   const currentPreviewPage = previewPagination?.page ?? previewPage;
   const previewHasPrev = Boolean(previewPagination?.has_prev);
   const previewHasNext = Boolean(previewPagination?.has_next);
 
-  const handlePreviewPrev = useCallback(() => {
+  const handlePreviewPrev = () => {
     if (previewHasPrev && !previewLoading) {
       setPreviewPage(Math.max(1, currentPreviewPage - 1));
     }
-  }, [previewHasPrev, previewLoading, currentPreviewPage, setPreviewPage]);
+  };
 
-  const handlePreviewNext = useCallback(() => {
+  const handlePreviewNext = () => {
     if (previewHasNext && !previewLoading) {
       setPreviewPage(currentPreviewPage + 1);
     }
-  }, [previewHasNext, previewLoading, currentPreviewPage, setPreviewPage]);
+  };
 
   const handleAddCondition = () => {
     const firstColumn = availableColumns[0];
@@ -566,33 +562,30 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     }
   };
 
-  const renderConditionMetadata = useCallback(
-    (condition: FilterConditionWithId, rowDisabled: boolean) => (
-      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+  const renderConditionMetadata = (condition: FilterConditionWithId, rowDisabled: boolean) => (
+    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+      <label className="flex items-center gap-1.5">
+        <Checkbox
+          id={`negate-${condition.id}`}
+          checked={Boolean(condition.negate)}
+          onCheckedChange={(checked) => handleConditionChange(condition.id, 'negate', checked === true)}
+          disabled={rowDisabled}
+        />
+        <span>negate</span>
+      </label>
+
+      {condition.dataType === 'string' && condition.operator === 'contains' && (
         <label className="flex items-center gap-1.5">
           <Checkbox
-            id={`negate-${condition.id}`}
-            checked={Boolean(condition.negate)}
-            onCheckedChange={(checked) => handleConditionChange(condition.id, 'negate', checked === true)}
+            id={`regex-${condition.id}`}
+            checked={Boolean(condition.regex ?? true)}
+            onCheckedChange={(checked) => handleConditionChange(condition.id, 'regex', checked === true)}
             disabled={rowDisabled}
           />
-          <span>negate</span>
+          <span>regex</span>
         </label>
-
-        {condition.dataType === 'string' && condition.operator === 'contains' && (
-          <label className="flex items-center gap-1.5">
-            <Checkbox
-              id={`regex-${condition.id}`}
-              checked={Boolean(condition.regex ?? true)}
-              onCheckedChange={(checked) => handleConditionChange(condition.id, 'regex', checked === true)}
-              disabled={rowDisabled}
-            />
-            <span>regex</span>
-          </label>
-        )}
-      </div>
-    ),
-    [handleConditionChange]
+      )}
+    </div>
   );
 
   const shouldHideOperatorSelect = (condition: FilterConditionWithId) => (

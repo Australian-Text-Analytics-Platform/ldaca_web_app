@@ -4,7 +4,7 @@ import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '../../../hooks/useWorkspaceSelection';
 import { useWorkspaceStatus } from '../../../hooks/useWorkspaceStatus';
 import { useAuth } from '../../../hooks/useAuth';
-import { useAnalysisLockState, useParameterChangeDetection } from '../../../hooks/useAnalysisLockState';
+import { useAnalysisLockState } from '../../../hooks/useAnalysisLockState';
 import { useSchemaManagement, useLatestRef, createNodeSnapshot, applySelectedColumnsToSnapshots } from '../../../hooks/useSchemaManagement';
 import { SequentialAnalysisRequest, SequentialFrequency, textApi } from '../../../api/text';
 import { nodesApi } from '../../../api/index';
@@ -40,7 +40,13 @@ import {
 } from 'recharts';
 import { normalizeTypeName } from '../../../utils/columnTypes';
 import { getAnalysisActionState } from '../common/analysisActionState';
-import { useAnalysisHydration } from '../common';
+import {
+  hasLockedParameterDiff,
+  normalizeStringArray,
+  normalizeUnknownStringArray,
+  useAnalysisHydration,
+} from '../common';
+import { useAnalysisServerRequestLock } from '../common';
 import {
   clearAnalysisTaskResults,
   collectTaskIds,
@@ -127,6 +133,11 @@ const SequentialAnalysisFeature: React.FC = () => {
   const { isLoading } = useWorkspaceStatus();
 
   const { getAuthHeaders } = useAuth();
+  const { hasServerRequest, serverRequest } = useAnalysisServerRequestLock({
+    analysisType: 'sequential_analysis',
+    workspaceId: currentWorkspaceId,
+    getAuthHeaders,
+  });
 
   // Use shared analysis lock state hook
   const {
@@ -181,16 +192,6 @@ const SequentialAnalysisFeature: React.FC = () => {
     numericInterval: number | null;
   } | null>(null);
   
-  // Track locked parameters and detect changes
-  const [lockedParams, setLockedParams] = useState<{
-    frequency: SequentialFrequency;
-    groupByColumns: string[];
-    columnType: 'datetime' | 'numeric';
-    numericOrigin: number | null;
-    numericInterval: number | null;
-    sortByTime: boolean;
-  } | null>(null);
-
   // Ref for hydration logic (needed to access latest values in async effect)
   const frequencyRef = useLatestRef(frequency);
   const chartTypeRef = useLatestRef(chartType);
@@ -241,10 +242,7 @@ const SequentialAnalysisFeature: React.FC = () => {
     [availableColumns]
   );
 
-  const timeColumnOptions = useMemo(
-    () => timeCompatibleColumns.map((column) => column.name),
-    [timeCompatibleColumns]
-  );
+  const timeColumnOptions = timeCompatibleColumns.map((column) => column.name);
 
   const activeTimeColumn = (() => {
     if (!activeNodeId) return '';
@@ -261,19 +259,31 @@ const SequentialAnalysisFeature: React.FC = () => {
   const numericOriginValue = derivedColumnType === 'numeric' ? parseNumericInput(numericOriginInput) : null;
   const numericIntervalValue = derivedColumnType === 'numeric' ? parseNumericInput(numericIntervalInput) : null;
 
-  // Use parameter change detection hook
-  const hasParamsChanged = useParameterChangeDetection(
+  const hasParamsChanged = hasLockedParameterDiff({
     isLocked,
-    {
+    serverRequest: serverRequest as Record<string, unknown> | null,
+    currentParams: {
       frequency,
-      groupByColumns,
-      columnType: derivedColumnType,
-      numericOrigin: derivedColumnType === 'numeric' ? numericOriginValue : null,
-      numericInterval: derivedColumnType === 'numeric' ? numericIntervalValue : null,
-      sortByTime: true,
+      group_by_columns: normalizeStringArray(groupByColumns),
+      column_type: derivedColumnType,
+      numeric_origin: derivedColumnType === 'numeric' ? numericOriginValue : null,
+      numeric_interval: derivedColumnType === 'numeric' ? numericIntervalValue : null,
     },
-    lockedParams
-  );
+    getServerParams: (request) => {
+      const serverColumnType = typeof request.column_type === 'string' ? request.column_type : 'datetime';
+      const serverFrequency = typeof request.frequency === 'string' ? request.frequency : 'year';
+      const serverNumericOrigin = request.numeric_origin == null ? null : Number(request.numeric_origin);
+      const serverNumericInterval = request.numeric_interval == null ? null : Number(request.numeric_interval);
+
+      return {
+        frequency: serverFrequency,
+        group_by_columns: normalizeUnknownStringArray(request.group_by_columns),
+        column_type: serverColumnType,
+        numeric_origin: serverColumnType === 'numeric' ? serverNumericOrigin : null,
+        numeric_interval: serverColumnType === 'numeric' ? serverNumericInterval : null,
+      };
+    },
+  });
 
   const actionState = getAnalysisActionState({
     hasWorkspace: Boolean(currentWorkspaceId),
@@ -424,17 +434,6 @@ const handleAnalyze = async () => {
           lockCurrentSchema(normalizedSnapshot.schema);
         }
 
-        // Save locked parameters
-        setLockedParams({
-          frequency,
-          groupByColumns: [...validGroupByColumns],
-          columnType: derivedColumnType,
-          numericOrigin: numericOriginValue,
-          numericInterval: numericIntervalValue,
-          sortByTime: true,
-        });
-
-        setIsLocked(true);
       } catch { /* ignore */ }
     } catch (error) {
       console.error('Sequential analysis error:', error);
@@ -476,8 +475,6 @@ const handleUpdateResults = async () => {
     setResults(null);
     setLockedNodesSnapshot([]);
     setLockedSchema(null);
-    setLockedParams(null);
-    setIsLocked(false);
     setChartType('line');
     setNumericOriginInput('');
     setNumericIntervalInput('1');
@@ -818,17 +815,7 @@ const handleUpdateResults = async () => {
         numericInterval: lockedNumericInterval,
       };
 
-      setLockedParams({
-        frequency: lockedFrequency,
-        groupByColumns: normalizedGroups.length ? [...normalizedGroups] : [],
-        columnType: reqColumnType,
-        numericOrigin: lockedNumericOrigin,
-        numericInterval: lockedNumericInterval,
-        sortByTime: typeof req.sort_by_time === 'boolean' ? req.sort_by_time : true,
-      });
-
       if (nodeIdStr) {
-        setIsLocked(true);
         try {
           const info = await getNodeInfo({ workspaceId: currentWorkspaceId!, nodeId: nodeIdStr, getAuthHeaders });
           const name = info?.name || info?.data?.name || nodeIdStr;
@@ -857,12 +844,15 @@ const handleUpdateResults = async () => {
       currentSchemaRef,
       frequencyRef,
       getAuthHeaders,
-      setIsLocked,
       setLockedNodesSnapshot,
       setLockedSchema,
       setNodeColumnSelections,
     ]
   );
+
+  useEffect(() => {
+    setIsLocked(hasServerRequest);
+  }, [hasServerRequest, setIsLocked]);
 
   const applyHydratedResult = useCallback(
     async (resultPayload: unknown) => {
