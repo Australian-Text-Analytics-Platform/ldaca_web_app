@@ -1,14 +1,8 @@
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 import { textApi, type TopicModelingRequest, type TopicModelingDetachRequest, type TopicModelingDetachNodeOption } from '../../../../api/text';
-import { workspacesApi } from '../../../../api/workspaces';
 import { queryKeys } from '../../../../lib/queryKeys';
 import { applySelectedColumnsToSnapshots } from '../../../../hooks/useSchemaManagement';
-import {
-  clearAnalysisTaskArtifacts,
-  collectTaskIds,
-  pruneTasksById,
-} from '../../../../hooks/analysisTaskUtils';
 import { analysisServerRequestLockQueryKey } from '../../common';
 
 type NodeSelection = {
@@ -28,15 +22,7 @@ type TopicModelingResponseLike = {
   metadata?: { task_id?: string; [key: string]: unknown };
 };
 
-type TopicTaskStatusLike = {
-  activeTaskId?: string | null;
-};
-
-type TopicTaskLike = {
-  task_id?: string | null;
-};
-
-type Params = {
+interface TopicModelingState {
   currentWorkspaceId: string | null;
   panelNodeIds: string[];
   panelSelectedNodes: NodeSelection[];
@@ -44,61 +30,55 @@ type Params = {
   effectiveNodeColumnSelections: NodeColumnSelection[];
   minTopicSize: number;
   useCtTfidf: boolean;
-  getAuthHeaders: () => Record<string, string>;
-  lockWithSnapshots: (snapshots: Array<{ id: string; name: string; columns: string[] }>) => void;
+  result: TopicModelingResponseLike | null;
+}
+
+interface TopicModelingActions {
   setIsRunning: (value: boolean) => void;
   runningRef: React.MutableRefObject<boolean>;
   setError: (value: string | null) => void;
   setResultSafely: (value: TopicModelingResponseLike | null) => void;
-  result: TopicModelingResponseLike | null;
-  localTopicModelingTaskId: string | null;
-  setLocalTopicModelingTaskId: (value: string | null) => void;
-  topicTaskStatus: TopicTaskStatusLike;
-  topicRunningTask: TopicTaskLike | null;
-  topicSuccessfulTask: TopicTaskLike | null;
-  topicFailedTask: TopicTaskLike | null;
-  unlockSelection: () => void;
-  setNodeColumnSelections: (
-    value: NodeColumnSelection[],
-    options?: { replace?: boolean; persist?: boolean }
-  ) => void;
-  recomputeAutoColumns: () => void;
-  setTasks: (updater: (prev: any[]) => any[]) => void;
-  lastFetchedRef: React.MutableRefObject<{ taskId: string | null; state: 'successful' | 'failed' | null }>;
+  lastFetchedRef: React.MutableRefObject<{ taskId: string | null; state: string | null }>;
   resolveTopicModelingTaskId: () => Promise<string | null>;
+}
+
+interface TopicModelingLock {
+  getAuthHeaders: () => Record<string, string>;
+  lockWithSnapshots: (snapshots: Array<{ id: string; name: string; columns: string[] }>) => void;
   queryClient: { invalidateQueries: (params: { queryKey: readonly unknown[] }) => Promise<unknown> };
+}
+
+type Params = {
+  state: TopicModelingState;
+  actions: TopicModelingActions;
+  lock: TopicModelingLock;
 };
 
 export function useTopicModelingTaskFlow({
-  currentWorkspaceId,
-  panelNodeIds,
-  panelSelectedNodes,
-  panelHasMissingColumns,
-  effectiveNodeColumnSelections,
-  minTopicSize,
-  useCtTfidf,
-  getAuthHeaders,
-  lockWithSnapshots,
-  setIsRunning,
-  runningRef,
-  setError,
-  setResultSafely,
-  result,
-  localTopicModelingTaskId,
-  setLocalTopicModelingTaskId,
-  topicTaskStatus,
-  topicRunningTask,
-  topicSuccessfulTask,
-  topicFailedTask,
-  unlockSelection,
-  setNodeColumnSelections,
-  recomputeAutoColumns,
-  setTasks,
-  lastFetchedRef,
-  resolveTopicModelingTaskId,
-  queryClient,
+  state: {
+    currentWorkspaceId,
+    panelNodeIds,
+    panelSelectedNodes,
+    panelHasMissingColumns,
+    effectiveNodeColumnSelections,
+    minTopicSize,
+    useCtTfidf,
+    result,
+  },
+  actions: {
+    setIsRunning,
+    runningRef,
+    setError,
+    setResultSafely,
+    lastFetchedRef,
+    resolveTopicModelingTaskId,
+  },
+  lock: {
+    getAuthHeaders,
+    lockWithSnapshots,
+    queryClient,
+  },
 }: Params) {
-  const [isClearing, setIsClearing] = useState(false);
   const [isDetachLoading, setIsDetachLoading] = useState(false);
   const [isDetaching, setIsDetaching] = useState(false);
   const [detachDialogOpen, setDetachDialogOpen] = useState(false);
@@ -278,88 +258,11 @@ export function useTopicModelingTaskFlow({
     queryClient,
   ]);
 
-  const handleClear = useCallback(async () => {
-    if (!currentWorkspaceId) return;
-
-    setIsClearing(true);
-    const taskIds = collectTaskIds([
-      (result as any)?.metadata?.task_id,
-      localTopicModelingTaskId,
-      topicTaskStatus.activeTaskId,
-      topicRunningTask?.task_id,
-      topicSuccessfulTask?.task_id,
-      topicFailedTask?.task_id,
-    ]);
-
-    try {
-      const headers = getAuthHeaders();
-      const resolvedTaskId = await resolveTopicModelingTaskId();
-      const allTaskIds = collectTaskIds([...taskIds, resolvedTaskId]);
-
-      await clearAnalysisTaskArtifacts({
-        workspaceId: currentWorkspaceId,
-        taskIds: allTaskIds,
-        cancelTask: (_workspaceId, taskId) => workspacesApi.cancelTasks({ task_id: taskId }, headers),
-        clearManagerTask: (_workspaceId, taskId) => workspacesApi.clearTasks({ task_id: taskId }, headers),
-        clearAnalysisTask: (_workspaceId, taskId) => textApi.clearTask(taskId, headers),
-        warnContext: 'topic-modeling',
-      });
-    } finally {
-      setIsClearing(false);
-      setResultSafely(null);
-      unlockSelection();
-      setIsRunning(false);
-      runningRef.current = false;
-      setLocalTopicModelingTaskId(null);
-      lastFetchedRef.current = { taskId: null, state: null };
-      setNodeColumnSelections([], { replace: true, persist: false });
-      recomputeAutoColumns();
-      setTasks((prev) =>
-        Array.isArray(prev)
-          ? pruneTasksById(
-              prev,
-              collectTaskIds([
-                (result as any)?.metadata?.task_id,
-                localTopicModelingTaskId,
-                topicTaskStatus.activeTaskId,
-                topicRunningTask?.task_id,
-                topicSuccessfulTask?.task_id,
-                topicFailedTask?.task_id,
-              ])
-            )
-          : prev
-      );
-      void queryClient.invalidateQueries({ queryKey: analysisServerRequestLockQueryKey('topic_modeling', currentWorkspaceId) });
-    }
-  }, [
-    currentWorkspaceId,
-    result,
-    localTopicModelingTaskId,
-    topicTaskStatus.activeTaskId,
-    topicRunningTask?.task_id,
-    topicSuccessfulTask?.task_id,
-    topicFailedTask?.task_id,
-    getAuthHeaders,
-    resolveTopicModelingTaskId,
-    setResultSafely,
-    unlockSelection,
-    setIsRunning,
-    runningRef,
-    setLocalTopicModelingTaskId,
-    lastFetchedRef,
-    setNodeColumnSelections,
-    recomputeAutoColumns,
-    setTasks,
-    queryClient,
-  ]);
-
   return {
     handleRun,
-    handleClear,
     openDetachDialog,
     toggleDetachColumn,
     handleDetachConfirm,
-    isClearing,
     isDetachLoading,
     isDetaching,
     detachDialogOpen,

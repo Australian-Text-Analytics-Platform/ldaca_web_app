@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PreviewPagination, PreviewRow } from '../types';
 
 export interface PreviewFetcherResult<Row = PreviewRow> {
@@ -70,6 +70,13 @@ export const usePreprocessingPreview = <RequestPayload, Row = PreviewRow>(
 
   const ready = Boolean(enabled && request);
 
+  // Use refs for fetcher and request to avoid re-triggering the effect on
+  // every render — callers typically pass inline functions/objects.
+  const fetcherRef = useRef(fetcher);
+  fetcherRef.current = fetcher;
+  const requestRef = useRef(request);
+  requestRef.current = request;
+
   const derivedSignature = useMemo(() => {
     if (!ready || !request) return 'disabled';
     if (signature) return signature;
@@ -88,7 +95,8 @@ export const usePreprocessingPreview = <RequestPayload, Row = PreviewRow>(
 
   // Debounced preview fetcher.
   useEffect(() => {
-    if (!ready || !request) {
+    const currentRequest = requestRef.current;
+    if (!ready || !currentRequest) {
       setData([]);
       setColumns([]);
       setPagination(null);
@@ -103,7 +111,7 @@ export const usePreprocessingPreview = <RequestPayload, Row = PreviewRow>(
     setError(null);
 
     const timeoutId = window.setTimeout(() => {
-      fetcher({ request, page, pageSize, signal: controller.signal })
+      fetcherRef.current({ request: currentRequest, page, pageSize, signal: controller.signal })
         .then((response) => {
           if (cancelled) return;
           setData(Array.isArray(response.data) ? response.data : []);
@@ -133,7 +141,7 @@ export const usePreprocessingPreview = <RequestPayload, Row = PreviewRow>(
       controller.abort();
       window.clearTimeout(timeoutId);
     };
-  }, [ready, request, page, pageSize, debounceMs, fetcher, refreshKey, derivedSignature]);
+  }, [ready, page, pageSize, debounceMs, refreshKey, derivedSignature]);
 
   const handleSetPageSize = useCallback((size: number) => {
     setPageSize(size);

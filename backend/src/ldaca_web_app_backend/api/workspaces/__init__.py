@@ -19,7 +19,7 @@ from fastapi import APIRouter
 from ...core.workspace import (
     workspace_manager,
 )  # re-export for test patches expecting api.workspaces.workspace_manager
-from . import base, lifecycle, nodes, task_manager, tasks
+from . import base, lifecycle, nodes
 from .analyses import (
     concordance,
     quotation,
@@ -32,8 +32,6 @@ from .analyses import (
 router = APIRouter()
 router.include_router(lifecycle.router)
 router.include_router(nodes.router)
-router.include_router(tasks.router)
-router.include_router(task_manager.router)
 router.include_router(base.router)
 router.include_router(token_frequencies.router)
 router.include_router(sequential_analysis.router)

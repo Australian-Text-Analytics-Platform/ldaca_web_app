@@ -288,7 +288,7 @@ export const useWorkspaceTaskInbox = (
     [setTasks, setTransientError, queryClient, workspaceId]
   );
 
-  const clientState = useWorkspaceTaskStreamClient(workspaceId, {
+  const clientState = useWorkspaceTaskStreamClient({
     enabled: true,
     getAuthHeaders,
     onEvent: handlePayload,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { nodesApi } from '../../../../api/nodes';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../../components/ui/select';
 import { Checkbox } from '../../../../components/ui/checkbox';
@@ -174,8 +174,10 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     error: string | null;
   }>>({});
   const [optionSearchQueries, setOptionSearchQueries] = useState<Record<string, string>>({});
+  const categoricalOptionsRef = useRef(categoricalOptions);
+  categoricalOptionsRef.current = categoricalOptions;
 
-  const availableColumns = (() => {
+  const availableColumns = useMemo(() => {
     const columns: ConditionColumnOption[] = [];
     const dtypes =
       nodeData?.dtypes && typeof nodeData.dtypes === 'object'
@@ -200,14 +202,14 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     }
 
     return columns;
-  })();
+  }, [nodeData, selectedNode]);
 
   const hasSelection = Boolean(selectedNodeId);
   const hasSchema = availableColumns.length > 0;
   const isSchemaLoading = hasSelection && !hasSchema && (isLoading.nodeData || isLoading.graph);
   const isConfigDisabled = !hasSelection || !hasSchema;
 
-  const workspaceNodeMap = (() => {
+  const workspaceNodeMap = useMemo(() => {
     const map = new Map<string, WorkspaceNodeLike>();
     workspaceNodes.forEach((node: WorkspaceNodeLike) => {
       const key = (node.id as string | undefined) ?? ((node as Record<string, unknown>).node_id as string | undefined);
@@ -216,8 +218,7 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
       }
     });
     return map;
-    return map;
-  })();
+  }, [workspaceNodes]);
 
   const filterSelectedNodesForPanel = (() => {
     if (!selectedNodeId) return [];
@@ -339,12 +340,12 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
         condition.column
       ) {
         const key = getCategoricalKey(condition.column);
-        if (!categoricalOptions[key]) {
+        if (!categoricalOptionsRef.current[key]) {
           void ensureCategoricalOptions(condition.column, condition.dataType);
         }
       }
     });
-  }, [conditions, currentWorkspaceId, selectedNodeId, categoricalOptions, getCategoricalKey, ensureCategoricalOptions]);
+  }, [conditions, currentWorkspaceId, selectedNodeId, getCategoricalKey, ensureCategoricalOptions]);
 
   useEffect(() => {
     if (selectedNode?.name) {

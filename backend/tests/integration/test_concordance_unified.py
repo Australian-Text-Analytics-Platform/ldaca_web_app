@@ -62,7 +62,8 @@ def _add_node(workspace_id: str, data: pl.LazyFrame, node_name: str):
 
 
 async def _get_current_task_id(client, workspace_id: str, analysis: str):
-    response = await client.get("/api/workspaces/" + analysis + "/current")
+    slug = analysis.replace("_", "-")
+    response = await client.get(f"/api/workspaces/{slug}/tasks/current")
     if response.status_code != 200:
         return None
     payload = response.json()
@@ -135,7 +136,7 @@ async def test_concordance_single_node_roundtrip(authenticated_client, workspace
 
     # Current request should surface the persisted request
     current_req = await authenticated_client.get(
-        f"/api/workspaces/tasks/{task_id}/request"
+        f"/api/workspaces/concordance/tasks/{task_id}/request"
     )
     assert current_req.status_code == 200
     current_req_payload = current_req.json()

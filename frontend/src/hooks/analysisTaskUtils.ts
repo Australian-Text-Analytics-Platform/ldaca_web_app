@@ -1,5 +1,46 @@
 import type { TaskItem } from '../stores/analysisStore';
 
+export const CANONICAL_TASK_TYPE_MAP = {
+  topic_modeling: 'topic_modeling',
+  token_frequencies: 'token_frequencies',
+  'token-frequency': 'token_frequencies',
+  sequential_analysis: 'sequential_analysis',
+  concordance: 'concordance',
+  quotation: 'quotation',
+} as const;
+
+export type CanonicalTaskType =
+  | 'topic_modeling'
+  | 'token_frequencies'
+  | 'sequential_analysis'
+  | 'concordance'
+  | 'quotation';
+
+export const normalizeTaskTypeKey = (taskType: string): string => {
+  const normalized = taskType.trim();
+  return CANONICAL_TASK_TYPE_MAP[normalized as keyof typeof CANONICAL_TASK_TYPE_MAP] ?? normalized;
+};
+
+export const getTaskTypeCandidates = (taskType: string): string[] => {
+  const canonical = normalizeTaskTypeKey(taskType);
+  const aliases = Object.entries(CANONICAL_TASK_TYPE_MAP)
+    .filter(([, value]) => value === canonical)
+    .map(([key]) => key);
+  return Array.from(new Set([canonical, ...aliases]));
+};
+
+export const normalizeTaskDedupeKey = (
+  taskId: string | null | undefined,
+  state: string | null | undefined
+): string | null => {
+  const normalizedTaskId = normalizeTaskId(taskId);
+  const normalizedState = typeof state === 'string' && state.trim().length > 0 ? state.trim() : null;
+  if (!normalizedTaskId || !normalizedState) {
+    return null;
+  }
+  return `${normalizedTaskId}:${normalizedState}`;
+};
+
 type TaskOperation = (workspaceId: string, taskId: string) => Promise<unknown>;
 
 const normalizeTaskId = (value: unknown): string | null => {
@@ -52,14 +93,14 @@ export const resolveAnalysisTaskId = async ({
 interface ClearAnalysisTaskResultsOptions {
   workspaceId: string;
   taskIds: string[];
-  clearAnalysisTask: TaskOperation;
+  clearTask: TaskOperation;
   warnContext?: string;
 }
 
 export const clearAnalysisTaskResults = async ({
   workspaceId,
   taskIds,
-  clearAnalysisTask,
+  clearTask,
   warnContext,
 }: ClearAnalysisTaskResultsOptions): Promise<void> => {
   const ids = collectTaskIds(taskIds);
@@ -68,13 +109,13 @@ export const clearAnalysisTaskResults = async ({
   }
 
   const settled = await Promise.allSettled(
-    ids.map((taskId) => clearAnalysisTask(workspaceId, taskId))
+    ids.map((taskId) => clearTask(workspaceId, taskId))
   );
 
   settled.forEach((result, index) => {
     if (result.status === 'rejected') {
       const label = warnContext ? `[${warnContext}]` : '[analysis]';
-      console.warn(`${label} failed to clear analysis task ${ids[index]}`, result.reason);
+      console.warn(`${label} failed to clear task ${ids[index]}`, result.reason);
     }
   });
 };
@@ -82,9 +123,7 @@ export const clearAnalysisTaskResults = async ({
 interface ClearAnalysisTaskArtifactsOptions {
   workspaceId: string;
   taskIds: string[];
-  cancelTask?: TaskOperation;
   clearManagerTask?: TaskOperation;
-  clearAnalysisTask?: TaskOperation;
   warnContext?: string;
 }
 
@@ -109,9 +148,7 @@ const runTaskOperation = async (
 export const clearAnalysisTaskArtifacts = async ({
   workspaceId,
   taskIds,
-  cancelTask,
   clearManagerTask,
-  clearAnalysisTask,
   warnContext,
 }: ClearAnalysisTaskArtifactsOptions): Promise<void> => {
   const ids = collectTaskIds(taskIds);
@@ -121,11 +158,7 @@ export const clearAnalysisTaskArtifacts = async ({
 
   await Promise.all(
     ids.map(async (taskId) => {
-      await runTaskOperation(cancelTask, workspaceId, taskId, 'cancel', warnContext);
-      await runTaskOperation(clearManagerTask, workspaceId, taskId, 'clear manager', warnContext);
-      if (!clearManagerTask) {
-        await runTaskOperation(clearAnalysisTask, workspaceId, taskId, 'clear analysis', warnContext);
-      }
+      await runTaskOperation(clearManagerTask, workspaceId, taskId, 'clear', warnContext);
     })
   );
 };

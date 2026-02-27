@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useWorkspaceSelection } from '../../../hooks/useWorkspaceSelection';
 import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
 import { useWorkspaceActions } from '../../../hooks/useWorkspaceActions';
@@ -34,10 +34,10 @@ const DataPreprocessingFeature: React.FC = () => {
   const [alertOpen, setAlertOpen] = useState(false);
   const [alertMessage, setAlertMessage] = useState('');
 
-  const handleAlert = (message: string) => {
+  const handleAlert = useCallback((message: string) => {
     setAlertMessage(message);
     setAlertOpen(true);
-  };
+  }, []);
 
   return (
     <div className="space-y-6">

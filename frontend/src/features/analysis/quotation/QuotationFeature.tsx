@@ -1,14 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
+
 import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
 import { ANALYSIS_LOCKED_MESSAGE } from '../../../components/tabs/AnalysisLockedNotice';
 import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '../../../hooks/useWorkspaceSelection';
 import { useWorkspaceActions } from '../../../hooks/useWorkspaceActions';
 import { useAuth } from '../../../hooks/useAuth';
+import { useUIStore } from '../../../stores/uiStore';
+import AnalysisTaskBanner from '../../../components/tabs/AnalysisTaskBanner';
 import { textApi } from '../../../api/text';
-import type { QuotationEngineConfig, QuotationEngineType, QuotationRequest, QuotationResultQuery } from '../../../api/text';
+import type { QuotationEngineConfig, QuotationEngineType } from '../../../api/text';
 import useNodeColumnInfos from '../../../hooks/useNodeColumnInfos';
-import { useAnalysisLockState } from '../../../hooks/useAnalysisLockState';
 import { useQuotationEngineDialogStore, useQuotationEngineConfigStore } from '../../../stores/quotationEngineStore';
 import { Button } from '../../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
@@ -36,21 +38,10 @@ import {
 } from '../../../components/ui/table';
 import { ScrollArea } from '../../../components/ui/scroll-area';
 import { ArrowUpDown, Loader2, Search, Trash2, Unlink } from 'lucide-react';
-import { getAnalysisActionState } from '../common/analysisActionState';
-import {
-  getNodeIdentifier,
-  getServerEngineConfig,
-  hasLockedParameterDiff,
-  restoreAnalysisLockFromRequest,
-  useAnalysisHydration,
-  useAnalysisServerRequestLock,
-} from '../common';
-import {
-  clearAnalysisTaskResults,
-  collectTaskIds,
-  resolveAnalysisTaskId,
-} from '../../../hooks/analysisTaskUtils';
+import {\n  getNodeIdentifier,\n  getServerEngineConfig,\n  hasLockedParameterDiff,\n  restoreAnalysisLockFromRequest,\n  useAnalysisLock,\n  useAnalysisFeature,\n  getAnalysisActionState,\n} from '../common';
+
 import { AnalysisPagination } from '../../../components/AnalysisPagination';
+import { useQuotationTaskFlow } from './hooks/useQuotationTaskFlow';
 
 interface QuotationResultState {
   rows: any[];
@@ -208,7 +199,6 @@ const clipTextAroundSpans = (text: string, spans: HighlightSpan[], surroundingWo
   };
 };
 
-type EngineRequestPayload = { type: 'local' } | { type: 'remote'; url: string };
 
 type NormalizationFailureReason = 'empty' | 'scheme' | 'format' | 'protocol';
 
@@ -263,15 +253,10 @@ const QuotationFeature: React.FC = () => {
   const { currentWorkspaceId, nodeData } = useWorkspaceData();
   const { quotationSearch, detachQuotation } = useWorkspaceActions();
   const { getAuthHeaders } = useAuth();
-  const { hasServerRequest, serverRequest } = useAnalysisServerRequestLock({
-    analysisType: 'quotation_analysis',
-    workspaceId: currentWorkspaceId,
-    getAuthHeaders,
-  });
-
+  const currentView = useUIStore((state) => state.currentView);
+  const isActiveTab = currentView === 'quotation';
   const {
     isLocked,
-    setIsLocked,
     lockWithSnapshots,
     unlockSelection,
     lockedNodesSnapshot,
@@ -282,7 +267,12 @@ const QuotationFeature: React.FC = () => {
     activeNodeColumnSelections,
     panelSelectedNodes,
     displayNodeCount,
-  } = useAnalysisLockState({
+    hasServerRequest,
+    serverRequest,
+  } = useAnalysisLock({
+    analysisType: 'quotation_analysis',
+    workspaceId: currentWorkspaceId,
+    getAuthHeaders,
     allowedDataTypes: ['string'],
     maxNodes: 1,
     docTypeOnly: true,
@@ -309,7 +299,6 @@ const QuotationFeature: React.FC = () => {
   const [isSavingContextLength, setIsSavingContextLength] = useState(false);
   const [errorDialogOpen, setErrorDialogOpen] = useState(false);
   const [errorDialogMessage, setErrorDialogMessage] = useState<string>('');
-  const [localQuotationTaskId, setLocalQuotationTaskId] = useState<string | null>(null);
 
   const { getColumnInfos } = useNodeColumnInfos({
     workspaceId: currentWorkspaceId,
@@ -319,10 +308,6 @@ const QuotationFeature: React.FC = () => {
   const activeSelections = isLocked ? activeNodeColumnSelections : nodeColumnSelections;
 
   const displayedNodes = panelSelectedNodes.slice(0, 1);
-
-  useEffect(() => {
-    setIsLocked(hasServerRequest);
-  }, [hasServerRequest, setIsLocked]);
 
   const originalColumnsByNode = (() => {
     const map: Record<string, string[]> = {};
@@ -371,100 +356,104 @@ const QuotationFeature: React.FC = () => {
       : resolvedEnginePayload.rawUrl
     : '';
 
-  const buildEngineRequest = (): EngineRequestPayload | null => {
-    if (resolvedEnginePayload.type === 'remote') {
-      const rawUrl = resolvedEnginePayload.rawUrl;
-      if (!rawUrl.length) {
-        setEngineError('Provide a quotation service URL.');
-        return null;
-      }
-
-      if (!resolvedEnginePayload.isValid) {
-        if (resolvedEnginePayload.failureReason === 'empty') {
-          setEngineError('Provide a quotation service URL.');
-        } else if (resolvedEnginePayload.failureReason === 'protocol') {
-          setEngineError('Remote engines must use http:// or https:// URLs.');
-        } else {
-          setEngineError('Enter a valid URL including http:// or https://');
-        }
-        return null;
-      }
-
-      const normalizedUrl = resolvedEnginePayload.normalizedUrl;
-      if ((engineConfig.url ?? '').trim() !== normalizedUrl) {
-        updateRemoteUrl(normalizedUrl);
-      }
-      setEngineError(null);
-      return { type: 'remote', url: normalizedUrl };
-    }
-    setEngineError(null);
-    return { type: 'local' };
-  };
-
-  const getErrorMessage = (error: any): string => {
-    const detail = error?.response?.data?.detail ?? error?.data?.detail ?? (error?.body as any)?.detail;
-    if (typeof detail === 'string' && detail.trim().length) return detail;
-    if (detail && typeof detail === 'object') {
-      try {
-        return JSON.stringify(detail);
-      } catch {
-        /* ignore */
-      }
-    }
-    if (typeof error?.message === 'string' && error.message.trim().length) return error.message;
-    return 'An unexpected error occurred while loading quotations.';
-  };
-
   const showErrorDialog = (message: string) => {
     setErrorDialogMessage(message || 'An unexpected error occurred.');
     setErrorDialogOpen(true);
-  };
-
-  const handleEngineDialogSave = () => {
-    const payload = buildEngineRequest();
-    if (!payload) {
-      return;
-    }
-    closeEngineDialog();
   };
 
   useEffect(() => {
     setEngineError(null);
   }, [engineConfig.type, engineConfig.url]);
 
-  useEffect(() => {
-    if (!currentWorkspaceId) {
-      setLocalQuotationTaskId(null);
-    }
-  }, [currentWorkspaceId]);
+  const quotationResultRef = useRef<any>(null);
 
-  const resolveQuotationTaskId = async (): Promise<string | null> => {
-    if (!currentWorkspaceId) {
-      return null;
-    }
-
-    return resolveAnalysisTaskId({
-      candidateIds: [localQuotationTaskId],
-      fetchCurrentTaskId: async () => {
-        const headers = getAuthHeaders();
-        const current = (await textApi.getAnalysisCurrent('quotation', headers)) as any;
-        const taskId = Array.isArray(current?.task_ids) ? current.task_ids[0] : null;
-        return typeof taskId === 'string' && taskId.trim().length > 0 ? taskId : null;
-      },
-      onResolved: setLocalQuotationTaskId,
-    });
-  };
-
-  const persistContextLengthPreference = async (value: number) => {
-    if (!currentWorkspaceId) return;
-    const taskId = await resolveQuotationTaskId();
-    if (!taskId) return;
-    await textApi.postQuotationTaskResult(
-      taskId,
-      { context_length: value, update_only: true },
-      getAuthHeaders()
-    );
-  };
+  const {
+    resolveTaskId,
+    localTaskId: localQuotationTaskId,
+    setLocalTaskId: setLocalQuotationTaskId,
+    banner: quotationWaitingBanner,
+    hasActiveTask,
+    clearResults,
+  } = useAnalysisFeature<any>({
+    analysisType: 'quotation_analysis',
+    taskType: 'quotation',
+    workspaceId: currentWorkspaceId,
+    getAuthHeaders,
+    isTabActive: isActiveTab,
+    resultRef: quotationResultRef,
+    fetchResult: async (taskId, headers) =>
+      textApi.getQuotationTaskResult(taskId, headers),
+    fetchRequest: async (taskId, headers) =>
+      textApi.getQuotationTaskRequest(taskId, headers),
+    onResultFetched: (result, taskId) => {
+      if (!result) return;
+      const targetNode =
+        (isLocked && lockedNodesSnapshot.length ? lockedNodesSnapshot[0] : displayedNodes[0]) as any;
+      const nodeId = targetNode ? getNodeIdentifier(targetNode, 0) : '';
+      const selection = activeSelections.find((s: any) => s.nodeId === nodeId);
+      const column = selection?.column ?? '';
+      applyContextLengthPreferenceFromResult(result);
+      if (nodeId && column) {
+        updateResultState(nodeId, column, result);
+      }
+      setHasLoaded(true);
+    },
+    onHydratedResult: async (resultPayload) => {
+      const res = resultPayload as any;
+      if (!res) return;
+      const selection = nodeColumnSelections[0];
+      const nodeId = selection?.nodeId ?? '';
+      const column = selection?.column ?? '';
+      if (!nodeId) return;
+      applyContextLengthPreferenceFromResult(res);
+      updateResultState(nodeId, column, res);
+      setHasLoaded(true);
+    },
+    onHydratedRequest: async (requestPayload) => {
+      const requestData = (requestPayload as any)?.data ?? requestPayload;
+      if (!requestData) return;
+      const nodeId = requestData?.node_id || requestData?.nodeId;
+      const column = requestData?.column || '';
+      const reqEngine = (requestData?.engine ?? null) as QuotationEngineConfig | null;
+      if (!nodeId) return;
+      if (reqEngine?.type === 'remote') {
+        const trimmed = (reqEngine.url ?? '').trim();
+        if (trimmed.length) {
+          const { normalized, valid } = normalizeRemoteUrl(trimmed);
+          const appliedUrl = valid ? normalized : trimmed;
+          updateRemoteUrl(appliedUrl);
+          setEngineConfigStore({ type: 'remote', url: appliedUrl });
+        }
+      } else if (reqEngine?.type === 'local') {
+        setEngineConfigStore({ type: 'local' });
+      }
+      setNodeColumnSelections([{ nodeId, column }], { replace: true });
+      setShowMetadata(true);
+      try {
+        await restoreAnalysisLockFromRequest({
+          workspaceId: currentWorkspaceId,
+          requestData: {
+            node_ids: [nodeId],
+            node_columns: column ? { [nodeId]: column } : {},
+          },
+          getAuthHeaders,
+          lockWithSnapshots,
+          maxNodes: 1,
+        });
+      } catch {
+        /* ignore */
+      }
+    },
+    onCleared: () => {
+      setIsClearing(false);
+      setHasLoaded(false);
+      setResultsByNode({});
+      setNodeState({});
+      unlockSelection();
+      setNodeColumnSelections([], { replace: true, persist: false });
+      recomputeAutoColumns();
+    },
+  });
 
   const applyContextLengthPreferenceFromResult = (payload: any) => {
     const prefValue = Number(payload?.preferences?.context_length ?? payload?.preferences?.contextLength);
@@ -567,23 +556,9 @@ const QuotationFeature: React.FC = () => {
     isLocked,
     hasResults: hasLoaded,
     isBusy: isLoadingQuotations,
-    hasActiveTask: false,
+    hasActiveTask,
     allowRunWhenLocked: hasParamsChanged,
   });
-
-    const resolveLockedNodeContext = (): { nodeId: string; column: string } | null => {
-      const sourceNode = (isLocked && lockedNodesSnapshot.length ? lockedNodesSnapshot[0] : displayedNodes[0]) as any;
-      if (!sourceNode) {
-        return null;
-      }
-      const nodeId = getNodeIdentifier(sourceNode, 0);
-      const selection = activeSelections.find((sel) => sel.nodeId === nodeId);
-      const column = selection?.column;
-      if (!column) {
-        return null;
-      }
-      return { nodeId, column };
-    };
 
   useEffect(() => {
     if (isLocked) return;
@@ -823,343 +798,56 @@ const QuotationFeature: React.FC = () => {
     return normalized;
   };
 
-  const fetchQuotations = async (
-    nodeId: string,
-    overrides?: {
-      page?: number;
-      pageSize?: number;
-      sortBy?: string;
-      descending?: boolean;
-      columnOverride?: string;
+  const {
+    buildEngineRequest,
+    persistContextLengthPreference,
+    handleSearchAll,
+    handlePageChange,
+    handlePageSizeChange,
+    handleSort,
+    handleDetach,
+  } = useQuotationTaskFlow({
+    state: {
+      currentWorkspaceId,
+      isLocked,
+      hasLoaded,
+      lockedNodesSnapshot,
+      displayedNodes,
+      activeSelections,
+      nodeState,
+      originalColumnsByNode,
+      resolvedEnginePayload,
+      engineConfigUrl: engineConfig.url ?? '',
     },
-  ) => {
-    if (!currentWorkspaceId) return null;
-    const selection = activeSelections.find((s) => s.nodeId === nodeId);
-    const column = overrides?.columnOverride || selection?.column;
-    if (!column) return null;
-
-    const state = nodeState[nodeId] || {
-      currentPage: 1,
-      pageSize: DEFAULT_PAGE_SIZE,
-      sortBy: undefined,
-      descending: false,
-    };
-
-    const page = overrides?.page ?? state.currentPage ?? 1;
-    const pageSize = overrides?.pageSize ?? state.pageSize ?? DEFAULT_PAGE_SIZE;
-    const sortBy = overrides?.sortBy ?? state.sortBy;
-    const descending: boolean = overrides?.descending ?? state.descending ?? false;
-
-    const enginePayload = buildEngineRequest();
-    if (!enginePayload) {
-      openEngineDialog();
-      return null;
-    }
-
-    const engineConfigForRequest: QuotationEngineConfig = enginePayload.type === 'remote'
-      ? { type: 'remote', url: enginePayload.url }
-      : { type: 'local' };
-
-    const requestPayload: QuotationRequest = {
-      column,
-      page,
-      page_size: pageSize,
-      sort_by: sortBy ?? undefined,
-      descending,
-      engine: engineConfigForRequest,
-    };
-
-    try {
-      const result = await quotationSearch(nodeId, requestPayload);
-      applyContextLengthPreferenceFromResult(result);
-      const normalized = updateResultState(nodeId, column, result);
-      return {
-        normalized,
-        request: {
-          column,
-          page: requestPayload.page,
-          page_size: requestPayload.page_size,
-          sort_by: requestPayload.sort_by ?? null,
-          descending: requestPayload.descending,
-          engine_type: engineConfigForRequest.type,
-          engine_url: engineConfigForRequest.type === 'remote' ? (engineConfigForRequest.url ?? '') : null,
-        },
-      };
-    } catch (error: any) {
-      console.error('Failed to fetch quotations', error);
-      showErrorDialog(getErrorMessage(error));
-      return null;
-    }
-  };
-
-  const updateStoredQuotationResult = async (
-    overrides: Partial<QuotationResultQuery> = {},
-  ) => {
-    if (!currentWorkspaceId) {
-      return null;
-    }
-    const context = resolveLockedNodeContext();
-    if (!context) {
-      return null;
-    }
-
-    const { nodeId, column } = context;
-    const state = nodeState[nodeId] || {
-      currentPage: 1,
-      pageSize: DEFAULT_PAGE_SIZE,
-      sortBy: undefined,
-      descending: false,
-    };
-
-    const payload: QuotationResultQuery = {
-      page: overrides.page ?? state.currentPage ?? 1,
-      page_size: overrides.page_size ?? state.pageSize ?? DEFAULT_PAGE_SIZE,
-      sort_by: overrides.sort_by ?? state.sortBy ?? null,
-      descending: overrides.descending ?? state.descending ?? false,
-    };
-
-    try {
-      const taskId = await resolveQuotationTaskId();
-      if (!taskId) {
-        return null;
-      }
-      const response = await textApi.postQuotationTaskResult(
-        taskId,
-        payload,
-        getAuthHeaders()
-      );
-
-      if (!response) {
-        return null;
-      }
-
-      applyContextLengthPreferenceFromResult(response);
-      const normalized = updateResultState(nodeId, column, response);
-      setHasLoaded(true);
-
-      return normalized;
-    } catch (error: any) {
-      console.error('Failed to refresh quotation results', error);
-      showErrorDialog(getErrorMessage(error));
-      return null;
-    }
-  };
-
-  const handleSearchAll = async () => {
-    const targetNode = displayedNodes[0];
-    const nodeId = targetNode ? getNodeIdentifier(targetNode, 0) : '';
-    if (!nodeId) return;
-
-    setIsLoadingQuotations(true);
-    try {
-      const outcome = await fetchQuotations(nodeId, { page: 1 });
-      if (!outcome?.normalized) {
-        return;
-      }
-      setHasLoaded(true);
-      try {
-        const lockedSelections = activeSelections.filter((sel) => sel.nodeId === nodeId && sel.column);
-        const columnMap = lockedSelections.reduce<Record<string, string | undefined>>(
-          (acc, sel) => {
-            acc[sel.nodeId] = sel.column;
-            return acc;
-          },
-          {}
-        );
-        await restoreAnalysisLockFromRequest({
-          workspaceId: currentWorkspaceId,
-          requestData: {
-            node_ids: [nodeId],
-            node_columns: columnMap,
-          },
-          getAuthHeaders,
-          lockWithSnapshots,
-          maxNodes: 1,
-        });
-      } catch {
-        /* ignore */
-      }
-    } finally {
-      setIsLoadingQuotations(false);
-    }
-  };
-
-  const handlePageChange = async (newPage: number) => {
-    const targetNode = (isLocked && lockedNodesSnapshot.length ? lockedNodesSnapshot[0] : displayedNodes[0]) as any;
-    const nodeId = targetNode ? getNodeIdentifier(targetNode, 0) : '';
-    if (!nodeId) {
-      baseHandlePageChange(newPage);
-      return;
-    }
-    if (!isLocked || !hasLoaded) {
-      baseHandlePageChange(newPage);
-      return;
-    }
-    const updated = await updateStoredQuotationResult({ page: newPage });
-    if (!updated) {
-      baseHandlePageChange(newPage);
-    }
-  };
-
-  const handlePageSizeChange = async (pageSize: number) => {
-    const targetNode = (isLocked && lockedNodesSnapshot.length ? lockedNodesSnapshot[0] : displayedNodes[0]) as any;
-    const nodeId = targetNode ? getNodeIdentifier(targetNode, 0) : '';
-    if (!nodeId) {
-      baseHandlePageSizeChange(pageSize);
-      return;
-    }
-    if (!isLocked || !hasLoaded) {
-      baseHandlePageSizeChange(pageSize);
-      return;
-    }
-    const updated = await updateStoredQuotationResult({ page: 1, page_size: pageSize });
-    if (!updated) {
-      baseHandlePageSizeChange(pageSize);
-    }
-  };
-
-  const handleSort = async (nodeId: string, column: string) => {
-    const sortableColumns = new Set(originalColumnsByNode[nodeId] || []);
-    if (!sortableColumns.has(column)) {
-      return;
-    }
-    const state = nodeState[nodeId] || {
-      currentPage: 1,
-      pageSize: DEFAULT_PAGE_SIZE,
-      sortBy: undefined,
-      descending: false,
-    };
-    const isSame = state.sortBy === column;
-    const nextDescending: boolean = isSame ? !state.descending : false;
-    if (!isLocked || !hasLoaded) {
-      await fetchQuotations(nodeId, {
-        page: 1,
-        sortBy: column,
-        descending: nextDescending,
-      });
-      return;
-    }
-
-    await updateStoredQuotationResult({
-      page: 1,
-      sort_by: column,
-      descending: nextDescending,
-    });
-  };
-
-  const handleDetach = async (nodeId: string) => {
-    const selection = activeSelections.find(s => s.nodeId === nodeId);
-    if (!selection?.column) return;
-    setNodeDetaching(prev => ({ ...prev, [nodeId]: true }));
-    try {
-      const enginePayload = buildEngineRequest();
-      if (!enginePayload) {
-        openEngineDialog();
-        return;
-      }
-      await detachQuotation(nodeId, {
-        node_id: nodeId,
-        column: selection.column,
-        engine: enginePayload.type === 'remote'
-          ? { type: 'remote', url: enginePayload.url }
-          : { type: 'local' },
-      });
-    } catch (e: any) {
-      showErrorDialog(getErrorMessage(e));
-    } finally {
-      setNodeDetaching(prev => ({ ...prev, [nodeId]: false }));
-    }
-  };
-
-  const applyHydratedRequest = async (requestPayload: unknown) => {
-    const requestData = (requestPayload as any)?.data ?? requestPayload;
-    if (!requestData) return;
-
-    const nodeId = requestData?.node_id || requestData?.nodeId;
-    const column = requestData?.column || '';
-    const reqEngine = (requestData?.engine ?? null) as QuotationEngineConfig | null;
-
-    if (!nodeId) {
-      return;
-    }
-
-    if (reqEngine?.type === 'remote') {
-      const trimmed = (reqEngine.url ?? '').trim();
-      if (trimmed.length) {
-        const { normalized, valid } = normalizeRemoteUrl(trimmed);
-        const appliedUrl = valid ? normalized : trimmed;
-        updateRemoteUrl(appliedUrl);
-        setEngineConfigStore({ type: 'remote', url: appliedUrl });
-      }
-    } else if (reqEngine?.type === 'local') {
-      setEngineConfigStore({ type: 'local' });
-    }
-
-    setNodeColumnSelections([{ nodeId, column }], { replace: true });
-    setShowMetadata(true);
-
-    try {
-      await restoreAnalysisLockFromRequest({
-        workspaceId: currentWorkspaceId,
-        requestData: {
-          node_ids: [nodeId],
-          node_columns: column ? { [nodeId]: column } : {},
-        },
-        getAuthHeaders,
-        lockWithSnapshots,
-        maxNodes: 1,
-      });
-    } catch {
-      /* ignore */
-    }
-
-  };
-
-  const applyHydratedResult = async (resultPayload: unknown) => {
-    const res = resultPayload as any;
-    if (!res) return;
-    const selection = nodeColumnSelections[0];
-    const nodeId = selection?.nodeId ?? '';
-    const column = selection?.column ?? '';
-    if (!nodeId) return;
-
-    applyContextLengthPreferenceFromResult(res);
-    updateResultState(nodeId, column, res);
-    setHasLoaded(true);
-  };
-
-  const fetchQuotationRequest = async (taskId?: string | null) => {
-    if (!currentWorkspaceId || !taskId) return null;
-    return textApi.getTaskRequest(taskId, getAuthHeaders());
-  };
-
-  const fetchQuotationResult = async (taskId?: string | null) => {
-    if (!currentWorkspaceId || !taskId) return null;
-    return textApi.getQuotationTaskResult(taskId, getAuthHeaders());
-  };
-
-  const { hydrateFromServer } = useAnalysisHydration({
-    workspaceId: currentWorkspaceId,
-    analysisKey: 'quotation',
-    getAuthHeaders,
-    onTaskIdResolved: setLocalQuotationTaskId,
-    fetchRequest: fetchQuotationRequest,
-    fetchResult: fetchQuotationResult,
-    applyRequest: applyHydratedRequest,
-    applyResult: applyHydratedResult,
-    autoHydrateOnFocus: false,
-    autoHydrateOnVisibility: false,
+    actions: {
+      setEngineError,
+      updateRemoteUrl,
+      setIsLoadingQuotations,
+      setHasLoaded,
+      setNodeDetaching,
+      showErrorDialog,
+      baseHandlePageChange,
+      baseHandlePageSizeChange,
+      updateResultState,
+      applyContextLengthPreferenceFromResult,
+    },
+    lock: {
+      getAuthHeaders,
+      lockWithSnapshots,
+      resolveTaskId,
+      quotationSearch,
+      detachQuotation,
+      openEngineDialog,
+    },
   });
 
-  const hydratedOnceRef = useRef<boolean>(false);
-  useEffect(() => {
-    hydratedOnceRef.current = false;
-  }, [currentWorkspaceId]);
-  useEffect(() => {
-    if (!currentWorkspaceId || hydratedOnceRef.current) return;
-    hydratedOnceRef.current = true;
-    void hydrateFromServer();
-  }, [currentWorkspaceId, hydrateFromServer]);
+  const handleEngineDialogSave = () => {
+    const payload = buildEngineRequest();
+    if (!payload) {
+      return;
+    }
+    closeEngineDialog();
+  };
 
   return (
     <>
@@ -1330,28 +1018,10 @@ const QuotationFeature: React.FC = () => {
                   onClick={async () => {
                     if (!currentWorkspaceId) return;
                     setIsClearing(true);
-                    try {
-                      const resolvedTaskId = await resolveQuotationTaskId();
-                      const taskIds = collectTaskIds([localQuotationTaskId, resolvedTaskId]);
-                      await clearAnalysisTaskResults({
-                        workspaceId: currentWorkspaceId,
-                        taskIds,
-                        clearAnalysisTask: (workspaceId, taskId) =>
-                          textApi.clearTask(taskId, getAuthHeaders()),
-                        warnContext: 'quotation',
-                      });
-                    } finally {
-                      setIsClearing(false);
-                      setLocalQuotationTaskId(null);
-                      setHasLoaded(false);
-                      setResultsByNode({});
-                      setNodeState({});
-                      unlockSelection();
-                      setNodeColumnSelections([], { replace: true, persist: false });
-                      recomputeAutoColumns();
-                    }
+                    await clearResults();
+                    setIsClearing(false);
                   }}
-                    disabled={actionState.clearDisabled || isClearing}
+                  disabled={actionState.clearDisabled || isClearing}
                 >
                   {isClearing ? (
                     <>
@@ -1370,6 +1040,15 @@ const QuotationFeature: React.FC = () => {
             </div>
           </CardContent>
         </Card>
+        {quotationWaitingBanner && (
+          <AnalysisTaskBanner
+            analysisName="Quotation"
+            status={quotationWaitingBanner.status}
+            taskId={quotationWaitingBanner.taskId}
+            message={quotationWaitingBanner.message}
+            className="mt-4"
+          />
+        )}
 
         {hasLoaded && displayedNodes.length > 0 && (
           <Card>

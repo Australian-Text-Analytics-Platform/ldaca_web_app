@@ -28,6 +28,7 @@ from .concordance_core import (
     build_concordance_response,
     normalize_saved_request,
 )
+from .current_tasks import get_current_task_ids_for_analysis
 from .text_column_prefs import resolve_text_columns_for_nodes
 
 router = APIRouter(prefix="/workspaces", tags=["concordance"])
@@ -176,6 +177,40 @@ async def run_concordance(
         return response
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to run concordance: {exc}")
+
+
+@router.get("/concordance/tasks/current")
+async def concordance_current_tasks(
+    current_user: dict = Depends(get_current_user),
+):
+    """Return current task IDs for concordance analysis."""
+    user_id = current_user["id"]
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    if not workspace_id:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+    return await get_current_task_ids_for_analysis(
+        user_id,
+        workspace_id,
+        ["concordance_analysis", "concordance-analysis", "concordance"],
+    )
+
+
+@router.get("/concordance/tasks/{task_id}/request")
+async def concordance_task_request(
+    task_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Return stored request payload for a concordance task."""
+    user_id = current_user["id"]
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    if not workspace_id:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+    task_manager = get_task_manager(user_id, workspace_id)
+    task = task_manager.get_task(task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    request = task.request
+    return request.model_dump() if hasattr(request, "model_dump") else request
 
 
 @router.get("/concordance/tasks/{task_id}/result")

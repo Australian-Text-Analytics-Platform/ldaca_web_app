@@ -22,7 +22,6 @@ type SidebarTasksSectionProps = {
   isConnecting: boolean;
   connectionError: string | null;
   onReconnect: () => void;
-  onCancelTask: (task: SidebarTaskRecord) => void;
   onClearTask: (task: SidebarTaskRecord) => void;
 };
 
@@ -45,7 +44,6 @@ const SidebarTasksSection: React.FC<SidebarTasksSectionProps> = ({
   isConnecting,
   connectionError,
   onReconnect,
-  onCancelTask,
   onClearTask,
 }) => {
   const sortedTasks = Array.isArray(tasks)
@@ -123,24 +121,14 @@ const SidebarTasksSection: React.FC<SidebarTasksSectionProps> = ({
                     </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
-                    {task.state === 'running' && (
+                    {(task.state === 'running' || (task.state && CLEARABLE_STATES.includes(task.state))) && (
                       <Button
-                        variant="destructive"
-                        size="sm"
-                        className="h-7 px-2 text-xs"
-                        onClick={() => onCancelTask(task)}
-                      >
-                        Cancel
-                      </Button>
-                    )}
-                    {task.state && CLEARABLE_STATES.includes(task.state) && (
-                      <Button
-                        variant="outline"
+                        variant={task.state === 'running' ? 'destructive' : 'outline'}
                         size="sm"
                         className="h-7 px-2 text-xs"
                         onClick={() => onClearTask(task)}
                       >
-                        Clear
+                        {task.state === 'running' ? 'Stop' : 'Clear'}
                       </Button>
                     )}
                   </div>

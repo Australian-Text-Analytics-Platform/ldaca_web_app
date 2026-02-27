@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '../../../hooks/useWorkspaceSelection';
 import { useWorkspaceStatus } from '../../../hooks/useWorkspaceStatus';
 import { useAuth } from '../../../hooks/useAuth';
-import { useAnalysisLockState } from '../../../hooks/useAnalysisLockState';
+import { useUIStore } from '../../../stores/uiStore';
 import { useSchemaManagement, useLatestRef, createNodeSnapshot, applySelectedColumnsToSnapshots } from '../../../hooks/useSchemaManagement';
 import { SequentialAnalysisRequest, SequentialFrequency, textApi } from '../../../api/text';
 import { nodesApi } from '../../../api/index';
@@ -16,6 +16,7 @@ import { Button } from '../../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Input } from '../../../components/ui/input';
 import HelpIcon from '../../../components/help/HelpIcon';
+import AnalysisTaskBanner from '../../../components/tabs/AnalysisTaskBanner';
 import { toast } from 'sonner';
 import {
   Select,
@@ -39,19 +40,7 @@ import {
   Area,
 } from 'recharts';
 import { normalizeTypeName } from '../../../utils/columnTypes';
-import { getAnalysisActionState } from '../common/analysisActionState';
-import {
-  hasLockedParameterDiff,
-  normalizeStringArray,
-  normalizeUnknownStringArray,
-  useAnalysisHydration,
-} from '../common';
-import { useAnalysisServerRequestLock } from '../common';
-import {
-  clearAnalysisTaskResults,
-  collectTaskIds,
-  resolveAnalysisTaskId,
-} from '../../../hooks/analysisTaskUtils';
+import {\n  hasLockedParameterDiff,\n  normalizeStringArray,\n  normalizeUnknownStringArray,\n  useAnalysisLock,\n  useAnalysisFeature,\n  getAnalysisActionState,\n} from '../common';
 
 // Component to display unique value count for a column
 interface UniqueValueCountProps {
@@ -131,30 +120,31 @@ const SequentialAnalysisFeature: React.FC = () => {
   const { selectedNodeId, selectedNode } = useWorkspaceSelection();
   const { nodeData, currentWorkspaceId } = useWorkspaceData();
   const { isLoading } = useWorkspaceStatus();
+  const currentView = useUIStore((state) => state.currentView);
+  const isActiveTab = currentView === 'analysis';
 
   const { getAuthHeaders } = useAuth();
-  const { hasServerRequest, serverRequest } = useAnalysisServerRequestLock({
-    analysisType: 'sequential_analysis',
-    workspaceId: currentWorkspaceId,
-    getAuthHeaders,
-  });
-
-  // Use shared analysis lock state hook
   const {
     isLocked,
-    setIsLocked,
     lockedNodesSnapshot,
     setLockedNodesSnapshot,
     activeNodeId,
     nodeColumnSelections,
     setNodeColumnSelections,
     displayNodeCount,
-  } = useAnalysisLockState({
+    hasServerRequest,
+    serverRequest,
+    unlockSelection,
+    lockWithSnapshots,
+  } = useAnalysisLock({
+    analysisType: 'sequential_analysis',
+    workspaceId: currentWorkspaceId,
+    getAuthHeaders,
     allowedDataTypes: ['datetime'],
     maxNodes: 1,
     docTypeOnly: false,
     enableHeuristicGuess: false,
-    storageScope: 'sequential-analysis', // Separate from other tabs
+    storageScope: 'sequential-analysis',
   });
 
   const [timeColumn, setTimeColumn] = useState('');
@@ -179,9 +169,7 @@ const SequentialAnalysisFeature: React.FC = () => {
     selectedNode,
   });
 
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [results, setResults] = useState<any>(null);
-  const [localSequentialTaskId, setLocalSequentialTaskId] = useState<string | null>(null);
   const [hydratingSelection, setHydratingSelection] = useState(false);
   const hydratedParamsRef = useRef<{
     timeColumn: string;
@@ -191,41 +179,146 @@ const SequentialAnalysisFeature: React.FC = () => {
     numericOrigin: number | null;
     numericInterval: number | null;
   } | null>(null);
-  
-  // Ref for hydration logic (needed to access latest values in async effect)
-  const frequencyRef = useLatestRef(frequency);
-  const chartTypeRef = useLatestRef(chartType);
 
-  useEffect(() => {
-    if (!currentWorkspaceId) {
-      setLocalSequentialTaskId(null);
-    }
-  }, [currentWorkspaceId]);
+  const resultsRef = useLatestRef(results);
 
-  const resolveSequentialTaskId = useCallback(async (): Promise<string | null> => {
-    if (!currentWorkspaceId) {
-      return null;
-    }
-
-    const metadataTaskId =
-      (results as any)?.metadata?.task_id ??
-      (results as any)?.metadata?.taskId ??
-      null;
-
-    return resolveAnalysisTaskId({
-      candidateIds: [localSequentialTaskId, metadataTaskId],
-      fetchCurrentTaskId: async () => {
-        const headers = getAuthHeaders();
-        const current = (await textApi.getAnalysisCurrent(
-          'sequential_analysis',
-          headers
-        )) as any;
-        const taskId = Array.isArray(current?.task_ids) ? current.task_ids[0] : null;
-        return typeof taskId === 'string' && taskId.trim().length > 0 ? taskId : null;
-      },
-      onResolved: setLocalSequentialTaskId,
-    });
-  }, [currentWorkspaceId, getAuthHeaders, localSequentialTaskId, results]);
+  const {
+    resolveTaskId,
+    localTaskId,
+    setLocalTaskId,
+    isRunning: isAnalyzing,
+    setIsRunning: setIsAnalyzing,
+    taskStatus: _seqTaskStatus,
+    banner: sequentialWaitingBanner,
+    hasActiveTask,
+    lastFetchedRef: _seqLastFetchedRef,
+    clearResults,
+  } = useAnalysisFeature<any>({
+    analysisType: 'sequential_analysis',
+    taskType: 'sequential_analysis',
+    workspaceId: currentWorkspaceId,
+    getAuthHeaders,
+    isTabActive: isActiveTab,
+    resultRef: resultsRef,
+    fetchResult: async (taskId, headers) =>
+      textApi.getSequentialAnalysisTaskResult(taskId, headers),
+    fetchRequest: async (taskId, headers) =>
+      textApi.getSequentialAnalysisTaskRequest(taskId, headers),
+    onResultFetched: (resultData) => {
+      if (!resultData) return;
+      const resolvedChartType = isChartTypeOption((resultData as any)?.chart_type)
+        ? (resultData as any).chart_type
+        : chartType;
+      setResults((prev: any) => {
+        const prevParams = prev?.analysis_params ?? {};
+        const nextParams = (resultData as any)?.analysis_params ?? {};
+        return {
+          ...(resultData as any),
+          analysis_params: { ...prevParams, ...nextParams },
+          chart_type: resolvedChartType,
+        };
+      });
+      setChartType(resolvedChartType);
+    },
+    onHydratedResult: (resultPayload) => {
+      if (!resultPayload) return;
+      const hydratedParams = hydratedParamsRef.current;
+      const enriched = {
+        ...(resultPayload as any),
+        analysis_params: {
+          ...((resultPayload as any)?.analysis_params ?? {}),
+          ...(hydratedParams
+            ? {
+                group_by_columns: hydratedParams.groupByColumns,
+                time_column: hydratedParams.timeColumn,
+                frequency: hydratedParams.frequency,
+                column_type: hydratedParams.columnType,
+                numeric_origin: hydratedParams.numericOrigin,
+                numeric_interval: hydratedParams.numericInterval,
+              }
+            : {}),
+        },
+      };
+      const resolvedChartType = isChartTypeOption((resultPayload as any)?.chart_type)
+        ? (resultPayload as any).chart_type
+        : chartType;
+      setResults({ ...enriched, chart_type: resolvedChartType });
+      setChartType(resolvedChartType);
+    },
+    onHydratedRequest: async (requestPayload) => {
+      const req = (requestPayload as any)?.data ?? requestPayload;
+      if (!req) return;
+      setHydratingSelection(true);
+      const nodeIdStr = String(req.node_id || req.nodeId || '');
+      const reqTimeColumn = typeof req.time_column === 'string' ? req.time_column : '';
+      const reqColumnType = req.column_type === 'numeric' ? 'numeric' : 'datetime';
+      const lockedNumericOrigin = reqColumnType === 'numeric' && typeof req.numeric_origin === 'number'
+        ? req.numeric_origin : null;
+      const lockedNumericInterval = reqColumnType === 'numeric' && typeof req.numeric_interval === 'number'
+        ? req.numeric_interval : null;
+      if (reqColumnType === 'numeric') {
+        setNumericOriginInput(lockedNumericOrigin != null ? String(lockedNumericOrigin) : '');
+        setNumericIntervalInput(lockedNumericInterval != null ? String(lockedNumericInterval) : '1');
+      } else {
+        setNumericOriginInput('');
+        setNumericIntervalInput('1');
+      }
+      if (nodeIdStr && reqTimeColumn) {
+        setNodeColumnSelections([{ nodeId: nodeIdStr, column: reqTimeColumn }]);
+        setTimeColumn(reqTimeColumn);
+      }
+      const normalizedGroups = Array.isArray(req.group_by_columns)
+        ? req.group_by_columns.filter((col: unknown): col is string => typeof col === 'string' && col.trim() !== '')
+        : [];
+      setGroupByColumns(normalizedGroups.length ? [...normalizedGroups] : []);
+      const validFrequencies: SequentialFrequency[] = ['hourly', 'daily', 'weekly', 'monthly', 'quarterly', 'yearly'];
+      const reqFrequency = typeof req.frequency === 'string' ? (req.frequency as any) : undefined;
+      const lockedFrequency = reqFrequency && validFrequencies.includes(reqFrequency) ? reqFrequency : frequency;
+      setFrequency(lockedFrequency);
+      hydratedParamsRef.current = {
+        timeColumn: reqTimeColumn,
+        groupByColumns: normalizedGroups.length ? [...normalizedGroups] : [],
+        frequency: lockedFrequency,
+        columnType: reqColumnType,
+        numericOrigin: lockedNumericOrigin,
+        numericInterval: lockedNumericInterval,
+      };
+      if (nodeIdStr) {
+        try {
+          const info = await getNodeInfo({ workspaceId: currentWorkspaceId!, nodeId: nodeIdStr, getAuthHeaders });
+          const name = info?.name || info?.data?.name || nodeIdStr;
+          const columns = Array.isArray(info?.columns)
+            ? info.columns
+            : (Array.isArray(info?.data?.columns) ? info.data.columns : []);
+          const [normalizedSnapshot] = applySelectedColumnsToSnapshots(
+            [{ id: nodeIdStr, name: String(name), columns }],
+            { [nodeIdStr]: reqTimeColumn }
+          );
+          setLockedNodesSnapshot([{ id: normalizedSnapshot.id, name: normalizedSnapshot.name, columns: normalizedSnapshot.columns }]);
+          const normalizedSchema = normalizeSchemaFromInfo(info);
+          if (Object.keys(normalizedSchema).length > 0) {
+            setLockedSchema(normalizedSchema);
+          } else {
+            setLockedSchema((prev: any) => prev ?? currentSchemaRef.current);
+          }
+        } catch {
+          setLockedSchema((prev: any) => prev ?? currentSchemaRef.current);
+        }
+      }
+      setHydratingSelection(false);
+    },
+    onCleared: () => {
+      setResults(null);
+      setLockedNodesSnapshot([]);
+      setLockedSchema(null);
+      setChartType('line');
+      setNumericOriginInput('');
+      setNumericIntervalInput('1');
+    },
+    getExtraTaskIdCandidates: () => [(resultsRef.current as any)?.metadata?.task_id],
+    getClearTaskIdSources: () => [(resultsRef.current as any)?.metadata?.task_id],
+    isResultRunning: (r: any) => r?.state === 'running',
+  });
 
   const timeCompatibleColumns = useMemo(
     () =>
@@ -242,7 +335,7 @@ const SequentialAnalysisFeature: React.FC = () => {
     [availableColumns]
   );
 
-  const timeColumnOptions = timeCompatibleColumns.map((column) => column.name);
+  const timeColumnOptions = useMemo(() => timeCompatibleColumns.map((column) => column.name), [timeCompatibleColumns]);
 
   const activeTimeColumn = (() => {
     if (!activeNodeId) return '';
@@ -291,7 +384,7 @@ const SequentialAnalysisFeature: React.FC = () => {
     isLocked,
     hasResults: Boolean(results),
     isBusy: isAnalyzing,
-    hasActiveTask: false,
+    hasActiveTask,
     allowRunWhenLocked: hasParamsChanged,
   });
 
@@ -325,9 +418,8 @@ const SequentialAnalysisFeature: React.FC = () => {
     if (!currentSelection || currentSelection.column !== desired) {
       setNodeColumnSelections([{ nodeId: selectedNodeId, column: desired }]);
     }
-  }, [isLocked, hydratingSelection, selectedNodeId, timeColumn, timeColumnOptions, setNodeColumnSelections]);
-  // Note: nodeColumnSelections intentionally excluded from deps to prevent infinite loop
-  // We read it directly inside the effect to check current state
+  }, [isLocked, hydratingSelection, selectedNodeId, timeColumnOptions, setNodeColumnSelections]);
+  // nodeColumnSelections and timeColumn intentionally excluded: read inside the effect to prevent loops
 
   const handleAddGroupByColumn = () => {
     if (groupByColumns.length < 3) {
@@ -399,7 +491,7 @@ const handleAnalyze = async () => {
         (result as any)?.metadata?.taskId ??
         null;
       if (typeof taskIdFromResponse === 'string' && taskIdFromResponse.trim().length > 0) {
-        setLocalSequentialTaskId(taskIdFromResponse);
+        setLocalTaskId(taskIdFromResponse);
       }
       const enrichedResult = {
         ...result,
@@ -415,7 +507,7 @@ const handleAnalyze = async () => {
       };
       const resolvedChartType = isChartTypeOption((enrichedResult as any)?.chart_type)
         ? (enrichedResult as any).chart_type
-        : chartTypeRef.current;
+        : chartType;
       const normalizedResult = {
         ...enrichedResult,
         chart_type: resolvedChartType,
@@ -444,40 +536,12 @@ const handleAnalyze = async () => {
   };
 
 const handleUpdateResults = async () => {
-    // Clear current results and rerun with new parameters
-    if (currentWorkspaceId) {
-      const taskId = await resolveSequentialTaskId();
-      await clearAnalysisTaskResults({
-        workspaceId: currentWorkspaceId,
-        taskIds: collectTaskIds([localSequentialTaskId, taskId]),
-        clearAnalysisTask: (workspaceId, id) =>
-          textApi.clearTask(id, getAuthHeaders()),
-        warnContext: 'sequential-analysis',
-      });
-    }
-    setResults(null);
-    // Keep locked state and nodes, just update the analysis with new params
+    await clearResults();
     await handleAnalyze();
   };
 
   const handleClearResults = async () => {
-    if (currentWorkspaceId) {
-      const taskId = await resolveSequentialTaskId();
-      await clearAnalysisTaskResults({
-        workspaceId: currentWorkspaceId,
-        taskIds: collectTaskIds([localSequentialTaskId, taskId]),
-        clearAnalysisTask: (workspaceId, id) =>
-          textApi.clearTask(id, getAuthHeaders()),
-        warnContext: 'sequential-analysis',
-      });
-    }
-    setLocalSequentialTaskId(null);
-    setResults(null);
-    setLockedNodesSnapshot([]);
-    setLockedSchema(null);
-    setChartType('line');
-    setNumericOriginInput('');
-    setNumericIntervalInput('1');
+    await clearResults();
   };
 
   const handleChartTypeChange = async (value: ChartTypeOption) => {
@@ -492,7 +556,7 @@ const handleUpdateResults = async () => {
     const headers = Object.keys(authHeaders).length > 0 ? (authHeaders as Record<string, string>) : {};
 
     try {
-      const taskId = await resolveSequentialTaskId();
+      const taskId = await resolveTaskId();
       if (!taskId) {
         return;
       }
@@ -761,188 +825,6 @@ const handleUpdateResults = async () => {
         : `Frequency of records grouped by ${summaryTimeColumn}`)
     : 'Aggregated frequency over time';
 
-  const applyHydratedRequest = useCallback(
-    async (requestPayload: unknown) => {
-      const req = (requestPayload as any)?.data ?? requestPayload;
-      if (!req) {
-        return;
-      }
-
-      setHydratingSelection(true);
-      const nodeIdStr = String(req.node_id || req.nodeId || '');
-      const reqTimeColumn = typeof req.time_column === 'string' ? req.time_column : '';
-      const reqColumnType = req.column_type === 'numeric' ? 'numeric' : 'datetime';
-      const lockedNumericOrigin = reqColumnType === 'numeric' && typeof req.numeric_origin === 'number'
-        ? req.numeric_origin
-        : null;
-      const lockedNumericInterval = reqColumnType === 'numeric' && typeof req.numeric_interval === 'number'
-        ? req.numeric_interval
-        : null;
-
-      if (reqColumnType === 'numeric') {
-        setNumericOriginInput(lockedNumericOrigin != null ? String(lockedNumericOrigin) : '');
-        setNumericIntervalInput(lockedNumericInterval != null ? String(lockedNumericInterval) : '1');
-      } else {
-        setNumericOriginInput('');
-        setNumericIntervalInput('1');
-      }
-
-      if (nodeIdStr && reqTimeColumn) {
-        setNodeColumnSelections([{ nodeId: nodeIdStr, column: reqTimeColumn }]);
-        setTimeColumn(reqTimeColumn);
-      }
-
-      const normalizedGroups = Array.isArray(req.group_by_columns)
-        ? req.group_by_columns.filter((col: unknown): col is string => typeof col === 'string' && col.trim() !== '')
-        : [];
-      setGroupByColumns(normalizedGroups.length ? [...normalizedGroups] : []);
-
-      const validFrequencies: SequentialFrequency[] = ['hourly', 'daily', 'weekly', 'monthly', 'quarterly', 'yearly'];
-      const reqFrequency = typeof req.frequency === 'string' ? (req.frequency as any) : undefined;
-      const lockedFrequency = reqFrequency && validFrequencies.includes(reqFrequency)
-        ? reqFrequency
-        : frequencyRef.current;
-      if (frequencyRef.current !== lockedFrequency) {
-        setFrequency(lockedFrequency);
-      }
-
-      hydratedParamsRef.current = {
-        timeColumn: reqTimeColumn,
-        groupByColumns: normalizedGroups.length ? [...normalizedGroups] : [],
-        frequency: lockedFrequency,
-        columnType: reqColumnType,
-        numericOrigin: lockedNumericOrigin,
-        numericInterval: lockedNumericInterval,
-      };
-
-      if (nodeIdStr) {
-        try {
-          const info = await getNodeInfo({ workspaceId: currentWorkspaceId!, nodeId: nodeIdStr, getAuthHeaders });
-          const name = info?.name || info?.data?.name || nodeIdStr;
-          const columns = Array.isArray(info?.columns)
-            ? info.columns
-            : (Array.isArray(info?.data?.columns) ? info.data.columns : []);
-          const [normalizedSnapshot] = applySelectedColumnsToSnapshots(
-            [{ id: nodeIdStr, name: String(name), columns }],
-            { [nodeIdStr]: reqTimeColumn }
-          );
-          setLockedNodesSnapshot([{ id: normalizedSnapshot.id, name: normalizedSnapshot.name, columns: normalizedSnapshot.columns }]);
-          const normalizedSchema = normalizeSchemaFromInfo(info);
-          if (Object.keys(normalizedSchema).length > 0) {
-            setLockedSchema(normalizedSchema);
-          } else {
-            setLockedSchema((prev) => prev ?? currentSchemaRef.current);
-          }
-        } catch {
-          setLockedSchema((prev) => prev ?? currentSchemaRef.current);
-        }
-      }
-
-      setHydratingSelection(false);
-    },
-    [
-      currentSchemaRef,
-      frequencyRef,
-      getAuthHeaders,
-      setLockedNodesSnapshot,
-      setLockedSchema,
-      setNodeColumnSelections,
-    ]
-  );
-
-  useEffect(() => {
-    setIsLocked(hasServerRequest);
-  }, [hasServerRequest, setIsLocked]);
-
-  const applyHydratedResult = useCallback(
-    async (resultPayload: unknown) => {
-      if (!resultPayload) {
-        return;
-      }
-
-      const metadataTaskId =
-        (resultPayload as any)?.metadata?.task_id ??
-        (resultPayload as any)?.metadata?.taskId ??
-        (resultPayload as any)?.data?.metadata?.task_id ??
-        (resultPayload as any)?.data?.metadata?.taskId ??
-        null;
-      if (typeof metadataTaskId === 'string' && metadataTaskId.trim().length > 0) {
-        setLocalSequentialTaskId(metadataTaskId);
-      }
-
-      const hydratedParams = hydratedParamsRef.current;
-      const enriched = {
-        ...(resultPayload as any),
-        analysis_params: {
-          ...((resultPayload as any)?.analysis_params ?? {}),
-          ...(hydratedParams
-            ? {
-                group_by_columns: hydratedParams.groupByColumns,
-                time_column: hydratedParams.timeColumn,
-                frequency: hydratedParams.frequency,
-                column_type: hydratedParams.columnType,
-                numeric_origin: hydratedParams.numericOrigin,
-                numeric_interval: hydratedParams.numericInterval,
-              }
-            : {}),
-        },
-      };
-
-      const resolvedChartType = isChartTypeOption((resultPayload as any)?.chart_type)
-        ? (resultPayload as any).chart_type
-        : chartTypeRef.current;
-      const normalizedResult = {
-        ...enriched,
-        chart_type: resolvedChartType,
-      };
-      setResults(normalizedResult);
-      setChartType(resolvedChartType);
-    },
-    [chartTypeRef]
-  );
-
-  const fetchSequentialRequest = useCallback(
-    async (taskId?: string | null) => {
-      if (!currentWorkspaceId || !taskId) return null;
-      return textApi.getTaskRequest(taskId, getAuthHeaders());
-    },
-    [currentWorkspaceId, getAuthHeaders]
-  );
-
-  const fetchSequentialResult = useCallback(
-    async (taskId?: string | null) => {
-      if (!currentWorkspaceId || !taskId) return null;
-      return textApi.getTaskResult(taskId, getAuthHeaders());
-    },
-    [currentWorkspaceId, getAuthHeaders]
-  );
-
-  const { hydrateFromServer } = useAnalysisHydration({
-    workspaceId: currentWorkspaceId,
-    analysisKey: 'sequential_analysis',
-    getAuthHeaders,
-    onTaskIdResolved: setLocalSequentialTaskId,
-    fetchRequest: fetchSequentialRequest,
-    fetchResult: fetchSequentialResult,
-    applyRequest: applyHydratedRequest,
-    applyResult: applyHydratedResult,
-    autoHydrateOnFocus: false,
-    autoHydrateOnVisibility: false,
-  });
-
-  const hydratedOnceRef = useRef<boolean>(false);
-  useEffect(() => {
-    hydratedOnceRef.current = false;
-  }, [currentWorkspaceId]);
-  useEffect(() => {
-    if (!currentWorkspaceId || hydratedOnceRef.current) {
-      return;
-    }
-
-    hydratedOnceRef.current = true;
-    void hydrateFromServer();
-  }, [currentWorkspaceId, hydrateFromServer]);
-
   return (
     <div className="space-y-6">
       <Card>
@@ -1171,6 +1053,16 @@ const handleUpdateResults = async () => {
         </div>
         </CardContent>
       </Card>
+
+      {sequentialWaitingBanner && (
+        <AnalysisTaskBanner
+          analysisName="Sequential Analysis"
+          status={sequentialWaitingBanner.status}
+          taskId={sequentialWaitingBanner.taskId}
+          message={sequentialWaitingBanner.message}
+          className="mt-4"
+        />
+      )}
 
       {/* Results Display */}
       {results && (

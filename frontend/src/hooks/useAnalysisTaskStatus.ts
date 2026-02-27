@@ -1,5 +1,7 @@
+import { useMemo } from 'react';
 import { useAnalysisStore } from '../stores/analysisStore';
 import type { TaskItem } from '../stores/analysisStore';
+import { getTaskTypeCandidates } from './analysisTaskUtils';
 
 const PENDING_STATES = new Set(['pending', 'queued', 'submitted']);
 
@@ -43,11 +45,18 @@ export interface AnalysisTaskStatus {
   bannerMessage?: string;
 }
 
-export const useAnalysisTaskStatus = (taskType: string): AnalysisTaskStatus => {
+export const useAnalysisTaskStatus = (taskType: string | string[]): AnalysisTaskStatus => {
   const tasks = useAnalysisStore((state) => state.tasks);
+  const candidateTypes = Array.isArray(taskType)
+    ? taskType.flatMap((value) => getTaskTypeCandidates(value))
+    : getTaskTypeCandidates(taskType);
+  const candidateSet = new Set(candidateTypes);
 
   const filteredTasks = Array.isArray(tasks)
-    ? tasks.filter((task) => task?.task_type === taskType)
+    ? tasks.filter((task) => {
+        const rawType = typeof task?.task_type === 'string' ? task.task_type : '';
+        return candidateSet.has(rawType);
+      })
     : ([] as TaskItem[]);
 
   const sortedTasks = filteredTasks.slice().sort((a, b) => {
@@ -96,17 +105,32 @@ export const useAnalysisTaskStatus = (taskType: string): AnalysisTaskStatus => {
         ? activeCandidate.message
         : undefined;
 
-  return {
-    tasks: sortedTasks,
-    runningTask,
-    queuedTask,
-    successfulTask,
-    failedTask,
-    cancelledTask,
-    terminalTask,
-    activeTaskId,
-    bannerStatus,
-    bannerTaskId,
-    bannerMessage,
-  };
+  return useMemo(
+    () => ({
+      tasks: sortedTasks,
+      runningTask,
+      queuedTask,
+      successfulTask,
+      failedTask,
+      cancelledTask,
+      terminalTask,
+      activeTaskId,
+      bannerStatus,
+      bannerTaskId,
+      bannerMessage,
+    }),
+    [
+      sortedTasks.map((t) => `${t.task_id}:${t.state}`).join(','),
+      runningTask?.task_id ?? '',
+      queuedTask?.task_id ?? '',
+      successfulTask?.task_id ?? '',
+      failedTask?.task_id ?? '',
+      cancelledTask?.task_id ?? '',
+      terminalTask?.task_id ?? '',
+      activeTaskId,
+      bannerStatus,
+      bannerTaskId,
+      bannerMessage,
+    ]
+  );
 };

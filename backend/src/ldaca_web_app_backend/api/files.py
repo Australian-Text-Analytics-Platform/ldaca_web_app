@@ -353,41 +353,6 @@ async def list_files_tasks(current_user: dict = Depends(get_current_user)):
     }
 
 
-@router.post("/tasks/cancel", response_model=FilesTaskActionResponse)
-async def cancel_files_tasks(
-    task_type: Optional[str] = None,
-    task_id: Optional[str] = None,
-    current_user: dict = Depends(get_current_user),
-):
-    """Cancel one or many user-scope worker tasks.
-
-    Used by:
-    - frontend import task cancellation controls
-
-    Why:
-    - Provides operational control for long-running remote imports.
-    """
-    user_id = current_user["id"]
-    tm = workspace_manager.get_task_manager(user_id, USER_TASK_SCOPE)
-    if task_id:
-        ok = await tm.cancel_task(task_id)
-        return {
-            "state": "successful",
-            "data": {"cancelled": ok},
-            "message": "Task cancelled successfully.",
-        }
-    count = await tm.cancel_all(
-        task_type=task_type,
-        user_id=user_id,
-        workspace_id=USER_TASK_SCOPE,
-    )
-    return {
-        "state": "successful",
-        "data": {"cancelled_count": count},
-        "message": "All tasks cancelled successfully.",
-    }
-
-
 @router.post("/tasks/clear", response_model=FilesTaskActionResponse)
 async def clear_files_tasks(
     task_type: Optional[str] = None,
@@ -405,7 +370,10 @@ async def clear_files_tasks(
     user_id = current_user["id"]
     tm = workspace_manager.get_task_manager(user_id, USER_TASK_SCOPE)
     if task_id:
-        cleared = await tm.clear_task(task_id)
+        task = await tm.get_task(task_id)
+        cleared = bool(task and task.metadata.get("workspace_id") == USER_TASK_SCOPE)
+        if cleared:
+            cleared = await tm.clear_task(task_id)
         return {
             "state": "successful",
             "data": {"cleared_count": 1 if cleared else 0},

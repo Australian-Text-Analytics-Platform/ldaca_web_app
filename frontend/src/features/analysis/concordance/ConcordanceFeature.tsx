@@ -7,17 +7,13 @@ import { useWorkspaceStatus } from '../../../hooks/useWorkspaceStatus';
 import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
 import { useWorkspaceActions } from '../../../hooks/useWorkspaceActions';
 import { useAuth } from '../../../hooks/useAuth';
-import { ConcordanceAnalysisRequest, ConcordanceAnalysisResponse, ConcordanceResultQuery, textApi } from '../../../api/text';
-import { httpRequest } from '../../../api/http';
-import { workspacesApi } from '../../../api/workspaces';
+import { ConcordanceAnalysisResponse, textApi } from '../../../api/text';
 import { useAnalysisStore } from '../../../stores/analysisStore';
 import { useUIStore } from '../../../stores';
-import { useAnalysisLockState } from '../../../hooks/useAnalysisLockState';
 import useNodeColumnInfos from '../../../hooks/useNodeColumnInfos';
 import { Button } from '../../../components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Play, Loader2, Trash2, Link as LinkIcon } from 'lucide-react';
-import { toast } from 'sonner';
 import HelpIcon from '../../../components/help/HelpIcon';
 import {
   Table,
@@ -30,44 +26,22 @@ import {
 import { ScrollArea } from '../../../components/ui/scroll-area';
 import { ANALYSIS_LOCKED_MESSAGE } from '../../../components/tabs/AnalysisLockedNotice';
 import AnalysisTaskBanner from '../../../components/tabs/AnalysisTaskBanner';
-import type { AnalysisTaskStatus } from '../../../hooks/useAnalysisTaskStatus';
-import useAnalysisTaskLifecycle, { type AnalysisTaskRefreshContext } from '../../../hooks/useAnalysisTaskLifecycle';
-import { getAnalysisActionState } from '../common/analysisActionState';
 import {
   hasLockedParameterDiff,
   restoreAnalysisLockFromRequest,
-  useAnalysisHydration,
-  useColorStackAllocator,
+  useAnalysisLock,
+  useAnalysisFeature,
+  useNodeColorManagement,
+  EXTENDED_PALETTE,
+  getAnalysisActionState,
 } from '../common';
-import { useAnalysisServerRequestLock } from '../common';
 import {
-  clearAnalysisTaskArtifacts,
-  collectTaskIds,
   pruneTasksById,
-  resolveAnalysisTaskId,
 } from '../../../hooks/analysisTaskUtils';
+import { useConcordanceTaskFlow } from './hooks/useConcordanceTaskFlow';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../../components/ui/dialog';
 import { AnalysisPagination } from '../../../components/AnalysisPagination';
 
-const sanitizeResultParams = (params?: Record<string, unknown>): Record<string, unknown> | undefined => {
-  if (!params) return undefined;
-  const cleaned = Object.entries(params).reduce<Record<string, unknown>>((acc, [key, value]) => {
-    if (value === undefined || value === null) {
-      return acc;
-    }
-    if (key === 'update_only') {
-      return acc;
-    }
-    acc[key] = value;
-    return acc;
-  }, {});
-  return Object.keys(cleaned).length ? cleaned : undefined;
-};
-
-const DEFAULT_PALETTE = [
-  '#2563eb', '#dc2626', '#16a34a', '#9333ea', '#d97706', '#0d9488',
-  '#db2777', '#4f46e5', '#65a30d', '#0891b2', '#92400e', '#6b7280',
-];
 
 const CORE_COLS = [
   'left_context', 'matched_text', 'right_context', 'start_idx',
@@ -160,18 +134,8 @@ const ConcordanceFeature: React.FC = () => {
   });
 
   const { getAuthHeaders } = useAuth();
-  const { hasServerRequest, serverRequest } = useAnalysisServerRequestLock({
-    analysisType: 'concordance_analysis',
-    workspaceId: currentWorkspaceId,
-    getAuthHeaders,
-  });
-  const pendingConcordance = useAnalysisStore((state) => state.pendingConcordance);
-  const clearPendingConcordance = useAnalysisStore((state) => state.clearPendingConcordance);
-  const setTasks = useAnalysisStore((state) => state.setTasks);
-
   const {
     isLocked,
-    setIsLocked,
     lockWithSnapshots,
     unlockSelection,
     nodeColumnSelections,
@@ -182,23 +146,26 @@ const ConcordanceFeature: React.FC = () => {
     activeNodeIds,
     panelSelectedNodes,
     displayNodeCount,
-  } = useAnalysisLockState({
+    hasServerRequest,
+    serverRequest,
+  } = useAnalysisLock({
+    analysisType: 'concordance_analysis',
+    workspaceId: currentWorkspaceId,
+    getAuthHeaders,
     allowedDataTypes: ['string'],
     maxNodes: 2,
     docTypeOnly: true,
     enableHeuristicGuess: false,
   });
+  const pendingConcordance = useAnalysisStore((state) => state.pendingConcordance);
+  const clearPendingConcordance = useAnalysisStore((state) => state.clearPendingConcordance);
+  const setTasks = useAnalysisStore((state) => state.setTasks);
   const [searchWord, setSearchWord] = useState('');
-
-  useEffect(() => {
-    setIsLocked(hasServerRequest);
-  }, [hasServerRequest, setIsLocked]);
   const [numLeftTokens, setNumLeftTokens] = useState(10);
   const [numRightTokens, setNumRightTokens] = useState(10);
   const [regex, setRegex] = useState(false);
   const [caseSensitive, setCaseSensitive] = useState(false);
   const [showMetadata, setShowMetadata] = useState(false);
-  const [isSearching, setIsSearching] = useState(false);
   const [results, setResults] = useState<ConcordanceAnalysisResponse | null>(null);
   const labelToNodeId = (() => {
     const params = (results as any)?.analysis_params;
@@ -216,35 +183,10 @@ const ConcordanceFeature: React.FC = () => {
   })();
 
   // Color management & view mode
-  // Use stack-based allocator for automatic color assignment
-  const stackPalette = DEFAULT_PALETTE.slice(0, 6);
-  const { nodeColors: stackColors } = useColorStackAllocator({
-    colors: stackPalette, // Use first six palette colors in stack order
-    activeNodeIds: activeNodeIds,
+  const { nodeColors, handleColorChange, defaultPalette } = useNodeColorManagement({
+    activeNodeIds,
+    palette: EXTENDED_PALETTE,
   });
-  const [manualColors, setManualColors] = useState<Record<string,string>>({});
-  // Merge stack-allocated and manually set colors
-  const nodeColors = (() => {
-    const merged: Record<string, string> = {};
-    // Start with stack-allocated colors
-    Object.entries(stackColors).forEach(([id, color]) => {
-      merged[id] = color;
-    });
-    // Override with manual selections
-    Object.entries(manualColors).forEach(([id, color]) => {
-      if (activeNodeIds.includes(id)) {
-        merged[id] = color;
-      }
-    });
-    // Fallback for overflow (>6 nodes)
-    activeNodeIds.forEach((id, index) => {
-      if (!merged[id]) {
-        merged[id] = DEFAULT_PALETTE[index % DEFAULT_PALETTE.length];
-      }
-    });
-    return merged;
-  })();
-  const defaultPalette = DEFAULT_PALETTE;
   const [viewMode, setViewMode] = useState<'separated'|'combined'>('separated');
   const [combinedPage, setCombinedPage] = useState(1);
   const [combinedPageSize] = useState(20);
@@ -280,7 +222,6 @@ const ConcordanceFeature: React.FC = () => {
   })();
   
   const lastPendingConcordanceRef = useRef<number | null>(null);
-  const lastTerminalFetchRef = useRef<string | null>(null);
 
   // Pagination and sorting state - separate for each node
   const [nodePagination, setNodePagination] = useState<Record<string, {
@@ -305,146 +246,124 @@ const ConcordanceFeature: React.FC = () => {
   
   // State for auto-triggering search from TokenFrequencyTab
   const [shouldAutoSearch, setShouldAutoSearch] = useState(false);
-  const [localConcordanceTaskId, setLocalConcordanceTaskId] = useState<string | null>(null);
-  const concordanceTaskStatusRef = useRef<AnalysisTaskStatus | null>(null);
 
-  const resolveConcordanceTaskId = async (): Promise<string | null> => {
-    if (!currentWorkspaceId) {
-      return null;
-    }
+  const concordanceResultsRef = useRef<ConcordanceAnalysisResponse | null>(null);
+  concordanceResultsRef.current = results;
 
-    const status = concordanceTaskStatusRef.current;
-    return resolveAnalysisTaskId({
-      candidateIds: [
-        localConcordanceTaskId,
-        (results as any)?.metadata?.task_id,
-        status?.activeTaskId,
-        status?.runningTask?.task_id,
-        status?.queuedTask?.task_id,
-        status?.terminalTask?.task_id,
-      ],
-      fetchCurrentTaskId: async () => {
-        const headers = getAuthHeaders();
-        const current = (await textApi.getAnalysisCurrent(
-          'concordance',
-          headers
-        )) as any;
-        const taskId = Array.isArray(current?.task_ids) ? current.task_ids[0] : null;
-        return typeof taskId === 'string' && taskId.trim().length > 0 ? taskId : null;
-      },
-      onResolved: setLocalConcordanceTaskId,
-    });
-  };
+  const {
+    resolveTaskId,
+    localTaskId: localConcordanceTaskId,
+    setLocalTaskId: setLocalConcordanceTaskId,
+    isRunning: isSearching,
+    setIsRunning: setIsSearching,
+    taskStatus: concordanceTaskStatus,
+    banner: concordanceWaitingBanner,
+    hasActiveTask,
+    clearResults,
+  } = useAnalysisFeature<ConcordanceAnalysisResponse>({
+    analysisType: 'concordance_analysis',
+    taskType: 'concordance',
+    workspaceId: currentWorkspaceId,
+    getAuthHeaders,
+    isTabActive: isActiveTab,
+    resultRef: concordanceResultsRef,
+    fetchResult: async (taskId, headers) =>
+      textApi.getConcordanceTaskResult(taskId, headers),
+    fetchRequest: async (taskId, headers) =>
+      textApi.getConcordanceTaskRequest(taskId, headers),
+    onResultFetched: (resultData) => {
+      if (resultData) {
+        setResults(resultData as ConcordanceAnalysisResponse);
+      }
+    },
+    onHydratedResult: (resultPayload) => {
+      const res = (resultPayload as any)?.data ?? resultPayload;
+      if (res) {
+        setResults(resultPayload as ConcordanceAnalysisResponse);
+      }
+    },
+    onHydratedRequest: async (requestPayload) => {
+      const req = (requestPayload as any)?.data ?? requestPayload;
+      if (!req) return;
+      const nodeIds: string[] = Array.isArray(req.node_ids) ? req.node_ids.slice(0, 2) : [];
+      const node_columns: Record<string, string> = req.node_columns || {};
+      const sels = nodeIds.map((id: string) => ({ nodeId: id, column: node_columns[id] || '' }));
+      setNodeColumnSelections(sels, { replace: true });
+      setSearchWord(String(req.search_word || ''));
+      setNumLeftTokens(Number(req.num_left_tokens ?? 10));
+      setNumRightTokens(Number(req.num_right_tokens ?? 10));
+      setRegex(!!req.regex);
+      setCaseSensitive(!!req.case_sensitive);
+      const hydratedMode: 'separated' | 'combined' = req.combined && req.combinable !== false ? 'combined' : 'separated';
+      setViewMode(hydratedMode);
+      try {
+        await restoreAnalysisLockFromRequest({
+          workspaceId: currentWorkspaceId,
+          requestData: req,
+          getAuthHeaders,
+          lockWithSnapshots,
+          maxNodes: 2,
+        });
+      } catch { /* ignore */ }
+    },
+    onCleared: () => {
+      setResults(null);
+      setNodePagination({});
+      setCombinedPage(1);
+      unlockSelection();
+    },
+    pruneGlobalTasks: (taskIds) => {
+      setTasks((prev) => {
+        if (!Array.isArray(prev)) return prev;
+        return taskIds.length > 0 ? pruneTasksById(prev, taskIds) : prev;
+      });
+    },
+    isResultRunning: (r) => r?.state === 'running',
+  });
 
   const effectiveNodeColumnSelections = isLocked ? activeNodeColumnSelections : nodeColumnSelections;
 
-  const refreshCurrentConcordanceResult = async (queryOverrides?: Record<string, unknown>) => {
-    if (!currentWorkspaceId) {
-      return null;
-    }
-
-    try {
-      const headers = getAuthHeaders();
-      const taskId = await resolveConcordanceTaskId();
-      if (!taskId) {
-        return null;
-      }
-      const response = await httpRequest<ConcordanceAnalysisResponse>(
-        `/workspaces/concordance/tasks/${taskId}/result`,
-        { method: 'GET', headers, params: sanitizeResultParams(queryOverrides) }
-      );
-      const typedResponse = response as ConcordanceAnalysisResponse | null;
-      if (typedResponse) {
-        setResults(typedResponse);
-      }
-      return typedResponse;
-    } catch (error) {
-      console.error('Failed to refresh concordance results automatically', error);
-      return null;
-    }
-  };
-
-  const updateStoredResult = async (
-    body: ConcordanceResultQuery
-  ): Promise<ConcordanceAnalysisResponse | null> => {
-    if (!currentWorkspaceId) {
-      return null;
-    }
-
-    const headers = getAuthHeaders();
-    const taskId = await resolveConcordanceTaskId();
-    if (!taskId) {
-      return null;
-    }
-    const response = await textApi.postConcordanceTaskResult(taskId, body, headers) as ConcordanceAnalysisResponse;
-    if (response) {
-      setResults(response);
-    }
-    return response;
-  };
-
-  const concordanceFallbackBanner = (status: AnalysisTaskStatus) => {
-    if (results?.state !== 'running') {
-      return null;
-    }
-    return {
-      taskId:
-        (results as any)?.metadata?.task_id ??
-        localConcordanceTaskId ??
-        status.activeTaskId ??
-        null,
-      message: status.bannerMessage?.trim() || undefined,
-    };
-  };
-
-  const handleTaskRefresh = async (context: AnalysisTaskRefreshContext) => {
-    if (context.reason !== 'terminal') {
-      return;
-    }
-
-    if (context.taskId && lastTerminalFetchRef.current === context.taskId && results) {
-      return;
-    }
-
-    const refreshed = await refreshCurrentConcordanceResult();
-    if (!refreshed && context.reason === 'terminal' && context.taskState === 'failed') {
-      setResults({
-        state: 'failed',
-        message: context.task?.message || 'Concordance analysis failed',
-        data: {},
-      } as ConcordanceAnalysisResponse);
-    }
-
-    if (context.reason === 'terminal' && context.taskId) {
-      setLocalConcordanceTaskId((prev) => (prev === context.taskId ? null : prev));
-      lastTerminalFetchRef.current = context.taskId;
-    }
-  };
-
   const {
-    status: concordanceTaskStatus,
-    banner: concordanceWaitingBanner,
-  } = useAnalysisTaskLifecycle({
-    taskType: 'concordance',
-    isTabActive: isActiveTab,
-    workspaceId: currentWorkspaceId,
-    manualActiveTaskId: localConcordanceTaskId,
-    fallbackRunningBanner: concordanceFallbackBanner,
-    onRefresh: handleTaskRefresh,
+    handleSearch,
+    updateStoredResult,
+    handleSort,
+    handlePageChange,
+    persistResultPreferences,
+    handleDetach,
+  } = useConcordanceTaskFlow({
+    state: {
+      currentWorkspaceId,
+      searchWord,
+      isLocked,
+      activeNodeIds,
+      effectiveNodeColumnSelections,
+      globalPageSize,
+      nodePagination,
+      viewMode,
+      combinedPage,
+      combinedPageSize,
+      numLeftTokens,
+      numRightTokens,
+      regex,
+      caseSensitive,
+    },
+    actions: {
+      setNodePagination,
+      setViewMode,
+      setCombinedPage,
+      setIsSearching,
+      setResults,
+      setLocalTaskId: setLocalConcordanceTaskId,
+      setNodeLoading,
+      setNodeDetaching,
+    },
+    lock: {
+      getAuthHeaders,
+      lockWithSnapshots,
+      resolveTaskId,
+      detachConcordance,
+    },
   });
-
-  useEffect(() => {
-    concordanceTaskStatusRef.current = concordanceTaskStatus;
-  }, [concordanceTaskStatus]);
-
-  const hasActiveTask = Boolean(
-    localConcordanceTaskId ||
-    concordanceTaskStatus.activeTaskId ||
-    concordanceTaskStatus.runningTask?.task_id ||
-    concordanceTaskStatus.queuedTask?.task_id ||
-    concordanceTaskStatus.terminalTask?.task_id ||
-    concordanceTaskStatus.tasks.length > 0
-  );
 
   const hasLockedParameterChanges = hasLockedParameterDiff({
     isLocked,
@@ -537,7 +456,6 @@ const ConcordanceFeature: React.FC = () => {
   useEffect(() => {
     if (!currentWorkspaceId) {
       setLocalConcordanceTaskId(null);
-      lastTerminalFetchRef.current = null;
     }
   }, [currentWorkspaceId]);
 
@@ -584,7 +502,9 @@ const ConcordanceFeature: React.FC = () => {
     }
 
     if (pendingConcordance.nodeColors) {
-      setManualColors((prev) => ({ ...pendingConcordance.nodeColors, ...prev }));
+      Object.entries(pendingConcordance.nodeColors).forEach(([nodeId, color]) => {
+        handleColorChange(nodeId, color as string);
+      });
     }
 
     const shouldAutoRun = pendingConcordance.autoRun === true;
@@ -619,164 +539,9 @@ const ConcordanceFeature: React.FC = () => {
   // Color assignment now handled by stack allocator - no auto-fill effect needed
 
 
-  const handleColorChange = (nodeId: string, color: string) => setManualColors(prev => ({ ...prev, [nodeId]: color }));
+
 
   const handleColumnChange = (nodeId: string, column: string) => setNodeColumnSelection(nodeId, column);
-
-  const handleSearch = async (
-    resetPage = true,
-    targetNodeId?: string,
-    forceMode?: 'separated' | 'combined',
-    overrideSortBy?: string,
-    overrideDescending?: boolean,
-    allowWhenLocked: boolean = false
-  ) => {
-    if (!currentWorkspaceId) return;
-    if (isLocked && !allowWhenLocked) return;
-
-    const trimmedSearch = searchWord.trim();
-    if (!trimmedSearch) {
-      toast.error('Please enter a search word.');
-      return;
-    }
-
-    const requestNodeIds = (() => {
-      const baseIds = activeNodeIds.slice(0, 2);
-      if (targetNodeId && !baseIds.includes(targetNodeId)) {
-        return [...baseIds, targetNodeId];
-      }
-      return baseIds;
-    })();
-
-    if (requestNodeIds.length === 0) {
-      return;
-    }
-
-    const effectiveSelections = effectiveNodeColumnSelections.filter((sel) =>
-      requestNodeIds.includes(sel.nodeId)
-    );
-
-    const incompleteSelections = effectiveSelections.filter((sel) => !sel.column);
-    if (incompleteSelections.length > 0) {
-      toast.error('Please select a text column for all selected data blocks.');
-      return;
-    }
-
-    const updatedPagination = { ...nodePagination };
-    requestNodeIds.forEach((nodeId) => {
-      if (!updatedPagination[nodeId]) {
-        updatedPagination[nodeId] = {
-          currentPage: 1,
-          pageSize: globalPageSize,
-          sortBy: '',
-          descending: false,
-        };
-      }
-      if (resetPage && (!targetNodeId || targetNodeId === nodeId)) {
-        updatedPagination[nodeId].currentPage = 1;
-      }
-    });
-    setNodePagination(updatedPagination);
-
-    const shouldForceSeparated = resetPage && !allowWhenLocked && !forceMode;
-    const effectiveMode = shouldForceSeparated ? 'separated' : (forceMode || viewMode);
-    if (shouldForceSeparated && viewMode !== 'separated') {
-      setViewMode('separated');
-    }
-    if (shouldForceSeparated && combinedPage !== 1) {
-      setCombinedPage(1);
-    }
-
-    const firstNodeId = requestNodeIds[0];
-    const firstNodePagination = updatedPagination[firstNodeId];
-    if (!firstNodePagination) {
-      return;
-    }
-
-    const nodeColumns: Record<string, string> = {};
-    effectiveSelections.forEach((sel) => {
-      nodeColumns[sel.nodeId] = sel.column;
-    });
-
-    setIsSearching(true);
-    try {
-      const authHeaders = getAuthHeaders();
-      const isCombinedQuery = effectiveMode === 'combined';
-      const useStoredResult = forceMode !== undefined || (isLocked && allowWhenLocked);
-      let response: ConcordanceAnalysisResponse | null = null;
-
-      if (useStoredResult) {
-        const overrides: ConcordanceResultQuery = {
-          combined: isCombinedQuery,
-          sort_by: (overrideSortBy ?? firstNodePagination.sortBy) || undefined,
-          descending: overrideDescending ?? firstNodePagination.descending,
-        };
-
-        if (isCombinedQuery) {
-          overrides.page = combinedPage;
-          overrides.page_size = combinedPageSize;
-        } else {
-          overrides.page = firstNodePagination.currentPage;
-          overrides.page_size = firstNodePagination.pageSize;
-        }
-
-        response = await updateStoredResult(overrides as ConcordanceResultQuery);
-
-        if (isCombinedQuery && response && response.combinable === false) {
-          setViewMode('separated');
-        }
-      } else {
-        const request: ConcordanceAnalysisRequest = {
-          node_ids: requestNodeIds,
-          node_columns: nodeColumns,
-          search_word: trimmedSearch,
-          num_left_tokens: numLeftTokens,
-          num_right_tokens: numRightTokens,
-          regex,
-          case_sensitive: caseSensitive,
-        };
-        if (isCombinedQuery) {
-          request.combined = true;
-        }
-        const requestedSortBy = overrideSortBy ?? firstNodePagination.sortBy;
-        if (requestedSortBy) {
-          request.sort_by = requestedSortBy;
-        }
-
-        response = await textApi.concordance(request, authHeaders);
-        setResults(response);
-        const responseTaskId = (response as any)?.metadata?.task_id;
-        if (typeof responseTaskId === 'string' && responseTaskId.trim().length > 0) {
-          setLocalConcordanceTaskId(responseTaskId);
-        }
-
-        try {
-          await restoreAnalysisLockFromRequest({
-            workspaceId: currentWorkspaceId,
-            requestData: { node_ids: requestNodeIds, node_columns: nodeColumns },
-            getAuthHeaders,
-            lockWithSnapshots,
-            maxNodes: 2,
-          });
-        } catch {
-          /* ignore */
-        }
-
-        if (response?.combinable === false && viewMode === 'combined') {
-          setViewMode('separated');
-        }
-      }
-    } catch (error) {
-      console.error('Error performing concordance search:', error);
-      setResults({
-        state: 'failed',
-        message: error instanceof Error ? error.message : 'Unknown error occurred',
-        data: {},
-      } as any);
-    } finally {
-      setIsSearching(false);
-    }
-  };
 
   useEffect(() => {
     if (!shouldAutoSearch) {
@@ -786,119 +551,9 @@ const ConcordanceFeature: React.FC = () => {
     void handleSearch(true);
   }, [shouldAutoSearch, handleSearch]);
 
-  const applyHydratedRequest = async (requestPayload: unknown) => {
-    const req = (requestPayload as any)?.data ?? requestPayload;
-    if (!req) {
-      return;
-    }
-
-    const nodeIds: string[] = Array.isArray(req.node_ids) ? req.node_ids.slice(0,2) : [];
-    const node_columns: Record<string,string> = req.node_columns || {};
-    const sels = nodeIds.map((id: string) => ({ nodeId: id, column: node_columns[id] || '' }));
-    setNodeColumnSelections(sels, { replace: true });
-    setSearchWord(String(req.search_word || ''));
-    setNumLeftTokens(Number(req.num_left_tokens ?? 10));
-    setNumRightTokens(Number(req.num_right_tokens ?? 10));
-    setRegex(!!req.regex);
-    setCaseSensitive(!!req.case_sensitive);
-    const hydratedMode: 'separated' | 'combined' = req.combined && req.combinable !== false ? 'combined' : 'separated';
-    setViewMode(hydratedMode);
-
-    try {
-      await restoreAnalysisLockFromRequest({
-        workspaceId: currentWorkspaceId,
-        requestData: req,
-        getAuthHeaders,
-        lockWithSnapshots,
-        maxNodes: 2,
-      });
-    } catch {
-      /* ignore */
-    }
-  };
-
-  const applyHydratedResult = async (resultPayload: unknown) => {
-    const res = (resultPayload as any)?.data ?? resultPayload;
-    if (res) {
-      setResults(resultPayload as any);
-    }
-  };
-
-  const fetchConcordanceRequest = async (taskId?: string | null) => {
-    if (!currentWorkspaceId || !taskId) return null;
-    return textApi.getTaskRequest(taskId, getAuthHeaders());
-  };
-
-  const fetchConcordanceResult = async (taskId?: string | null) => {
-    if (!currentWorkspaceId || !taskId) return null;
-    return textApi.getConcordanceTaskResult(taskId, getAuthHeaders());
-  };
-
-  const { hydrateFromServer } = useAnalysisHydration({
-    workspaceId: currentWorkspaceId,
-    analysisKey: 'concordance',
-    getAuthHeaders,
-    onTaskIdResolved: setLocalConcordanceTaskId,
-    fetchRequest: fetchConcordanceRequest,
-    fetchResult: fetchConcordanceResult,
-    applyRequest: applyHydratedRequest,
-    applyResult: applyHydratedResult,
-    autoHydrateOnFocus: false,
-    autoHydrateOnVisibility: false,
-  });
-
-  const hydratedOnceRef = useRef<boolean>(false);
-  useEffect(() => {
-    hydratedOnceRef.current = false;
-  }, [currentWorkspaceId]);
-  useEffect(() => {
-    if (!currentWorkspaceId || !isActiveTab) {
-      return;
-    }
-    if (hydratedOnceRef.current) {
-      return;
-    }
-    hydratedOnceRef.current = true;
-    void hydrateFromServer();
-  }, [currentWorkspaceId, hydrateFromServer, isActiveTab]);
-
   const handleClearResults = async () => {
-    const taskIds = collectTaskIds([
-      (results as any)?.metadata?.task_id,
-      localConcordanceTaskId,
-      concordanceTaskStatus.activeTaskId,
-      concordanceTaskStatus.runningTask?.task_id,
-      concordanceTaskStatus.queuedTask?.task_id,
-      concordanceTaskStatus.terminalTask?.task_id,
-    ]);
-
-    if (currentWorkspaceId) {
-      const headers = getAuthHeaders();
-
-      await clearAnalysisTaskArtifacts({
-        workspaceId: currentWorkspaceId,
-        taskIds,
-        cancelTask: (workspaceId, taskId) =>
-          workspacesApi.cancelTasks({ task_id: taskId }, headers),
-        clearManagerTask: (workspaceId, taskId) =>
-          workspacesApi.clearTasks({ task_id: taskId }, headers),
-        clearAnalysisTask: (workspaceId, taskId) =>
-          textApi.clearTask(taskId, headers),
-        warnContext: 'concordance',
-      });
-    }
-
-    setTasks((prev) => {
-      if (!Array.isArray(prev)) return prev;
-      if (taskIds.length === 0) {
-        return prev;
-      }
-      return pruneTasksById(prev, taskIds);
-    });
-    setResults(null);
-    setNodePagination({});
-    setCombinedPage(1);
-    unlockSelection();
+    if (!currentWorkspaceId) return;
+    await clearResults();
   };
 
   const handleViewModeChange = (nextMode: 'separated' | 'combined') => {
@@ -990,128 +645,6 @@ const ConcordanceFeature: React.FC = () => {
   }, [viewMode, results, combinedPage, combinedPageSize, updateStoredResult]);
 
 
-  const handleSort = (columnName: string, nodeKey: string, requestNodeId?: string) => {
-    const currentNodePagination = nodePagination[nodeKey] || {
-      currentPage: 1,
-      pageSize: globalPageSize,
-      sortBy: '',
-      descending: false,
-    };
-
-    const isSameColumn = currentNodePagination.sortBy === columnName;
-    const newDescending = isSameColumn ? !currentNodePagination.descending : false;
-
-    setNodePagination(prev => ({
-      ...prev,
-      [nodeKey]: {
-        ...currentNodePagination,
-        currentPage: 1, // reset to first page on new sort
-        sortBy: columnName,
-        descending: newDescending
-      }
-    }));
-
-    // Trigger backend resort using current-result POST
-    const pageSize = currentNodePagination.pageSize;
-    if (!currentWorkspaceId) {
-      return;
-    }
-    const targetNodeId = requestNodeId ?? nodeKey;
-    void (async () => {
-      setNodeLoading(prev => ({ ...prev, [nodeKey]: true }));
-      try {
-        const overrides: ConcordanceResultQuery = {
-          node_id: targetNodeId,
-          sort_by: columnName,
-          descending: newDescending,
-          page: 1,
-          page_size: pageSize,
-        };
-        await updateStoredResult(overrides);
-      } finally {
-        setNodeLoading(prev => ({ ...prev, [nodeKey]: false }));
-      }
-    })();
-  };
-
-  const handlePageChange = (newPage: number, nodeKey: string, requestNodeId?: string) => {
-    const currentNodePagination = nodePagination[nodeKey] || {
-      currentPage: 1,
-      pageSize: globalPageSize,
-      sortBy: '',
-      descending: false,
-    };
-
-    setNodePagination(prev => ({
-      ...prev,
-      [nodeKey]: {
-        ...currentNodePagination,
-        currentPage: newPage
-      }
-    }));
-
-    // Trigger backend page update using current-result POST
-    if (!currentWorkspaceId) {
-      return;
-    }
-    const targetNodeId = requestNodeId ?? nodeKey;
-    void (async () => {
-      setNodeLoading(prev => ({ ...prev, [nodeKey]: true }));
-      try {
-        const overrides: ConcordanceResultQuery = {
-          node_id: targetNodeId,
-          page: newPage,
-          page_size: currentNodePagination.pageSize,
-          sort_by: currentNodePagination.sortBy || undefined,
-          descending: currentNodePagination.descending,
-        };
-        await updateStoredResult(overrides);
-      } finally {
-        setNodeLoading(prev => ({ ...prev, [nodeKey]: false }));
-      }
-    })();
-  };
-
-  const persistResultPreferences = async (partial: { pageSize?: number; showMetadata?: boolean }) => {
-    if (!currentWorkspaceId) {
-      return;
-    }
-
-    const preferenceUpdates: Record<string, unknown> = {};
-    if (partial.pageSize !== undefined) {
-      preferenceUpdates.page_size = partial.pageSize;
-    }
-    if (partial.showMetadata !== undefined) {
-      preferenceUpdates.show_metadata = partial.showMetadata;
-    }
-
-    if (Object.keys(preferenceUpdates).length === 0) {
-      return;
-    }
-
-    try {
-      const fetchParams: Record<string, unknown> = { combined: viewMode === 'combined' };
-      if (viewMode === 'combined') {
-        fetchParams.page = combinedPage;
-        fetchParams.page_size = partial.pageSize ?? combinedPageSize;
-      } else {
-        fetchParams.page = 1;
-        fetchParams.page_size = partial.pageSize ?? globalPageSize;
-      }
-
-      const mergedBody = {
-        ...preferenceUpdates,
-        ...fetchParams,
-        update_only: false
-      } as ConcordanceResultQuery;
-
-      return await updateStoredResult(mergedBody);
-    } catch (error) {
-      console.error('Failed to persist concordance preferences', error);
-      throw error;
-    }
-  };
-
   const handleRowClick = (row: any, nodeId: string, column: string) => {
     if (!currentWorkspaceId) return;
 
@@ -1162,39 +695,6 @@ const ConcordanceFeature: React.FC = () => {
 
     return { text: textCandidate, highlighted };
   })();
-
-  const handleDetach = async (nodeId: string, column: string) => {
-    if (!currentWorkspaceId || !searchWord.trim()) {
-      return;
-    }
-
-    setNodeDetaching(prev => ({ ...prev, [nodeId]: true }));
-    
-    try {
-      const request = {
-        node_id: nodeId,
-        column: column,
-        search_word: searchWord.trim(),
-        num_left_tokens: numLeftTokens,
-        num_right_tokens: numRightTokens,
-        regex: regex,
-        case_sensitive: caseSensitive,
-        new_node_name: undefined // Let backend generate the name
-      };
-
-      await detachConcordance(nodeId, request);
-      
-      // The workspace will automatically refresh and show the new node
-      // No need for additional notifications
-      
-    } catch (error) {
-      console.error('Error detaching concordance:', error);
-      // Only show error messages, not success messages
-      toast.error(`Error detaching concordance: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
-      setNodeDetaching(prev => ({ ...prev, [nodeId]: false }));
-    }
-  };
 
   const SortableHeader: React.FC<{ columnKey: string; label: string; paginationKey: string; requestNodeId: string }> = ({ columnKey, label, paginationKey, requestNodeId }) => {
     const nodeState = nodePagination[paginationKey] || { sortBy: '', descending: false };

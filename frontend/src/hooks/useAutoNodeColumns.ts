@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ColumnInfo, filterColumnsByType, mapColumnsToInfo, normalizeTypeName } from '../utils/columnTypes';
 import columnPersistence from '../utils/columnPersistence';
 
@@ -143,37 +143,46 @@ export const useAutoNodeColumns = ({
     }
   }, [persist, storageScope, workspaceId]);
 
-  const persistSelections = (next: NodeColumnSelection[]) => {
-    const persistenceCtx = resolvePersistenceContext();
-    if (!persistenceCtx) return;
-    const map: Record<string, string> = {};
-    next.forEach(({ nodeId, column }) => {
-      if (column) {
-        map[nodeId] = column;
-      }
-    });
-    columnPersistence.storeAll(persistenceCtx, map);
-  };
+  const persistSelections = useCallback(
+    (next: NodeColumnSelection[]) => {
+      const persistenceCtx = resolvePersistenceContext();
+      if (!persistenceCtx) return;
+      const map: Record<string, string> = {};
+      next.forEach(({ nodeId, column }) => {
+        if (column) {
+          map[nodeId] = column;
+        }
+      });
+      columnPersistence.storeAll(persistenceCtx, map);
+    },
+    [persist, workspaceId, storageScope]
+  );
 
-  const setSelections = (next: NodeColumnSelection[], opts?: { replace?: boolean; persist?: boolean }) => {
-    setSelectionsState((prev) => {
-      let updated: NodeColumnSelection[];
-      if (opts?.replace) {
-        updated = next;
-      } else {
-        const map = new Map<string, NodeColumnSelection>();
-        prev.forEach((sel) => map.set(sel.nodeId, sel));
-        next.forEach((sel) => map.set(sel.nodeId, sel));
-        updated = Array.from(map.values());
-      }
-      if (opts?.persist !== false) persistSelections(updated);
-      return updated;
-    });
-  };
+  const setSelections = useCallback(
+    (next: NodeColumnSelection[], opts?: { replace?: boolean; persist?: boolean }) => {
+      setSelectionsState((prev) => {
+        let updated: NodeColumnSelection[];
+        if (opts?.replace) {
+          updated = next;
+        } else {
+          const map = new Map<string, NodeColumnSelection>();
+          prev.forEach((sel) => map.set(sel.nodeId, sel));
+          next.forEach((sel) => map.set(sel.nodeId, sel));
+          updated = Array.from(map.values());
+        }
+        if (opts?.persist !== false) persistSelections(updated);
+        return updated;
+      });
+    },
+    [persistSelections]
+  );
 
-  const setSelection = (nodeId: string, column: string) => {
-    setSelections([{ nodeId, column }], { replace: false });
-  };
+  const setSelection = useCallback(
+    (nodeId: string, column: string) => {
+      setSelections([{ nodeId, column }], { replace: false });
+    },
+    [setSelections]
+  );
 
   const normalizeColumnInfos = (source: NodeColumnSource | undefined): ColumnInfo[] => {
     if (!source || !Array.isArray(source) || source.length === 0) return [];
@@ -267,25 +276,34 @@ export const useAutoNodeColumns = ({
     });
   }, [persistSelections]);
 
+  const selectedNodeIdsKey = useMemo(
+    () => selectedNodes.slice(0, maxNodes).map((n, idx) => resolveNodeId(n, idx)).filter(Boolean).join(','),
+    [selectedNodes, maxNodes]
+  );
+
   useEffect(() => {
-    const currIds = selectedNodes.slice(0, maxNodes).map((n, idx) => resolveNodeId(n, idx)).filter(Boolean);
+    const currIds = selectedNodeIdsKey.split(',').filter(Boolean);
     const last = lastSelectedIdsRef.current;
     if (currIds.length !== last.length || currIds.some((id, i) => id !== last[i])) {
       recomputeAutoColumns();
     }
-  }, [selectedNodes, maxNodes, recomputeAutoColumns]);
+  }, [selectedNodeIdsKey, recomputeAutoColumns]);
 
-  const columnOptions = selectedNodes.slice(0, maxNodes).reduce<Record<string, ColumnOptionInfo>>((acc, node, idx) => {
-    const nodeId = resolveNodeId(node, idx);
-    const infos = normalizeColumns(deriveColumnInfosForRender(node));
-    const filtered = allowedDataTypes?.length ? filterColumnsByType(infos, allowedDataTypes) : infos;
-    const filteredOutByType = Boolean(allowedDataTypes?.length && infos.length && filtered.length === 0);
-    acc[nodeId] = {
-      columns: filtered.length ? filtered : infos,
-      filteredOutByType,
-    };
-    return acc;
-  }, {});
+  const columnOptions = useMemo(
+    () =>
+      selectedNodes.slice(0, maxNodes).reduce<Record<string, ColumnOptionInfo>>((acc, node, idx) => {
+        const nodeId = resolveNodeId(node, idx);
+        const infos = normalizeColumns(deriveColumnInfosForRender(node));
+        const filtered = allowedDataTypes?.length ? filterColumnsByType(infos, allowedDataTypes) : infos;
+        const filteredOutByType = Boolean(allowedDataTypes?.length && infos.length && filtered.length === 0);
+        acc[nodeId] = {
+          columns: filtered.length ? filtered : infos,
+          filteredOutByType,
+        };
+        return acc;
+      }, {}),
+    [selectedNodes, maxNodes, allowedDataTypes, deriveColumnInfosForRender]
+  );
 
   return {
     selections,

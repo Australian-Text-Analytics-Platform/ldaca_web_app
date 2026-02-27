@@ -29,6 +29,7 @@ from ....models import (
 )
 from ....settings import settings
 from . import quotation_core as qcore
+from .current_tasks import get_current_task_ids_for_analysis
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +88,38 @@ def _prepare_quotation_artifact_target(
     )
     artifact_prefix = f"quotation_detach_{uuid4().hex}"
     return str(artifact_dir), artifact_prefix
+
+
+@router.get("/quotation/tasks/current")
+async def quotation_current_tasks(
+    current_user: dict = Depends(get_current_user),
+):
+    """Return current task IDs for quotation analysis."""
+    user_id = current_user["id"]
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    if not workspace_id:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+    return await get_current_task_ids_for_analysis(
+        user_id, workspace_id, ["quotation_analysis", "quotation-analysis", "quotation"]
+    )
+
+
+@router.get("/quotation/tasks/{task_id}/request")
+async def quotation_task_request(
+    task_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Return stored request payload for a quotation task."""
+    user_id = current_user["id"]
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    if not workspace_id:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+    task_manager = get_task_manager(user_id, workspace_id)
+    task = task_manager.get_task(task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    request = task.request
+    return request.model_dump() if hasattr(request, "model_dump") else request
 
 
 @router.get("/quotation/tasks/{task_id}/result")

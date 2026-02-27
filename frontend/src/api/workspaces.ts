@@ -15,8 +15,7 @@ export const workspacesApi = {
   saveAs: (filename: string, headers: Record<string,string> = {}) => post(`/workspaces/save-as`, {}, headers, { filename }),
   updateName: (newName: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/name`, { method: 'PUT', headers, params: { new_name: newName } }),
   clearAnalysis: (task?: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/analysis/clear`, { method: 'POST', headers, params: task ? { task } : {} }),
-  listTasks: (headers: Record<string,string> = {}) => httpRequest(`/workspaces/tasks`, { method: 'GET', headers }),
-  cancelTasks: (options?: { task_id?: string }, headers: Record<string,string> = {}) => httpRequest(`/workspaces/tasks/cancel`, { method: 'POST', headers, params: options || {} }),
+  listTasks: (headers: Record<string,string> = {}) => httpRequest(`/tasks`, { method: 'GET', headers }),
   clearTokenFrequencies: (headers: Record<string, string> = {}) =>
       httpRequest(`/workspaces/token-frequencies`, {
       method: 'DELETE',
@@ -24,9 +23,9 @@ export const workspacesApi = {
     }),
   
   clearTasks: (
-    options?: { task_id?: string; task_type?: string; workspace_id?: string },
+    options: { task_id: string },
     headers: Record<string,string> = {}
-  ) => httpRequest(`/workspaces/tasks/clear`, { method: 'POST', headers, params: options || {} }),
+  ) => httpRequest(`/tasks/clear`, { method: 'POST', headers, params: options }),
   current: {
     get: (headers: Record<string,string> = {}) => get<{ id: string|null }>('/workspaces/current', headers).then(r => r.id),
     set: (workspaceId: string | null, headers: Record<string,string> = {}) => httpRequest(`/workspaces/current${workspaceId ? `?workspace_id=${encodeURIComponent(workspaceId)}` : ''}`, { method: 'POST', headers }),

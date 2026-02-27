@@ -1,85 +1,91 @@
 import { toast } from 'sonner';
 import { textApi, type TokenFrequencyRequest, type TokenFrequencyResponse } from '@/api/text';
-import { workspacesApi } from '@/api/workspaces';
 import type { NodeColumnSelection } from '@/hooks/useAutoNodeColumns';
 import { resolveTokenFrequencyNodeContext, type TokenFrequencyAnalysisParams } from '@/components/tabs/tokenFrequencyHelpers';
 import { restoreAnalysisLockFromRequest } from '../../common';
-import {
-  clearAnalysisTaskArtifacts,
-  collectTaskIds,
-  pruneTasksById,
-} from '../../../../hooks/analysisTaskUtils';
 
-type UseTokenFrequencyTaskFlowParams = {
+interface AnalysisState {
   currentWorkspaceId: string | null;
   selectedNodes: Array<{ id: string }>;
   effectiveNodeColumnSelections: NodeColumnSelection[];
   stopWords: string;
   results: TokenFrequencyResponse | null;
-  localTokenFrequencyTaskId: string | null;
-  tokenFrequencyTaskStatus: any;
+  lastCompareNodeIds: string[];
+  nodeColors: Record<string, string>;
   lockedNodeNameMap: Record<string, string>;
   nodeIdToName: Record<string, string>;
-  nodeColors: Record<string, string>;
-  lastCompareNodeIds: string[];
-  setLocalTokenFrequencyTaskId: React.Dispatch<React.SetStateAction<string | null>>;
-  setIsAnalyzing: React.Dispatch<React.SetStateAction<boolean>>;
-  analyzingRef: React.MutableRefObject<boolean>;
+}
+
+interface AnalysisActions {
+  setLocalTaskId: (value: string | null) => void;
+  setIsRunning: (value: boolean) => void;
+  runningRef: React.MutableRefObject<boolean>;
   setResultsSafely: (value: any) => void;
   setLastCompareNodeIds: React.Dispatch<React.SetStateAction<string[]>>;
   setAppliedStopSet: React.Dispatch<React.SetStateAction<Set<string>>>;
   setStopWords: React.Dispatch<React.SetStateAction<string>>;
-  resetPreferenceUiState: () => void;
-  setTasks: React.Dispatch<React.SetStateAction<any[]>>;
-  unlockSelection: () => void;
+  lastFetchedRef: React.MutableRefObject<{ taskId: string | null; state: string | null }>;
+}
+
+interface LockActions {
   getAuthHeaders: () => Record<string, string>;
   lockWithSnapshots: (nodes: any[]) => void;
-  resolveTokenFrequencyTaskId: () => Promise<string | null>;
+}
+
+interface NavigationActions {
   selectNodes: (nodeIds: string[]) => void;
   setPendingConcordance: (payload: any) => void;
   setCurrentView: (view: any) => void;
   applyStopSetFromText: (text: string) => void;
   getColorForNode: (nodeId: string, index?: number) => string;
-  lastFetchedRef: React.MutableRefObject<{ taskId: string | null; state: string | null }>;
+}
+
+type UseTokenFrequencyTaskFlowParams = {
+  state: AnalysisState;
+  actions: AnalysisActions;
+  lock: LockActions;
+  navigation: NavigationActions;
 };
 
 export const useTokenFrequencyTaskFlow = ({
-  currentWorkspaceId,
-  selectedNodes,
-  effectiveNodeColumnSelections,
-  stopWords,
-  results,
-  localTokenFrequencyTaskId,
-  tokenFrequencyTaskStatus,
-  lockedNodeNameMap,
-  nodeIdToName,
-  nodeColors,
-  lastCompareNodeIds,
-  setLocalTokenFrequencyTaskId,
-  setIsAnalyzing,
-  analyzingRef,
-  setResultsSafely,
-  setLastCompareNodeIds,
-  setAppliedStopSet,
-  setStopWords,
-  resetPreferenceUiState,
-  setTasks,
-  unlockSelection,
-  getAuthHeaders,
-  lockWithSnapshots,
-  resolveTokenFrequencyTaskId,
-  selectNodes,
-  setPendingConcordance,
-  setCurrentView,
-  applyStopSetFromText,
-  getColorForNode,
-  lastFetchedRef,
+  state: {
+    currentWorkspaceId,
+    selectedNodes,
+    effectiveNodeColumnSelections,
+    stopWords,
+    results,
+    lockedNodeNameMap,
+    nodeIdToName,
+    nodeColors,
+    lastCompareNodeIds,
+  },
+  actions: {
+    setLocalTaskId,
+    setIsRunning,
+    runningRef,
+    setResultsSafely,
+    setLastCompareNodeIds,
+    setAppliedStopSet,
+    setStopWords,
+    lastFetchedRef,
+  },
+  lock: {
+    getAuthHeaders,
+    lockWithSnapshots,
+  },
+  navigation: {
+    selectNodes,
+    setPendingConcordance,
+    setCurrentView,
+    applyStopSetFromText,
+    getColorForNode,
+  },
 }: UseTokenFrequencyTaskFlowParams) => {
   const handleAnalyze = async () => {
     if (!currentWorkspaceId || selectedNodes.length === 0) {
       return;
     }
-    if (analyzingRef.current) return;
+    if (runningRef.current) return;
 
     const incompleteSelections = effectiveNodeColumnSelections.filter((sel) => !sel.column);
     if (incompleteSelections.length > 0) {
@@ -88,8 +94,8 @@ export const useTokenFrequencyTaskFlow = ({
     }
 
     lastFetchedRef.current = { taskId: null, state: null };
-    setIsAnalyzing(true);
-    analyzingRef.current = true;
+    setIsRunning(true);
+    runningRef.current = true;
     setResultsSafely(null);
 
     try {
@@ -130,7 +136,7 @@ export const useTokenFrequencyTaskFlow = ({
 
       const responseTaskId = (response as any)?.metadata?.task_id;
       if (typeof responseTaskId === 'string' && responseTaskId.trim()) {
-        setLocalTokenFrequencyTaskId(responseTaskId);
+        setLocalTaskId(responseTaskId);
       }
 
       setLastCompareNodeIds(request.node_ids);
@@ -144,73 +150,20 @@ export const useTokenFrequencyTaskFlow = ({
       }
 
       if (response.state === 'failed') {
-        setIsAnalyzing(false);
-        analyzingRef.current = false;
+        setIsRunning(false);
+        runningRef.current = false;
       }
     } catch (error) {
       console.error('Error calculating token frequencies:', error);
-      setLocalTokenFrequencyTaskId(null);
+      setLocalTaskId(null);
       setResultsSafely({
         state: 'failed',
         message: error instanceof Error ? error.message : 'Unknown error occurred',
         data: null,
       } as any);
-      setIsAnalyzing(false);
-      analyzingRef.current = false;
+      setIsRunning(false);
+      runningRef.current = false;
     }
-  };
-
-  const handleClearResults = async () => {
-    if (currentWorkspaceId) {
-      const taskIds = collectTaskIds([
-        (results as any)?.metadata?.task_id,
-        localTokenFrequencyTaskId,
-        tokenFrequencyTaskStatus.activeTaskId,
-        tokenFrequencyTaskStatus.runningTask?.task_id,
-        tokenFrequencyTaskStatus.successfulTask?.task_id,
-        tokenFrequencyTaskStatus.failedTask?.task_id,
-      ]);
-      try {
-        const headers = getAuthHeaders();
-        const resolvedTaskId = await resolveTokenFrequencyTaskId();
-        const allTaskIds = collectTaskIds([...taskIds, resolvedTaskId]);
-
-        await clearAnalysisTaskArtifacts({
-          workspaceId: currentWorkspaceId,
-          taskIds: allTaskIds,
-          cancelTask: (_workspaceId: string, taskId: string) => workspacesApi.cancelTasks({ task_id: taskId }, headers),
-          clearManagerTask: (_workspaceId: string, taskId: string) => workspacesApi.clearTasks({ task_id: taskId }, headers),
-          clearAnalysisTask: (_workspaceId: string, taskId: string) => textApi.clearTask(taskId, headers),
-          warnContext: 'token-frequency',
-        });
-      } catch (error) {
-        console.warn('Failed to clear token frequency tasks:', error);
-      }
-    }
-
-    setResultsSafely(null);
-    setLocalTokenFrequencyTaskId(null);
-    lastFetchedRef.current = { taskId: null, state: null };
-    unlockSelection();
-    setIsAnalyzing(false);
-    analyzingRef.current = false;
-    setLastCompareNodeIds([]);
-    resetPreferenceUiState();
-    setTasks((prev: any[]) =>
-      Array.isArray(prev)
-        ? pruneTasksById(
-            prev,
-            collectTaskIds([
-              (results as any)?.metadata?.task_id,
-              localTokenFrequencyTaskId,
-              tokenFrequencyTaskStatus.activeTaskId,
-              tokenFrequencyTaskStatus.runningTask?.task_id,
-              tokenFrequencyTaskStatus.successfulTask?.task_id,
-              tokenFrequencyTaskStatus.failedTask?.task_id,
-            ])
-          )
-        : prev
-    );
   };
 
   const handleTokenClick = (token: string) => {
@@ -293,7 +246,6 @@ export const useTokenFrequencyTaskFlow = ({
 
   return {
     handleAnalyze,
-    handleClearResults,
     handleTokenClick,
     handleTokenRightClick,
   };

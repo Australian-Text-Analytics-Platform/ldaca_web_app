@@ -26,6 +26,7 @@ from ....core.auth import get_current_user
 from ....core.workspace import workspace_manager
 from ....models import TokenFrequencyRequest, TokenFrequencyResponse
 from ..utils import ensure_task_synced
+from .current_tasks import get_current_task_ids_for_analysis
 from .text_column_prefs import resolve_text_columns_for_nodes
 
 router = APIRouter(prefix="/workspaces")
@@ -282,6 +283,38 @@ def _rebuild_token_result(task: AnalysisTask) -> dict:
         "metadata": metadata,
         "stop_words": stop_words,
     }
+
+
+@router.get("/token-frequencies/tasks/current")
+async def token_frequencies_current_tasks(
+    current_user: dict = Depends(get_current_user),
+):
+    """Return current task IDs for token-frequencies analysis."""
+    user_id = current_user["id"]
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    if not workspace_id:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+    return await get_current_task_ids_for_analysis(
+        user_id, workspace_id, ["token_frequencies", "token-frequencies"]
+    )
+
+
+@router.get("/token-frequencies/tasks/{task_id}/request")
+async def token_frequencies_task_request(
+    task_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Return stored request payload for a token-frequencies task."""
+    user_id = current_user["id"]
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    if not workspace_id:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+    task_manager = get_task_manager(user_id, workspace_id)
+    task = task_manager.get_task(task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    request = task.request
+    return request.model_dump() if hasattr(request, "model_dump") else request
 
 
 @router.get("/token-frequencies/tasks/{task_id}/result")

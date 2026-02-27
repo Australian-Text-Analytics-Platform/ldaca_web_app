@@ -1,0 +1,440 @@
+import type { Dispatch, SetStateAction } from 'react';
+import type {
+  QuotationRequest,
+  QuotationResultQuery,
+  QuotationEngineConfig,
+} from '../../../../api/text';
+import { textApi } from '../../../../api/text';
+import { getNodeIdentifier, restoreAnalysisLockFromRequest } from '../../common';
+import type { NodeColumnSelection } from '../../common';
+
+const DEFAULT_PAGE_SIZE = 100;
+
+type EngineRequestPayload = { type: 'local' } | { type: 'remote'; url: string };
+
+type ResolvedEnginePayload =
+  | { type: 'local' }
+  | {
+      type: 'remote';
+      rawUrl: string;
+      normalizedUrl: string;
+      isValid: boolean;
+      failureReason: string | null;
+    };
+
+interface NodePaginationState {
+  currentPage: number;
+  pageSize: number;
+  sortBy?: string;
+  descending: boolean;
+}
+
+function getErrorMessage(error: any): string {
+  const detail =
+    error?.response?.data?.detail ??
+    error?.data?.detail ??
+    (error?.body as any)?.detail;
+  if (typeof detail === 'string' && detail.trim().length) return detail;
+  if (detail && typeof detail === 'object') {
+    try {
+      return JSON.stringify(detail);
+    } catch {
+      /* ignore */
+    }
+  }
+  if (typeof error?.message === 'string' && error.message.trim().length)
+    return error.message;
+  return 'An unexpected error occurred while loading quotations.';
+}
+
+interface QuotationState {
+  currentWorkspaceId: string | null;
+  isLocked: boolean;
+  hasLoaded: boolean;
+  lockedNodesSnapshot: any[];
+  displayedNodes: any[];
+  activeSelections: NodeColumnSelection[];
+  nodeState: Record<string, NodePaginationState>;
+  originalColumnsByNode: Record<string, string[]>;
+  resolvedEnginePayload: ResolvedEnginePayload;
+  engineConfigUrl: string;
+}
+
+interface QuotationActions {
+  setEngineError: (error: string | null) => void;
+  updateRemoteUrl: (url: string) => void;
+  setIsLoadingQuotations: (value: boolean) => void;
+  setHasLoaded: (value: boolean) => void;
+  setNodeDetaching: Dispatch<SetStateAction<Record<string, boolean>>>;
+  showErrorDialog: (message: string) => void;
+  baseHandlePageChange: (page: number) => void;
+  baseHandlePageSizeChange: (pageSize: number) => void;
+  updateResultState: (nodeId: string, column: string, result: any) => void;
+  applyContextLengthPreferenceFromResult: (payload: any) => void;
+}
+
+interface QuotationLock {
+  getAuthHeaders: () => Record<string, string>;
+  lockWithSnapshots: (
+    snapshots: Array<{ id: string; name?: string; columns?: string[] }>,
+  ) => void;
+  resolveTaskId: () => Promise<string | null>;
+  quotationSearch: (
+    nodeId: string,
+    request: QuotationRequest,
+  ) => Promise<any>;
+  detachQuotation: (nodeId: string, request: any) => Promise<void>;
+  openEngineDialog: () => void;
+}
+
+type Params = {
+  state: QuotationState;
+  actions: QuotationActions;
+  lock: QuotationLock;
+};
+
+export function useQuotationTaskFlow({
+  state: {
+    currentWorkspaceId,
+    isLocked,
+    hasLoaded,
+    lockedNodesSnapshot,
+    displayedNodes,
+    activeSelections,
+    nodeState,
+    originalColumnsByNode,
+    resolvedEnginePayload,
+    engineConfigUrl,
+  },
+  actions: {
+    setEngineError,
+    updateRemoteUrl,
+    setIsLoadingQuotations,
+    setHasLoaded,
+    setNodeDetaching,
+    showErrorDialog,
+    baseHandlePageChange,
+    baseHandlePageSizeChange,
+    updateResultState,
+    applyContextLengthPreferenceFromResult,
+  },
+  lock: {
+    getAuthHeaders,
+    lockWithSnapshots,
+    resolveTaskId,
+    quotationSearch,
+    detachQuotation,
+    openEngineDialog,
+  },
+}: Params) {
+  const buildEngineRequest = (): EngineRequestPayload | null => {
+    if (resolvedEnginePayload.type === 'remote') {
+      const rawUrl = resolvedEnginePayload.rawUrl;
+      if (!rawUrl.length) {
+        setEngineError('Provide a quotation service URL.');
+        return null;
+      }
+      if (!resolvedEnginePayload.isValid) {
+        if (resolvedEnginePayload.failureReason === 'empty') {
+          setEngineError('Provide a quotation service URL.');
+        } else if (resolvedEnginePayload.failureReason === 'protocol') {
+          setEngineError('Remote engines must use http:// or https:// URLs.');
+        } else {
+          setEngineError('Enter a valid URL including http:// or https://');
+        }
+        return null;
+      }
+      const normalizedUrl = resolvedEnginePayload.normalizedUrl;
+      if (engineConfigUrl.trim() !== normalizedUrl) {
+        updateRemoteUrl(normalizedUrl);
+      }
+      setEngineError(null);
+      return { type: 'remote', url: normalizedUrl };
+    }
+    setEngineError(null);
+    return { type: 'local' };
+  };
+
+  const resolveLockedNodeContext = (): {
+    nodeId: string;
+    column: string;
+  } | null => {
+    const sourceNode = (
+      isLocked && lockedNodesSnapshot.length
+        ? lockedNodesSnapshot[0]
+        : displayedNodes[0]
+    ) as any;
+    if (!sourceNode) return null;
+    const nodeId = getNodeIdentifier(sourceNode, 0);
+    const selection = activeSelections.find((sel) => sel.nodeId === nodeId);
+    const column = selection?.column;
+    if (!column) return null;
+    return { nodeId, column };
+  };
+
+  const persistContextLengthPreference = async (value: number) => {
+    if (!currentWorkspaceId) return;
+    const taskId = await resolveTaskId();
+    if (!taskId) return;
+    await textApi.postQuotationTaskResult(
+      taskId,
+      { context_length: value, update_only: true },
+      getAuthHeaders(),
+    );
+  };
+
+  const fetchQuotations = async (
+    nodeId: string,
+    overrides?: {
+      page?: number;
+      pageSize?: number;
+      sortBy?: string;
+      descending?: boolean;
+      columnOverride?: string;
+    },
+  ) => {
+    if (!currentWorkspaceId) return null;
+    const selection = activeSelections.find((s) => s.nodeId === nodeId);
+    const column = overrides?.columnOverride || selection?.column;
+    if (!column) return null;
+
+    const st = nodeState[nodeId] || {
+      currentPage: 1,
+      pageSize: DEFAULT_PAGE_SIZE,
+      sortBy: undefined,
+      descending: false,
+    };
+    const page = overrides?.page ?? st.currentPage ?? 1;
+    const pageSize = overrides?.pageSize ?? st.pageSize ?? DEFAULT_PAGE_SIZE;
+    const sortBy = overrides?.sortBy ?? st.sortBy;
+    const descending: boolean =
+      overrides?.descending ?? st.descending ?? false;
+
+    const enginePayload = buildEngineRequest();
+    if (!enginePayload) {
+      openEngineDialog();
+      return null;
+    }
+
+    const engineConfigForRequest: QuotationEngineConfig =
+      enginePayload.type === 'remote'
+        ? { type: 'remote', url: enginePayload.url }
+        : { type: 'local' };
+
+    const requestPayload: QuotationRequest = {
+      column,
+      page,
+      page_size: pageSize,
+      sort_by: sortBy ?? undefined,
+      descending,
+      engine: engineConfigForRequest,
+    };
+
+    try {
+      const result = await quotationSearch(nodeId, requestPayload);
+      applyContextLengthPreferenceFromResult(result);
+      updateResultState(nodeId, column, result);
+      return {
+        column,
+        page: requestPayload.page,
+        page_size: requestPayload.page_size,
+        sort_by: requestPayload.sort_by ?? null,
+        descending: requestPayload.descending,
+        engine_type: engineConfigForRequest.type,
+        engine_url:
+          engineConfigForRequest.type === 'remote'
+            ? (engineConfigForRequest.url ?? '')
+            : null,
+      };
+    } catch (error: any) {
+      console.error('Failed to fetch quotations', error);
+      showErrorDialog(getErrorMessage(error));
+      return null;
+    }
+  };
+
+  const updateStoredQuotationResult = async (
+    overrides: Partial<QuotationResultQuery> = {},
+  ) => {
+    if (!currentWorkspaceId) return null;
+    const context = resolveLockedNodeContext();
+    if (!context) return null;
+
+    const { nodeId, column } = context;
+    const st = nodeState[nodeId] || {
+      currentPage: 1,
+      pageSize: DEFAULT_PAGE_SIZE,
+      sortBy: undefined,
+      descending: false,
+    };
+
+    const payload: QuotationResultQuery = {
+      page: overrides.page ?? st.currentPage ?? 1,
+      page_size: overrides.page_size ?? st.pageSize ?? DEFAULT_PAGE_SIZE,
+      sort_by: overrides.sort_by ?? st.sortBy ?? null,
+      descending: overrides.descending ?? st.descending ?? false,
+    };
+
+    try {
+      const taskId = await resolveTaskId();
+      if (!taskId) return null;
+      const response = await textApi.postQuotationTaskResult(
+        taskId,
+        payload,
+        getAuthHeaders(),
+      );
+      if (!response) return null;
+      applyContextLengthPreferenceFromResult(response);
+      updateResultState(nodeId, column, response);
+      setHasLoaded(true);
+      return response;
+    } catch (error: any) {
+      console.error('Failed to refresh quotation results', error);
+      showErrorDialog(getErrorMessage(error));
+      return null;
+    }
+  };
+
+  const handleSearchAll = async () => {
+    const targetNode = displayedNodes[0];
+    const nodeId = targetNode ? getNodeIdentifier(targetNode, 0) : '';
+    if (!nodeId) return;
+
+    setIsLoadingQuotations(true);
+    try {
+      const outcome = await fetchQuotations(nodeId, { page: 1 });
+      if (!outcome) return;
+      setHasLoaded(true);
+      try {
+        const lockedSelections = activeSelections.filter(
+          (sel) => sel.nodeId === nodeId && sel.column,
+        );
+        const columnMap = lockedSelections.reduce<
+          Record<string, string | undefined>
+        >((acc, sel) => {
+          acc[sel.nodeId] = sel.column;
+          return acc;
+        }, {});
+        await restoreAnalysisLockFromRequest({
+          workspaceId: currentWorkspaceId,
+          requestData: {
+            node_ids: [nodeId],
+            node_columns: columnMap,
+          },
+          getAuthHeaders,
+          lockWithSnapshots,
+          maxNodes: 1,
+        });
+      } catch {
+        /* ignore */
+      }
+    } finally {
+      setIsLoadingQuotations(false);
+    }
+  };
+
+  const handlePageChange = async (newPage: number) => {
+    const targetNode = (
+      isLocked && lockedNodesSnapshot.length
+        ? lockedNodesSnapshot[0]
+        : displayedNodes[0]
+    ) as any;
+    const nodeId = targetNode ? getNodeIdentifier(targetNode, 0) : '';
+    if (!nodeId) {
+      baseHandlePageChange(newPage);
+      return;
+    }
+    if (!isLocked || !hasLoaded) {
+      baseHandlePageChange(newPage);
+      return;
+    }
+    const updated = await updateStoredQuotationResult({ page: newPage });
+    if (!updated) baseHandlePageChange(newPage);
+  };
+
+  const handlePageSizeChange = async (pageSize: number) => {
+    const targetNode = (
+      isLocked && lockedNodesSnapshot.length
+        ? lockedNodesSnapshot[0]
+        : displayedNodes[0]
+    ) as any;
+    const nodeId = targetNode ? getNodeIdentifier(targetNode, 0) : '';
+    if (!nodeId) {
+      baseHandlePageSizeChange(pageSize);
+      return;
+    }
+    if (!isLocked || !hasLoaded) {
+      baseHandlePageSizeChange(pageSize);
+      return;
+    }
+    const updated = await updateStoredQuotationResult({
+      page: 1,
+      page_size: pageSize,
+    });
+    if (!updated) baseHandlePageSizeChange(pageSize);
+  };
+
+  const handleSort = async (nodeId: string, column: string) => {
+    const sortableColumns = new Set(originalColumnsByNode[nodeId] || []);
+    if (!sortableColumns.has(column)) return;
+    const st = nodeState[nodeId] || {
+      currentPage: 1,
+      pageSize: DEFAULT_PAGE_SIZE,
+      sortBy: undefined,
+      descending: false,
+    };
+    const isSame = st.sortBy === column;
+    const nextDescending: boolean = isSame ? !st.descending : false;
+    if (!isLocked || !hasLoaded) {
+      await fetchQuotations(nodeId, {
+        page: 1,
+        sortBy: column,
+        descending: nextDescending,
+      });
+      return;
+    }
+    await updateStoredQuotationResult({
+      page: 1,
+      sort_by: column,
+      descending: nextDescending,
+    });
+  };
+
+  const handleDetach = async (nodeId: string) => {
+    const selection = activeSelections.find((s) => s.nodeId === nodeId);
+    if (!selection?.column) return;
+    setNodeDetaching((prev) => ({ ...prev, [nodeId]: true }));
+    try {
+      const enginePayload = buildEngineRequest();
+      if (!enginePayload) {
+        openEngineDialog();
+        return;
+      }
+      await detachQuotation(nodeId, {
+        node_id: nodeId,
+        column: selection.column,
+        engine:
+          enginePayload.type === 'remote'
+            ? { type: 'remote', url: enginePayload.url }
+            : { type: 'local' },
+      });
+    } catch (e: any) {
+      showErrorDialog(getErrorMessage(e));
+    } finally {
+      setNodeDetaching((prev) => ({ ...prev, [nodeId]: false }));
+    }
+  };
+
+  return {
+    buildEngineRequest,
+    resolveLockedNodeContext,
+    persistContextLengthPreference,
+    fetchQuotations,
+    updateStoredQuotationResult,
+    handleSearchAll,
+    handlePageChange,
+    handlePageSizeChange,
+    handleSort,
+    handleDetach,
+  };
+}

@@ -34,7 +34,8 @@ async def get_json(client: AsyncClient, path: str):
 
 async def get_current_task_id(client: AsyncClient, workspace_id: str, analysis: str):
     """Fetch the current task id for a given analysis tab."""
-    response = await client.get("/api/workspaces/" + analysis + "/current")
+    slug = analysis.replace("_", "-")
+    response = await client.get(f"/api/workspaces/{slug}/tasks/current")
     if response.status_code != 200:
         return None
     payload = response.json()
@@ -60,8 +61,9 @@ def assert_successful_result(result_dict: dict):
     """Assert that a result dict represents a successful analysis."""
     # Contract migrated: 'success': True -> 'state': 'successful'
     assert result_dict.get("state") == "successful"
-    # message remains optional in some endpoints; only assert data presence
-    assert "data" in result_dict
+    # Some analyses return a generic data envelope, while others expose
+    # analysis-specific fields at top-level.
+    assert "data" in result_dict or "analysis_params" in result_dict
 
 
 def _simulate_token_frequency_completion(workspace_id: str):
@@ -182,15 +184,12 @@ class TestTokenFrequencyPersistence:
         assert response.status_code == 200
         result_data = response.json()
         assert result_data.get("state") == "running"
-        assert result_data.get("metadata", {}).get("task_id")
+        task_id = result_data.get("metadata", {}).get("task_id")
+        assert task_id
 
         # Simulate worker completion and fetch persisted result
         _simulate_token_frequency_completion(workspace_id)
 
-        task_id = await get_current_task_id(
-            authenticated_client, workspace_id, "token_frequencies"
-        )
-        assert task_id
         result_resp = await get_json(
             authenticated_client,
             f"/api/workspaces/token-frequencies/tasks/{task_id}/result",

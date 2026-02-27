@@ -118,36 +118,51 @@ export interface TopicModelingDetachResponse {
 export const textApi = {
   concordance: (req: ConcordanceAnalysisRequest, headers: Record<string,string> = {}) => post<ConcordanceAnalysisResponse>(`/workspaces/concordance`, req, headers),
   concordanceDetach: (node: string, req: ConcordanceDetachRequest, headers: Record<string,string> = {}) => post(`/workspaces/nodes/${node}/concordance/detach`, req, headers),
+  getConcordanceTaskRequest: (taskId: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/concordance/tasks/${taskId}/request`, { method: 'GET', headers }),
   getConcordanceTaskResult: (taskId: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/concordance/tasks/${taskId}/result`, { method: 'GET', headers }),
   postConcordanceTaskResult: (taskId: string, body: ConcordanceResultQuery, headers: Record<string,string> = {}) => post(`/workspaces/concordance/tasks/${taskId}/result`, body, headers),
 
   // Quotation
   quotation: (node: string, req: QuotationRequest, headers: Record<string,string> = {}) => post(`/workspaces/nodes/${node}/quotation`, req, headers),
   quotationDetach: (node: string, req: QuotationDetachRequest, headers: Record<string,string> = {}) => post(`/workspaces/nodes/${node}/quotation/detach`, req, headers),
+  getQuotationTaskRequest: (taskId: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/quotation/tasks/${taskId}/request`, { method: 'GET', headers }),
   getQuotationTaskResult: (taskId: string, headers: Record<string,string> = {}, params?: QuotationResultQuery) => httpRequest(`/workspaces/quotation/tasks/${taskId}/result`, { method: 'GET', headers, params }),
   postQuotationTaskResult: (taskId: string, body: QuotationResultQuery, headers: Record<string,string> = {}) => post(`/workspaces/quotation/tasks/${taskId}/result`, body, headers),
 
   // Sequential analysis
   sequentialAnalysis: (node: string, req: SequentialAnalysisRequest, headers: Record<string,string> = {}) => post(`/workspaces/nodes/${node}/sequential-analysis`, req, headers),
+  getSequentialAnalysisTaskRequest: (taskId: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/sequential-analysis/tasks/${taskId}/request`, { method: 'GET', headers }),
+  getSequentialAnalysisTaskResult: (taskId: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/sequential-analysis/tasks/${taskId}/result`, { method: 'GET', headers }),
   postSequentialAnalysisTaskResult: (taskId: string, body: Record<string,unknown>, headers: Record<string,string> = {}) => post(`/workspaces/sequential-analysis/tasks/${taskId}/result`, body, headers),
 
   // Token Frequency
   tokenFrequencies: (req: TokenFrequencyRequest, headers: Record<string,string> = {}) => post(`/workspaces/token-frequencies`, req, headers),
   defaultStopWords: (headers: Record<string,string> = {}) => get<{ stopwords?: string[]; error?: string }>('/text/default-stop-words', headers),
+  getTokenFrequenciesTaskRequest: (taskId: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/token-frequencies/tasks/${taskId}/request`, { method: 'GET', headers }),
   getTokenFrequenciesTaskResult: (taskId: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/token-frequencies/tasks/${taskId}/result`, { method: 'GET', headers }),
   postTokenFrequenciesTaskResult: (taskId: string, reqUpdate: any, headers: Record<string,string> = {}) => post(`/workspaces/token-frequencies/tasks/${taskId}/result`, reqUpdate, headers),
 
   // Topic Modeling
   topicModeling: (req: TopicModelingRequest, headers: Record<string, string> = {}) => post(`/workspaces/topic-modeling`, req, headers),
+  getTopicModelingTaskRequest: (taskId: string, headers: Record<string, string> = {}) => httpRequest(`/workspaces/topic-modeling/tasks/${taskId}/request`, { method: 'GET', headers }),
   getTopicModelingTaskResult: (taskId: string, headers: Record<string, string> = {}) => httpRequest<TopicModelingResponse>(`/workspaces/topic-modeling/tasks/${taskId}/result`, { method: 'GET', headers }),
   getTopicModelingDetachOptions: (taskId: string, headers: Record<string, string> = {}) =>
     httpRequest<TopicModelingDetachOptionsResponse>(`/workspaces/topic-modeling/tasks/${taskId}/detach-options`, { method: 'GET', headers }),
   topicModelingDetach: (taskId: string, req: TopicModelingDetachRequest, headers: Record<string, string> = {}) =>
     post<TopicModelingDetachResponse>(`/workspaces/topic-modeling/tasks/${taskId}/detach`, req, headers),
 
-  getAnalysisCurrent: (analysis: string, headers: Record<string, string> = {}) => httpRequest(`/workspaces/${analysis}/current`, { method: 'GET', headers }),
-  getTaskRequest: (taskId: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/tasks/${taskId}/request`, { method: 'GET', headers }),
-  getTaskResult: (taskId: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/tasks/${taskId}/result`, { method: 'GET', headers }),
-  clearTask: (taskId: string, headers: Record<string,string> = {}) => post(`/workspaces/tasks/clear?task_id=${encodeURIComponent(taskId)}`, {}, headers),
+  getAnalysisCurrent: (analysis: string, headers: Record<string, string> = {}) => {
+    const ANALYSIS_URL_SLUG: Record<string, string> = {
+      concordance: 'concordance',
+      concordance_analysis: 'concordance',
+      quotation: 'quotation',
+      quotation_analysis: 'quotation',
+      token_frequencies: 'token-frequencies',
+      topic_modeling: 'topic-modeling',
+      sequential_analysis: 'sequential-analysis',
+    };
+    const slug = ANALYSIS_URL_SLUG[analysis] ?? analysis.replace(/_/g, '-');
+    return httpRequest(`/workspaces/${slug}/tasks/current`, { method: 'GET', headers });
+  },
 
 };

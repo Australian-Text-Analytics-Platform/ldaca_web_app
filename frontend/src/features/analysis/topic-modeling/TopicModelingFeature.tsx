@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '../../../hooks/useWorkspaceSelection';
 import { useAuth } from '../../../hooks/useAuth';
@@ -7,39 +8,51 @@ import { textApi } from '../../../api/text';
 import { useAnalysisStore } from '../../../stores/analysisStore';
 import { useUIStore } from '../../../stores';
 import useNodeColumnInfos from '../../../hooks/useNodeColumnInfos';
-import { useQueryClient } from '@tanstack/react-query';
-import type { AnalysisTaskStatus } from '../../../hooks/useAnalysisTaskStatus';
-import useAnalysisTaskLifecycle, { type AnalysisTaskRefreshContext } from '../../../hooks/useAnalysisTaskLifecycle';
-import { getAnalysisActionState } from '../common/analysisActionState';
+import { pruneTasksById } from '../../../hooks/analysisTaskUtils';
 import {
   hasLockedParameterDiff,
   getNodeIdentifier,
   restoreAnalysisLockFromRequest,
-  useAnalysisHydration,
-  useAnalysisLockMachine,
-  useColorStackAllocator,
+  useAnalysisLock,
+  useAnalysisFeature,
+  useSafeResult,
+  useNodeColorManagement,
+  DEFAULT_PALETTE,
+  getAnalysisActionState,
 } from '../common';
-import { resolveAnalysisTaskId } from '../../../hooks/analysisTaskUtils';
 import { TopicModelingParameterPanel } from './components/panels/TopicModelingParameterPanel';
 import { TopicModelingResultsPanel } from './components/panels/TopicModelingResultsPanel';
 import { useTopicModelingTaskFlow } from './hooks/useTopicModelingTaskFlow';
-import { useAnalysisServerRequestLock } from '../common';
 import { useTopicModelingZoomBrush } from './hooks/useTopicModelingZoomBrush';
 import { useTopicModelingBubbleChart } from './hooks/useTopicModelingBubbleChart';
 interface TopicModelingTopic { id: number; label: string; size: number[]; total_size: number; x: number; y: number; }
 interface TopicModelingResponse { state?: 'running' | 'successful' | 'failed' | 'cancelled'; message?: string; data?: { topics: TopicModelingTopic[]; corpus_sizes?: number[] }; metadata?: { task_id?: string; [k: string]: any } }
-
-const DEFAULT_PALETTE = ['#2563eb','#dc2626','#16a34a','#9333ea','#0d9488','#db2777'];
 
 const TopicModelingFeature: React.FC = () => {
   const { selectedNodes } = useWorkspaceSelection();
   const { currentWorkspaceId } = useWorkspaceData();
   const { getAuthHeaders } = useAuth();
   const queryClient = useQueryClient();
-  const { hasServerRequest, serverRequest } = useAnalysisServerRequestLock({
+  const {
+    isLocked,
+    lockWithSnapshots,
+    unlockSelection,
+    nodeColumnSelections,
+    setNodeColumnSelection,
+    setNodeColumnSelections,
+    recomputeAutoColumns,
+    activeNodeIds,
+    activeNodeColumnSelections,
+    panelSelectedNodes,
+    serverRequest,
+  } = useAnalysisLock({
     analysisType: 'topic_modeling',
     workspaceId: currentWorkspaceId,
     getAuthHeaders,
+    allowedDataTypes: ['string'],
+    maxNodes: 2,
+    docTypeOnly: true,
+    enableHeuristicGuess: false,
   });
 
   const typedServerRequest = serverRequest as
@@ -53,127 +66,68 @@ const TopicModelingFeature: React.FC = () => {
   const currentView = useUIStore((state) => state.currentView);
   const isActiveTab = currentView === 'topic-modeling';
   const setTasks = useAnalysisStore((state: any) => state.setTasks);
-  const [isRunning, setIsRunning] = useState(false);
-  const {
-    isLocked,
-    setIsLocked,
-    lockWithSnapshots,
-    unlockSelection,
-    nodeColumnSelections,
-    setNodeColumnSelection,
-    setNodeColumnSelections,
-    recomputeAutoColumns,
-    activeNodeIds,
-    activeNodeColumnSelections,
-    panelSelectedNodes,
-  } = useAnalysisLockMachine({
-    allowedDataTypes: ['string'],
-    maxNodes: 2,
-    docTypeOnly: true,
-    enableHeuristicGuess: false,
-    workspaceId: currentWorkspaceId,
-    getAuthHeaders,
-  });
-  const runningRef = useRef<boolean>(false);
-  const fetchingTaskIdRef = useRef<string | null>(null); // Prevent duplicate inflight requests
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<TopicModelingResponse | null>(null);
-  const resultRef = useRef<TopicModelingResponse | null>(null); // Track result to prevent downgrades
-  const [localTopicModelingTaskId, setLocalTopicModelingTaskId] = useState<string | null>(null);
-  
-  // Safe setResult wrapper that prevents downgrades from successful to running
-  const setResultSafely = (newResult: TopicModelingResponse | null) => {
-    // Prevent downgrading from successful to running (race condition fix)
-    if (resultRef.current?.state === 'successful' && newResult?.state === 'running') {
-      return;
-    }
-
-    setResult(newResult);
-    resultRef.current = newResult;
-  };
+  const [result, resultRef, setResultSafely] = useSafeResult<TopicModelingResponse>();
   
   const [minTopicSize, setMinTopicSize] = useState(10);
   const [useCtTfidf, setUseCtTfidf] = useState(true);
-  const [manualColors, setManualColors] = useState<Record<string,string>>({});
   const [hoveredTopicId, setHoveredTopicId] = useState<number | null>(null);
   const [tooltip, setTooltip] = useState<{x:number;y:number; topic: TopicModelingTopic | null}>({x:0,y:0,topic:null});
-  const containerRef = useRef<HTMLDivElement | null>(null); // overall card
-  const chartRef = useRef<HTMLDivElement | null>(null); // chart area
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const chartRef = useRef<HTMLDivElement | null>(null);
   const [chartWidth, setChartWidth] = useState<number>(800);
-  const lastFetchedRef = useRef<{ taskId: string | null; state: 'successful' | 'failed' | null }>({ taskId: null, state: null });
-  useEffect(() => {
-    lastFetchedRef.current = { taskId: null, state: null };
-    setLocalTopicModelingTaskId(null);
-  }, [currentWorkspaceId]);
+  const [isClearing, setIsClearing] = useState(false);
 
-  const resolveTopicModelingTaskId = async (): Promise<string | null> => {
-    if (!currentWorkspaceId) return null;
-
-    return resolveAnalysisTaskId({
-      candidateIds: [
-        localTopicModelingTaskId,
-        (resultRef.current as any)?.metadata?.task_id,
-        topicTaskStatus.activeTaskId,
-        topicRunningTask?.task_id,
-        topicTaskStatus.queuedTask?.task_id,
-        topicTaskStatus.terminalTask?.task_id,
-      ],
-      fetchCurrentTaskId: async () => {
-        const headers = getAuthHeaders();
-        const current = (await textApi.getAnalysisCurrent(
-          'topic_modeling',
-          headers
-        )) as any;
-        const taskId = Array.isArray(current?.task_ids) ? current.task_ids[0] : null;
-        return typeof taskId === 'string' && taskId.trim().length > 0 ? taskId : null;
-      },
-      onResolved: setLocalTopicModelingTaskId,
-    });
-  };
-
-  const fetchTopicModelingResult = async (taskId: string | null, expectedState: 'successful' | 'failed') => {
-    if (!isActiveTab) return;
-    if (!currentWorkspaceId) return;
-    const resolvedTaskId = taskId ?? await resolveTopicModelingTaskId();
-    if (!resolvedTaskId) return;
-    
-    // Prevent duplicate fetching if already executing for this ID
-    if (fetchingTaskIdRef.current === resolvedTaskId) {
-      return;
-    }
-
-    if (
-      lastFetchedRef.current.taskId === resolvedTaskId &&
-      lastFetchedRef.current.state === expectedState
-    ) {
-      return;
-    }
-
-    try {
-      fetchingTaskIdRef.current = resolvedTaskId;
-      const rr = await textApi.getTopicModelingTaskResult(resolvedTaskId, getAuthHeaders());
-      if (!rr) return;
-
-      // Ensure lock snapshot + node-column selections are restored from task request,
-      // so Topic Modeling matches other tabs on tab re-entry.
-      try {
-        const reqPayload = await textApi.getTaskRequest(resolvedTaskId, getAuthHeaders());
-        const req = (reqPayload as any)?.data ?? reqPayload;
-        const nodeIds: string[] = Array.isArray(req?.node_ids)
-          ? req.node_ids
-              .slice(0, 2)
-              .filter((id: unknown): id is string => typeof id === 'string' && id.trim().length > 0)
-          : [];
-        const nodeColumns: Record<string, string> =
-          req?.node_columns && typeof req.node_columns === 'object'
-            ? req.node_columns
-            : {};
-
-        if (nodeIds.length) {
-          setNodeColumnSelections(
-            nodeIds.map((nodeId) => ({ nodeId, column: nodeColumns[nodeId] || '' })),
-            { replace: true }
-          );
+  const {
+    resolveTaskId,
+    isRunning,
+    setIsRunning,
+    runningRef,
+    taskStatus,
+    lastFetchedRef,
+    clearResults,
+    setLocalTaskId: _setLocalTaskId,
+    banner: topicWaitingBanner,
+    hasActiveTask,
+  } = useAnalysisFeature<TopicModelingResponse>({
+    analysisType: 'topic_modeling',
+    taskType: 'topic_modeling',
+    workspaceId: currentWorkspaceId,
+    getAuthHeaders,
+    isTabActive: isActiveTab,
+    resultRef,
+    fetchResult: async (taskId, headers) =>
+      (await textApi.getTopicModelingTaskResult(taskId, headers)) as TopicModelingResponse | null,
+    fetchRequest: async (taskId, headers) =>
+      textApi.getTopicModelingTaskRequest(taskId, headers),
+    onResultFetched: (resultData) => {
+      setResultSafely(resultData);
+      if (resultData.state === 'failed') {
+        setError(resultData.message || 'Topic modeling failed');
+      } else if (resultData.state === 'successful') {
+        setError(null);
+      }
+    },
+    onHydratedResult: (resultData) => {
+      if (!resultData) return;
+      setResultSafely(resultData);
+      if (resultData.state === 'failed') {
+        setError(resultData.message || 'Topic modeling failed');
+      } else if (resultData.state === 'successful') {
+        setError(null);
+      }
+    },
+    onHydratedRequest: async (requestPayload) => {
+      const req = (requestPayload as any)?.data ?? requestPayload;
+      if (!req) return;
+      const nodeIds: string[] = Array.isArray(req.node_ids) ? req.node_ids.slice(0, 2) : [];
+      const node_columns: Record<string, string> = req.node_columns || {};
+      const sels = nodeIds.map((id: string) => ({ nodeId: id, column: node_columns[id] || '' }));
+      setNodeColumnSelections(sels, { replace: true });
+      setMinTopicSize(Number(req.min_topic_size ?? 10));
+      setUseCtTfidf(req.use_ctfidf === undefined ? true : !!req.use_ctfidf);
+      if (nodeIds.length && currentWorkspaceId) {
+        try {
           await restoreAnalysisLockFromRequest({
             workspaceId: currentWorkspaceId,
             requestData: req,
@@ -181,79 +135,30 @@ const TopicModelingFeature: React.FC = () => {
             lockWithSnapshots,
             maxNodes: 2,
           });
-        }
-      } catch {
-        /* best effort restore */
+        } catch { /* ignore */ }
       }
-
-      const processedResult = rr as TopicModelingResponse;
-
-      setResultSafely(processedResult);
-
-      if (processedResult.state === 'successful') {
-        setIsRunning(false);
-        runningRef.current = false;
-        setError(null);
-        lastFetchedRef.current = { taskId: resolvedTaskId ?? null, state: 'successful' };
-      } else if (processedResult.state === 'failed') {
-        setIsRunning(false);
-        runningRef.current = false;
-        setError(processedResult.message || 'Topic modeling failed');
-        lastFetchedRef.current = { taskId: resolvedTaskId ?? null, state: 'failed' };
-      }
-    } catch (error) {
-      console.warn('Failed to fetch topic modeling result', error);
-    } finally {
-      fetchingTaskIdRef.current = null;
-    }
-  };
-
-  const topicFallbackBanner = (status: AnalysisTaskStatus) => {
-    if (result?.state !== 'running') {
-      return null;
-    }
-    return {
-      taskId: (result as any)?.metadata?.task_id ?? status.activeTaskId ?? null,
-      message: status.bannerMessage?.trim() || undefined,
-    };
-  };
-
-  const handleTopicTaskRefresh = async (context: AnalysisTaskRefreshContext) => {
-    if (context.reason !== 'terminal') {
-      return;
-    }
-    if (!isActiveTab) {
-      return;
-    }
-    if (context.taskState !== 'successful' && context.taskState !== 'failed') {
-      return;
-    }
-    await fetchTopicModelingResult(context.taskId ?? null, context.taskState);
-  };
-
-  const {
-    status: topicTaskStatus,
-    banner: topicWaitingBanner,
-  } = useAnalysisTaskLifecycle({
-    taskType: 'topic_modeling',
-    isTabActive: isActiveTab,
-    workspaceId: currentWorkspaceId,
-    fallbackRunningBanner: topicFallbackBanner,
-    onRefresh: handleTopicTaskRefresh,
+    },
+    onCleared: () => {
+      setResultSafely(null);
+      setError(null);
+      unlockSelection();
+      setNodeColumnSelections([], { replace: true, persist: false });
+      recomputeAutoColumns();
+    },
+    pruneGlobalTasks: (taskIds) =>
+      setTasks((prev: any[]) => Array.isArray(prev) ? pruneTasksById(prev, taskIds) : prev),
+    getExtraTaskIdCandidates: () => [(resultRef.current as any)?.metadata?.task_id],
+    getClearTaskIdSources: () => [(resultRef.current as any)?.metadata?.task_id],
+    isResultRunning: (r) => r?.state === 'running',
   });
 
-  const topicModelingTasks = topicTaskStatus.tasks;
-  const topicRunningTask = topicTaskStatus.runningTask;
-  const topicSuccessfulTask = topicTaskStatus.successfulTask;
-  const topicFailedTask = topicTaskStatus.failedTask;
-  const hasActiveTask = Boolean(
-    topicTaskStatus.activeTaskId ||
-    topicRunningTask?.task_id ||
-    topicTaskStatus.queuedTask?.task_id ||
-    topicTaskStatus.terminalTask?.task_id ||
-    topicTaskStatus.tasks.length > 0
-  );
+  const handleClear = useCallback(async () => {
+    setIsClearing(true);
+    await clearResults();
+    setIsClearing(false);
+  }, [clearResults]);
 
+  const topicRunningTask = taskStatus.runningTask;
   const panelNodeIds = panelSelectedNodes
     .slice(0, 2)
     .map((node, idx) => getNodeIdentifier(node, idx) || activeNodeIds[idx])
@@ -276,35 +181,10 @@ const TopicModelingFeature: React.FC = () => {
   },[]);
 
   const defaultPalette = DEFAULT_PALETTE;
-  const stackPalette = DEFAULT_PALETTE.slice(0, 6);
 
-  // Use stack-based allocator for automatic color assignment
-  const stackActiveNodeIds = panelNodeIds.slice(0, 2); // Topic modeling uses first 2 nodes from panel
-  const { nodeColors: stackColors } = useColorStackAllocator({
-    colors: stackPalette, // Use first six palette colors in stack order
-    activeNodeIds: stackActiveNodeIds,
+  const { nodeColors, handleColorChange, defaultPalette: _dp } = useNodeColorManagement({
+    activeNodeIds: panelNodeIds.slice(0, 2),
   });
-  // Merge stack-allocated and manually set colors
-  const nodeColors = (() => {
-    const merged: Record<string, string> = {};
-    // Start with stack-allocated colors
-    Object.entries(stackColors).forEach(([id, color]) => {
-      merged[id] = color;
-    });
-    // Override with manual selections
-    Object.entries(manualColors).forEach(([id, color]) => {
-      if (stackActiveNodeIds.includes(id)) {
-        merged[id] = color;
-      }
-    });
-    // Fallback for overflow (>6 nodes)
-    panelNodeIds.forEach((id, index) => {
-      if (!merged[id]) {
-        merged[id] = DEFAULT_PALETTE[index % DEFAULT_PALETTE.length];
-      }
-    });
-    return merged;
-  })();
 
   const effectiveNodeColumnSelections = isLocked ? activeNodeColumnSelections : nodeColumnSelections;
 
@@ -353,15 +233,12 @@ const TopicModelingFeature: React.FC = () => {
     if (isLocked) return;
     setNodeColumnSelection(nodeId, column);
   };
-  const handleColorChange = (nodeId: string, color: string) => setManualColors(p=>({...p,[nodeId]:color}));
 
   const {
     handleRun,
-    handleClear,
     openDetachDialog,
     toggleDetachColumn,
     handleDetachConfirm,
-    isClearing,
     isDetachLoading,
     isDetaching,
     detachDialogOpen,
@@ -369,33 +246,29 @@ const TopicModelingFeature: React.FC = () => {
     detachNodeOptions,
     selectedDetachColumns,
   } = useTopicModelingTaskFlow({
-    currentWorkspaceId,
-    panelNodeIds,
-    panelSelectedNodes,
-    panelHasMissingColumns,
-    effectiveNodeColumnSelections,
-    minTopicSize,
-    useCtTfidf,
-    getAuthHeaders,
-    lockWithSnapshots,
-    setIsRunning,
-    runningRef,
-    setError,
-    setResultSafely,
-    result,
-    localTopicModelingTaskId,
-    setLocalTopicModelingTaskId,
-    topicTaskStatus,
-    topicRunningTask,
-    topicSuccessfulTask,
-    topicFailedTask,
-    unlockSelection,
-    setNodeColumnSelections,
-    recomputeAutoColumns,
-    setTasks,
-    lastFetchedRef,
-    resolveTopicModelingTaskId,
-    queryClient,
+    state: {
+      currentWorkspaceId,
+      panelNodeIds,
+      panelSelectedNodes,
+      panelHasMissingColumns,
+      effectiveNodeColumnSelections,
+      minTopicSize,
+      useCtTfidf,
+      result,
+    },
+    actions: {
+      setIsRunning,
+      runningRef,
+      setError,
+      setResultSafely,
+      lastFetchedRef,
+      resolveTopicModelingTaskId: resolveTaskId,
+    },
+    lock: {
+      getAuthHeaders,
+      lockWithSnapshots,
+      queryClient,
+    },
   });
 
   const topics: TopicModelingTopic[] = result?.data?.topics || [];
@@ -443,126 +316,6 @@ const TopicModelingFeature: React.FC = () => {
     nodeColors,
     defaultPalette,
   });
-
-  const applyHydratedRequest = async (requestPayload: unknown) => {
-    const req = (requestPayload as any)?.data ?? requestPayload;
-    if (!req) return;
-
-    const nodeIds: string[] = Array.isArray(req.node_ids) ? req.node_ids.slice(0,2) : [];
-    const node_columns: Record<string,string> = req.node_columns || {};
-    const sels = nodeIds.map((id: string) => ({ nodeId: id, column: node_columns[id] || '' }));
-    setNodeColumnSelections(sels, { replace: true });
-    setMinTopicSize(Number(req.min_topic_size ?? 10));
-    setUseCtTfidf(req.use_ctfidf === undefined ? true : !!req.use_ctfidf);
-
-    if (nodeIds.length && currentWorkspaceId) {
-      try {
-        await restoreAnalysisLockFromRequest({
-          workspaceId: currentWorkspaceId,
-          requestData: req,
-          getAuthHeaders,
-          lockWithSnapshots,
-          maxNodes: 2,
-        });
-      } catch {
-        /* ignore snapshot failures */
-      }
-    }
-  };
-
-  const applyHydratedResult = async (resultPayload: unknown) => {
-    if (!resultPayload) return;
-    const resStatus = (resultPayload as any)?.state;
-    setResultSafely(resultPayload as any);
-
-    if (resStatus === 'running') {
-      if (!resultRef.current || resultRef.current.state !== 'successful') {
-        runningRef.current = true;
-        setIsRunning(true);
-      }
-    } else if (resStatus === 'failed') {
-      runningRef.current = false;
-      setIsRunning(false);
-    } else if (resStatus === 'successful') {
-      runningRef.current = false;
-      setIsRunning(false);
-      setError(null);
-    }
-  };
-
-  const fetchTopicRequest = async (taskId?: string | null) => {
-    if (!currentWorkspaceId || !taskId) return null;
-    return textApi.getTaskRequest(taskId, getAuthHeaders());
-  };
-
-  const fetchTopicResult = async (taskId?: string | null) => {
-    if (!currentWorkspaceId || !taskId) return null;
-    return textApi.getTopicModelingTaskResult(taskId, getAuthHeaders());
-  };
-
-  const { hydrateFromServer } = useAnalysisHydration({
-    workspaceId: currentWorkspaceId,
-    analysisKey: 'topic_modeling',
-    getAuthHeaders,
-    onTaskIdResolved: setLocalTopicModelingTaskId,
-    fetchRequest: fetchTopicRequest,
-    fetchResult: fetchTopicResult,
-    applyRequest: applyHydratedRequest,
-    applyResult: applyHydratedResult,
-    autoHydrateOnFocus: false,
-    autoHydrateOnVisibility: false,
-  });
-
-  const hydratedOnceRef = useRef<boolean>(false);
-  useEffect(() => {
-    hydratedOnceRef.current = false;
-  }, [currentWorkspaceId]);
-  useEffect(() => {
-    if (!isActiveTab || !currentWorkspaceId || hydratedOnceRef.current) return;
-    hydratedOnceRef.current = true;
-    void hydrateFromServer();
-  }, [currentWorkspaceId, hydrateFromServer, isActiveTab]);
-
-  // React to task state changes for running state management
-  useEffect(() => {
-    setIsLocked(hasServerRequest);
-  }, [hasServerRequest, setIsLocked]);
-
-  useEffect(() => {
-    if (!topicModelingTasks.length) {
-      if (runningRef.current) {
-        setIsRunning(false);
-        runningRef.current = false;
-      }
-      return;
-    }
-
-    if (topicRunningTask) {
-      setIsRunning(true);
-      runningRef.current = true;
-    } else if (!topicFailedTask) {
-      if (runningRef.current) {
-        setIsRunning(false);
-        runningRef.current = false;
-      }
-    }
-
-    if (topicSuccessfulTask?.task_id) {
-      setIsRunning(false);
-      runningRef.current = false;
-      void fetchTopicModelingResult(topicSuccessfulTask.task_id, 'successful');
-    } else if (topicFailedTask?.task_id) {
-      setIsRunning(false);
-      runningRef.current = false;
-      void fetchTopicModelingResult(topicFailedTask.task_id, 'failed');
-    }
-  }, [
-    topicModelingTasks,
-    topicRunningTask,
-    topicSuccessfulTask,
-    topicFailedTask,
-    fetchTopicModelingResult,
-  ]);
 
   const shouldShowResultsPanel = Boolean(topicWaitingBanner || result || error);
 

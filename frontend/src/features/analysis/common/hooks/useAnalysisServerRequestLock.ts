@@ -9,6 +9,14 @@ export type ServerLockAnalysisType =
   | 'topic_modeling'
   | 'sequential_analysis';
 
+const ANALYSIS_REQUEST_FN: Record<ServerLockAnalysisType, (taskId: string, headers: Record<string, string>) => Promise<unknown>> = {
+  token_frequencies: textApi.getTokenFrequenciesTaskRequest,
+  quotation_analysis: textApi.getQuotationTaskRequest,
+  concordance_analysis: textApi.getConcordanceTaskRequest,
+  topic_modeling: textApi.getTopicModelingTaskRequest,
+  sequential_analysis: textApi.getSequentialAnalysisTaskRequest,
+};
+
 export const analysisServerRequestLockQueryKey = (
   analysisType: ServerLockAnalysisType,
   workspaceId: string | null
@@ -43,13 +51,13 @@ export function useAnalysisServerRequestLock({ analysisType, workspaceId, getAut
       let serverRequest: Record<string, unknown> | null = null;
 
       if (currentTaskId) {
-        const request = await textApi.getTaskRequest(currentTaskId, getAuthHeaders());
+        const request = await ANALYSIS_REQUEST_FN[analysisType](currentTaskId, getAuthHeaders());
         serverRequest = request && typeof request === 'object' ? (request as Record<string, unknown>) : null;
       }
 
       return { hasServerRequest, currentTaskId, serverRequest };
     },
-    staleTime: 0,
+    staleTime: 30_000,
   });
 
   return React.useMemo(

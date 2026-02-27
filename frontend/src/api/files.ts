@@ -65,8 +65,6 @@ export const filesApi = {
   importLdaca: (url: string, headers: Record<string,string> = {}) =>
     post<LdacaImportStartResponse>('/files/import-ldaca', { url }, headers),
   listTasks: (headers: Record<string,string> = {}) => get<FilesTaskListResponse>('/files/tasks', headers),
-  cancelTasks: (payload: { task_type?: string; task_id?: string } = {}, headers: Record<string,string> = {}) =>
-    post('/files/tasks/cancel', payload, headers),
   clearTasks: (payload: { task_type?: string; task_id?: string } = {}, headers: Record<string,string> = {}) =>
     post('/files/tasks/clear', payload, headers),
 };

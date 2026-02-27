@@ -310,25 +310,6 @@ const Sidebar: React.FC = () => {
       })}
     </SidebarMenu>
   );
-  const handleCancelTask = async (task: SidebarTaskRecord) => {
-    try {
-      const isUserTask = task.metadata?.task_scope === 'user';
-      if (isUserTask) {
-        await filesApi.cancelTasks({ task_id: task.task_id }, getAuthHeaders());
-      } else {
-        if (!currentWorkspaceId) return;
-        await workspacesApi.cancelTasks({ task_id: task.task_id }, getAuthHeaders());
-      }
-      setTasks((prev) =>
-        prev.map((item) =>
-          item.task_id === task.task_id ? { ...item, state: 'cancelled' } : item
-        )
-      );
-    } catch (error) {
-      console.error('Failed to cancel task', error);
-    }
-  };
-
   const handleClearTask = async (task: SidebarTaskRecord) => {
     try {
       const isUserTask = task.metadata?.task_scope === 'user';
@@ -454,7 +435,6 @@ const Sidebar: React.FC = () => {
                             isConnecting={isConnecting}
                             connectionError={connectionError}
                             onReconnect={reconnectTaskStream}
-                            onCancelTask={handleCancelTask}
                             onClearTask={handleClearTask}
                           />
                         )}

@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { workspacesApi } from '../../api/workspaces';
 import { nodesApi } from '../../api/nodes';
@@ -91,30 +92,53 @@ export const useWorkspaceQueries = ({
     workspaces.find((workspace: any) => workspace.id === currentWorkspaceId) || null;
   const workspaceGraph = graphQuery.data || null;
 
-  const nodes = workspaceGraph?.nodes || [];
-  const selectedNode = nodes.find((node: any) => node.id === selectedNodeId) || null;
+  const nodes = useMemo(() => workspaceGraph?.nodes ?? [], [workspaceGraph]);
+  const selectedNode = useMemo(
+    () => nodes.find((node: any) => node.id === selectedNodeId) || null,
+    [nodes, selectedNodeId]
+  );
 
-  const selectedNodes = selectedNodeIds
-    .map((id: string) => nodes.find((node: any) => node.id === id))
-    .filter(Boolean);
+  const selectedNodes = useMemo(
+    () =>
+      selectedNodeIds
+        .map((id: string) => nodes.find((node: any) => node.id === id))
+        .filter(Boolean),
+    [selectedNodeIds, nodes]
+  );
 
   const nodeData = nodeDataQuery.data || { data: [], page: 0, total_pages: 0 };
 
-  const queryLoadingState = {
-    workspaces: workspacesQuery.isLoading,
-    currentWorkspace: currentWorkspaceQuery.isLoading,
-    nodes: graphQuery.isLoading,
-    graph: graphQuery.isLoading,
-    nodeData: nodeDataQuery.isLoading,
-  };
+  const queryLoadingState = useMemo(
+    () => ({
+      workspaces: workspacesQuery.isLoading,
+      currentWorkspace: currentWorkspaceQuery.isLoading,
+      nodes: graphQuery.isLoading,
+      graph: graphQuery.isLoading,
+      nodeData: nodeDataQuery.isLoading,
+    }),
+    [
+      workspacesQuery.isLoading,
+      currentWorkspaceQuery.isLoading,
+      graphQuery.isLoading,
+      nodeDataQuery.isLoading,
+    ]
+  );
 
-  const queryErrorState = {
-    workspaces: workspacesQuery.error?.message || null,
-    currentWorkspace: currentWorkspaceQuery.error?.message || null,
-    nodes: graphQuery.error?.message || null,
-    graph: graphQuery.error?.message || null,
-    nodeData: nodeDataQuery.error?.message || null,
-  };
+  const queryErrorState = useMemo(
+    () => ({
+      workspaces: workspacesQuery.error?.message || null,
+      currentWorkspace: currentWorkspaceQuery.error?.message || null,
+      nodes: graphQuery.error?.message || null,
+      graph: graphQuery.error?.message || null,
+      nodeData: nodeDataQuery.error?.message || null,
+    }),
+    [
+      workspacesQuery.error?.message,
+      currentWorkspaceQuery.error?.message,
+      graphQuery.error?.message,
+      nodeDataQuery.error?.message,
+    ]
+  );
 
   return {
     workspacesQuery,

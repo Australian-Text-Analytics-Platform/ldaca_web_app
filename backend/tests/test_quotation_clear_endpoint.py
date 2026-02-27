@@ -18,7 +18,7 @@ async def test_quotation_clear_endpoint(authenticated_client):
 
     try:
         response = await authenticated_client.post(
-            f"/api/workspaces/tasks/{task_id}/clear"
+            "/api/tasks/clear", params={"task_id": task_id}
         )
         assert response.status_code == 200
         payload = response.json()

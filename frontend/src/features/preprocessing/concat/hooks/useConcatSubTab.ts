@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import type { NodeColumnSelection, WorkspaceNodeLike } from '../../../../components/NodeSelectionPanel';
 import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
@@ -241,10 +241,10 @@ export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult
   const [newNodeName, setNewNodeName] = useState('');
   const [isConcatenating, setIsConcatenating] = useState(false);
 
-  const workspaceNodeMap = buildWorkspaceNodeMap(workspaceNodes);
+  const workspaceNodeMap = useMemo(() => buildWorkspaceNodeMap(workspaceNodes), [workspaceNodes]);
 
-  const uniqueNodeIds = dedupeNodeIds(selectedNodeIds);
-  const concatNodeIds = uniqueNodeIds.slice(0, MAX_CONCAT_NODES);
+  const uniqueNodeIds = useMemo(() => dedupeNodeIds(selectedNodeIds), [selectedNodeIds]);
+  const concatNodeIds = useMemo(() => uniqueNodeIds.slice(0, MAX_CONCAT_NODES), [uniqueNodeIds]);
   const concatOriginalCount = uniqueNodeIds.length;
 
   const concatSelectedNodes: WorkspaceNodeLike[] = (() => {

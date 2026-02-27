@@ -4,8 +4,7 @@ import { useAuth } from '../../../hooks/useAuth';
 import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '../../../hooks/useWorkspaceSelection';
 import { useWorkspaceActions } from '../../../hooks/useWorkspaceActions';
-import { useAnalysisTaskStatus } from '../../../hooks/useAnalysisTaskStatus';
-import { useAutoNodeColumns } from '../../../hooks/useAutoNodeColumns';
+
 import { useNodeColumnInfos } from '../../../hooks/useNodeColumnInfos';
 import {
   hasLockedParameterDiff,
@@ -25,7 +24,12 @@ import { buildSelectionNameById, deriveBackendStopWordsKey, deriveBackendTokenLi
 import { downloadFrequencyRowsAsCsv, downloadWordCloudSvgAsPng } from './tokenFrequencyExport';
 import { useTokenFrequencyPreferences } from './hooks/useTokenFrequencyPreferences';
 import { useTokenFrequencyTaskFlow } from './hooks/useTokenFrequencyTaskFlow';
-import { useAnalysisServerRequestLock } from '../common';
+import {
+  useAnalysisLock,
+  useAnalysisFeature,
+  useSafeResult,
+} from '../common';
+import { pruneTasksById } from '../../../hooks/analysisTaskUtils';
 import { TokenFrequencyParameterPanel } from './components/panels/TokenFrequencyParameterPanel';
 import { TokenFrequencyResultsPanel } from './components/panels/TokenFrequencyResultsPanel';
 import { useAnalysisStore } from '../../../stores/analysisStore';
@@ -40,10 +44,20 @@ const PALETTE = ['#3b82f6', '#ef4444', '#10b981', '#a855f7', '#f59e0b'];
 const TokenFrequencyFeature = () => {
   const { getAuthHeaders } = useAuth();
   const { currentWorkspace } = useWorkspaceData();
-  const { hasServerRequest, serverRequest } = useAnalysisServerRequestLock({
+  const {
+    isLocked,
+    serverRequest,
+    unlockSelection,
+    lockWithSnapshots,
+    nodeColumnSelections,
+    setNodeColumnSelection,
+    setNodeColumnSelections,
+  } = useAnalysisLock({
     analysisType: 'token_frequencies',
     workspaceId: currentWorkspace?.id ?? null,
     getAuthHeaders,
+    allowedDataTypes: ['string'],
+    maxNodes: 2,
   });
   const { selectedNodes } = useWorkspaceSelection();
   const { selectNodes } = useWorkspaceActions();
@@ -52,45 +66,70 @@ const TokenFrequencyFeature = () => {
   const setPendingConcordance = useAnalysisStore((state) => state.setPendingConcordance);
   const setTasks = useAnalysisStore((state) => state.setTasks);
 
-  const [results, setResults] = useState<TokenFrequencyResponse | null>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [isLocked, setIsLocked] = useState(false);
+  const [results, resultRef, setResultSafely, setResults] = useSafeResult<TokenFrequencyResponse>();
   const [lastCompareNodeIds, setLastCompareNodeIds] = useState<string[]>([]);
-  const [localTokenFrequencyTaskId, setLocalTokenFrequencyTaskId] = useState<string | null>(null);
   const [statsSortColumn, setStatsSortColumn] = useState<string>('log_likelihood_llv');
   const [statsSortDirection, setStatsSortDirection] = useState<'asc' | 'desc'>('desc');
   const [statsPage, setStatsPage] = useState<number>(1);
   const [statsRowsPerPage, setStatsRowsPerPage] = useState<number>(50);
   const [nodeColors, setNodeColors] = useState<Record<string, string>>({});
 
-  const analyzingRef = useRef(false);
-  const lastFetchedRef = useRef<{ taskId: string | null; state: string | null }>({ taskId: null, state: null });
   const wordCloudRefs = useRef<Record<string, SVGSVGElement | null>>({});
   const unifiedCloudContainerRef = useRef<HTMLDivElement | null>(null);
 
   const currentWorkspaceId = currentWorkspace?.id ?? null;
   const isActiveTab = currentView === 'token-frequency';
 
-  const tokenFrequencyTaskStatus = useAnalysisTaskStatus('token-frequency');
-
-  const effectiveSelectionSource = selectedNodes;
   const {
-    selections: nodeColumnSelections,
-    setSelection: setNodeColumnSelection,
-    setSelections: setNodeColumnSelections,
-  } = useAutoNodeColumns({
-    selectedNodes: effectiveSelectionSource,
+    resolveTaskId,
+    isRunning,
+    setIsRunning,
+    runningRef,
+    taskStatus,
+    lastFetchedRef,
+    clearResults,
+    setLocalTaskId,
+  } = useAnalysisFeature<TokenFrequencyResponse>({
+    analysisType: 'token_frequencies',
+    taskType: 'token_frequencies',
     workspaceId: currentWorkspaceId,
-    isLocked,
-    allowedDataTypes: ['string'],
-    });
-  const effectiveNodeColumnSelections = nodeColumnSelections;
+    getAuthHeaders,
+    isTabActive: isActiveTab,
+    resultRef,
+    fetchResult: (taskId, headers) =>
+      textApi.getTokenFrequenciesTaskResult(taskId, headers) as Promise<TokenFrequencyResponse>,
+    onResultFetched: (result) => setResultSafely(result),
+    onHydratedResult: (result) => {
+      if (!result) return;
+      const requestData = (result as any)?.analysis_params ?? {};
+      const { nodeIds, selections } = parseAnalysisNodeRequest(requestData, 2);
+      setNodeColumnSelections(selections, { replace: true });
+      setLastCompareNodeIds(nodeIds);
+      applyTokenLimitState(
+        typeof requestData?.token_limit === 'number' ? requestData.token_limit : null,
+      );
+      setResultSafely(result);
+      if (Array.isArray(result.stop_words)) {
+        const normalizedStops = result.stop_words
+          .map((word) => String(word).trim().toLowerCase())
+          .filter(Boolean);
+        setAppliedStopSet(new Set(normalizedStops));
+        setStopWords(normalizedStops.join(', '));
+      }
+    },
+    onCleared: () => {
+      setResultSafely(null);
+      unlockSelection();
+      setLastCompareNodeIds([]);
+      resetPreferenceUiState();
+    },
+    pruneGlobalTasks: (taskIds) =>
+      setTasks((prev: any[]) =>
+        Array.isArray(prev) ? pruneTasksById(prev, taskIds) : prev,
+      ),
+  });
 
-  useEffect(() => {
-    if (tokenFrequencyTaskStatus.activeTaskId && tokenFrequencyTaskStatus.activeTaskId !== localTokenFrequencyTaskId) {
-      setLocalTokenFrequencyTaskId(tokenFrequencyTaskStatus.activeTaskId);
-    }
-  }, [localTokenFrequencyTaskId, tokenFrequencyTaskStatus.activeTaskId]);
+  const effectiveNodeColumnSelections = nodeColumnSelections;
 
   useEffect(() => {
     const next: Record<string, string> = {};
@@ -106,12 +145,6 @@ const TokenFrequencyFeature = () => {
 
   const setNodeColor = (nodeId: string, color: string) => {
     setNodeColors((prev) => ({ ...prev, [nodeId]: color }));
-  };
-
-  const resolveTaskId = async () => {
-    if (localTokenFrequencyTaskId) return localTokenFrequencyTaskId;
-    if (tokenFrequencyTaskStatus.activeTaskId) return tokenFrequencyTaskStatus.activeTaskId;
-    return null;
   };
 
   const backendTokenLimit = deriveBackendTokenLimit(results);
@@ -155,87 +188,40 @@ const TokenFrequencyFeature = () => {
     return map;
   })();
 
-  const { handleAnalyze, handleClearResults, handleTokenClick, handleTokenRightClick } = useTokenFrequencyTaskFlow({
-    currentWorkspaceId,
-    selectedNodes,
-    effectiveNodeColumnSelections,
-    stopWords,
-    results,
-    localTokenFrequencyTaskId,
-    tokenFrequencyTaskStatus,
-    lockedNodeNameMap,
-    nodeIdToName,
-    nodeColors,
-    lastCompareNodeIds,
-    setLocalTokenFrequencyTaskId,
-    setIsAnalyzing,
-    analyzingRef,
-    setResultsSafely: setResults,
-    setLastCompareNodeIds,
-    setAppliedStopSet,
-    setStopWords,
-    resetPreferenceUiState,
-    setTasks,
-    unlockSelection: () => undefined,
-    getAuthHeaders,
-    lockWithSnapshots: () => undefined,
-    resolveTokenFrequencyTaskId: resolveTaskId,
-    selectNodes,
-    setPendingConcordance,
-    setCurrentView,
-    applyStopSetFromText,
-    getColorForNode,
-    lastFetchedRef,
+  const { handleAnalyze, handleTokenClick, handleTokenRightClick } = useTokenFrequencyTaskFlow({
+    state: {
+      currentWorkspaceId,
+      selectedNodes,
+      effectiveNodeColumnSelections,
+      stopWords,
+      results,
+      lockedNodeNameMap,
+      nodeIdToName,
+      nodeColors,
+      lastCompareNodeIds,
+    },
+    actions: {
+      setLocalTaskId,
+      setIsRunning,
+      runningRef,
+      setResultsSafely: setResultSafely,
+      setLastCompareNodeIds,
+      setAppliedStopSet,
+      setStopWords,
+      lastFetchedRef,
+    },
+    lock: {
+      getAuthHeaders,
+      lockWithSnapshots,
+    },
+    navigation: {
+      selectNodes,
+      setPendingConcordance,
+      setCurrentView,
+      applyStopSetFromText,
+      getColorForNode,
+    },
   });
-
-  useEffect(() => {
-    if (!isActiveTab || !currentWorkspaceId) return;
-
-    let cancelled = false;
-
-    const hydrate = async () => {
-      const taskId = await resolveTaskId();
-      if (!taskId || cancelled) return;
-
-      setLocalTokenFrequencyTaskId(taskId);
-      try {
-        const hydrated = (await textApi.getTokenFrequenciesTaskResult(taskId, getAuthHeaders())) as TokenFrequencyResponse;
-        if (!cancelled && hydrated) {
-          const requestData = (hydrated as any)?.analysis_params ?? {};
-          const { nodeIds, selections } = parseAnalysisNodeRequest(requestData, 2);
-          setNodeColumnSelections(selections, { replace: true });
-          setLastCompareNodeIds(nodeIds);
-          applyTokenLimitState(typeof requestData?.token_limit === 'number' ? requestData.token_limit : null);
-
-          setResults(hydrated);
-          if (Array.isArray(hydrated.stop_words)) {
-            const normalizedStops = hydrated.stop_words
-              .map((word) => String(word).trim().toLowerCase())
-              .filter(Boolean);
-            setAppliedStopSet(new Set(normalizedStops));
-            setStopWords(normalizedStops.join(', '));
-          }
-        }
-      } catch {
-        // best-effort
-      }
-    };
-
-    void hydrate();
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    applyTokenLimitState,
-    currentWorkspaceId,
-    getAuthHeaders,
-    isActiveTab,
-    resolveTaskId,
-    setAppliedStopSet,
-    setNodeColumnSelections,
-    setStopWords,
-    tokenFrequencyTaskStatus.activeTaskId,
-  ]);
 
   const responseDisplayNameHints = buildResponseDisplayNameHints(results);
   const displayNameMap = {
@@ -321,10 +307,6 @@ const TokenFrequencyFeature = () => {
     setNodeColumnSelection(nodeId, column);
   };
 
-  useEffect(() => {
-    setIsLocked(hasServerRequest);
-  }, [hasServerRequest]);
-
   const { getColumnInfos } = useNodeColumnInfos({
     workspaceId: currentWorkspaceId,
     nodes: selectedNodes as any,
@@ -346,14 +328,14 @@ const TokenFrequencyFeature = () => {
         actionState={{
           runDisabled:
             selectedNodes.length === 0 ||
-            isAnalyzing ||
+            isRunning ||
             hasIncompleteSelections ||
             (isLocked && !hasLockedParameterChanges),
-          clearDisabled: !results && !isAnalyzing,
+          clearDisabled: !results && !isRunning,
         }}
-        isAnalyzing={isAnalyzing}
+        isAnalyzing={isRunning}
         onAnalyze={handleAnalyze}
-        onClearResults={handleClearResults}
+        onClearResults={clearResults}
         hasIncompleteSelections={hasIncompleteSelections}
         appliedStopCount={appliedStopSet.size}
         hasResults={Boolean(results)}
@@ -361,8 +343,8 @@ const TokenFrequencyFeature = () => {
 
       <TokenFrequencyResultsPanel
         results={results}
-        isRunning={isAnalyzing || Boolean(tokenFrequencyTaskStatus.runningTask)}
-        runningTask={tokenFrequencyTaskStatus.runningTask}
+        isRunning={isRunning || Boolean(taskStatus.runningTask)}
+        runningTask={taskStatus.runningTask}
         stopWords={stopWords}
         onStopWordsChange={setStopWords}
         onStopWordsApply={handleApplyStopWords}

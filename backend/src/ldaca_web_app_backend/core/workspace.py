@@ -19,8 +19,11 @@ from docworkspace import Workspace  # type: ignore
 from docworkspace.workspace.io import read_workspace_metadata
 from ldaca_web_app_backend.models import WorkspaceSummary
 
-from .utils import (allocate_workspace_folder, ensure_display_folder_name,
-                    get_user_workspace_folder)
+from .utils import (
+    allocate_workspace_folder,
+    ensure_display_folder_name,
+    get_user_workspace_folder,
+)
 
 
 class WorkspaceManager:
@@ -28,8 +31,8 @@ class WorkspaceManager:
 
     def __init__(self) -> None:
         self._current: Dict[str, Dict[str, Any]] = {}
-        # Per-user/workspace task managers (not serialized)
-        self._task_managers: Dict[tuple[str, str], Any] = {}
+        # Per-user task managers (single channel per user, not serialized)
+        self._task_managers: Dict[str, Any] = {}
         # Track on-disk workspace folder paths per user/workspace
         self._paths: Dict[tuple[str, str], Path] = {}
 
@@ -253,26 +256,25 @@ class WorkspaceManager:
         return False
 
     def get_task_manager(self, user_id: str, workspace_id: str):
-        """Return or create worker-task manager bound to user/workspace key.
+        """Return or create worker-task manager bound to user.
 
         Used by:
         - task endpoints and analysis routes submitting background work
 
-        Why:
-        - Keeps worker task tracking isolated by workspace scope.
+                Why:
+                - Uses one unified task channel per user while retaining workspace
+                    filtering at API/query level via task metadata.
 
         Refactor note:
         - Lazy import avoids cycles but obscures typing; introducing a protocol or
             factory module could reduce import indirection.
         """
-        from ldaca_web_app_backend.core.worker_task_manager import \
-            WorkerTaskManager
+        from ldaca_web_app_backend.core.worker_task_manager import WorkerTaskManager
 
-        key = (user_id, workspace_id)
-        tm = self._task_managers.get(key)
+        tm = self._task_managers.get(user_id)
         if tm is None:
             tm = WorkerTaskManager()
-            self._task_managers[key] = tm
+            self._task_managers[user_id] = tm
         return tm
 
     def list_user_task_scopes(self, user_id: str) -> list[str]:
@@ -281,11 +283,10 @@ class WorkspaceManager:
         Includes any already-created task managers for this user plus the current
         workspace (if set) so callers can proactively subscribe.
         """
-        scopes = {
-            workspace_id
-            for (uid, workspace_id) in self._task_managers.keys()
-            if uid == user_id
-        }
+        if user_id not in self._task_managers:
+            scopes: set[str] = set()
+        else:
+            scopes = set()
         current_workspace_id = self.get_current_workspace_id(user_id)
         if current_workspace_id:
             scopes.add(current_workspace_id)

@@ -97,30 +97,32 @@ class WorkerTaskManager:
         self._mp_manager = mp.Manager()
         self._task_progress_queues: Dict[str, Any] = {}
 
-        # Event bus for real-time updates
+        # Event bus for real-time updates (single channel per user)
         self._subscribers: Dict[
-            Tuple[str, str], Set[asyncio.Queue]
-        ] = {}  # (user_id, workspace_id) -> set of queues
+            str, Set[asyncio.Queue]
+        ] = {}  # user_id -> set of queues
         self._subscriber_lock = asyncio.Lock()
 
-    async def subscribe(self, user_id: str, workspace_id: str) -> asyncio.Queue:
-        """Subscribe to events for a specific user and workspace."""
+    async def subscribe(
+        self, user_id: str, workspace_id: Optional[str] = None
+    ) -> asyncio.Queue:
+        """Subscribe to events for a specific user channel."""
         queue = asyncio.Queue(maxsize=100)  # Bounded to prevent memory leaks
-        key = (user_id, workspace_id)
+        key = user_id
 
         async with self._subscriber_lock:
             if key not in self._subscribers:
                 self._subscribers[key] = set()
             self._subscribers[key].add(queue)
 
-        logger.debug(
-            f"Subscribed to events for user {user_id}, workspace {workspace_id}"
-        )
+        logger.debug(f"Subscribed to events for user {user_id}")
         return queue
 
-    async def unsubscribe(self, user_id: str, workspace_id: str, queue: asyncio.Queue):
+    async def unsubscribe(
+        self, user_id: str, workspace_id: Optional[str], queue: asyncio.Queue
+    ):
         """Unsubscribe from events."""
-        key = (user_id, workspace_id)
+        key = user_id
 
         async with self._subscriber_lock:
             if key in self._subscribers:
@@ -128,25 +130,23 @@ class WorkerTaskManager:
                 if not self._subscribers[key]:  # Clean up empty sets
                     del self._subscribers[key]
 
-        logger.debug(
-            f"Unsubscribed from events for user {user_id}, workspace {workspace_id}"
-        )
+        logger.debug(f"Unsubscribed from events for user {user_id}")
         return queue
 
     async def emit(self, user_id: str, workspace_id: str, event: Dict[str, Any]):
-        """Emit an event to all subscribers for a user/workspace."""
-        key = (user_id, workspace_id)
+        """Emit an event to all subscribers for a user channel."""
+        key = user_id
 
         async with self._subscriber_lock:
             if key not in self._subscribers:
                 logger.debug(
-                    f"No subscribers for user {user_id}, workspace {workspace_id} - event {event.get('type')} dropped"
+                    f"No subscribers for user {user_id} - event {event.get('type')} dropped"
                 )
                 return
 
             subscriber_count = len(self._subscribers[key])
             logger.debug(
-                f"Emitting {event.get('type')} event to {subscriber_count} subscribers for user {user_id}, workspace {workspace_id}"
+                f"Emitting {event.get('type')} event to {subscriber_count} subscribers for user {user_id}"
             )
 
             is_terminal = _is_terminal_task_event(event)
@@ -169,11 +169,11 @@ class WorkerTaskManager:
                             active_queues.add(queue)
                         except asyncio.QueueFull:
                             logger.warning(
-                                f"Event queue full for user {user_id}, workspace {workspace_id}, dropping terminal event"
+                                f"Event queue full for user {user_id}, dropping terminal event"
                             )
                     else:
                         logger.warning(
-                            f"Event queue full for user {user_id}, workspace {workspace_id}, dropping event"
+                            f"Event queue full for user {user_id}, dropping event"
                         )
                         # Keep subscriber active; drop only this stale/non-terminal event.
                         active_queues.add(queue)

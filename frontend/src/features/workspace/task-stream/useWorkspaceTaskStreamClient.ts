@@ -35,13 +35,7 @@ const clampRetryDelay = (attempt: number) => {
   return Math.min(backoff, STREAM_RETRY_MAX_MS);
 };
 
-const buildUrl = (workspaceId: string | null) => {
-  const baseUrl = getApiBase();
-  if (workspaceId) {
-    return `${baseUrl}/tasks/stream?workspace_id=${encodeURIComponent(workspaceId)}`;
-  }
-  return `${baseUrl}/tasks/stream`;
-};
+const buildUrl = () => `${getApiBase()}/tasks/stream`;
 
 const parseSseFrame = (frame: string, onMessage: (message: TaskEventPayload) => void) => {
   if (!frame.trim()) return;
@@ -77,7 +71,6 @@ const parseSseFrames = (buffer: string, onMessage: (message: TaskEventPayload) =
 };
 
 export const useWorkspaceTaskStreamClient = (
-  workspaceId: string | null,
   options: WorkspaceTaskStreamClientOptions = {}
 ): WorkspaceTaskStreamClientState => {
   const { enabled = true, getAuthHeaders = () => ({}), onEvent } = options;
@@ -191,7 +184,7 @@ export const useWorkspaceTaskStreamClient = (
 
       try {
         abortController = new AbortController();
-        const response = await fetch(buildUrl(workspaceId), {
+        const response = await fetch(buildUrl(), {
           method: 'GET',
           headers: {
             Accept: 'text/event-stream',
@@ -240,7 +233,7 @@ export const useWorkspaceTaskStreamClient = (
       closeStream();
       setState({ status: 'idle', error: null, reconnectAttempt: 0, lastEventTimestamp: null });
     };
-  }, [workspaceId, enabled, getAuthHeaders]);
+  }, [enabled, getAuthHeaders]);
 
   return { ...state, reconnect };
 };

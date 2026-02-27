@@ -22,6 +22,8 @@ from ....analysis.results import GenericAnalysisResult
 from ....core.auth import get_current_user
 from ....core.workspace import workspace_manager
 from ....models import SequentialAnalysisRequest
+from ..utils import ensure_task_synced
+from .current_tasks import get_current_task_ids_for_analysis
 
 logger = logging.getLogger(__name__)
 
@@ -451,6 +453,61 @@ async def run_sequential_analysis(
         print(f"ERROR: Unexpected sequential analysis error: {e}")
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
+
+
+@router.get("/sequential-analysis/tasks/current")
+async def sequential_analysis_current_tasks(
+    current_user: dict = Depends(get_current_user),
+):
+    """Return current task IDs for sequential-analysis."""
+    user_id = current_user["id"]
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    if not workspace_id:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+    return await get_current_task_ids_for_analysis(
+        user_id, workspace_id, ["sequential_analysis", "sequential-analysis"]
+    )
+
+
+@router.get("/sequential-analysis/tasks/{task_id}/request")
+async def sequential_analysis_task_request(
+    task_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Return stored request payload for a sequential-analysis task."""
+    user_id = current_user["id"]
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    if not workspace_id:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+    task_manager = get_task_manager(user_id, workspace_id)
+    task = task_manager.get_task(task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    request = task.request
+    return request.model_dump() if hasattr(request, "model_dump") else request
+
+
+@router.get("/sequential-analysis/tasks/{task_id}/result")
+async def sequential_analysis_task_result(
+    task_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Return stored result payload for a sequential-analysis task."""
+    user_id = current_user["id"]
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    if not workspace_id:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+    task_manager = get_task_manager(user_id, workspace_id)
+
+    task = await ensure_task_synced(user_id, workspace_id, task_id, task_manager)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    result = task.result
+    if result is None:
+        return {"state": "pending", "metadata": {"task_id": task_id}}
+
+    return result.to_json() if hasattr(result, "to_json") else result
 
 
 @router.post("/sequential-analysis/tasks/{task_id}/result")

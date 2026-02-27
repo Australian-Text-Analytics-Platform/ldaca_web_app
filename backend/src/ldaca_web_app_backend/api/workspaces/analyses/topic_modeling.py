@@ -25,6 +25,7 @@ from ....models import (
     TopicModelingResponse,
 )
 from ..utils import ensure_task_synced, update_workspace
+from .current_tasks import get_current_task_ids_for_analysis
 from .text_column_prefs import resolve_text_columns_for_nodes
 
 router = APIRouter(prefix="/workspaces", tags=["topic-modeling"])
@@ -252,6 +253,38 @@ async def run_topic_modeling(
         data=None,
         metadata={"task_id": worker_task.id},
     )
+
+
+@router.get("/topic-modeling/tasks/current")
+async def topic_modeling_current_tasks(
+    current_user: dict = Depends(get_current_user),
+):
+    """Return current task IDs for topic-modeling analysis."""
+    user_id = current_user["id"]
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    if not workspace_id:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+    return await get_current_task_ids_for_analysis(
+        user_id, workspace_id, ["topic_modeling", "topic-modeling"]
+    )
+
+
+@router.get("/topic-modeling/tasks/{task_id}/request")
+async def topic_modeling_task_request(
+    task_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Return stored request payload for a topic-modeling task."""
+    user_id = current_user["id"]
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    if not workspace_id:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+    task_manager = get_task_manager(user_id, workspace_id)
+    task = task_manager.get_task(task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    request = task.request
+    return request.model_dump() if hasattr(request, "model_dump") else request
 
 
 @router.get(

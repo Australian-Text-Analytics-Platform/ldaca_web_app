@@ -104,7 +104,8 @@ def _stub_task_manager(monkeypatch):
 
 
 async def _get_current_task_id(client, workspace_id: str, analysis: str):
-    response = await client.get("/api/workspaces/" + analysis + "/current")
+    slug = analysis.replace("_", "-")
+    response = await client.get(f"/api/workspaces/{slug}/tasks/current")
     if response.status_code != 200:
         return None
     payload = response.json()
