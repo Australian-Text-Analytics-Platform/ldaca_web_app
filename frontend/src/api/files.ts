@@ -29,10 +29,12 @@ export interface FilesTaskItem {
   task_id: string;
   state: string;
   task_type?: string;
+  name?: string;
+  user_id?: string;
+  workspace_id?: string;
   progress?: number;
   progress_message?: string;
   message?: string;
-  metadata?: Record<string, unknown>;
 }
 
 export interface FilesTaskListResponse {

@@ -346,9 +346,7 @@ async def list_files_tasks(current_user: dict = Depends(get_current_user)):
     data = [
         task
         for task in all_tasks
-        if isinstance(task, dict)
-        and isinstance(task.get("metadata"), dict)
-        and task["metadata"].get("task_type") == "ldaca_import"
+        if isinstance(task, dict) and task.get("task_type") == "ldaca_import"
     ]
     return {
         "state": "successful",
@@ -375,7 +373,7 @@ async def clear_files_tasks(
     tm = workspace_manager.get_task_manager(user_id)
     if task_id:
         task = await tm.get_task(task_id)
-        cleared = bool(task and task.metadata.get("task_type") == "ldaca_import")
+        cleared = bool(task and task.task_type == "ldaca_import")
         if cleared:
             cleared = await tm.clear_task(task_id)
         return {

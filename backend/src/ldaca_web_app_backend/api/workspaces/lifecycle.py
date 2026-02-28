@@ -228,7 +228,6 @@ async def start_workspace_download(
             "target_workspace_dir": str(workspace_dir),
         },
         task_name=f"Download: {ws_name}",
-        metadata={"workspace_id": workspace_id},
     )
 
     return {
@@ -265,12 +264,12 @@ async def download_workspace_artifact(
         raise HTTPException(status_code=404, detail="Task not found")
 
     # Verify the task belongs to this workspace
-    if task_info.metadata.get("workspace_id") != workspace_id:
+    if task_info.workspace_id != workspace_id:
         raise HTTPException(
             status_code=403, detail="Task does not belong to this workspace"
         )
 
-    if task_info.metadata.get("task_type") != "workspace_download":
+    if task_info.task_type != "workspace_download":
         raise HTTPException(status_code=400, detail="Task is not a workspace download")
 
     from ...core.worker_task_manager import TaskStatus

@@ -9,11 +9,10 @@ export type SidebarTaskStatus =
 export type SidebarTaskRecord = {
   task_id: string;
   task_type?: string;
+  name?: string;
+  user_id?: string;
+  workspace_id?: string;
   state?: SidebarTaskStatus;
-  metadata?: {
-    name?: string;
-    [key: string]: unknown;
-  };
   message?: string;
   created_at?: number | string;
   started_at?: number | string | null;

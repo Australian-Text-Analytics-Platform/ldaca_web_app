@@ -111,7 +111,7 @@ const SidebarTasksSection: React.FC<SidebarTasksSectionProps> = ({
                     <div className={cn('min-w-0 space-y-1', isComplete && 'space-y-0.5')}>
                       <p className="text-xs font-medium capitalize text-foreground">
                         {task.task_type?.replace(/_/g, ' ') || 'task'}
-                        {task.metadata?.name ? `: ${task.metadata.name}` : ''}
+                        {task.name ? `: ${task.name}` : ''}
                       </p>
                       {task.message && (
                         <p className="text-[11px] text-muted-foreground" title={task.message}>

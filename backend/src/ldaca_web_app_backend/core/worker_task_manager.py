@@ -59,7 +59,10 @@ class TaskInfo:
     error: Optional[str] = None
     progress: float = 0.0  # 0..1 for UI progress bars
     progress_message: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    task_type: str = ""
+    name: str = ""
+    user_id: str = ""
+    workspace_id: str = ""
 
     def update_status(self):
         """Update status based on future state."""
@@ -186,6 +189,10 @@ class WorkerTaskManager:
         """Serialize task info for events."""
         return {
             "task_id": task_info.id,
+            "task_type": task_info.task_type,
+            "name": task_info.name,
+            "user_id": task_info.user_id,
+            "workspace_id": task_info.workspace_id,
             # Public API field renamed from 'status' -> 'state'
             "state": task_info.status.value,
             "created_at": task_info.created_at,
@@ -193,7 +200,6 @@ class WorkerTaskManager:
             "finished_at": task_info.finished_at,
             "progress": task_info.progress,
             "progress_message": task_info.progress_message,
-            "metadata": task_info.metadata,
         }
 
     def _cleanup_progress_queue(self, task_id: str) -> None:
@@ -372,7 +378,7 @@ class WorkerTaskManager:
             task_info.update_status()
 
             if task_info.status == TaskStatus.SUCCESSFUL:
-                task_type = task_info.metadata.get("task_type")
+                task_type = task_info.task_type
 
                 # Handle DETACH tasks (add node to workspace)
                 if task_type in ["concordance_detach", "quotation_detach"]:
@@ -569,7 +575,6 @@ class WorkerTaskManager:
         task_type: str,
         task_args: Dict[str, Any],
         task_name: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
     ) -> TaskInfo:
         """Submit a worker task, register tracking, and start monitors.
 
@@ -609,13 +614,10 @@ class WorkerTaskManager:
             future=future,
             status=TaskStatus.RUNNING,
             started_at=time.time(),
-            metadata={
-                "task_type": task_type,
-                "name": task_name or task_type,
-                "user_id": user_id,
-                "workspace_id": workspace_id,
-                **(metadata or {}),
-            },
+            task_type=task_type,
+            name=task_name or task_type,
+            user_id=user_id,
+            workspace_id=workspace_id,
         )
 
         # Initialize progress tracking
@@ -684,14 +686,11 @@ class WorkerTaskManager:
         async with self._lock:
             for task_info in list(self._tasks.values()):
                 # Apply filters
-                if task_type and task_info.metadata.get("task_type") != task_type:
+                if task_type and task_info.task_type != task_type:
                     continue
-                if user_id and task_info.metadata.get("user_id") != user_id:
+                if user_id and task_info.user_id != user_id:
                     continue
-                if (
-                    workspace_id
-                    and task_info.metadata.get("workspace_id") != workspace_id
-                ):
+                if workspace_id and task_info.workspace_id != workspace_id:
                     continue
 
                 if not task_info.future.done():
@@ -715,25 +714,25 @@ class WorkerTaskManager:
             out: List[Dict[str, Any]] = []
             for task_info in self._tasks.values():
                 # Apply filters
-                if user_id and task_info.metadata.get("user_id") != user_id:
+                if user_id and task_info.user_id != user_id:
                     continue
-                if (
-                    workspace_id
-                    and task_info.metadata.get("workspace_id") != workspace_id
-                ):
+                if workspace_id and task_info.workspace_id != workspace_id:
                     continue
 
                 self._reconcile_task_progress(task_info)
 
                 d = {
                     "task_id": task_info.id,
+                    "task_type": task_info.task_type,
+                    "name": task_info.name,
+                    "user_id": task_info.user_id,
+                    "workspace_id": task_info.workspace_id,
                     "state": task_info.status.value,
                     "created_at": task_info.created_at,
                     "started_at": task_info.started_at,
                     "finished_at": task_info.finished_at,
                     "progress": task_info.progress,
                     "progress_message": task_info.progress_message,
-                    "metadata": task_info.metadata,
                 }
                 out.append(d)
             return out
@@ -749,14 +748,11 @@ class WorkerTaskManager:
         async with self._lock:
             for task_info in self._tasks.values():
                 # Apply filters
-                if task_type and task_info.metadata.get("task_type") != task_type:
+                if task_type and task_info.task_type != task_type:
                     continue
-                if user_id and task_info.metadata.get("user_id") != user_id:
+                if user_id and task_info.user_id != user_id:
                     continue
-                if (
-                    workspace_id
-                    and task_info.metadata.get("workspace_id") != workspace_id
-                ):
+                if workspace_id and task_info.workspace_id != workspace_id:
                     continue
 
                 task_info.update_status()
@@ -775,14 +771,11 @@ class WorkerTaskManager:
         async with self._lock:
             items = []
             for task_info in self._tasks.values():
-                if task_info.metadata.get("task_type") != task_type:
+                if task_info.task_type != task_type:
                     continue
-                if user_id and task_info.metadata.get("user_id") != user_id:
+                if user_id and task_info.user_id != user_id:
                     continue
-                if (
-                    workspace_id
-                    and task_info.metadata.get("workspace_id") != workspace_id
-                ):
+                if workspace_id and task_info.workspace_id != workspace_id:
                     continue
 
                 task_info.update_status()
@@ -841,14 +834,11 @@ class WorkerTaskManager:
             task_ids_to_remove = []
             for task_id, task_info in self._tasks.items():
                 # Apply filters
-                if task_type and task_info.metadata.get("task_type") != task_type:
+                if task_type and task_info.task_type != task_type:
                     continue
-                if user_id and task_info.metadata.get("user_id") != user_id:
+                if user_id and task_info.user_id != user_id:
                     continue
-                if (
-                    workspace_id
-                    and task_info.metadata.get("workspace_id") != workspace_id
-                ):
+                if workspace_id and task_info.workspace_id != workspace_id:
                     continue
 
                 if not task_info.future.done():

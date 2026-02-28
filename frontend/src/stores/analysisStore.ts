@@ -6,6 +6,9 @@ import type { NodeColumnSelection } from '../hooks/useAutoNodeColumns';
 export interface TaskItem {
   task_id: string;
   task_type?: string;
+  name?: string;
+  user_id?: string;
+  workspace_id?: string;
   state?: 'pending' | 'running' | 'successful' | 'failed' | 'cancelled' | string;
   progress?: number;
   message?: string;
