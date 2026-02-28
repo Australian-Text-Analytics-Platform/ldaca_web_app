@@ -70,7 +70,7 @@ const TopicModelingFeature: React.FC = () => {
   
   const [minTopicSize, setMinTopicSize] = useState(10);
   const [hoveredTopicId, setHoveredTopicId] = useState<number | null>(null);
-  const [tooltip, setTooltip] = useState<{x:number;y:number; topic: TopicModelingTopic | null; containerW: number; containerH: number}>({x:0,y:0,topic:null,containerW:0,containerH:0});
+  const [tooltip, setTooltip] = useState<{x:number;y:number; topic: TopicModelingTopic | null}>({x:0,y:0,topic:null});
   const [selectedTopicIds, setSelectedTopicIds] = useState<Set<number>>(new Set());
   const [topicSearchQuery, setTopicSearchQuery] = useState('');
   const containerRef = useRef<HTMLDivElement | null>(null);

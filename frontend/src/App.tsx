@@ -266,7 +266,7 @@ const WorkspaceShell: React.FC = () => {
                   <div className="relative flex flex-1 overflow-hidden" ref={layoutRef}>
                     <main
                       ref={mainRef}
-                      className={`relative h-full flex-1 overflow-y-auto p-6 ${isResizing ? 'transition-none' : 'transition-all duration-300 ease-in-out'}`}
+                      className={`relative h-full flex-1 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden p-6 ${isResizing ? 'transition-none' : 'transition-all duration-300 ease-in-out'}`}
                       style={{ width: isRightCollapsed ? '100%' : `${100 - rightWidth}%`, minWidth: 280 }}
                     >
                       <div className="w-full max-w-none mx-0">

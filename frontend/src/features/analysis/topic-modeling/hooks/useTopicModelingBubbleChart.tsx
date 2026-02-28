@@ -22,8 +22,6 @@ type TooltipState = {
   x: number;
   y: number;
   topic: TopicModelingTopic | null;
-  containerW: number;
-  containerH: number;
 };
 
 type Params = {
@@ -195,8 +193,6 @@ export function useTopicModelingBubbleChart({
                     x: event.clientX - bounds.left + 12,
                     y: event.clientY - bounds.top + 12,
                     topic,
-                    containerW: bounds.width,
-                    containerH: bounds.height,
                   });
                 }
               }}
@@ -205,7 +201,7 @@ export function useTopicModelingBubbleChart({
                 const bounds = chartRef.current.getBoundingClientRect();
                 setTooltip((previous) =>
                   previous.topic && previous.topic.id === topic.id
-                    ? { x: event.clientX - bounds.left + 12, y: event.clientY - bounds.top + 12, topic, containerW: bounds.width, containerH: bounds.height }
+                    ? { x: event.clientX - bounds.left + 12, y: event.clientY - bounds.top + 12, topic }
                     : previous
                 );
               }}

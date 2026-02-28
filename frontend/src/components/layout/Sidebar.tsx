@@ -418,7 +418,7 @@ const Sidebar: React.FC = () => {
                     <div className="flex h-full flex-col overflow-hidden">
                       <div
                         ref={(node) => assignSectionScrollRef(key, node)}
-                        className="flex h-full min-h-0 flex-col overflow-y-auto px-2 py-2 text-sm"
+                        className="flex h-full min-h-0 flex-col overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden px-2 py-2 text-sm"
                       >
                         {key === 'views' && renderViewsBody()}
                         {key === 'nodes' && (

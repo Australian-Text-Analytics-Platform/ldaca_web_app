@@ -18,7 +18,7 @@ type Props = {
   handleResetZoom: () => void;
   isAtGlobalZoom: boolean;
   bubbleElements: React.ReactNode;
-  tooltip: { topic: TopicLike | null; x: number; y: number; containerW: number; containerH: number };
+  tooltip: { topic: TopicLike | null; x: number; y: number };
   renderSizeComposition: (size: number[] | undefined, totalSize?: number | null) => React.ReactNode;
   hoveredTopicId: number | null;
   setHoveredTopicId: React.Dispatch<React.SetStateAction<number | null>>;
@@ -62,25 +62,16 @@ export function TopicModelingBubbleChartSection({
           Reset view
         </button>
         {bubbleElements}
-        {tooltip.topic && (() => {
-          const tooltipW = 200;
-          const tooltipH = 90;
-          const flipX = tooltip.x + tooltipW > tooltip.containerW;
-          const flipY = tooltip.y + tooltipH > tooltip.containerH;
-          return (
-            <div
-              className="pointer-events-none absolute z-10 max-w-xs rounded-md border border-border bg-card p-3 text-xs shadow-lg"
-              style={{
-                left: flipX ? Math.max(0, tooltip.x - tooltipW - 8) : tooltip.x,
-                top: flipY ? Math.max(0, tooltip.y - tooltipH - 8) : tooltip.y,
-              }}
-            >
-              <div className="text-sm font-semibold">Topic {tooltip.topic.id}</div>
-              <div className="mt-1 wrap-break-word text-[10px] leading-snug text-muted-foreground">{tooltip.topic.label}</div>
-              <div className="mt-2">{renderSizeComposition(tooltip.topic.size, tooltip.topic.total_size)}</div>
-            </div>
-          );
-        })()}
+        {tooltip.topic && (
+          <div
+            className="pointer-events-none absolute z-10 max-w-xs rounded-md border border-border bg-card p-3 text-xs shadow-lg"
+            style={{ left: tooltip.x, top: tooltip.y }}
+          >
+            <div className="text-sm font-semibold">Topic {tooltip.topic.id}</div>
+            <div className="mt-1 wrap-break-word text-[10px] leading-snug text-muted-foreground">{tooltip.topic.label}</div>
+            <div className="mt-2">{renderSizeComposition(tooltip.topic.size, tooltip.topic.total_size)}</div>
+          </div>
+        )}
       </div>
 
       <TopicSelectionPanel

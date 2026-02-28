@@ -710,7 +710,7 @@ export function WorkspaceTable({
       <div className="flex h-full w-full flex-col min-h-0">
         <ScrollArea
           type="always"
-          scrollbars="both"
+          scrollbars="horizontal"
           className="flex-1 rounded-t-lg border border-border shadow-sm bg-white"
         >
           <Table disableContainer>
@@ -726,7 +726,7 @@ export function WorkspaceTable({
                           meta?.headerClassName,
                           'last:border-r-0',
                           header.column.getIsPinned()
-                            ? 'bg-muted shadow-sm ring-1 ring-primary/20'
+                            ? 'bg-muted shadow-sm'
                             : 'bg-muted'
                         )}
                         style={{
@@ -767,7 +767,7 @@ export function WorkspaceTable({
                           meta?.cellClassName,
                           'last:border-r-0',
                           cell.column.getIsPinned()
-                            ? 'bg-white ring-1 ring-inset ring-primary/10'
+                            ? 'bg-white'
                             : undefined
                         )}
                         style={{
