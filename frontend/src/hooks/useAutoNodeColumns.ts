@@ -12,8 +12,6 @@ export interface UseAutoNodeColumnsOptions {
   maxNodes?: number;
   allowedDataTypes?: string[];
   docTypeOnly?: boolean;
-  enableHeuristicGuess?: boolean;
-  heuristicCandidates?: string[];
   persist?: boolean;
   workspaceId?: string | null;
   storageScope?: string;
@@ -28,8 +26,6 @@ interface ColumnOptionInfo {
 }
 
 type NodeColumnSource = string[] | ColumnInfo[];
-
-const DEFAULT_HEURISTIC_CANDIDATES = ['document', 'text', 'content', 'body', 'transcript'];
 
 const extractDocumentColumn = (node: any): string => {
   const candidates = [
@@ -73,8 +69,6 @@ export const useAutoNodeColumns = ({
   maxNodes = 2,
   allowedDataTypes,
   docTypeOnly = false,
-  enableHeuristicGuess = true,
-  heuristicCandidates = DEFAULT_HEURISTIC_CANDIDATES,
   persist = true,
   workspaceId,
   storageScope = 'analysis',
@@ -88,8 +82,6 @@ export const useAutoNodeColumns = ({
   const maxNodesRef = useRef(maxNodes);
   const allowedDataTypesRef = useRef(allowedDataTypes);
   const docTypeOnlyRef = useRef(docTypeOnly);
-  const enableHeuristicGuessRef = useRef(enableHeuristicGuess);
-  const heuristicCandidatesRef = useRef(heuristicCandidates);
   const isLockedRef = useRef(isLocked);
   const getNodeColumnsRef = useRef(getNodeColumns);
   const fallbackToAllColumnsRef = useRef(fallbackToAllColumns);
@@ -99,8 +91,6 @@ export const useAutoNodeColumns = ({
     maxNodesRef.current = maxNodes;
     allowedDataTypesRef.current = allowedDataTypes;
     docTypeOnlyRef.current = docTypeOnly;
-    enableHeuristicGuessRef.current = enableHeuristicGuess;
-    heuristicCandidatesRef.current = heuristicCandidates;
     isLockedRef.current = isLocked;
     getNodeColumnsRef.current = getNodeColumns;
     fallbackToAllColumnsRef.current = fallbackToAllColumns;
@@ -109,8 +99,6 @@ export const useAutoNodeColumns = ({
     maxNodes,
     allowedDataTypes,
     docTypeOnly,
-    enableHeuristicGuess,
-    heuristicCandidates,
     isLocked,
     getNodeColumns,
     fallbackToAllColumns,
@@ -257,13 +245,6 @@ export const useAutoNodeColumns = ({
           const documentColumn = extractDocumentColumn(node);
           if (documentColumn && columns.includes(documentColumn)) {
             column = documentColumn;
-          } else if (enableHeuristicGuessRef.current && (!docTypeOnlyRef.current || documentColumn)) {
-            const candidate = columns.find((name) =>
-              (heuristicCandidatesRef.current ?? []).some((needle) =>
-                name.toLowerCase().includes(needle.toLowerCase())
-              )
-            );
-            column = candidate || '';
           } else if (!docTypeOnlyRef.current && columns.length > 0) {
             column = columns[0] || '';
           }

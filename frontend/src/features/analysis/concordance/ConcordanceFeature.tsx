@@ -156,7 +156,6 @@ const ConcordanceFeature: React.FC = () => {
     allowedDataTypes: ['string'],
     maxNodes: 2,
     docTypeOnly: true,
-    enableHeuristicGuess: false,
   });
   const pendingConcordance = useAnalysisStore((state) => state.pendingConcordance);
   const clearPendingConcordance = useAnalysisStore((state) => state.clearPendingConcordance);

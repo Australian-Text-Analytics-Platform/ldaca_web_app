@@ -88,7 +88,6 @@ const SequentialAnalysisFeature: React.FC = () => {
     allowedDataTypes: ['datetime'],
     maxNodes: 1,
     docTypeOnly: false,
-    enableHeuristicGuess: false,
     storageScope: 'sequential-analysis',
   });
 

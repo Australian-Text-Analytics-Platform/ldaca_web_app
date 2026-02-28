@@ -53,7 +53,6 @@ const TopicModelingFeature: React.FC = () => {
     allowedDataTypes: ['string'],
     maxNodes: 2,
     docTypeOnly: true,
-    enableHeuristicGuess: false,
   });
 
   const typedServerRequest = serverRequest as

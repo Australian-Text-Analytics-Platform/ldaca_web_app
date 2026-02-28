@@ -13,7 +13,6 @@ export interface AnalysisLockConfig {
   allowedDataTypes: string[];
   maxNodes?: number;
   docTypeOnly?: boolean;
-  enableHeuristicGuess?: boolean;
   storageScope?: string;
 }
 
@@ -28,7 +27,6 @@ export const useAnalysisLockCore = (config: AnalysisLockConfig) => {
     allowedDataTypes,
     maxNodes = 2,
     docTypeOnly = false,
-    enableHeuristicGuess = false,
     storageScope,
   } = config;
 
@@ -56,7 +54,6 @@ export const useAnalysisLockCore = (config: AnalysisLockConfig) => {
     maxNodes,
     isLocked,
     docTypeOnly,
-    enableHeuristicGuess,
     storageScope,
   });
 

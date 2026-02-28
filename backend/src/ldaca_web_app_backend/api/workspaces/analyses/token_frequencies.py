@@ -27,7 +27,6 @@ from ....core.workspace import workspace_manager
 from ....models import TokenFrequencyRequest, TokenFrequencyResponse
 from ..utils import ensure_task_synced
 from .current_tasks import get_current_task_ids_for_analysis
-from .text_column_prefs import resolve_text_columns_for_nodes
 
 router = APIRouter(prefix="/workspaces")
 
@@ -439,13 +438,12 @@ async def calculate_token_frequencies(
             status_code=400, detail="token_limit must be a positive integer"
         )
 
-    validated_columns = resolve_text_columns_for_nodes(
-        user_id=user_id,
-        workspace_id=workspace_id,
-        node_ids=request.node_ids,
-        requested_node_columns=request.node_columns or {},
-        persist_preference=True,
-    )
+    for nid in request.node_ids:
+        if nid not in request.node_columns:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Missing text column selection for node {nid}",
+            )
 
     node_corpora: dict[str, list[str]] = {}
     node_display_names: dict[str, str] = {}
@@ -462,9 +460,9 @@ async def calculate_token_frequencies(
                 detail=f"Node {node_id} data must be a LazyFrame",
             )
 
-        column_name = validated_columns.get(node_id)
+        column_name = request.node_columns[node_id]
         available_columns = list(node_data.collect_schema().names())
-        if not column_name or column_name not in available_columns:
+        if column_name not in available_columns:
             raise HTTPException(
                 status_code=400,
                 detail=(
@@ -472,6 +470,11 @@ async def calculate_token_frequencies(
                     f"Available columns: {available_columns}"
                 ),
             )
+
+        try:
+            node.document = column_name
+        except Exception:
+            pass
 
         docs_df = node_data.select(pl.col(column_name).alias("__doc_col__")).collect()
         node_corpora[node_id] = [
@@ -523,7 +526,7 @@ async def calculate_token_frequencies(
 
     analysis_request = AnalysisTokenFrequencyRequest(
         node_ids=request.node_ids,
-        node_columns=validated_columns,
+        node_columns=request.node_columns,
         token_limit=effective_limit,
         stop_words=requested_stop_words,
     )

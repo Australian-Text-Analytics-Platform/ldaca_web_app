@@ -29,7 +29,6 @@ from .concordance_core import (
     normalize_saved_request,
 )
 from .current_tasks import get_current_task_ids_for_analysis
-from .text_column_prefs import resolve_text_columns_for_nodes
 
 router = APIRouter(prefix="/workspaces", tags=["concordance"])
 
@@ -122,20 +121,19 @@ async def run_concordance(
             status_code=400, detail="At least one node ID must be provided"
         )
 
-    validated_columns = resolve_text_columns_for_nodes(
-        user_id=user_id,
-        workspace_id=workspace_id,
-        node_ids=request.node_ids,
-        requested_node_columns=request.node_columns or {},
-        persist_preference=True,
-    )
+    for nid in request.node_ids:
+        if nid not in request.node_columns:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Missing text column selection for node {nid}",
+            )
 
     try:
         from ....analysis.implementations.concordance import ConcordanceRequest
 
         analysis_request = ConcordanceRequest(
             node_ids=request.node_ids,
-            node_columns=validated_columns,
+            node_columns=request.node_columns,
             search_word=request.search_word,
             num_left_tokens=request.num_left_tokens,
             num_right_tokens=request.num_right_tokens,

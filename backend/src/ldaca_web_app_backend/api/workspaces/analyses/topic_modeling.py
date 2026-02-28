@@ -26,7 +26,6 @@ from ....models import (
 )
 from ..utils import ensure_task_synced, update_workspace
 from .current_tasks import get_current_task_ids_for_analysis
-from .text_column_prefs import resolve_text_columns_for_nodes
 
 router = APIRouter(prefix="/workspaces", tags=["topic-modeling"])
 
@@ -137,13 +136,12 @@ async def run_topic_modeling(
             status_code=400, detail="At least one node ID must be provided"
         )
 
-    node_columns = resolve_text_columns_for_nodes(
-        user_id=user_id,
-        workspace_id=workspace_id,
-        node_ids=request.node_ids,
-        requested_node_columns=request.node_columns or {},
-        persist_preference=True,
-    )
+    for nid in request.node_ids:
+        if nid not in request.node_columns:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Missing text column selection for node {nid}",
+            )
 
     corpora: list[list[str]] = []
     node_infos: list[dict[str, object]] = []
@@ -160,13 +158,7 @@ async def run_topic_modeling(
                 detail=f"Node {node_id} data must be a LazyFrame",
             )
 
-        column_name = node_columns.get(node_id)
-        if not column_name:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Could not determine text column for node {node_id}",
-            )
-
+        column_name = request.node_columns[node_id]
         available_columns = list(node_data.collect_schema().names())
         if column_name not in available_columns:
             raise HTTPException(

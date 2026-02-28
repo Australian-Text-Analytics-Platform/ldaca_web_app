@@ -284,7 +284,6 @@ const QuotationFeature: React.FC = () => {
     allowedDataTypes: ['string'],
     maxNodes: 1,
     docTypeOnly: true,
-    enableHeuristicGuess: false,
   });
 
   // Show metadata by default so the table mirrors original columns

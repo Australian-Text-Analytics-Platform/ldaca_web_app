@@ -597,9 +597,7 @@ class StopWordsPayload(BaseModel):
 
 class TokenFrequencyRequest(BaseModel):
     node_ids: List[str]  # 1 or 2 node IDs
-    node_columns: Optional[Dict[str, str]] = (
-        None  # Maps node_id -> column_name (optional for auto-detection)
-    )
+    node_columns: Dict[str, str]  # Maps node_id -> column_name
     stop_words: Optional[List[str]] = None
     token_limit: Optional[int] = None
 
@@ -676,7 +674,7 @@ class TokenFrequencyResponse(BaseModel):
 
 class TopicModelingRequest(BaseModel):
     node_ids: List[str]  # 1 or 2 node IDs
-    node_columns: Optional[Dict[str, str]] = None  # Maps node_id -> column_name
+    node_columns: Dict[str, str]  # Maps node_id -> column_name
     min_topic_size: Optional[int] = 10  # BERTopic minimum topic size
     use_ctfidf: Optional[bool] = True
 
