@@ -19,6 +19,7 @@ import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 import { Label } from '../../../components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../../components/ui/table';
+import { ScrollArea } from '../../../components/ui/scroll-area';
 import { Badge } from '../../../components/ui/badge';
 import { toast } from 'sonner';
 import { getInvalidWorkspaceNameMessage } from '../../../lib/workspaceName';
@@ -66,6 +67,10 @@ const formatTimestamp = (value?: number | string | null): string => {
 
 const getWorkspaceId = (workspace: Record<string, any>): string | null =>
   workspace?.id || workspace?.unique_id || null;
+
+const MAX_VISIBLE_FILE_ROWS = 10;
+const FILE_ROW_MIN_HEIGHT_REM = 4;
+const FILE_HEADER_HEIGHT_REM = 3;
 
 export const DataLoaderFeature: React.FC = () => {
   const queryClient = useQueryClient();
@@ -158,6 +163,7 @@ export const DataLoaderFeature: React.FC = () => {
   });
 
   const sortedFiles = [...files].sort((a: FileInfo, b: FileInfo) => a.filename.localeCompare(b.filename));
+  const fileListMaxHeightRem = FILE_HEADER_HEIGHT_REM + MAX_VISIBLE_FILE_ROWS * FILE_ROW_MIN_HEIGHT_REM;
 
   const currentWorkspace = workspaces.find((ws: any) => getWorkspaceId(ws) === currentWorkspaceId) || null;
 
@@ -709,79 +715,87 @@ export const DataLoaderFeature: React.FC = () => {
             </div>
           ) : (
             <div className="overflow-hidden rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead className="hidden md:table-cell">Size</TableHead>
-                    <TableHead className="hidden lg:table-cell">Updated</TableHead>
-                    <TableHead>
-                      <span className="inline-flex items-center gap-1">
-                        Actions
-                        <HelpIcon targetKey="data-loader.add.button" label="Add file to workspace" />
-                      </span>
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sortedFiles.map((file) => (
-                    <TableRow key={file.filename} className={selectedFile === file.filename ? 'bg-muted/50' : undefined}>
-                      <TableCell>
-                        <div className="flex items-center gap-1.5 font-medium text-foreground">
-                          <span>{file.display_name || file.filename}</span>
-                          {Boolean(file.readme?.trim()) && (file.display_name || '').toLowerCase() !== 'readme.md' && (
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-6 w-6 text-muted-foreground hover:text-foreground"
-                              aria-label={`View citation for ${file.display_name || file.filename}`}
-                              title="View citation"
-                              onClick={() => setCitationFile(file)}
-                            >
-                              <Quote className="h-3.5 w-3.5" />
-                            </Button>
-                          )}
-                        </div>
-                        <div className="text-xs text-muted-foreground font-mono">{file.filename}</div>
-                      </TableCell>
-                      <TableCell className="hidden text-sm text-muted-foreground md:table-cell">{formatBytes(file.size)}</TableCell>
-                      <TableCell className="hidden text-xs text-muted-foreground lg:table-cell">{formatTimestamp(file.modified)}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-2">
-                          <Button size="sm" variant="secondary" onClick={() => setPreviewFile(file.filename)}>
-                            <Eye className="mr-1.5 h-4 w-4" /> Preview
-                          </Button>
-                          <Button
-                            size="sm"
-                            disabled={!hasWorkspaceSelected}
-                            onClick={() => {
-                              if (!hasWorkspaceSelected) {
-                                setWorkspaceAlertOpen(true);
-                                return;
-                              }
-                              setAddFileName(file.filename);
-                              setSelectedFile(file.filename);
-                            }}
-                          >
-                            <Plus className="mr-1.5 h-4 w-4" /> Add
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => handleDownloadFile(file.filename)}>
-                            <DownloadIcon className="mr-1.5 h-4 w-4" /> Download
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => handleDeleteFile(file.filename)}
-                            disabled={fileActionInFlight}
-                          >
-                            <Trash2 className="mr-1.5 h-4 w-4" /> Delete
-                          </Button>
-                        </div>
-                      </TableCell>
+              <ScrollArea
+                className="w-full"
+                style={sortedFiles.length > MAX_VISIBLE_FILE_ROWS ? { maxHeight: `${fileListMaxHeightRem}rem` } : undefined}
+              >
+                <Table disableContainer>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead className="hidden md:table-cell">Size</TableHead>
+                      <TableHead className="hidden lg:table-cell">Updated</TableHead>
+                      <TableHead>
+                        <span className="inline-flex items-center gap-1">
+                          Actions
+                          <HelpIcon targetKey="data-loader.add.button" label="Add file to workspace" />
+                        </span>
+                      </TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {sortedFiles.map((file) => (
+                      <TableRow
+                        key={file.filename}
+                        className={`${selectedFile === file.filename ? 'bg-muted/50' : ''} min-h-16`}
+                      >
+                        <TableCell>
+                          <div className="flex items-center gap-1.5 font-medium text-foreground">
+                            <span>{file.display_name || file.filename}</span>
+                            {Boolean(file.readme?.trim()) && (file.display_name || '').toLowerCase() !== 'readme.md' && (
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                                aria-label={`View citation for ${file.display_name || file.filename}`}
+                                title="View citation"
+                                onClick={() => setCitationFile(file)}
+                              >
+                                <Quote className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                          </div>
+                          <div className="text-xs text-muted-foreground font-mono">{file.filename}</div>
+                        </TableCell>
+                        <TableCell className="hidden text-sm text-muted-foreground md:table-cell">{formatBytes(file.size)}</TableCell>
+                        <TableCell className="hidden text-xs text-muted-foreground lg:table-cell">{formatTimestamp(file.modified)}</TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-2">
+                            <Button size="sm" variant="secondary" onClick={() => setPreviewFile(file.filename)}>
+                              <Eye className="mr-1.5 h-4 w-4" /> Preview
+                            </Button>
+                            <Button
+                              size="sm"
+                              disabled={!hasWorkspaceSelected}
+                              onClick={() => {
+                                if (!hasWorkspaceSelected) {
+                                  setWorkspaceAlertOpen(true);
+                                  return;
+                                }
+                                setAddFileName(file.filename);
+                                setSelectedFile(file.filename);
+                              }}
+                            >
+                              <Plus className="mr-1.5 h-4 w-4" /> Add
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => handleDownloadFile(file.filename)}>
+                              <DownloadIcon className="mr-1.5 h-4 w-4" /> Download
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => handleDeleteFile(file.filename)}
+                              disabled={fileActionInFlight}
+                            >
+                              <Trash2 className="mr-1.5 h-4 w-4" /> Delete
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </ScrollArea>
             </div>
           )}
         </CardContent>

@@ -710,7 +710,7 @@ export function WorkspaceTable({
       <div className="flex h-full w-full flex-col min-h-0">
         <ScrollArea
           type="always"
-          scrollbars="horizontal"
+          scrollbars="both"
           className="flex-1 rounded-t-lg border border-border shadow-sm bg-white"
         >
           <Table disableContainer>
