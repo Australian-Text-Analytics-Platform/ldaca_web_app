@@ -15,7 +15,7 @@ from concurrent.futures import Future
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set
 
 from .worker import TASK_REGISTRY, get_worker_pool
 
@@ -400,12 +400,18 @@ class WorkerTaskManager:
 
                         from .workspace import workspace_manager
 
-                        # Worker returns {"state": ..., "result": {actual payload}}
-                        data = (
-                            result.get("result", result)
-                            if isinstance(result, dict)
-                            else result
-                        )
+                        # Worker contract: {"state": "successful", "result": {...}}
+                        if not isinstance(result, dict):
+                            raise ValueError(
+                                "Detach task result must be a dictionary payload"
+                            )
+
+                        data = result.get("result")
+                        if not isinstance(data, dict):
+                            raise ValueError(
+                                "Detach task result missing structured result payload"
+                            )
+
                         parquet_path = data.get("parquet_path")
                         new_node_name = data.get("new_node_name")
                         parent_id = data.get("parent_node_id")

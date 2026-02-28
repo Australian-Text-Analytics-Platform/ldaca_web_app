@@ -6,9 +6,7 @@ export const deriveNodeLabel = (node: WorkspaceNodeLike | null | undefined): str
   const base = toRecord(node);
   return (
     (base.name as string | undefined) ??
-    (base.label as string | undefined) ??
     (base.id as string | undefined) ??
-    (base.node_id as string | undefined) ??
     ''
   );
 };
@@ -17,7 +15,6 @@ export const getNodeKey = (node: WorkspaceNodeLike, fallback?: string): string =
   const base = toRecord(node);
   return (
     (base.id as string | undefined) ??
-    (base.node_id as string | undefined) ??
     fallback ??
     ''
   );
@@ -42,31 +39,13 @@ export const extractNodeColumns = (node: WorkspaceNodeLike | null | undefined): 
   if (base.schema && typeof base.schema === 'object') {
     return Object.keys(base.schema as Record<string, unknown>);
   }
-  if (base.column_schema && typeof base.column_schema === 'object') {
-    return Object.keys(base.column_schema as Record<string, unknown>);
-  }
-  if (base.dtypes && typeof base.dtypes === 'object') {
-    return Object.keys(base.dtypes as Record<string, unknown>);
-  }
   return [];
 };
 
 export const extractNodeDtypes = (node: WorkspaceNodeLike | null | undefined): Record<string, string> => {
   const base = toRecord(node);
-  if (base.dtypes && typeof base.dtypes === 'object') {
-    return Object.entries(base.dtypes as Record<string, unknown>).reduce<Record<string, string>>((acc, [column, dtype]) => {
-      acc[column] = String(dtype);
-      return acc;
-    }, {});
-  }
   if (base.schema && typeof base.schema === 'object') {
     return Object.entries(base.schema as Record<string, unknown>).reduce<Record<string, string>>((acc, [column, dtype]) => {
-      acc[column] = String(dtype);
-      return acc;
-    }, {});
-  }
-  if (base.column_schema && typeof base.column_schema === 'object') {
-    return Object.entries(base.column_schema as Record<string, unknown>).reduce<Record<string, string>>((acc, [column, dtype]) => {
       acc[column] = String(dtype);
       return acc;
     }, {});

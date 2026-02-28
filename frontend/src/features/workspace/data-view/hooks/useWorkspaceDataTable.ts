@@ -48,14 +48,7 @@ const buildTabDescriptor = (node: WorkspaceSelectionTab['id'], label?: string, i
 interface WorkspaceNodeDisplayLike {
   id?: string;
   name?: string;
-  label?: string;
-  data?: {
-    nodeName?: string;
-    label?: string;
-    node?: {
-      name?: string;
-    };
-  };
+  shape?: [number | null, number | null] | number[];
 }
 
 const resolveNodeDisplayLabel = (node: WorkspaceNodeDisplayLike | null | undefined): string | undefined => {
@@ -63,12 +56,7 @@ const resolveNodeDisplayLabel = (node: WorkspaceNodeDisplayLike | null | undefin
     return undefined;
   }
 
-  return node.name
-    || node.data?.node?.name
-    || node.data?.nodeName
-    || node.label
-    || node.data?.label
-    || node.id;
+  return node.name || node.id;
 };
 
 export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
@@ -155,8 +143,8 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
   );
 
   const displayShape = useMemo(() => {
-    if (selectedNode?.data?.shape) {
-      const [rows, cols] = selectedNode.data.shape;
+    if (Array.isArray(selectedNode?.shape)) {
+      const [rows, cols] = selectedNode.shape;
       const formatPart = (value: number | null | undefined) =>
         typeof value === 'number' && Number.isFinite(value) ? value.toLocaleString() : '?';
       return [formatPart(rows), formatPart(cols)] as [string, string];

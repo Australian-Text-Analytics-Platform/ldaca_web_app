@@ -10,7 +10,7 @@ import type {
   PreviewRow,
 } from '../../types';
 import { MAX_CONCAT_NODES } from '../../types';
-import { buildWorkspaceNodeMap, deriveNodeLabel, getNodeKey } from '../../utils/nodeMetadata';
+import { buildWorkspaceNodeMap, deriveNodeLabel, extractNodeColumns, extractNodeDtypes, getNodeKey } from '../../utils/nodeMetadata';
 
 const DEFAULT_CONCAT_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#f97316', '#d946ef', '#0ea5e9', '#f59e0b', '#14b8a6'];
 
@@ -94,29 +94,9 @@ const buildConcatNodeSummaries = (nodes: WorkspaceNodeLike[]): ConcatNodeSummary
   return nodes.map((node) => {
     const nodeId = getNodeKey(node);
     const displayName = deriveNodeLabel(node) || nodeId;
-    const data = (node.data ?? {}) as Record<string, unknown>;
 
-    let columns: string[] = [];
-    if (Array.isArray(data.columns)) {
-      columns = (data.columns as unknown[]).map((entry) => String(entry));
-    }
-
-    let rawDtypes: Record<string, string> = {};
-    if (data.dtypes && typeof data.dtypes === 'object') {
-      rawDtypes = Object.entries(data.dtypes as Record<string, unknown>).reduce<Record<string, string>>((acc, [col, dtype]) => {
-        acc[col] = String(dtype);
-        return acc;
-      }, {});
-    } else if (data.schema && typeof data.schema === 'object') {
-      rawDtypes = Object.entries(data.schema as Record<string, unknown>).reduce<Record<string, string>>((acc, [col, dtype]) => {
-        acc[col] = String(dtype);
-        return acc;
-      }, {});
-    }
-
-    if (!columns.length) {
-      columns = Object.keys(rawDtypes);
-    }
+    const columns = extractNodeColumns(node);
+    const rawDtypes = extractNodeDtypes(node);
 
     const uniqueColumns = Array.from(new Set(columns.map((name) => String(name))));
     const normalizedColumns = [...uniqueColumns].sort((a, b) => a.localeCompare(b));
