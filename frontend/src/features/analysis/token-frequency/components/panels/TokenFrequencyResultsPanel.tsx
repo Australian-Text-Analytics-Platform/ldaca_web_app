@@ -61,7 +61,7 @@ type TokenFrequencyResultsPanelProps = {
   statsSortColumn: string;
   statsSortDirection: 'asc' | 'desc';
   onToggleStatsSort: (column: string) => void;
-  sortedStatistics: Array<{ token: string; frequency: number; zscore: number }>;
+  sortedStatistics: any[];
   statsRowsPerPage: number;
   statsPage: number;
   onStatsPageChange: (page: number) => void;
@@ -238,7 +238,7 @@ export const TokenFrequencyResultsPanel = ({
             normalizedNodeResults={normalizedNodeResults}
             nodeDisplayResults={nodeDisplayResults}
             lastCompareNodeIds={lastCompareNodeIds}
-            statistics={null}
+            statistics={results?.statistics}
             appliedStopSet={appliedStopSet}
             statsSortColumn={statsSortColumn}
             statsSortDirection={statsSortDirection}

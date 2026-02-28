@@ -4,6 +4,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Download, SortAsc, SortDesc } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Wordcloud } from '@visx/wordcloud';
+import { Text } from '@visx/text';
 
 type TokenFrequencyUnifiedTokenSectionProps = {
   normalizedNodeResults: NormalizedNodeResult[];
@@ -37,16 +39,16 @@ export const TokenFrequencyUnifiedTokenSection = ({
   normalizedNodeResults,
   nodeDisplayResults,
   lastCompareNodeIds,
-  statistics: _statistics,
-  appliedStopSet: _appliedStopSet,
+  statistics,
+  appliedStopSet,
   effectiveTokenLimit,
   defaultTokenLimit,
-  computeDisplayName: _computeDisplayName,
+  computeDisplayName,
   getColorForNode,
   onDownloadWordCloud,
   onTokenClick,
   onTokenRightClick,
-  unifiedCloudWidth: _unifiedCloudWidth,
+  unifiedCloudWidth,
   unifiedCloudHeight,
   unifiedCloudContainerRef,
   registerWordCloudRef,
@@ -67,15 +69,92 @@ export const TokenFrequencyUnifiedTokenSection = ({
     safeStatsPage * statsRowsPerPage
   );
 
-  const unifiedRows = Array.from(
-    new Map(
-      normalizedNodeResults
-        .flatMap((node) => node.rows || [])
-        .map((row) => [row.token, row])
-    ).values()
-  ).slice(0, Math.max(10, Math.min(200, effectiveTokenLimit || defaultTokenLimit)));
+  const isComparative = normalizedNodeResults.length === 2 && lastCompareNodeIds.length === 2;
+  const nodeAResult = (nodeDisplayResults[0] ?? normalizedNodeResults[0]) ?? null;
+  const nodeBResult = (nodeDisplayResults[1] ?? normalizedNodeResults[1]) ?? null;
+  const nodeAId = nodeAResult?.nodeId ?? lastCompareNodeIds[0] ?? '';
+  const nodeBId = nodeBResult?.nodeId ?? lastCompareNodeIds[1] ?? '';
+  const nodeAName = nodeAResult?.displayName ?? computeDisplayName(nodeAId, nodeAId);
+  const nodeBName = nodeBResult?.displayName ?? computeDisplayName(nodeBId, nodeBId);
+  const nodeAColor = getColorForNode(nodeAId || nodeAName, 0);
+  const nodeBColor = getColorForNode(nodeBId || nodeBName, 1);
 
-  const maxUnifiedFrequency = Math.max(1, ...unifiedRows.map((row) => Number(row.frequency) || 0));
+  const statsSource = Array.isArray(statistics) && statistics.length > 0 ? statistics : sortedStatistics;
+  const cloudStats = (Array.isArray(statsSource) ? statsSource : [])
+    .filter((s: any) => !appliedStopSet.has(String(s?.token ?? '').toLowerCase()))
+    .map((s: any) => ({
+      token: String(s?.token ?? ''),
+      o1: Number(s?.freq_corpus_0) || 0,
+      o2: Number(s?.freq_corpus_1) || 0,
+      p1: Number(s?.percent_corpus_0) || 0,
+      p2: Number(s?.percent_corpus_1) || 0,
+      logratio: Number(s?.log_ratio) || 0,
+    }))
+    .map((s: any) => ({
+      ...s,
+      total: s.o1 + s.o2,
+      juxRank: (s.o1 + s.o2) > 0 ? Math.log10(s.o1 + s.o2) * (s.logratio || 0) : 0,
+    }))
+    .filter((s: any) => s.token.length > 0 && s.total > 10);
+
+  const sortedByRank = [...cloudStats].sort((a, b) => a.juxRank - b.juxRank);
+  const limitForCloudBase = typeof effectiveTokenLimit === 'number' ? effectiveTokenLimit : defaultTokenLimit;
+  const cloudLimit = Math.max(0, limitForCloudBase * 2);
+  const half = Math.floor(cloudLimit / 2);
+  const low = sortedByRank.slice(0, Math.min(half, sortedByRank.length));
+  const high = sortedByRank.slice(Math.max(sortedByRank.length - half, 0));
+  let selectedCloudStats = [...low, ...high];
+
+  const remaining = Math.max(0, cloudLimit - selectedCloudStats.length);
+  if (remaining > 0 && sortedByRank.length > selectedCloudStats.length) {
+    const nextLow = sortedByRank[low.length] || null;
+    const nextHigh = sortedByRank[sortedByRank.length - high.length - 1] || null;
+    const pick = (() => {
+      const al = nextLow ? Math.abs(nextLow.juxRank) : -1;
+      const ah = nextHigh ? Math.abs(nextHigh.juxRank) : -1;
+      return ah >= al ? nextHigh : nextLow;
+    })();
+    if (pick) selectedCloudStats.push(pick);
+  }
+
+  const selectedSeen = new Set<string>();
+  selectedCloudStats = selectedCloudStats
+    .filter((s) => (selectedSeen.has(s.token) ? false : (selectedSeen.add(s.token), true)))
+    .slice(0, Math.min(cloudLimit, selectedCloudStats.length));
+
+  const maxCloudTotal = Math.max(1, ...selectedCloudStats.map((s) => Number(s.total) || 0));
+
+  const hexToRgb = (hex: string) => {
+    const h = hex.replace('#', '');
+    return {
+      r: parseInt(h.substring(0, 2), 16),
+      g: parseInt(h.substring(2, 4), 16),
+      b: parseInt(h.substring(4, 6), 16),
+    };
+  };
+  const rgbToHex = (r: number, g: number, b: number) => `#${[r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+  const colorA = hexToRgb(nodeAColor);
+  const colorB = hexToRgb(nodeBColor);
+  const blend = (t: number) => {
+    const lerp = (a: number, b: number, k: number) => a + (b - a) * k;
+    const r = Math.round(lerp(colorB.r, colorA.r, t));
+    const g = Math.round(lerp(colorB.g, colorA.g, t));
+    const b = Math.round(lerp(colorB.b, colorA.b, t));
+    return rgbToHex(r, g, b);
+  };
+
+  const words = selectedCloudStats.map((s) => {
+    const denom = s.p1 + s.p2;
+    return {
+      text: s.token,
+      value: s.total,
+      proportion: denom > 0 ? (s.p1 / denom) : 0.5,
+    };
+  });
+  const proportionByToken = new Map<string, number>(
+    words.map((word) => [word.text, Number(word.proportion) || 0.5])
+  );
+  const fontSizeSetter = (datum: { value: number }) => Math.max(12, Math.min(54, (datum.value / maxCloudTotal) * 42 + 12));
 
   return (
     <div className="space-y-3">
@@ -92,45 +171,71 @@ export const TokenFrequencyUnifiedTokenSection = ({
 
         <CardContent>
           <div ref={unifiedCloudContainerRef} className="rounded-lg border p-3" style={{ minHeight: Math.max(240, unifiedCloudHeight) }}>
-            <div className="flex flex-wrap gap-2">
-              {unifiedRows.map((row, index) => {
-                const frequency = Number(row.frequency) || 0;
-                const ratio = Math.max(0.4, frequency / maxUnifiedFrequency);
-                const fontSize = Math.round(11 + ratio * 18);
-                const sourceNode =
-                  (Array.isArray(row.node_ids) && row.node_ids[0]) ||
-                  lastCompareNodeIds[index % Math.max(1, lastCompareNodeIds.length)] ||
-                  nodeDisplayResults[index % Math.max(1, nodeDisplayResults.length)]?.nodeId ||
-                  '';
-                const color = sourceNode ? getColorForNode(sourceNode, index) : undefined;
-                return (
-                  <button
-                    key={`unified-${row.token}-${index}`}
-                    type="button"
-                    className="inline-flex items-center rounded border px-2 py-1 font-medium hover:bg-muted"
-                    style={{ fontSize, color }}
-                    onClick={() => onTokenClick(row.token)}
-                    onContextMenu={(event) => {
-                      event.preventDefault();
-                      onTokenRightClick(row.token, event);
-                    }}
-                    title={`Frequency: ${frequency}`}
-                  >
-                    {row.token}
-                  </button>
-                );
-              })}
-            </div>
+            {isComparative && selectedCloudStats.length > 0 ? (
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center gap-4 text-sm">
+                  <div className="flex items-center gap-1"><span className="inline-block h-3.5 w-3.5 rounded" style={{ backgroundColor: nodeAColor }} />{nodeAName}</div>
+                  <div className="flex items-center gap-1"><span className="inline-block h-3.5 w-3.5 rounded" style={{ backgroundColor: nodeBColor }} />{nodeBName}</div>
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <span>Gradient</span>
+                    <div className="h-2.5 w-28 rounded" style={{ background: `linear-gradient(to right, ${nodeAColor}, ${nodeBColor})` }} />
+                    <span>A → B</span>
+                  </div>
+                </div>
 
-            <div className="h-0 w-0 overflow-hidden">
-              <svg
-                ref={(element) => registerWordCloudRef('unified', element)}
-                xmlns="http://www.w3.org/2000/svg"
-                width="1"
-                height="1"
-                viewBox="0 0 1 1"
-              />
-            </div>
+                <div className="flex w-full justify-center overflow-visible">
+                  <svg
+                    ref={(element) => registerWordCloudRef('unified', element)}
+                    width={unifiedCloudWidth}
+                    height={unifiedCloudHeight}
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="overflow-visible"
+                    style={{ overflow: 'visible' }}
+                  >
+                    <Wordcloud
+                      words={words}
+                      width={unifiedCloudWidth}
+                      height={unifiedCloudHeight}
+                      fontSize={fontSizeSetter}
+                      font="Segoe UI, Roboto, sans-serif"
+                      padding={2}
+                      spiral="archimedean"
+                      rotate={0}
+                      random={() => 0.5}
+                    >
+                      {(cloudWords) =>
+                        cloudWords.map((word) => {
+                          const proportion = proportionByToken.get(word.text) ?? 0.5;
+                          return (
+                            <Text
+                              key={word.text}
+                              fill={blend(Math.max(0, Math.min(1, proportion)))}
+                              textAnchor="middle"
+                              transform={`translate(${word.x}, ${word.y}) rotate(${word.rotate})`}
+                              fontSize={word.size}
+                              fontFamily={word.font}
+                              className="cursor-pointer transition-colors"
+                              onClick={() => word.text && onTokenClick(word.text)}
+                              onContextMenu={(event) => {
+                                event.preventDefault();
+                                if (word.text) {
+                                  onTokenRightClick(word.text, event);
+                                }
+                              }}
+                              style={{ cursor: 'pointer' }}
+                            >
+                              {word.text || ''}
+                            </Text>
+                          );
+                        })
+                      }
+                    </Wordcloud>
+                  </svg>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">Unified cloud appears when two node results and comparative statistics are available.</p>
+            )}
           </div>
         </CardContent>
       </Card>

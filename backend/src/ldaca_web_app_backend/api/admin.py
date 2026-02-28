@@ -8,8 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 
 from ..core.auth import get_current_user
-from ..db import (User, UserSession, async_session_maker,
-                  cleanup_expired_sessions)
+from ..db import User, UserSession, async_session_maker, cleanup_expired_sessions
 from ..settings import settings
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -97,5 +96,4 @@ async def admin_cleanup(current_user: dict = Depends(get_current_user)):
     return {
         "message": "Expired sessions cleaned up successfully",
         "performed_by": current_user["email"],
-    }
     }
