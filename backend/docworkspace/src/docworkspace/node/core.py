@@ -16,6 +16,8 @@ if False:  # TYPE_CHECKING replacement to avoid runtime import cycle
 
 
 class Node:
+    MAX_UNDO_DEPTH = 50
+
     def __init__(
         self,
         data: pl.LazyFrame,
@@ -34,7 +36,9 @@ class Node:
                 "Node data must be a polars LazyFrame "
                 f"(received {type(data).__name__})."
             )
-        self.data: pl.LazyFrame = data
+        self._undo_stack: list[pl.LazyFrame] = []
+        self._redo_stack: list[pl.LazyFrame] = []
+        self._data: pl.LazyFrame = data
         self._document_column: Optional[str] = None
         self.parents: list[Node] = parents or []
         self.children: list[Node] = []
@@ -77,6 +81,30 @@ class Node:
     def shape(self) -> tuple[int, int]:
         height = int(self.data.select(pl.len()).collect().item())
         return (height, self.data.collect_schema().len())
+
+    @property
+    def data(self) -> pl.LazyFrame:
+        return self._data
+
+    @data.setter
+    def data(self, value: pl.LazyFrame) -> None:
+        if not isinstance(value, pl.LazyFrame):
+            raise TypeError(
+                "Node data must be a polars LazyFrame "
+                f"(received {type(value).__name__})."
+            )
+
+        if hasattr(self, "_data"):
+            current = self._data
+            if current is value:
+                return
+
+            self._undo_stack.append(current)
+            if len(self._undo_stack) > self.MAX_UNDO_DEPTH:
+                self._undo_stack.pop(0)
+            self._redo_stack.clear()
+
+        self._data = value
 
     @property
     def columns(self):  # pragma: no cover
@@ -182,6 +210,24 @@ class Node:
 
         return self
 
+    def undo(self) -> "Node":
+        if not self._undo_stack:
+            raise ValueError("Nothing to undo")
+
+        self._redo_stack.append(self._data)
+        self._data = self._undo_stack.pop()
+        return self
+
+    def redo(self) -> "Node":
+        if not self._redo_stack:
+            raise ValueError("Nothing to redo")
+
+        self._undo_stack.append(self._data)
+        if len(self._undo_stack) > self.MAX_UNDO_DEPTH:
+            self._undo_stack.pop(0)
+        self._data = self._redo_stack.pop()
+        return self
+
     # ------------------------------------------------------------------
     # Properties
     # ------------------------------------------------------------------
@@ -192,6 +238,14 @@ class Node:
     @document.setter
     def document(self, value: Optional[str]) -> None:
         self._document_column = value
+
+    @property
+    def can_undo(self) -> bool:
+        return len(self._undo_stack) > 0
+
+    @property
+    def can_redo(self) -> bool:
+        return len(self._redo_stack) > 0
 
     # ------------------------------------------------------------------
     # Schema utilities
@@ -223,6 +277,8 @@ class Node:
             "shape": (height, self.data.collect_schema().len()),
             "schema": {col: str(dtype) for col, dtype in schema.items()},
             "columns": list(schema.names()),
+            "can_undo": self.can_undo,
+            "can_redo": self.can_redo,
         }
 
     # Representation --------------------------------------------------

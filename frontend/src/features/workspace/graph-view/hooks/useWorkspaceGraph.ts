@@ -59,6 +59,8 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
     deleteNode,
     copyNode,
     renameNode,
+    undoNode,
+    redoNode,
     toggleNodeSelection,
     clearSelection,
   } = useWorkspaceActions();
@@ -99,6 +101,26 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
       copyNode(nodeId);
     },
     [copyNode]
+  );
+
+  const handleUndo = useCallback(
+    (nodeId: string) => {
+      if (!nodeId || !undoNode) {
+        return;
+      }
+      void undoNode(nodeId);
+    },
+    [undoNode]
+  );
+
+  const handleRedo = useCallback(
+    (nodeId: string) => {
+      if (!nodeId || !redoNode) {
+        return;
+      }
+      void redoNode(nodeId);
+    },
+    [redoNode]
   );
 
 
@@ -162,6 +184,8 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
             preview: [],
             is_text_data: Boolean(documentColumn),
             data_type: 'LazyFrame',
+            can_undo: Boolean(node.can_undo),
+            can_redo: Boolean(node.can_redo),
             document: documentColumn,
             document_column: documentColumn,
             column_schema: columnSchema,
@@ -171,6 +195,8 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
           onDelete: handleDelete,
           onRename: handleRename,
           onCopy: handleCopy,
+          onUndo: handleUndo,
+          onRedo: handleRedo,
         },
         hidden: false,
         draggable: true,
@@ -179,7 +205,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
         connectable: false,
       } as Node;
     });
-  }, [workspaceGraph, selectedNodeIds, handleDelete, handleRename, handleCopy, dlog]);
+  }, [workspaceGraph, selectedNodeIds, handleDelete, handleRename, handleCopy, handleUndo, handleRedo, dlog]);
 
   const initialEdges = useMemo(() => {
     if (!workspaceGraph?.edges) {
@@ -213,7 +239,9 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
       const dt = node?.data?.node?.data_type ?? 'unknown';
       const docc = node?.data?.node?.document_column || '';
       const name = node?.data?.node?.name || '';
-      return `${node.id}:${dt}:${docc}:${name}`;
+      const canUndo = node?.data?.node?.can_undo ? '1' : '0';
+      const canRedo = node?.data?.node?.can_redo ? '1' : '0';
+      return `${node.id}:${dt}:${docc}:${name}:${canUndo}:${canRedo}`;
     })
     .join(',');
 
@@ -222,7 +250,9 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
       const dt = node?.data?.node?.data_type ?? 'unknown';
       const docc = node?.data?.node?.document_column || '';
       const name = node?.data?.node?.name || '';
-      return `${node.id}:${dt}:${docc}:${name}`;
+      const canUndo = node?.data?.node?.can_undo ? '1' : '0';
+      const canRedo = node?.data?.node?.can_redo ? '1' : '0';
+      return `${node.id}:${dt}:${docc}:${name}:${canUndo}:${canRedo}`;
     })
     .join(',');
 

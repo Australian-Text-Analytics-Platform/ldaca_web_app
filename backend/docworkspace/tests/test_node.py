@@ -214,6 +214,72 @@ class TestNode:
         assert "LazyFrame" in repr_str
         assert "document=None" in repr_str
 
+    def test_node_data_setter_creates_undo_checkpoint(self, sample_df):
+        """Assigning node.data should push previous plan onto undo stack."""
+        node = Node(sample_df.lazy(), "test_node")
+
+        node.data = node.data.with_columns(pl.lit("x").alias("new_col"))
+
+        assert node.can_undo is True
+        assert node.can_redo is False
+        assert "new_col" in node.data.collect_schema().names()
+
+    def test_node_undo_and_redo_round_trip(self, sample_df):
+        """Undo should restore prior plan and redo should reapply it."""
+        node = Node(sample_df.lazy(), "test_node")
+
+        original_columns = list(node.data.collect_schema().names())
+        node.data = node.data.with_columns(pl.lit(99).alias("new_col"))
+        changed_columns = list(node.data.collect_schema().names())
+
+        assert changed_columns != original_columns
+
+        node.undo()
+        assert list(node.data.collect_schema().names()) == original_columns
+        assert node.can_redo is True
+
+        node.redo()
+        assert list(node.data.collect_schema().names()) == changed_columns
+
+    def test_new_assignment_clears_redo_stack(self, sample_df):
+        """A fresh assignment after undo should clear redo history."""
+        node = Node(sample_df.lazy(), "test_node")
+
+        node.data = node.data.with_columns(pl.lit(1).alias("c1"))
+        node.data = node.data.with_columns(pl.lit(2).alias("c2"))
+        node.undo()
+        assert node.can_redo is True
+
+        node.data = node.data.with_columns(pl.lit(3).alias("c3"))
+        assert node.can_redo is False
+
+    def test_undo_raises_when_history_empty(self, sample_df):
+        """Undo should fail clearly when there is no undo history."""
+        node = Node(sample_df.lazy(), "test_node")
+
+        with pytest.raises(ValueError, match="Nothing to undo"):
+            node.undo()
+
+    def test_redo_raises_when_history_empty(self, sample_df):
+        """Redo should fail clearly when there is no redo history."""
+        node = Node(sample_df.lazy(), "test_node")
+
+        with pytest.raises(ValueError, match="Nothing to redo"):
+            node.redo()
+
+    def test_node_info_includes_undo_redo_flags(self, sample_df):
+        """Node info payload should expose can_undo/can_redo for API/UI use."""
+        node = Node(sample_df.lazy(), "test_node")
+
+        initial_info = node.info()
+        assert initial_info["can_undo"] is False
+        assert initial_info["can_redo"] is False
+
+        node.data = node.data.with_columns(pl.lit(1).alias("new_col"))
+        updated_info = node.info()
+        assert updated_info["can_undo"] is True
+        assert updated_info["can_redo"] is False
+
 
 class TestNodeRelationships:
     """Test parent-child relationships between nodes."""

@@ -11,10 +11,12 @@ interface CustomNodeData {
   onDelete: (nodeId: string) => void;
   onRename?: (nodeId: string, newName: string) => void;
   onCopy?: (nodeId: string) => void;
+  onUndo?: (nodeId: string) => void;
+  onRedo?: (nodeId: string) => void;
 }
 
 function CustomNode({ data, selected }: NodeProps<any>) {
-  const { node: initialNode, isMultiSelected = false, onDelete, onRename, onCopy } = data as CustomNodeData;
+  const { node: initialNode, isMultiSelected = false, onDelete, onRename, onCopy, onUndo, onRedo } = data as CustomNodeData;
   // Keep a local state but always sync with props to prevent staleness after in-place updates
   const [node, setNode] = useState(initialNode);
   const [showMenu, setShowMenu] = useState(false);
@@ -112,6 +114,22 @@ function CustomNode({ data, selected }: NodeProps<any>) {
     }
   };
 
+  const handleUndoNode = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowMenu(false);
+    if (onUndo && node?.node_id && node?.can_undo) {
+      onUndo(node.node_id);
+    }
+  };
+
+  const handleRedoNode = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowMenu(false);
+    if (onRedo && node?.node_id && node?.can_redo) {
+      onRedo(node.node_id);
+    }
+  };
+
   const handleCopyId = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (node?.node_id) {
@@ -185,7 +203,7 @@ function CustomNode({ data, selected }: NodeProps<any>) {
         <div className="flex items-center flex-1 mr-2">
           {isHighlighted && (
             <div
-              className="w-2 h-2 bg-green-500 rounded-full mr-2 flex-shrink-0"
+              className="w-2 h-2 bg-green-500 rounded-full mr-2 shrink-0"
               title={isMultiSelected ? 'Selected for joining' : 'Selected'}
             ></div>
           )}
@@ -223,7 +241,7 @@ function CustomNode({ data, selected }: NodeProps<any>) {
           )}
         </div>
         
-        <div className="flex items-center space-x-1 flex-shrink-0">
+        <div className="flex items-center space-x-1 shrink-0">
           {/* More menu button */}
           <div className="relative" ref={menuRef}>
             <button
@@ -259,7 +277,23 @@ function CustomNode({ data, selected }: NodeProps<any>) {
                   onClick={handleCopyNode}
                   className="w-full text-left px-3 py-2 text-xs hover:bg-muted/60 border-t border-border/60"
                 >
-                  Copy
+                  Clone
+                </button>
+
+                <button
+                  onClick={handleUndoNode}
+                  disabled={!node?.can_undo}
+                  className="w-full text-left px-3 py-2 text-xs border-t border-border/60 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-muted/60 disabled:hover:bg-transparent"
+                >
+                  Undo
+                </button>
+
+                <button
+                  onClick={handleRedoNode}
+                  disabled={!node?.can_redo}
+                  className="w-full text-left px-3 py-2 text-xs border-t border-border/60 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-muted/60 disabled:hover:bg-transparent"
+                >
+                  Redo
                 </button>
                 
               </div>
@@ -281,7 +315,7 @@ function CustomNode({ data, selected }: NodeProps<any>) {
       {/* Node Body */}
       <div className="p-3 bg-white rounded-b-lg space-y-1">
         <div className="flex items-center justify-between group">
-          <div className="font-mono text-xs text-gray-500 truncate max-w-[180px]" title={node?.node_id}>
+          <div className="font-mono text-xs text-gray-500 truncate max-w-45" title={node?.node_id}>
             id: {node?.node_id?.substring(0, 8)}...
           </div>
           <button
@@ -300,8 +334,8 @@ function CustomNode({ data, selected }: NodeProps<any>) {
       </div>
 
       {/* Passive handles so backend edges can attach; UI connections remain disabled by parent ReactFlow props */}
-      <Handle type="target" position={Position.Left} className="!w-2 !h-2 !bg-gray-400 opacity-0 pointer-events-none" />
-      <Handle type="source" position={Position.Right} className="!w-2 !h-2 !bg-gray-400 opacity-0 pointer-events-none" />
+      <Handle type="target" position={Position.Left} className="w-2! h-2! bg-gray-400! opacity-0 pointer-events-none" />
+      <Handle type="source" position={Position.Right} className="w-2! h-2! bg-gray-400! opacity-0 pointer-events-none" />
 
     </div>
   );

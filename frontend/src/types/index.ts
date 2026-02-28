@@ -100,6 +100,8 @@ export interface WorkspaceNode {
   columns: string[];
   preview: any[];
   is_text_data: boolean;
+  can_undo?: boolean;
+  can_redo?: boolean;
   data_type?: string; // e.g., 'polars.dataframe.frame.DataFrame', 'pandas.core.frame.DataFrame'
   column_schema?: Record<string, string>; // Column name to data type mapping
   dtypes?: Record<string, string>; // Alternative name for column types

@@ -156,7 +156,9 @@ def read_workspace(path: Union[str, Path]) -> "Workspace":
         node = Node.__new__(Node)
         node.id = node_meta["id"]
         node.name = node_meta["name"]
-        node.data = lf
+        node._undo_stack = []
+        node._redo_stack = []
+        node._data = lf
         node._document_column = node_meta.get("document")
         node.parents = []
         node.children = []

@@ -294,6 +294,31 @@ class TestWorkspaceSerialization:
             # After serialization, lazy frames should remain lazy
             assert isinstance(loaded_lazy.data, pl.LazyFrame)
 
+    def test_undo_redo_stacks_are_not_persisted(self):
+        """Undo/redo history is in-memory only and must reset after load."""
+        workspace = Workspace("undo_runtime_only")
+        node = workspace.add_node(
+            Node(
+                data=pl.DataFrame({"a": [1, 2, 3]}).lazy(),
+                name="root",
+                workspace=workspace,
+            )
+        )
+
+        node.data = node.data.with_columns(pl.lit(1).alias("b"))
+        assert node.can_undo is True
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            meta_path = Path(tmpdir) / "metadata.json"
+            workspace.save(meta_path)
+
+            loaded_workspace = Workspace.load(meta_path)
+            loaded_node = loaded_workspace.get_node_by_name("root")
+
+            assert loaded_node is not None
+            assert loaded_node.can_undo is False
+            assert loaded_node.can_redo is False
+
     def test_load_from_dict_rejected(self):
         """Workspace.load should accept path-like values only."""
         with pytest.raises(TypeError):

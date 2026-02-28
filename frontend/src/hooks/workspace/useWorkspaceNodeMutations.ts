@@ -218,7 +218,7 @@ export const useWorkspaceNodeMutations = ({
 
   const copyNodeMutation = useMutation({
     mutationFn: ({ workspaceId, nodeId }: { workspaceId: string; nodeId: string }) =>
-      nodesApi.copy(nodeId, authHeaders),
+      nodesApi.clone(nodeId, authHeaders),
     onMutate: () => {
       startOperation('copyNode');
     },
@@ -255,6 +255,46 @@ export const useWorkspaceNodeMutations = ({
     onError: (error: any) => {
       setOperationError('deleteNode', error.message);
       endOperation('deleteNode');
+    },
+  });
+
+  const undoNodeMutation = useMutation({
+    mutationFn: ({ nodeId }: { nodeId: string }) => nodesApi.undo(nodeId, authHeaders),
+    onMutate: () => {
+      startOperation('undoNode');
+    },
+    onSuccess: (_data, variables) => {
+      if (currentWorkspaceId) {
+        invalidateNodeInfo(currentWorkspaceId, variables.nodeId);
+        queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.nodeData(currentWorkspaceId, variables.nodeId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.nodeSchema(currentWorkspaceId, variables.nodeId) });
+      }
+      endOperation('undoNode');
+    },
+    onError: (error: any) => {
+      setOperationError('undoNode', error.message);
+      endOperation('undoNode');
+    },
+  });
+
+  const redoNodeMutation = useMutation({
+    mutationFn: ({ nodeId }: { nodeId: string }) => nodesApi.redo(nodeId, authHeaders),
+    onMutate: () => {
+      startOperation('redoNode');
+    },
+    onSuccess: (_data, variables) => {
+      if (currentWorkspaceId) {
+        invalidateNodeInfo(currentWorkspaceId, variables.nodeId);
+        queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.nodeData(currentWorkspaceId, variables.nodeId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.nodeSchema(currentWorkspaceId, variables.nodeId) });
+      }
+      endOperation('redoNode');
+    },
+    onError: (error: any) => {
+      setOperationError('redoNode', error.message);
+      endOperation('redoNode');
     },
   });
 
@@ -468,12 +508,12 @@ export const useWorkspaceNodeMutations = ({
     onMutate: () => {
       startOperation('castNode');
     },
-    onSuccess: () => {
-      if (currentWorkspaceId && selectedNodeId) {
-        invalidateNodeInfo(currentWorkspaceId, selectedNodeId);
+    onSuccess: (_data, variables) => {
+      if (currentWorkspaceId && variables?.nodeId) {
+        invalidateNodeInfo(currentWorkspaceId, variables.nodeId);
         queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
-        queryClient.invalidateQueries({ queryKey: queryKeys.nodeData(currentWorkspaceId, selectedNodeId) });
-        queryClient.invalidateQueries({ queryKey: queryKeys.nodeSchema(currentWorkspaceId, selectedNodeId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.nodeData(currentWorkspaceId, variables.nodeId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.nodeSchema(currentWorkspaceId, variables.nodeId) });
       }
       endOperation('castNode');
     },
@@ -536,6 +576,10 @@ export const useWorkspaceNodeMutations = ({
     renameWorkspace: (newName: string) => updateWorkspaceNameMutation.mutateAsync(newName),
     renameNode: (nodeId: string, newName: string) =>
       renameNodeMutation.mutateAsync({ workspaceId: ensureWorkspaceSelected(), nodeId, newName }),
+    undoNode: (nodeId: string) =>
+      undoNodeMutation.mutateAsync({ nodeId }),
+    redoNode: (nodeId: string) =>
+      redoNodeMutation.mutateAsync({ nodeId }),
     copyNode: (nodeId: string) =>
       copyNodeMutation.mutateAsync({ workspaceId: ensureWorkspaceSelected(), nodeId }),
     deleteNode: (nodeId: string) =>

@@ -113,6 +113,84 @@ async def rename_node_column(
         ) from exc
 
 
+@router.post("/nodes/{node_id}/undo")
+async def undo_node_operation(
+    node_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Undo the latest in-memory execution plan change for a node."""
+
+    user_id = current_user["id"]
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    ws = workspace_manager.get_current_workspace(user_id)
+    if not workspace_id or ws is None:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+
+    node = ws.nodes.get(node_id)
+    if node is None:
+        raise HTTPException(status_code=404, detail=f"Node '{node_id}' not found")
+
+    try:
+        node.undo()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  # pragma: no cover
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to undo node '{node_id}': {exc}",
+        ) from exc
+
+    try:
+        update_workspace(user_id, workspace_id, best_effort=True)
+    except Exception as exc:
+        logger.debug(
+            "Best-effort workspace update failed after undo on node %s: %s",
+            node_id,
+            exc,
+        )
+
+    return node.info()
+
+
+@router.post("/nodes/{node_id}/redo")
+async def redo_node_operation(
+    node_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Redo the latest undone in-memory execution plan change for a node."""
+
+    user_id = current_user["id"]
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    ws = workspace_manager.get_current_workspace(user_id)
+    if not workspace_id or ws is None:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+
+    node = ws.nodes.get(node_id)
+    if node is None:
+        raise HTTPException(status_code=404, detail=f"Node '{node_id}' not found")
+
+    try:
+        node.redo()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  # pragma: no cover
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to redo node '{node_id}': {exc}",
+        ) from exc
+
+    try:
+        update_workspace(user_id, workspace_id, best_effort=True)
+    except Exception as exc:
+        logger.debug(
+            "Best-effort workspace update failed after redo on node %s: %s",
+            node_id,
+            exc,
+        )
+
+    return node.info()
+
+
 # -----------------------------------------------------------------------------
 # Configure Numba threading layer with automatic TBB detection and fallback
 # -----------------------------------------------------------------------------

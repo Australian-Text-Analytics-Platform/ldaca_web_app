@@ -70,6 +70,20 @@ export interface ExpressionApplyResponse {
   message: string;
 }
 
+export interface NodeInfoResponse {
+  id: string;
+  name: string;
+  operation: string | null;
+  parent_ids: string[];
+  child_ids: string[];
+  document: string | null;
+  shape: [number | null, number | null];
+  schema: Record<string, string>;
+  columns: string[];
+  can_undo?: boolean;
+  can_redo?: boolean;
+}
+
 export const nodesApi = {
   info: (node: string, headers: Record<string,string> = {}) => get(`/workspaces/nodes/${node}`, headers),
   data: (node: string, page = 0, pageSize = 20, headers: Record<string,string> = {}) => httpRequest(`/workspaces/nodes/${node}/data`, { method: 'GET', headers, params: { page, page_size: pageSize } }),
@@ -78,7 +92,13 @@ export const nodesApi = {
   describeColumn: (node: string, col: string, headers: Record<string,string> = {}) => get<ColumnDescribeResponse>(`/workspaces/nodes/${node}/columns/${col}/describe`, headers),
   delete: (node: string, headers: Record<string,string> = {}) => del(`/workspaces/nodes/${node}`, headers),
   rename: (node: string, newName: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/nodes/${node}/name`, { method: 'PUT', headers, params: { new_name: newName } }),
-  copy: (node: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/nodes/${node}/copy`, { method: 'POST', headers }),
+  clone: (node: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/nodes/${node}/clone`, { method: 'POST', headers }),
+  // Backward-compatible alias for older call sites.
+  copy: (node: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/nodes/${node}/clone`, { method: 'POST', headers }),
+  undo: (node: string, headers: Record<string, string> = {}) =>
+    httpRequest<NodeInfoResponse>(`/workspaces/nodes/${node}/undo`, { method: 'POST', headers }),
+  redo: (node: string, headers: Record<string, string> = {}) =>
+    httpRequest<NodeInfoResponse>(`/workspaces/nodes/${node}/redo`, { method: 'POST', headers }),
   renameColumn: (node: string, column: string, newName: string, headers: Record<string,string> = {}) =>
     httpRequest(`/workspaces/nodes/${node}/columns/${encodeURIComponent(column)}`, {
       method: 'PUT',
