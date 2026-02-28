@@ -155,18 +155,15 @@ export const TokenFrequencyResultsPanel = ({
                   tooltip="Words entered here are removed from all displayed token frequencies."
                 />
               </div>
-              <Input
+              <textarea
                 id="stop-words"
+                rows={4}
                 value={stopWords}
                 onChange={(event) => onStopWordsChange(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    event.preventDefault();
-                    onStopWordsApply();
-                  }
-                }}
+                onBlur={onStopWordsApply}
                 placeholder="the, and, of"
                 disabled={isLoadingStopWords}
+                className="w-full resize-y overflow-y-auto rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               />
               <div className="flex items-center gap-2">
                 <Button
