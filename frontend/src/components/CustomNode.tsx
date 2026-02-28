@@ -1,10 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { NodeProps, Handle, Position } from '@xyflow/react';
+import { NodeProps, Handle, Position, useStore } from '@xyflow/react';
 import { Settings2, Trash2, Copy, Check } from 'lucide-react';
 import { WorkspaceNode } from '../types';
 
 type DebugWindow = Window & { __LDACA_DEBUG_GRAPH?: boolean };
-type DocumentAwareNode = WorkspaceNode & { document?: string | null };
 
 interface CustomNodeData {
   node: WorkspaceNode;
@@ -25,6 +24,9 @@ function CustomNode({ data, selected }: NodeProps<any>) {
   const menuRef = useRef<HTMLDivElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
 
+  const zoom = useStore((s) => s.transform[2]);
+  const isZoomedOut = zoom < 0.7;
+
   const debugWindow: DebugWindow | null = typeof window !== 'undefined' ? (window as DebugWindow) : null;
   const DEBUG_GRAPH = Boolean(debugWindow?.__LDACA_DEBUG_GRAPH) || (typeof window !== 'undefined' && localStorage.getItem('debugGraph') === '1');
   const dlog = (...args: unknown[]) => {
@@ -43,7 +45,6 @@ function CustomNode({ data, selected }: NodeProps<any>) {
 
   const nodeName = node?.name || 'Loading...';
   const nodeShape = node?.shape;
-  const documentName = (node as DocumentAwareNode)?.document ?? null;
 
   // Close menu when clicking outside (capture to beat React Flow internal handlers)
   useEffect(() => {
@@ -145,6 +146,35 @@ function CustomNode({ data, selected }: NodeProps<any>) {
     shapeFirstElement: nodeShape ? nodeShape[0] : 'no shape',
     isFirstElementNull: nodeShape ? nodeShape[0] === null : 'no shape'
   });
+
+  if (isZoomedOut) {
+    // Compact view: name only, single uniform box
+    const compactClasses = `
+      flex items-start rounded-lg border-2 p-4 transition-all duration-150 ease-in-out
+      ${isHighlighted
+        ? 'border-green-500 bg-green-100 shadow-lg ring-2 ring-green-200'
+        : 'border-border bg-muted shadow-md'}
+    `;
+    return (
+      <div
+        className={compactClasses}
+        style={{ minWidth: '180px', maxWidth: '300px', position: 'relative' }}
+      >
+        {isHighlighted && (
+          <div className="w-3 h-3 bg-green-500 rounded-full mr-2.5 mt-2 shrink-0" />
+        )}
+        <div
+          className="font-bold text-3xl leading-snug whitespace-normal"
+          style={{ wordBreak: 'break-word', overflowWrap: 'anywhere', hyphens: 'auto' }}
+          title={nodeName}
+        >
+          {nodeName}
+        </div>
+        <Handle type="target" position={Position.Left} className="w-2! h-2! bg-gray-400! opacity-0 pointer-events-none" />
+        <Handle type="source" position={Position.Right} className="w-2! h-2! bg-gray-400! opacity-0 pointer-events-none" />
+      </div>
+    );
+  }
 
   return (
     <div className={nodeClasses} style={{ minWidth: '256px', minHeight: '120px', position: 'relative' }}>
@@ -266,11 +296,6 @@ function CustomNode({ data, selected }: NodeProps<any>) {
           <div className="font-mono text-xs text-gray-700">Shape: {shapeLabel}</div>
         ) : (
           <div className="font-mono text-xs text-gray-400 italic">Shape unavailable</div>
-        )}
-        {documentName && (
-          <div className="font-mono text-xs text-gray-600">
-            document: <span className="text-gray-900">{documentName}</span>
-          </div>
         )}
       </div>
 

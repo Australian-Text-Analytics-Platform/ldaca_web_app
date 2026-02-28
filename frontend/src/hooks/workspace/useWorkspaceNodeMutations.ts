@@ -9,7 +9,7 @@ import {
 } from '../../api/nodes';
 import { queryKeys } from '../../lib/queryKeys';
 import { NodeSchemaResponse } from '../../types';
-import { getNodeInfo } from '../../lib/nodeInfoCache';
+import { getNodeInfo, invalidateNodeInfo } from '../../lib/nodeInfoCache';
 import { normalizeSchemaFromInfo } from '../useSchemaManagement';
 
 interface WorkspaceNodeMutationsParams {
@@ -470,8 +470,10 @@ export const useWorkspaceNodeMutations = ({
     },
     onSuccess: () => {
       if (currentWorkspaceId && selectedNodeId) {
+        invalidateNodeInfo(currentWorkspaceId, selectedNodeId);
         queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
         queryClient.invalidateQueries({ queryKey: queryKeys.nodeData(currentWorkspaceId, selectedNodeId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.nodeSchema(currentWorkspaceId, selectedNodeId) });
       }
       endOperation('castNode');
     },

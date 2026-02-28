@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { normalizeTypeName } from '../utils/columnTypes';
 import { getNodeInfo } from '../lib/nodeInfoCache';
+import { queryKeys } from '../lib/queryKeys';
 
 export interface NodeSnapshot {
   id: string;
@@ -157,30 +159,22 @@ export function useSchemaManagement(config: SchemaManagementConfig) {
     currentSchemaRef.current = currentSchema;
   }, [currentSchema]);
 
-  // Fetch schema when node changes (but not when locked)
+  // Fetch schema via React Query so invalidation (e.g. after cast) triggers re-fetch
+  const schemaQuery = useQuery({
+    queryKey: (nodeId && workspaceId) ? queryKeys.nodeSchema(workspaceId, nodeId) : ['_no_schema_'],
+    queryFn: async () => {
+      const info = await getNodeInfo({ workspaceId: workspaceId!, nodeId: nodeId!, getAuthHeaders, force: true });
+      return normalizeSchemaFromInfo(info);
+    },
+    enabled: !!nodeId && !isLocked && !!workspaceId,
+    staleTime: 0,
+  });
+
   useEffect(() => {
-    if (!nodeId || isLocked || !workspaceId) return;
-
-    let cancelled = false;
-
-    (async () => {
-      try {
-        const info = await getNodeInfo({ workspaceId, nodeId, getAuthHeaders, force: true });
-        if (cancelled) return;
-        
-        const schemaMap = normalizeSchemaFromInfo(info);
-        if (Object.keys(schemaMap).length > 0) {
-          setCurrentSchema(schemaMap);
-        }
-      } catch {
-        // Ignore schema fetch errors - not critical
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [nodeId, isLocked, workspaceId, getAuthHeaders]);
+    if (schemaQuery.data && Object.keys(schemaQuery.data).length > 0) {
+      setCurrentSchema(schemaQuery.data);
+    }
+  }, [schemaQuery.data]);
 
   /**
    * Get the effective schema (locked if locked, otherwise current)
