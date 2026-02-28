@@ -1,5 +1,6 @@
 import React from 'react';
 import { getReadableTextColor, interpolateColor, type ZoomDomain } from '../topicModelingAdapters';
+import { matchChecklistOption } from '../../../preprocessing/filter/utils/checklistSearch';
 
 type TopicModelingTopic = {
   id: number;
@@ -21,6 +22,8 @@ type TooltipState = {
   x: number;
   y: number;
   topic: TopicModelingTopic | null;
+  containerW: number;
+  containerH: number;
 };
 
 type Params = {
@@ -43,6 +46,10 @@ type Params = {
   panelNodeIds: string[];
   nodeColors: Record<string, string>;
   defaultPalette: string[];
+  selectedTopicIds: Set<number>;
+  onToggleTopicSelection: (id: number) => void;
+  topicSearchQuery: string;
+  handleResetZoom: () => void;
 };
 
 const resolvePanelColor = (
@@ -79,6 +86,10 @@ export function useTopicModelingBubbleChart({
   panelNodeIds,
   nodeColors,
   defaultPalette,
+  selectedTopicIds,
+  onToggleTopicSelection,
+  topicSearchQuery,
+  handleResetZoom,
 }: Params) {
   const fallbackPrimaryColor = defaultPalette[0] ?? '#2563eb';
   const fallbackSecondaryColor = defaultPalette[1] ?? '#dc2626';
@@ -118,6 +129,7 @@ export function useTopicModelingBubbleChart({
     const scaleX = (x: number) => ((x - activeDomain.xMin) / (activeDomain.xMax - activeDomain.xMin || 1)) * (width - 2 * chartPadding) + chartPadding;
     const scaleY = (y: number) => ((y - activeDomain.yMin) / (activeDomain.yMax - activeDomain.yMin || 1)) * (height - 2 * chartPadding) + chartPadding;
     const maxSize = Math.max(...topics.map((topic) => topic.total_size));
+    const hasSearchFilter = topicSearchQuery.trim().length > 0;
 
     const brushDisplay = brushRect
       ? {
@@ -140,6 +152,11 @@ export function useTopicModelingBubbleChart({
         onMouseDown={handleBrushStart}
         onMouseMove={handleBrushMove}
         onMouseUp={handleBrushEnd}
+        onDoubleClick={(e) => {
+          if (e.currentTarget === e.target) {
+            handleResetZoom();
+          }
+        }}
         onMouseLeave={() => {
           if (isBrushing) {
             handleBrushEnd();
@@ -159,13 +176,18 @@ export function useTopicModelingBubbleChart({
           const cx = scaleX(topic.x);
           const cy = scaleY(topic.y);
           const isHovered = hoveredTopicId === topic.id;
+          const isSelected = selectedTopicIds.has(topic.id);
+          const isFilteredOut = hasSearchFilter && !matchChecklistOption(topic.label, topicSearchQuery);
+          const displayRadius = isHovered && !isFilteredOut ? radius + 2 : radius;
 
           return (
             <g
               key={topic.id}
               transform={`translate(${cx},${cy})`}
+              opacity={isFilteredOut ? 0.18 : undefined}
+              style={{ cursor: isFilteredOut ? 'default' : isBrushing ? 'grabbing' : 'pointer' }}
               onMouseEnter={(event) => {
-                if (isBrushing) return;
+                if (isBrushing || isFilteredOut) return;
                 setHoveredTopicId(topic.id);
                 const bounds = chartRef.current?.getBoundingClientRect();
                 if (bounds) {
@@ -173,30 +195,50 @@ export function useTopicModelingBubbleChart({
                     x: event.clientX - bounds.left + 12,
                     y: event.clientY - bounds.top + 12,
                     topic,
+                    containerW: bounds.width,
+                    containerH: bounds.height,
                   });
                 }
               }}
               onMouseMove={(event) => {
-                if (isBrushing || !chartRef.current) return;
+                if (isBrushing || isFilteredOut || !chartRef.current) return;
                 const bounds = chartRef.current.getBoundingClientRect();
                 setTooltip((previous) =>
                   previous.topic && previous.topic.id === topic.id
-                    ? { x: event.clientX - bounds.left + 12, y: event.clientY - bounds.top + 12, topic }
+                    ? { x: event.clientX - bounds.left + 12, y: event.clientY - bounds.top + 12, topic, containerW: bounds.width, containerH: bounds.height }
                     : previous
                 );
               }}
               onMouseLeave={() => {
-                if (isBrushing) return;
+                if (isBrushing || isFilteredOut) return;
                 setHoveredTopicId(null);
                 setTooltip((previous) => ({ ...previous, topic: null }));
               }}
+              onClick={() => {
+                if (isBrushing || isFilteredOut) return;
+                onToggleTopicSelection(topic.id);
+              }}
             >
+              {isSelected && !isFilteredOut && (
+                <circle
+                  r={radius + 5}
+                  fill="none"
+                  stroke="#16a34a"
+                  strokeWidth={2}
+                  strokeOpacity={0.6}
+                  className="pointer-events-none"
+                />
+              )}
               <circle
-                r={radius}
+                r={displayRadius}
                 fill={fill}
-                fillOpacity={isHovered ? 0.92 : 0.7}
-                stroke={isHovered ? '#1d4ed8' : '#334155'}
-                strokeWidth={isHovered ? 2 : 1}
+                fillOpacity={isHovered ? 0.88 : isSelected ? 0.78 : 0.6}
+                stroke={
+                  isSelected ? '#16a34a'
+                  : isHovered ? '#3b82f6'
+                  : '#94a3b8'
+                }
+                strokeWidth={isSelected ? 2 : isHovered ? 2 : 1}
               />
               <text textAnchor="middle" dy={4} fontSize={12} className="pointer-events-none select-none" fill="#1e293b">
                 {`T${topic.id}`}
@@ -232,6 +274,7 @@ export function useTopicModelingBubbleChart({
     handleBrushStart,
     handleBrushMove,
     handleBrushEnd,
+    handleResetZoom,
     setHoveredTopicId,
     setTooltip,
     corpusCount,
@@ -242,6 +285,9 @@ export function useTopicModelingBubbleChart({
     panelNodeIds,
     nodeColors,
     defaultPalette,
+    selectedTopicIds,
+    onToggleTopicSelection,
+    topicSearchQuery,
   ]);
 
   return {

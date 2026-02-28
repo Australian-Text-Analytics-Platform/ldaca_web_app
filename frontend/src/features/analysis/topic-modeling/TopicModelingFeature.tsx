@@ -59,7 +59,6 @@ const TopicModelingFeature: React.FC = () => {
     | {
         node_ids?: string[];
         node_columns?: Record<string, string>;
-        use_ctfidf?: boolean;
         min_topic_size?: number;
       }
     | null;
@@ -70,9 +69,10 @@ const TopicModelingFeature: React.FC = () => {
   const [result, resultRef, setResultSafely] = useSafeResult<TopicModelingResponse>();
   
   const [minTopicSize, setMinTopicSize] = useState(10);
-  const [useCtTfidf, setUseCtTfidf] = useState(true);
   const [hoveredTopicId, setHoveredTopicId] = useState<number | null>(null);
-  const [tooltip, setTooltip] = useState<{x:number;y:number; topic: TopicModelingTopic | null}>({x:0,y:0,topic:null});
+  const [tooltip, setTooltip] = useState<{x:number;y:number; topic: TopicModelingTopic | null; containerW: number; containerH: number}>({x:0,y:0,topic:null,containerW:0,containerH:0});
+  const [selectedTopicIds, setSelectedTopicIds] = useState<Set<number>>(new Set());
+  const [topicSearchQuery, setTopicSearchQuery] = useState('');
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<HTMLDivElement | null>(null);
   const [chartWidth, setChartWidth] = useState<number>(800);
@@ -125,7 +125,6 @@ const TopicModelingFeature: React.FC = () => {
       const sels = nodeIds.map((id: string) => ({ nodeId: id, column: node_columns[id] || '' }));
       setNodeColumnSelections(sels, { replace: true });
       setMinTopicSize(Number(req.min_topic_size ?? 10));
-      setUseCtTfidf(req.use_ctfidf === undefined ? true : !!req.use_ctfidf);
       if (nodeIds.length && currentWorkspaceId) {
         try {
           await restoreAnalysisLockFromRequest({
@@ -153,8 +152,23 @@ const TopicModelingFeature: React.FC = () => {
   const handleClear = useCallback(async () => {
     setIsClearing(true);
     await clearResults();
+    setSelectedTopicIds(new Set());
+    setTopicSearchQuery('');
     setIsClearing(false);
   }, [clearResults]);
+
+  const handleToggleTopicSelection = useCallback((id: number) => {
+    setSelectedTopicIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const handleClearTopicSelection = useCallback(() => {
+    setSelectedTopicIds(new Set());
+  }, []);
 
   const topicRunningTask = taskStatus.runningTask;
   const panelNodeIds = panelSelectedNodes
@@ -200,11 +214,9 @@ const TopicModelingFeature: React.FC = () => {
     isLocked,
     serverRequest: typedServerRequest,
     currentParams: {
-      use_ctfidf: Boolean(useCtTfidf),
       min_topic_size: Number(minTopicSize),
     },
     getServerParams: (request) => ({
-      use_ctfidf: Boolean(request.use_ctfidf),
       min_topic_size: Number(request.min_topic_size),
     }),
   });
@@ -251,8 +263,7 @@ const TopicModelingFeature: React.FC = () => {
       panelHasMissingColumns,
       effectiveNodeColumnSelections,
       minTopicSize,
-      useCtTfidf,
-      result,
+      selectedTopicIds,
     },
     actions: {
       setIsRunning,
@@ -313,6 +324,10 @@ const TopicModelingFeature: React.FC = () => {
     panelNodeIds,
     nodeColors,
     defaultPalette,
+    selectedTopicIds,
+    onToggleTopicSelection: handleToggleTopicSelection,
+    topicSearchQuery,
+    handleResetZoom,
   });
 
   const shouldShowResultsPanel = Boolean(topicWaitingBanner || result || error);
@@ -331,8 +346,6 @@ const TopicModelingFeature: React.FC = () => {
         actionState={actionState}
         minTopicSize={minTopicSize}
         onMinTopicSizeChange={setMinTopicSize}
-        useCtTfidf={useCtTfidf}
-        onUseCtTfidfChange={setUseCtTfidf}
         isRunning={isRunning}
         isClearing={isClearing}
         onRun={handleRun}
@@ -360,6 +373,12 @@ const TopicModelingFeature: React.FC = () => {
           renderSizeComposition={renderSizeComposition}
           hoveredTopicId={hoveredTopicId}
           setHoveredTopicId={setHoveredTopicId}
+          selectedTopicIds={selectedTopicIds}
+          onToggleTopicSelection={handleToggleTopicSelection}
+          onClearSelection={handleClearTopicSelection}
+          topicSearchQuery={topicSearchQuery}
+          onTopicSearchQueryChange={setTopicSearchQuery}
+          activeDomain={activeDomain}
           detachDialogOpen={detachDialogOpen}
           setDetachDialogOpen={setDetachDialogOpen}
           detachNodeOptions={detachNodeOptions}

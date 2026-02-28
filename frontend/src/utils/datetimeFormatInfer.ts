@@ -27,6 +27,15 @@ export function inferDatetimeFormat(samples: string[], opts: { requireTime?: boo
     if (!format.includes('%d')) format = format.replace(/\b\d{2}\b/, '%d');
   }
 
+  // Timezone offset MUST be detected BEFORE time patterns to avoid
+  // +00:00 being misinterpreted as a second %H:%M.
+  // With colon: +00:00, -05:30 → %:z (chrono/Polars specifier)
+  format = format.replace(/ ?[+-]\d{2}:\d{2}\s*$/, '%:z');
+  // Without colon: +0000, -0530 → %z
+  format = format.replace(/ ?[+-]\d{4}\b/, ' %z');
+  // Trailing Z for UTC
+  format = format.replace(/Z$/, 'Z');
+
   // Time HH:MM:SS
   format = format.replace(/\b([01]\d|2[0-3]):[0-5]\d:[0-5]\d/, '%H:%M:%S');
   // Time HH:MM (only if full not already replaced)
@@ -34,10 +43,6 @@ export function inferDatetimeFormat(samples: string[], opts: { requireTime?: boo
 
   // Fractional seconds .123 or .123456 -> replace any dot + 3-6 digits with %.f (Chrono-style subseconds placeholder)
   format = format.replace(/\.\d{3,6}/, '%.f');
-
-  // Timezone offset +0000 / -0430 or Z
-  format = format.replace(/ ?[+-]\d{4}\b/, ' %z');
-  format = format.replace(/Z$/, 'Z'); // keep literal Z
 
   // Basic validation
   if (!format.includes('%Y')) return null;

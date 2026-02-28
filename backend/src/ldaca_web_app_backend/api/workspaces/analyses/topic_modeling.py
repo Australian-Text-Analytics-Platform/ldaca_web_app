@@ -499,6 +499,14 @@ async def detach_topic_modeling(
             )
         assignments_lf = pl.scan_parquet(assignments_path)
 
+        # Filter assignments to selected topics if topic_ids specified
+        join_how = "left"
+        if request.topic_ids:
+            assignments_lf = assignments_lf.filter(
+                pl.col("_tm_topic").is_in(request.topic_ids)
+            )
+            join_how = "inner"
+
         try:
             source_node = ws.nodes[node_id]
         except Exception:
@@ -533,7 +541,7 @@ async def detach_topic_modeling(
         output_lf = (
             source_data
             .with_row_index("__row_nr__")
-            .join(assignments_lf, on="__row_nr__", how="left")
+            .join(assignments_lf, on="__row_nr__", how=join_how)
             .select(
                 [pl.col(col) for col in selected_columns]
                 + [pl.col("_tm_topic").alias(topic_column_name)]

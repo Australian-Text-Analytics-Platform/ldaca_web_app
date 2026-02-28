@@ -537,15 +537,23 @@ async def cast_node(
                             strict=bool(strict_flag)
                         )
 
-                    # Ensure timezone-aware UTC. Polars returns naive datetimes by default.
-                    # If the parsed result is already timezone aware we convert to UTC, otherwise we set it.
-                    # We can't inspect the expression's dtype pre-execution, so we defensively apply replace_time_zone then convert.
-                    cast_expr = (
-                        parsed.dt
-                        .replace_time_zone("UTC")
-                        .dt.convert_time_zone("UTC")
-                        .alias(column_name)
+                    # Ensure timezone-aware UTC.
+                    # If the format includes a timezone specifier (%z, %:z, %#z),
+                    # str.to_datetime already returns a tz-aware Datetime and
+                    # replace_time_zone would fail.  In that case we only need
+                    # convert_time_zone.  For naive results we set the timezone.
+                    _tz_tokens = ("%z", "%:z", "%#z")
+                    _format_has_tz = datetime_format and any(
+                        tok in datetime_format for tok in _tz_tokens
                     )
+                    if _format_has_tz:
+                        cast_expr = parsed.dt.convert_time_zone("UTC").alias(
+                            column_name
+                        )
+                    else:
+                        cast_expr = parsed.dt.replace_time_zone("UTC").alias(
+                            column_name
+                        )
                 except Exception as e:
                     raise HTTPException(
                         status_code=400,

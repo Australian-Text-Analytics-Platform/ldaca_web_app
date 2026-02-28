@@ -5,6 +5,7 @@ import { TopicModelingBubbleChartSection } from '../results/TopicModelingBubbleC
 import { TopicModelingDetachDialog } from '../results/TopicModelingDetachDialog';
 import { AnalysisCardLayout } from '../../../common/components/AnalysisCardLayout';
 import { AnalysisRunningStateCard } from '../../../common/components/AnalysisRunningStateCard';
+import type { ZoomDomain } from '../../topicModelingAdapters';
 
 type Props = {
   topicWaitingBanner: { status: 'running' | 'queued'; taskId: string | null; message?: string } | null;
@@ -29,6 +30,12 @@ type Props = {
   renderSizeComposition: (size: number[] | undefined, totalSize?: number | null) => React.ReactNode;
   hoveredTopicId: number | null;
   setHoveredTopicId: React.Dispatch<React.SetStateAction<number | null>>;
+  selectedTopicIds: Set<number>;
+  onToggleTopicSelection: (id: number) => void;
+  onClearSelection: () => void;
+  topicSearchQuery: string;
+  onTopicSearchQueryChange: (query: string) => void;
+  activeDomain: ZoomDomain | null;
   detachDialogOpen: boolean;
   setDetachDialogOpen: React.Dispatch<React.SetStateAction<boolean>>;
   detachNodeOptions: Array<{ node_id: string; node_name: string; available_columns: string[]; disabled_columns?: string[] }>;
@@ -55,6 +62,12 @@ export function TopicModelingResultsPanel({
   renderSizeComposition,
   hoveredTopicId,
   setHoveredTopicId,
+  selectedTopicIds,
+  onToggleTopicSelection,
+  onClearSelection,
+  topicSearchQuery,
+  onTopicSearchQueryChange,
+  activeDomain,
   detachDialogOpen,
   setDetachDialogOpen,
   detachNodeOptions,
@@ -114,8 +127,10 @@ export function TopicModelingResultsPanel({
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Loading Detach…
                   </>
+                ) : selectedTopicIds.size > 0 ? (
+                  `Detach (${selectedTopicIds.size} topics)`
                 ) : (
-                  'Detach'
+                  'Detach (all)'
                 )}
               </Button>
             </div>
@@ -129,6 +144,12 @@ export function TopicModelingResultsPanel({
               renderSizeComposition={renderSizeComposition}
               hoveredTopicId={hoveredTopicId}
               setHoveredTopicId={setHoveredTopicId}
+              selectedTopicIds={selectedTopicIds}
+              onToggleTopicSelection={onToggleTopicSelection}
+              onClearSelection={onClearSelection}
+              topicSearchQuery={topicSearchQuery}
+              onTopicSearchQueryChange={onTopicSearchQueryChange}
+              activeDomain={activeDomain}
             />
           </div>
         ) : null}

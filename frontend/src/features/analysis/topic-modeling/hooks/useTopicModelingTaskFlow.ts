@@ -29,8 +29,7 @@ interface TopicModelingState {
   panelHasMissingColumns: boolean;
   effectiveNodeColumnSelections: NodeColumnSelection[];
   minTopicSize: number;
-  useCtTfidf: boolean;
-  result: TopicModelingResponseLike | null;
+  selectedTopicIds: Set<number>;
 }
 
 interface TopicModelingActions {
@@ -62,8 +61,7 @@ export function useTopicModelingTaskFlow({
     panelHasMissingColumns,
     effectiveNodeColumnSelections,
     minTopicSize,
-    useCtTfidf,
-    result,
+    selectedTopicIds,
   },
   actions: {
     setIsRunning,
@@ -136,7 +134,6 @@ export function useTopicModelingTaskFlow({
         node_ids: requestNodeIds,
         node_columns: nodeColumns,
         min_topic_size: minTopicSize,
-        use_ctfidf: useCtTfidf,
       };
 
       const res = await textApi.topicModeling(req, getAuthHeaders());
@@ -215,6 +212,7 @@ export function useTopicModelingTaskFlow({
       const payload: TopicModelingDetachRequest = {
         node_ids: nodeIds,
         selected_columns: selectedDetachColumns,
+        ...(selectedTopicIds.size > 0 ? { topic_ids: Array.from(selectedTopicIds) } : {}),
       };
       const resp = await textApi.topicModelingDetach(taskId, payload, getAuthHeaders());
       if (resp?.state !== 'successful') {

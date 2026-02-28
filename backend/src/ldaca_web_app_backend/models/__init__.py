@@ -743,6 +743,7 @@ class TopicModelingDetachRequest(BaseModel):
     selected_columns: Dict[str, List[str]] = Field(default_factory=dict)
     new_node_names: Optional[Dict[str, str]] = None
     topic_column_name: Optional[str] = "topic"
+    topic_ids: Optional[List[int]] = None
 
 
 class TopicModelingDetachNodeOption(BaseModel):

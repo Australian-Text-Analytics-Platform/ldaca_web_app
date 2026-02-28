@@ -89,7 +89,7 @@ export interface TokenFrequencyResponse {
     significance?: string;
   }>;
 }
-export interface TopicModelingRequest { node_ids: string[]; node_columns?: Record<string,string>; min_topic_size?: number; use_ctfidf?: boolean; }
+export interface TopicModelingRequest { node_ids: string[]; node_columns?: Record<string,string>; min_topic_size?: number; }
 export interface TopicModelingResponse { state: 'running' | 'successful' | 'failed' | 'cancelled'; message: string; data?: { topics: any[]; corpus_sizes?: number[] }; metadata?: { task_id?: string; [k: string]: any } }
 export interface TopicModelingDetachNodeOption {
   node_id: string;
@@ -109,6 +109,7 @@ export interface TopicModelingDetachRequest {
   selected_columns: Record<string, string[]>;
   new_node_names?: Record<string, string>;
   topic_column_name?: string;
+  topic_ids?: number[];
 }
 export interface TopicModelingDetachResponse {
   state: 'running' | 'successful' | 'failed' | 'cancelled';

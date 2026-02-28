@@ -270,11 +270,6 @@ const registry: Record<string, TutorialTarget> = {
     anchor: 'help-topic-modeling-min-topic-size',
     label: 'Minimum topic size',
   },
-  'analysis.topic-modeling.ctfidf-toggle': {
-    file: 'tutorials/topic-modeling.md',
-    anchor: 'help-topic-modeling-ctfidf-toggle',
-    label: 'c-TF-IDF toggle',
-  },
   'analysis.sequential-analysis.tab': {
     file: 'tutorials/sequential-analysis.md',
     anchor: 'help-sequential-section',

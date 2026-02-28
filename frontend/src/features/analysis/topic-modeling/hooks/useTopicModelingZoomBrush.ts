@@ -17,6 +17,8 @@ type TooltipLike<TTopic> = {
   x: number;
   y: number;
   topic: TTopic | null;
+  containerW: number;
+  containerH: number;
 };
 
 type Params<TTopic extends TopicPoint> = {

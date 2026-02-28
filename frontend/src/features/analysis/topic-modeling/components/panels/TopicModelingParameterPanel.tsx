@@ -1,6 +1,5 @@
 import { Label } from '../../../../../components/ui/label';
 import { Input } from '../../../../../components/ui/input';
-import { Checkbox } from '../../../../../components/ui/checkbox';
 import HelpIcon from '../../../../../components/help/HelpIcon';
 import NodeSelectionPanel from '../../../../../components/NodeSelectionPanel';
 import type { NodeColumnSelection } from '../../../../../hooks/useAutoNodeColumns';
@@ -18,8 +17,6 @@ type Props = {
   actionState: { runDisabled: boolean; clearDisabled: boolean };
   minTopicSize: number;
   onMinTopicSizeChange: (value: number) => void;
-  useCtTfidf: boolean;
-  onUseCtTfidfChange: (value: boolean) => void;
   isRunning: boolean;
   isClearing: boolean;
   onRun: () => void | Promise<void>;
@@ -40,8 +37,6 @@ export function TopicModelingParameterPanel({
   actionState,
   minTopicSize,
   onMinTopicSizeChange,
-  useCtTfidf,
-  onUseCtTfidfChange,
   isRunning,
   isClearing,
   onRun,
@@ -89,18 +84,6 @@ export function TopicModelingParameterPanel({
             step={1}
             value={minTopicSize}
             onChange={(event) => onMinTopicSizeChange(Math.max(2, Number(event.target.value) || 0))}
-          />
-        </div>
-
-        <div className="flex items-center justify-between rounded border px-3 py-2">
-          <div className="flex items-center gap-1">
-            <Label htmlFor="use-ctfidf" className="text-sm">Use c-TF-IDF</Label>
-            <HelpIcon targetKey="analysis.topic-modeling.use-ct-tfidf" />
-          </div>
-          <Checkbox
-            id="use-ctfidf"
-            checked={useCtTfidf}
-            onCheckedChange={(checked) => onUseCtTfidfChange(Boolean(checked))}
           />
         </div>
       </div>
