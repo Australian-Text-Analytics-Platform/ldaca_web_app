@@ -424,9 +424,7 @@ class WorkerTaskManager:
                             parents=[parent_node] if parent_node else [],
                         )
                         workspace.add_node(new_node)
-                        workspace.set_metadata(
-                            "modified_at", datetime.now().isoformat()
-                        )
+                        workspace.modified_at = datetime.now().isoformat()
                         target_dir = workspace_manager._resolve_workspace_dir(
                             user_id=user_id,
                             workspace_id=workspace_id,

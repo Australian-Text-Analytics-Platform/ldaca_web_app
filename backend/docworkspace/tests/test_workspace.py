@@ -126,21 +126,14 @@ class TestWorkspace:
         assert root_node not in leaf_nodes
 
     def test_metadata(self, workspace):
-        """Test workspace metadata operations."""
-        # Set metadata
-        workspace.set_metadata("description", "Example workspace")
-        workspace.set_metadata("created_at", "2024-01-01T00:00:00Z")
-        workspace.set_metadata("modified_at", "2024-01-02T00:00:00Z")
+        """Test workspace metadata operations via direct properties."""
+        workspace.description = "Example workspace"
+        workspace.created_at = "2024-01-01T00:00:00Z"
+        workspace.modified_at = "2024-01-02T00:00:00Z"
 
-        # Get metadata
-        assert workspace.get_metadata("description") == "Example workspace"
-        assert workspace.get_metadata("created_at") == "2024-01-01T00:00:00Z"
-        assert workspace.get_metadata("modified_at") == "2024-01-02T00:00:00Z"
-        assert workspace.get_metadata("nonexistent") is None
-
-        # Unsupported metadata should raise
-        with pytest.raises(ValueError):
-            workspace.set_metadata("project", "test")
+        assert workspace.description == "Example workspace"
+        assert workspace.created_at == "2024-01-01T00:00:00Z"
+        assert workspace.modified_at == "2024-01-02T00:00:00Z"
 
     def test_workspace_info_json(self, workspace, sample_df):
         """Test workspace info_json payload."""
@@ -204,9 +197,9 @@ class TestWorkspaceSerialization:
     def populated_workspace(self):
         """Create a workspace with some nodes and relationships."""
         workspace = Workspace("test_workspace")
-        workspace.set_metadata("description", "serialized workspace")
-        workspace.set_metadata("created_at", "2024-01-01T00:00:00Z")
-        workspace.set_metadata("modified_at", "2024-01-01T12:00:00Z")
+        workspace.description = "serialized workspace"
+        workspace.created_at = "2024-01-01T00:00:00Z"
+        workspace.modified_at = "2024-01-01T12:00:00Z"
 
         # Create nodes
         df1 = pl.DataFrame({
@@ -244,13 +237,9 @@ class TestWorkspaceSerialization:
             # Check workspace properties
             assert loaded_workspace.name == populated_workspace.name
             assert len(loaded_workspace.nodes) == len(populated_workspace.nodes)
-            assert (
-                loaded_workspace.get_metadata("description") == "serialized workspace"
-            )
-            assert loaded_workspace.get_metadata("created_at") == "2024-01-01T00:00:00Z"
-            assert (
-                loaded_workspace.get_metadata("modified_at") == "2024-01-01T12:00:00Z"
-            )
+            assert loaded_workspace.description == "serialized workspace"
+            assert loaded_workspace.created_at == "2024-01-01T00:00:00Z"
+            assert loaded_workspace.modified_at == "2024-01-01T12:00:00Z"
 
             # Check nodes exist
             root1 = loaded_workspace.get_node_by_name("root1")
@@ -263,7 +252,7 @@ class TestWorkspaceSerialization:
             assert len(root2.children) == 1  # merged
 
     def test_json_serialization(self, populated_workspace):
-        """Explicit JSON serialization test (legacy name retained for compatibility)."""
+        """Explicit JSON serialization test."""
         with tempfile.TemporaryDirectory() as tmpdir:
             meta_path = Path(tmpdir) / "metadata.json"
 
@@ -276,9 +265,7 @@ class TestWorkspaceSerialization:
             # Check workspace properties
             assert loaded_workspace.name == populated_workspace.name
             assert len(loaded_workspace.nodes) == len(populated_workspace.nodes)
-            assert (
-                loaded_workspace.get_metadata("description") == "serialized workspace"
-            )
+            assert loaded_workspace.description == "serialized workspace"
 
     def test_serialization_with_lazy_nodes(self):
         """Test serialization of workspace containing lazy nodes."""
@@ -512,15 +499,13 @@ class TestWorkspaceGraphOperations:
         workspace = Workspace("metadata_test")
 
         # Set metadata
-        workspace.set_metadata("description", "meta")
-        workspace.set_metadata("created_at", "2024-03-01T00:00:00Z")
-        workspace.set_metadata("modified_at", "2024-03-02T00:00:00Z")
+        workspace.description = "meta"
+        workspace.created_at = "2024-03-01T00:00:00Z"
+        workspace.modified_at = "2024-03-02T00:00:00Z"
 
-        # Get metadata
-        assert workspace.get_metadata("description") == "meta"
-        assert workspace.get_metadata("created_at") == "2024-03-01T00:00:00Z"
-        assert workspace.get_metadata("modified_at") == "2024-03-02T00:00:00Z"
-        assert workspace.get_metadata("nonexistent") is None
+        assert workspace.description == "meta"
+        assert workspace.created_at == "2024-03-01T00:00:00Z"
+        assert workspace.modified_at == "2024-03-02T00:00:00Z"
 
         # info_json now focuses on structural node counts only
         summary = workspace.info_json()

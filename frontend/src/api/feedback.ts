@@ -16,6 +16,3 @@ export interface FeedbackResponseBody {
 export const feedbackApi = {
   submit: (body: FeedbackRequestBody, headers: Record<string,string> = {}) => post<FeedbackResponseBody>('/feedback/submit', body, headers),
 };
-
-// Legacy compatibility name
-export const submitFeedback = feedbackApi.submit;

@@ -45,7 +45,7 @@ def test_workspace_manager_sets_cwd_on_create(tmp_path, monkeypatch):
         manager = WorkspaceManager()
         ws = Workspace(name="Workspace")
         ws.id = generate_workspace_id()
-        ws.set_metadata("modified_at", datetime.now().isoformat())
+        ws.modified_at = datetime.now().isoformat()
         target_dir = manager._resolve_workspace_dir(
             user_id="test",
             workspace_id=ws.id,

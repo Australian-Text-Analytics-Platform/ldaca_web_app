@@ -39,22 +39,7 @@ def update_workspace(
         if workspace is None:
             return None
 
-        has_resolver = all(
-            hasattr(workspace_manager, attr)
-            for attr in [
-                "_resolve_workspace_dir",
-                "_attach_workspace_dir",
-                "_set_cached_path",
-            ]
-        )
-
-        if not has_resolver:
-            legacy_save = getattr(workspace_manager, "save_workspace", None)
-            if callable(legacy_save):
-                legacy_save(user_id, workspace_id)
-            return None
-
-        workspace.set_metadata("modified_at", datetime.now().isoformat())
+        workspace.modified_at = datetime.now().isoformat()
         target_dir = workspace_manager._resolve_workspace_dir(
             user_id=user_id,
             workspace_id=workspace_id,
@@ -85,7 +70,7 @@ async def ensure_task_synced(
         - analysis task-result endpoints that bridge memory store and worker store
 
         Why:
-        - Keeps legacy in-memory task records consistent with worker completion.
+        - Keeps in-memory task records consistent with worker completion.
 
         Refactor note:
         - Similar sync logic appears across analysis routes; extraction to a shared

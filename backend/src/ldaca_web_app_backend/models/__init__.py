@@ -653,11 +653,7 @@ class TokenFrequencyNodeResult(BaseModel):
 
 
 class TokenFrequencyResponse(BaseModel):
-    """Unified response model for token frequency analysis.
-
-    NOTE: Legacy fields 'success' and 'status' have been removed in favor of a
-    single 'state' field. Valid values: 'successful', 'failed', 'running'.
-    """
+    """Unified response model for token frequency analysis."""
 
     state: Optional[str] = None  # 'successful', 'failed', 'running'
     message: str
@@ -725,13 +721,7 @@ class FeedbackRequest(BaseModel):
 
 
 class FeedbackResponse(BaseModel):
-    """Unified feedback response model.
-
-    Migration notes:
-    - Legacy field `success` (bool) replaced by `state` (str) with values: 'successful' | 'failed'
-    - Frontend should now branch on `state == 'successful'` instead of the boolean.
-    - `meta` remains free-form for auxiliary info.
-    """
+    """Unified feedback response model."""
 
     state: str  # 'successful' | 'failed'
     message: str

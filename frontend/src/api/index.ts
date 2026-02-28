@@ -5,6 +5,6 @@ export { filesApi } from './files';
 export { workspacesApi } from './workspaces';
 export { nodesApi } from './nodes';
 export { textApi } from './text';
-export { feedbackApi, submitFeedback } from './feedback';
+export { feedbackApi } from './feedback';
 export { configApi } from './config';
 

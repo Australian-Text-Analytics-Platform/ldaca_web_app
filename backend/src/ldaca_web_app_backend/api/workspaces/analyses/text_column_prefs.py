@@ -139,18 +139,3 @@ def resolve_text_columns_for_nodes(
             pass
 
     return resolved
-
-
-def guess_text_column(*, available_columns: list[str]) -> str | None:
-    """Guess a preferred text column from available names.
-
-    Used by:
-    - `api.workspaces.nodes` text-column fallback paths
-
-    Why:
-    - Preserves legacy helper API while reusing shared candidate precedence.
-    """
-    for candidate in COMMON_TEXT_COLUMN_CANDIDATES:
-        if candidate in available_columns:
-            return candidate
-    return None

@@ -132,39 +132,6 @@ class Workspace:
     # cycle detection, connectivity, topological order) removed to keep the
     # core minimal. Reintroduce only with strong use cases and dedicated tests.
 
-    # Metadata --------------------------------------------------------
-    def get_metadata(self, key: str) -> Any:
-        if key == "description":
-            return self.description
-        if key == "created_at":
-            return self.created_at
-        if key == "modified_at":
-            return self.modified_at
-        return None
-
-    def set_metadata(self, key: str, value: Any) -> None:
-        if key == "description":
-            self.description = value if value is not None else ""
-            return
-        if key == "created_at":
-            self.created_at = value
-            return
-        if key == "modified_at":
-            self.modified_at = value
-            return
-        raise ValueError(f"Unsupported metadata key: {key}")
-
-    @property
-    def metadata_keys(self) -> list[str]:
-        keys: list[str] = []
-        if self.description:
-            keys.append("description")
-        if self.created_at:
-            keys.append("created_at")
-        if self.modified_at:
-            keys.append("modified_at")
-        return keys
-
     # Dunder ----------------------------------------------------------
     def __repr__(self) -> str:  # pragma: no cover
         return (

@@ -15,8 +15,8 @@ def test_add_node_preserves_document_metadata(settings_override):
     with patch("ldaca_web_app_backend.core.utils.settings", settings_override):
         workspace = Workspace(name="docdf_ws")
         workspace.id = generate_workspace_id()
-        workspace.set_metadata("description", "LazyFrame workspace")
-        workspace.set_metadata("modified_at", datetime.now().isoformat())
+        workspace.description = "LazyFrame workspace"
+        workspace.modified_at = datetime.now().isoformat()
         target_dir = workspace_manager._resolve_workspace_dir(
             user_id="test",
             workspace_id=workspace.id,
@@ -43,7 +43,7 @@ def test_add_node_preserves_document_metadata(settings_override):
 
         assert node is not None, "Node creation with LazyFrame should succeed"
         node.document = "text"
-        current_ws.set_metadata("modified_at", datetime.now().isoformat())
+        current_ws.modified_at = datetime.now().isoformat()
         target_dir = workspace_manager._resolve_workspace_dir(
             user_id="test",
             workspace_id=workspace_id,

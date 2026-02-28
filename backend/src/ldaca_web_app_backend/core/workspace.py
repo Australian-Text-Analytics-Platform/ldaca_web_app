@@ -17,6 +17,7 @@ from typing import Any, Dict, Optional
 
 from docworkspace import Workspace  # type: ignore
 from docworkspace.workspace.io import read_workspace_metadata
+
 from ldaca_web_app_backend.models import WorkspaceSummary
 
 from .utils import (
@@ -236,7 +237,7 @@ class WorkspaceManager:
         cws = self.get_current_workspace(user_id)
         if cid == workspace_id and cws is not None:
             try:
-                cws.set_metadata("modified_at", datetime.now().isoformat())
+                cws.modified_at = datetime.now().isoformat()
                 target_dir = self._resolve_workspace_dir(
                     user_id=user_id,
                     workspace_id=cid,
@@ -360,7 +361,7 @@ class WorkspaceManager:
         if workspace_id is not None and workspace_id != cid:
             return False
         if save:
-            cws.set_metadata("modified_at", datetime.now().isoformat())
+            cws.modified_at = datetime.now().isoformat()
             target_dir = self._resolve_workspace_dir(
                 user_id=user_id,
                 workspace_id=cid,

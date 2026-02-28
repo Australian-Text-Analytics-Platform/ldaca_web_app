@@ -97,7 +97,7 @@ async def create_workspace(
     try:
         workspace = Workspace(name=request.name)
         workspace_id = workspace.id
-        workspace.set_metadata("description", request.description or "")
+        workspace.description = request.description or ""
 
         update_workspace(user_id, workspace_id, workspace)
         workspace_manager.set_current_workspace(user_id, workspace_id)

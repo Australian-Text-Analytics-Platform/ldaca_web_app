@@ -11,7 +11,7 @@ export interface NodeSnapshot {
 
 /**
  * Utility function to normalize schema from node info API response.
- * Handles both array format (NodeSummary) and object format (legacy).
+ * Handles both array and object schema payload formats.
  */
 export function normalizeSchemaFromInfo(info: unknown): Record<string, string> {
   const rawSchema = (info as Record<string, unknown>)?.schema;

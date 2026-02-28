@@ -84,11 +84,9 @@ class TestWorkspaceAPI:
         mock_workspace = Mock()
         mock_workspace.id = "workspace-123"
         mock_workspace.name = "Test Workspace"
-        mock_workspace.get_metadata.side_effect = lambda key: {
-            "description": "Test description",
-            "created_at": "2024-01-01T00:00:00Z",
-            "modified_at": "2024-01-01T12:00:00Z",
-        }.get(key)
+        mock_workspace.description = "Test description"
+        mock_workspace.created_at = "2024-01-01T00:00:00Z"
+        mock_workspace.modified_at = "2024-01-01T12:00:00Z"
         mock_workspace.info_json.return_value = {
             "id": "workspace-123",
             "name": "Test Workspace",

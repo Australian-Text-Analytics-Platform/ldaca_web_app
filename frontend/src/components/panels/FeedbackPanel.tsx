@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { submitFeedback } from '../../api/feedback';
+import { feedbackApi } from '../../api/feedback';
 import { useAuth } from '../../hooks/useAuth';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../ui/card';
@@ -40,7 +40,7 @@ export const FeedbackPanel: React.FC<FeedbackPanelProps> = ({ open, onClose }) =
 
     setSubmitting(true);
     try {
-      const response = await submitFeedback(
+      const response = await feedbackApi.submit(
         { subject, comments, email: email.trim() || undefined },
         isAuthenticated ? getAuthHeaders() : {}
       );
