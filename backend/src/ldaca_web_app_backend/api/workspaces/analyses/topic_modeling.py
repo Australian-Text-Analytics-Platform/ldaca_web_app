@@ -226,7 +226,7 @@ async def run_topic_modeling(
     analysis_tm = get_task_manager(user_id)
     analysis_request = AnalysisTopicModelingRequest(
         node_ids=request.node_ids,
-        node_columns=node_columns,
+        node_columns=request.node_columns,
         min_topic_size=request.min_topic_size,
     )
     analysis_tm.save_task(

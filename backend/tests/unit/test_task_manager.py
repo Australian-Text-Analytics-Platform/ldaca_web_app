@@ -10,8 +10,7 @@ from ldaca_web_app_backend.analysis.models import BaseAnalysisRequest
 def test_task_manager_roundtrip_and_current_mapping() -> None:
     """TaskManager stores tasks by task_id and manages current ids per tab."""
     user_id = str(uuid4())
-    workspace_id = str(uuid4())
-    manager = TaskManager(user_id, workspace_id)
+    manager = TaskManager(user_id)
 
     request = BaseAnalysisRequest()
     task_id = manager.create_task(request)

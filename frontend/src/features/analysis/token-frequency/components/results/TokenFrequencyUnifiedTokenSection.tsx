@@ -205,26 +205,27 @@ export const TokenFrequencyUnifiedTokenSection = ({
                     >
                       {(cloudWords) =>
                         cloudWords.map((word) => {
-                          const proportion = proportionByToken.get(word.text) ?? 0.5;
+                          const tokenText = word.text ?? '';
+                          const proportion = proportionByToken.get(tokenText) ?? 0.5;
                           return (
                             <Text
-                              key={word.text}
+                              key={tokenText}
                               fill={blend(Math.max(0, Math.min(1, proportion)))}
                               textAnchor="middle"
                               transform={`translate(${word.x}, ${word.y}) rotate(${word.rotate})`}
                               fontSize={word.size}
                               fontFamily={word.font}
                               className="cursor-pointer transition-colors"
-                              onClick={() => word.text && onTokenClick(word.text)}
+                              onClick={() => tokenText && onTokenClick(tokenText)}
                               onContextMenu={(event) => {
                                 event.preventDefault();
-                                if (word.text) {
-                                  onTokenRightClick(word.text, event);
+                                if (tokenText) {
+                                  onTokenRightClick(tokenText, event);
                                 }
                               }}
                               style={{ cursor: 'pointer' }}
                             >
-                              {word.text || ''}
+                              {tokenText}
                             </Text>
                           );
                         })

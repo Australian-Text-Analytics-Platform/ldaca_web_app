@@ -15,7 +15,7 @@ from ldaca_web_app_backend.core.workspace import workspace_manager
 
 
 def _simulate_token_frequency_completion(workspace_id: str):
-    task_manager = get_task_manager("test", workspace_id)
+    task_manager = get_task_manager("test")
     task_ids = task_manager.get_current_task_ids("token_frequencies")
     assert task_ids
     task = task_manager.get_task(task_ids[0])
@@ -81,7 +81,7 @@ def _stub_task_manager(monkeypatch):
         async def submit_task(self, **_kwargs):  # pragma: no cover
             return SimpleNamespace(id="test-task")
 
-    def fake_get_task_manager(self, _user_id, _workspace_id):
+    def fake_get_task_manager(self, _user_id):
         return ImmediateTaskManager()
 
     monkeypatch.setattr(

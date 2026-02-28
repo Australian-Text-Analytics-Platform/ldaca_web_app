@@ -232,7 +232,7 @@ class TestWorkspaceAPI:
             mock_delete.assert_called_once_with("test", "workspace-b")
 
     async def test_download_workspace_zip(self, authenticated_client, tmp_path):
-        """Workspace download kickoff submits task under USER_TASK_SCOPE."""
+        """Workspace download kickoff submits a running background task."""
         workspace_dir = tmp_path / "ws1"
         workspace_dir.mkdir(parents=True)
         (workspace_dir / "metadata.json").write_text(
@@ -281,8 +281,7 @@ class TestWorkspaceAPI:
             body = response.json()
             assert body["state"] == "running"
             assert body["metadata"]["task_id"] == "task-download-123"
-            assert body["metadata"]["task_scope"] == "user"
-            mock_get_tm.assert_called_once_with("test", "__user__")
+            mock_get_tm.assert_called_once_with("test")
             mock_tm.submit_task.assert_called_once()
 
     async def test_download_workspace_artifact(self, authenticated_client, tmp_path):
@@ -294,10 +293,8 @@ class TestWorkspaceAPI:
 
         mock_task_info = MagicMock()
         mock_task_info.status = TaskStatus.SUCCESSFUL
-        mock_task_info.metadata = {
-            "workspace_id": "ws-1",
-            "task_type": "workspace_download",
-        }
+        mock_task_info.workspace_id = "ws-1"
+        mock_task_info.task_type = "workspace_download"
         mock_task_info.result = {
             "artifact_path": str(artifact),
             "filename": "WS_One.zip",
@@ -329,8 +326,7 @@ class TestWorkspaceAPI:
             assert response.content == b"PK-fake-zip-content"
             # Artifact deleted after download
             assert not artifact.exists()
-            # Task looked up under USER_TASK_SCOPE
-            mock_get_tm.assert_called_once_with("test", "__user__")
+            mock_get_tm.assert_called_once_with("test")
 
     async def test_download_workspace_artifact_already_deleted(
         self, authenticated_client, tmp_path
@@ -340,10 +336,8 @@ class TestWorkspaceAPI:
 
         mock_task_info = MagicMock()
         mock_task_info.status = TaskStatus.SUCCESSFUL
-        mock_task_info.metadata = {
-            "workspace_id": "ws-1",
-            "task_type": "workspace_download",
-        }
+        mock_task_info.workspace_id = "ws-1"
+        mock_task_info.task_type = "workspace_download"
         mock_task_info.result = {
             "artifact_path": str(tmp_path / "gone.zip"),
             "filename": "WS_One.zip",
@@ -368,7 +362,7 @@ class TestWorkspaceAPI:
             )
 
             assert response.status_code == 410
-            mock_get_tm.assert_called_once_with("test", "__user__")
+            mock_get_tm.assert_called_once_with("test")
 
     async def test_upload_workspace_zip(self, authenticated_client, tmp_path):
         """Workspace upload ingests ZIP and writes workspace folder contents."""

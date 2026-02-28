@@ -13,7 +13,7 @@ async def test_quotation_clear_endpoint(authenticated_client):
     }
 
     workspace_id = "test-workspace"
-    task_manager = get_task_manager("test", workspace_id)
+    task_manager = get_task_manager("test")
     task_id = task_manager.create_task({"node_id": "node-1", "column": "document"})
 
     try:

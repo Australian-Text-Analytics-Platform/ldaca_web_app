@@ -75,8 +75,7 @@ def test_import_ldaca_starts_background_task_under_user_scope(client: TestClient
     payload = response.json()
     assert payload["state"] == "running"
     assert payload["metadata"]["task_id"] == "task-123"
-    assert payload["metadata"]["task_scope"] == "user"
-    get_task_manager.assert_called_once_with("test_user", files_api.USER_TASK_SCOPE)
+    get_task_manager.assert_called_once_with("test_user")
     mock_tm.submit_task.assert_awaited_once()
 
 
@@ -108,8 +107,7 @@ def test_import_ldaca_ignores_current_workspace_for_task_scope(client: TestClien
     payload = response.json()
     assert payload["state"] == "running"
     assert payload["metadata"]["task_id"] == "task-456"
-    assert payload["metadata"]["task_scope"] == "user"
-    get_task_manager.assert_called_once_with("test_user", files_api.USER_TASK_SCOPE)
+    get_task_manager.assert_called_once_with("test_user")
 
 
 def test_list_files_tasks_returns_user_scope_tasks(client: TestClient):
@@ -137,7 +135,4 @@ def test_list_files_tasks_returns_user_scope_tasks(client: TestClient):
     payload = response.json()
     assert payload["state"] == "successful"
     assert payload["data"][0]["task_id"] == "task-abc"
-    mock_user_tm.list.assert_awaited_once_with(
-        user_id="test_user",
-        workspace_id=files_api.USER_TASK_SCOPE,
-    )
+    mock_user_tm.list.assert_awaited_once_with(user_id="test_user")

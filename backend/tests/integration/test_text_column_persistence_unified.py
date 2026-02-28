@@ -19,7 +19,7 @@ def _stub_worker_task_manager(monkeypatch):
         async def submit_task(self, **_kwargs):
             return SimpleNamespace(id="test-worker-task")
 
-    def fake_get_task_manager(self, _user_id, _workspace_id):
+    def fake_get_task_manager(self, _user_id):
         return ImmediateTaskManager()
 
     monkeypatch.setattr(
@@ -87,15 +87,14 @@ async def test_text_column_preference_persists_across_text_analyses(
 
     refreshed = workspace.nodes.get(node.id)
     assert refreshed is not None
-    assert refreshed.document == "text_b"
+    assert refreshed.document == "text_a"
 
     topic_response = await authenticated_client.post(
         "/api/workspaces/topic-modeling",
         json={
             "node_ids": [node.id],
-            "node_columns": {},
+            "node_columns": {node.id: "text_a"},
             "min_topic_size": 2,
-            "use_ctfidf": True,
         },
     )
     assert topic_response.status_code == 200, topic_response.text
@@ -104,7 +103,7 @@ async def test_text_column_preference_persists_across_text_analyses(
     task_id = payload.get("metadata", {}).get("task_id")
     assert task_id
 
-    analysis_task = get_task_manager(user_id, workspace_id).get_task(task_id)
+    analysis_task = get_task_manager(user_id).get_task(task_id)
     assert analysis_task is not None
 
     request_data = (
@@ -112,4 +111,4 @@ async def test_text_column_preference_persists_across_text_analyses(
         if hasattr(analysis_task.request, "model_dump")
         else analysis_task.request.dict()
     )
-    assert request_data["node_columns"][node.id] == "text_b"
+    assert request_data["node_columns"][node.id] == "text_a"

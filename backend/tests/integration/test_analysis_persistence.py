@@ -69,7 +69,7 @@ def assert_successful_result(result_dict: dict):
 def _simulate_token_frequency_completion(workspace_id: str):
     """Run token frequencies synchronously and persist the result via TaskManager."""
 
-    task_manager = get_task_manager("test", workspace_id)
+    task_manager = get_task_manager("test")
     task_ids = task_manager.get_current_task_ids("token_frequencies")
     assert task_ids
     task = task_manager.get_task(task_ids[0])
@@ -116,8 +116,12 @@ def _simulate_token_frequency_completion(workspace_id: str):
 
 
 def _list_analysis_records(user_id: str, workspace_id: str, task: str | None = None):
-    task_manager = get_task_manager(user_id, workspace_id)
-    tasks = task_manager.get_all_tasks()
+    task_manager = get_task_manager(user_id)
+    tasks = [
+        t
+        for t in task_manager.get_all_tasks()
+        if getattr(t, "workspace_id", None) == workspace_id
+    ]
     if task:
         task_ids = set(task_manager.get_current_task_ids(task))
         tasks = [t for t in tasks if t.task_id in task_ids]
@@ -151,12 +155,20 @@ def _stub_task_manager(monkeypatch):
         async def submit_task(self, **_kwargs):  # pragma: no cover
             return SimpleNamespace(id="test-task")
 
-    def fake_get_task_manager(self, _user_id, _workspace_id):
+    def fake_get_task_manager(self, _user_id):
         return ImmediateTaskManager()
 
     monkeypatch.setattr(
         workspace_manager.__class__, "get_task_manager", fake_get_task_manager
     )
+
+
+@pytest.fixture(autouse=True)
+def _reset_analysis_task_manager_state():
+    task_manager = get_task_manager("test")
+    task_manager.clear_all()
+    yield
+    task_manager.clear_all()
 
 
 @pytest.mark.anyio
@@ -934,24 +946,23 @@ class TestAnalysisPersistenceEdgeCases:
         assert ws2_result.get("state") == "running"
         assert ws2_result.get("metadata", {}).get("task_id")
 
-        # Then: Each workspace has its own isolated analyses
+        # Then: Under single-active-workspace semantics, only the currently active
+        # workspace analysis remains in the per-user in-memory task manager.
         ws1_analyses = _list_analysis_records(test_user["id"], ws1_id)
         ws2_analyses = _list_analysis_records(test_user["id"], ws2_id)
 
         # Debug output if assertions fail
-        if len(ws1_analyses) != 1 or len(ws2_analyses) != 1:
+        if len(ws1_analyses) != 0 or len(ws2_analyses) != 1:
             print(f"\nDEBUG: ws1_analyses count: {len(ws1_analyses)}")
             print(f"DEBUG: ws2_analyses count: {len(ws2_analyses)}")
             print(f"DEBUG: ws1_id: {ws1_id}")
             print(f"DEBUG: ws2_id: {ws2_id}")
             print(f"DEBUG: test_user: {test_user}")
 
-        assert len(ws1_analyses) == 1
+        assert len(ws1_analyses) == 0
         assert len(ws2_analyses) == 1
 
-        # And: The analyses contain different request data
-        assert ws1_analyses[0].request["token_limit"] == DEFAULT_TOKEN_LIMIT
-        assert ws1_analyses[0].request.get("stop_words") == ["alpha"]
+        # And: The active workspace analysis carries the expected request data
         assert ws2_analyses[0].request["token_limit"] == DEFAULT_TOKEN_LIMIT
         assert ws2_analyses[0].request.get("stop_words") == ["beta"]
 

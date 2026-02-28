@@ -22,7 +22,7 @@ async def test_topic_modeling_result_returns_payload(
     user_id = "test"
     task_id = "topic-task-1"
 
-    task_manager = get_task_manager(user_id, workspace_id)
+    task_manager = get_task_manager(user_id)
     payload = {
         "topics": [
             {

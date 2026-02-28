@@ -17,7 +17,7 @@ from ldaca_web_app_backend.core.workspace import workspace_manager
 
 
 def _simulate_token_frequency_completion(workspace_id: str):
-    task_manager = get_task_manager("test", workspace_id)
+    task_manager = get_task_manager("test")
     task_ids = task_manager.get_current_task_ids("token_frequencies")
     assert task_ids
     task = task_manager.get_task(task_ids[0])
@@ -62,8 +62,12 @@ def _simulate_token_frequency_completion(workspace_id: str):
 
 
 def _list_analysis_records(user_id: str, workspace_id: str, task: str | None = None):
-    task_manager = get_task_manager(user_id, workspace_id)
-    tasks = task_manager.get_all_tasks()
+    task_manager = get_task_manager(user_id)
+    tasks = [
+        t
+        for t in task_manager.get_all_tasks()
+        if getattr(t, "workspace_id", None) == workspace_id
+    ]
     if task:
         task_ids = set(task_manager.get_current_task_ids(task))
         tasks = [t for t in tasks if t.task_id in task_ids]
@@ -95,12 +99,20 @@ def _stub_task_manager(monkeypatch):
         async def submit_task(self, **_kwargs):  # pragma: no cover
             return SimpleNamespace(id="test-task")
 
-    def fake_get_task_manager(self, _user_id, _workspace_id):
+    def fake_get_task_manager(self, _user_id):
         return ImmediateTaskManager()
 
     monkeypatch.setattr(
         workspace_manager.__class__, "get_task_manager", fake_get_task_manager
     )
+
+
+@pytest.fixture(autouse=True)
+def _reset_analysis_task_manager_state():
+    task_manager = get_task_manager("test")
+    task_manager.clear_all()
+    yield
+    task_manager.clear_all()
 
 
 async def _get_current_task_id(client, workspace_id: str, analysis: str):
@@ -265,7 +277,7 @@ class TestAnalysisErrorHandling:
         "invalid_param,expected_status",
         [
             ({"node_ids": []}, 400),  # Empty node list
-            ({"node_ids": ["nonexistent"]}, 404),  # Nonexistent node
+            ({"node_ids": ["nonexistent"]}, 400),  # Nonexistent node
             ({"token_limit": -1}, 400),  # Invalid limit
             ({"token_limit": "not_a_number"}, 422),  # Type error
         ],

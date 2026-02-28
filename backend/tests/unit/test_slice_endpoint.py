@@ -37,10 +37,14 @@ class DummyWorkspace:
     def __init__(self, nodes: dict[str, DummyNode], manager: "FakeWorkspaceManager"):
         self.nodes = nodes
         self._manager = manager
+        self.name = "dummy"
 
     def add_node(self, node: DummyNode):
         self.nodes[node.id] = node
         self._manager.add_calls.append({"node": node})
+
+    def save(self, _target_dir):
+        return None
 
 
 class FakeWorkspaceManager:
@@ -63,6 +67,24 @@ class FakeWorkspaceManager:
 
     def save_workspace(self, _user_id: str, _workspace_id: str) -> None:
         pass
+
+    def _resolve_workspace_dir(
+        self,
+        user_id: str,
+        workspace_id: str,
+        workspace_name: str,
+    ):
+        return "workspace_path"
+
+    def _attach_workspace_dir(self, workspace, target_dir):
+        return None
+
+    def _set_cached_path(self, user_id: str, workspace_id: str, target_dir):
+        return None
+
+    def set_current_workspace(self, user_id: str, workspace_id: str):
+        self.workspace_id = workspace_id
+        return True
 
 
 @pytest.fixture

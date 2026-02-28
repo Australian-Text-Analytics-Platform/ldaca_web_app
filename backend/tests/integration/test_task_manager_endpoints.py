@@ -11,7 +11,7 @@ from ldaca_web_app_backend.core.worker_task_manager import TaskInfo, WorkerTaskM
 async def test_task_manager_endpoints_roundtrip(authenticated_client, workspace_id):
     """Current endpoint returns task_id and task request/result endpoints serve data."""
     user_id = "test"
-    manager = get_task_manager(user_id, workspace_id)
+    manager = get_task_manager(user_id)
 
     task_id = manager.create_task({"node_ids": ["node-1"]})
     manager.set_current_task("token-frequencies", task_id)
@@ -42,7 +42,7 @@ async def test_task_manager_endpoints_roundtrip(authenticated_client, workspace_
 async def test_task_manager_saves_result_by_task_id(workspace_id):
     """WorkerTaskManager should persist results by task_id in TaskManager."""
     user_id = "test"
-    manager = get_task_manager(user_id, workspace_id)
+    manager = get_task_manager(user_id)
     task_id = manager.create_task({"node_ids": ["node-1"]})
 
     task_info = TaskInfo(id=task_id, future=Future())
@@ -58,4 +58,5 @@ async def test_task_manager_saves_result_by_task_id(workspace_id):
 
     task = manager.get_task(task_id)
     assert task is not None
+    assert task.result is not None
     assert task.result is not None

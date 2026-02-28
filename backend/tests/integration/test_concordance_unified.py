@@ -43,7 +43,7 @@ async def _wait_for_concordance_result(
 
 
 def _clear_concordance_state(user_id: str, workspace_id: str):
-    task_manager = get_task_manager(user_id, workspace_id)
+    task_manager = get_task_manager(user_id)
     task_manager.clear_all()
 
 
@@ -147,7 +147,7 @@ async def test_concordance_single_node_roundtrip(authenticated_client, workspace
     assert "descending" not in current_req_payload
     assert "pagination" not in current_req_payload
 
-    task_manager = get_task_manager("test", workspace_id)
+    task_manager = get_task_manager("test")
     current_task = task_manager.get_task(task_id)
     stored_request = (
         current_task.request.model_dump()

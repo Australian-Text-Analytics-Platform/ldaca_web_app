@@ -46,13 +46,13 @@ def _prime_workspace_state():
 
 def _cleanup_workspace_state():
     workspace_manager._current.pop(USER_ID, None)  # type: ignore[attr-defined]
-    task_manager = get_task_manager(USER_ID, WORKSPACE_ID)
+    task_manager = get_task_manager(USER_ID)
     task_manager.clear_all()
 
 
 def _seed_paginated_analysis(rows: List[Dict[str, Any]], context_length: int = 15):
     _prime_workspace_state()
-    task_manager = get_task_manager(USER_ID, WORKSPACE_ID)
+    task_manager = get_task_manager(USER_ID)
     request = QuotationRequest(node_id="node-1", column="text")
     task_id = task_manager.create_task(request)
     task = task_manager.get_task(task_id)
@@ -93,7 +93,7 @@ def seeded_paginated_quotation():
 @pytest.fixture
 def seeded_quotation_analysis():
     _prime_workspace_state()
-    task_manager = get_task_manager(USER_ID, WORKSPACE_ID)
+    task_manager = get_task_manager(USER_ID)
     request = QuotationRequest(node_id="node-1", column="text")
     task_id = task_manager.create_task(request)
     task = task_manager.get_task(task_id)
@@ -124,7 +124,7 @@ async def test_update_context_length_persists_preference(
     payload = response.json()
     assert payload["data"]["context_length"] == 42
 
-    task_manager = get_task_manager(USER_ID, WORKSPACE_ID)
+    task_manager = get_task_manager(USER_ID)
     task = task_manager.get_task(task_id)
     assert task is not None
     assert task.result.data["preferences"]["context_length"] == 42
@@ -134,7 +134,7 @@ async def test_update_context_length_persists_preference(
 async def test_update_context_length_clamps_bounds(authenticated_client):
     _prime_workspace_state()
 
-    task_manager = get_task_manager(USER_ID, WORKSPACE_ID)
+    task_manager = get_task_manager(USER_ID)
     request = QuotationRequest(node_id="node-1", column="text")
     task_id = task_manager.create_task(request)
     task = task_manager.get_task(task_id)
@@ -348,4 +348,5 @@ async def test_quotation_endpoint_recomputes_on_demand(
     payload = response.json()
     assert payload["pagination"]["page"] == 2
     assert payload["data"][0]["quote"] == "beta"
+    assert recompute_called is True
     assert recompute_called is True

@@ -1,9 +1,11 @@
 from types import SimpleNamespace
 
 import pytest
-from ldaca_web_app_backend.analysis.models import (AnalysisStatus,
-                                                   AnalysisTask,
-                                                   BaseAnalysisRequest)
+from ldaca_web_app_backend.analysis.models import (
+    AnalysisStatus,
+    AnalysisTask,
+    BaseAnalysisRequest,
+)
 from ldaca_web_app_backend.api.workspaces.utils import ensure_task_synced
 from ldaca_web_app_backend.core.workspace import workspace_manager
 
@@ -50,7 +52,7 @@ async def test_ensure_task_synced_updates_pending_task_on_worker_success(monkeyp
     monkeypatch.setattr(
         workspace_manager,
         "get_task_manager",
-        lambda _user_id, _workspace_id: _WorkerTaskManager(),
+        lambda _user_id: _WorkerTaskManager(),
     )
 
     synced = await ensure_task_synced(
@@ -89,7 +91,7 @@ async def test_ensure_task_synced_updates_pending_task_on_worker_failure(monkeyp
     monkeypatch.setattr(
         workspace_manager,
         "get_task_manager",
-        lambda _user_id, _workspace_id: _WorkerTaskManager(),
+        lambda _user_id: _WorkerTaskManager(),
     )
 
     synced = await ensure_task_synced(
