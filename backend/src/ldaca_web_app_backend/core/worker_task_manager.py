@@ -545,7 +545,7 @@ class WorkerTaskManager:
             from ..analysis.manager import get_task_manager
             from ..analysis.results import GenericAnalysisResult
 
-            task_manager = get_task_manager(user_id, workspace_id)
+            task_manager = get_task_manager(user_id)
             task = task_manager.get_task(task_info.id)
             if task:
                 task.complete(GenericAnalysisResult(result))

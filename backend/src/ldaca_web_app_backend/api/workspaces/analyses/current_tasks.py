@@ -24,7 +24,7 @@ async def get_current_task_ids_for_analysis(
     Returns:
         dict: {"task_ids": [...]}
     """
-    manager = get_analysis_task_manager(user_id, workspace_id)
+    manager = get_analysis_task_manager(user_id)
 
     task_ids: list[str] = []
     for key in analysis_keys:

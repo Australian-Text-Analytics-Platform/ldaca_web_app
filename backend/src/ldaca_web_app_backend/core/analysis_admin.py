@@ -131,7 +131,7 @@ async def clear_analyses_and_cache(
     """
 
     cleared_task_ids: list[str] = []
-    task_manager = get_task_manager(user_id, workspace_id)
+    task_manager = get_task_manager(user_id)
 
     if task is None:
         cleared_task_ids = task_manager.clear_all()

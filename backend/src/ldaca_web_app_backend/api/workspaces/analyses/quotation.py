@@ -115,7 +115,7 @@ async def quotation_task_request(
     workspace_id = workspace_manager.get_current_workspace_id(user_id)
     if not workspace_id:
         raise HTTPException(status_code=404, detail="No active workspace selected")
-    task_manager = get_task_manager(user_id, workspace_id)
+    task_manager = get_task_manager(user_id)
     task = task_manager.get_task(task_id)
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -145,7 +145,7 @@ async def quotation_task_result(
     ws = workspace_manager.get_current_workspace(user_id)
     if not workspace_id or ws is None:
         raise HTTPException(status_code=404, detail="No active workspace selected")
-    task_manager = get_task_manager(user_id, workspace_id)
+    task_manager = get_task_manager(user_id)
     task = task_manager.get_task(task_id)
     if not task or not task.result:
         return None
@@ -214,7 +214,7 @@ async def update_quotation_task_result(
     ws = workspace_manager.get_current_workspace(user_id)
     if not workspace_id or ws is None:
         raise HTTPException(status_code=404, detail="No active workspace selected")
-    task_manager = get_task_manager(user_id, workspace_id)
+    task_manager = get_task_manager(user_id)
     task = task_manager.get_task(task_id)
     if not task or not task.result:
         raise HTTPException(status_code=404, detail="No quotation analysis found")
@@ -339,7 +339,7 @@ async def get_quotation(
     if not workspace_id:
         raise HTTPException(status_code=404, detail="No active workspace selected")
 
-    task_manager = get_task_manager(user_id, workspace_id)
+    task_manager = get_task_manager(user_id)
 
     try:
         node = workspace_manager.get_current_workspace(user_id).nodes[node_id]

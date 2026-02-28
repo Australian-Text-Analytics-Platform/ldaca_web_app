@@ -1,29 +1,26 @@
-"""Analysis storage manager."""
+"""Analysis storage manager.
+
+Provides per-user in-memory storage for analysis task records.  Each
+``AnalysisTask`` tracks the ``workspace_id`` it was created for, so
+tasks can be bulk-cleared when a workspace is unloaded.
+"""
 
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 from pydantic import BaseModel
 
 from .models import AnalysisStatus, AnalysisTask, BaseAnalysisRequest
 
-# In-memory storage: (user_id, workspace_id) -> TaskManagerStore
-# Structure:
-# _TASK_MANAGER_STORE[workspace_key] = TaskManagerStore
+# In-memory storage: user_id -> TaskManagerStore
+_TASK_MANAGER_STORE: Dict[str, TaskManagerStore] = {}
 
 
 class TaskManagerStore:
-    """Per-workspace in-memory storage for analysis task records.
-
-    Used by:
-    - `TaskManager`
-
-    Why:
-    - Keeps task persistence lightweight and scoped by `(user_id, workspace_id)`.
-    """
+    """Per-user in-memory storage for analysis task records."""
 
     def __init__(self) -> None:
         self.tasks: Dict[str, AnalysisTask] = {}
@@ -58,36 +55,43 @@ class TaskManagerStore:
         self.current_task_ids.clear()
         return ids
 
-
-_TASK_MANAGER_STORE: Dict[Tuple[str, str], TaskManagerStore] = {}
+    def clear_workspace(self, workspace_id: str) -> List[str]:
+        """Remove all tasks belonging to *workspace_id* and return their IDs."""
+        to_remove = [
+            tid for tid, task in self.tasks.items() if task.workspace_id == workspace_id
+        ]
+        for tid in to_remove:
+            self.clear_task(tid)
+        return to_remove
 
 
 class TaskManager:
-    """Task storage keyed by task_id with per-tab current mapping."""
+    """Per-user task storage keyed by task_id with per-tab current mapping."""
 
-    def __init__(self, user_id: str, workspace_id: str) -> None:
+    def __init__(self, user_id: str) -> None:
         self.user_id = user_id
-        self.workspace_id = workspace_id
-        self.key = (user_id, workspace_id)
-        if self.key not in _TASK_MANAGER_STORE:
-            _TASK_MANAGER_STORE[self.key] = TaskManagerStore()
-        self.store = _TASK_MANAGER_STORE[self.key]
+        if user_id not in _TASK_MANAGER_STORE:
+            _TASK_MANAGER_STORE[user_id] = TaskManagerStore()
+        self.store = _TASK_MANAGER_STORE[user_id]
 
-    def create_task(self, request: BaseModel | dict | BaseAnalysisRequest) -> str:
+    def create_task(
+        self,
+        request: BaseModel | dict | BaseAnalysisRequest,
+    ) -> str:
         """Create and store a new pending analysis task.
 
-        Used by:
-        - analysis route handlers before launching work
-
-        Why:
-        - Gives routes a stable task id and normalized request snapshot.
+        The current workspace is resolved automatically from
+        ``workspace_manager`` so callers don't need to pass it.
         """
+        from ..core.workspace import workspace_manager
+
+        workspace_id = workspace_manager.get_current_workspace_id(self.user_id) or ""
         task_id = str(uuid4())
         normalized_request = self._normalize_request(request)
         task = AnalysisTask(
             task_id=task_id,
             user_id=self.user_id,
-            workspace_id=self.workspace_id,
+            workspace_id=workspace_id,
             request=normalized_request,
             status=AnalysisStatus.PENDING,
         )
@@ -121,6 +125,10 @@ class TaskManager:
     def clear_all(self) -> List[str]:
         return self.store.clear_all()
 
+    def clear_workspace(self, workspace_id: str) -> List[str]:
+        """Clear all tasks belonging to *workspace_id*."""
+        return self.store.clear_workspace(workspace_id)
+
     def get_all_tasks(self) -> List[AnalysisTask]:
         return self.store.get_all_tasks()
 
@@ -132,13 +140,11 @@ class TaskManager:
         return BaseAnalysisRequest.model_validate(request)
 
 
-def get_task_manager(user_id: str, workspace_id: str) -> TaskManager:
-    """Return the analysis task manager for a user/workspace pair.
+def get_task_manager(user_id: str) -> TaskManager:
+    """Return the analysis task manager for a user.
 
-    Used by:
-    - analysis API routes and worker result persistence paths
-
-    Why:
-    - Centralizes access to per-workspace in-memory analysis task storage.
+    A single user can only have one workspace loaded at a time, so the
+    manager is keyed by *user_id* only.  Individual tasks track their
+    ``workspace_id`` internally.
     """
-    return TaskManager(user_id, workspace_id)
+    return TaskManager(user_id)

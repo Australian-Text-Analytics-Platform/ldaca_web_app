@@ -250,7 +250,7 @@ async def run_sequential_analysis(
     if not workspace_id or ws is None:
         raise HTTPException(status_code=404, detail="No active workspace selected")
 
-    task_manager = get_task_manager(user_id, workspace_id)
+    task_manager = get_task_manager(user_id)
     existing_task_ids = task_manager.get_current_task_ids("sequential_analysis")
     existing_task = (
         task_manager.get_task(existing_task_ids[0]) if existing_task_ids else None
@@ -474,7 +474,7 @@ async def sequential_analysis_task_request(
     workspace_id = workspace_manager.get_current_workspace_id(user_id)
     if not workspace_id:
         raise HTTPException(status_code=404, detail="No active workspace selected")
-    task_manager = get_task_manager(user_id, workspace_id)
+    task_manager = get_task_manager(user_id)
     task = task_manager.get_task(task_id)
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -492,7 +492,7 @@ async def sequential_analysis_task_result(
     workspace_id = workspace_manager.get_current_workspace_id(user_id)
     if not workspace_id:
         raise HTTPException(status_code=404, detail="No active workspace selected")
-    task_manager = get_task_manager(user_id, workspace_id)
+    task_manager = get_task_manager(user_id)
 
     task = await ensure_task_synced(user_id, workspace_id, task_id, task_manager)
     if not task:
@@ -527,7 +527,7 @@ async def update_sequential_analysis_task_result(
     workspace_id = workspace_manager.get_current_workspace_id(user_id)
     if not workspace_id:
         raise HTTPException(status_code=404, detail="No active workspace selected")
-    task_manager = get_task_manager(user_id, workspace_id)
+    task_manager = get_task_manager(user_id)
     task = task_manager.get_task(task_id)
     if not task or not task.result:
         raise HTTPException(status_code=404, detail="No sequential analysis found")

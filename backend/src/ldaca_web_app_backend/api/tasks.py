@@ -49,17 +49,13 @@ async def clear_tasks(
     user_id = current_user["id"]
     tm = workspace_manager.get_task_manager(user_id)
 
-    task_info = await tm.get_task(task_id)
-    workspace_id = task_info.metadata.get("workspace_id") if task_info else None
-
     cleared_worker = await tm.clear_task(task_id)
 
     cleared_analysis = False
-    if workspace_id:
-        analysis_tm = get_analysis_task_manager(user_id, workspace_id)
-        if analysis_tm.get_task(task_id) is not None:
-            analysis_tm.clear_task(task_id)
-            cleared_analysis = True
+    analysis_tm = get_analysis_task_manager(user_id)
+    if analysis_tm.get_task(task_id) is not None:
+        analysis_tm.clear_task(task_id)
+        cleared_analysis = True
 
     return {
         "state": "successful",

@@ -98,7 +98,7 @@ async def clear_topic_modeling_results(
     if not workspace_id:
         raise HTTPException(status_code=404, detail="No active workspace selected")
 
-    task_manager = get_task_manager(user_id, workspace_id)
+    task_manager = get_task_manager(user_id)
     current_id = task_manager.get_current_task_ids("topic_modeling")
     if current_id:
         task_manager.clear_task(current_id[0])
@@ -223,7 +223,7 @@ async def run_topic_modeling(
             task_name="Topic Modeling",
         )
 
-    analysis_tm = get_task_manager(user_id, workspace_id)
+    analysis_tm = get_task_manager(user_id)
     analysis_request = AnalysisTopicModelingRequest(
         node_ids=request.node_ids,
         node_columns=node_columns,
@@ -271,7 +271,7 @@ async def topic_modeling_task_request(
     workspace_id = workspace_manager.get_current_workspace_id(user_id)
     if not workspace_id:
         raise HTTPException(status_code=404, detail="No active workspace selected")
-    task_manager = get_task_manager(user_id, workspace_id)
+    task_manager = get_task_manager(user_id)
     task = task_manager.get_task(task_id)
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -302,7 +302,7 @@ async def topic_modeling_task_result(
         raise HTTPException(status_code=404, detail="No active workspace selected")
 
     task = await ensure_task_synced(
-        user_id, workspace_id, task_id, get_task_manager(user_id, workspace_id)
+        user_id, workspace_id, task_id, get_task_manager(user_id)
     )
 
     if not task:
@@ -384,7 +384,7 @@ async def topic_modeling_detach_options(
     if not workspace_id or ws is None:
         raise HTTPException(status_code=404, detail="No active workspace selected")
 
-    analysis_tm = get_task_manager(user_id, workspace_id)
+    analysis_tm = get_task_manager(user_id)
     task = await ensure_task_synced(user_id, workspace_id, task_id, analysis_tm)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -453,7 +453,7 @@ async def detach_topic_modeling(
     if not workspace_id or ws is None:
         raise HTTPException(status_code=404, detail="No active workspace selected")
 
-    analysis_tm = get_task_manager(user_id, workspace_id)
+    analysis_tm = get_task_manager(user_id)
     task = await ensure_task_synced(user_id, workspace_id, task_id, analysis_tm)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")

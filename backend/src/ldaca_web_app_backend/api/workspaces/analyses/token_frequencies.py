@@ -63,7 +63,7 @@ async def clear_token_frequencies(
     if not workspace_id:
         raise HTTPException(status_code=404, detail="No active workspace selected")
 
-    task_manager = get_task_manager(user_id, workspace_id)
+    task_manager = get_task_manager(user_id)
     current_ids = task_manager.get_current_task_ids("token_frequencies")
     if current_ids:
         task_manager.clear_task(current_ids[0])
@@ -310,7 +310,7 @@ async def token_frequencies_task_request(
     workspace_id = workspace_manager.get_current_workspace_id(user_id)
     if not workspace_id:
         raise HTTPException(status_code=404, detail="No active workspace selected")
-    task_manager = get_task_manager(user_id, workspace_id)
+    task_manager = get_task_manager(user_id)
     task = task_manager.get_task(task_id)
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -328,7 +328,7 @@ async def token_frequencies_task_result(
     workspace_id = workspace_manager.get_current_workspace_id(user_id)
     if not workspace_id:
         raise HTTPException(status_code=404, detail="No active workspace selected")
-    task_manager = get_task_manager(user_id, workspace_id)
+    task_manager = get_task_manager(user_id)
 
     task = await ensure_task_synced(user_id, workspace_id, task_id, task_manager)
     if not task:
@@ -372,7 +372,7 @@ async def update_token_frequencies_task_result(
     workspace_id = workspace_manager.get_current_workspace_id(user_id)
     if not workspace_id:
         raise HTTPException(status_code=404, detail="No active workspace selected")
-    task_manager = get_task_manager(user_id, workspace_id)
+    task_manager = get_task_manager(user_id)
     task = task_manager.get_task(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="No token frequency task found")
@@ -543,7 +543,7 @@ async def calculate_token_frequencies(
         stop_words=requested_stop_words,
     )
 
-    task_manager = get_task_manager(user_id, workspace_id)
+    task_manager = get_task_manager(user_id)
     task_manager.save_task(
         AnalysisTask(
             task_id=task_info.id,
