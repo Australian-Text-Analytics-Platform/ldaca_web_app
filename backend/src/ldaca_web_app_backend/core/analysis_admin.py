@@ -145,7 +145,7 @@ async def clear_analyses_and_cache(
     tasks_removed = 0
     if cleared_task_ids:
         try:
-            tm = workspace_manager.get_task_manager(user_id, workspace_id)
+            tm = workspace_manager.get_task_manager(user_id)
             for task_id in cleared_task_ids:
                 try:
                     if await tm.clear_task(task_id):

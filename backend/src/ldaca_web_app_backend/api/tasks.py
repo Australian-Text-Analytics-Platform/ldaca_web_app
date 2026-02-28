@@ -16,7 +16,6 @@ from fastapi.responses import StreamingResponse
 from ..analysis.manager import get_task_manager as get_analysis_task_manager
 from ..core.auth import get_current_user
 from ..core.workspace import workspace_manager
-from .files import USER_TASK_SCOPE
 
 router = APIRouter(prefix="/tasks", tags=["task_streaming"])
 
@@ -27,7 +26,7 @@ async def list_tasks(
 ) -> Dict[str, Any]:
     """List tasks for current user."""
     user_id = current_user["id"]
-    tm = workspace_manager.get_task_manager(user_id, USER_TASK_SCOPE)
+    tm = workspace_manager.get_task_manager(user_id)
     tasks = await tm.list(user_id=user_id)
     return {
         "state": "successful",
@@ -48,7 +47,7 @@ async def clear_tasks(
     the current-task-id mapping) are removed.
     """
     user_id = current_user["id"]
-    tm = workspace_manager.get_task_manager(user_id, USER_TASK_SCOPE)
+    tm = workspace_manager.get_task_manager(user_id)
 
     task_info = await tm.get_task(task_id)
     workspace_id = task_info.metadata.get("workspace_id") if task_info else None
@@ -70,89 +69,6 @@ async def clear_tasks(
         },
         "message": "Task cleared successfully.",
     }
-
-
-def _event_scope(workspace_id: Optional[str]) -> str:
-    """Resolve task scope label from workspace identifier.
-
-    Used by:
-    - `_annotate_task`
-    - `_annotate_event`
-
-    Why:
-    - Keeps user-scope vs workspace-scope events distinguishable in one stream.
-    """
-    return "user" if workspace_id == USER_TASK_SCOPE else "workspace"
-
-
-def _annotate_task(task: Dict[str, Any]) -> Dict[str, Any]:
-    """Attach normalized task metadata for SSE consumers.
-
-    Used by:
-    - `_annotate_event`
-    - initial snapshot generation in `stream_tasks`
-
-    Why:
-    - Ensures each task includes scope/workspace hints for Task Center rendering.
-    """
-    annotated = dict(task)
-    metadata = dict((annotated.get("metadata") or {}))
-    meta_workspace_id = metadata.get("workspace_id")
-    task_workspace_id = (
-        meta_workspace_id
-        if isinstance(meta_workspace_id, str)
-        else task.get("workspace_id")
-    )
-    if not task_workspace_id:
-        task_workspace_id = USER_TASK_SCOPE
-
-    metadata.setdefault("task_scope", _event_scope(task_workspace_id))
-    metadata.setdefault(
-        "workspace_id",
-        None if task_workspace_id == USER_TASK_SCOPE else task_workspace_id,
-    )
-    annotated["metadata"] = metadata
-    return annotated
-
-
-def _annotate_event(event: Dict[str, Any]) -> Dict[str, Any]:
-    """Attach scope metadata to task events and nested task payloads.
-
-    Used by:
-    - `stream_tasks`
-
-    Why:
-    - Normalizes mixed event payloads from multiple task-manager scopes.
-    """
-    payload = dict(event)
-    event_workspace_id = payload.get("workspace_id")
-
-    if isinstance(payload.get("task"), dict):
-        task_metadata = payload["task"].get("metadata") or {}
-        event_workspace_id = task_metadata.get("workspace_id") or event_workspace_id
-
-    if not event_workspace_id:
-        event_workspace_id = USER_TASK_SCOPE
-
-    scope = _event_scope(event_workspace_id)
-
-    payload.setdefault("task_scope", scope)
-    payload.setdefault(
-        "workspace_id",
-        None if event_workspace_id == USER_TASK_SCOPE else event_workspace_id,
-    )
-
-    if isinstance(payload.get("task"), dict):
-        payload["task"] = _annotate_task(payload["task"])
-
-    if payload.get("type") == "tasks_snapshot" and isinstance(
-        payload.get("tasks"), list
-    ):
-        payload["tasks"] = [
-            _annotate_task(task) for task in payload["tasks"] if isinstance(task, dict)
-        ]
-
-    return payload
 
 
 async def _get_stream_user(
@@ -181,7 +97,7 @@ async def stream_tasks(
         - frontend Task Center SSE subscriber
 
         Why:
-        - Consolidates multi-scope task updates into one stream connection.
+        - Streams all per-user task updates through one connection.
 
         Refactor note:
         - Nested helper closures inside endpoint are sizeable; extraction to a small
@@ -190,20 +106,15 @@ async def stream_tasks(
     user_id = current_user["id"]
 
     async def event_generator():
-        tm = workspace_manager.get_task_manager(user_id, USER_TASK_SCOPE)
+        tm = workspace_manager.get_task_manager(user_id)
         queue = await tm.subscribe(user_id)
 
         try:
             tasks = await tm.list(user_id=user_id)
-            combined_tasks = [
-                _annotate_task(task) for task in tasks if isinstance(task, dict)
-            ]
-
             snapshot = {
                 "type": "tasks_snapshot",
-                "tasks": combined_tasks,
+                "tasks": [task for task in tasks if isinstance(task, dict)],
                 "timestamp": time.time(),
-                "task_scope": "all",
             }
             yield f"data: {json.dumps(snapshot)}\n\n"
 
@@ -217,7 +128,6 @@ async def stream_tasks(
                         heartbeat = {
                             "type": "heartbeat",
                             "timestamp": time.time(),
-                            "task_scope": "all",
                         }
                         yield f"data: {json.dumps(heartbeat)}\n\n"
                         last_heartbeat = time.time()
@@ -226,8 +136,7 @@ async def stream_tasks(
                 if not isinstance(event, dict):
                     continue
 
-                annotated = _annotate_event(event)
-                yield f"data: {json.dumps(annotated)}\n\n"
+                yield f"data: {json.dumps(event)}\n\n"
                 last_heartbeat = time.time()
 
         except asyncio.CancelledError:  # pragma: no cover
@@ -238,7 +147,6 @@ async def stream_tasks(
                 "type": "error",
                 "message": str(exc),
                 "timestamp": time.time(),
-                "task_scope": "all",
             }
             yield f"data: {json.dumps(error_data)}\n\n"
         finally:

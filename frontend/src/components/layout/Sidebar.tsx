@@ -312,11 +312,11 @@ const Sidebar: React.FC = () => {
   );
   const handleClearTask = async (task: SidebarTaskRecord) => {
     try {
-      const isUserTask = task.metadata?.task_scope === 'user';
-      if (isUserTask) {
+      const taskType = String(task.metadata?.task_type ?? '');
+      const isFileImportTask = taskType === 'ldaca_import';
+      if (isFileImportTask) {
         await filesApi.clearTasks({ task_id: task.task_id }, getAuthHeaders());
       } else {
-        if (!currentWorkspaceId) return;
         await workspacesApi.clearTasks({ task_id: task.task_id }, getAuthHeaders());
       }
       setTasks((prev) => prev.filter((item) => item.task_id !== task.task_id));

@@ -94,7 +94,7 @@ async def ensure_task_synced(
     }
 
     if is_running:
-        worker_tm = workspace_manager.get_task_manager(user_id, workspace_id)
+        worker_tm = workspace_manager.get_task_manager(user_id)
         try:
             tm_task = await worker_tm.get_task(task.task_id)
             if tm_task:

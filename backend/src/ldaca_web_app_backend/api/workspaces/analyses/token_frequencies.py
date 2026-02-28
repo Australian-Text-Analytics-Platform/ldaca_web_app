@@ -68,7 +68,7 @@ async def clear_token_frequencies(
     if current_ids:
         task_manager.clear_task(current_ids[0])
 
-    worker_tm = workspace_manager.get_task_manager(user_id, workspace_id)
+    worker_tm = workspace_manager.get_task_manager(user_id)
     if current_ids:
         await worker_tm.clear_task(current_ids[0])
 
@@ -418,7 +418,7 @@ async def calculate_token_frequencies(
     ws = workspace_manager.get_current_workspace(user_id)
     if not workspace_id or ws is None:
         raise HTTPException(status_code=404, detail="No active workspace selected")
-    tm = workspace_manager.get_task_manager(user_id, workspace_id)
+    tm = workspace_manager.get_task_manager(user_id)
 
     if not request.node_ids:
         raise HTTPException(

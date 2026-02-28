@@ -103,7 +103,7 @@ async def clear_topic_modeling_results(
     if current_id:
         task_manager.clear_task(current_id[0])
 
-    worker_tm = workspace_manager.get_task_manager(user_id, workspace_id)
+    worker_tm = workspace_manager.get_task_manager(user_id)
     if current_id:
         await worker_tm.clear_task(current_id[0])
 
@@ -183,7 +183,7 @@ async def run_topic_modeling(
             "text_column": column_name,
             "original_columns": available_columns,
         })
-    tm = workspace_manager.get_task_manager(user_id, workspace_id)
+    tm = workspace_manager.get_task_manager(user_id)
     submission_lock = _topic_submission_lock(user_id, workspace_id)
     async with submission_lock:
         # Match token-frequencies behavior: short-circuit when topic modeling is

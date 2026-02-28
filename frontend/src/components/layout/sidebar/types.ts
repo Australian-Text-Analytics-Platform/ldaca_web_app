@@ -12,7 +12,6 @@ export type SidebarTaskRecord = {
   state?: SidebarTaskStatus;
   metadata?: {
     name?: string;
-    task_scope?: string;
     [key: string]: unknown;
   };
   message?: string;

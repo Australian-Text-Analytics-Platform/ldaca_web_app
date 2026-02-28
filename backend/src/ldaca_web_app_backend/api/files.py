@@ -37,7 +37,6 @@ logger = logging.getLogger(__name__)
 
 README_FILENAME = "README.md"
 README_MAX_BYTES = 200_000
-USER_TASK_SCOPE = "__user__"
 
 
 def _read_sample_folder_readme(readme_path: Path) -> Optional[str]:
@@ -310,16 +309,14 @@ async def import_ldaca_dataset(
     """
     user_id = current_user["id"]
     try:
-        # LDaCA import is independent of a specific workspace and always uses
-        # a user-level task scope so /api/files/tasks* can track progress.
-        task_scope = USER_TASK_SCOPE
-        tm = workspace_manager.get_task_manager(user_id, task_scope)
+        # LDaCA import is independent of a specific workspace.
+        workspace_id = workspace_manager.get_current_workspace_id(user_id) or "global"
+        tm = workspace_manager.get_task_manager(user_id)
         task_info = await tm.submit_task(
             user_id=user_id,
-            workspace_id=task_scope,
+            workspace_id=workspace_id,
             task_type="ldaca_import",
             task_args={"url": request.url, "filename": request.filename},
-            metadata={"task_scope": "user"},
         )
 
         return {
@@ -327,7 +324,6 @@ async def import_ldaca_dataset(
             "message": "LDaCA import started",
             "metadata": {
                 "task_id": task_info.id,
-                "task_scope": "user",
             },
         }
     except Exception as e:
@@ -336,18 +332,24 @@ async def import_ldaca_dataset(
 
 @router.get("/tasks", response_model=FilesTasksListResponse)
 async def list_files_tasks(current_user: dict = Depends(get_current_user)):
-    """List user-scope worker tasks exposed via the files API.
+    """List file-import worker tasks exposed via the files API.
 
     Used by:
     - frontend import-task status polling
 
     Why:
-        - Keeps user-level import/download task stream separate from
-            workspace-analysis task streams.
+        - Exposes file-import task status via explicit task types.
     """
     user_id = current_user["id"]
-    tm = workspace_manager.get_task_manager(user_id, USER_TASK_SCOPE)
-    data = await tm.list(user_id=user_id, workspace_id=USER_TASK_SCOPE)
+    tm = workspace_manager.get_task_manager(user_id)
+    all_tasks = await tm.list(user_id=user_id)
+    data = [
+        task
+        for task in all_tasks
+        if isinstance(task, dict)
+        and isinstance(task.get("metadata"), dict)
+        and task["metadata"].get("task_type") == "ldaca_import"
+    ]
     return {
         "state": "successful",
         "data": data,
@@ -361,19 +363,19 @@ async def clear_files_tasks(
     task_id: Optional[str] = None,
     current_user: dict = Depends(get_current_user),
 ):
-    """Clear persisted user-scope task records.
+    """Clear persisted file-import task records.
 
     Used by:
     - frontend task-list cleanup actions
 
     Why:
-    - Removes completed/failed task clutter while keeping imported artifacts.
+    - Removes completed/failed import task clutter while keeping artifacts.
     """
     user_id = current_user["id"]
-    tm = workspace_manager.get_task_manager(user_id, USER_TASK_SCOPE)
+    tm = workspace_manager.get_task_manager(user_id)
     if task_id:
         task = await tm.get_task(task_id)
-        cleared = bool(task and task.metadata.get("workspace_id") == USER_TASK_SCOPE)
+        cleared = bool(task and task.metadata.get("task_type") == "ldaca_import")
         if cleared:
             cleared = await tm.clear_task(task_id)
         return {
@@ -381,11 +383,8 @@ async def clear_files_tasks(
             "data": {"cleared_count": 1 if cleared else 0},
             "message": "Task cleared successfully.",
         }
-    count = await tm.clear_tasks(
-        task_type=task_type,
-        user_id=user_id,
-        workspace_id=USER_TASK_SCOPE,
-    )
+    effective_task_type = task_type or "ldaca_import"
+    count = await tm.clear_tasks(task_type=effective_task_type, user_id=user_id)
     return {
         "state": "successful",
         "data": {"cleared_count": count},

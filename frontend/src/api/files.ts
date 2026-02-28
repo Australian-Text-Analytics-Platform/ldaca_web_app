@@ -46,7 +46,6 @@ export interface LdacaImportStartResponse {
   message: string;
   metadata: {
     task_id: string;
-    task_scope?: string;
   };
 }
 

@@ -136,7 +136,6 @@ class MessageResponse(BaseModel):
 
 class FilesTaskMetadataResponse(BaseModel):
     task_id: str
-    task_scope: str
 
 
 class FilesImportTaskStartResponse(BaseModel):

@@ -265,7 +265,7 @@ class WorkspaceManager:
             return True
         return False
 
-    def get_task_manager(self, user_id: str, workspace_id: str):
+    def get_task_manager(self, user_id: str):
         """Return or create worker-task manager bound to user.
 
         Used by:
@@ -286,21 +286,6 @@ class WorkspaceManager:
             tm = WorkerTaskManager()
             self._task_managers[user_id] = tm
         return tm
-
-    def list_user_task_scopes(self, user_id: str) -> list[str]:
-        """List workspace/task scopes that currently have task manager instances.
-
-        Includes any already-created task managers for this user plus the current
-        workspace (if set) so callers can proactively subscribe.
-        """
-        if user_id not in self._task_managers:
-            scopes: set[str] = set()
-        else:
-            scopes = set()
-        current_workspace_id = self.get_current_workspace_id(user_id)
-        if current_workspace_id:
-            scopes.add(current_workspace_id)
-        return sorted(scopes)
 
     def get_workspace_dir(self, user_id: str, workspace_id: str) -> Optional[Path]:
         cached = self._get_indexed_path(user_id, workspace_id)

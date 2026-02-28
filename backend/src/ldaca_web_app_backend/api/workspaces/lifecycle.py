@@ -17,7 +17,6 @@ from ...core.auth import get_current_user
 from ...core.utils import generate_workspace_id, validate_workspace_name
 from ...core.workspace import workspace_manager
 from ...models import WorkspaceCreateRequest, WorkspaceInfo, WorkspaceSummary
-from ..files import USER_TASK_SCOPE
 from .utils import update_workspace
 
 router = APIRouter(prefix="/workspaces", tags=["lifecycle"])
@@ -219,22 +218,17 @@ async def start_workspace_download(
     # Resolve a human-readable name for the task centre label
     ws_name = ws.name if ws else workspace_id
 
-    # Use USER_TASK_SCOPE so the download task appears in the unified
-    # SSE stream immediately (the stream always subscribes to this scope).
-    tm = workspace_manager.get_task_manager(user_id, USER_TASK_SCOPE)
+    tm = workspace_manager.get_task_manager(user_id)
     task_info = await tm.submit_task(
         user_id=user_id,
-        workspace_id=USER_TASK_SCOPE,
+        workspace_id=workspace_id,
         task_type="workspace_download",
         task_args={
             "target_workspace_id": workspace_id,
             "target_workspace_dir": str(workspace_dir),
         },
         task_name=f"Download: {ws_name}",
-        metadata={
-            "task_scope": "user",
-            "workspace_id": workspace_id,
-        },
+        metadata={"workspace_id": workspace_id},
     )
 
     return {
@@ -242,7 +236,6 @@ async def start_workspace_download(
         "message": "Workspace download started",
         "metadata": {
             "task_id": task_info.id,
-            "task_scope": "user",
         },
     }
 
@@ -266,8 +259,7 @@ async def download_workspace_artifact(
     if not workspace_id:
         raise HTTPException(status_code=404, detail="No active workspace selected")
 
-    # Download tasks live under USER_TASK_SCOPE for unified SSE visibility.
-    tm = workspace_manager.get_task_manager(user_id, USER_TASK_SCOPE)
+    tm = workspace_manager.get_task_manager(user_id)
     task_info = await tm.get_task(task_id)
     if task_info is None:
         raise HTTPException(status_code=404, detail="Task not found")
