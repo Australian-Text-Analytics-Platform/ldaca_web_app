@@ -377,6 +377,18 @@ class WorkerTaskManager:
             # Update task status
             task_info.update_status()
 
+            # Workers catch exceptions internally and return
+            # {"state": "failed", ...} as a normal value, so the future
+            # completes without error and update_status() marks SUCCESSFUL.
+            # Detect this and override the status.
+            if isinstance(result, dict) and result.get("state") == "failed":
+                task_info.status = TaskStatus.FAILED
+                task_info.error = result.get("error") or result.get(
+                    "message", "Worker reported failure"
+                )
+                task_info.progress = -1.0
+                task_info.progress_message = f"Failed: {task_info.error}"
+
             if task_info.status == TaskStatus.SUCCESSFUL:
                 task_type = task_info.task_type
 
@@ -388,8 +400,12 @@ class WorkerTaskManager:
 
                         from .workspace import workspace_manager
 
-                        # Result contains path and info
-                        data = result
+                        # Worker returns {"state": ..., "result": {actual payload}}
+                        data = (
+                            result.get("result", result)
+                            if isinstance(result, dict)
+                            else result
+                        )
                         parquet_path = data.get("parquet_path")
                         new_node_name = data.get("new_node_name")
                         parent_id = data.get("parent_node_id")

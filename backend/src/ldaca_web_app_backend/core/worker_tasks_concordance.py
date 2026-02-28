@@ -25,7 +25,6 @@ def run_concordance_detach_task(
 
     try:
         import os
-        import re
         from pathlib import Path
 
         import polars as pl
@@ -42,18 +41,24 @@ def run_concordance_detach_task(
         if progress_callback:
             progress_callback(0.5, "Generating concordance...")
 
-        escaped_word = re.escape(search_word)
-        pattern = escaped_word if not regex else search_word
-        if not case_sensitive:
-            pattern = f"(?i){pattern}"
-
-        left_col_name = f"{document_column}_left"
-        search_col_name = f"{document_column}_search"
-        right_col_name = f"{document_column}_right"
-
-        result = pt.StringNamespace.to_concordance(
-            pl.Series(corpus), pattern, num_left_tokens, num_right_tokens
-        ).filter(pl.col(search_col_name).is_not_null())
+        df = pl.DataFrame({document_column: corpus})
+        result = (
+            df
+            .select([
+                pl.all(),
+                pt.concordance(
+                    pl.col(document_column),
+                    search_word,
+                    num_left_tokens=num_left_tokens,
+                    num_right_tokens=num_right_tokens,
+                    regex=regex,
+                    case_sensitive=case_sensitive,
+                ).alias("concordance"),
+            ])
+            .explode("concordance")
+            .unnest("concordance")
+            .filter(pl.col("matched_text").is_not_null())
+        )
 
         if progress_callback:
             progress_callback(0.8, "Writing artifact...")
@@ -78,7 +83,7 @@ def run_concordance_detach_task(
                 "new_node_name": new_node_name,
                 "parent_node_id": parent_node_id,
                 "document_column": document_column,
-                "output_columns": [left_col_name, search_col_name, right_col_name],
+                "output_columns": ["left_context", "matched_text", "right_context"],
                 "record_count": len(result),
             },
             "message": "Concordance detach completed successfully",

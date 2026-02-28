@@ -45,6 +45,32 @@ const buildTabDescriptor = (node: WorkspaceSelectionTab['id'], label?: string, i
   isActive,
 });
 
+interface WorkspaceNodeDisplayLike {
+  id?: string;
+  name?: string;
+  label?: string;
+  data?: {
+    nodeName?: string;
+    label?: string;
+    node?: {
+      name?: string;
+    };
+  };
+}
+
+const resolveNodeDisplayLabel = (node: WorkspaceNodeDisplayLike | null | undefined): string | undefined => {
+  if (!node) {
+    return undefined;
+  }
+
+  return node.name
+    || node.data?.node?.name
+    || node.data?.nodeName
+    || node.label
+    || node.data?.label
+    || node.id;
+};
+
 export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
   const { currentWorkspaceId, nodeData } = useWorkspaceData();
   const {
@@ -111,7 +137,7 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
       if (!nodeId || nodeId === activeNodeId || !normalizedSelectedNodeIds.includes(nodeId)) {
         return;
       }
-      const reordered = [nodeId, ...normalizedSelectedNodeIds.filter((id) => id !== nodeId)];
+      const reordered = [...normalizedSelectedNodeIds.filter((id) => id !== nodeId), nodeId];
       selectNodes(reordered);
     },
     [activeNodeId, selectNodes, normalizedSelectedNodeIds]
@@ -141,7 +167,7 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
   const rowsLoaded = useMemo(() => (Array.isArray(nodeData.data) ? nodeData.data.length : 0), [nodeData.data]);
 
   const header: WorkspaceDataTableHeaderInfo = {
-    nodeLabel: selectedNode?.data?.nodeName || selectedNode?.data?.label || selectedNode?.id || 'Unknown node',
+    nodeLabel: resolveNodeDisplayLabel(selectedNode) || 'Unknown node',
     shapeLabel: `${displayShape[0]} × ${displayShape[1]}`,
     rowsLoaded,
     tabPosition,
@@ -152,7 +178,7 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
   const tabs: WorkspaceSelectionTabsState = {
     shouldShowTabs,
     tabs: displayTabIds.map((id) =>
-      buildTabDescriptor(id, nodeById.get(id)?.data?.nodeName || nodeById.get(id)?.data?.label || id, id === activeNodeId)
+      buildTabDescriptor(id, resolveNodeDisplayLabel(nodeById.get(id)) || id, id === activeNodeId)
     ),
     tabPosition,
     totalTabs: multiSelectedNodes.length,

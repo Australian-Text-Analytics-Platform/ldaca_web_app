@@ -93,17 +93,15 @@ export const useSelectionStore = create<SelectionStore>()(
       // Multiple node selection
       setSelectedNodes: (nodeIds) => set((state) => {
         state.selectedNodeIds = nodeIds;
-        // Update single selection to first item
-        state.selectedNodeId = nodeIds.length > 0 ? nodeIds[0] : null;
+        // Keep active selection aligned with rightmost tab (latest item)
+        state.selectedNodeId = nodeIds.length > 0 ? nodeIds[nodeIds.length - 1] : null;
       }),
       
       addNodeToSelection: (nodeId) => set((state) => {
         if (!state.selectedNodeIds.includes(nodeId)) {
           state.selectedNodeIds.push(nodeId);
-          // If no single selection, set it to this node
-          if (!state.selectedNodeId) {
-            state.selectedNodeId = nodeId;
-          }
+          // New selections are appended at rightmost tab and become active
+          state.selectedNodeId = nodeId;
         }
       }),
       
@@ -111,7 +109,9 @@ export const useSelectionStore = create<SelectionStore>()(
         state.selectedNodeIds = state.selectedNodeIds.filter(id => id !== nodeId);
         // If removing the current single selection, update it
         if (state.selectedNodeId === nodeId) {
-          state.selectedNodeId = state.selectedNodeIds.length > 0 ? state.selectedNodeIds[0] : null;
+          state.selectedNodeId = state.selectedNodeIds.length > 0
+            ? state.selectedNodeIds[state.selectedNodeIds.length - 1]
+            : null;
         }
       }),
       
@@ -120,13 +120,14 @@ export const useSelectionStore = create<SelectionStore>()(
         if (isSelected) {
           state.selectedNodeIds = state.selectedNodeIds.filter(id => id !== nodeId);
           if (state.selectedNodeId === nodeId) {
-            state.selectedNodeId = state.selectedNodeIds.length > 0 ? state.selectedNodeIds[0] : null;
+            state.selectedNodeId = state.selectedNodeIds.length > 0
+              ? state.selectedNodeIds[state.selectedNodeIds.length - 1]
+              : null;
           }
         } else {
           state.selectedNodeIds.push(nodeId);
-          if (!state.selectedNodeId) {
-            state.selectedNodeId = nodeId;
-          }
+          // Newly selected node should become active immediately
+          state.selectedNodeId = nodeId;
         }
       }),
       
