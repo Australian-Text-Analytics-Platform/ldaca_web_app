@@ -7,14 +7,9 @@ import {
   textApi,
 } from '../../../../api/text';
 import { restoreAnalysisLockFromRequest } from '../../common';
-import type { NodeColumnSelection } from '../../common';
+import type { NodeColumnSelection, NodePaginationState } from '../../common';
 
-export type PaginationState = Record<string, {
-  currentPage: number;
-  pageSize: number;
-  sortBy: string;
-  descending: boolean;
-}>;
+export type PaginationState = Record<string, NodePaginationState>;
 
 interface ConcordanceState {
   currentWorkspaceId: string | null;

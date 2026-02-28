@@ -51,6 +51,13 @@ export const useAnalysisTaskFlow = (options: UseAnalysisTaskFlowOptions): UseAna
     }
 
     if (resolvedFallbackBanner) {
+      // When the store already knows the task reached a terminal state and
+      // there are no running/queued tasks, the fallback is stale (result ref
+      // hasn't been updated yet in this render cycle).  Suppress it so the
+      // UI doesn't get stuck showing a "running" banner.
+      if (status.terminalTask && !status.runningTask && !status.queuedTask) {
+        return null;
+      }
       return {
         status: 'running' as const,
         taskId: resolvedFallbackBanner.taskId ?? effectiveActiveTaskId,

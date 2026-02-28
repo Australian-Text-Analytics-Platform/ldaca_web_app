@@ -10,7 +10,7 @@ import json
 import time
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Header, Query
 from fastapi.responses import StreamingResponse
 
 from ..analysis.manager import get_task_manager as get_analysis_task_manager
@@ -155,9 +155,24 @@ def _annotate_event(event: Dict[str, Any]) -> Dict[str, Any]:
     return payload
 
 
+async def _get_stream_user(
+    authorization: Optional[str] = Header(None),
+    token: Optional[str] = Query(None),
+):
+    """Resolve auth for the SSE stream endpoint.
+
+    Accepts token from the ``Authorization`` header (fetch clients) or a
+    ``token`` query parameter (native ``EventSource`` clients that cannot
+    set custom HTTP headers).
+    """
+    if not authorization and token:
+        authorization = f"Bearer {token}"
+    return await get_current_user(authorization)
+
+
 @router.get("/stream")
 async def stream_tasks(
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_get_stream_user),
 ):
     """Unified SSE stream for task center.
 

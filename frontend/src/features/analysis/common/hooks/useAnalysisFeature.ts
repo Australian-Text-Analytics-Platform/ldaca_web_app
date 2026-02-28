@@ -169,25 +169,34 @@ export function useAnalysisFeature<TResult = unknown>(
       expectedState: 'successful' | 'failed',
     ): Promise<void> => {
       const cfg = configRef.current;
-      if (!cfg.isTabActive || !cfg.workspaceId) return;
+      if (!cfg.isTabActive || !cfg.workspaceId) {
+        return;
+      }
 
       const resolvedTaskId = taskId ?? (await resolveTaskId());
-      if (!resolvedTaskId) return;
+      if (!resolvedTaskId) {
+        return;
+      }
 
       // In-flight dedup
-      if (fetchingTaskIdRef.current === resolvedTaskId) return;
+      if (fetchingTaskIdRef.current === resolvedTaskId) {
+        return;
+      }
       // Already-fetched dedup
       if (
         lastFetchedRef.current.taskId === resolvedTaskId &&
         lastFetchedRef.current.state === expectedState
-      )
+      ) {
         return;
+      }
 
       try {
         fetchingTaskIdRef.current = resolvedTaskId;
         const headers = cfg.getAuthHeaders();
         const result = await cfg.fetchResult(resolvedTaskId, headers);
-        if (!result) return;
+        if (!result) {
+          return;
+        }
 
         cfg.onResultFetched(result, resolvedTaskId);
 
@@ -196,7 +205,7 @@ export function useAnalysisFeature<TResult = unknown>(
           setIsRunning(false);
           lastFetchedRef.current = { taskId: resolvedTaskId, state };
         }
-      } catch {
+      } catch (_err) {
         // best effort
       } finally {
         fetchingTaskIdRef.current = null;

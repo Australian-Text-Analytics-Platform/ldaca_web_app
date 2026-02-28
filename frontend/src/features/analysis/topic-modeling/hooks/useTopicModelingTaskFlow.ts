@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import { toast } from 'sonner';
 import { textApi, type TopicModelingRequest, type TopicModelingDetachRequest, type TopicModelingDetachNodeOption } from '../../../../api/text';
 import { queryKeys } from '../../../../lib/queryKeys';
@@ -85,7 +85,7 @@ export function useTopicModelingTaskFlow({
   const [detachNodeOptions, setDetachNodeOptions] = useState<TopicModelingDetachNodeOption[]>([]);
   const [selectedDetachColumns, setSelectedDetachColumns] = useState<Record<string, string[]>>({});
 
-  const handleRun = useCallback(async () => {
+  const handleRun = async () => {
     if (!currentWorkspaceId || panelNodeIds.length === 0) return;
     if (runningRef.current) return;
     if (panelHasMissingColumns) {
@@ -156,25 +156,9 @@ export function useTopicModelingTaskFlow({
       setIsRunning(false);
       runningRef.current = false;
     }
-  }, [
-    currentWorkspaceId,
-    panelNodeIds,
-    panelHasMissingColumns,
-    runningRef,
-    lastFetchedRef,
-    setIsRunning,
-    setError,
-    setResultSafely,
-    effectiveNodeColumnSelections,
-    panelSelectedNodes,
-    lockWithSnapshots,
-    minTopicSize,
-    useCtTfidf,
-    getAuthHeaders,
-    queryClient,
-  ]);
+  };
 
-  const openDetachDialog = useCallback(async () => {
+  const openDetachDialog = async () => {
     if (!currentWorkspaceId) return;
     const taskId = await resolveTopicModelingTaskId();
     if (!taskId) {
@@ -200,18 +184,18 @@ export function useTopicModelingTaskFlow({
     } finally {
       setIsDetachLoading(false);
     }
-  }, [currentWorkspaceId, resolveTopicModelingTaskId, getAuthHeaders]);
+  };
 
-  const toggleDetachColumn = useCallback((nodeId: string, column: string, checked: boolean) => {
+  const toggleDetachColumn = (nodeId: string, column: string, checked: boolean) => {
     setSelectedDetachColumns((prev) => {
       const current = new Set(prev[nodeId] || []);
       if (checked) current.add(column);
       else current.delete(column);
       return { ...prev, [nodeId]: Array.from(current) };
     });
-  }, []);
+  };
 
-  const handleDetachConfirm = useCallback(async () => {
+  const handleDetachConfirm = async () => {
     if (!currentWorkspaceId) return;
     const taskId = await resolveTopicModelingTaskId();
     if (!taskId) {
@@ -249,14 +233,7 @@ export function useTopicModelingTaskFlow({
     } finally {
       setIsDetaching(false);
     }
-  }, [
-    currentWorkspaceId,
-    resolveTopicModelingTaskId,
-    detachNodeOptions,
-    selectedDetachColumns,
-    getAuthHeaders,
-    queryClient,
-  ]);
+  };
 
   return {
     handleRun,

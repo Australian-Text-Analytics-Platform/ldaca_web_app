@@ -8,6 +8,13 @@ export type CanonicalAnalysisTaskType =
   | 'concordance'
   | 'quotation';
 
+export interface NodePaginationState {
+  currentPage: number;
+  pageSize: number;
+  sortBy?: string;
+  descending: boolean;
+}
+
 export interface AnalysisTaskFlowRefreshContext {
   reason: 'terminal';
   task: TaskItem | null;

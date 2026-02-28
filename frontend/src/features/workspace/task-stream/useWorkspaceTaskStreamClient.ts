@@ -35,39 +35,18 @@ const clampRetryDelay = (attempt: number) => {
   return Math.min(backoff, STREAM_RETRY_MAX_MS);
 };
 
-const buildUrl = () => `${getApiBase()}/tasks/stream`;
-
-const parseSseFrame = (frame: string, onMessage: (message: TaskEventPayload) => void) => {
-  if (!frame.trim()) return;
-
-  const dataLines = frame
-    .split(/\r?\n/)
-    .map((line) => line.replace(/\r$/, ''))
-    .filter((line) => /^data:\s?/.test(line))
-    .map((line) => line.replace(/^data:\s?/, ''));
-
-  if (!dataLines.length) return;
-
-  const raw = dataLines.join('\n');
-  if (!raw.trim()) return;
-
-  try {
-    const parsed = JSON.parse(raw) as TaskEventPayload;
-    onMessage(parsed);
-  } catch (error) {
-    console.warn('Failed to parse SSE payload', raw, error);
-  }
-};
-
-const parseSseFrames = (buffer: string, onMessage: (message: TaskEventPayload) => void) => {
-  const frames = buffer.split(/\r?\n\r?\n/);
-  const remainder = frames.pop() ?? '';
-
-  for (const frame of frames) {
-    parseSseFrame(frame, onMessage);
-  }
-
-  return remainder;
+/**
+ * Build the SSE stream URL, embedding the Bearer token as a query parameter
+ * when present so that native EventSource (which cannot set custom headers)
+ * can authenticate.
+ */
+const buildStreamUrl = (authHeaders: Record<string, string>) => {
+  const base = `${getApiBase()}/tasks/stream`;
+  const authValue = authHeaders.Authorization ?? authHeaders.authorization;
+  if (!authValue) return base;
+  const token = authValue.startsWith('Bearer ') ? authValue.slice(7) : authValue;
+  if (!token) return base;
+  return `${base}?token=${encodeURIComponent(token)}`;
 };
 
 export const useWorkspaceTaskStreamClient = (
@@ -101,11 +80,8 @@ export const useWorkspaceTaskStreamClient = (
     }
 
     let active = true;
-    let abortController: AbortController | null = null;
+    let es: EventSource | null = null;
     let reconnectTimer: number | null = null;
-    let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
-    let buffer = '';
-    const decoder = new TextDecoder();
 
     const cleanupTimers = () => {
       if (reconnectTimer !== null) {
@@ -115,17 +91,9 @@ export const useWorkspaceTaskStreamClient = (
     };
 
     const closeStream = () => {
-      if (reader) {
-        try {
-          reader.releaseLock();
-        } catch (_) {
-          /* noop */
-        }
-        reader = null;
-      }
-      if (abortController) {
-        abortController.abort();
-        abortController = null;
+      if (es) {
+        es.close();
+        es = null;
       }
       cleanupTimers();
     };
@@ -151,66 +119,44 @@ export const useWorkspaceTaskStreamClient = (
       }
     };
 
-    const readLoop = async () => {
-      if (!reader) return;
-      try {
-        while (active) {
-          const { done, value } = await reader.read();
-          if (done) {
-            // Flush any final frame even when the stream ends without
-            // a trailing blank-line delimiter.
-            parseSseFrame(buffer, invokeOnEvent);
-            buffer = '';
-            break;
-          }
-          buffer += decoder.decode(value, { stream: true });
-          buffer = parseSseFrames(buffer, invokeOnEvent);
-        }
-      } catch (error) {
-        if (active) {
-          console.warn('Task stream read failed', error);
-          setState((prev) => ({
-            ...prev,
-            status: 'error',
-            error: 'Stream processing error',
-          }));
-        }
-      }
-    };
-
-    const connect = async (attempt: number) => {
+    const connect = (attempt: number) => {
       if (!active) return;
+      closeStream();
       setState({ status: 'connecting', error: null, reconnectAttempt: attempt, lastEventTimestamp: null });
 
       try {
-        abortController = new AbortController();
-        const response = await fetch(buildUrl(), {
-          method: 'GET',
-          headers: {
-            Accept: 'text/event-stream',
-            'Cache-Control': 'no-cache',
-            ...getAuthHeaders(),
-          },
-          credentials: 'include',
-          signal: abortController.signal,
-        });
+        const url = buildStreamUrl(getAuthHeaders());
+        const source = new EventSource(url, { withCredentials: true });
+        es = source;
 
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
+        source.onopen = () => {
+          if (!active) { source.close(); return; }
+          setState({ status: 'open', error: null, reconnectAttempt: 0, lastEventTimestamp: Date.now() });
+        };
 
-        if (!response.body) {
-          throw new Error('Task stream response body missing');
-        }
+        source.onmessage = (event: MessageEvent<string>) => {
+          if (!active) { source.close(); return; }
+          try {
+            const parsed = JSON.parse(event.data) as TaskEventPayload;
+            invokeOnEvent(parsed);
+          } catch (error) {
+            console.warn('Failed to parse SSE payload', event.data, error);
+          }
+        };
 
-        reader = response.body.getReader();
-        buffer = '';
-        setState({ status: 'open', error: null, reconnectAttempt: attempt, lastEventTimestamp: Date.now() });
-        await readLoop();
-
-        if (active) {
-          throw new Error('Task stream closed unexpectedly');
-        }
+        // Disable EventSource auto-reconnect — use our own backoff logic.
+        source.onerror = () => {
+          if (!active) { source.close(); return; }
+          source.close();
+          es = null;
+          setState({
+            status: 'error',
+            error: 'EventSource connection error',
+            reconnectAttempt: attempt,
+            lastEventTimestamp: Date.now(),
+          });
+          scheduleReconnect(attempt);
+        };
       } catch (error) {
         if (!active) return;
         const message = error instanceof Error ? error.message : 'Connection error';

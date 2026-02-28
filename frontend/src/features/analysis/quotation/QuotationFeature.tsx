@@ -38,7 +38,15 @@ import {
 } from '../../../components/ui/table';
 import { ScrollArea } from '../../../components/ui/scroll-area';
 import { ArrowUpDown, Loader2, Search, Trash2, Unlink } from 'lucide-react';
-import {\n  getNodeIdentifier,\n  getServerEngineConfig,\n  hasLockedParameterDiff,\n  restoreAnalysisLockFromRequest,\n  useAnalysisLock,\n  useAnalysisFeature,\n  getAnalysisActionState,\n} from '../common';
+import {
+  getNodeIdentifier,
+  getServerEngineConfig,
+  hasLockedParameterDiff,
+  restoreAnalysisLockFromRequest,
+  useAnalysisLock,
+  useAnalysisFeature,
+  getAnalysisActionState,
+} from '../common';
 
 import { AnalysisPagination } from '../../../components/AnalysisPagination';
 import { useQuotationTaskFlow } from './hooks/useQuotationTaskFlow';

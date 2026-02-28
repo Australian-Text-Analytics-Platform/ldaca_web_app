@@ -6,7 +6,7 @@ import type {
 } from '../../../../api/text';
 import { textApi } from '../../../../api/text';
 import { getNodeIdentifier, restoreAnalysisLockFromRequest } from '../../common';
-import type { NodeColumnSelection } from '../../common';
+import type { NodeColumnSelection, NodePaginationState } from '../../common';
 
 const DEFAULT_PAGE_SIZE = 100;
 
@@ -21,13 +21,6 @@ type ResolvedEnginePayload =
       isValid: boolean;
       failureReason: string | null;
     };
-
-interface NodePaginationState {
-  currentPage: number;
-  pageSize: number;
-  sortBy?: string;
-  descending: boolean;
-}
 
 function getErrorMessage(error: any): string {
   const detail =

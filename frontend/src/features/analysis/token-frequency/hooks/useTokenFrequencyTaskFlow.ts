@@ -2,11 +2,12 @@ import { toast } from 'sonner';
 import { textApi, type TokenFrequencyRequest, type TokenFrequencyResponse } from '@/api/text';
 import type { NodeColumnSelection } from '@/hooks/useAutoNodeColumns';
 import { resolveTokenFrequencyNodeContext, type TokenFrequencyAnalysisParams } from '@/components/tabs/tokenFrequencyHelpers';
-import { restoreAnalysisLockFromRequest } from '../../common';
+import { restoreAnalysisLockFromRequest, type WorkspaceNodeLike } from '../../common';
 
 interface AnalysisState {
   currentWorkspaceId: string | null;
-  selectedNodes: Array<{ id: string }>;
+  panelNodeIds: string[];
+  panelSelectedNodes: WorkspaceNodeLike[];
   effectiveNodeColumnSelections: NodeColumnSelection[];
   stopWords: string;
   results: TokenFrequencyResponse | null;
@@ -50,7 +51,8 @@ type UseTokenFrequencyTaskFlowParams = {
 export const useTokenFrequencyTaskFlow = ({
   state: {
     currentWorkspaceId,
-    selectedNodes,
+    panelNodeIds,
+    panelSelectedNodes,
     effectiveNodeColumnSelections,
     stopWords,
     results,
@@ -82,7 +84,7 @@ export const useTokenFrequencyTaskFlow = ({
   },
 }: UseTokenFrequencyTaskFlowParams) => {
   const handleAnalyze = async () => {
-    if (!currentWorkspaceId || selectedNodes.length === 0) {
+    if (!currentWorkspaceId || panelNodeIds.length === 0) {
       return;
     }
     if (runningRef.current) return;
@@ -112,7 +114,7 @@ export const useTokenFrequencyTaskFlow = ({
       });
 
       const request: TokenFrequencyRequest = {
-        node_ids: selectedNodes.slice(0, 2).map((node) => node.id),
+        node_ids: panelNodeIds.slice(0, 2),
         node_columns: nodeColumns,
         stop_words: stopWordsArray,
       };
@@ -173,7 +175,7 @@ export const useTokenFrequencyTaskFlow = ({
     const resolvedContext = resolveTokenFrequencyNodeContext({
       lastCompareNodeIds,
       analysisParams,
-      selectedNodes: selectedNodes.map((node) => ({ id: node.id })),
+      selectedNodes: panelSelectedNodes.map((node) => ({ id: node.id })),
       nodeColumnSelections: effectiveNodeColumnSelections,
       maxNodes: 2,
     });
@@ -181,9 +183,8 @@ export const useTokenFrequencyTaskFlow = ({
     const fallbackNodeIds: string[] =
       resolvedContext.nodeIds.length > 0
         ? resolvedContext.nodeIds
-        : selectedNodes
+        : panelNodeIds
             .slice(0, 2)
-            .map((node) => node.id)
             .filter((id): id is string => typeof id === 'string' && id.trim().length > 0);
 
     const fallbackSelections: NodeColumnSelection[] =

@@ -38,7 +38,7 @@ import {
 import {
   pruneTasksById,
 } from '../../../hooks/analysisTaskUtils';
-import { useConcordanceTaskFlow } from './hooks/useConcordanceTaskFlow';
+import { useConcordanceTaskFlow, type PaginationState } from './hooks/useConcordanceTaskFlow';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../../components/ui/dialog';
 import { AnalysisPagination } from '../../../components/AnalysisPagination';
 
@@ -224,12 +224,7 @@ const ConcordanceFeature: React.FC = () => {
   const lastPendingConcordanceRef = useRef<number | null>(null);
 
   // Pagination and sorting state - separate for each node
-  const [nodePagination, setNodePagination] = useState<Record<string, {
-    currentPage: number;
-    pageSize: number;
-    sortBy: string;
-    descending: boolean;
-  }>>({});
+  const [nodePagination, setNodePagination] = useState<PaginationState>({});
   
   // Individual node loading states for pagination/sorting (separate from main search)
   const [nodeLoading, setNodeLoading] = useState<Record<string, boolean>>({});

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { textApi, type TokenFrequencyResponse } from '../../../api/text';
 import { useAuth } from '../../../hooks/useAuth';
 import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
@@ -11,6 +11,8 @@ import {
   normalizeCommaSeparatedWords,
   normalizeRequestStopWords,
   parseAnalysisNodeRequest,
+  getNodeIdentifier,
+  restoreAnalysisLockFromRequest,
 } from '../common';
 import {
   buildResponseDisplayNameHints,
@@ -28,6 +30,7 @@ import {
   useAnalysisLock,
   useAnalysisFeature,
   useSafeResult,
+  useNodeColorManagement,
 } from '../common';
 import { pruneTasksById } from '../../../hooks/analysisTaskUtils';
 import { TokenFrequencyParameterPanel } from './components/panels/TokenFrequencyParameterPanel';
@@ -39,7 +42,7 @@ const DEFAULT_TOKEN_LIMIT = 100;
 const MAX_TOKEN_LIMIT_INPUT = 100;
 const UNIFIED_WORDCLOUD_HEIGHT = 480;
 
-const PALETTE = ['#3b82f6', '#ef4444', '#10b981', '#a855f7', '#f59e0b'];
+const TOKEN_FREQUENCY_PALETTE = ['#3b82f6', '#ef4444', '#10b981', '#a855f7', '#f59e0b'];
 
 const TokenFrequencyFeature = () => {
   const { getAuthHeaders } = useAuth();
@@ -52,6 +55,10 @@ const TokenFrequencyFeature = () => {
     nodeColumnSelections,
     setNodeColumnSelection,
     setNodeColumnSelections,
+    recomputeAutoColumns,
+    activeNodeIds,
+    activeNodeColumnSelections,
+    panelSelectedNodes,
   } = useAnalysisLock({
     analysisType: 'token_frequencies',
     workspaceId: currentWorkspace?.id ?? null,
@@ -72,7 +79,16 @@ const TokenFrequencyFeature = () => {
   const [statsSortDirection, setStatsSortDirection] = useState<'asc' | 'desc'>('desc');
   const [statsPage, setStatsPage] = useState<number>(1);
   const [statsRowsPerPage, setStatsRowsPerPage] = useState<number>(50);
-  const [nodeColors, setNodeColors] = useState<Record<string, string>>({});
+
+  const panelNodeIds = panelSelectedNodes
+    .slice(0, 2)
+    .map((node, idx) => getNodeIdentifier(node, idx) || activeNodeIds[idx])
+    .filter((id): id is string => Boolean(id));
+
+  const { nodeColors, handleColorChange, defaultPalette } = useNodeColorManagement({
+    activeNodeIds: panelNodeIds.slice(0, 2),
+    palette: TOKEN_FREQUENCY_PALETTE,
+  });
 
   const wordCloudRefs = useRef<Record<string, SVGSVGElement | null>>({});
   const unifiedCloudContainerRef = useRef<HTMLDivElement | null>(null);
@@ -98,6 +114,8 @@ const TokenFrequencyFeature = () => {
     resultRef,
     fetchResult: (taskId, headers) =>
       textApi.getTokenFrequenciesTaskResult(taskId, headers) as Promise<TokenFrequencyResponse>,
+    fetchRequest: async (taskId, headers) =>
+      textApi.getTokenFrequenciesTaskRequest(taskId, headers),
     onResultFetched: (result) => setResultSafely(result),
     onHydratedResult: (result) => {
       if (!result) return;
@@ -117,11 +135,31 @@ const TokenFrequencyFeature = () => {
         setStopWords(normalizedStops.join(', '));
       }
     },
+    onHydratedRequest: async (requestPayload) => {
+      const req = (requestPayload as any)?.data ?? requestPayload;
+      if (!req) return;
+      const nodeIds: string[] = Array.isArray(req.node_ids) ? req.node_ids.slice(0, 2) : [];
+      const node_columns: Record<string, string> = req.node_columns || {};
+      const sels = nodeIds.map((id: string) => ({ nodeId: id, column: node_columns[id] || '' }));
+      setNodeColumnSelections(sels, { replace: true });
+      if (nodeIds.length && currentWorkspaceId) {
+        try {
+          await restoreAnalysisLockFromRequest({
+            workspaceId: currentWorkspaceId,
+            requestData: req,
+            getAuthHeaders,
+            lockWithSnapshots,
+            maxNodes: 2,
+          });
+        } catch { /* ignore */ }
+      }
+    },
     onCleared: () => {
       setResultSafely(null);
       unlockSelection();
       setLastCompareNodeIds([]);
       resetPreferenceUiState();
+      recomputeAutoColumns();
     },
     pruneGlobalTasks: (taskIds) =>
       setTasks((prev: any[]) =>
@@ -129,22 +167,10 @@ const TokenFrequencyFeature = () => {
       ),
   });
 
-  const effectiveNodeColumnSelections = nodeColumnSelections;
-
-  useEffect(() => {
-    const next: Record<string, string> = {};
-    selectedNodes.slice(0, 2).forEach((node, index) => {
-      next[node.id] = nodeColors[node.id] ?? PALETTE[index] ?? PALETTE[0];
-    });
-    setNodeColors((prev) => ({ ...next, ...prev }));
-  }, [selectedNodes.map((node) => node.id).join('|')]);
+  const effectiveNodeColumnSelections = isLocked ? activeNodeColumnSelections : nodeColumnSelections;
 
   const getColorForNode = (nodeId: string, index = 0) => {
-    return nodeColors[nodeId] ?? PALETTE[index % PALETTE.length];
-  };
-
-  const setNodeColor = (nodeId: string, color: string) => {
-    setNodeColors((prev) => ({ ...prev, [nodeId]: color }));
+    return nodeColors[nodeId] ?? defaultPalette[index % defaultPalette.length];
   };
 
   const backendTokenLimit = deriveBackendTokenLimit(results);
@@ -178,11 +204,11 @@ const TokenFrequencyFeature = () => {
     maxTokenLimitInput: MAX_TOKEN_LIMIT_INPUT,
   });
 
-  const lockedNodeNameMap = isLocked ? buildSelectionNameById(selectedNodes as any, selectedNodes as any) : {};
+  const lockedNodeNameMap = isLocked ? buildSelectionNameById(panelSelectedNodes as any, panelSelectedNodes as any) : {};
 
   const nodeIdToName = (() => {
     const map: Record<string, string> = {};
-    selectedNodes.forEach((node: any) => {
+    panelSelectedNodes.forEach((node: any) => {
       map[node.id] = node.name || node.label || node.id;
     });
     return map;
@@ -191,7 +217,8 @@ const TokenFrequencyFeature = () => {
   const { handleAnalyze, handleTokenClick, handleTokenRightClick } = useTokenFrequencyTaskFlow({
     state: {
       currentWorkspaceId,
-      selectedNodes,
+      panelNodeIds,
+      panelSelectedNodes,
       effectiveNodeColumnSelections,
       stopWords,
       results,
@@ -283,7 +310,7 @@ const TokenFrequencyFeature = () => {
   };
 
   const hasIncompleteSelections = effectiveNodeColumnSelections.some((selection) => !selection.column);
-  const displayNodeCount = selectedNodes.length;
+  const displayNodeCount = panelSelectedNodes.length;
   const typedServerRequest = serverRequest as
     | {
         node_ids?: string[];
@@ -304,6 +331,7 @@ const TokenFrequencyFeature = () => {
   });
 
   const handleColumnChange = (nodeId: string, column: string) => {
+    if (isLocked) return;
     setNodeColumnSelection(nodeId, column);
   };
 
@@ -316,18 +344,18 @@ const TokenFrequencyFeature = () => {
   return (
     <div className="space-y-6">
       <TokenFrequencyParameterPanel
-        panelSelectedNodes={selectedNodes as any[]}
+        panelSelectedNodes={panelSelectedNodes as any[]}
         effectiveNodeColumnSelections={effectiveNodeColumnSelections}
         onColumnChange={handleColumnChange}
         nodeColors={nodeColors}
-        onColorChange={setNodeColor}
-        defaultPalette={PALETTE}
+        onColorChange={handleColorChange}
+        defaultPalette={defaultPalette}
         isLocked={isLocked}
         getNodeColumns={getColumnInfos as any}
         displayNodeCount={displayNodeCount}
         actionState={{
           runDisabled:
-            selectedNodes.length === 0 ||
+            panelSelectedNodes.length === 0 ||
             isRunning ||
             hasIncompleteSelections ||
             (isLocked && !hasLockedParameterChanges),

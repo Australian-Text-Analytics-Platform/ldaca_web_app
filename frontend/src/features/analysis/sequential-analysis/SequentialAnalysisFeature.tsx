@@ -1,13 +1,11 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '../../../hooks/useWorkspaceSelection';
 import { useWorkspaceStatus } from '../../../hooks/useWorkspaceStatus';
 import { useAuth } from '../../../hooks/useAuth';
 import { useUIStore } from '../../../stores/uiStore';
-import { useSchemaManagement, useLatestRef, createNodeSnapshot, applySelectedColumnsToSnapshots } from '../../../hooks/useSchemaManagement';
-import { SequentialAnalysisRequest, SequentialFrequency, textApi } from '../../../api/text';
-import { nodesApi } from '../../../api/index';
+import { useSchemaManagement, applySelectedColumnsToSnapshots } from '../../../hooks/useSchemaManagement';
+import { SequentialFrequency, textApi } from '../../../api/text';
 import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
 import { getNodeInfo } from '../../../lib/nodeInfoCache';
 import { ANALYSIS_LOCKED_MESSAGE } from '../../../components/tabs/AnalysisLockedNotice';
@@ -17,7 +15,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui
 import { Input } from '../../../components/ui/input';
 import HelpIcon from '../../../components/help/HelpIcon';
 import AnalysisTaskBanner from '../../../components/tabs/AnalysisTaskBanner';
-import { toast } from 'sonner';
 import {
   Select,
   SelectContent,
@@ -25,37 +22,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../../../components/ui/select';
-import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '../../../components/ui/chart';
 import { Loader2, Play, Plus, Trash2 } from 'lucide-react';
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  AreaChart,
-  Area,
-} from 'recharts';
 import { normalizeTypeName } from '../../../utils/columnTypes';
-import {\n  hasLockedParameterDiff,\n  normalizeStringArray,\n  normalizeUnknownStringArray,\n  useAnalysisLock,\n  useAnalysisFeature,\n  getAnalysisActionState,\n} from '../common';
-
-// Component to display unique value count for a column
-interface UniqueValueCountProps {
-  workspaceId: string;
-  nodeId: string;
-  columnName: string;
-}
-
-type SequentialAnalysisDatum = Record<string, unknown>;
-
-type ChartTypeOption = 'line' | 'bar' | 'area';
-
-const CHART_TYPE_OPTIONS: ChartTypeOption[] = ['line', 'bar', 'area'];
-const isChartTypeOption = (value: unknown): value is ChartTypeOption =>
-  typeof value === 'string' && CHART_TYPE_OPTIONS.includes(value as ChartTypeOption);
+import {
+  hasLockedParameterDiff,
+  normalizeStringArray,
+  normalizeUnknownStringArray,
+  useAnalysisLock,
+  useAnalysisFeature,
+  getAnalysisActionState,
+  useSafeResult,
+} from '../common';
+import {
+  useSequentialAnalysisTaskFlow,
+  isChartTypeOption,
+  type ChartTypeOption,
+} from './hooks/useSequentialAnalysisTaskFlow';
+import { UniqueValueCount } from './components/UniqueValueCount';
+import { SequentialChart } from './components/SequentialChart';
 
 const FREQUENCY_OPTIONS: Array<{ value: SequentialFrequency; label: string }> = [
   { value: 'hourly', label: 'Hourly' },
@@ -75,45 +59,6 @@ const parseNumericInput = (value: string): number | null => {
   if (!trimmed.length) return null;
   const parsed = Number(trimmed);
   return Number.isFinite(parsed) ? parsed : null;
-};
-
-const SEQUENTIAL_ANALYSIS_PALETTE = [
-  '#2563eb', // blue
-  '#16a34a', // green
-  '#f59e0b', // amber
-  '#ef4444', // red
-  '#8b5cf6', // violet
-  '#14b8a6', // teal
-  '#f97316', // orange
-  '#ec4899', // pink
-  '#0ea5e9', // sky
-  '#22c55e', // emerald
-] as const;
-
-const getPaletteColor = (index: number) => SEQUENTIAL_ANALYSIS_PALETTE[index % SEQUENTIAL_ANALYSIS_PALETTE.length];
-
-const UniqueValueCount: React.FC<UniqueValueCountProps> = ({ workspaceId, nodeId, columnName }) => {
-  const { getAuthHeaders } = useAuth();
-  
-  const { data, isLoading, error } = useQuery({
-    queryKey: ['columnUniqueValues', workspaceId, nodeId, columnName],
-  queryFn: () => nodesApi.uniqueValues(nodeId, columnName, getAuthHeaders()),
-    enabled: !!workspaceId && !!nodeId && !!columnName,
-  });
-
-  if (isLoading) {
-    return <span className="text-xs text-gray-500 px-2">Loading...</span>;
-  }
-
-  if (error || !data) {
-    return <span className="text-xs text-red-500 px-2">Error</span>;
-  }
-
-  return (
-    <span className="text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded">
-      {data.unique_count} unique{data.has_null ? ' + null' : ''}
-    </span>
-  );
 };
 
 const SequentialAnalysisFeature: React.FC = () => {
@@ -169,7 +114,7 @@ const SequentialAnalysisFeature: React.FC = () => {
     selectedNode,
   });
 
-  const [results, setResults] = useState<any>(null);
+  const [results, resultRef, setResultSafely, setResults] = useSafeResult<any>();
   const [hydratingSelection, setHydratingSelection] = useState(false);
   const hydratedParamsRef = useRef<{
     timeColumn: string;
@@ -179,8 +124,6 @@ const SequentialAnalysisFeature: React.FC = () => {
     numericOrigin: number | null;
     numericInterval: number | null;
   } | null>(null);
-
-  const resultsRef = useLatestRef(results);
 
   const {
     resolveTaskId,
@@ -199,7 +142,7 @@ const SequentialAnalysisFeature: React.FC = () => {
     workspaceId: currentWorkspaceId,
     getAuthHeaders,
     isTabActive: isActiveTab,
-    resultRef: resultsRef,
+    resultRef: resultRef,
     fetchResult: async (taskId, headers) =>
       textApi.getSequentialAnalysisTaskResult(taskId, headers),
     fetchRequest: async (taskId, headers) =>
@@ -209,14 +152,13 @@ const SequentialAnalysisFeature: React.FC = () => {
       const resolvedChartType = isChartTypeOption((resultData as any)?.chart_type)
         ? (resultData as any).chart_type
         : chartType;
-      setResults((prev: any) => {
-        const prevParams = prev?.analysis_params ?? {};
-        const nextParams = (resultData as any)?.analysis_params ?? {};
-        return {
-          ...(resultData as any),
-          analysis_params: { ...prevParams, ...nextParams },
-          chart_type: resolvedChartType,
-        };
+      setResultSafely({
+        ...(resultData as any),
+        analysis_params: {
+          ...((results as any)?.analysis_params ?? {}),
+          ...((resultData as any)?.analysis_params ?? {}),
+        },
+        chart_type: resolvedChartType,
       });
       setChartType(resolvedChartType);
     },
@@ -308,15 +250,15 @@ const SequentialAnalysisFeature: React.FC = () => {
       setHydratingSelection(false);
     },
     onCleared: () => {
-      setResults(null);
+      setResultSafely(null);
       setLockedNodesSnapshot([]);
       setLockedSchema(null);
       setChartType('line');
       setNumericOriginInput('');
       setNumericIntervalInput('1');
     },
-    getExtraTaskIdCandidates: () => [(resultsRef.current as any)?.metadata?.task_id],
-    getClearTaskIdSources: () => [(resultsRef.current as any)?.metadata?.task_id],
+    getExtraTaskIdCandidates: () => [(resultRef.current as any)?.metadata?.task_id],
+    getClearTaskIdSources: () => [(resultRef.current as any)?.metadata?.task_id],
     isResultRunning: (r: any) => r?.state === 'running',
   });
 
@@ -437,375 +379,44 @@ const SequentialAnalysisFeature: React.FC = () => {
     setGroupByColumns(newColumns);
   };
 
-const handleAnalyze = async () => {
-    const nodeIdForAnalysis = activeNodeId;
-    if (!nodeIdForAnalysis || !currentWorkspaceId) {
-      toast.error('Please select a node first');
-      return;
-    }
-
-    // Use column from picker state
-    const picked =
-      nodeColumnSelections.find((s) => s.nodeId === nodeIdForAnalysis)?.column ||
-      timeColumn ||
-      (results?.analysis_params?.time_column as string | undefined) ||
-      '';
-    if (!picked) {
-      toast.error('Please select a time column');
-      return;
-    }
-
-    setNodeColumnSelections([{ nodeId: nodeIdForAnalysis, column: picked }]);
-    setTimeColumn(picked);
-
-    const validGroupByColumns = groupByColumns.filter(col => col.trim() !== '');
-
-    if (derivedColumnType === 'numeric') {
-      if (numericIntervalValue === null || numericIntervalValue <= 0) {
-        toast.error('Please enter a numeric interval greater than 0.');
-        return;
-      }
-      if (numericOriginInput.trim().length > 0 && numericOriginValue === null) {
-        toast.error('Numeric origin must be a valid number.');
-        return;
-      }
-    }
-
-    const request: SequentialAnalysisRequest = {
-      time_column: picked,
-      group_by_columns: validGroupByColumns.length > 0 ? validGroupByColumns : null,
+  const {
+    handleAnalyze,
+    handleUpdateResults,
+    handleClearResults,
+    handleChartTypeChange,
+    chartData,
+    groupKeys,
+    chartConfig,
+    groupPointCounts,
+  } = useSequentialAnalysisTaskFlow({
+    state: {
+      currentWorkspaceId,
+      activeNodeId,
+      nodeColumnSelections,
+      timeColumn,
+      groupByColumns,
       frequency,
-      sort_by_time: true,
-      column_type: derivedColumnType,
-      numeric_origin: derivedColumnType === 'numeric' ? numericOriginValue : undefined,
-      numeric_interval: derivedColumnType === 'numeric' ? numericIntervalValue : undefined,
-    };
-
-    try {
-      setIsAnalyzing(true);
-      const authHeaders = getAuthHeaders();
-      const headers = Object.keys(authHeaders).length > 0 ? authHeaders as Record<string, string> : {};
-      const result = await textApi.sequentialAnalysis(nodeIdForAnalysis, request, headers);
-      const taskIdFromResponse =
-        (result as any)?.metadata?.task_id ??
-        (result as any)?.metadata?.taskId ??
-        null;
-      if (typeof taskIdFromResponse === 'string' && taskIdFromResponse.trim().length > 0) {
-        setLocalTaskId(taskIdFromResponse);
-      }
-      const enrichedResult = {
-        ...result,
-        analysis_params: {
-          ...(result as any)?.analysis_params,
-          group_by_columns: validGroupByColumns,
-          time_column: picked,
-          frequency,
-          column_type: derivedColumnType,
-          numeric_origin: numericOriginValue,
-          numeric_interval: numericIntervalValue,
-        },
-      };
-      const resolvedChartType = isChartTypeOption((enrichedResult as any)?.chart_type)
-        ? (enrichedResult as any).chart_type
-        : chartType;
-      const normalizedResult = {
-        ...enrichedResult,
-        chart_type: resolvedChartType,
-      };
-      setResults(normalizedResult);
-      setChartType(resolvedChartType);
-      // Lock with snapshot & preserve schema and params
-      try {
-        const snapshot = await createNodeSnapshot(currentWorkspaceId, nodeIdForAnalysis, () => getAuthHeaders());
-        const [normalizedSnapshot] = applySelectedColumnsToSnapshots(
-          [snapshot],
-          { [nodeIdForAnalysis]: picked }
-        );
-        if (normalizedSnapshot) {
-          setLockedNodesSnapshot([{ id: normalizedSnapshot.id, name: normalizedSnapshot.name, columns: normalizedSnapshot.columns }]);
-          lockCurrentSchema(normalizedSnapshot.schema);
-        }
-
-      } catch { /* ignore */ }
-    } catch (error) {
-      console.error('Sequential analysis error:', error);
-      toast.error(`Error performing sequential analysis: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
-
-const handleUpdateResults = async () => {
-    await clearResults();
-    await handleAnalyze();
-  };
-
-  const handleClearResults = async () => {
-    await clearResults();
-  };
-
-  const handleChartTypeChange = async (value: ChartTypeOption) => {
-    setChartType(value);
-    setResults((prev: any) => (prev ? { ...prev, chart_type: value } : prev));
-
-    if (!currentWorkspaceId) {
-      return;
-    }
-
-    const authHeaders = getAuthHeaders();
-    const headers = Object.keys(authHeaders).length > 0 ? (authHeaders as Record<string, string>) : {};
-
-    try {
-      const taskId = await resolveTaskId();
-      if (!taskId) {
-        return;
-      }
-      await textApi.postSequentialAnalysisTaskResult(taskId, { chart_type: value }, headers);
-    } catch (error) {
-      console.error('Failed to update sequential analysis chart type:', error);
-    }
-  };
-
-  // Prepare data for chart visualization
-  const chartData = useMemo<SequentialAnalysisDatum[]>(() => {
-    if (!results?.data || !Array.isArray(results.data)) {
-      return [];
-    }
-
-    const groupingColumns = (results as any)?.analysis_params?.group_by_columns;
-    const effectiveGroupColumns = Array.isArray(groupingColumns)
-      ? groupingColumns
-      : (groupByColumns.length ? groupByColumns : []);
-    
-    if (!effectiveGroupColumns || effectiveGroupColumns.length === 0) {
-      // No grouping - simple time series
-      return results.data.map((item: Record<string, unknown>) => ({
-        ...item,
-        time_period:
-          (item.time_period_formatted as string | undefined) ||
-          (item.time_period as string | undefined),
-        sequential_count: item.sequential_count,
-      }));
-    }
-
-    // With grouping - need to reshape data for recharts
-    const timeMap = new Map<string, SequentialAnalysisDatum>();
-    
-    results.data.forEach((item: Record<string, unknown>) => {
-      const timePeriod = (item.time_period_formatted as string | undefined) || (item.time_period as string | undefined) || '';
-      const groupKey = effectiveGroupColumns.map((col: string) => String(item[col] ?? '')).join(' - ');
-      
-      if (!timeMap.has(timePeriod)) {
-        timeMap.set(timePeriod, { time_period: timePeriod });
-      }
-      
-      const timeEntry = timeMap.get(timePeriod);
-      if (timeEntry) {
-        timeEntry[groupKey] = item.sequential_count;
-      }
-    });
-    
-    return Array.from(timeMap.values()).sort((a, b) => {
-      const aTime = String(a.time_period ?? '');
-      const bTime = String(b.time_period ?? '');
-      return aTime.localeCompare(bTime);
-    });
-  }, [results, groupByColumns]);
-
-  // Get unique group values for legend colors
-  const groupKeys = useMemo(() => {
-    const groupingColumns = (results as any)?.analysis_params?.group_by_columns;
-    const effectiveGroupColumns = Array.isArray(groupingColumns)
-      ? groupingColumns
-      : (groupByColumns.length ? groupByColumns : []);
-
-    if (!effectiveGroupColumns.length || !chartData.length) {
-      return ['sequential_count'];
-    }
-    
-    // Extract all group keys from the transformed data
-    const keys = new Set<string>();
-    chartData.forEach((item: any) => {
-      Object.keys(item).forEach(key => {
-        if (key !== 'time_period') {
-          keys.add(key);
-        }
-      });
-    });
-    
-    return Array.from(keys);
-  }, [results, chartData, groupByColumns]);
-
-  const chartConfig = useMemo<ChartConfig>(() => {
-    if (!groupKeys.length || (groupKeys.length === 1 && groupKeys[0] === 'sequential_count')) {
-      return {
-        sequential_count: {
-          label: 'Sequential Count',
-          color: getPaletteColor(0),
-        },
-      };
-    }
-
-    return groupKeys.reduce<ChartConfig>((acc, key, index) => {
-      acc[key] = {
-        label: key,
-        color: getPaletteColor(index),
-      };
-      return acc;
-    }, {});
-  }, [groupKeys]);
-
-  const formatTimeLabel = (value?: string | number) => {
-    if (!value) return '—';
-    const str = String(value);
-    const parsed = new Date(str);
-    if (!Number.isNaN(parsed.getTime())) {
-      const options: Intl.DateTimeFormatOptions = {
-        year: 'numeric',
-        month: 'short',
-      };
-      if (!(parsed.getUTCDate() === 1 && parsed.getUTCHours() === 0 && parsed.getUTCMinutes() === 0)) {
-        options.day = 'numeric';
-      }
-      return parsed.toLocaleString(undefined, options);
-    }
-    return str;
-  };
-
-  const groupPointCounts = useMemo(() => {
-    if (!chartData.length) return {} as Record<string, number>;
-
-    const counts: Record<string, number> = {};
-    chartData.forEach((row) => {
-      const typedRow = row as Record<string, unknown>;
-      groupKeys.forEach((key) => {
-        const value = typedRow[key];
-        if (value !== undefined && value !== null) {
-          counts[key] = (counts[key] ?? 0) + 1;
-        }
-      });
-    });
-    return counts;
-  }, [chartData, groupKeys]);
-
-  const renderChart = () => {
-    if (!chartData.length) {
-      return (
-        <div className="flex h-40 items-center justify-center rounded-md border border-dashed border-muted-foreground/30 text-sm text-muted-foreground">
-          No sequential analysis data available. Adjust your configuration and try again.
-        </div>
-      );
-    }
-
-    const margin = { top: 20, right: 30, left: 20, bottom: 20 };
-
-    const axisTickProps = {
-      angle: -45,
-      textAnchor: 'end' as const,
-      height: 100,
-      minTickGap: 20,
-    };
-
-    return (
-      <ChartContainer config={chartConfig} className="w-full">
-        <div className="aspect-auto h-100 w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            {chartType === 'bar' ? (
-              <BarChart data={chartData} margin={margin}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="time_period" {...axisTickProps} />
-                <YAxis />
-                <ChartTooltip
-                  content={<ChartTooltipContent className="min-w-50" labelFormatter={formatTimeLabel} />}
-                />
-                {groupKeys.map((key, idx) => {
-                  const color = chartConfig[key]?.color ?? getPaletteColor(idx);
-                  return (
-                    <Bar key={key} dataKey={key} fill={color} radius={[6, 6, 0, 0]} name={key} />
-                  );
-                })}
-              </BarChart>
-            ) : chartType === 'area' ? (
-              <AreaChart data={chartData} margin={margin}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="time_period" {...axisTickProps} />
-                <YAxis />
-                <ChartTooltip
-                  content={<ChartTooltipContent className="min-w-50" labelFormatter={formatTimeLabel} />}
-                />
-                {groupKeys.map((key, idx) => {
-                  const color = chartConfig[key]?.color ?? getPaletteColor(idx);
-                  return (
-                    <Area
-                      key={key}
-                      type="monotone"
-                      dataKey={key}
-                      stackId="1"
-                      stroke={color}
-                      fill={color}
-                      fillOpacity={0.35}
-                      name={key}
-                    />
-                  );
-                })}
-              </AreaChart>
-            ) : (
-              <LineChart data={chartData} margin={margin}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="time_period" {...axisTickProps} />
-                <YAxis />
-                <ChartTooltip
-                  content={
-                    <ChartTooltipContent
-                      className="min-w-50"
-                      indicator="line"
-                      labelFormatter={formatTimeLabel}
-                    />
-                  }
-                />
-                {groupKeys.map((key, idx) => {
-                  const color = chartConfig[key]?.color ?? getPaletteColor(idx);
-                  const shouldShowDot = (groupPointCounts[key] ?? chartData.length) <= 1;
-                  return (
-                    <Line
-                      key={key}
-                      type="monotone"
-                      dataKey={key}
-                      stroke={color}
-                      strokeWidth={2}
-                      dot={shouldShowDot ? { r: 4, strokeWidth: 0 } : false}
-                      activeDot={{ r: 5 }}
-                      name={key}
-                    />
-                  );
-                })}
-              </LineChart>
-            )}
-          </ResponsiveContainer>
-        </div>
-        <div className="mt-4 flex flex-wrap items-center justify-center gap-4 px-4">
-          {groupKeys.map((key) => {
-            const color = chartConfig[key]?.color;
-            const label = chartConfig[key]?.label || key;
-            return (
-              <div key={key} className="flex items-center gap-2">
-                {chartType === 'line' ? (
-                  <div className="flex items-center">
-                    <div className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
-                    <div className="h-0.5 w-3" style={{ backgroundColor: color }} />
-                    <div className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
-                  </div>
-                ) : (
-                  <div className="h-3 w-3 rounded-sm" style={{ backgroundColor: color }} />
-                )}
-                <span className="text-sm font-medium text-muted-foreground">{label}</span>
-              </div>
-            );
-          })}
-        </div>
-      </ChartContainer>
-    );
-  };
+      chartType,
+      derivedColumnType,
+      numericOriginValue,
+      numericIntervalValue,
+      numericOriginInput,
+      results,
+    },
+    actions: {
+      setIsAnalyzing,
+      setResults,
+      setChartType,
+      setLocalTaskId,
+      setNodeColumnSelections,
+      setTimeColumn,
+      setLockedNodesSnapshot,
+      lockCurrentSchema,
+      resolveTaskId,
+      clearResults,
+    },
+    lock: { getAuthHeaders },
+  });
 
   const summaryTimeColumn = (results?.analysis_params?.time_column as string | undefined) ?? timeColumn;
   const summaryGroupBy = (results?.analysis_params?.group_by_columns as string[] | undefined) ?? groupByColumns;
@@ -1135,7 +746,13 @@ const handleUpdateResults = async () => {
               </div>
             </div>
 
-            {renderChart()}
+            <SequentialChart
+              chartType={chartType}
+              chartData={chartData}
+              chartConfig={chartConfig}
+              groupKeys={groupKeys}
+              groupPointCounts={groupPointCounts}
+            />
           </CardContent>
         </Card>
       )}
