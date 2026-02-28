@@ -24,9 +24,6 @@ class TopicModelingRequest(BaseAnalysisRequest):
     Why:
     - Validates node selection and clustering configuration inputs.
 
-    Refactor note:
-    - `use_ctfidf` is marked unused compatibility field; remove when frontend/API
-        contract no longer depends on it.
     """
 
     node_ids: List[str] = Field(..., description="List of node IDs to analyze")
@@ -35,7 +32,4 @@ class TopicModelingRequest(BaseAnalysisRequest):
     )
     min_topic_size: Optional[int] = Field(
         5, description="DBSCAN min_points (minimum cluster size)"
-    )
-    use_ctfidf: Optional[bool] = Field(
-        False, description="Unused (kept for compatibility)"
     )

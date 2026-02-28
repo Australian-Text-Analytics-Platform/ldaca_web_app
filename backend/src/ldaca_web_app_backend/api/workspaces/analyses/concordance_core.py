@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import math
 from typing import Any, Optional
 
@@ -9,6 +10,8 @@ import polars as pl
 from fastapi import HTTPException
 
 from ....core.workspace import workspace_manager
+
+logger = logging.getLogger(__name__)
 
 CORE_CONCORDANCE_COLUMNS = {
     "left_context",
@@ -221,8 +224,12 @@ def compute_concordance_page(
             if sort_by in schema and sort_by not in CORE_CONCORDANCE_COLUMNS:
                 base_lf = base_lf.sort(sort_by, descending=descending)
                 effective_sort_by = sort_by
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug(
+                "Ignoring unsupported sort_by '%s' for concordance page: %s",
+                sort_by,
+                exc,
+            )
 
     start = max(page - 1, 0) * page_size
     page_lf = base_lf.slice(start, page_size)

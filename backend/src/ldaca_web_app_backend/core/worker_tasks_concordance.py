@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
 
 def run_concordance_detach_task(
@@ -18,7 +18,7 @@ def run_concordance_detach_task(
     new_node_name: str,
     artifact_dir: str,
     artifact_prefix: str,
-    progress_callback: Optional[callable] = None,
+    progress_callback: Optional[Callable[[float, str], None]] = None,
 ) -> Dict[str, Any]:
     """Run concordance detach with API-prepared corpus and write artifact parquet."""
     configure_worker_environment()

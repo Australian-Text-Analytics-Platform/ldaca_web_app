@@ -676,7 +676,6 @@ class TopicModelingRequest(BaseModel):
     node_ids: List[str]  # 1 or 2 node IDs
     node_columns: Dict[str, str]  # Maps node_id -> column_name
     min_topic_size: Optional[int] = 10  # BERTopic minimum topic size
-    use_ctfidf: Optional[bool] = True
 
     # Pydantic v2 model config
     model_config = ConfigDict(
@@ -685,7 +684,6 @@ class TopicModelingRequest(BaseModel):
                 "node_ids": ["node1", "node2"],
                 "node_columns": {"node1": "text", "node2": "content"},
                 "min_topic_size": 10,
-                "use_ctfidf": True,
             }
         }
     )

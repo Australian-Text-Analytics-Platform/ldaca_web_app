@@ -120,7 +120,7 @@ async def quotation_task_request(
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
     request = task.request
-    return request.model_dump() if hasattr(request, "model_dump") else request
+    return request.model_dump()
 
 
 @router.get("/quotation/tasks/{task_id}/result")
@@ -151,11 +151,7 @@ async def quotation_task_result(
         return None
 
     base_result = task.result.to_json()
-    req_dict = (
-        task.request.model_dump()
-        if hasattr(task.request, "model_dump")
-        else task.request.dict()
-    )
+    req_dict = task.request.model_dump()
 
     if any(v is not None for v in (page, page_size, sort_by, descending)):
         node_id = req_dict.get("node_id")
@@ -223,11 +219,7 @@ async def update_quotation_task_result(
     if not task or not task.result:
         raise HTTPException(status_code=404, detail="No quotation analysis found")
 
-    base_request = (
-        task.request.model_dump()
-        if hasattr(task.request, "model_dump")
-        else task.request.dict()
-    )
+    base_request = task.request.model_dump()
     base_result = task.result.to_json()
 
     context_length_value = qcore.extract_context_preference(base_result)

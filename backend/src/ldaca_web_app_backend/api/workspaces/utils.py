@@ -1,5 +1,6 @@
 """Shared utility helpers for workspace API modules."""
 
+import logging
 import os
 import re
 from datetime import datetime
@@ -11,6 +12,8 @@ from fastapi import HTTPException
 
 from ...analysis.models import AnalysisStatus
 from ...core.workspace import workspace_manager
+
+logger = logging.getLogger(__name__)
 
 
 def update_workspace(
@@ -103,8 +106,12 @@ async def ensure_task_synced(
                 elif tm_task.status == "failed":
                     task.fail(tm_task.error or "Task failed")
                     memory_task_manager.save_task(task)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug(
+                "Failed to sync task %s from worker manager: %s",
+                task.task_id,
+                exc,
+            )
     return task
 
 

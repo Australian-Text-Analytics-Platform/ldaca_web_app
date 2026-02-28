@@ -6,7 +6,7 @@ Separated from `worker.py` to keep the worker module focused and smaller.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
 from .analysis_helpers import sanitize_stop_words
 
@@ -21,7 +21,7 @@ def run_token_frequencies_task(
     artifact_prefix: str,
     token_limit: int = 10,
     stop_words: Optional[list[str]] = None,
-    progress_callback: Optional[callable] = None,
+    progress_callback: Optional[Callable[[float, str], None]] = None,
 ) -> Dict[str, Any]:
     """Execute token-frequency analysis inside a worker process.
 

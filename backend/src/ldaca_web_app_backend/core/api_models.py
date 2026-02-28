@@ -1,6 +1,6 @@
 """FastAPI integration models for DocWorkspace."""
 
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -68,15 +68,3 @@ class OperationResult(BaseModel):
     node_id: Optional[str] = None
     data: Optional[Dict[str, Any]] = None
     errors: List[str] = Field(default_factory=list)
-
-
-# Type aliases for FastAPI route annotations
-# Used by:
-# - route return annotations in workspace API modules
-# Why:
-# - keeps endpoint signatures concise while preserving explicit union response types
-# Refactor note:
-# - these aliases currently have no in-repo consumers; remove if annotation usage
-#   remains absent to reduce dead declarations.
-NodeResponse = Union[NodeSummary, ErrorResponse]
-DataResponse = Union[PaginatedData, ErrorResponse]

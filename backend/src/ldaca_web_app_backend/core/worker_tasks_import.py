@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
 
 def run_ldaca_import_task(
@@ -12,7 +12,7 @@ def run_ldaca_import_task(
     workspace_id: str,
     url: str,
     filename: Optional[str] = None,
-    progress_callback: Optional[callable] = None,
+    progress_callback: Optional[Callable[[float, str], None]] = None,
 ) -> Dict[str, Any]:
     """Execute LDaCA dataset import in a worker process.
 
@@ -33,8 +33,9 @@ def run_ldaca_import_task(
         import re
         import urllib.parse
 
-        from ldaca_web_app_backend.core.utils import get_user_data_folder
         from ldacatabulator.tabulator import LDaCATabulator
+
+        from ldaca_web_app_backend.core.utils import get_user_data_folder
 
         print(f"[Worker {os.getpid()}] Starting LDaCA import task for user {user_id}")
 

@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import time
 from concurrent.futures import Future, ProcessPoolExecutor
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
 from .worker_tasks_concordance import run_concordance_detach_task
 from .worker_tasks_download import run_workspace_download_task
@@ -14,11 +15,13 @@ from .worker_tasks_quotation import run_quotation_detach_task
 from .worker_tasks_token import run_token_frequencies_task
 from .worker_tasks_topic import run_topic_modeling_task
 
+logger = logging.getLogger(__name__)
+
 
 def _build_progress_callback(
     progress_queue: Optional[Any],
-    progress_callback: Optional[callable],
-) -> Optional[callable]:
+    progress_callback: Optional[Callable[[float, str], None]],
+) -> Optional[Callable[[float, str], None]]:
     if progress_queue is None and progress_callback is None:
         return None
 
@@ -32,17 +35,23 @@ def _build_progress_callback(
         if progress_queue is not None:
             try:
                 progress_queue.put_nowait(payload)
-            except Exception:
+            except Exception as exc:
+                logger.debug(
+                    "progress_queue.put_nowait failed, retrying with put: %s", exc
+                )
                 try:
                     progress_queue.put(payload)
-                except Exception:
-                    pass
+                except Exception as put_exc:
+                    logger.debug(
+                        "progress_queue.put failed; dropping progress payload: %s",
+                        put_exc,
+                    )
 
         if progress_callback is not None:
             try:
                 progress_callback(progress, message)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("progress_callback invocation failed: %s", exc)
 
     return _cb
 
@@ -83,7 +92,7 @@ def ldaca_import_task(
     workspace_id: str,
     url: str,
     filename: Optional[str] = None,
-    progress_callback: Optional[callable] = None,
+    progress_callback: Optional[Callable[[float, str], None]] = None,
     progress_queue: Optional[Any] = None,
 ) -> Dict[str, Any]:
     cb = _build_progress_callback(progress_queue, progress_callback)
@@ -102,7 +111,7 @@ def workspace_download_task(
     workspace_id: str,
     target_workspace_id: Optional[str] = None,
     target_workspace_dir: Optional[str] = None,
-    progress_callback: Optional[callable] = None,
+    progress_callback: Optional[Callable[[float, str], None]] = None,
     progress_queue: Optional[Any] = None,
 ) -> Dict[str, Any]:
     cb = _build_progress_callback(progress_queue, progress_callback)
@@ -129,7 +138,7 @@ def concordance_detach_task(
     new_node_name: str,
     artifact_dir: str,
     artifact_prefix: str,
-    progress_callback: Optional[callable] = None,
+    progress_callback: Optional[Callable[[float, str], None]] = None,
     progress_queue: Optional[Any] = None,
 ) -> Dict[str, Any]:
     cb = _build_progress_callback(progress_queue, progress_callback)
@@ -160,7 +169,7 @@ def quotation_detach_task(
     new_node_name: str,
     artifact_dir: str,
     artifact_prefix: str,
-    progress_callback: Optional[callable] = None,
+    progress_callback: Optional[Callable[[float, str], None]] = None,
     progress_queue: Optional[Any] = None,
 ) -> Dict[str, Any]:
     cb = _build_progress_callback(progress_queue, progress_callback)
@@ -185,8 +194,7 @@ def topic_modeling_task(
     artifact_dir: str,
     artifact_prefix: str,
     min_topic_size: int,
-    use_ctfidf: bool,
-    progress_callback: Optional[callable] = None,
+    progress_callback: Optional[Callable[[float, str], None]] = None,
     progress_queue: Optional[Any] = None,
 ) -> Dict[str, Any]:
     cb = _build_progress_callback(progress_queue, progress_callback)
@@ -199,7 +207,6 @@ def topic_modeling_task(
         artifact_dir=artifact_dir,
         artifact_prefix=artifact_prefix,
         min_topic_size=min_topic_size,
-        use_ctfidf=use_ctfidf,
         progress_callback=cb,
     )
 
@@ -213,7 +220,7 @@ def token_frequencies_task(
     artifact_prefix: str,
     token_limit: int,
     stop_words: Optional[list[str]] = None,
-    progress_callback: Optional[callable] = None,
+    progress_callback: Optional[Callable[[float, str], None]] = None,
     progress_queue: Optional[Any] = None,
 ) -> Dict[str, Any]:
     cb = _build_progress_callback(progress_queue, progress_callback)

@@ -83,13 +83,11 @@ def to_polars_dataframe(data: Any) -> pl.DataFrame:
     Why:
     - Enforces strict Polars-only node data contracts for quotation analysis.
     """
-    if isinstance(data, pl.DataFrame):
-        return data
     if isinstance(data, pl.LazyFrame):
         return data.collect()
 
     raise ValueError(
-        f"Quotation analysis requires Polars DataFrame/LazyFrame, got {type(data).__name__}"
+        f"Quotation analysis requires Polars LazyFrame, got {type(data).__name__}"
     )
 
 

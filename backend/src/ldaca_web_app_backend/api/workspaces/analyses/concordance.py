@@ -208,7 +208,7 @@ async def concordance_task_request(
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
     request = task.request
-    return request.model_dump() if hasattr(request, "model_dump") else request
+    return request.model_dump()
 
 
 @router.get("/concordance/tasks/{task_id}/result")
@@ -239,11 +239,7 @@ async def concordance_task_result(
     if not task or not task.request:
         return None
 
-    req_dict = (
-        task.request.model_dump()
-        if hasattr(task.request, "model_dump")
-        else task.request.dict()
-    )
+    req_dict = task.request.model_dump()
     normalized_request = normalize_saved_request(req_dict) or {}
     _apply_result_query_overrides(normalized_request, query)
     return build_concordance_response(user_id, workspace_id, normalized_request)
@@ -288,11 +284,7 @@ async def concordance_task_result_post(
             "data": None,
         }
 
-    req_dict = (
-        task.request.model_dump()
-        if hasattr(task.request, "model_dump")
-        else task.request.dict()
-    )
+    req_dict = task.request.model_dump()
     normalized_request = normalize_saved_request(req_dict) or {}
     _apply_result_query_overrides(normalized_request, query)
     return build_concordance_response(user_id, workspace_id, normalized_request)

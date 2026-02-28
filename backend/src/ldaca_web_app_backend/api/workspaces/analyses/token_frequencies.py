@@ -9,6 +9,7 @@ Artifact-first implementation:
 from __future__ import annotations
 
 import asyncio
+import logging
 import math
 from pathlib import Path
 from uuid import uuid4
@@ -29,6 +30,7 @@ from ..utils import ensure_task_synced
 from .current_tasks import get_current_task_ids_for_analysis
 
 router = APIRouter(prefix="/workspaces")
+logger = logging.getLogger(__name__)
 
 _TOKEN_FREQ_SUBMISSION_LOCKS: dict[tuple[str, str], asyncio.Lock] = {}
 
@@ -313,7 +315,7 @@ async def token_frequencies_task_request(
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
     request = task.request
-    return request.model_dump() if hasattr(request, "model_dump") else request
+    return request.model_dump()
 
 
 @router.get("/token-frequencies/tasks/{task_id}/result")
@@ -473,8 +475,13 @@ async def calculate_token_frequencies(
 
         try:
             node.document = column_name
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug(
+                "Failed to persist node.document for node %s column %s: %s",
+                node_id,
+                column_name,
+                exc,
+            )
 
         docs_df = node_data.select(pl.col(column_name).alias("__doc_col__")).collect()
         node_corpora[node_id] = [
@@ -504,7 +511,12 @@ async def calculate_token_frequencies(
                     "metadata": {"task_id": latest.id if latest else None},
                 }
         except Exception:
-            pass
+            logger.debug(
+                "Failed to query existing running token-frequency task for user=%s workspace=%s",
+                user_id,
+                workspace_id,
+                exc_info=True,
+            )
 
         artifact_dir, artifact_prefix = _prepare_token_artifact_target(
             user_id, workspace_id

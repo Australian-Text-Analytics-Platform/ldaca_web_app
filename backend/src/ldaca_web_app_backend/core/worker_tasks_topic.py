@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
 _EMBEDDER_CACHE: dict[str, Any] = {}
 
@@ -30,8 +30,7 @@ def run_topic_modeling_task(
     artifact_dir: str,
     artifact_prefix: str,
     min_topic_size: int = 5,
-    use_ctfidf: bool = False,
-    progress_callback: Optional[callable] = None,
+    progress_callback: Optional[Callable[[float, str], None]] = None,
 ) -> Dict[str, Any]:
     """Execute topic modeling in a worker process.
 
@@ -231,7 +230,6 @@ def run_topic_modeling_task(
             embeddings, c_tfidf_used = select_topic_representation(
                 topic_model.c_tf_idf_,
                 topic_model.topic_embeddings_,
-                use_ctfidf=bool(use_ctfidf),
                 output_ndarray=True,
             )
             if len(indices) > 0:
@@ -343,8 +341,6 @@ def run_topic_modeling_task(
                     "native": True,
                     "engine": "bertopic",
                     "embedding_model": embedding_model_name,
-                    "used_ctfidf": bool(use_ctfidf),
-                    "use_ctfidf": bool(use_ctfidf),
                     "embeddings_from_ctfidf": bool(c_tfidf_used),
                     "min_topic_size": int(min_topic_size),
                     "total_topics_incl_outlier": int(topic_freq.height),

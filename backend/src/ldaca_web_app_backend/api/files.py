@@ -1,5 +1,6 @@
 """File management endpoints."""
 
+import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -32,6 +33,7 @@ from ..models import (
 )
 
 router = APIRouter(prefix="/files", tags=["file_management"])
+logger = logging.getLogger(__name__)
 
 README_FILENAME = "README.md"
 README_MAX_BYTES = 200_000
@@ -100,8 +102,8 @@ def _lazy_scan(file_path, file_type: str) -> pl.LazyFrame:
                 lf = scan_ndjson(file_path)
                 if isinstance(lf, pl.LazyFrame):
                     return lf
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("scan_ndjson failed for %s: %s", file_path, exc)
         return pl.read_ndjson(file_path).lazy()
     if ft == "json":
         return pl.read_json(file_path).lazy()
@@ -468,7 +470,7 @@ async def unified_file_preview(
             df = base_df.slice(offset, page_size)
 
             columns = list(df.columns)
-            preview = df.fill_null("None").to_dicts() if hasattr(df, "to_dicts") else []
+            preview = df.fill_null("None").to_dicts()
 
         elif file_type == "zip":
             df = read_zip_file(file_path)

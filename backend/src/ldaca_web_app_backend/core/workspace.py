@@ -9,6 +9,7 @@ Design Goals:
 """
 
 import json
+import logging
 import os
 import shutil
 from datetime import datetime
@@ -25,6 +26,8 @@ from .utils import (
     ensure_display_folder_name,
     get_user_workspace_folder,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class WorkspaceManager:
@@ -88,8 +91,10 @@ class WorkspaceManager:
     def _attach_workspace_dir(self, workspace: Workspace, path: Path) -> None:
         try:
             setattr(workspace, "_workspace_dir", path)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug(
+                "Failed to attach workspace_dir metadata to workspace object: %s", exc
+            )
 
     def _set_working_dir(self, path: Path) -> None:
         try:
@@ -246,8 +251,12 @@ class WorkspaceManager:
                 self._attach_workspace_dir(cws, target_dir)
                 cws.save(target_dir)
                 self._set_cached_path(user_id, cid, target_dir)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug(
+                    "Best-effort save before delete failed for workspace %s: %s",
+                    workspace_id,
+                    exc,
+                )
             self._current.pop(user_id, None)
         target_dir = self._get_indexed_path(user_id, workspace_id)
         if target_dir and target_dir.exists():
@@ -375,6 +384,4 @@ class WorkspaceManager:
         return True
 
 
-workspace_manager = WorkspaceManager()
-workspace_manager = WorkspaceManager()
 workspace_manager = WorkspaceManager()

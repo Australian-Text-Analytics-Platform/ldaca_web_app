@@ -5,6 +5,7 @@ Users are responsible for setting environment variables themselves.
 """
 
 from pathlib import Path
+from secrets import token_urlsafe
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -78,7 +79,16 @@ class Settings(BaseSettings):
     # Security Configuration
     token_expire_hours: int = Field(default=24, description="Token expiration hours")
     secret_key: str = Field(
-        default="your-secret-key-here", description="Secret key for JWT tokens"
+        default_factory=lambda: token_urlsafe(32),
+        description=(
+            "Secret key for JWT tokens (set SECRET_KEY in environment for stable deployments)"
+        ),
+    )
+    admin_emails: str = Field(
+        default="",
+        description=(
+            "Comma-separated admin email allowlist for admin endpoints in multi-user mode"
+        ),
     )
 
     # Feedback / Airtable Configuration
@@ -168,6 +178,16 @@ class Settings(BaseSettings):
         # Construct a sqlite URL under DATA_ROOT/database_file
         db_path = self.get_data_root() / self.database_file
         return f"sqlite+aiosqlite:///{db_path}"
+
+    def get_admin_emails(self) -> set[str]:
+        """Return normalized admin email allowlist from settings."""
+        if not self.admin_emails.strip():
+            return set()
+        return {
+            email.strip().lower()
+            for email in self.admin_emails.split(",")
+            if email.strip()
+        }
 
 
 # Global settings instance

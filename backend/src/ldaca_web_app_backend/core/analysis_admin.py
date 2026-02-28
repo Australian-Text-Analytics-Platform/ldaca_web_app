@@ -83,8 +83,8 @@ def _clear_tuple_prefix_cache_for(
         try:
             cache.pop(k, None)
             removed += 1
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Failed to remove cache key %r: %s", k, exc)
     return removed
 
 
@@ -150,8 +150,8 @@ async def clear_analyses_and_cache(
                 try:
                     if await tm.clear_task(task_id):
                         tasks_removed += 1
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("Failed to clear task %s: %s", task_id, exc)
         except Exception as exc:  # pragma: no cover - defensive logging only
             logger.warning(
                 "Failed to clear tasks for user=%s workspace=%s task=%s: %s",

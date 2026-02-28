@@ -7,7 +7,7 @@ import re
 import tempfile
 import zipfile
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
 
 def _safe_download_name(name: str) -> str:
@@ -20,7 +20,7 @@ def run_workspace_download_task(
     user_id: str,
     workspace_id: str,
     target_workspace_dir: Optional[str] = None,
-    progress_callback: Optional[callable] = None,
+    progress_callback: Optional[Callable[[float, str], None]] = None,
 ) -> Dict[str, Any]:
     """Package a persisted workspace folder into a ZIP artifact.
 

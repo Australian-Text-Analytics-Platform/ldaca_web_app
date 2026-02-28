@@ -271,8 +271,11 @@ async def run_sequential_analysis(
                 )
         except HTTPException:
             raise
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug(
+                "Failed to compare sequential-analysis request payloads for task reuse: %s",
+                exc,
+            )
 
     try:
         try:
@@ -407,20 +410,12 @@ async def run_sequential_analysis(
             ):
                 inherited_chart_type = previous_result["chart_type"]
 
-        if hasattr(sequential_result, "to_dicts"):
-            result_payload = {
-                "state": "successful",
-                "data": sequential_result.to_dicts(),
-                "columns": list(sequential_result.columns),
-                "total_records": len(sequential_result),
-            }
-        else:
-            result_payload = {
-                "state": "successful",
-                "data": [],
-                "columns": [],
-                "total_records": 0,
-            }
+        result_payload = {
+            "state": "successful",
+            "data": sequential_result.to_dicts(),
+            "columns": list(sequential_result.columns),
+            "total_records": len(sequential_result),
+        }
 
         result_payload["chart_type"] = inherited_chart_type
 
@@ -484,7 +479,7 @@ async def sequential_analysis_task_request(
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
     request = task.request
-    return request.model_dump() if hasattr(request, "model_dump") else request
+    return request.model_dump()
 
 
 @router.get("/sequential-analysis/tasks/{task_id}/result")
@@ -507,7 +502,7 @@ async def sequential_analysis_task_result(
     if result is None:
         return {"state": "pending", "metadata": {"task_id": task_id}}
 
-    return result.to_json() if hasattr(result, "to_json") else result
+    return result.to_json()
 
 
 @router.post("/sequential-analysis/tasks/{task_id}/result")

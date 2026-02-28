@@ -53,8 +53,12 @@ async def delete_node_column(
         dropped_node = node.drop(column_name)
         try:
             update_workspace(user_id, workspace_id, best_effort=True)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug(
+                "Best-effort workspace update failed after drop on node %s: %s",
+                node_id,
+                exc,
+            )
         return dropped_node.info()
     except Exception as exc:  # pragma: no cover - defensive
         raise HTTPException(
@@ -95,8 +99,12 @@ async def rename_node_column(
         node.rename({column_name: trimmed_name})
         try:
             update_workspace(user_id, workspace_id, best_effort=True)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug(
+                "Best-effort workspace update failed after rename on node %s: %s",
+                node_id,
+                exc,
+            )
         return node.info()
     except Exception as exc:  # pragma: no cover
         raise HTTPException(

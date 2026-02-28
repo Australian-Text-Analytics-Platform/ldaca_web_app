@@ -143,8 +143,8 @@ async def lifespan(app: FastAPI):
     if log_file:
         try:
             log_file.close()
-        except Exception:
-            pass
+        except Exception as exc:
+            print(f"[main] Failed to close startup log file cleanly: {exc}", flush=True)
 
     # Shutdown worker pool with timeout to prevent hanging
     try:

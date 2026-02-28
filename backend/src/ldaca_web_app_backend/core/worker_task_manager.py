@@ -194,14 +194,6 @@ class WorkerTaskManager:
             "progress": task_info.progress,
             "progress_message": task_info.progress_message,
             "metadata": task_info.metadata,
-            "task_type": task_info.metadata.get("task_type"),
-            "message": task_info.error
-            or task_info.progress_message
-            or (
-                "Task running"
-                if task_info.status == TaskStatus.RUNNING
-                else "Task finished"
-            ),
         }
 
     def _cleanup_progress_queue(self, task_id: str) -> None:
@@ -212,8 +204,8 @@ class WorkerTaskManager:
             close = getattr(progress_queue, "close", None)
             if callable(close):
                 close()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Failed to close progress queue for task %s: %s", task_id, exc)
 
     async def _consume_worker_progress(
         self,
@@ -439,8 +431,13 @@ class WorkerTaskManager:
                         if new_node and doc_col:
                             try:
                                 new_node.document = doc_col
-                            except Exception:
-                                pass
+                            except Exception as exc:
+                                logger.debug(
+                                    "Failed to set document column '%s' for new node %s: %s",
+                                    doc_col,
+                                    getattr(new_node, "id", "unknown"),
+                                    exc,
+                                )
 
                         result_persisted = True
                         await self.emit(
@@ -737,15 +734,6 @@ class WorkerTaskManager:
                     "progress": task_info.progress,
                     "progress_message": task_info.progress_message,
                     "metadata": task_info.metadata,
-                    # Back-compat fields used by UI
-                    "task_type": task_info.metadata.get("task_type"),
-                    "message": task_info.error
-                    or task_info.progress_message
-                    or (
-                        "Task running"
-                        if task_info.status == TaskStatus.RUNNING
-                        else "Task finished"
-                    ),
                 }
                 out.append(d)
             return out

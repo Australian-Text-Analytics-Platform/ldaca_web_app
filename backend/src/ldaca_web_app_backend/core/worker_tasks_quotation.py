@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
 
 def run_quotation_detach_task(
@@ -14,7 +14,7 @@ def run_quotation_detach_task(
     new_node_name: str,
     artifact_dir: str,
     artifact_prefix: str,
-    progress_callback: Optional[callable] = None,
+    progress_callback: Optional[Callable[[float, str], None]] = None,
 ) -> Dict[str, Any]:
     """Run quotation detach with API-prepared corpus and write artifact parquet."""
     configure_worker_environment()
@@ -24,6 +24,7 @@ def run_quotation_detach_task(
         from pathlib import Path
 
         import polars as pl
+
         from ldaca_web_app_backend.api.workspaces.analyses.quotation_core import (
             ensure_quote_dataframe,
             quotation_via_polars_text,

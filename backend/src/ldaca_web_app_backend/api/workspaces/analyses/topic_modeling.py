@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from pathlib import Path
 from uuid import uuid4
 
@@ -28,6 +29,7 @@ from ..utils import ensure_task_synced, update_workspace
 from .current_tasks import get_current_task_ids_for_analysis
 
 router = APIRouter(prefix="/workspaces", tags=["topic-modeling"])
+logger = logging.getLogger(__name__)
 
 _TOPIC_SUBMISSION_LOCKS: dict[tuple[str, str], asyncio.Lock] = {}
 
@@ -217,7 +219,6 @@ async def run_topic_modeling(
                 "artifact_dir": str(artifact_dir),
                 "artifact_prefix": artifact_prefix,
                 "min_topic_size": request.min_topic_size,
-                "use_ctfidf": request.use_ctfidf,
             },
             task_name="Topic Modeling",
         )
@@ -227,7 +228,6 @@ async def run_topic_modeling(
         node_ids=request.node_ids,
         node_columns=node_columns,
         min_topic_size=request.min_topic_size,
-        use_ctfidf=request.use_ctfidf,
     )
     analysis_tm.save_task(
         AnalysisTask(
@@ -276,7 +276,7 @@ async def topic_modeling_task_request(
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
     request = task.request
-    return request.model_dump() if hasattr(request, "model_dump") else request
+    return request.model_dump()
 
 
 @router.get(
@@ -560,8 +560,13 @@ async def detach_topic_modeling(
         if text_column and text_column in selected_columns:
             try:
                 new_node.document = text_column
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug(
+                    "Failed to set detached topic node document column '%s' for node %s: %s",
+                    text_column,
+                    new_node.id,
+                    exc,
+                )
 
         meanings_node_name = f"{node_name}_topic_meanings"
         meanings_node = Node(
