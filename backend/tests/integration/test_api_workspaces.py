@@ -773,12 +773,12 @@ class TestWorkspaceAPI:
             assert response_data.get("state") == "successful"
             assert response_data["cast_info"]["column"] == "created_at"
 
-    async def test_cast_node_preserves_text_column_metadata(self, authenticated_client):
-        """LazyFrame nodes preserve text_column metadata after casting."""
+    async def test_cast_node_preserves_document_column(self, authenticated_client):
+        """LazyFrame nodes preserve document column after casting."""
         import polars as pl
 
         mock_node = Mock()
-        mock_node.metadata = {"text_column": "text"}
+        mock_node.document = "text"
         lazy_data = pl.DataFrame({
             "text": ["doc one", "doc two"],
             "score": ["1", "2"],
@@ -808,7 +808,7 @@ class TestWorkspaceAPI:
             assert response.status_code == 200
             payload = response.json()
             assert payload.get("state") == "successful"
-            assert getattr(mock_node, "metadata", {}).get("text_column") == "text"
+            assert getattr(mock_node, "document", None) == "text"
 
     async def test_cast_node_datetime_to_string(self, authenticated_client):
         """Test casting datetime column to string"""

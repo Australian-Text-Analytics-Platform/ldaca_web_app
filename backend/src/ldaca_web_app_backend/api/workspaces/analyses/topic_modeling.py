@@ -565,13 +565,9 @@ async def detach_topic_modeling(
         ws.add_node(new_node)
 
         text_column = artifact_payload.get("text_column")
-        if (
-            text_column
-            and hasattr(new_node, "set_metadata")
-            and text_column in selected_columns
-        ):
+        if text_column and text_column in selected_columns:
             try:
-                new_node.set_metadata("text_column", text_column)
+                new_node.document = text_column
             except Exception:
                 pass
 

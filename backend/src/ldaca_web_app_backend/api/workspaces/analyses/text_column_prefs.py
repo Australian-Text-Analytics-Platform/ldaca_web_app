@@ -4,7 +4,7 @@ Used by:
 - token-frequency, concordance, and topic-modeling routes
 
 Why:
-- Centralizes column selection heuristics and preference persistence behavior.
+- Centralizes column selection heuristics and document-column persistence behavior.
 """
 
 from __future__ import annotations
@@ -35,10 +35,10 @@ def _resolve_text_column_for_node(
     - Centralizes column precedence and validation so all text analyses behave
             consistently.
 
-    Precedence order:
-      1) explicit request column
-      2) node.metadata['text_column']
-      3) common heuristic candidates
+        Precedence order:
+            1) explicit request column
+            2) node.document
+            3) common heuristic candidates
     """
 
     node_data = getattr(node, "data", None)
@@ -52,9 +52,9 @@ def _resolve_text_column_for_node(
 
     column_name = requested_column
     if not column_name:
-        metadata = getattr(node, "metadata", {}) or {}
-        if isinstance(metadata, dict):
-            column_name = metadata.get("text_column")
+        doc_column = getattr(node, "document", None)
+        if isinstance(doc_column, str) and doc_column:
+            column_name = doc_column
 
     if not column_name:
         for candidate in COMMON_TEXT_COLUMN_CANDIDATES:
@@ -81,30 +81,6 @@ def _resolve_text_column_for_node(
         )
 
     return column_name
-
-
-def persist_text_column_preference(node: Any, text_column: str) -> None:
-    """Persist preferred text column metadata on a node (best effort).
-
-    Used by:
-    - `resolve_text_columns_for_nodes`
-
-    Why:
-    - Stores user intent so subsequent analyses can default to the same column.
-    """
-    try:
-        if hasattr(node, "set_metadata"):
-            node.set_metadata("text_column", text_column)
-            return
-
-        metadata = getattr(node, "metadata", None)
-        if not isinstance(metadata, dict):
-            metadata = {}
-        metadata["text_column"] = text_column
-        setattr(node, "metadata", metadata)
-    except Exception:
-        # Never fail analysis on metadata persistence issues.
-        pass
 
 
 def resolve_text_columns_for_nodes(
@@ -149,7 +125,11 @@ def resolve_text_columns_for_nodes(
         resolved[node_id] = column_name
 
         if persist_preference:
-            persist_text_column_preference(node, column_name)
+            try:
+                node.document = column_name
+            except Exception:
+                # Never fail analysis on document persistence issues.
+                pass
 
     if persist_preference:
         try:

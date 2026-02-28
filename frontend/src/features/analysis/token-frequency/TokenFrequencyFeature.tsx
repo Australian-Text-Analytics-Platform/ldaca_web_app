@@ -12,6 +12,7 @@ import {
   normalizeRequestStopWords,
   parseAnalysisNodeRequest,
   getNodeIdentifier,
+  resetAnalysisSelectionAfterClear,
   restoreAnalysisLockFromRequest,
 } from '../common';
 import {
@@ -55,7 +56,6 @@ const TokenFrequencyFeature = () => {
     nodeColumnSelections,
     setNodeColumnSelection,
     setNodeColumnSelections,
-    recomputeAutoColumns,
     activeNodeIds,
     activeNodeColumnSelections,
     panelSelectedNodes,
@@ -156,10 +156,9 @@ const TokenFrequencyFeature = () => {
     },
     onCleared: () => {
       setResultSafely(null);
-      unlockSelection();
+      resetAnalysisSelectionAfterClear({ unlockSelection });
       setLastCompareNodeIds([]);
       resetPreferenceUiState();
-      recomputeAutoColumns();
     },
     pruneGlobalTasks: (taskIds) =>
       setTasks((prev: any[]) =>

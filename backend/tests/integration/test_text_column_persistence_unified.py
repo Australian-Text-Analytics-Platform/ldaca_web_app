@@ -68,9 +68,7 @@ async def test_text_column_preference_persists_across_text_analyses(
 
     refreshed = workspace.nodes.get(node.id)
     assert refreshed is not None
-    metadata = getattr(refreshed, "metadata", {}) or {}
-    assert isinstance(metadata, dict)
-    assert metadata.get("text_column") == "text_a"
+    assert refreshed.document == "text_a"
 
     concordance_response = await authenticated_client.post(
         "/api/workspaces/concordance",
@@ -89,9 +87,7 @@ async def test_text_column_preference_persists_across_text_analyses(
 
     refreshed = workspace.nodes.get(node.id)
     assert refreshed is not None
-    metadata = getattr(refreshed, "metadata", {}) or {}
-    assert isinstance(metadata, dict)
-    assert metadata.get("text_column") == "text_b"
+    assert refreshed.document == "text_b"
 
     topic_response = await authenticated_client.post(
         "/api/workspaces/topic-modeling",

@@ -28,6 +28,7 @@ import { ANALYSIS_LOCKED_MESSAGE } from '../../../components/tabs/AnalysisLocked
 import AnalysisTaskBanner from '../../../components/tabs/AnalysisTaskBanner';
 import {
   hasLockedParameterDiff,
+  resetAnalysisSelectionAfterClear,
   restoreAnalysisLockFromRequest,
   useAnalysisLock,
   useAnalysisFeature,
@@ -305,7 +306,7 @@ const ConcordanceFeature: React.FC = () => {
       setResults(null);
       setNodePagination({});
       setCombinedPage(1);
-      unlockSelection();
+      resetAnalysisSelectionAfterClear({ unlockSelection });
     },
     pruneGlobalTasks: (taskIds) => {
       setTasks((prev) => {

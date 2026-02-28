@@ -28,6 +28,7 @@ from ....models import (
     QuotationResultQuery,
 )
 from ....settings import settings
+from ..utils import update_workspace
 from . import quotation_core as qcore
 from .current_tasks import get_current_task_ids_for_analysis
 
@@ -350,6 +351,13 @@ async def get_quotation(
 
     try:
         node = workspace_manager.get_current_workspace(user_id).nodes[node_id]
+        try:
+            node.document = request.column
+            update_workspace(user_id, workspace_id, best_effort=True)
+        except Exception:
+            # Best-effort persistence only; do not block analysis.
+            pass
+
         engine = request.engine or QuotationEngineConfig()
 
         page, page_size = qcore.normalize_pagination(request.page, request.page_size)

@@ -42,6 +42,7 @@ import {
   getNodeIdentifier,
   getServerEngineConfig,
   hasLockedParameterDiff,
+  resetAnalysisSelectionAfterClear,
   restoreAnalysisLockFromRequest,
   useAnalysisLock,
   useAnalysisFeature,
@@ -275,7 +276,6 @@ const QuotationFeature: React.FC = () => {
     activeNodeColumnSelections,
     panelSelectedNodes,
     displayNodeCount,
-    hasServerRequest,
     serverRequest,
   } = useAnalysisLock({
     analysisType: 'quotation_analysis',
@@ -377,8 +377,6 @@ const QuotationFeature: React.FC = () => {
 
   const {
     resolveTaskId,
-    localTaskId: localQuotationTaskId,
-    setLocalTaskId: setLocalQuotationTaskId,
     banner: quotationWaitingBanner,
     hasActiveTask,
     clearResults,
@@ -393,7 +391,7 @@ const QuotationFeature: React.FC = () => {
       textApi.getQuotationTaskResult(taskId, headers),
     fetchRequest: async (taskId, headers) =>
       textApi.getQuotationTaskRequest(taskId, headers),
-    onResultFetched: (result, taskId) => {
+    onResultFetched: (result, _taskId) => {
       if (!result) return;
       const targetNode =
         (isLocked && lockedNodesSnapshot.length ? lockedNodesSnapshot[0] : displayedNodes[0]) as any;
@@ -457,9 +455,7 @@ const QuotationFeature: React.FC = () => {
       setHasLoaded(false);
       setResultsByNode({});
       setNodeState({});
-      unlockSelection();
-      setNodeColumnSelections([], { replace: true, persist: false });
-      recomputeAutoColumns();
+      resetAnalysisSelectionAfterClear({ unlockSelection });
     },
   });
 

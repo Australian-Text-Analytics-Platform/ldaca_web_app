@@ -86,8 +86,7 @@ async def test_concordance_single_node_roundtrip(authenticated_client, workspace
         "speaker": ["A", "B", "C"],
     })
     node = _add_node(workspace_id, df.lazy(), "single_text_node")
-    if hasattr(node, "set_metadata"):
-        node.set_metadata("text_column", "text")
+    node.document = "text"
     assert node is not None
 
     request_payload = {
@@ -216,11 +215,9 @@ async def test_concordance_multi_node_combined(authenticated_client, workspace_i
     })
 
     left_node = _add_node(workspace_id, df_left.lazy(), "left_docs")
-    if hasattr(left_node, "set_metadata"):
-        left_node.set_metadata("text_column", "text")
+    left_node.document = "text"
     right_node = _add_node(workspace_id, df_right.lazy(), "right_docs")
-    if hasattr(right_node, "set_metadata"):
-        right_node.set_metadata("text_column", "text")
+    right_node.document = "text"
 
     request_payload = {
         "node_ids": [left_node.id, right_node.id],
@@ -292,11 +289,9 @@ async def test_concordance_combined_toggle_after_separated_request(
     })
 
     left_node = _add_node(workspace_id, df_left.lazy(), "left_docs")
-    if hasattr(left_node, "set_metadata"):
-        left_node.set_metadata("text_column", "text")
+    left_node.document = "text"
     right_node = _add_node(workspace_id, df_right.lazy(), "right_docs")
-    if hasattr(right_node, "set_metadata"):
-        right_node.set_metadata("text_column", "text")
+    right_node.document = "text"
 
     request_payload = {
         "node_ids": [left_node.id, right_node.id],
@@ -358,11 +353,9 @@ async def test_concordance_combined_handles_mismatched_columns(
     })
 
     left_node = _add_node(workspace_id, left_df.lazy(), "left_docs")
-    if hasattr(left_node, "set_metadata"):
-        left_node.set_metadata("text_column", "text")
+    left_node.document = "text"
     right_node = _add_node(workspace_id, right_df.lazy(), "right_docs")
-    if hasattr(right_node, "set_metadata"):
-        right_node.set_metadata("text_column", "text")
+    right_node.document = "text"
 
     request_payload = {
         "node_ids": [left_node.id, right_node.id],

@@ -438,9 +438,9 @@ class WorkerTaskManager:
                             user_id, workspace_id, target_dir
                         )
 
-                        if new_node and doc_col and hasattr(new_node, "set_metadata"):
+                        if new_node and doc_col:
                             try:
-                                new_node.set_metadata("text_column", doc_col)
+                                new_node.document = doc_col
                             except Exception:
                                 pass
 

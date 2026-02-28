@@ -12,6 +12,7 @@ import { pruneTasksById } from '../../../hooks/analysisTaskUtils';
 import {
   hasLockedParameterDiff,
   getNodeIdentifier,
+  resetAnalysisSelectionAfterClear,
   restoreAnalysisLockFromRequest,
   useAnalysisLock,
   useAnalysisFeature,
@@ -141,9 +142,7 @@ const TopicModelingFeature: React.FC = () => {
     onCleared: () => {
       setResultSafely(null);
       setError(null);
-      unlockSelection();
-      setNodeColumnSelections([], { replace: true, persist: false });
-      recomputeAutoColumns();
+      resetAnalysisSelectionAfterClear({ unlockSelection });
     },
     pruneGlobalTasks: (taskIds) =>
       setTasks((prev: any[]) => Array.isArray(prev) ? pruneTasksById(prev, taskIds) : prev),

@@ -129,3 +129,13 @@ export const restoreAnalysisLockFromRequest = async ({
 
   return parsed;
 };
+
+export interface ResetAnalysisSelectionAfterClearArgs {
+  unlockSelection: () => void;
+}
+
+export const resetAnalysisSelectionAfterClear = ({
+  unlockSelection,
+}: ResetAnalysisSelectionAfterClearArgs): void => {
+  unlockSelection();
+};
