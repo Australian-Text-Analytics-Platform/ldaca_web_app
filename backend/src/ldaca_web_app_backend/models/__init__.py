@@ -619,26 +619,31 @@ class TokenFrequencyData(BaseModel):
 
 
 class TokenStatisticsData(BaseModel):
+    """Token-level comparative statistics.
+
+    Numeric statistics use a JSON-safe union to preserve semantic distinctions:
+    - finite number -> float
+    - positive infinity -> "+Inf"
+    - negative infinity -> "-Inf"
+    - missing/undefined -> None
+    """
+
     token: str
     freq_corpus_0: int  # O1 - observed frequency in corpus 1
     freq_corpus_1: int  # O2 - observed frequency in corpus 2
-    expected_0: float  # Expected frequency in corpus 1
-    expected_1: float  # Expected frequency in corpus 2
+    expected_0: float | str | None  # Expected frequency in corpus 1
+    expected_1: float | str | None  # Expected frequency in corpus 2
     corpus_0_total: int  # Total tokens in corpus 1
     corpus_1_total: int  # Total tokens in corpus 2
-    percent_corpus_0: float  # %1 - percentage in corpus 1
-    percent_corpus_1: float  # %2 - percentage in corpus 2
-    percent_diff: float  # %DIFF - percentage difference
-    log_likelihood_llv: float  # LL - log likelihood G2 statistic
-    bayes_factor_bic: float  # Bayes - Bayes factor (BIC)
-    effect_size_ell: float  # ELL - effect size for log likelihood
-    relative_risk: Optional[float] = (
-        None  # RRisk - relative risk ratio (can be None/infinite)
-    )
-    log_ratio: Optional[float] = (
-        None  # LogRatio - log of relative frequencies (can be None)
-    )
-    odds_ratio: Optional[float] = None  # OddsRatio - odds ratio (can be None/infinite)
+    percent_corpus_0: float | str | None  # %1 - percentage in corpus 1
+    percent_corpus_1: float | str | None  # %2 - percentage in corpus 2
+    percent_diff: float | str | None  # %DIFF - percentage difference
+    log_likelihood_llv: float | str | None  # LL - log likelihood G2 statistic
+    bayes_factor_bic: float | str | None  # Bayes - Bayes factor (BIC)
+    effect_size_ell: float | str | None  # ELL - effect size for log likelihood
+    relative_risk: float | str | None = None  # RRisk - relative risk ratio
+    log_ratio: float | str | None = None  # LogRatio - log of relative frequencies
+    odds_ratio: float | str | None = None  # OddsRatio - odds ratio
     significance: str  # Significance level indicator
 
 

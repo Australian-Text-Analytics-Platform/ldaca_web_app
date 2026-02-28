@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { TokenFrequencyResponse } from '@/api/text';
 import { textApi } from '@/api/text';
 import { clampDisplayTokenLimit, DEFAULT_TOKEN_LIMIT, toFiniteNumber } from '../../common';
@@ -32,7 +32,7 @@ export const useTokenFrequencyPreferences = ({
   const [tokenLimitError, setTokenLimitError] = useState<string | null>(null);
   const [isApplyingTokenLimit, setIsApplyingTokenLimit] = useState(false);
 
-  const applyTokenLimitState = (rawLimit: number | null | undefined) => {
+  const applyTokenLimitState = useCallback((rawLimit: number | null | undefined) => {
     const target = typeof rawLimit === 'number' && Number.isFinite(rawLimit) && rawLimit > 0
       ? rawLimit
       : DEFAULT_TOKEN_LIMIT;
@@ -41,7 +41,7 @@ export const useTokenFrequencyPreferences = ({
     setTokenLimitOverride(inputLimit);
     setTokenLimitInput(String(inputLimit));
     setTokenLimitError(null);
-  };
+  }, [maxTokenLimitInput]);
 
   useEffect(() => {
     const backendLimit =
@@ -240,13 +240,6 @@ export const useTokenFrequencyPreferences = ({
     void applyTokenLimitWithValidation();
   };
 
-  const handleTokenLimitKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      void applyTokenLimitWithValidation();
-    }
-  };
-
   const handleFillDefaultStopWords = async () => {
     setIsLoadingStopWords(true);
     try {
@@ -284,7 +277,6 @@ export const useTokenFrequencyPreferences = ({
     applyStopSetFromText,
     handleTokenLimitInputChange,
     handleTokenLimitBlur,
-    handleTokenLimitKeyDown,
     handleFillDefaultStopWords,
     persistTokenPreferences,
     resetPreferenceUiState,

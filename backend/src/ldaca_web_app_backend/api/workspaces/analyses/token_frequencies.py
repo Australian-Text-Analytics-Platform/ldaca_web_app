@@ -144,15 +144,19 @@ def _server_limit(token_limit: int) -> int:
     )
 
 
-def _safe_float(value, default: float | None = 0.0):
+def _safe_float(value) -> float | str | None:
     if value is None:
-        return default
+        return None
     try:
         numeric = float(value)
     except TypeError, ValueError:
-        return default
-    if not math.isfinite(numeric):
-        return default
+        return None
+    if math.isnan(numeric):
+        return None
+    if numeric == math.inf:
+        return "+Inf"
+    if numeric == -math.inf:
+        return "-Inf"
     return numeric
 
 
@@ -222,31 +226,19 @@ def _rebuild_token_result(task: AnalysisTask) -> dict:
                 "token": str(row.get("token") or ""),
                 "freq_corpus_0": int(row.get("freq_corpus_0") or 0),
                 "freq_corpus_1": int(row.get("freq_corpus_1") or 0),
-                "expected_0": _safe_float(row.get("expected_0"), 0.0),
-                "expected_1": _safe_float(row.get("expected_1"), 0.0),
+                "expected_0": _safe_float(row.get("expected_0")),
+                "expected_1": _safe_float(row.get("expected_1")),
                 "corpus_0_total": int(row.get("corpus_0_total") or 0),
                 "corpus_1_total": int(row.get("corpus_1_total") or 0),
-                "percent_corpus_0": _safe_float(row.get("percent_corpus_0"), 0.0),
-                "percent_corpus_1": _safe_float(row.get("percent_corpus_1"), 0.0),
-                "percent_diff": _safe_float(row.get("percent_diff"), 0.0),
-                "log_likelihood_llv": _safe_float(row.get("log_likelihood_llv"), 0.0),
-                "bayes_factor_bic": _safe_float(row.get("bayes_factor_bic"), 0.0),
-                "effect_size_ell": _safe_float(row.get("effect_size_ell"), 0.0),
-                "relative_risk": (
-                    _safe_float(row.get("relative_risk"), None)
-                    if row.get("relative_risk") is not None
-                    else None
-                ),
-                "log_ratio": (
-                    _safe_float(row.get("log_ratio"), None)
-                    if row.get("log_ratio") is not None
-                    else None
-                ),
-                "odds_ratio": (
-                    _safe_float(row.get("odds_ratio"), None)
-                    if row.get("odds_ratio") is not None
-                    else None
-                ),
+                "percent_corpus_0": _safe_float(row.get("percent_corpus_0")),
+                "percent_corpus_1": _safe_float(row.get("percent_corpus_1")),
+                "percent_diff": _safe_float(row.get("percent_diff")),
+                "log_likelihood_llv": _safe_float(row.get("log_likelihood_llv")),
+                "bayes_factor_bic": _safe_float(row.get("bayes_factor_bic")),
+                "effect_size_ell": _safe_float(row.get("effect_size_ell")),
+                "relative_risk": _safe_float(row.get("relative_risk")),
+                "log_ratio": _safe_float(row.get("log_ratio")),
+                "odds_ratio": _safe_float(row.get("odds_ratio")),
                 "significance": str(row.get("significance") or ""),
             }
             for row in stats_df.to_dicts()

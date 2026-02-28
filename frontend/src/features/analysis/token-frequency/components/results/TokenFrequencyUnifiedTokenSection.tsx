@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Download, SortAsc, SortDesc } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import HelpIcon from '@/components/help/HelpIcon';
 import { Wordcloud } from '@visx/wordcloud';
 import { Text } from '@visx/text';
 
@@ -34,6 +35,130 @@ type TokenFrequencyUnifiedTokenSectionProps = {
   onStatsRowsPerPageChange: (rows: number) => void;
   onDownloadFrequencyCsv: (label: string, rows: any[]) => void;
 };
+
+type StatisticsColumn = {
+  key: string;
+  label: string;
+  className?: string;
+  render?: (value: unknown, row: any) => React.ReactNode;
+};
+
+const parseStatisticsNumericValue = (value: unknown): number => {
+  if (value === null || value === undefined) return NaN;
+  if (value === '+Inf') return Number.POSITIVE_INFINITY;
+  if (value === '-Inf') return Number.NEGATIVE_INFINITY;
+  return Number(value);
+};
+
+const formatNumber = (
+  value: unknown,
+  options: {
+    decimals?: number;
+    suffix?: string;
+    multiplier?: number;
+    fallback?: string;
+  } = {}
+) => {
+  const {
+    decimals = 2,
+    suffix = '',
+    multiplier = 1,
+    fallback = 'N/A',
+  } = options;
+  if (value === '+Inf') {
+    return `+∞${suffix}`;
+  }
+  if (value === '-Inf') {
+    return `-∞${suffix}`;
+  }
+  const parsed = parseStatisticsNumericValue(value);
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+  return `${(parsed * multiplier).toFixed(decimals)}${suffix}`;
+};
+
+const STATISTICS_COLUMNS: StatisticsColumn[] = [
+  { key: 'token', label: 'Token', className: 'font-medium' },
+  { key: 'freq_corpus_0', label: 'O1', className: 'tabular-nums' },
+  {
+    key: 'percent_corpus_0',
+    label: '%1',
+    className: 'tabular-nums',
+    render: (value) => formatNumber(value, { decimals: 2, suffix: '%' }),
+  },
+  { key: 'freq_corpus_1', label: 'O2', className: 'tabular-nums' },
+  {
+    key: 'percent_corpus_1',
+    label: '%2',
+    className: 'tabular-nums',
+    render: (value) => formatNumber(value, { decimals: 2, suffix: '%' }),
+  },
+  {
+    key: 'log_likelihood_llv',
+    label: 'LL',
+    className: 'tabular-nums',
+    render: (value) => formatNumber(value, { decimals: 2 }),
+  },
+  {
+    key: 'percent_diff',
+    label: '%DIFF',
+    className: 'tabular-nums',
+    render: (value) => formatNumber(value, { decimals: 2, suffix: '%', multiplier: 100 }),
+  },
+  {
+    key: 'bayes_factor_bic',
+    label: 'Bayes',
+    className: 'tabular-nums',
+    render: (value) => formatNumber(value, { decimals: 2 }),
+  },
+  {
+    key: 'effect_size_ell',
+    label: 'ELL',
+    className: 'tabular-nums',
+    render: (value) => formatNumber(value, { decimals: 4 }),
+  },
+  {
+    key: 'relative_risk',
+    label: 'RRisk',
+    className: 'tabular-nums',
+    render: (value) => formatNumber(value, { decimals: 2 }),
+  },
+  {
+    key: 'log_ratio',
+    label: 'LogRatio',
+    className: 'tabular-nums',
+    render: (value) => formatNumber(value, { decimals: 4 }),
+  },
+  {
+    key: 'odds_ratio',
+    label: 'OddsRatio',
+    className: 'tabular-nums',
+    render: (value) => formatNumber(value, { decimals: 2 }),
+  },
+  {
+    key: 'significance',
+    label: 'Significance',
+    render: (_value, row) => {
+      const significance = String(row?.significance ?? '');
+      const badgeClass =
+        significance === '****'
+          ? 'bg-red-100 text-red-800'
+          : significance === '***'
+            ? 'bg-orange-100 text-orange-800'
+            : significance === '**'
+              ? 'bg-yellow-100 text-yellow-800'
+              : significance === '*'
+                ? 'bg-green-100 text-green-800'
+                : 'bg-muted text-muted-foreground';
+      return (
+        <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${badgeClass}`}>
+          {significance || 'n.s.'}
+        </span>
+      );
+    },
+  },
+];
 
 export const TokenFrequencyUnifiedTokenSection = ({
   normalizedNodeResults,
@@ -86,14 +211,17 @@ export const TokenFrequencyUnifiedTokenSection = ({
       token: String(s?.token ?? ''),
       o1: Number(s?.freq_corpus_0) || 0,
       o2: Number(s?.freq_corpus_1) || 0,
-      p1: Number(s?.percent_corpus_0) || 0,
-      p2: Number(s?.percent_corpus_1) || 0,
-      logratio: Number(s?.log_ratio) || 0,
+      p1: parseStatisticsNumericValue(s?.percent_corpus_0),
+      p2: parseStatisticsNumericValue(s?.percent_corpus_1),
+      logratio: parseStatisticsNumericValue(s?.log_ratio),
     }))
     .map((s: any) => ({
       ...s,
       total: s.o1 + s.o2,
-      juxRank: (s.o1 + s.o2) > 0 ? Math.log10(s.o1 + s.o2) * (s.logratio || 0) : 0,
+      juxRank:
+        (s.o1 + s.o2) > 0 && Number.isFinite(s.logratio)
+          ? Math.log10(s.o1 + s.o2) * s.logratio
+          : 0,
     }))
     .filter((s: any) => s.token.length > 0 && s.total > 10);
 
@@ -161,8 +289,15 @@ export const TokenFrequencyUnifiedTokenSection = ({
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between gap-2">
-            <CardTitle className="text-base font-semibold">Unified tokens</CardTitle>
-            <Button variant="outline" size="sm" onClick={() => onDownloadWordCloud('unified', 'Unified tokens')}>
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-base font-semibold">Unified Word Cloud</CardTitle>
+              <HelpIcon
+                targetKey="analysis.token-frequency.unified-word-cloud"
+                label="Unified word cloud"
+                tooltip="Shows a combined comparative word cloud for the selected node pair."
+              />
+            </div>
+            <Button variant="outline" size="sm" onClick={() => onDownloadWordCloud('unified', 'Unified Word Cloud')}>
               <Download className="mr-2 h-4 w-4" />
               Cloud
             </Button>
@@ -244,7 +379,14 @@ export const TokenFrequencyUnifiedTokenSection = ({
       {sortedStatistics.length > 0 && (
         <div className="space-y-3 rounded-lg border p-4">
           <div className="flex items-center justify-between">
-            <h4 className="font-semibold">Keyness statistics</h4>
+            <div className="flex items-center gap-2">
+              <h4 className="font-semibold">Statistics</h4>
+              <HelpIcon
+                targetKey="analysis.token-frequency.statistical-measures"
+                label="Statistics"
+                tooltip="Displays comparative token-level statistical measures for the selected nodes."
+              />
+            </div>
             <Button
               variant="outline"
               size="sm"
@@ -256,21 +398,15 @@ export const TokenFrequencyUnifiedTokenSection = ({
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full min-w-200 border-collapse text-sm">
+            <table className="w-full min-w-300 border-collapse text-sm">
               <thead>
                 <tr className="border-b text-left">
-                  {[
-                    ['token', 'Token'],
-                    ['freq_corpus_0', 'Freq A'],
-                    ['freq_corpus_1', 'Freq B'],
-                    ['log_likelihood_llv', 'LogL'],
-                    ['log_ratio', 'Log Ratio'],
-                  ].map(([column, label]) => {
-                    const isActive = statsSortColumn === column;
+                  {STATISTICS_COLUMNS.map((column) => {
+                    const isActive = statsSortColumn === column.key;
                     return (
-                      <th key={column} className="px-2 py-2">
-                        <Button variant="ghost" size="sm" className="h-auto px-0" onClick={() => onToggleStatsSort(column)}>
-                          {label}
+                      <th key={column.key} className="px-2 py-2 whitespace-nowrap">
+                        <Button variant="ghost" size="sm" className="h-auto px-0" onClick={() => onToggleStatsSort(column.key)}>
+                          {column.label}
                           {isActive ? (
                             statsSortDirection === 'asc' ? <SortAsc className="ml-1 h-3.5 w-3.5" /> : <SortDesc className="ml-1 h-3.5 w-3.5" />
                           ) : null}
@@ -283,11 +419,15 @@ export const TokenFrequencyUnifiedTokenSection = ({
               <tbody>
                 {pagedStatistics.map((stat, idx) => (
                   <tr key={`${stat.token}-${idx}`} className="border-b last:border-b-0">
-                    <td className="px-2 py-1 font-medium">{stat.token}</td>
-                    <td className="px-2 py-1 tabular-nums">{stat.freq_corpus_0}</td>
-                    <td className="px-2 py-1 tabular-nums">{stat.freq_corpus_1}</td>
-                    <td className="px-2 py-1 tabular-nums">{stat.log_likelihood_llv}</td>
-                    <td className="px-2 py-1 tabular-nums">{stat.log_ratio}</td>
+                    {STATISTICS_COLUMNS.map((column) => {
+                      const rawValue = stat?.[column.key];
+                      const content = column.render ? column.render(rawValue, stat) : (rawValue ?? '');
+                      return (
+                        <td key={`${column.key}-${idx}`} className={`px-2 py-1 whitespace-nowrap ${column.className ?? ''}`}>
+                          {content}
+                        </td>
+                      );
+                    })}
                   </tr>
                 ))}
               </tbody>
@@ -313,12 +453,23 @@ export const TokenFrequencyUnifiedTokenSection = ({
               />
             </div>
             <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" disabled={safeStatsPage <= 1} onClick={() => onStatsPageChange(1)}>
+                First
+              </Button>
               <Button variant="outline" size="sm" disabled={safeStatsPage <= 1} onClick={() => onStatsPageChange(safeStatsPage - 1)}>
                 Previous
               </Button>
               <span className="text-xs text-muted-foreground">Page {safeStatsPage} / {statisticsPageCount}</span>
               <Button variant="outline" size="sm" disabled={safeStatsPage >= statisticsPageCount} onClick={() => onStatsPageChange(safeStatsPage + 1)}>
                 Next
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={safeStatsPage >= statisticsPageCount}
+                onClick={() => onStatsPageChange(statisticsPageCount)}
+              >
+                Last
               </Button>
             </div>
           </div>

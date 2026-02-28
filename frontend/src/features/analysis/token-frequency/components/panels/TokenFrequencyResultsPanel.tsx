@@ -33,7 +33,6 @@ type TokenFrequencyResultsPanelProps = {
   tokenLimitInput: string;
   onTokenLimitInputChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onTokenLimitBlur: () => void;
-  onTokenLimitKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => void;
   tokenLimitError: string | null;
   isApplyingTokenLimit: boolean;
 
@@ -82,7 +81,6 @@ export const TokenFrequencyResultsPanel = ({
   tokenLimitInput,
   onTokenLimitInputChange,
   onTokenLimitBlur,
-  onTokenLimitKeyDown,
   tokenLimitError,
   isApplyingTokenLimit,
   appliedStopCount,
@@ -204,7 +202,6 @@ export const TokenFrequencyResultsPanel = ({
                   value={tokenLimitInput}
                   onChange={onTokenLimitInputChange}
                   onBlur={onTokenLimitBlur}
-                  onKeyDown={onTokenLimitKeyDown}
                 />
                 <Button type="button" variant="outline" size="sm" onClick={onTokenLimitBlur} disabled={isApplyingTokenLimit}>
                   <Wand2 className="mr-1 h-3.5 w-3.5" />

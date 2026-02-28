@@ -41,7 +41,8 @@ import { useUIStore } from '../../../stores/uiStore';
 
 const DEFAULT_TOKEN_LIMIT = 100;
 const MAX_TOKEN_LIMIT_INPUT = 100;
-const UNIFIED_WORDCLOUD_HEIGHT = 480;
+const UNIFIED_WORDCLOUD_WIDTH = 640;
+const UNIFIED_WORDCLOUD_HEIGHT = 340;
 
 const TOKEN_FREQUENCY_PALETTE = ['#3b82f6', '#ef4444', '#10b981', '#a855f7', '#f59e0b'];
 
@@ -189,7 +190,6 @@ const TokenFrequencyFeature = () => {
     applyStopSetFromText,
     handleTokenLimitInputChange,
     handleTokenLimitBlur,
-    handleTokenLimitKeyDown,
     handleFillDefaultStopWords,
     resetPreferenceUiState,
   } = useTokenFrequencyPreferences({
@@ -380,7 +380,6 @@ const TokenFrequencyFeature = () => {
         tokenLimitInput={tokenLimitInput}
         onTokenLimitInputChange={handleTokenLimitInputChange}
         onTokenLimitBlur={handleTokenLimitBlur}
-        onTokenLimitKeyDown={handleTokenLimitKeyDown}
         tokenLimitError={tokenLimitError}
         isApplyingTokenLimit={isApplyingTokenLimit}
         appliedStopCount={appliedStopSet.size}
@@ -395,7 +394,7 @@ const TokenFrequencyFeature = () => {
         onDownloadWordCloud={handleDownloadWordCloud}
         onTokenClick={handleTokenClick}
         onTokenRightClick={handleTokenRightClick}
-        unifiedCloudWidth={800}
+        unifiedCloudWidth={UNIFIED_WORDCLOUD_WIDTH}
         unifiedCloudHeight={UNIFIED_WORDCLOUD_HEIGHT}
         unifiedCloudContainerRef={unifiedCloudContainerRef}
         registerWordCloudRef={registerWordCloudRef}

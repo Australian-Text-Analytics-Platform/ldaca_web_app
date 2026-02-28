@@ -62,6 +62,9 @@ export interface TokenFrequencyNodeResult {
   columns: string[];
   metadata?: Record<string, any> | null;
 }
+
+type StatisticsNumericValue = number | '+Inf' | '-Inf' | null;
+
 export interface TokenFrequencyResponse {
   state: 'running' | 'successful' | 'failed' | 'cancelled';
   message?: string;
@@ -73,16 +76,16 @@ export interface TokenFrequencyResponse {
   statistics?: Array<{
     token: string;
     freq_corpus_0: number;
-    percent_corpus_0: number;
+    percent_corpus_0: StatisticsNumericValue;
     freq_corpus_1: number;
-    percent_corpus_1: number;
-    log_likelihood_llv: number;
-    percent_diff: number;
-    bayes_factor_bic?: number;
-    effect_size_ell?: number;
-    relative_risk?: number;
-    log_ratio?: number;
-    odds_ratio?: number;
+    percent_corpus_1: StatisticsNumericValue;
+    log_likelihood_llv: StatisticsNumericValue;
+    percent_diff: StatisticsNumericValue;
+    bayes_factor_bic?: StatisticsNumericValue;
+    effect_size_ell?: StatisticsNumericValue;
+    relative_risk?: StatisticsNumericValue;
+    log_ratio?: StatisticsNumericValue;
+    odds_ratio?: StatisticsNumericValue;
     significance?: string;
   }>;
 }

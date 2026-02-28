@@ -8,6 +8,7 @@ from ldaca_web_app_backend.api.workspaces.analyses.token_frequencies import (
     DEFAULT_TOKEN_LIMIT,
     MAX_SERVER_TOKEN_LIMIT,
     SERVER_LIMIT_MULTIPLIER,
+    _safe_float,
 )
 from ldaca_web_app_backend.core.utils import get_user_data_folder
 from ldaca_web_app_backend.core.worker import token_frequencies_task
@@ -97,6 +98,13 @@ def _write_token_csv(folder, filename, start, end):
         for i in range(start, end):
             writer.writerow([f"token{i}"])
     return file_path
+
+
+def test_safe_float_preserves_missing_and_distinguishes_infinities():
+    assert _safe_float(None) is None
+    assert _safe_float(float("inf")) == "+Inf"
+    assert _safe_float(float("-inf")) == "-Inf"
+    assert _safe_float(float("nan")) is None
 
 
 @pytest.mark.anyio

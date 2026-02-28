@@ -16,6 +16,10 @@ type TokenFrequencySingleTokenSectionProps = {
 };
 
 const MAX_ROWS = 30;
+const VISIBLE_BAR_ROWS = 10;
+const BAR_ROW_HEIGHT_REM = 2;
+const BAR_ROW_GAP_REM = 0.5;
+const BAR_LIST_MAX_HEIGHT_REM = VISIBLE_BAR_ROWS * BAR_ROW_HEIGHT_REM + (VISIBLE_BAR_ROWS - 1) * BAR_ROW_GAP_REM;
 
 export const TokenFrequencySingleTokenSection = ({
   nodeDisplayResults,
@@ -110,7 +114,7 @@ export const TokenFrequencySingleTokenSection = ({
                 </svg>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-2 overflow-y-auto pr-1" style={{ maxHeight: `${BAR_LIST_MAX_HEIGHT_REM}rem` }}>
                 {displayRows.map((row) => {
                   const frequency = Number(row.frequency) || 0;
                   const widthPct = Math.max(3, Math.round((frequency / maxFrequency) * 100));

@@ -70,6 +70,13 @@ export const STATS_SORT_ACCESSORS: Record<string, (stat: any) => unknown> = {
   odds_ratio: (stat) => stat.odds_ratio,
 };
 
+const parseStatisticsNumericForSort = (value: unknown): number => {
+  if (value === null || value === undefined) return NaN;
+  if (value === '+Inf') return Number.POSITIVE_INFINITY;
+  if (value === '-Inf') return Number.NEGATIVE_INFINITY;
+  return Number(value);
+};
+
 export const buildResponseDisplayNameHints = (results?: TokenFrequencyResponse | null): Record<string, string> => {
   const mapping: Record<string, string> = {};
   const metadataNodeNames = ((results?.metadata as Record<string, unknown> | null | undefined)?.node_display_names ?? {}) as Record<string, unknown>;
@@ -261,17 +268,22 @@ export const sortStatistics = (
 
     const va = accessor(a);
     const vb = accessor(b);
-    if (typeof va === 'string' || typeof vb === 'string') {
+    if (columnKey === 'token') {
       const sa = (va ?? '').toString();
       const sb = (vb ?? '').toString();
       if (sa === sb) return 0;
       return direction * (sa < sb ? -1 : 1);
     }
 
-    const numA = Number(va);
-    const numB = Number(vb);
-    const na = Number.isFinite(numA) ? numA : -Infinity;
-    const nb = Number.isFinite(numB) ? numB : -Infinity;
-    return direction * (na - nb);
+    const numA = parseStatisticsNumericForSort(va);
+    const numB = parseStatisticsNumericForSort(vb);
+    const missingA = Number.isNaN(numA);
+    const missingB = Number.isNaN(numB);
+
+    if (missingA && missingB) return 0;
+    if (missingA) return 1;
+    if (missingB) return -1;
+
+    return direction * (numA - numB);
   });
 };
