@@ -69,19 +69,6 @@ def ensure_uv_is_available() -> None:
         raise RuntimeError("The 'uv' CLI is required but was not found in PATH")
 
 
-def sanitize_lockfile(lockfile: Path, sanitized: Path) -> None:
-    editable_prefixes = ("-e ", "--editable")
-    with (
-        lockfile.open("r", encoding="utf-8") as src,
-        sanitized.open("w", encoding="utf-8") as dest,
-    ):
-        for line in src:
-            stripped = line.lstrip()
-            if stripped.startswith(editable_prefixes):
-                continue
-            dest.write(line)
-
-
 def remove_externally_managed_markers(root: Path) -> None:
     for marker in root.rglob("EXTERNALLY-MANAGED"):
         marker.unlink()
@@ -297,7 +284,6 @@ def main() -> None:
     dist_root = output_dir.parent
     runtime_name = output_dir.name
     managed_python_dir = output_dir / "managed-python"
-    lockfile = dist_root / f"{runtime_name}-requirements.txt"
     sanitized_lockfile = dist_root / f"{runtime_name}-thirdparty.txt"
     wheel_dir = dist_root / "wheels"
     uv_packaging_env = create_uv_packaging_env(managed_python_dir)
@@ -313,28 +299,26 @@ def main() -> None:
     for d in (output_dir, dist_root, wheel_dir):
         d.mkdir(parents=True, exist_ok=True)
 
-    if lockfile.exists():
-        lockfile.unlink()
     if sanitized_lockfile.exists():
         sanitized_lockfile.unlink()
 
-    print("[INFO] Resolving dependencies...")
+    print("[INFO] Exporting third-party dependencies from uv.lock...")
     run(
         [
             "uv",
-            "pip",
-            "compile",
-            "pyproject.toml",
-            "--python-version",
+            "export",
+            "--frozen",
+            "--python",
             args.python_version,
+            "--no-editable",
+            "--no-emit-workspace",
+            "--no-header",
             "--output-file",
-            str(lockfile),
+            str(sanitized_lockfile),
         ],
-        cwd=PROJECT_ROOT,
+        cwd=WORKSPACE_ROOT,
     )
-
-    sanitize_lockfile(lockfile, sanitized_lockfile)
-    print(f"[INFO] Lockfile written to {sanitized_lockfile}")
+    print(f"[INFO] Third-party lockfile exported to {sanitized_lockfile}")
 
     print("[INFO] Setting up Python runtime via uv venv...")
     run(
@@ -442,11 +426,9 @@ def main() -> None:
         built_wheels=built_wheels,
     )
 
-    if lockfile.exists():
-        lockfile.unlink()
     if sanitized_lockfile.exists():
         sanitized_lockfile.unlink()
-        print("[INFO] Removed temporary lockfiles")
+        print("[INFO] Removed temporary third-party lockfile")
 
     print("[SUCCESS] Backend runtime created")
     print(f"   Runtime folder: {output_dir}")

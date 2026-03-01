@@ -602,6 +602,9 @@ fn main() {
                 .get_webview_window("main")
                 .ok_or_else(|| make_error("Main window not found"))?;
 
+            // Apply native webview zoom to avoid CSS layout artifacts.
+            window.set_zoom(0.95)?;
+
             // Inject backend URL as an initialization script BEFORE any page content loads
             // This ensures window.__BACKEND_URL__ is available when React boots
             window.eval(&format!(
@@ -610,76 +613,6 @@ fn main() {
                 window.__BACKEND_PORT__ = {backend_port};
                 console.log('[Tauri] Backend URL injected:', window.__BACKEND_URL__);
                 console.log('[Tauri] Backend port injected:', window.__BACKEND_PORT__);
-
-                (function() {{
-                    if (window.__LDACA_DESKTOP_ZOOM_INITIALIZED) {{
-                        return;
-                    }}
-                    window.__LDACA_DESKTOP_ZOOM_INITIALIZED = true;
-                    const STORAGE_KEY = '__ldaca_desktop_zoom';
-                    const MIN_ZOOM = 0.85;
-                    const MAX_ZOOM = 1.25;
-                    const STEP = 0.05;
-
-                    const clamp = (value) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value));
-                    let zoomValue = Number(localStorage.getItem(STORAGE_KEY));
-                    if (!Number.isFinite(zoomValue)) {{
-                        zoomValue = 0.95;
-                    }}
-                    zoomValue = clamp(zoomValue);
-
-                    const applyZoom = () => {{
-                        const target = document.body;
-                        if (!target) {{
-                            requestAnimationFrame(applyZoom);
-                            return;
-                        }}
-                        target.style.zoom = zoomValue.toString();
-                    }};
-
-                    const persistZoom = () => {{
-                        try {{
-                            localStorage.setItem(STORAGE_KEY, zoomValue.toString());
-                        }} catch (err) {{
-                            console.warn('[Tauri] Unable to persist zoom preference', err);
-                        }}
-                    }};
-
-                    const setZoom = (value) => {{
-                        zoomValue = clamp(value);
-                        applyZoom();
-                        persistZoom();
-                    }};
-
-                    const adjustZoom = (delta) => {{
-                        setZoom(zoomValue + delta);
-                    }};
-
-                    window.addEventListener('keydown', (event) => {{
-                        if (!(event.metaKey || event.ctrlKey) || event.altKey) {{
-                            return;
-                        }}
-                        if (event.key === '=' || event.key === '+') {{
-                            event.preventDefault();
-                            adjustZoom(STEP);
-                        }} else if (event.key === '-' || event.key === '_') {{
-                            event.preventDefault();
-                            adjustZoom(-STEP);
-                        }} else if (event.key === '0') {{
-                            event.preventDefault();
-                            setZoom(1.0);
-                        }} else if (event.key === 'r' || event.key === 'R') {{
-                            event.preventDefault();
-                            window.location.reload();
-                        }}
-                    }});
-
-                    if (document.readyState === 'complete' || document.readyState === 'interactive') {{
-                        applyZoom();
-                    }} else {{
-                        document.addEventListener('DOMContentLoaded', applyZoom, {{ once: true }});
-                    }}
-                }})();
                 "#,
                 backend_url = backend_url,
                 backend_port = backend_port

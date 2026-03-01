@@ -8,23 +8,23 @@ import sys
 
 
 def main():
-        """Start backend server from packaged/CLI runtime entrypoint.
+    """Start backend server from packaged/CLI runtime entrypoint.
 
-        Used by:
-        - `if __name__ == "__main__"` execution path in packaged and local CLI runs
+    Used by:
+    - `if __name__ == "__main__"` execution path in packaged and local CLI runs
 
-        Why:
-        - Coordinates startup logging, signal handling, and uvicorn app launch.
+    Why:
+    - Coordinates startup logging, signal handling, and uvicorn app launch.
 
-        Refactor note:
-        - Function is large and handles logging/process/signal/server concerns;
-            splitting into focused helpers would improve maintainability.
-        """
+    Refactor note:
+    - Function is large and handles logging/process/signal/server concerns;
+        splitting into focused helpers would improve maintainability.
+    """
     # Setup file logging immediately for packaged app debugging
     import os
-    from pathlib import Path
     from datetime import datetime
-    
+    from pathlib import Path
+
     log_file = None
     try:
         backend_runtime = os.environ.get("LDACA_BACKEND_RUNTIME")
@@ -33,13 +33,16 @@ def main():
             log_dir.mkdir(parents=True, exist_ok=True)
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             log_file_path = log_dir / f"cli_startup_{timestamp}.log"
-            log_file = open(log_file_path, "w", encoding="utf-8", buffering=1)  # Line buffered
-            
+            log_file = open(
+                log_file_path, "w", encoding="utf-8", buffering=1
+            )  # Line buffered
+
             # Redirect stdout/stderr to both console and file
             class TeeOutput:
                 def __init__(self, file_obj, original):
                     self.file = file_obj
                     self.original = original
+
                 def write(self, data):
                     try:
                         self.original.write(data)
@@ -47,30 +50,34 @@ def main():
                     except UnicodeEncodeError:
                         # Windows console may not support all Unicode characters
                         # Replace problematic characters with ASCII equivalents
-                        safe_data = data.encode('ascii', 'replace').decode('ascii')
+                        safe_data = data.encode("ascii", "replace").decode("ascii")
                         self.original.write(safe_data)
                         self.original.flush()
                     if self.file:
                         self.file.write(data)
                         self.file.flush()
+
                 def flush(self):
                     self.original.flush()
                     if self.file:
                         self.file.flush()
+
                 def isatty(self):
                     # Return False for file output (no TTY colors)
                     return False
-            
+
             sys.stdout = TeeOutput(log_file, sys.__stdout__)
             sys.stderr = TeeOutput(log_file, sys.__stderr__)
             print(f"[cli] Log file created: {log_file_path}", flush=True)
     except Exception as e:
         print(f"[cli] Failed to setup CLI logging: {e}", flush=True)
-    
+
     print("[cli] CLI main() called", flush=True)
     import uvicorn
+
     print("[cli] uvicorn imported", flush=True)
     from ldaca_web_app_backend.settings import settings
+
     print("[cli] settings imported", flush=True)
 
     # Setup cleanup handlers for child processes
@@ -160,7 +167,10 @@ def main():
 
     print("[cli] Starting LDaCA Web App Backend", flush=True)
     print(f"[cli] Data folder: {data_root}", flush=True)
-    print(f"[cli] Server: http://{settings.server_host}:{settings.backend_port}", flush=True)
+    print(
+        f"[cli] Server: http://{settings.server_host}:{settings.backend_port}",
+        flush=True,
+    )
     print(f"[cli] Multi-user mode: {settings.multi_user}", flush=True)
     print(flush=True)
 
@@ -180,10 +190,14 @@ def main():
     # which makes it harder to kill when Tauri terminates the parent
     print("[cli] Importing FastAPI app", flush=True)
     from ldaca_web_app_backend.main import app as fastapi_app
+
     print("[cli] FastAPI app imported successfully", flush=True)
 
     # Run the FastAPI app in-process (not as subprocess)
-    print(f"[cli] Starting uvicorn on {settings.server_host}:{settings.backend_port}", flush=True)
+    print(
+        f"[cli] Starting uvicorn on {settings.server_host}:{settings.backend_port}",
+        flush=True,
+    )
     print("[cli] Calling uvicorn.run()...", flush=True)
     try:
         uvicorn.run(
@@ -197,6 +211,7 @@ def main():
     except Exception as e:
         print(f"[cli] ERROR in uvicorn.run(): {e}", flush=True)
         import traceback
+
         print(f"[cli] Traceback: {traceback.format_exc()}", flush=True)
         raise
 
@@ -207,7 +222,7 @@ if __name__ == "__main__":
     # re-execute the main script. We must prevent them from starting
     # additional uvicorn servers.
     import multiprocessing as mp
-    
+
     print("[cli] __main__ block executed", flush=True)
     mp.freeze_support()  # Required for Windows frozen executables
     print(f"[cli] Current process: {mp.current_process().name}", flush=True)
@@ -219,5 +234,8 @@ if __name__ == "__main__":
         print("[cli] Running in MainProcess, starting server", flush=True)
         main()
     else:
-        print(f"[cli] Running in child process ({mp.current_process().name}), skipping server startup", flush=True)
+        print(
+            f"[cli] Running in child process ({mp.current_process().name}), skipping server startup",
+            flush=True,
+        )
     # Child processes will exit here without starting uvicorn
