@@ -64,7 +64,7 @@ async def test_compute_column_preview_adds_new_column(
     assert len(new_columns) == 1
     new_column_name = next(iter(new_columns))
     first_row = payload["data"][0]
-    assert first_row[new_column_name] == pytest.approx(1 + 5)
+    assert first_row[new_column_name] == "6"
 
 
 @pytest.mark.integration
@@ -118,5 +118,5 @@ async def test_compute_column_apply_mutates_node(authenticated_client, monkeypat
     assert payload["state"] == "successful"
     collected = node.data.collect()
     assert "A_plus_B" in collected.columns
-    assert collected["A_plus_B"].to_list() == [4, 6]
+    assert collected["A_plus_B"].to_list() == ["4", "6"]
     assert persist_calls["count"] == 1

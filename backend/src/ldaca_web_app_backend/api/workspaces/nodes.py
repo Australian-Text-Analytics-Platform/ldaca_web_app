@@ -409,7 +409,7 @@ async def compute_column_preview(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     column_name = _resolve_expression_column_name(request)
-    expr = expr.alias(column_name)
+    expr = expr.cast(pl.Utf8, strict=False).alias(column_name)
 
     preview_limit = request.preview_limit or 50
     preview_limit = max(1, min(preview_limit, 500))
@@ -459,8 +459,10 @@ async def compute_column_apply(
     column_name = _resolve_expression_column_name(request)
 
     try:
-        expr = build_polars_expression(request.expression, columns=columns).alias(
-            column_name
+        expr = (
+            build_polars_expression(request.expression, columns=columns)
+            .cast(pl.Utf8, strict=False)
+            .alias(column_name)
         )
     except ExpressionParseError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
