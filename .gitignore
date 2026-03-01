@@ -29,10 +29,6 @@ ENV/
 env.bak/
 venv.bak/
 
-# Backend - uv
-.python-version
-uv.lock
-
 # Backend - Database & Data
 *.db
 *.sqlite
