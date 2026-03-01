@@ -206,12 +206,10 @@ class _PolarsExpressionBuilder(ast.NodeVisitor):
                 right.is_literal and isinstance(right.literal_value, str)
             ):
                 return self._wrap(
-                    pl.concat_str(
-                        [
-                            left.expr.cast(pl.Utf8, strict=False),
-                            right.expr.cast(pl.Utf8, strict=False),
-                        ]
-                    )
+                    pl.concat_str([
+                        left.expr.cast(pl.Utf8, strict=False),
+                        right.expr.cast(pl.Utf8, strict=False),
+                    ])
                 )
             return self._wrap(left.expr + right.expr)
         if isinstance(op, ast.Sub):
