@@ -672,6 +672,148 @@ class TokenFrequencyResponse(BaseModel):
 
 
 # =============================================================================
+# AI ANNOTATION MODELS
+# =============================================================================
+
+
+class AiAnnotationClassDef(BaseModel):
+    name: str
+    description: str
+
+
+class AiAnnotationExample(BaseModel):
+    query: str
+    classification: str
+
+
+class AiAnnotationRequest(BaseModel):
+    node_ids: List[str]
+    node_columns: Dict[str, str]
+
+    classes: List[AiAnnotationClassDef] = Field(min_length=1)
+    examples: List[AiAnnotationExample] = Field(default_factory=list)
+
+    technique: Literal["zero_shot", "few_shot", "chain_of_thought"] = "zero_shot"
+    modifier: Literal["no_modifier", "self_consistency"] = "no_modifier"
+
+    provider: Literal["openai", "gemini", "anthropic", "ollama"] = "openai"
+    model: str
+    api_key: Optional[str] = None
+    endpoint: Optional[str] = None
+
+    temperature: float = Field(default=1.0, gt=0)
+    top_p: float = Field(default=1.0, gt=0, le=1.0)
+    n_completions: int = Field(default=1, gt=0)
+    seed: Optional[int] = 42
+    reasoning_effort: Optional[Literal["low", "medium", "high"]] = None
+    enable_reasoning: bool = False
+    max_reasoning_chars: int = Field(default=150, gt=0)
+
+    page: int = 1
+    page_size: int = 20
+    sort_by: Optional[str] = None
+    descending: bool = True
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "node_ids": ["node1"],
+                "node_columns": {"node1": "document"},
+                "classes": [
+                    {"name": "support", "description": "Supportive tone"},
+                    {"name": "critical", "description": "Critical tone"},
+                ],
+                "examples": [
+                    {
+                        "query": "This policy is fantastic and fair.",
+                        "classification": "support",
+                    }
+                ],
+                "technique": "few_shot",
+                "modifier": "no_modifier",
+                "provider": "openai",
+                "model": "gpt-4o-mini",
+                "temperature": 0.7,
+                "top_p": 0.9,
+                "enable_reasoning": False,
+                "max_reasoning_chars": 150,
+            }
+        }
+    )
+
+
+class AiAnnotationDetachRequest(BaseModel):
+    column: str
+    new_node_name: Optional[str] = None
+
+    classes: List[AiAnnotationClassDef] = Field(min_length=1)
+    examples: List[AiAnnotationExample] = Field(default_factory=list)
+
+    technique: Literal["zero_shot", "few_shot", "chain_of_thought"] = "zero_shot"
+    modifier: Literal["no_modifier", "self_consistency"] = "no_modifier"
+
+    provider: Literal["openai", "gemini", "anthropic", "ollama"] = "openai"
+    model: str
+    api_key: Optional[str] = None
+    endpoint: Optional[str] = None
+
+    temperature: float = Field(default=1.0, gt=0)
+    top_p: float = Field(default=1.0, gt=0, le=1.0)
+    n_completions: int = Field(default=1, gt=0)
+    seed: Optional[int] = 42
+    reasoning_effort: Optional[Literal["low", "medium", "high"]] = None
+    enable_reasoning: bool = False
+    max_reasoning_chars: int = Field(default=150, gt=0)
+
+
+class AiAnnotationEdit(BaseModel):
+    row_index: int = Field(ge=0)
+    provider: str = Field(min_length=1)
+    annotation: str = ""
+
+
+class AiAnnotationSaveRequest(BaseModel):
+    annotation_column: Optional[str] = None
+    edits: List[AiAnnotationEdit] = Field(default_factory=list)
+
+
+class AiAnnotationResultItem(BaseModel):
+    row_index: int
+    text: str
+    classification: Optional[str] = None
+    confidence: Optional[float] = None
+    reasoning: Optional[str] = None
+    reasoning_content: Optional[str] = None
+    error: Optional[str] = None
+
+
+class AiAnnotationNodeResult(BaseModel):
+    data: List[Dict[str, Any]]
+    columns: List[str]
+    metadata: Optional[Dict[str, Any]] = None
+    pagination: Optional[Dict[str, Any]] = None
+    sorting: Optional[Dict[str, Any]] = None
+
+
+class AiAnnotationResultQuery(BaseModel):
+    page: Optional[int] = None
+    page_size: Optional[int] = None
+    sort_by: Optional[str] = None
+    descending: Optional[bool] = None
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class AiAnnotationResponse(BaseModel):
+    state: str
+    message: str
+    data: Optional[Dict[str, AiAnnotationNodeResult]] = None
+    analysis_params: Optional[Dict[str, Any]] = None
+    combinable: Optional[bool] = None
+    metadata: Optional[Dict[str, Any]] = None
+
+
+# =============================================================================
 # TOPIC MODELING MODELS
 # =============================================================================
 

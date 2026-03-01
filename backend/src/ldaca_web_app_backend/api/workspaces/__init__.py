@@ -21,6 +21,7 @@ from ...core.workspace import (
 )  # re-export for test patches expecting api.workspaces.workspace_manager
 from . import base, lifecycle, nodes
 from .analyses import (
+    ai_annotation,
     concordance,
     quotation,
     sequential_analysis,
@@ -33,6 +34,7 @@ router = APIRouter()
 router.include_router(lifecycle.router)
 router.include_router(nodes.router)
 router.include_router(base.router)
+router.include_router(ai_annotation.router)
 router.include_router(token_frequencies.router)
 router.include_router(sequential_analysis.router)
 router.include_router(quotation.router)

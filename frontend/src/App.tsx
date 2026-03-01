@@ -24,6 +24,7 @@ const TopicModelingFeature = lazy(() => import('./features/analysis/topic-modeli
 const SequentialAnalysisFeature = lazy(() => import('./features/analysis/sequential-analysis/SequentialAnalysisFeature'));
 const ExportFeature = lazy(() => import('./features/analysis/export/ExportFeature'));
 const TokenFrequencyFeature = lazy(() => import('./features/analysis/token-frequency/TokenFrequencyFeature'));
+const AiAnnotatorFeature = lazy(() => import('./features/analysis/ai-annotator/AiAnnotatorFeature'));
 
 const REFRESH_CHIP_DELAY_MS = 3000;
 const LAG_HINT_DELAY_MS = 8000;
@@ -286,6 +287,7 @@ const WorkspaceShell: React.FC = () => {
                             {currentView === 'analysis' && <SequentialAnalysisFeature />}
                             {currentView === 'topic-modeling' && <TopicModelingFeature />}
                             {currentView === 'quotation' && <QuotationFeature />}
+                            {currentView === 'ai-annotator' && <AiAnnotatorFeature />}
                             {currentView === 'export' && <ExportFeature />}
                           </Suspense>
                         </ErrorBoundary>

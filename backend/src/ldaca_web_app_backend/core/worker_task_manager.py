@@ -393,7 +393,11 @@ class WorkerTaskManager:
                 task_type = task_info.task_type
 
                 # Handle DETACH tasks (add node to workspace)
-                if task_type in ["concordance_detach", "quotation_detach"]:
+                if task_type in [
+                    "concordance_detach",
+                    "quotation_detach",
+                    "ai_annotation_detach",
+                ]:
                     try:
                         import polars as pl
                         from docworkspace import Node

@@ -18,6 +18,7 @@ export type ViewType =
   | 'analysis'
   | 'topic-modeling'
   | 'quotation'
+  | 'ai-annotator'
   | 'export';
 
 interface UIState {

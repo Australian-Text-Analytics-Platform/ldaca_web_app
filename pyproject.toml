@@ -10,12 +10,14 @@ dependencies = [
 [tool.uv.workspace]
 members = [
     "backend",
+    "backend/ai-annotator",
     "backend/docworkspace",
     "backend/ldaca-tabulator",
     "backend/polars-text"
 ]
 
 [tool.uv.sources]
+classifier-fastapi = { workspace = true }
 docworkspace = { workspace = true }
 ldaca-web-app-backend = { workspace = true }
 ldaca-loader = { workspace = true }

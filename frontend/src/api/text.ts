@@ -118,6 +118,117 @@ export interface TopicModelingDetachResponse {
   metadata?: { task_id?: string; [k: string]: any };
 }
 
+export interface AiAnnotationClassDef {
+  name: string;
+  description: string;
+}
+
+export interface AiAnnotationExample {
+  query: string;
+  classification: string;
+}
+
+export interface AiAnnotationRequest {
+  node_ids: string[];
+  node_columns: Record<string, string>;
+  classes: AiAnnotationClassDef[];
+  examples?: AiAnnotationExample[];
+  technique?: 'zero_shot' | 'few_shot' | 'chain_of_thought';
+  modifier?: 'no_modifier' | 'self_consistency';
+  provider?: 'openai' | 'gemini' | 'anthropic' | 'ollama';
+  model: string;
+  api_key?: string | null;
+  endpoint?: string | null;
+  temperature?: number;
+  top_p?: number;
+  n_completions?: number;
+  seed?: number | null;
+  reasoning_effort?: 'low' | 'medium' | 'high' | null;
+  enable_reasoning?: boolean;
+  max_reasoning_chars?: number;
+  page?: number;
+  page_size?: number;
+  sort_by?: string | null;
+  descending?: boolean;
+}
+
+export interface AiAnnotationDetachRequest {
+  column: string;
+  new_node_name?: string | null;
+  classes: AiAnnotationClassDef[];
+  examples?: AiAnnotationExample[];
+  technique?: 'zero_shot' | 'few_shot' | 'chain_of_thought';
+  modifier?: 'no_modifier' | 'self_consistency';
+  provider?: 'openai' | 'gemini' | 'anthropic' | 'ollama';
+  model: string;
+  api_key?: string | null;
+  endpoint?: string | null;
+  temperature?: number;
+  top_p?: number;
+  n_completions?: number;
+  seed?: number | null;
+  reasoning_effort?: 'low' | 'medium' | 'high' | null;
+  enable_reasoning?: boolean;
+  max_reasoning_chars?: number;
+}
+
+export interface AiAnnotationEdit {
+  row_index: number;
+  provider: string;
+  annotation: string;
+}
+
+export interface AiAnnotationSaveRequest {
+  annotation_column?: string | null;
+  edits: AiAnnotationEdit[];
+}
+
+export interface AiAnnotationNodeResult {
+  data: Array<Record<string, unknown>>;
+  columns: string[];
+  metadata?: Record<string, unknown>;
+  pagination?: {
+    page: number;
+    page_size: number;
+    total_source_rows?: number;
+    total_source_pages?: number;
+    result_count?: number;
+    has_next: boolean;
+    has_prev: boolean;
+  };
+  sorting?: {
+    sort_by?: string | null;
+    descending: boolean;
+  };
+}
+
+export interface AiAnnotationResultQuery {
+  page?: number;
+  page_size?: number;
+  sort_by?: string | null;
+  descending?: boolean;
+}
+
+export interface AiAnnotationResponse {
+  state: 'running' | 'successful' | 'failed' | 'cancelled';
+  message: string;
+  data?: Record<string, AiAnnotationNodeResult> | null;
+  analysis_params?: Record<string, unknown>;
+  combinable?: boolean;
+  metadata?: { task_id?: string; [k: string]: unknown };
+}
+
+export interface AiAnnotationModelsResponse {
+  state: 'successful' | 'failed';
+  message: string;
+  data?: {
+    providers?: Record<string, { models?: Array<{ name?: string; full_name?: string }> }>;
+    techniques?: Array<{ name?: string; description?: string }>;
+    modifiers?: Array<{ name?: string; description?: string }>;
+  };
+  metadata?: Record<string, unknown>;
+}
+
 export const textApi = {
   concordance: (req: ConcordanceAnalysisRequest, headers: Record<string,string> = {}) => post<ConcordanceAnalysisResponse>(`/workspaces/concordance`, req, headers),
   concordanceDetach: (node: string, req: ConcordanceDetachRequest, headers: Record<string,string> = {}) => post(`/workspaces/nodes/${node}/concordance/detach`, req, headers),
@@ -154,10 +265,29 @@ export const textApi = {
   topicModelingDetach: (taskId: string, req: TopicModelingDetachRequest, headers: Record<string, string> = {}) =>
     post<TopicModelingDetachResponse>(`/workspaces/topic-modeling/tasks/${taskId}/detach`, req, headers),
 
+  // AI Annotation
+  aiAnnotationModels: (headers: Record<string, string> = {}) =>
+    httpRequest<AiAnnotationModelsResponse>(`/workspaces/ai-annotation/models`, { method: 'GET', headers }),
+  aiAnnotation: (req: AiAnnotationRequest, headers: Record<string, string> = {}) =>
+    post<AiAnnotationResponse>(`/workspaces/ai-annotation`, req, headers),
+  aiAnnotationDetach: (node: string, req: AiAnnotationDetachRequest, headers: Record<string, string> = {}) =>
+    post(`/workspaces/nodes/${node}/ai-annotation/detach`, req, headers),
+  aiAnnotationSave: (node: string, req: AiAnnotationSaveRequest, headers: Record<string, string> = {}) =>
+    post(`/workspaces/nodes/${node}/ai-annotation/save`, req, headers),
+  clearAiAnnotation: (headers: Record<string, string> = {}) =>
+    httpRequest<{ state: string; message: string }>(`/workspaces/ai-annotation`, { method: 'DELETE', headers }),
+  getAiAnnotationTaskRequest: (taskId: string, headers: Record<string, string> = {}) =>
+    httpRequest(`/workspaces/ai-annotation/tasks/${taskId}/request`, { method: 'GET', headers }),
+  getAiAnnotationTaskResult: (taskId: string, headers: Record<string, string> = {}) =>
+    httpRequest<AiAnnotationResponse>(`/workspaces/ai-annotation/tasks/${taskId}/result`, { method: 'GET', headers }),
+  postAiAnnotationTaskResult: (taskId: string, body: AiAnnotationResultQuery, headers: Record<string, string> = {}) =>
+    post<AiAnnotationResponse>(`/workspaces/ai-annotation/tasks/${taskId}/result`, body, headers),
+
   getAnalysisCurrent: (analysis: string, headers: Record<string, string> = {}) => {
     const ANALYSIS_URL_SLUG: Record<string, string> = {
       concordance: 'concordance',
       concordance_analysis: 'concordance',
+      ai_annotation: 'ai-annotation',
       quotation: 'quotation',
       quotation_analysis: 'quotation',
       token_frequencies: 'token-frequencies',

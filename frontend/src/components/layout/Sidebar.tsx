@@ -36,6 +36,7 @@ import type {
 import {
   BarChart3,
   BookOpen,
+  Bot,
   Circle,
   Cog,
   FileText,
@@ -77,6 +78,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'analysis', label: 'Sequential Analysis', icon: BarChart3 },
   { id: 'topic-modeling', label: 'Topic Modeling', icon: Puzzle },
   { id: 'quotation', label: 'Quotation', icon: Quote },
+  { id: 'ai-annotator', label: 'AI Annotator', icon: Bot },
   { id: 'export', label: 'Export', icon: Upload },
 ];
 

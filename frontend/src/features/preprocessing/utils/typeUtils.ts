@@ -4,6 +4,15 @@
 export const normalizeTypeName = (type: string): string => {
   const lowercaseType = type.toLowerCase();
   if (
+    lowercaseType === 'annotation' ||
+    (lowercaseType.includes('list') &&
+      lowercaseType.includes('struct') &&
+      lowercaseType.includes('provider') &&
+      lowercaseType.includes('annotation'))
+  ) {
+    return 'annotation';
+  }
+  if (
     lowercaseType === 'list_string' ||
     lowercaseType.includes('list(string') ||
     lowercaseType.includes('list[utf8') ||

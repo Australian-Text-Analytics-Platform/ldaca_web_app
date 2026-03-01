@@ -1,5 +1,6 @@
 """DocWorkspace data-type and schema conversion utilities for FastAPI."""
 
+from dataclasses import dataclass
 from typing import Any, List
 
 import polars as pl
@@ -8,12 +9,30 @@ import polars as pl
 from .api_models import ColumnSchema
 
 
+@dataclass(frozen=True)
+class Annotation:
+    """Semantic annotation value stored in annotation-typed columns."""
+
+    provider: str
+    annotation: str
+
+
+ANNOTATION_POLARS_DTYPE = pl.List(
+    pl.Struct([
+        pl.Field("provider", pl.Utf8),
+        pl.Field("annotation", pl.Utf8),
+    ])
+)
+
+
 class DocWorkspaceDataTypeUtils:
     """Utilities for DocWorkspace dtype mapping and schema serialization."""
 
     @staticmethod
     def polars_dtype_to_ldaca_dtype(polars_dtype: pl.DataType) -> str:
         """Convert Polars dtype into LDaCA-controlled dtype categories."""
+        if polars_dtype == ANNOTATION_POLARS_DTYPE:
+            return "annotation"
         if polars_dtype in (
             pl.Int8,
             pl.Int16,

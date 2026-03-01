@@ -2,6 +2,7 @@ import { NodeSchemaResponse } from '../../../../types';
 
 export const DATA_TYPES = [
   { value: 'string', label: 'string' },
+  { value: 'annotation', label: 'annotation' },
   { value: 'categorical', label: 'categorical' },
   { value: 'integer', label: 'integer' },
   { value: 'float', label: 'float' },
@@ -30,6 +31,15 @@ export const extractColumnTypes = (
 
 export const normalizeTypeName = (type: string): string => {
   const lowercaseType = type.toLowerCase();
+  if (
+    lowercaseType === 'annotation' ||
+    (lowercaseType.includes('list') &&
+      lowercaseType.includes('struct') &&
+      lowercaseType.includes('provider') &&
+      lowercaseType.includes('annotation'))
+  ) {
+    return 'annotation';
+  }
   if (
     lowercaseType === 'list_string' ||
     lowercaseType.includes('list(string') ||

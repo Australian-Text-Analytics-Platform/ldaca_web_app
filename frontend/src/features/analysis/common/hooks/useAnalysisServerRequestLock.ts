@@ -6,6 +6,7 @@ export type ServerLockAnalysisType =
   | 'token_frequencies'
   | 'quotation_analysis'
   | 'concordance_analysis'
+  | 'ai_annotation'
   | 'topic_modeling'
   | 'sequential_analysis';
 
@@ -13,6 +14,7 @@ const ANALYSIS_REQUEST_FN: Record<ServerLockAnalysisType, (taskId: string, heade
   token_frequencies: textApi.getTokenFrequenciesTaskRequest,
   quotation_analysis: textApi.getQuotationTaskRequest,
   concordance_analysis: textApi.getConcordanceTaskRequest,
+  ai_annotation: textApi.getAiAnnotationTaskRequest,
   topic_modeling: textApi.getTopicModelingTaskRequest,
   sequential_analysis: textApi.getSequentialAnalysisTaskRequest,
 };

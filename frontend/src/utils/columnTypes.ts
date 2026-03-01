@@ -11,7 +11,7 @@ export interface ColumnInfo {
  * Handles Polars, Pandas, and generic type strings.
  * 
  * @param type - Raw type string from backend (e.g., 'Utf8', 'Int64', 'Datetime')
- * @returns Normalized type name ('string', 'integer', 'float', 'datetime', 'boolean', 'categorical', 'list_string', 'unknown', 'struct')
+ * @returns Normalized type name ('string', 'integer', 'float', 'datetime', 'boolean', 'categorical', 'list_string', 'annotation', 'unknown', 'struct')
  * 
  * @example
  * ```ts
@@ -27,6 +27,16 @@ export const normalizeTypeName = (type?: string | null): string => {
   }
 
   const lowercaseType = type.toLowerCase();
+
+  if (
+    lowercaseType === 'annotation' ||
+    (lowercaseType.includes('list') &&
+      lowercaseType.includes('struct') &&
+      lowercaseType.includes('provider') &&
+      lowercaseType.includes('annotation'))
+  ) {
+    return 'annotation';
+  }
 
   if (
     lowercaseType === 'list_string' ||

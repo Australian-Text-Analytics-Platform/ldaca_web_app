@@ -19,7 +19,7 @@ import type { AnalysisTaskStatus } from '@/hooks/useAnalysisTaskStatus';
 
 export interface UseAnalysisFeatureConfig<TResult = unknown> {
   analysisType: ServerLockAnalysisType;
-  taskType: CanonicalAnalysisTaskType;
+  taskType: CanonicalAnalysisTaskType | string;
   workspaceId: string | null;
   getAuthHeaders: () => Record<string, string>;
   isTabActive: boolean;
