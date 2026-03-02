@@ -35,6 +35,10 @@ class AiAnnotationRequest(BaseAnalysisRequest):
     node_columns: Dict[str, str] = Field(
         ..., description="Map of node_id to column name"
     )
+    annotation_column: Optional[str] = Field(
+        default=None,
+        description="Target annotation column name. If provided, results are written to this column; otherwise a new column is created.",
+    )
 
     classes: List[AiAnnotationClassDef] = Field(
         ..., min_length=1, description="Classification labels and descriptions"

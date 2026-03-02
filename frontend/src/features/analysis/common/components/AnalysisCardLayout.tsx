@@ -23,6 +23,7 @@ type AnalysisCardLayoutProps = {
     isRunning?: boolean;
     isClearing?: boolean;
     hasResult?: boolean;
+    runLabel?: string;
     runHelp?: HelpConfig;
     clearHelp?: HelpConfig;
     extraContent?: React.ReactNode;
@@ -44,7 +45,7 @@ export function AnalysisCardLayout({
 }: AnalysisCardLayoutProps) {
   const cardToneClassName = tone === 'error' ? 'border-destructive/50' : undefined;
   const runLabel = actions
-    ? (actions.isRunning ? 'Running' : actions.hasResult ? 'Update' : 'Run')
+    ? (actions.runLabel ?? (actions.isRunning ? 'Running' : actions.hasResult ? 'Update' : 'Run'))
     : 'Run';
 
   return (

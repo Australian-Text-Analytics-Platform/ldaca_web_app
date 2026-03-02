@@ -41,7 +41,14 @@ def normalize_saved_request(raw_request: Optional[dict]) -> Optional[dict]:
     return {k: v for k, v in normalized_request.items() if v is not None}
 
 
-def _resolve_annotation_column_name(base_lf: pl.LazyFrame, text_column: str) -> str:
+def _resolve_annotation_column_name(
+    base_lf: pl.LazyFrame,
+    text_column: str,
+    annotation_column: Optional[str] = None,
+) -> str:
+    if annotation_column:
+        return annotation_column
+
     preferred_name = f"{text_column}_annotation"
     schema = base_lf.collect_schema()
 
@@ -216,6 +223,7 @@ async def compute_annotation_page(
     page_size: int,
     sort_by: Optional[str],
     descending: bool,
+    annotation_column_override: Optional[str] = None,
 ) -> dict[str, Any]:
     """Compute one on-demand AI annotation page for a single node source."""
     working_lf = base_lf
@@ -235,7 +243,9 @@ async def compute_annotation_page(
     start = (page - 1) * page_size
     page_df = working_lf.slice(start, page_size).collect()
 
-    annotation_column = _resolve_annotation_column_name(working_lf, column)
+    annotation_column = _resolve_annotation_column_name(
+        working_lf, column, annotation_column_override
+    )
 
     texts: list[str] = []
     for value in page_df.get_column(column).to_list():
@@ -372,6 +382,7 @@ async def build_ai_annotation_response(
     page_size = int(request.get("page_size") or DEFAULT_AI_ANNOTATION_PAGE_SIZE)
     sort_by = request.get("sort_by")
     descending = bool(request.get("descending", DEFAULT_AI_ANNOTATION_DESCENDING))
+    annotation_column_override = request.get("annotation_column") or None
 
     node_ids = request.get("node_ids") or []
     node_sources, label_to_node_map = resolve_node_sources(
@@ -392,6 +403,7 @@ async def build_ai_annotation_response(
             page_size=page_size,
             sort_by=sort_by,
             descending=descending,
+            annotation_column_override=annotation_column_override,
         )
 
     analysis_params = {k: v for k, v in request.items() if k not in {"api_key"}}

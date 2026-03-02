@@ -195,12 +195,20 @@ def ensure_venv_libpython(
 ) -> None:
     """Copy libpython into the venv lib directory for relocatable execution.
 
-    The vendored CPython executable resolves `@rpath/libpythonX.Y.dylib` against the
-    virtualenv's `python/lib` directory when launched from the packaged app.
-    If that dylib is missing, startup fails on moved/DMG app bundles.
+    On macOS the vendored CPython resolves `@rpath/libpythonX.Y.dylib` against
+    the virtualenv's `python/lib` directory.  On Linux a similar `.so` lookup
+    applies.  On Windows the DLL lives next to `python.exe` and is found via
+    the standard DLL search order, so no manual copy is needed.
     """
+    if sys.platform == "win32":
+        print("[INFO] Skipping libpython copy (not required on Windows)")
+        return
+
     major_minor = ".".join(python_version.split(".")[:2])
-    libpython_name = f"libpython{major_minor}.dylib"
+    if sys.platform == "darwin":
+        libpython_name = f"libpython{major_minor}.dylib"
+    else:
+        libpython_name = f"libpython{major_minor}.so"
 
     source = next(
         managed_install_dir.glob(f"**/{libpython_name}"),

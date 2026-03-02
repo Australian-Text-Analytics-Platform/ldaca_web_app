@@ -131,6 +131,7 @@ export interface AiAnnotationExample {
 export interface AiAnnotationRequest {
   node_ids: string[];
   node_columns: Record<string, string>;
+  annotation_column?: string | null;
   classes: AiAnnotationClassDef[];
   examples?: AiAnnotationExample[];
   technique?: 'zero_shot' | 'few_shot' | 'chain_of_thought';
@@ -155,6 +156,7 @@ export interface AiAnnotationRequest {
 export interface AiAnnotationDetachRequest {
   column: string;
   new_node_name?: string | null;
+  annotation_column?: string | null;
   classes: AiAnnotationClassDef[];
   examples?: AiAnnotationExample[];
   technique?: 'zero_shot' | 'few_shot' | 'chain_of_thought';
@@ -229,6 +231,24 @@ export interface AiAnnotationModelsResponse {
   metadata?: Record<string, unknown>;
 }
 
+export interface AiAnnotationProvidersResponse {
+  state: 'successful' | 'failed';
+  message: string;
+  data?: {
+    providers?: string[];
+  };
+  metadata?: Record<string, unknown>;
+}
+
+export interface AiAnnotationCategoriesResponse {
+  state: 'successful' | 'failed';
+  message: string;
+  data?: {
+    categories?: string[];
+  };
+  metadata?: Record<string, unknown>;
+}
+
 export const textApi = {
   concordance: (req: ConcordanceAnalysisRequest, headers: Record<string,string> = {}) => post<ConcordanceAnalysisResponse>(`/workspaces/concordance`, req, headers),
   concordanceDetach: (node: string, req: ConcordanceDetachRequest, headers: Record<string,string> = {}) => post(`/workspaces/nodes/${node}/concordance/detach`, req, headers),
@@ -274,6 +294,18 @@ export const textApi = {
     post(`/workspaces/nodes/${node}/ai-annotation/detach`, req, headers),
   aiAnnotationSave: (node: string, req: AiAnnotationSaveRequest, headers: Record<string, string> = {}) =>
     post(`/workspaces/nodes/${node}/ai-annotation/save`, req, headers),
+  aiAnnotationProviders: (node: string, annotationColumn: string, headers: Record<string, string> = {}) =>
+    httpRequest<AiAnnotationProvidersResponse>(`/workspaces/nodes/${node}/ai-annotation/providers`, {
+      method: 'GET',
+      headers,
+      params: { annotation_column: annotationColumn },
+    }),
+  aiAnnotationCategories: (node: string, annotationColumn: string, headers: Record<string, string> = {}) =>
+    httpRequest<AiAnnotationCategoriesResponse>(`/workspaces/nodes/${node}/ai-annotation/categories`, {
+      method: 'GET',
+      headers,
+      params: { annotation_column: annotationColumn },
+    }),
   clearAiAnnotation: (headers: Record<string, string> = {}) =>
     httpRequest<{ state: string; message: string }>(`/workspaces/ai-annotation`, { method: 'DELETE', headers }),
   getAiAnnotationTaskRequest: (taskId: string, headers: Record<string, string> = {}) =>

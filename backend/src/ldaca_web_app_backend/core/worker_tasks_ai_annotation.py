@@ -12,6 +12,18 @@ def _resolve_ai_annotator_root() -> Path:
     return backend_root / "ai-annotator"
 
 
+def _drop_internal_row_index_keys(row: dict[str, Any]) -> dict[str, Any]:
+    """Remove temporary row-index keys so they are never persisted to output nodes."""
+    return {
+        key: value
+        for key, value in row.items()
+        if not (
+            key == "__row_index"
+            or (key.startswith("__row_index_") and key[len("__row_index_") :].isdigit())
+        )
+    }
+
+
 def run_ai_annotation_task(
     configure_worker_environment,
     user_id: str,
@@ -444,7 +456,7 @@ def run_ai_annotation_detach_task(
 
         updated_rows: list[dict[str, Any]] = []
         for idx, row in enumerate(node_rows):
-            row_dict = dict(row)
+            row_dict = _drop_internal_row_index_keys(dict(row))
             row_dict[annotation_column] = _merge_provider(
                 row_dict.get(annotation_column),
                 provider_name,

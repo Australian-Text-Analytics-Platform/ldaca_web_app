@@ -45,6 +45,7 @@ interface NodeSelectionPanelProps {
   statusMessage?: ReactNode; // optional inline status/warning rendered within the panel
   statusVariant?: 'info' | 'warning' | 'error';
   headerAddon?: ReactNode; // optional element rendered next to the header label
+  renderExtraNodeContent?: (args: NodeSelectionRenderArgs) => React.ReactNode;
 }
 
 /** Shared node + text-column + color selection panel reused across analysis tabs */
@@ -73,6 +74,7 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
   statusMessage,
   statusVariant = 'warning',
   headerAddon,
+  renderExtraNodeContent,
 }) => {
   const getColumnLabel = (node: WorkspaceNodeLike, idx: number) => (columnLabelFn ? columnLabelFn(node, idx) : 'Text Column:');
   // Compute stable list of selected node ids to avoid retriggering on object identity changes
@@ -202,6 +204,7 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
           onColorChange={showColorPicker ? handleNodeColorChange : undefined}
           renderNodeMeta={shouldRenderMeta ? renderMetaContent : undefined}
           renderNodeBody={showColumnPicker ? renderColumnSelector : undefined}
+          renderExtraNodeContent={renderExtraNodeContent}
         />
       )}
       {(originalCount ?? selectedNodes.length) > maxCompare && (

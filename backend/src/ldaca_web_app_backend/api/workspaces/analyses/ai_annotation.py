@@ -121,6 +121,34 @@ def _merge_annotation(
     return merged
 
 
+def _collect_with_temp_row_index(
+    lf: pl.LazyFrame,
+    base_name: str = "__row_index",
+) -> tuple[pl.DataFrame, str]:
+    """Collect a LazyFrame with a guaranteed-unique row index column name."""
+    schema = lf.collect_schema()
+    row_index_col = base_name
+    suffix = 0
+    while row_index_col in schema:
+        suffix += 1
+        row_index_col = f"{base_name}_{suffix}"
+
+    collected = lf.with_row_index(row_index_col).collect()
+    if not isinstance(collected, pl.DataFrame):
+        raise HTTPException(status_code=500, detail="Failed to collect node data")
+    return collected, row_index_col
+
+
+def _internal_row_index_columns(columns: list[str]) -> list[str]:
+    """Return internal temporary row-index column names to remove before persisting."""
+    return [
+        col
+        for col in columns
+        if col == "__row_index"
+        or (col.startswith("__row_index_") and col[len("__row_index_") :].isdigit())
+    ]
+
+
 def _ensure_ai_annotator_import_path() -> None:
     backend_root = Path(__file__).resolve().parents[5]
     ai_annotator_root = backend_root / "ai-annotator"
@@ -493,9 +521,11 @@ async def detach_ai_annotation(
             detail=f"Column '{request.column}' not found",
         )
 
-    annotation_column = _resolve_annotation_column(node_data, None, request.column)
+    annotation_column = _resolve_annotation_column(
+        node_data, request.annotation_column, request.column
+    )
 
-    source_df = node_data.with_row_index("__row_index").collect()
+    source_df, _row_index_col = _collect_with_temp_row_index(node_data)
     source_rows = source_df.to_dicts()
 
     artifact_dir, artifact_prefix = _prepare_ai_annotation_artifact_target(
@@ -591,7 +621,7 @@ async def save_ai_annotation_edits(
     for edit in request.edits:
         edit_map.setdefault(edit.row_index, []).append(edit)
 
-    source_df = node_data.with_row_index("__row_index").collect()
+    source_df, row_index_col = _collect_with_temp_row_index(node_data)
     if annotation_column not in source_df.columns:
         source_df = source_df.with_columns(
             pl.lit([], dtype=ANNOTATION_POLARS_DTYPE).alias(annotation_column)
@@ -600,7 +630,7 @@ async def save_ai_annotation_edits(
     rows = source_df.to_dicts()
     updated_rows = 0
     for row in rows:
-        row_index = int(row.get("__row_index", -1))
+        row_index = int(row.get(row_index_col, -1))
         edits_for_row = edit_map.get(row_index)
         if not edits_for_row:
             continue
@@ -616,7 +646,12 @@ async def save_ai_annotation_edits(
         row[annotation_column] = current_value
         updated_rows += 1
 
-    updated_df = pl.DataFrame(rows).drop("__row_index")
+    updated_df = pl.DataFrame(rows)
+    columns_to_drop = set(_internal_row_index_columns(updated_df.columns))
+    columns_to_drop.add(row_index_col)
+    existing_to_drop = [col for col in columns_to_drop if col in updated_df.columns]
+    if existing_to_drop:
+        updated_df = updated_df.drop(existing_to_drop)
     updated_df = updated_df.with_columns(
         pl.col(annotation_column).cast(ANNOTATION_POLARS_DTYPE, strict=False)
     )
@@ -637,4 +672,120 @@ async def save_ai_annotation_edits(
             "annotation_column": annotation_column,
             "updated_rows": updated_rows,
         },
+    }
+
+
+@router.get("/nodes/{node_id}/ai-annotation/providers")
+async def list_ai_annotation_providers(
+    node_id: str,
+    annotation_column: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Return all unique annotator/provider names for an annotation column (global across node)."""
+    user_id = current_user["id"]
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    workspace = workspace_manager.get_current_workspace(user_id)
+    if not workspace_id or workspace is None:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+
+    try:
+        node = workspace.nodes[node_id]
+    except Exception:
+        raise HTTPException(status_code=404, detail="Node not found")
+
+    node_data = getattr(node, "data", None)
+    if not isinstance(node_data, pl.LazyFrame):
+        raise HTTPException(
+            status_code=400, detail="Selected node data must be a LazyFrame"
+        )
+
+    schema = node_data.collect_schema()
+    if annotation_column not in schema:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Column '{annotation_column}' not found",
+        )
+
+    try:
+        values_df = node_data.select(pl.col(annotation_column)).collect()
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to load annotation providers: {exc}",
+        )
+
+    providers: set[str] = set()
+    for cell in values_df.get_column(annotation_column).to_list():
+        if not isinstance(cell, list):
+            continue
+        for item in cell:
+            if not isinstance(item, dict):
+                continue
+            provider_name = str(item.get("provider") or "").strip()
+            if provider_name:
+                providers.add(provider_name)
+
+    return {
+        "state": "successful",
+        "message": "AI annotation providers loaded",
+        "data": {"providers": sorted(providers)},
+        "metadata": {"annotation_column": annotation_column},
+    }
+
+
+@router.get("/nodes/{node_id}/ai-annotation/categories")
+async def list_ai_annotation_categories(
+    node_id: str,
+    annotation_column: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Return all unique annotation strings for an annotation column (global across node)."""
+    user_id = current_user["id"]
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    workspace = workspace_manager.get_current_workspace(user_id)
+    if not workspace_id or workspace is None:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+
+    try:
+        node = workspace.nodes[node_id]
+    except Exception:
+        raise HTTPException(status_code=404, detail="Node not found")
+
+    node_data = getattr(node, "data", None)
+    if not isinstance(node_data, pl.LazyFrame):
+        raise HTTPException(
+            status_code=400, detail="Selected node data must be a LazyFrame"
+        )
+
+    schema = node_data.collect_schema()
+    if annotation_column not in schema:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Column '{annotation_column}' not found",
+        )
+
+    try:
+        values_df = node_data.select(pl.col(annotation_column)).collect()
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to load annotation categories: {exc}",
+        )
+
+    categories: set[str] = set()
+    for cell in values_df.get_column(annotation_column).to_list():
+        if not isinstance(cell, list):
+            continue
+        for item in cell:
+            if not isinstance(item, dict):
+                continue
+            annotation_value = str(item.get("annotation") or "").strip()
+            if annotation_value:
+                categories.add(annotation_value)
+
+    return {
+        "state": "successful",
+        "message": "AI annotation categories loaded",
+        "data": {"categories": sorted(categories)},
+        "metadata": {"annotation_column": annotation_column},
     }

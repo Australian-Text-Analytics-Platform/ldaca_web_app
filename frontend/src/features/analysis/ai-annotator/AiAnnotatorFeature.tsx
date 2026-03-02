@@ -4,6 +4,7 @@ import { useAuth } from '../../../hooks/useAuth';
 import useNodeColumnInfos from '../../../hooks/useNodeColumnInfos';
 import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
 import { type AiAnnotationResponse, textApi } from '../../../api/text';
+import { nodesApi } from '../../../api/nodes';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 import { Label } from '../../../components/ui/label';
@@ -12,12 +13,23 @@ import { AnalysisCardLayout } from '../common/components/AnalysisCardLayout';
 import AnalysisTaskBanner from '../../../components/tabs/AnalysisTaskBanner';
 import { useUIStore } from '../../../stores/uiStore';
 import { getNodeIdentifier, useAnalysisFeature, useAnalysisLockMachine } from '../common';
-import { ChevronDown, ChevronUp, Loader2, RotateCcw, Sparkles, Wrench } from 'lucide-react';
+import { ChevronDown, ChevronUp, Loader2, Plus, RotateCcw, Sparkles, Wrench } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../components/ui/card';
 import { ScrollArea } from '../../../components/ui/scroll-area';
 import { AnalysisPagination } from '../../../components/AnalysisPagination';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../../components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../components/ui/tabs';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../../../components/ui/alert-dialog';
+import { normalizeTypeName } from '../../../utils/columnTypes';
 
 const DEFAULT_PARAMS = {
   provider: 'openai' as 'openai' | 'gemini' | 'anthropic' | 'ollama',
@@ -138,13 +150,36 @@ const AiAnnotatorFeature: React.FC = () => {
   const [resultNode, setResultNode] = useState<AiAnnotationNodeResult | null>(null);
   const [isPaging, setIsPaging] = useState(false);
   const [showMetadata, setShowMetadata] = useState(false);
-  const [activeTab, setActiveTab] = useState<'annotation' | 'review'>('annotation');
+  const [panelTab, setPanelTab] = useState<'ai-annotation' | 'review'>('ai-annotation');
   const [isDetaching, setIsDetaching] = useState(false);
-  const [isSavingEdits, setIsSavingEdits] = useState(false);
   const [reviewEdits, setReviewEdits] = useState<Record<string, string>>({});
+  const [savingReviewCells, setSavingReviewCells] = useState<Record<string, boolean>>({});
   const [additionalProviders, setAdditionalProviders] = useState<string[]>([]);
   const [newProviderName, setNewProviderName] = useState('');
+  const [isAddAnnotatorDialogOpen, setIsAddAnnotatorDialogOpen] = useState(false);
   const aiAnnotationResultRef = useRef<AiAnnotationResponse | null>(null);
+
+  // Review tab state
+  const [reviewTextColumn, setReviewTextColumn] = useState('');
+  const [reviewAnnotationColumn, setReviewAnnotationColumn] = useState('');
+  const [reviewData, setReviewData] = useState<AiAnnotationNodeResult | null>(null);
+  const [reviewNodeId, setReviewNodeId] = useState<string | null>(null);
+  const [isReviewLoading, setIsReviewLoading] = useState(false);
+  const [isReviewPaging, setIsReviewPaging] = useState(false);
+  const [reviewGlobalProviders, setReviewGlobalProviders] = useState<string[]>([]);
+  const [reviewGlobalCategories, setReviewGlobalCategories] = useState<string[]>([]);
+  const [temporaryCategories, setTemporaryCategories] = useState<string[]>([]);
+  const [isAddCategoryDialogOpen, setIsAddCategoryDialogOpen] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [pendingCategoryCell, setPendingCategoryCell] = useState<{
+    row: Record<string, unknown>;
+    rowIndex: number;
+    providerName: string;
+    annotationColumn: string;
+  } | null>(null);
+
+  // AI annotation tab: optional target annotation column
+  const [aiAnnotationColumn, setAiAnnotationColumn] = useState('');
 
   const {
     isLocked,
@@ -258,6 +293,11 @@ const AiAnnotatorFeature: React.FC = () => {
       if (hydratedNodeId && requestNodeColumns[hydratedNodeId]) {
         setNodeColumnSelection(hydratedNodeId, requestNodeColumns[hydratedNodeId]);
       }
+
+      const hydratedAnnotationColumn = requestData.annotation_column;
+      setAiAnnotationColumn(
+        typeof hydratedAnnotationColumn === 'string' ? hydratedAnnotationColumn : '',
+      );
     },
     onCleared: () => {
       aiAnnotationResultRef.current = null;
@@ -352,6 +392,7 @@ const AiAnnotatorFeature: React.FC = () => {
         selectedNodeId,
         {
           column: selectedColumn,
+          annotation_column: aiAnnotationColumn.trim() ? aiAnnotationColumn : null,
           classes: parsedClasses,
           examples: parsedExamples,
           technique,
@@ -396,6 +437,7 @@ const AiAnnotatorFeature: React.FC = () => {
         {
           node_ids: [selectedNodeId],
           node_columns: { [selectedNodeId]: selectedColumn },
+          annotation_column: aiAnnotationColumn.trim() ? aiAnnotationColumn : null,
           classes: parsedClasses,
           examples: parsedExamples,
           technique,
@@ -471,36 +513,14 @@ const AiAnnotatorFeature: React.FC = () => {
   const totalPages = pagination?.total_source_pages;
   const annotationColumn = annotationColumns[0] ?? `${selectedColumn || 'text'}_annotation`;
 
-  const discoveredProviders = Array.from(
-    new Set(
-      resultRows.flatMap((row) => {
-        const raw = row[annotationColumn];
-        if (!Array.isArray(raw)) {
-          return [];
-        }
-        return raw
-          .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
-          .map((item) => String(item.provider ?? '').trim())
-          .filter(Boolean);
-      }),
-    ),
-  );
-
-  const reviewProviders = Array.from(new Set([...discoveredProviders, ...additionalProviders])).filter(Boolean);
-
   const buildEditKey = (rowIndex: number, providerName: string) => `${rowIndex}::${providerName}`;
 
-  const getAnnotationValue = (
+  const getPersistedAnnotationValue = (
     row: Record<string, unknown>,
     providerName: string,
-    rowIndex: number,
+    annCol: string = annotationColumn,
   ) => {
-    const editKey = buildEditKey(rowIndex, providerName);
-    if (Object.prototype.hasOwnProperty.call(reviewEdits, editKey)) {
-      return reviewEdits[editKey] ?? '';
-    }
-
-    const raw = row[annotationColumn];
+    const raw = row[annCol];
     if (!Array.isArray(raw)) {
       return '';
     }
@@ -511,6 +531,19 @@ const AiAnnotatorFeature: React.FC = () => {
       return String((item as Record<string, unknown>).provider ?? '') === providerName;
     }) as Record<string, unknown> | undefined;
     return found ? String(found.annotation ?? '') : '';
+  };
+
+  const getAnnotationValue = (
+    row: Record<string, unknown>,
+    providerName: string,
+    rowIndex: number,
+    annCol: string = annotationColumn,
+  ) => {
+    const editKey = buildEditKey(rowIndex, providerName);
+    if (Object.prototype.hasOwnProperty.call(reviewEdits, editKey)) {
+      return reviewEdits[editKey] ?? '';
+    }
+    return getPersistedAnnotationValue(row, providerName, annCol);
   };
 
   const handleReviewValueChange = (rowIndex: number, providerName: string, value: string) => {
@@ -525,65 +558,262 @@ const AiAnnotatorFeature: React.FC = () => {
     }
     setAdditionalProviders((prev) => (prev.includes(name) ? prev : [...prev, name]));
     setNewProviderName('');
+    setIsAddAnnotatorDialogOpen(false);
   };
 
-  const handleSaveEdits = async () => {
-    if (!resultNodeId) {
-      return;
-    }
-
-    const edits = Object.entries(reviewEdits)
-      .map(([key, annotation]) => {
-        const [rowIndexRaw, providerName] = key.split('::');
-        const rowIndex = Number(rowIndexRaw);
-        if (!Number.isFinite(rowIndex) || !providerName) {
-          return null;
-        }
-        return {
-          row_index: rowIndex,
-          provider: providerName,
-          annotation,
-        };
-      })
-      .filter((item): item is { row_index: number; provider: string; annotation: string } => Boolean(item));
-
-    if (edits.length === 0) {
-      setStatusMessage('No review edits to save.');
-      return;
-    }
-
-    setIsSavingEdits(true);
+  const loadReviewPage = async (nodeId: string, textCol: string, annotationCol: string, pg: number, pgSize: number) => {
+    setIsReviewPaging(true);
     try {
-      const response = await textApi.aiAnnotationSave(
-        resultNodeId,
+      const response = await nodesApi.data(nodeId, pg, pgSize, getAuthHeaders());
+      const rows = (response as { data?: Array<Record<string, unknown>> })?.data ?? [];
+      const columns = (response as { columns?: string[] })?.columns ?? [];
+      const pagination = (response as { pagination?: AiAnnotationNodeResult['pagination'] })?.pagination;
+      setReviewData({
+        data: rows,
+        columns,
+        metadata: { annotation_columns: [annotationCol] },
+        pagination: pagination ? {
+          page: pagination.page ?? pg,
+          page_size: pagination.page_size ?? pgSize,
+          total_source_rows: (pagination as Record<string, unknown>).total_rows as number | undefined,
+          total_source_pages: (pagination as Record<string, unknown>).total_pages as number | undefined,
+          result_count: rows.length,
+          has_next: pagination.has_next ?? false,
+          has_prev: pagination.has_prev ?? false,
+        } : undefined,
+      });
+      setReviewNodeId(nodeId);
+      setStatusMessage('Review data loaded.');
+    } catch (error) {
+      setStatusMessage(`Failed to load review data: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setIsReviewPaging(false);
+    }
+  };
+
+  const loadReviewProviders = async (nodeId: string, annotationCol: string) => {
+    try {
+      const response = await textApi.aiAnnotationProviders(
+        nodeId,
+        annotationCol,
+        getAuthHeaders(),
+      );
+      const providers = response?.data?.providers ?? [];
+      setReviewGlobalProviders(
+        Array.from(new Set(providers.map((name) => String(name).trim()).filter(Boolean))),
+      );
+    } catch (error) {
+      setStatusMessage(
+        `Failed to load annotators: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      setReviewGlobalProviders([]);
+    }
+  };
+
+  const loadReviewCategories = async (nodeId: string, annotationCol: string) => {
+    try {
+      const response = await textApi.aiAnnotationCategories(
+        nodeId,
+        annotationCol,
+        getAuthHeaders(),
+      );
+      const categories = response?.data?.categories ?? [];
+      setReviewGlobalCategories(
+        Array.from(new Set(categories.map((name) => String(name).trim()).filter(Boolean))),
+      );
+    } catch (error) {
+      setStatusMessage(
+        `Failed to load annotation categories: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      setReviewGlobalCategories([]);
+    }
+  };
+
+  const refreshCategoryCache = async (nodeId: string, annotationCol: string) => {
+    setTemporaryCategories([]);
+    setReviewGlobalCategories([]);
+    await loadReviewCategories(nodeId, annotationCol);
+  };
+
+  const handleReview = async () => {
+    if (!selectedNodeId || !reviewTextColumn || !reviewAnnotationColumn) {
+      setStatusMessage('Select a node, text column, and annotation column to review.');
+      return;
+    }
+    setIsReviewLoading(true);
+    try {
+      await Promise.all([
+        loadReviewPage(selectedNodeId, reviewTextColumn, reviewAnnotationColumn, 1, DEFAULT_PAGE_SIZE),
+        loadReviewProviders(selectedNodeId, reviewAnnotationColumn),
+        refreshCategoryCache(selectedNodeId, reviewAnnotationColumn),
+      ]);
+    } finally {
+      setIsReviewLoading(false);
+    }
+  };
+
+  const handleCategorySelected = async (
+    row: Record<string, unknown>,
+    rowIndex: number,
+    providerName: string,
+    annotationCol: string,
+    selectedValue: string,
+  ) => {
+    if (selectedValue === '__add_new_category__') {
+      setPendingCategoryCell({ row, rowIndex, providerName, annotationColumn: annotationCol });
+      setNewCategoryName('');
+      setIsAddCategoryDialogOpen(true);
+      return;
+    }
+
+    const nextValue = selectedValue === '__empty__' ? '' : selectedValue;
+    handleReviewValueChange(rowIndex, providerName, nextValue);
+    await handleReviewInputBlur(row, rowIndex, providerName, annotationCol, nextValue);
+  };
+
+  const handleConfirmAddCategory = async () => {
+    const name = newCategoryName.trim();
+    if (!name || !pendingCategoryCell) {
+      return;
+    }
+
+    setTemporaryCategories((prev) => (prev.includes(name) ? prev : [...prev, name]));
+    handleReviewValueChange(pendingCategoryCell.rowIndex, pendingCategoryCell.providerName, name);
+    await handleReviewInputBlur(
+      pendingCategoryCell.row,
+      pendingCategoryCell.rowIndex,
+      pendingCategoryCell.providerName,
+      pendingCategoryCell.annotationColumn,
+      name,
+    );
+
+    setPendingCategoryCell(null);
+    setNewCategoryName('');
+    setIsAddCategoryDialogOpen(false);
+  };
+
+  const handleReviewInputBlur = async (
+    row: Record<string, unknown>,
+    rowIndex: number,
+    providerName: string,
+    annCol: string,
+    nextValue: string,
+  ) => {
+    if (!reviewNodeId || !reviewAnnotationColumn) {
+      return;
+    }
+
+    const editKey = buildEditKey(rowIndex, providerName);
+    const persistedValue = getPersistedAnnotationValue(row, providerName, annCol);
+    const trimmedNextValue = nextValue;
+
+    if (trimmedNextValue === persistedValue) {
+      setReviewEdits((prev) => {
+        if (!Object.prototype.hasOwnProperty.call(prev, editKey)) {
+          return prev;
+        }
+        const { [editKey]: _, ...rest } = prev;
+        return rest;
+      });
+      return;
+    }
+
+    if (savingReviewCells[editKey]) {
+      return;
+    }
+
+    setSavingReviewCells((prev) => ({ ...prev, [editKey]: true }));
+    try {
+      await textApi.aiAnnotationSave(
+        reviewNodeId,
         {
-          annotation_column: annotationColumn,
-          edits,
+          annotation_column: reviewAnnotationColumn,
+          edits: [{ row_index: rowIndex, provider: providerName, annotation: trimmedNextValue }],
         },
         getAuthHeaders(),
       );
 
-      setStatusMessage(
-        (response as { message?: string })?.message ?? 'AI annotation edits saved.',
-      );
-      setReviewEdits({});
-      await loadResultPage(page, pageSize);
+      setReviewData((prev) => {
+        if (!prev) {
+          return prev;
+        }
+        const pagination = prev.pagination;
+        const currentPage = pagination?.page ?? 1;
+        const currentPageSize = pagination?.page_size ?? DEFAULT_PAGE_SIZE;
+        const pageOffset = (Math.max(currentPage, 1) - 1) * currentPageSize;
+
+        const updatedRows = prev.data.map((existingRow, localIndex) => {
+          const globalIndex = pageOffset + localIndex;
+          if (globalIndex !== rowIndex) {
+            return existingRow;
+          }
+
+          const raw = existingRow[annCol];
+          const existingEntries = Array.isArray(raw)
+            ? raw
+              .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
+              .map((item) => ({
+                provider: String(item.provider ?? ''),
+                annotation: String(item.annotation ?? ''),
+              }))
+            : [];
+
+          let replaced = false;
+          const nextEntries = existingEntries.map((entry) => {
+            if (entry.provider === providerName) {
+              replaced = true;
+              return { provider: entry.provider, annotation: trimmedNextValue };
+            }
+            return entry;
+          });
+
+          if (!replaced) {
+            nextEntries.push({ provider: providerName, annotation: trimmedNextValue });
+          }
+
+          return {
+            ...existingRow,
+            [annCol]: nextEntries,
+          };
+        });
+
+        return {
+          ...prev,
+          data: updatedRows,
+        };
+      });
+
+      setReviewEdits((prev) => {
+        if (!Object.prototype.hasOwnProperty.call(prev, editKey)) {
+          return prev;
+        }
+        const { [editKey]: _, ...rest } = prev;
+        return rest;
+      });
     } catch (error) {
-      setStatusMessage(`Failed to save AI annotation edits: ${error instanceof Error ? error.message : String(error)}`);
+      setStatusMessage(`Failed to auto-save review edit: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
-      setIsSavingEdits(false);
+      setSavingReviewCells((prev) => {
+        const { [editKey]: _, ...rest } = prev;
+        return rest;
+      });
     }
   };
+
+  // Shared column infos for selector UIs in both tabs
+  const currentNodeColumnInfos = selectedNodeId ? getColumnInfos(displayedNodes[0]) : [];
+  const aiStringColumns = currentNodeColumnInfos.filter((ci) => normalizeTypeName(ci.dataType) === 'string');
+  const aiAnnotationColumns = currentNodeColumnInfos.filter((ci) => normalizeTypeName(ci.dataType) === 'annotation');
+  const reviewStringColumns = aiStringColumns;
+  const reviewAnnotationColumns = aiAnnotationColumns;
+
+  const reviewRunDisabled =
+    !currentWorkspaceId || !selectedNodeId || !reviewTextColumn || !reviewAnnotationColumn || isReviewLoading;
 
   useEffect(() => {
     setReviewEdits({});
   }, [resultNodeId, page, pageSize]);
 
-  useEffect(() => {
-    if (annotationColumns.length === 0 && activeTab === 'review') {
-      setActiveTab('annotation');
-    }
-  }, [activeTab, annotationColumns.length]);
 
   return (
     <div className="space-y-6">
@@ -598,8 +828,8 @@ const AiAnnotatorFeature: React.FC = () => {
       ) : null}
 
       <AnalysisCardLayout
-        title="AI Annotator Parameters"
-        actions={{
+        title="AI Annotation and Review"
+        actions={panelTab === 'ai-annotation' ? {
           onRun: handleRun,
           onClear: handleClear,
           runDisabled,
@@ -634,260 +864,379 @@ const AiAnnotatorFeature: React.FC = () => {
               </Button>
             </div>
           ),
+        } : {
+          onRun: handleReview,
+          onClear: handleClear,
+          runDisabled: reviewRunDisabled,
+          clearDisabled,
+          isRunning: isReviewLoading,
+          isClearing,
+          hasResult: Boolean(reviewData),
+          runLabel: isReviewLoading ? 'Reviewing' : 'Review',
         }}
       >
-        <div className="space-y-6">
-          <section className="space-y-4">
-            <div>
-              <h3 className="text-sm font-semibold text-foreground">Commonly Used Parameters</h3>
-              <p className="text-xs text-muted-foreground">Choose one node, text column, model, and prompt schema.</p>
-            </div>
+        <Tabs value={panelTab} onValueChange={(value) => setPanelTab(value as 'ai-annotation' | 'review')}>
+          <TabsList className="mb-4">
+            <TabsTrigger value="ai-annotation">AI Annotation</TabsTrigger>
+            <TabsTrigger value="review">Review</TabsTrigger>
+          </TabsList>
 
-          <NodeSelectionPanel
-            selectedNodes={displayedNodes}
-            nodeColumnSelections={effectiveSelections}
-            onColumnChange={handleColumnChange}
-            nodeColors={{}}
-            onColorChange={() => {}}
-            getNodeColumns={getColumnInfos}
-            defaultPalette={[]}
-            maxCompare={1}
-            className="rounded-lg border border-dashed border-muted-foreground/40 bg-muted/30 p-4"
-            showShape
-            showColorPicker={false}
-            disabled={isLocked}
-            locked={isLocked}
-            allowedDataTypes={['string']}
-            originalCount={displayNodeCount}
-          />
+          <TabsContent value="ai-annotation" className="mt-0">
+            <div className="space-y-6">
+              <section className="space-y-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground">Commonly Used Parameters</h3>
+                  <p className="text-xs text-muted-foreground">Choose one node, text column, model, and prompt schema.</p>
+                </div>
 
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-              <div className="space-y-2">
-                <Label htmlFor="ai-annotator-provider">Provider</Label>
-                <Select value={provider} onValueChange={(value) => setProvider(value as 'openai' | 'gemini' | 'anthropic' | 'ollama')}>
-                  <SelectTrigger id="ai-annotator-provider">
-                    <SelectValue placeholder="Select provider" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="openai">OpenAI</SelectItem>
-                    <SelectItem value="gemini">Gemini</SelectItem>
-                    <SelectItem value="anthropic">Anthropic</SelectItem>
-                    <SelectItem value="ollama">Ollama</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              <NodeSelectionPanel
+                selectedNodes={displayedNodes}
+                nodeColumnSelections={[]}
+                onColumnChange={() => {}}
+                nodeColors={{}}
+                onColorChange={() => {}}
+                getNodeColumns={getColumnInfos}
+                defaultPalette={[]}
+                maxCompare={1}
+                className="rounded-lg border border-dashed border-muted-foreground/40 bg-muted/30 p-4"
+                showShape
+                showColorPicker={false}
+                showColumnPicker={false}
+                disabled={isLocked}
+                locked={isLocked}
+                originalCount={displayNodeCount}
+                renderExtraNodeContent={() => (
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs font-medium text-muted-foreground" htmlFor="ai-text-column">Text Column</Label>
+                      <Select
+                        value={selectedColumn}
+                        onValueChange={(value) => {
+                          if (selectedNodeId) {
+                            handleColumnChange(selectedNodeId, value);
+                          }
+                        }}
+                        disabled={isLocked}
+                      >
+                        <SelectTrigger id="ai-text-column" className="w-full text-sm">
+                          <SelectValue placeholder="Select text column" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {aiStringColumns.map((ci) => (
+                            <SelectItem key={ci.name} value={ci.name}>{ci.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs font-medium text-muted-foreground" htmlFor="ai-annotation-column">Annotation Column</Label>
+                      <Select
+                        value={aiAnnotationColumn || '__none__'}
+                        onValueChange={(value) => setAiAnnotationColumn(value === '__none__' ? '' : value)}
+                        disabled={isLocked}
+                      >
+                        <SelectTrigger id="ai-annotation-column" className="w-full text-sm">
+                          <SelectValue placeholder="Select annotation column" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">Create new annotation column</SelectItem>
+                          {aiAnnotationColumns.map((ci) => (
+                            <SelectItem key={ci.name} value={ci.name}>{ci.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                )}
+              />
 
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="ai-annotator-model">Model</Label>
-                <Input
-                  id="ai-annotator-model"
-                  value={model}
-                  onChange={(event) => setModel(event.target.value)}
-                  placeholder={providerModels[0] || 'e.g. gpt-4o-mini'}
-                  list="ai-annotator-model-suggestions"
-                />
-                <datalist id="ai-annotator-model-suggestions">
-                  {providerModels.map((modelName) => (
-                    <option key={modelName} value={modelName} />
-                  ))}
-                </datalist>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="ai-annotator-technique">Technique</Label>
-                <Select value={technique} onValueChange={(value) => setTechnique(value as 'zero_shot' | 'few_shot' | 'chain_of_thought')}>
-                  <SelectTrigger id="ai-annotator-technique">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="zero_shot">Zero-shot</SelectItem>
-                    <SelectItem value="few_shot">Few-shot</SelectItem>
-                    <SelectItem value="chain_of_thought">Chain-of-thought</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="ai-annotator-classes">Classes (one per line, `name: description`)</Label>
-                <textarea
-                  id="ai-annotator-classes"
-                  value={classesText}
-                  onChange={(event) => setClassesText(event.target.value)}
-                  className="min-h-27.5 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  placeholder="support: Supportive stance"
-                />
-              </div>
-            </div>
-          </section>
-
-          <section className="space-y-4">
-            <Button
-              type="button"
-              variant="ghost"
-              className="h-auto px-0 text-sm"
-              onClick={() => setShowAdvanced((value) => !value)}
-            >
-              <Wrench className="mr-2 h-4 w-4" />
-              Advanced Parameters
-              {showAdvanced ? <ChevronUp className="ml-2 h-4 w-4" /> : <ChevronDown className="ml-2 h-4 w-4" />}
-            </Button>
-
-            {showAdvanced ? (
-              <div className="space-y-4 rounded-md border border-border/60 bg-muted/20 p-4">
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                   <div className="space-y-2">
-                    <Label htmlFor="ai-annotator-modifier">Modifier</Label>
-                    <Select value={modifier} onValueChange={(value) => setModifier(value as 'no_modifier' | 'self_consistency')}>
-                      <SelectTrigger id="ai-annotator-modifier">
-                        <SelectValue />
+                    <Label htmlFor="ai-annotator-provider">Provider</Label>
+                    <Select value={provider} onValueChange={(value) => setProvider(value as 'openai' | 'gemini' | 'anthropic' | 'ollama')}>
+                      <SelectTrigger id="ai-annotator-provider">
+                        <SelectValue placeholder="Select provider" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="no_modifier">No modifier</SelectItem>
-                        <SelectItem value="self_consistency">Self consistency</SelectItem>
+                        <SelectItem value="openai">OpenAI</SelectItem>
+                        <SelectItem value="gemini">Gemini</SelectItem>
+                        <SelectItem value="anthropic">Anthropic</SelectItem>
+                        <SelectItem value="ollama">Ollama</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="ai-annotator-temperature">Temperature</Label>
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="ai-annotator-model">Model</Label>
                     <Input
-                      id="ai-annotator-temperature"
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      value={temperature}
-                      onChange={(event) => setTemperature(event.target.value)}
+                      id="ai-annotator-model"
+                      value={model}
+                      onChange={(event) => setModel(event.target.value)}
+                      placeholder={providerModels[0] || 'e.g. gpt-4o-mini'}
+                      list="ai-annotator-model-suggestions"
                     />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="ai-annotator-top-p">Top P</Label>
-                    <Input
-                      id="ai-annotator-top-p"
-                      type="number"
-                      step="0.05"
-                      min="0"
-                      max="1"
-                      value={topP}
-                      onChange={(event) => setTopP(event.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="ai-annotator-n-completions">N completions</Label>
-                    <Input
-                      id="ai-annotator-n-completions"
-                      type="number"
-                      min="1"
-                      value={nCompletions}
-                      onChange={(event) => setNCompletions(event.target.value)}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="ai-annotator-seed">Seed</Label>
-                    <Input
-                      id="ai-annotator-seed"
-                      type="number"
-                      value={seed}
-                      onChange={(event) => setSeed(event.target.value)}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="ai-annotator-max-reasoning">Max reasoning chars</Label>
-                    <Input
-                      id="ai-annotator-max-reasoning"
-                      type="number"
-                      min="1"
-                      value={maxReasoningChars}
-                      onChange={(event) => setMaxReasoningChars(event.target.value)}
-                    />
+                    <datalist id="ai-annotator-model-suggestions">
+                      {providerModels.map((modelName) => (
+                        <option key={modelName} value={modelName} />
+                      ))}
+                    </datalist>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="ai-annotator-api-key">API Key (optional override)</Label>
-                    <Input
-                      id="ai-annotator-api-key"
-                      type="password"
-                      value={apiKey}
-                      onChange={(event) => setApiKey(event.target.value)}
-                      placeholder="Leave blank to use defaults"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="ai-annotator-endpoint">Endpoint (optional)</Label>
-                    <Input
-                      id="ai-annotator-endpoint"
-                      value={endpoint}
-                      onChange={(event) => setEndpoint(event.target.value)}
-                      placeholder="e.g. http://localhost:11434/v1"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="ai-annotator-reasoning-effort">Reasoning effort</Label>
-                    <Select value={reasoningEffort} onValueChange={(value) => setReasoningEffort(value as 'low' | 'medium' | 'high')}>
-                      <SelectTrigger id="ai-annotator-reasoning-effort">
+                    <Label htmlFor="ai-annotator-technique">Technique</Label>
+                    <Select value={technique} onValueChange={(value) => setTechnique(value as 'zero_shot' | 'few_shot' | 'chain_of_thought')}>
+                      <SelectTrigger id="ai-annotator-technique">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="low">Low</SelectItem>
-                        <SelectItem value="medium">Medium</SelectItem>
-                        <SelectItem value="high">High</SelectItem>
+                        <SelectItem value="zero_shot">Zero-shot</SelectItem>
+                        <SelectItem value="few_shot">Few-shot</SelectItem>
+                        <SelectItem value="chain_of_thought">Chain-of-thought</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="ai-annotator-enable-reasoning">Enable reasoning</Label>
-                    <Select
-                      value={enableReasoning ? 'yes' : 'no'}
-                      onValueChange={(value) => setEnableReasoning(value === 'yes')}
-                    >
-                      <SelectTrigger id="ai-annotator-enable-reasoning">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="no">No</SelectItem>
-                        <SelectItem value="yes">Yes</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Label htmlFor="ai-annotator-classes">Classes (one per line, `name: description`)</Label>
+                    <textarea
+                      id="ai-annotator-classes"
+                      value={classesText}
+                      onChange={(event) => setClassesText(event.target.value)}
+                      className="min-h-27.5 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      placeholder="support: Supportive stance"
+                    />
                   </div>
                 </div>
+              </section>
 
-                <div className="space-y-2">
-                  <Label htmlFor="ai-annotator-examples">Examples (one per line, query to class format)</Label>
-                  <textarea
-                    id="ai-annotator-examples"
-                    value={examplesText}
-                    onChange={(event) => setExamplesText(event.target.value)}
-                    className="min-h-27.5 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    placeholder="This policy is fair => support"
-                  />
-                </div>
-              </div>
-            ) : null}
-          </section>
+              <section className="space-y-4">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-auto px-0 text-sm"
+                  onClick={() => setShowAdvanced((value) => !value)}
+                >
+                  <Wrench className="mr-2 h-4 w-4" />
+                  Advanced Parameters
+                  {showAdvanced ? <ChevronUp className="ml-2 h-4 w-4" /> : <ChevronDown className="ml-2 h-4 w-4" />}
+                </Button>
 
-          {statusMessage ? (
-            <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
-              {statusMessage}
-              {taskId ? <span className="ml-2 font-mono text-xs">Task: {taskId}</span> : null}
+                {showAdvanced ? (
+                  <div className="space-y-4 rounded-md border border-border/60 bg-muted/20 p-4">
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="ai-annotator-modifier">Modifier</Label>
+                        <Select value={modifier} onValueChange={(value) => setModifier(value as 'no_modifier' | 'self_consistency')}>
+                          <SelectTrigger id="ai-annotator-modifier">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="no_modifier">No modifier</SelectItem>
+                            <SelectItem value="self_consistency">Self consistency</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="ai-annotator-temperature">Temperature</Label>
+                        <Input
+                          id="ai-annotator-temperature"
+                          type="number"
+                          step="0.1"
+                          min="0"
+                          value={temperature}
+                          onChange={(event) => setTemperature(event.target.value)}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="ai-annotator-top-p">Top P</Label>
+                        <Input
+                          id="ai-annotator-top-p"
+                          type="number"
+                          step="0.05"
+                          min="0"
+                          max="1"
+                          value={topP}
+                          onChange={(event) => setTopP(event.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="ai-annotator-n-completions">N completions</Label>
+                        <Input
+                          id="ai-annotator-n-completions"
+                          type="number"
+                          min="1"
+                          value={nCompletions}
+                          onChange={(event) => setNCompletions(event.target.value)}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="ai-annotator-seed">Seed</Label>
+                        <Input
+                          id="ai-annotator-seed"
+                          type="number"
+                          value={seed}
+                          onChange={(event) => setSeed(event.target.value)}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="ai-annotator-max-reasoning">Max reasoning chars</Label>
+                        <Input
+                          id="ai-annotator-max-reasoning"
+                          type="number"
+                          min="1"
+                          value={maxReasoningChars}
+                          onChange={(event) => setMaxReasoningChars(event.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="ai-annotator-api-key">API Key (optional override)</Label>
+                        <Input
+                          id="ai-annotator-api-key"
+                          type="password"
+                          value={apiKey}
+                          onChange={(event) => setApiKey(event.target.value)}
+                          placeholder="Leave blank to use defaults"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="ai-annotator-endpoint">Endpoint (optional)</Label>
+                        <Input
+                          id="ai-annotator-endpoint"
+                          value={endpoint}
+                          onChange={(event) => setEndpoint(event.target.value)}
+                          placeholder="e.g. http://localhost:11434/v1"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="ai-annotator-reasoning-effort">Reasoning effort</Label>
+                        <Select value={reasoningEffort} onValueChange={(value) => setReasoningEffort(value as 'low' | 'medium' | 'high')}>
+                          <SelectTrigger id="ai-annotator-reasoning-effort">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="low">Low</SelectItem>
+                            <SelectItem value="medium">Medium</SelectItem>
+                            <SelectItem value="high">High</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="ai-annotator-enable-reasoning">Enable reasoning</Label>
+                        <Select
+                          value={enableReasoning ? 'yes' : 'no'}
+                          onValueChange={(value) => setEnableReasoning(value === 'yes')}
+                        >
+                          <SelectTrigger id="ai-annotator-enable-reasoning">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="no">No</SelectItem>
+                            <SelectItem value="yes">Yes</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="ai-annotator-examples">Examples (one per line, query to class format)</Label>
+                      <textarea
+                        id="ai-annotator-examples"
+                        value={examplesText}
+                        onChange={(event) => setExamplesText(event.target.value)}
+                        className="min-h-27.5 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        placeholder="This policy is fair => support"
+                      />
+                    </div>
+                  </div>
+                ) : null}
+              </section>
             </div>
-          ) : null}
-        </div>
+          </TabsContent>
+
+          <TabsContent value="review" className="mt-0">
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">Review Annotations</h3>
+                <p className="text-xs text-muted-foreground">Select a node, text column, and annotation column to review and edit annotations.</p>
+              </div>
+
+              <NodeSelectionPanel
+                selectedNodes={displayedNodes}
+                nodeColumnSelections={[]}
+                onColumnChange={() => {}}
+                nodeColors={{}}
+                onColorChange={() => {}}
+                getNodeColumns={getColumnInfos}
+                defaultPalette={[]}
+                maxCompare={1}
+                className="rounded-lg border border-dashed border-muted-foreground/40 bg-muted/30 p-4"
+                showShape
+                showColorPicker={false}
+                showColumnPicker={false}
+                disabled={isLocked}
+                locked={isLocked}
+                originalCount={displayNodeCount}
+                renderExtraNodeContent={() => (
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs font-medium text-muted-foreground" htmlFor="review-text-column">Text Column</Label>
+                      <Select value={reviewTextColumn} onValueChange={setReviewTextColumn} disabled={isLocked}>
+                        <SelectTrigger id="review-text-column" className="w-full text-sm">
+                          <SelectValue placeholder="Select text column" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {reviewStringColumns.map((ci) => (
+                            <SelectItem key={ci.name} value={ci.name}>{ci.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs font-medium text-muted-foreground" htmlFor="review-annotation-column">Annotation Column</Label>
+                      <Select value={reviewAnnotationColumn} onValueChange={setReviewAnnotationColumn} disabled={isLocked}>
+                        <SelectTrigger id="review-annotation-column" className="w-full text-sm">
+                          <SelectValue placeholder="Select annotation column" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {reviewAnnotationColumns.map((ci) => (
+                            <SelectItem key={ci.name} value={ci.name}>{ci.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                )}
+              />
+            </div>
+          </TabsContent>
+        </Tabs>
+
+        {statusMessage ? (
+          <div className="mt-4 rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+            {statusMessage}
+            {taskId ? <span className="ml-2 font-mono text-xs">Task: {taskId}</span> : null}
+          </div>
+        ) : null}
       </AnalysisCardLayout>
 
-      {resultNode && resultNodeId ? (
+      {/* AI Annotation result panel */}
+      {panelTab === 'ai-annotation' && resultNode && resultNodeId ? (
         <Card>
           <CardHeader className="space-y-3">
             <div className="flex items-center justify-between gap-3">
@@ -915,159 +1264,313 @@ const AiAnnotatorFeature: React.FC = () => {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'annotation' | 'review')}>
-              <TabsList>
-                <TabsTrigger value="annotation">Annotation</TabsTrigger>
-                <TabsTrigger value="review" disabled={annotationColumns.length === 0}>
-                  Review
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="annotation" className="space-y-4">
-                <div className="flex flex-wrap items-center gap-4">
-                  <label className="flex items-center gap-2 text-sm text-foreground">
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4"
-                      checked={showMetadata}
-                      onChange={(event) => setShowMetadata(event.target.checked)}
-                    />
-                    <span>Show metadata</span>
-                  </label>
-                </div>
-
-                <div className="rounded-lg border border-border bg-card">
-                  <ScrollArea scrollbars="both" className="max-h-[70vh]">
-                    <div className="min-w-max">
-                      <Table className="min-w-180" disableContainer>
-                        <TableHeader className="bg-muted sticky top-0 z-10">
-                          <TableRow>
-                            {visibleColumns.map((columnName) => (
-                              <TableHead key={columnName} className="whitespace-nowrap">
-                                {columnName}
-                              </TableHead>
-                            ))}
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {resultRows.length > 0 ? (
-                            resultRows.map((row, rowIndex) => (
-                              <TableRow key={`${rowIndex}`}>
-                                {visibleColumns.map((columnName) => (
-                                  <TableCell key={columnName} className="align-top">
-                                    {stringifyCell(row[columnName])}
-                                  </TableCell>
-                                ))}
-                              </TableRow>
-                            ))
-                          ) : (
-                            <TableRow>
-                              <TableCell colSpan={Math.max(visibleColumns.length, 1)} className="h-24 text-center text-muted-foreground">
-                                No annotation rows returned for this page.
-                              </TableCell>
-                            </TableRow>
-                          )}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </ScrollArea>
-                </div>
-
-                <AnalysisPagination
-                  page={page}
-                  pageSize={pageSize}
-                  hasNext={hasNext}
-                  hasPrev={hasPrev}
-                  totalPages={totalPages}
-                  onPageChange={(nextPage) => {
-                    void loadResultPage(nextPage, pageSize);
-                  }}
-                  onPageSizeChange={(nextPageSize) => {
-                    void loadResultPage(1, nextPageSize);
-                  }}
-                  pageSizeOptions={[5, 10, 20, 50, 100]}
-                  loading={isPaging}
+            <div className="flex flex-wrap items-center gap-4">
+              <label className="flex items-center gap-2 text-sm text-foreground">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={showMetadata}
+                  onChange={(event) => setShowMetadata(event.target.checked)}
                 />
-              </TabsContent>
+                <span>Show metadata</span>
+              </label>
+            </div>
 
-              <TabsContent value="review" className="space-y-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Input
-                    value={newProviderName}
-                    onChange={(event) => setNewProviderName(event.target.value)}
-                    placeholder="Add provider"
-                    className="w-48"
-                  />
-                  <Button type="button" variant="outline" onClick={handleAddProvider}>
-                    Add Provider
-                  </Button>
-                  <Button type="button" onClick={handleSaveEdits} disabled={isSavingEdits || Object.keys(reviewEdits).length === 0}>
-                    {isSavingEdits ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      'Save Edits'
-                    )}
-                  </Button>
-                </div>
-
-                <div className="rounded-lg border border-border bg-card">
-                  <ScrollArea scrollbars="both" className="max-h-[70vh]">
-                    <div className="min-w-max">
-                      <Table className="min-w-180" disableContainer>
-                        <TableHeader className="bg-muted sticky top-0 z-10">
-                          <TableRow>
-                            {inferredTextColumn ? <TableHead className="whitespace-nowrap">{inferredTextColumn}</TableHead> : null}
-                            {reviewProviders.map((providerName) => (
-                              <TableHead key={providerName} className="whitespace-nowrap">
-                                {providerName}
-                              </TableHead>
+            <div className="rounded-lg border border-border bg-card">
+              <ScrollArea scrollbars="both" className="max-h-[70vh]">
+                <div className="min-w-max">
+                  <Table className="min-w-180" disableContainer>
+                    <TableHeader className="bg-muted sticky top-0 z-10">
+                      <TableRow>
+                        {visibleColumns.map((columnName) => (
+                          <TableHead key={columnName} className="whitespace-nowrap">
+                            {columnName}
+                          </TableHead>
+                        ))}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {resultRows.length > 0 ? (
+                        resultRows.map((row, rowIndex) => (
+                          <TableRow key={`${rowIndex}`}>
+                            {visibleColumns.map((columnName) => (
+                              <TableCell key={columnName} className="align-top">
+                                {stringifyCell(row[columnName])}
+                              </TableCell>
                             ))}
                           </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {resultRows.length > 0 ? (
-                            resultRows.map((row, rowIdx) => {
-                              const rowIndex = (Math.max(page, 1) - 1) * pageSize + rowIdx;
-                              return (
-                                <TableRow key={`${rowIndex}`}>
-                                  {inferredTextColumn ? (
-                                    <TableCell className="align-top max-w-xl whitespace-pre-wrap wrap-break-word">
-                                      {stringifyCell(row[inferredTextColumn])}
-                                    </TableCell>
-                                  ) : null}
-                                  {reviewProviders.map((providerName) => (
-                                    <TableCell key={`${rowIndex}-${providerName}`} className="align-top min-w-40">
-                                      <Input
-                                        value={getAnnotationValue(row, providerName, rowIndex)}
-                                        onChange={(event) =>
-                                          handleReviewValueChange(rowIndex, providerName, event.target.value)
-                                        }
-                                      />
-                                    </TableCell>
-                                  ))}
-                                </TableRow>
-                              );
-                            })
-                          ) : (
-                            <TableRow>
-                              <TableCell colSpan={Math.max(reviewProviders.length + 1, 1)} className="h-24 text-center text-muted-foreground">
-                                No annotation rows available for review.
-                              </TableCell>
-                            </TableRow>
-                          )}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </ScrollArea>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={Math.max(visibleColumns.length, 1)} className="h-24 text-center text-muted-foreground">
+                            No annotation rows returned for this page.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
                 </div>
-              </TabsContent>
-            </Tabs>
+              </ScrollArea>
+            </div>
+
+            <AnalysisPagination
+              page={page}
+              pageSize={pageSize}
+              hasNext={hasNext}
+              hasPrev={hasPrev}
+              totalPages={totalPages}
+              onPageChange={(nextPage) => {
+                void loadResultPage(nextPage, pageSize);
+              }}
+              onPageSizeChange={(nextPageSize) => {
+                void loadResultPage(1, nextPageSize);
+              }}
+              pageSizeOptions={[5, 10, 20, 50, 100]}
+              loading={isPaging}
+            />
           </CardContent>
         </Card>
       ) : null}
+
+      {/* Review result panel */}
+      {panelTab === 'review' && reviewData && reviewNodeId ? (() => {
+        const rvRows = reviewData.data ?? [];
+        const rvPagination = reviewData.pagination;
+        const rvPage = rvPagination?.page ?? 1;
+        const rvPageSize = rvPagination?.page_size ?? DEFAULT_PAGE_SIZE;
+        const rvHasNext = Boolean(rvPagination?.has_next);
+        const rvHasPrev = Boolean(rvPagination?.has_prev);
+        const rvTotalPages = rvPagination?.total_source_pages;
+
+        const rvAnnotationCol = reviewAnnotationColumn;
+        const rvDiscoveredProviders = Array.from(
+          new Set(
+            rvRows.flatMap((row) => {
+              const raw = row[rvAnnotationCol];
+              if (!Array.isArray(raw)) return [];
+              return raw
+                .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
+                .map((item) => String(item.provider ?? '').trim())
+                .filter(Boolean);
+            }),
+          ),
+        );
+        const rvProviders = Array.from(
+          new Set([
+            ...reviewGlobalProviders,
+            ...rvDiscoveredProviders,
+            ...additionalProviders,
+          ]),
+        ).filter(Boolean);
+        const rvDiscoveredCategories = Array.from(
+          new Set(
+            rvRows.flatMap((row) => {
+              const raw = row[rvAnnotationCol];
+              if (!Array.isArray(raw)) return [];
+              return raw
+                .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
+                .map((item) => String(item.annotation ?? '').trim())
+                .filter(Boolean);
+            }),
+          ),
+        );
+        const rvCategoryOptions = Array.from(
+          new Set([
+            ...reviewGlobalCategories,
+            ...rvDiscoveredCategories,
+            ...temporaryCategories,
+          ]),
+        ).filter(Boolean);
+
+        return (
+          <Card>
+            <CardHeader className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <CardTitle>Review Annotations</CardTitle>
+                  <CardDescription>
+                    Node: <span className="font-mono text-xs">{reviewNodeId}</span>
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="rounded-lg border border-border bg-card">
+                <ScrollArea scrollbars="both" className="max-h-[70vh]">
+                  <div className="min-w-max">
+                    <Table className="min-w-180" disableContainer>
+                      <TableHeader className="sticky top-0 z-10">
+                        <TableRow className="bg-muted/90 backdrop-blur-sm border-b border-border/80">
+                          <TableHead className="whitespace-nowrap border-r border-border/70 bg-muted/90 py-2">
+                            <div className="flex items-center justify-center gap-2">
+                              <span className="font-semibold tracking-tight">text</span>
+                              <span className="rounded-full border border-border/70 bg-background/70 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                                1 column
+                              </span>
+                            </div>
+                          </TableHead>
+                          <TableHead colSpan={rvProviders.length + 1} className="border-b-2 border-border/80 bg-muted/90 py-2">
+                            <div className="flex items-center justify-center gap-2">
+                              <span className="font-semibold tracking-tight">{rvAnnotationCol}</span>
+                            </div>
+                          </TableHead>
+                        </TableRow>
+                        <TableRow className="bg-muted/80 backdrop-blur-sm border-b border-border/80">
+                          <TableHead className="whitespace-nowrap border-r border-border/70 bg-muted/80">
+                            {reviewTextColumn}
+                          </TableHead>
+                          {rvProviders.map((providerName) => (
+                            <TableHead key={providerName} className="whitespace-nowrap border-r border-border/60">
+                              {providerName}
+                            </TableHead>
+                          ))}
+                          <TableHead className="w-12 min-w-12 text-center border-l border-border/70">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 rounded-full border border-border/60 hover:border-border"
+                              onClick={() => setIsAddAnnotatorDialogOpen(true)}
+                              aria-label="Add annotator"
+                              title="Add annotator"
+                            >
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {rvRows.length > 0 ? (
+                          rvRows.map((row, rowIdx) => {
+                            const rowIndex = (Math.max(rvPage, 1) - 1) * rvPageSize + rowIdx;
+                            return (
+                              <TableRow key={`${rowIndex}`}>
+                                <TableCell className="align-top max-w-xl whitespace-pre-wrap wrap-break-word">
+                                  {stringifyCell(row[reviewTextColumn])}
+                                </TableCell>
+                                {rvProviders.map((providerName) => (
+                                  <TableCell key={`${rowIndex}-${providerName}`} className="align-top min-w-40">
+                                    <Select
+                                      value={getAnnotationValue(row, providerName, rowIndex, rvAnnotationCol) || '__empty__'}
+                                      onValueChange={(value) => {
+                                        void handleCategorySelected(
+                                          row,
+                                          rowIndex,
+                                          providerName,
+                                          rvAnnotationCol,
+                                          value,
+                                        );
+                                      }}
+                                      disabled={Boolean(savingReviewCells[buildEditKey(rowIndex, providerName)])}
+                                    >
+                                      <SelectTrigger className="w-full">
+                                        <SelectValue placeholder="Select category" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="__add_new_category__">+ Add a new category</SelectItem>
+                                        <SelectItem value="__empty__">(empty)</SelectItem>
+                                        {rvCategoryOptions.map((category) => (
+                                          <SelectItem key={category} value={category}>{category}</SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </TableCell>
+                                ))}
+                                <TableCell className="w-12" />
+                              </TableRow>
+                            );
+                          })
+                        ) : (
+                          <TableRow>
+                            <TableCell colSpan={Math.max(rvProviders.length + 2, 1)} className="h-24 text-center text-muted-foreground">
+                              No annotation rows available for review.
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </ScrollArea>
+              </div>
+
+              <AnalysisPagination
+                page={rvPage}
+                pageSize={rvPageSize}
+                hasNext={rvHasNext}
+                hasPrev={rvHasPrev}
+                totalPages={rvTotalPages}
+                onPageChange={(nextPage) => {
+                  void Promise.all([
+                    loadReviewPage(reviewNodeId, reviewTextColumn, reviewAnnotationColumn, nextPage, rvPageSize),
+                    refreshCategoryCache(reviewNodeId, reviewAnnotationColumn),
+                  ]);
+                }}
+                onPageSizeChange={(nextPageSize) => {
+                  void Promise.all([
+                    loadReviewPage(reviewNodeId, reviewTextColumn, reviewAnnotationColumn, 1, nextPageSize),
+                    refreshCategoryCache(reviewNodeId, reviewAnnotationColumn),
+                  ]);
+                }}
+                pageSizeOptions={[5, 10, 20, 50, 100]}
+                loading={isReviewPaging}
+              />
+
+              <AlertDialog open={isAddAnnotatorDialogOpen} onOpenChange={setIsAddAnnotatorDialogOpen}>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Add Annotator</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Enter the annotator name to add a new review column.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <Input
+                    value={newProviderName}
+                    onChange={(event) => setNewProviderName(event.target.value)}
+                    placeholder="e.g. userA"
+                    autoFocus
+                  />
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleAddProvider}>Add</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+
+              <AlertDialog
+                open={isAddCategoryDialogOpen}
+                onOpenChange={(open) => {
+                  setIsAddCategoryDialogOpen(open);
+                  if (!open) {
+                    setPendingCategoryCell(null);
+                    setNewCategoryName('');
+                  }
+                }}
+              >
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Add a New Category</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This category is temporary in the frontend and will reset on page change.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <Input
+                    value={newCategoryName}
+                    onChange={(event) => setNewCategoryName(event.target.value)}
+                    placeholder="e.g. mixed"
+                    autoFocus
+                  />
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => void handleConfirmAddCategory()}>
+                      Add Category
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </CardContent>
+          </Card>
+        );
+      })() : null}
     </div>
   );
 };

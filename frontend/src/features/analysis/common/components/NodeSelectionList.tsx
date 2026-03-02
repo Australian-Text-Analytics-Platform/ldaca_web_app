@@ -22,6 +22,7 @@ export interface NodeSelectionListProps {
   onColorChange?: (nodeId: string, color: string) => void;
   renderNodeMeta?: (args: NodeSelectionRenderArgs) => React.ReactNode;
   renderNodeBody?: (args: NodeSelectionRenderArgs) => React.ReactNode;
+  renderExtraNodeContent?: (args: NodeSelectionRenderArgs) => React.ReactNode;
   getNodeTitle?: (node: WorkspaceNodeLike, nodeId: string, index: number) => string;
   emptyState?: React.ReactNode;
   className?: string;
@@ -38,6 +39,7 @@ export const NodeSelectionList: React.FC<NodeSelectionListProps> = ({
   onColorChange,
   renderNodeMeta,
   renderNodeBody,
+  renderExtraNodeContent,
   getNodeTitle = getNodeDisplayName,
   emptyState,
   className,
@@ -97,9 +99,10 @@ export const NodeSelectionList: React.FC<NodeSelectionListProps> = ({
                 </div>
               )}
             </CardHeader>
-            {renderNodeBody && (
+            {(renderNodeBody || renderExtraNodeContent) && (
               <CardContent className="space-y-2 px-3 pb-3 pt-0">
-                {renderNodeBody({ node, nodeId, index, color })}
+                {renderNodeBody?.({ node, nodeId, index, color })}
+                {renderExtraNodeContent?.({ node, nodeId, index, color })}
               </CardContent>
             )}
           </Card>

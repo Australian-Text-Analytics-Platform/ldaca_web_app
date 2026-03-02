@@ -689,6 +689,7 @@ class AiAnnotationExample(BaseModel):
 class AiAnnotationRequest(BaseModel):
     node_ids: List[str]
     node_columns: Dict[str, str]
+    annotation_column: Optional[str] = None
 
     classes: List[AiAnnotationClassDef] = Field(min_length=1)
     examples: List[AiAnnotationExample] = Field(default_factory=list)
@@ -745,6 +746,7 @@ class AiAnnotationRequest(BaseModel):
 class AiAnnotationDetachRequest(BaseModel):
     column: str
     new_node_name: Optional[str] = None
+    annotation_column: Optional[str] = None
 
     classes: List[AiAnnotationClassDef] = Field(min_length=1)
     examples: List[AiAnnotationExample] = Field(default_factory=list)
