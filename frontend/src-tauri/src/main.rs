@@ -7,7 +7,7 @@ use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use tauri::{path::BaseDirectory, AppHandle, Manager, State};
 
 /// Holds the backend URL, process, and PID
@@ -187,9 +187,25 @@ fn detect_runtime_dir(app: &AppHandle) -> Option<PathBuf> {
         }
     }
 
-    // Fallback for direct executable launches where resolver may fail:
-    // derive bundle Resources from current executable location only.
+    // Fallback for direct executable launches where resolver may fail.
     if let Ok(exe_path) = std::env::current_exe() {
+        // On Windows, both MSI-installed apps and bare build outputs place
+        // backend-runtime adjacent to the executable.
+        if let Some(exe_dir) = exe_path.parent() {
+            for rel in BUNDLE_RUNTIME_CANDIDATES {
+                let candidate = exe_dir.join(rel);
+                if candidate.exists() && runtime_dir_has_manifest(&candidate) {
+                    println!(
+                        "Resolved backend runtime via exe-adjacent candidate '{}': {}",
+                        rel,
+                        candidate.display()
+                    );
+                    return Some(candidate);
+                }
+            }
+        }
+
+        // macOS bundle layout: derive Resources from executable location.
         if let Some(resources_dir) = exe_path
             .parent()
             .and_then(|p| p.parent())
@@ -273,6 +289,7 @@ fn locate_python_binary(runtime_dir: &Path) -> Option<PathBuf> {
     let candidates = [
         runtime_dir.join("python").join("bin").join("python3"),
         runtime_dir.join("python").join("bin").join("python"),
+        runtime_dir.join("python").join("Scripts").join("python.exe"),
         runtime_dir.join("python").join("python.exe"),
         runtime_dir.join("python").join("python3.exe"),
         runtime_dir.join("venv").join("bin").join("python"),
@@ -306,6 +323,77 @@ fn infer_runtime_dir_from_python(python_path: &Path) -> Option<PathBuf> {
         }
 
         current = current.parent()?;
+    }
+
+    None
+}
+
+/// Locate the managed CPython installation that ships with the bundled runtime.
+///
+/// Works cross-platform: on Unix the stdlib lives under `lib/python3.X/encodings`,
+/// on Windows it is `Lib/encodings` (flat, no version subdirectory).
+fn find_managed_python_home(runtime_root: &Path) -> Option<PathBuf> {
+    let managed_dir = runtime_root.join("managed-python");
+    let entries = std::fs::read_dir(&managed_dir).ok()?;
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+
+        // Windows layout: <cpython-dir>/Lib/encodings
+        if path.join("Lib").join("encodings").is_dir() {
+            return Some(path);
+        }
+
+        // Unix layout: <cpython-dir>/lib/python3.X/encodings
+        if let Ok(lib_entries) = std::fs::read_dir(path.join("lib")) {
+            for lib_entry in lib_entries.flatten() {
+                let lib_dir = lib_entry.path();
+                if lib_dir
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .is_some_and(|name| name.starts_with("python3."))
+                    && lib_dir.join("encodings").is_dir()
+                {
+                    return Some(path);
+                }
+            }
+        }
+    }
+
+    None
+}
+
+/// Locate the venv site-packages directory inside the bundled runtime.
+///
+/// On Unix this is `python/lib/python3.X/site-packages`.
+/// On Windows this is `python/Lib/site-packages` (flat, no version subdirectory).
+fn find_venv_site_packages(runtime_root: &Path) -> Option<PathBuf> {
+    let python_dir = runtime_root.join("python");
+
+    // Windows layout: python/Lib/site-packages
+    let win_sp = python_dir.join("Lib").join("site-packages");
+    if win_sp.is_dir() {
+        return Some(win_sp);
+    }
+
+    // Unix layout: python/lib/python3.X/site-packages
+    if let Ok(lib_entries) = std::fs::read_dir(python_dir.join("lib")) {
+        for entry in lib_entries.flatten() {
+            let lib_dir = entry.path();
+            if lib_dir
+                .file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.starts_with("python3."))
+            {
+                let sp = lib_dir.join("site-packages");
+                if sp.is_dir() {
+                    return Some(sp);
+                }
+            }
+        }
     }
 
     None
@@ -393,41 +481,15 @@ fn spawn_backend_process(
     // Ensure packaged Python runtime is relocatable across machines.
     // `pyvenv.cfg` may contain build-machine absolute paths; use managed-python
     // as PYTHONHOME and venv site-packages as PYTHONPATH.
-    let managed_python_home = std::fs::read_dir(runtime.root.join("managed-python"))
-        .ok()
-        .into_iter()
-        .flat_map(|entries| entries.flatten())
-        .map(|entry| entry.path())
-        .find(|path| {
-            std::fs::read_dir(path.join("lib"))
-                .ok()
-                .into_iter()
-                .flat_map(|entries| entries.flatten())
-                .map(|entry| entry.path())
-                .any(|lib_dir| {
-                    lib_dir
-                        .file_name()
-                        .and_then(|name| name.to_str())
-                        .is_some_and(|name| name.starts_with("python3."))
-                        && lib_dir.join("encodings").is_dir()
-                })
-        });
+    let managed_python_home = find_managed_python_home(&runtime.root);
 
-    let venv_site_packages = std::fs::read_dir(runtime.root.join("python").join("lib"))
-        .ok()
-        .into_iter()
-        .flat_map(|entries| entries.flatten())
-        .map(|entry| entry.path())
-        .find(|lib_dir| {
-            lib_dir
-                .file_name()
-                .and_then(|name| name.to_str())
-                .is_some_and(|name| name.starts_with("python3."))
-                && lib_dir.join("site-packages").is_dir()
-        })
-        .map(|lib_dir| lib_dir.join("site-packages"));
+    let venv_site_packages = find_venv_site_packages(&runtime.root);
 
-    if let Some(home) = managed_python_home {
+    if let Some(ref home) = managed_python_home {
+        println!(
+            "Setting PYTHONHOME={} (overrides pyvenv.cfg for relocatability)",
+            home.display()
+        );
         command.env("PYTHONHOME", home.as_os_str());
         if let Some(site_packages) = venv_site_packages.as_deref() {
             if let Ok(paths) = std::env::join_paths([site_packages]) {
@@ -435,6 +497,11 @@ fn spawn_backend_process(
             }
         }
         command.env("PYTHONNOUSERSITE", "1");
+    } else {
+        eprintln!(
+            "WARNING: managed-python not found under {}; pyvenv.cfg home path may be stale on this machine",
+            runtime.root.display()
+        );
     }
 
     let host_value = determine_server_host(env_overrides);
