@@ -117,6 +117,13 @@ const stringifyCell = (value: unknown): string => {
   return String(value);
 };
 
+const buildDetachNodeName = (nodeLabel: string, suffix: string) => {
+  const trimmed = nodeLabel.trim();
+  const base = trimmed.length > 0 ? trimmed : 'node';
+  const normalized = base.replace(/\s+/g, '_');
+  return `${normalized}${suffix}`;
+};
+
 const AiAnnotatorFeature: React.FC = () => {
   const { currentWorkspaceId } = useWorkspaceData();
   const { getAuthHeaders } = useAuth();
@@ -392,6 +399,10 @@ const AiAnnotatorFeature: React.FC = () => {
         selectedNodeId,
         {
           column: selectedColumn,
+          new_node_name: buildDetachNodeName(
+            String(displayedNodes[0]?.name || displayedNodes[0]?.id || selectedNodeId),
+            '_ai_annotation',
+          ),
           annotation_column: aiAnnotationColumn.trim() ? aiAnnotationColumn : null,
           classes: parsedClasses,
           examples: parsedExamples,

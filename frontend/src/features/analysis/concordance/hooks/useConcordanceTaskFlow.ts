@@ -87,6 +87,13 @@ export function useConcordanceTaskFlow({
   },
 }: Params) {
 
+  const buildDetachNodeName = (nodeLabel: string, suffix: string) => {
+    const trimmed = nodeLabel.trim();
+    const base = trimmed.length > 0 ? trimmed : 'node';
+    const normalized = base.replace(/\s+/g, '_');
+    return `${normalized}${suffix}`;
+  };
+
   const updateStoredResult = async (
     body: ConcordanceResultQuery
   ): Promise<ConcordanceAnalysisResponse | null> => {
@@ -365,11 +372,14 @@ export function useConcordanceTaskFlow({
     }
   };
 
-  const handleDetach = async (nodeId: string, column: string) => {
+  const handleDetach = async (nodeId: string, column: string, nodeLabel?: string) => {
     if (!currentWorkspaceId || !searchWord.trim()) return;
 
     setNodeDetaching(prev => ({ ...prev, [nodeId]: true }));
     try {
+      const resolvedNodeLabel = (nodeLabel && nodeLabel.trim().length > 0)
+        ? nodeLabel
+        : nodeId;
       const request = {
         node_id: nodeId,
         column,
@@ -378,7 +388,7 @@ export function useConcordanceTaskFlow({
         num_right_tokens: numRightTokens,
         regex,
         case_sensitive: caseSensitive,
-        new_node_name: undefined,
+        new_node_name: buildDetachNodeName(resolvedNodeLabel, '_conc'),
       };
       await detachConcordance(nodeId, request);
     } catch (error) {

@@ -77,6 +77,13 @@ export function useTopicModelingTaskFlow({
     queryClient,
   },
 }: Params) {
+  const buildDetachNodeName = (nodeLabel: string, suffix: string) => {
+    const trimmed = nodeLabel.trim();
+    const base = trimmed.length > 0 ? trimmed : 'node';
+    const normalized = base.replace(/\s+/g, '_');
+    return `${normalized}${suffix}`;
+  };
+
   const [isDetachLoading, setIsDetachLoading] = useState(false);
   const [isDetaching, setIsDetaching] = useState(false);
   const [detachDialogOpen, setDetachDialogOpen] = useState(false);
@@ -209,9 +216,16 @@ export function useTopicModelingTaskFlow({
 
     try {
       setIsDetaching(true);
+      const newNodeNames = Object.fromEntries(
+        detachNodeOptions.map((node) => [
+          node.node_id,
+          buildDetachNodeName(String(node.node_name || node.node_id), '_topic'),
+        ])
+      );
       const payload: TopicModelingDetachRequest = {
         node_ids: nodeIds,
         selected_columns: selectedDetachColumns,
+        new_node_names: newNodeNames,
         ...(selectedTopicIds.size > 0 ? { topic_ids: Array.from(selectedTopicIds) } : {}),
       };
       const resp = await textApi.topicModelingDetach(taskId, payload, getAuthHeaders());

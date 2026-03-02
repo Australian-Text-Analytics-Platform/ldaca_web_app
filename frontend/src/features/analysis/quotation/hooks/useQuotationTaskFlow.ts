@@ -120,6 +120,19 @@ export function useQuotationTaskFlow({
     openEngineDialog,
   },
 }: Params) {
+  const buildDetachNodeName = (nodeLabel: string, suffix: string) => {
+    const trimmed = nodeLabel.trim();
+    const base = trimmed.length > 0 ? trimmed : 'node';
+    const normalized = base.replace(/\s+/g, '_');
+    return `${normalized}${suffix}`;
+  };
+
+  const resolveNodeLabel = (nodeId: string): string => {
+    const candidates = (isLocked && lockedNodesSnapshot.length ? lockedNodesSnapshot : displayedNodes) as any[];
+    const match = candidates.find((node, idx) => getNodeIdentifier(node, idx) === nodeId);
+    const rawLabel = match?.name || match?.label || match?.id || nodeId;
+    return String(rawLabel);
+  };
   const buildEngineRequest = (): EngineRequestPayload | null => {
     if (resolvedEnginePayload.type === 'remote') {
       const rawUrl = resolvedEnginePayload.rawUrl;
@@ -406,6 +419,7 @@ export function useQuotationTaskFlow({
       await detachQuotation(nodeId, {
         node_id: nodeId,
         column: selection.column,
+        new_node_name: buildDetachNodeName(resolveNodeLabel(nodeId), '_quotation'),
         engine:
           enginePayload.type === 'remote'
             ? { type: 'remote', url: enginePayload.url }

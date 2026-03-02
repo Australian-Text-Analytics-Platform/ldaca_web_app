@@ -30,6 +30,7 @@ import {
   hasLockedParameterDiff,
   resetAnalysisSelectionAfterClear,
   restoreAnalysisLockFromRequest,
+  getNodeIdentifier,
   useAnalysisLock,
   useAnalysisFeature,
   useNodeColorManagement,
@@ -750,7 +751,9 @@ const ConcordanceFeature: React.FC = () => {
                       // Prefer lockedNodeColumns when available to ensure correct column
                       const col = effectiveNodeColumnSelections.find(s => s.nodeId === nid)?.column || '';
                       if (!col) continue;
-                      await handleDetach(nid, col);
+                      const sourceNode = panelSelectedNodes.find((node, idx) => getNodeIdentifier(node, idx) === nid);
+                      const sourceLabel = (sourceNode?.name || sourceNode?.id || nid) as string;
+                      await handleDetach(nid, col, sourceLabel);
                     }
                   } finally { setCombinedLoading(false); }
                 }}
@@ -956,7 +959,7 @@ const ConcordanceFeature: React.FC = () => {
           <Button
             onClick={() => {
               if (detachNodeId) {
-                handleDetach(detachNodeId, column);
+                handleDetach(detachNodeId, column, nodeKey);
               }
             }}
             disabled={nodeIsLoading || isDetaching || !searchWord.trim() || !canDetach || !detachNodeId}
