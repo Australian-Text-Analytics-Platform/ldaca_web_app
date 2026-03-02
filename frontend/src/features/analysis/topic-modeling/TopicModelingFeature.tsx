@@ -304,6 +304,8 @@ const TopicModelingFeature: React.FC = () => {
     setTooltip,
   });
 
+  const colorNodeIds = isLocked ? activeNodeIds.slice(0, 2) : panelNodeIds;
+
   const { bubbleElements, renderSizeComposition } = useTopicModelingBubbleChart({
     topics,
     activeDomain,
@@ -321,7 +323,7 @@ const TopicModelingFeature: React.FC = () => {
     setHoveredTopicId,
     setTooltip,
     corpusCount,
-    panelNodeIds,
+    panelNodeIds: colorNodeIds,
     nodeColors,
     defaultPalette,
     selectedTopicIds,

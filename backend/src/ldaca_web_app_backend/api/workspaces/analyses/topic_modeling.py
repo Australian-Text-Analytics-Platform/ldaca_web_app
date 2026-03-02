@@ -477,6 +477,14 @@ async def detach_topic_modeling(
             detail="Topic meanings artifact is missing",
         )
     meanings_lf = pl.scan_parquet(meanings_path)
+    selected_topic_ids = sorted({
+        int(topic_id) for topic_id in (request.topic_ids or [])
+    })
+    filtered_meanings_lf = (
+        meanings_lf.filter(pl.col("topic").is_in(selected_topic_ids))
+        if selected_topic_ids
+        else meanings_lf
+    )
 
     target_node_ids = request.node_ids or list(assignments_by_node_id.keys())
     if not target_node_ids:
@@ -501,9 +509,9 @@ async def detach_topic_modeling(
 
         # Filter assignments to selected topics if topic_ids specified
         join_how = "left"
-        if request.topic_ids:
+        if selected_topic_ids:
             assignments_lf = assignments_lf.filter(
-                pl.col("_tm_topic").is_in(request.topic_ids)
+                pl.col("_tm_topic").is_in(selected_topic_ids)
             )
             join_how = "inner"
 
@@ -578,7 +586,7 @@ async def detach_topic_modeling(
 
         meanings_node_name = f"{node_name}_topic_meanings"
         meanings_node = Node(
-            data=meanings_lf,
+            data=filtered_meanings_lf,
             name=meanings_node_name,
             workspace=ws,
             operation="topic_modeling_meanings_detach",

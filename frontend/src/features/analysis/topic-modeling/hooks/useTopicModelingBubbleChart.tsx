@@ -166,10 +166,16 @@ export function useTopicModelingBubbleChart({
       >
         {topics.map((topic) => {
           const sizes = topic.size || [];
-          const proportion = corpusCount === 2 && topic.total_size > 0 ? sizes[0] / topic.total_size : 0.5;
+          const proportion =
+            corpusCount === 2 && topic.total_size > 0
+              ? sizes[0] / topic.total_size
+              : 0.5;
           const colorA = resolvePanelColor(0, fallbackPrimaryColor, panelNodeIds, nodeColors, defaultPalette);
           const colorB = resolvePanelColor(1, fallbackSecondaryColor, panelNodeIds, nodeColors, defaultPalette);
-          const fill = interpolateColor(colorA, colorB, proportion);
+          const fill =
+            corpusCount <= 1
+              ? colorA
+              : interpolateColor(colorA, colorB, proportion);
           const radius = 10 + 40 * Math.sqrt(topic.total_size / (maxSize || 1));
           const cx = scaleX(topic.x);
           const cy = scaleY(topic.y);
