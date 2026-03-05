@@ -6,15 +6,37 @@ import io
 import os
 import shutil
 import uuid
+import warnings
 import zipfile
 from contextlib import nullcontext
 from importlib import resources
 from pathlib import Path
-from typing import Any, Dict, Union
+from typing import Any, Dict, Iterable, Union
 
 import polars as pl
 
 from ..settings import settings
+
+_DEFAULT_TEXT_FILE_EXTENSIONS: set[str] = {
+    ".txt",
+    ".md",
+    ".rst",
+    ".log",
+    ".csv",
+    ".tsv",
+    ".json",
+    ".jsonl",
+    ".ndjson",
+    ".xml",
+    ".html",
+    ".htm",
+    ".yaml",
+    ".yml",
+    ".toml",
+    ".ini",
+    ".cfg",
+    ".text",
+}
 
 # Direct imports - assuming proper package installation
 # (Optional) Import heavy libs lazily where needed to reduce import cost.
@@ -288,50 +310,88 @@ def read_text_file(file_path: Path) -> pl.DataFrame:
     return pl.DataFrame({"text": lines})
 
 
-def read_zip_file(file_path: Path) -> pl.DataFrame:
-    """Read a zip archive and return a Polars DataFrame.
+def read_zip_file(
+    file_path: str | Path,
+    *,
+    encoding: str = "utf-8",
+    errors: str = "ignore",
+    text_extensions: Iterable[str] | None = None,
+    include_extensionless: bool = True,
+) -> pl.DataFrame:
+    """Read text files from a ZIP archive into a Polars DataFrame.
 
-    Strategy: if the zip contains a single supported data file, read it.
-    Otherwise, return a DataFrame listing contained files.
+    Returns a deterministic, path-sorted table with columns:
+    ``file_path``, ``base_name``, ``extension``, and ``document``.
     """
-    with zipfile.ZipFile(file_path, "r") as zf:
-        file_infos = [info for info in zf.infolist() if not info.is_dir()]
-        if not file_infos:
-            return pl.DataFrame({"filename": [], "size": []})
+    archive_path = Path(file_path)
+    if not archive_path.exists():
+        raise FileNotFoundError(f"ZIP archive not found: {archive_path}")
 
-        def file_type_from_name(name: str) -> str:
-            return detect_file_type(name)
+    if text_extensions is None:
+        allowed_extensions = _DEFAULT_TEXT_FILE_EXTENSIONS
+    else:
+        allowed_extensions = {
+            (ext if ext.startswith(".") else f".{ext}").lower()
+            for ext in text_extensions
+        }
 
-        supported = [
-            info
-            for info in file_infos
-            if file_type_from_name(info.filename)
-            in {"csv", "tsv", "json", "jsonl", "ndjson", "parquet", "text"}
-        ]
+    records: list[dict[str, str]] = []
 
-        if len(supported) == 1:
-            info = supported[0]
-            inner_type = file_type_from_name(info.filename)
-            with zf.open(info, "r") as fh:
-                data = fh.read()
-            if inner_type in {"csv", "tsv"}:
-                sep = "\t" if inner_type == "tsv" else ","
-                return pl.read_csv(io.BytesIO(data), separator=sep)
-            if inner_type in {"jsonl", "ndjson"}:
-                return pl.read_ndjson(io.BytesIO(data))
-            if inner_type == "json":
-                return pl.read_json(io.BytesIO(data))
-            if inner_type == "parquet":
-                return pl.read_parquet(io.BytesIO(data))
-            if inner_type == "text":
-                content = data.decode("utf-8", errors="replace")
-                lines = content.splitlines()
-                return pl.DataFrame({"text": lines})
+    with zipfile.ZipFile(archive_path) as archive:
+        for info in archive.infolist():
+            if info.is_dir():
+                continue
 
-        return pl.DataFrame({
-            "filename": [info.filename for info in file_infos],
-            "size": [info.file_size for info in file_infos],
-        })
+            inner_path = info.filename
+            path_obj = Path(inner_path)
+            file_name = path_obj.name
+            base_name = path_obj.stem
+            extension = path_obj.suffix
+
+            if inner_path.startswith("__MACOSX/") or file_name.startswith("._"):
+                continue
+
+            suffix = extension.lower()
+            if suffix:
+                if suffix not in allowed_extensions:
+                    continue
+            elif not include_extensionless:
+                continue
+
+            with archive.open(info, "r") as file_obj:
+                data = file_obj.read()
+
+            try:
+                text_content = data.decode(encoding, errors=errors)
+            except UnicodeDecodeError:
+                warnings.warn(
+                    (
+                        f"Skipping '{inner_path}' - unable to decode with "
+                        f"encoding {encoding!r}"
+                    ),
+                    UserWarning,
+                    stacklevel=2,
+                )
+                continue
+
+            records.append({
+                "file_path": inner_path,
+                "base_name": base_name,
+                "extension": extension,
+                "document": text_content,
+            })
+
+    records.sort(key=lambda entry: entry["file_path"])
+
+    return pl.DataFrame(
+        records,
+        schema={
+            "file_path": pl.String,
+            "base_name": pl.String,
+            "extension": pl.String,
+            "document": pl.String,
+        },
+    )
 
 
 def generate_workspace_id() -> str:

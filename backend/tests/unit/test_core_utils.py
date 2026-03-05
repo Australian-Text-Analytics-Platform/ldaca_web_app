@@ -13,6 +13,7 @@ from ldaca_web_app_backend.core.utils import (
     get_user_data_folder,
     get_user_workspace_folder,
     load_data_file,
+    read_zip_file,
     setup_user_folders,
     validate_file_path,
 )
@@ -149,6 +150,33 @@ class TestFileOperations:
             zf.writestr("a.txt", "hello")
             zf.writestr("b.txt", "world")
         return target
+
+    def test_read_zip_file_returns_legacy_text_schema(self, temp_dir):
+        """ZIP text ingestion should expose legacy file metadata columns."""
+        from zipfile import ZipFile
+
+        target = temp_dir / "legacy.zip"
+        with ZipFile(target, "w") as zf:
+            zf.writestr("nested/alpha.txt", "hello alpha")
+            zf.writestr("beta.md", "hello beta")
+
+        df = read_zip_file(target)
+
+        assert df.columns == ["file_path", "base_name", "extension", "document"]
+        assert df.to_dicts() == [
+            {
+                "file_path": "beta.md",
+                "base_name": "beta",
+                "extension": ".md",
+                "document": "hello beta",
+            },
+            {
+                "file_path": "nested/alpha.txt",
+                "base_name": "alpha",
+                "extension": ".txt",
+                "document": "hello alpha",
+            },
+        ]
 
     """Test data loading functionality"""
 

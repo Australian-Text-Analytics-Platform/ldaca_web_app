@@ -86,7 +86,7 @@ def test_csv_preview_supported_types_and_preview(client, tmp_path):
 
 
 def test_zip_preview_returns_file_listing(client, tmp_path):
-    """ZIP archives should return a file listing when multiple entries exist."""
+    """ZIP archives should return legacy text-ingestion metadata columns."""
 
     user_root = tmp_path / "users" / "user_test_user" / "user_data"
     zip_path = user_root / "archive.zip"
@@ -104,9 +104,9 @@ def test_zip_preview_returns_file_listing(client, tmp_path):
     assert resp.status_code == 200
     payload = resp.json()
     assert payload["file_type"] == "zip"
-    assert payload["columns"] == ["filename", "size"]
+    assert payload["columns"] == ["file_path", "base_name", "extension", "document"]
     assert "LazyFrame" in payload["supported_types"]
-    assert any(row["filename"] == "a.txt" for row in payload["preview"])
+    assert any(row["file_path"] == "a.txt" for row in payload["preview"])
 
 
 def test_text_preview_returns_single_cell(client, tmp_path):
