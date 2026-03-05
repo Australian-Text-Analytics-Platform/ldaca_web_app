@@ -168,7 +168,7 @@ export function useTopicModelingBubbleChart({
           const sizes = topic.size || [];
           const proportion =
             corpusCount === 2 && topic.total_size > 0
-              ? sizes[0] / topic.total_size
+              ? (sizes[1] ?? 0) / topic.total_size
               : 0.5;
           const colorA = resolvePanelColor(0, fallbackPrimaryColor, panelNodeIds, nodeColors, defaultPalette);
           const colorB = resolvePanelColor(1, fallbackSecondaryColor, panelNodeIds, nodeColors, defaultPalette);
