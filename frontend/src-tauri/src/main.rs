@@ -10,6 +10,14 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tauri::{path::BaseDirectory, AppHandle, Manager, State};
 
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
+/// Windows: CREATE_NO_WINDOW flag prevents a visible console window when
+/// spawning the backend Python process.
+#[cfg(target_os = "windows")]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
 /// Holds the backend URL, process, and PID
 struct BackendState {
     url: String,
@@ -286,6 +294,17 @@ fn runtime_from_launcher_env() -> Option<PathBuf> {
 }
 
 fn locate_python_binary(runtime_dir: &Path) -> Option<PathBuf> {
+    // Prefer the managed-python real interpreter over the venv stub launcher.
+    // The venv Scripts/python.exe is a stub that reads pyvenv.cfg to locate the
+    // real interpreter – but pyvenv.cfg uses an absolute path baked at build time
+    // that won't exist on other machines. Using managed-python directly avoids
+    // this entirely; PYTHONHOME and PYTHONPATH set in spawn_backend_process()
+    // ensure the interpreter finds stdlib and site-packages.
+    if let Some(managed) = find_managed_python_binary(runtime_dir) {
+        return Some(managed);
+    }
+
+    // Fallback to venv launchers (works in dev when pyvenv.cfg is valid)
     let candidates = [
         runtime_dir.join("python").join("bin").join("python3"),
         runtime_dir.join("python").join("bin").join("python"),
@@ -299,6 +318,36 @@ fn locate_python_binary(runtime_dir: &Path) -> Option<PathBuf> {
     for candidate in candidates {
         if candidate.exists() {
             return Some(candidate);
+        }
+    }
+
+    None
+}
+
+/// Locate the real Python interpreter inside managed-python.
+///
+/// On Windows: managed-python/cpython-*/python.exe
+/// On Unix:    managed-python/cpython-*/bin/python3
+fn find_managed_python_binary(runtime_dir: &Path) -> Option<PathBuf> {
+    let managed_dir = runtime_dir.join("managed-python");
+    let entries = std::fs::read_dir(&managed_dir).ok()?;
+
+    for entry in entries.flatten() {
+        let cpython_dir = entry.path();
+        if !cpython_dir.is_dir() {
+            continue;
+        }
+
+        // Windows: python.exe directly in cpython dir
+        let win_python = cpython_dir.join("python.exe");
+        if win_python.exists() {
+            return Some(win_python);
+        }
+
+        // Unix: bin/python3
+        let unix_python = cpython_dir.join("bin").join("python3");
+        if unix_python.exists() {
+            return Some(unix_python);
         }
     }
 
@@ -497,6 +546,16 @@ fn spawn_backend_process(
             }
         }
         command.env("PYTHONNOUSERSITE", "1");
+
+        // Prepend managed-python dir to PATH so C extension modules (greenlet,
+        // numpy, etc.) can find vcruntime140.dll and other DLLs that ship with
+        // the managed CPython installation.
+        let mut new_path = std::ffi::OsString::from(home);
+        if let Some(existing_path) = std::env::var_os("PATH") {
+            new_path.push(";");
+            new_path.push(existing_path);
+        }
+        command.env("PATH", new_path);
     } else {
         eprintln!(
             "WARNING: managed-python not found under {}; pyvenv.cfg home path may be stale on this machine",
@@ -520,6 +579,10 @@ fn spawn_backend_process(
         runtime.root.display(),
         backend_port
     );
+
+    // On Windows, suppress the console window for the Python child process.
+    #[cfg(target_os = "windows")]
+    command.creation_flags(CREATE_NO_WINDOW);
 
     let mut child = command.spawn()?;
     if let Some(stdout) = child.stdout.take() {
