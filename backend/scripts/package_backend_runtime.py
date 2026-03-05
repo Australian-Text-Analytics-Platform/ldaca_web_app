@@ -7,8 +7,10 @@ import argparse
 import json
 import os
 import shutil
+import stat
 import subprocess
 import sys
+import time
 import tomllib
 from datetime import datetime, timezone
 from pathlib import Path
@@ -69,6 +71,66 @@ def ensure_uv_is_available() -> None:
         raise RuntimeError("The 'uv' CLI is required but was not found in PATH")
 
 
+def _handle_remove_error(
+    func: object, path: str, excinfo: tuple[object, BaseException, object]
+) -> None:
+    """Best-effort fixups for read-only files during recursive deletion."""
+    _ = func  # unused but part of shutil callback contract
+    _ = excinfo
+    target = Path(path)
+    try:
+        os.chmod(target, stat.S_IWRITE)
+        if target.is_dir():
+            os.rmdir(target)
+        else:
+            os.remove(target)
+    except Exception:
+        # Let the outer retry/fallback logic decide what to do next.
+        pass
+
+
+def remove_tree_with_retries(
+    path: Path, *, retries: int = 5, base_delay_seconds: float = 0.25
+) -> None:
+    """Remove a directory tree robustly, especially on Windows.
+
+    Windows can intermittently throw errors like WinError 145 (directory not
+    empty) during deep deletions due to delayed file handle release. We retry
+    and then fall back to `rmdir /s /q` when needed.
+    """
+    if not path.exists():
+        return
+
+    last_error: OSError | None = None
+    for attempt in range(1, retries + 1):
+        try:
+            shutil.rmtree(path, onexc=_handle_remove_error)
+            return
+        except FileNotFoundError:
+            return
+        except OSError as exc:
+            last_error = exc
+            if attempt < retries:
+                time.sleep(base_delay_seconds * attempt)
+                continue
+
+    # Final Windows-specific fallback.
+    if os.name == "nt" and path.exists():
+        subprocess.run(
+            ["cmd", "/d", "/s", "/c", "rmdir", "/s", "/q", str(path)],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if not path.exists():
+            return
+
+    if last_error is not None:
+        raise last_error
+
+    raise RuntimeError(f"Failed to remove directory: {path}")
+
+
 def remove_externally_managed_markers(root: Path) -> None:
     for marker in root.rglob("EXTERNALLY-MANAGED"):
         marker.unlink()
@@ -81,6 +143,7 @@ def create_uv_packaging_env(managed_install_dir: Path) -> dict[str, str]:
         "UV_PYTHON_INSTALL_DIR": str(managed_install_dir),
         "UV_PYTHON_PREFER_MANAGED": "1",
         "UV_PYTHON_DOWNLOADS": "automatic",
+        "UV_VENV_CLEAR": "1",
     }
 
 
@@ -302,7 +365,7 @@ def main() -> None:
 
     if args.clean and dist_root.exists():
         print(f"[INFO] Removing previous dist at {dist_root}")
-        shutil.rmtree(dist_root)
+        remove_tree_with_retries(dist_root)
 
     for d in (output_dir, dist_root, wheel_dir):
         d.mkdir(parents=True, exist_ok=True)
@@ -336,7 +399,7 @@ def main() -> None:
 
     runtime_python_dir = output_dir / "python"
     if runtime_python_dir.exists():
-        shutil.rmtree(runtime_python_dir)
+        remove_tree_with_retries(runtime_python_dir)
 
     run(
         [
