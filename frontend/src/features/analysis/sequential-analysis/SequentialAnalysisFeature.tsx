@@ -81,6 +81,7 @@ const SequentialAnalysisFeature: React.FC = () => {
     serverRequest,
     unlockSelection,
     lockWithSnapshots,
+    panelSelectedNodes,
   } = useAnalysisLock({
     analysisType: 'sequential_analysis',
     workspaceId: currentWorkspaceId,
@@ -454,14 +455,7 @@ const SequentialAnalysisFeature: React.FC = () => {
         </CardHeader>
         <CardContent className="space-y-6 pt-0">
           <NodeSelectionPanel
-            selectedNodes={(isLocked && lockedNodesSnapshot.length)
-              ? lockedNodesSnapshot.map((s) => ({
-                  id: s.id,
-                  name: s.name,
-                  data: { name: s.name, nodeName: s.name, label: s.name, columns: s.columns },
-                  columns: s.columns,
-                }))
-              : (selectedNode ? [{ id: selectedNode.id, name: selectedNode.data?.name, data: selectedNode.data }] : [])}
+            selectedNodes={panelSelectedNodes}
             nodeColumnSelections={nodeColumnSelections}
             onColumnChange={(nodeId, column) => {
               if (isLocked) return;
