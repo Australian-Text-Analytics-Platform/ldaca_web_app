@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   LineChart,
   Line,
@@ -31,6 +31,22 @@ export const SequentialChart: React.FC<SequentialChartProps> = ({
   groupKeys,
   groupPointCounts,
 }) => {
+  const [hiddenKeys, setHiddenKeys] = useState<Set<string>>(new Set());
+
+  const toggleKey = (key: string) => {
+    setHiddenKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
+
+  const visibleKeys = groupKeys.filter((key) => !hiddenKeys.has(key));
+
   if (!chartData.length) {
     return (
       <div className="flex h-40 items-center justify-center rounded-md border border-dashed border-muted-foreground/30 text-sm text-muted-foreground">
@@ -59,7 +75,7 @@ export const SequentialChart: React.FC<SequentialChartProps> = ({
               <ChartTooltip
                 content={<ChartTooltipContent className="min-w-50" labelFormatter={formatTimeLabel} />}
               />
-              {groupKeys.map((key, idx) => {
+              {visibleKeys.map((key, idx) => {
                 const color = chartConfig[key]?.color ?? getPaletteColor(idx);
                 return <Bar key={key} dataKey={key} fill={color} radius={[6, 6, 0, 0]} name={key} />;
               })}
@@ -72,7 +88,7 @@ export const SequentialChart: React.FC<SequentialChartProps> = ({
               <ChartTooltip
                 content={<ChartTooltipContent className="min-w-50" labelFormatter={formatTimeLabel} />}
               />
-              {groupKeys.map((key, idx) => {
+              {visibleKeys.map((key, idx) => {
                 const color = chartConfig[key]?.color ?? getPaletteColor(idx);
                 return (
                   <Area
@@ -98,7 +114,7 @@ export const SequentialChart: React.FC<SequentialChartProps> = ({
                   <ChartTooltipContent className="min-w-50" indicator="line" labelFormatter={formatTimeLabel} />
                 }
               />
-              {groupKeys.map((key, idx) => {
+              {visibleKeys.map((key, idx) => {
                 const color = chartConfig[key]?.color ?? getPaletteColor(idx);
                 const shouldShowDot = (groupPointCounts[key] ?? chartData.length) <= 1;
                 return (
@@ -122,8 +138,17 @@ export const SequentialChart: React.FC<SequentialChartProps> = ({
         {groupKeys.map((key) => {
           const color = chartConfig[key]?.color;
           const label = chartConfig[key]?.label || key;
+          const isHidden = hiddenKeys.has(key);
           return (
-            <div key={key} className="flex items-center gap-2">
+            <button
+              key={key}
+              type="button"
+              className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 transition-opacity hover:bg-muted/60"
+              style={{ opacity: isHidden ? 0.4 : 1 }}
+              onClick={() => toggleKey(key)}
+              aria-pressed={!isHidden}
+              aria-label={isHidden ? `Show ${label}` : `Hide ${label}`}
+            >
               {chartType === 'line' ? (
                 <div className="flex items-center">
                   <div className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
@@ -133,8 +158,13 @@ export const SequentialChart: React.FC<SequentialChartProps> = ({
               ) : (
                 <div className="h-3 w-3 rounded-sm" style={{ backgroundColor: color }} />
               )}
-              <span className="text-sm font-medium text-muted-foreground">{label}</span>
-            </div>
+              <span
+                className="text-sm font-medium text-muted-foreground"
+                style={{ textDecoration: isHidden ? 'line-through' : 'none' }}
+              >
+                {label}
+              </span>
+            </button>
           );
         })}
       </div>

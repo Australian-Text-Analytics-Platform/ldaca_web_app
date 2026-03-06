@@ -9,7 +9,7 @@ interface AddFilePanelProps {
   filename: string | null;
   open: boolean;
   onClose: () => void;
-  onConfirm: () => Promise<void> | void;
+  onConfirm: (selectedSheet?: string | null) => Promise<void> | void;
 }
 
 export const AddFilePanel: React.FC<AddFilePanelProps> = ({ filename, open, onClose, onConfirm }) => {
@@ -44,7 +44,7 @@ export const AddFilePanel: React.FC<AddFilePanelProps> = ({ filename, open, onCl
     if (!filename) return;
     try {
       setSubmitting(true);
-      await onConfirm();
+      await onConfirm(selectedSheet);
       handleClose();
     } finally {
       setSubmitting(false);

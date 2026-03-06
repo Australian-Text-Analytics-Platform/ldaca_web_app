@@ -1,12 +1,19 @@
 """File management endpoints."""
 
 import logging
+import xml.etree.ElementTree as ET
+import zipfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import polars as pl
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
+
+try:
+    import fastexcel
+except Exception:  # pragma: no cover - optional import hardening
+    fastexcel = None
 
 from ..core.auth import get_current_user
 from ..core.utils import (
@@ -151,7 +158,98 @@ def _read_excel_sheet(file_path: Path, sheet_name: str) -> pl.DataFrame:
     Why:
     - Isolates sheet-level reads for preview pagination.
     """
-    return pl.read_excel(file_path, sheet_name=sheet_name)
+    result = pl.read_excel(file_path, sheet_name=sheet_name)
+    return _coerce_excel_result_to_dataframe(result, preferred_sheet=sheet_name)
+
+
+def _coerce_excel_result_to_dataframe(
+    result: Any,
+    preferred_sheet: Optional[str] = None,
+) -> pl.DataFrame:
+    """Normalize Polars Excel reads into a single DataFrame.
+
+    Used by:
+    - `_read_excel_sheet`
+    - `unified_file_preview`
+
+    Why:
+    - Depending on Polars version/options, `read_excel` may return either a
+      DataFrame or a dict[str, DataFrame]. Preview rendering expects a
+      DataFrame, so this helper removes return-shape ambiguity.
+    """
+    if isinstance(result, pl.DataFrame):
+        return result
+
+    if isinstance(result, dict):
+        if (
+            preferred_sheet
+            and preferred_sheet in result
+            and isinstance(result[preferred_sheet], pl.DataFrame)
+        ):
+            return result[preferred_sheet]
+
+        for value in result.values():
+            if isinstance(value, pl.DataFrame):
+                return value
+
+    raise TypeError(f"Unexpected Excel read result type: {type(result)!r}")
+
+
+def _list_excel_sheet_names(file_path: Path) -> List[str]:
+    """Return workbook sheet names in a Polars-version-tolerant way.
+
+    Used by:
+    - `unified_file_preview`
+
+    Why:
+    - Some Polars versions return a dict for `sheet_id=None`, while others may
+      return a single DataFrame (e.g., single-sheet workbooks). This helper
+      normalizes both behaviors to avoid `.keys()` attribute errors.
+    """
+    if fastexcel is not None:
+        try:
+            reader = fastexcel.read_excel(str(file_path))
+            names = getattr(reader, "sheet_names", None)
+            if names:
+                return [str(name) for name in names]
+        except Exception:
+            # Fall back to Polars-based detection below.
+            pass
+
+    workbook = pl.read_excel(file_path, sheet_id=None)
+    if isinstance(workbook, dict):
+        return [str(name) for name in workbook.keys()]
+    if isinstance(workbook, pl.DataFrame):
+        # Continue to XML fallback below to recover names when possible.
+        pass
+
+    # Defensive fallback for uncommon return types.
+    keys = getattr(workbook, "keys", None)
+    if callable(keys):
+        try:
+            return [str(name) for name in keys()]
+        except Exception:
+            pass
+
+    # Final fallback for .xlsx/.xlsm containers: parse workbook.xml directly.
+    try:
+        with zipfile.ZipFile(file_path) as zf:
+            with zf.open("xl/workbook.xml") as workbook_xml:
+                root = ET.parse(workbook_xml).getroot()
+                names: List[str] = []
+                for sheet in root.iter():
+                    tag = sheet.tag.rsplit("}", 1)[-1]
+                    if tag != "sheet":
+                        continue
+                    name = sheet.attrib.get("name")
+                    if name:
+                        names.append(str(name))
+                if names:
+                    return names
+    except Exception:
+        pass
+
+    return []
 
 
 @router.get("/", response_model=UserFilesResponse)
@@ -434,32 +532,26 @@ async def unified_file_preview(
     try:
         if file_type == "excel":
             try:
-                sheet_names = pl.read_excel(file_path, sheet_id=None).keys()
-                sheet_names = list(sheet_names) if sheet_names else []
+                sheet_names = _list_excel_sheet_names(file_path)
             except Exception as exc:
                 raise HTTPException(status_code=500, detail=str(exc)) from exc
 
             # Choose sheet: payload.sheet_name or first sheet
             payload = req.payload or {}
-            selected_sheet = payload.get("sheet_name") or (
+            requested_sheet = payload.get("sheet_name")
+            selected_sheet = requested_sheet or (
                 sheet_names[0] if sheet_names else None
             )
 
-            if selected_sheet is None:
-                # No sheets found or cannot determine
-                return FilePreviewResponse(
-                    filename=req.filename,
-                    file_type=file_type,
-                    supported_types=supported_types,
-                    columns=[],
-                    preview=[],
-                    total_rows=0,
-                    sheet_names=sheet_names,
-                    selected_sheet=None,
-                )
-
             try:
-                base_df = _read_excel_sheet(file_path, selected_sheet)
+                if selected_sheet is not None:
+                    base_df = _read_excel_sheet(file_path, selected_sheet)
+                else:
+                    # Sheet names unavailable (e.g., single-sheet workbook on some
+                    # Polars versions): preview the first sheet by index.
+                    base_df = _coerce_excel_result_to_dataframe(
+                        pl.read_excel(file_path, sheet_id=0)
+                    )
             except Exception as exc:
                 raise HTTPException(status_code=500, detail=str(exc)) from exc
 

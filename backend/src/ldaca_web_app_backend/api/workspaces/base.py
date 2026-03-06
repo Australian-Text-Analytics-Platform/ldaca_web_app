@@ -7,6 +7,7 @@ All business logic is handled by the DocWorkspace library itself.
 
 import logging
 import os
+from typing import Optional
 
 import polars as pl
 from docworkspace import Node
@@ -292,6 +293,10 @@ _configure_numba_threading()
 @router.post("/nodes")
 async def add_node_to_workspace(
     filename: str,
+    sheet_name: Optional[str] = Query(
+        None,
+        description="Optional Excel sheet name to load when the source file is a workbook.",
+    ),
     mode: str = Query(
         "LazyFrame",
         description=(
@@ -322,7 +327,7 @@ async def add_node_to_workspace(
             )
 
         # Load the data
-        data = load_data_file(file_path)
+        data = load_data_file(file_path, sheet_name=sheet_name)
 
         # Validate requested mode (lazy-only workflow)
         valid_modes = {"LazyFrame"}

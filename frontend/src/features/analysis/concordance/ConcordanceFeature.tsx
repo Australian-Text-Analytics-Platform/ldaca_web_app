@@ -850,23 +850,34 @@ const ConcordanceFeature: React.FC = () => {
     const displayColumns = dedupeColumns(rawDisplayColumns);
     const sortableColumns = new Set(metaCols);
 
+    const currentNodePagination = nodePagination[paginationKey];
+    const currentPage = currentNodePagination?.currentPage ?? 1;
+    const nodeIsLoading = Boolean(nodeLoading[paginationKey]);
+    const hasPrev = Boolean(nodeData.pagination?.has_prev) || currentPage > 1;
+    const hasNext = Boolean(nodeData.pagination?.has_next);
+
     if (!nodeData.data || nodeData.data.length === 0) {
       return (
         <div key={nodeKey} className="mb-6">
           <div className="bg-white p-4 rounded-lg border">
             <div className="text-center text-gray-500">
-              No results found for “{searchWord}”
+              No results on this page for &quot;{searchWord}&quot;
             </div>
           </div>
+          {hasPrev && (
+            <AnalysisPagination
+              page={currentPage}
+              pageSize={currentNodePagination?.pageSize ?? globalPageSize}
+              hasNext={hasNext}
+              hasPrev={hasPrev}
+              totalPages={nodeData.pagination?.total_source_pages}
+              onPageChange={(newPage) => handlePageChange(newPage, paginationKey, requestNodeId)}
+              loading={nodeIsLoading}
+            />
+          )}
         </div>
       );
     }
-
-    const currentNodePagination = nodePagination[paginationKey];
-    const currentPage = currentNodePagination?.currentPage ?? 1;
-    const nodeIsLoading = Boolean(nodeLoading[paginationKey]);
-    const hasPrev = Boolean(nodeData.pagination?.has_prev);
-    const hasNext = Boolean(nodeData.pagination?.has_next);
     const detachingKey = detachNodeId ?? "";
     const isDetaching = detachingKey ? Boolean(nodeDetaching[detachingKey]) : false;
 
@@ -959,7 +970,9 @@ const ConcordanceFeature: React.FC = () => {
           <Button
             onClick={() => {
               if (detachNodeId) {
-                handleDetach(detachNodeId, column, nodeKey);
+                const detachNode = panelSelectedNodes.find((n) => n.id === detachNodeId);
+                const detachLabel = (detachNode?.name || nodeKey) as string;
+                handleDetach(detachNodeId, column, detachLabel);
               }
             }}
             disabled={nodeIsLoading || isDetaching || !searchWord.trim() || !canDetach || !detachNodeId}

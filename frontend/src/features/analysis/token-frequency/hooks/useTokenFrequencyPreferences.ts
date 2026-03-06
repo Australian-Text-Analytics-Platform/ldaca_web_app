@@ -208,6 +208,7 @@ export const useTokenFrequencyPreferences = ({
       .split(',')
       .map((word) => word.trim().toLowerCase())
       .filter(Boolean);
+    words.sort((a, b) => a.localeCompare(b));
     setStopWords(words.join(', '));
     setAppliedStopSet(new Set(words));
     void saveStopWordsToBackend(words);

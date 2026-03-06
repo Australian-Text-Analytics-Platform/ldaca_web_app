@@ -69,9 +69,26 @@ export function ConditionBuilder<Condition extends ConditionBuilderItem>(props: 
           <p className="text-base font-semibold text-foreground">{title}</p>
           <p className="text-sm text-muted-foreground">{description}</p>
         </div>
-        <Button onClick={onAddCondition} disabled={disabled} size="sm">
-          Add condition
-        </Button>
+        <div className="flex items-center gap-2">
+          {conditions.length > 1 && (
+            <Select
+              value={logic}
+              onValueChange={(value) => onLogicChange(value as 'and' | 'or')}
+              disabled={disabled}
+            >
+              <SelectTrigger className="w-20">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="and">AND</SelectItem>
+                <SelectItem value="or">OR</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+          <Button onClick={onAddCondition} disabled={disabled} size="sm">
+            Add condition
+          </Button>
+        </div>
       </div>
 
       {!hasSelection ? (
@@ -101,19 +118,9 @@ export function ConditionBuilder<Condition extends ConditionBuilderItem>(props: 
                   <div className="flex flex-1 flex-col gap-2">
                     <div className="flex items-center gap-2">
                       {index > 0 && (
-                        <Select
-                          value={logic}
-                          onValueChange={(value) => onLogicChange(value as 'and' | 'or')}
-                          disabled={disabled}
-                        >
-                          <SelectTrigger className="w-20">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="and">AND</SelectItem>
-                            <SelectItem value="or">OR</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <span className="w-20 text-center text-xs font-semibold uppercase text-muted-foreground">
+                          {logic.toUpperCase()}
+                        </span>
                       )}
                       {renderConditionMetadata?.(condition, rowDisabled)}
                     </div>

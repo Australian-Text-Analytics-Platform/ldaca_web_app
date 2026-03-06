@@ -416,10 +416,10 @@ export const DataLoaderFeature: React.FC = () => {
     }
   };
 
-  const handleAddToWorkspace = async () => {
+  const handleAddToWorkspace = async (selectedSheet?: string | null) => {
     if (!addFileName) return;
     try {
-      await workspaceActions.createNodeFromFile(addFileName);
+      await workspaceActions.createNodeFromFile(addFileName, selectedSheet ?? undefined);
       notify('success', `${addFileName} added to workspace.`);
     } catch (error) {
       notify('error', (error as Error).message || 'Failed to add file to workspace.');
@@ -623,7 +623,7 @@ export const DataLoaderFeature: React.FC = () => {
                           onClick={() => workspaceActions.setCurrentWorkspace(workspaceId)}
                           disabled={isActive}
                         >
-                          {isActive ? 'Active' : 'Activate'}
+                          {isActive ? 'Loaded' : 'Load'}
                         </Button>
                         <Button
                           size="sm"

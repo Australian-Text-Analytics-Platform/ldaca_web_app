@@ -11,7 +11,7 @@ import zipfile
 from contextlib import nullcontext
 from importlib import resources
 from pathlib import Path
-from typing import Any, Dict, Iterable, Union
+from typing import Any, Dict, Iterable, Optional, Union
 
 import polars as pl
 
@@ -269,6 +269,7 @@ def detect_file_type(filename: str) -> str:
 
 def load_data_file(
     file_path: Path,
+    sheet_name: Optional[str] = None,
 ) -> Union[pl.DataFrame, pl.LazyFrame, Any]:
     """Load data file into appropriate DataFrame type - defaults to polars LazyFrame for efficiency"""
     file_type = detect_file_type(file_path.name)
@@ -285,12 +286,35 @@ def load_data_file(
         return pl.scan_csv(file_path, separator="\t")
     elif file_type == "excel":
         # Use Polars to read Excel directly; returns an eager DataFrame
+        def _coerce_excel_result_to_dataframe(result: Any) -> pl.DataFrame:
+            if isinstance(result, pl.DataFrame):
+                return result
+            if isinstance(result, dict):
+                if (
+                    sheet_name
+                    and sheet_name in result
+                    and isinstance(result[sheet_name], pl.DataFrame)
+                ):
+                    return result[sheet_name]
+                for value in result.values():
+                    if isinstance(value, pl.DataFrame):
+                        return value
+            raise RuntimeError(
+                f"Unexpected Excel read result type: {type(result).__name__}"
+            )
+
         try:
-            return pl.read_excel(file_path)
+            if sheet_name:
+                return _coerce_excel_result_to_dataframe(
+                    pl.read_excel(file_path, sheet_name=sheet_name)
+                )
+            return _coerce_excel_result_to_dataframe(pl.read_excel(file_path))
         except Exception as ex:
             # Some versions require specifying sheet id/name
             try:
-                return pl.read_excel(file_path, sheet_id=0)
+                return _coerce_excel_result_to_dataframe(
+                    pl.read_excel(file_path, sheet_id=0)
+                )
             except Exception as ex2:
                 raise RuntimeError(f"Failed to read Excel via polars: {ex2}") from ex
     elif file_type == "zip":

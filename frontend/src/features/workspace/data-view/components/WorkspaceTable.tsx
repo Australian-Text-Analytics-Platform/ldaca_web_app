@@ -40,6 +40,55 @@ import {
   normalizeTypeName,
 } from '../services/schemaMutations';
 
+/**
+ * Self-contained rename input that manages its own draft state so parent
+ * column memoisation is never busted by keystrokes.
+ */
+function RenameInput({
+  column,
+  disabled,
+  onSubmit,
+  onCancel,
+}: {
+  column: string;
+  disabled: boolean;
+  onSubmit: (column: string, value: string) => void;
+  onCancel: () => void;
+}) {
+  const [draft, setDraft] = useState(column);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const el = inputRef.current;
+    if (el) {
+      el.focus();
+      el.select();
+    }
+  }, []);
+
+  return (
+    <Input
+      ref={inputRef}
+      value={draft}
+      disabled={disabled}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => {
+        if (!disabled) onSubmit(column, draft);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          if (!disabled) onSubmit(column, draft);
+        } else if (e.key === 'Escape') {
+          onCancel();
+        }
+      }}
+      className="h-7 w-40 truncate text-xs"
+      aria-label={`Rename column ${column}`}
+    />
+  );
+}
+
 declare module '@tanstack/react-table' {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface ColumnMeta<TData, TValue> {
@@ -96,8 +145,7 @@ export function WorkspaceTable({
     targetType: '',
   });
   const [columnActionLoading, setColumnActionLoading] = useState<Record<string, boolean>>({});
-  const [renameState, setRenameState] = useState<{ column: string; value: string } | null>(null);
-  const renameInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const [renamingColumn, setRenamingColumn] = useState<string | null>(null);
   const [columnPinning, setColumnPinning] = useState<ColumnPinningState>({ left: [] });
   const [expandedColumns, setExpandedColumns] = useState<Record<string, boolean>>({});
   const [deleteColumnDialogOpen, setDeleteColumnDialogOpen] = useState(false);
@@ -149,19 +197,6 @@ export function WorkspaceTable({
       cancelled = true;
     };
   }, [workspaceId, nodeId, onRefreshSchema, applySchema]);
-
-  useEffect(() => {
-    if (!renameState) {
-      return;
-    }
-    const input = renameInputRefs.current[renameState.column];
-    if (input) {
-      setTimeout(() => {
-        input.focus();
-        input.select();
-      }, 10);
-    }
-  }, [renameState]);
 
   useEffect(() => {
     if (!debugEnabled) {
@@ -280,18 +315,7 @@ export function WorkspaceTable({
   );
 
   const beginRename = (column: string) => {
-    setRenameState({ column, value: column });
-    setTimeout(() => {
-      const input = renameInputRefs.current[column];
-      if (input) {
-        input.focus();
-        input.select();
-      }
-    }, 20);
-  };
-
-  const updateRenameDraft = (column: string, nextValue: string) => {
-    setRenameState((prev) => (prev && prev.column === column ? { column, value: nextValue } : prev));
+    setRenamingColumn(column);
   };
 
   const setColumnBusy = useCallback((column: string, active: boolean) => {
@@ -313,11 +337,8 @@ export function WorkspaceTable({
 
   const submitRename = useCallback(
     async (column: string, value: string) => {
-      if (!renameState || renameState.column !== column) {
-        return;
-      }
       if (!onRenameColumn) {
-        setRenameState(null);
+        setRenamingColumn(null);
         return;
       }
 
@@ -328,7 +349,7 @@ export function WorkspaceTable({
       }
 
       if (trimmed === column) {
-        setRenameState(null);
+        setRenamingColumn(null);
         return;
       }
 
@@ -345,7 +366,7 @@ export function WorkspaceTable({
           const schema = await onRefreshSchema();
           applySchema(schema);
         }
-        setRenameState(null);
+        setRenamingColumn(null);
       } catch (error) {
         console.error('WorkspaceTable: rename column error', error);
         const message = error instanceof Error ? error.message : String(error);
@@ -354,7 +375,7 @@ export function WorkspaceTable({
         setColumnBusy(column, false);
       }
     },
-    [renameState, onRenameColumn, columns, onRefreshSchema, applySchema, setColumnBusy]
+    [onRenameColumn, columns, onRefreshSchema, applySchema, setColumnBusy]
   );
 
   const requestDeleteColumn = async (column: string) => {
@@ -390,8 +411,8 @@ export function WorkspaceTable({
           return next;
         });
       }
-      if (renameState?.column === column) {
-        setRenameState(null);
+      if (renamingColumn === column) {
+        setRenamingColumn(null);
       }
     } catch (error) {
       console.error('WorkspaceTable: delete column error', error);
@@ -400,7 +421,7 @@ export function WorkspaceTable({
     } finally {
       setColumnBusy(column, false);
     }
-  }, [columnToDelete, onDeleteColumn, onRefreshSchema, applySchema, renameState, setColumnBusy]);
+  }, [columnToDelete, onDeleteColumn, onRefreshSchema, applySchema, renamingColumn, setColumnBusy]);
 
   const columnDefs = useMemo<ColumnDef<DataRow, unknown>[]>(() => {
     return columns.map((column) => {
@@ -413,8 +434,7 @@ export function WorkspaceTable({
         { value: currentType, label: displayLabel },
         ...DATA_TYPES.filter((type) => type.value !== currentType),
       ];
-      const isRenaming = renameState?.column === column;
-      const renameDraftValue = isRenaming ? renameState.value : column;
+      const isRenaming = renamingColumn === column;
       const canRename = Boolean(onRenameColumn);
       const canDelete = Boolean(onDeleteColumn);
       const isWideColumn = wideColumns.has(column);
@@ -441,34 +461,11 @@ export function WorkspaceTable({
                 <Pin className="h-3.5 w-3.5" fill={isPinnedLeft ? 'currentColor' : 'none'} />
               </button>
               {isRenaming ? (
-                <Input
-                  ref={(element) => {
-                    if (element) {
-                      renameInputRefs.current[column] = element;
-                    } else {
-                      delete renameInputRefs.current[column];
-                    }
-                  }}
-                  value={renameDraftValue}
+                <RenameInput
+                  column={column}
                   disabled={isColumnBusy}
-                  onChange={(event) => updateRenameDraft(column, event.target.value)}
-                  onBlur={() => {
-                    if (!isColumnBusy) {
-                      void submitRename(column, renameDraftValue);
-                    }
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                      event.preventDefault();
-                      if (!isColumnBusy) {
-                        void submitRename(column, renameDraftValue);
-                      }
-                    } else if (event.key === 'Escape') {
-                      setRenameState(null);
-                    }
-                  }}
-                  className="h-7 w-40 truncate text-xs"
-                  aria-label={`Rename column ${column}`}
+                  onSubmit={submitRename}
+                  onCancel={() => setRenamingColumn(null)}
                 />
               ) : (
                 <div className="min-w-0">
@@ -631,7 +628,7 @@ export function WorkspaceTable({
     columnTypes,
     loadingCast,
     columnActionLoading,
-    renameState,
+    renamingColumn,
     onRenameColumn,
     onDeleteColumn,
     onCast,
@@ -639,7 +636,6 @@ export function WorkspaceTable({
     expandedColumns,
     toggleColumnWidth,
     handleTypeChange,
-    updateRenameDraft,
     submitRename,
     beginRename,
     requestDeleteColumn,

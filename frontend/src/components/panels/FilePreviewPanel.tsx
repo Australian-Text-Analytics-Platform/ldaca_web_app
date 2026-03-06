@@ -16,6 +16,10 @@ export const FilePreviewPanel: React.FC<FilePreviewPanelProps> = ({ filename, op
     previewData,
     columns,
     totalRows,
+    fileType,
+    sheetNames,
+    selectedSheet,
+    setSelectedSheet,
     page,
     pageSize,
     loading,
@@ -26,6 +30,7 @@ export const FilePreviewPanel: React.FC<FilePreviewPanelProps> = ({ filename, op
 
   const rows = previewData as ReadonlyArray<Record<string, unknown>>;
   const columnNames = columns as ReadonlyArray<string>;
+  const availableSheets = sheetNames as ReadonlyArray<string> | null | undefined;
 
   const canPrev = page > 0;
   const canNext = totalRows ? (page + 1) * pageSize < totalRows : rows.length > 0;
@@ -62,6 +67,32 @@ export const FilePreviewPanel: React.FC<FilePreviewPanelProps> = ({ filename, op
 
           <CardContent className="flex-1 min-w-0 overflow-hidden px-0 py-0">
             <div className="h-full w-full min-w-0 overflow-y-auto px-6 py-4">
+              {fileType === 'excel' && availableSheets && availableSheets.length > 0 && (
+                <div className="mb-4">
+                  <label className="mb-2 block text-sm font-medium text-foreground">Sheet</label>
+                  <Select
+                    value={selectedSheet || ''}
+                    onValueChange={(value) => {
+                      const next = value || null;
+                      setSelectedSheet(next);
+                      setPage(0);
+                    }}
+                  >
+                    <SelectTrigger className="w-full max-w-xs">
+                      <SelectValue placeholder="Select a sheet" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableSheets.map((name) => (
+                        <SelectItem key={name} value={name}>
+                          {name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="mt-1 text-xs text-muted-foreground">Choose a worksheet to refresh the preview.</p>
+                </div>
+              )}
+
               {loading ? (
                 <div className="py-12 text-center text-muted-foreground">Loading…</div>
               ) : error ? (
@@ -83,11 +114,14 @@ export const FilePreviewPanel: React.FC<FilePreviewPanelProps> = ({ filename, op
                     <tbody>
                       {rows.map((row, rowIndex) => (
                         <tr key={rowIndex} className={rowIndex % 2 ? 'bg-muted/40' : 'bg-background'}>
-                          {columnNames.map((column) => (
-                            <td key={`${column}-${rowIndex}`} className="whitespace-nowrap px-3 py-2">
-                              {String(row[column] ?? '')}
-                            </td>
-                          ))}
+                          {columnNames.map((column) => {
+                            const cellValue = String(row[column] ?? '');
+                            return (
+                              <td key={`${column}-${rowIndex}`} className="max-w-xs truncate px-3 py-2" title={cellValue}>
+                                {cellValue}
+                              </td>
+                            );
+                          })}
                         </tr>
                       ))}
                     </tbody>

@@ -139,11 +139,18 @@ export const PreviewTable: React.FC<PreviewTableProps> = ({
                   ) : (
                     data.map((row, rowIndex) => (
                       <TableRow key={rowIndex}>
-                        {columnsToRender.map((col) => (
-                          <TableCell key={`${rowIndex}-${col}`} className="px-3 py-2 font-mono text-xs text-foreground">
-                            {formatPreviewValue(row[col])}
-                          </TableCell>
-                        ))}
+                        {columnsToRender.map((col) => {
+                          const cellValue = formatPreviewValue(row[col]);
+                          return (
+                            <TableCell
+                              key={`${rowIndex}-${col}`}
+                              className="max-w-xs truncate px-3 py-2 font-mono text-xs text-foreground"
+                              title={String(cellValue ?? '')}
+                            >
+                              {cellValue}
+                            </TableCell>
+                          );
+                        })}
                       </TableRow>
                     ))
                   )}

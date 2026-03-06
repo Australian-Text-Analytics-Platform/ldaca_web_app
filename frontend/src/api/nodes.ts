@@ -110,11 +110,16 @@ export const nodesApi = {
       method: 'DELETE',
       headers,
     }),
-  createFromFile: (filename: string, nodeName?: string, headers: Record<string,string> = {}) =>
+  createFromFile: (filename: string, nodeName?: string, headers: Record<string,string> = {}, sheetName?: string) =>
     httpRequest(`/workspaces/nodes`, {
       method: 'POST',
       headers,
-      params: { filename, node_name: nodeName, mode: 'LazyFrame' },
+      params: {
+        filename,
+        node_name: nodeName,
+        mode: 'LazyFrame',
+        ...(sheetName ? { sheet_name: sheetName } : {}),
+      },
     }),
   join: (req: JoinNodesRequest, headers: Record<string,string> = {}) => httpRequest(`/workspaces/nodes/join`, { method: 'POST', headers, params: req }),
   joinPreview: (

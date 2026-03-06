@@ -264,14 +264,39 @@ class TestFileOperations:
             # It's a DataFrame
             assert df.shape[0] == 3
 
-        # Handle both LazyFrame and DataFrame results
-        if hasattr(df, "collect"):
-            # It's a LazyFrame
-            actual_df = df.collect()
-            assert actual_df.shape[0] == 3
-        else:
-            # It's a DataFrame
-            assert df.shape[0] == 3
+    @patch("ldaca_web_app_backend.core.utils.pl.read_excel")
+    def test_load_excel_file_selects_requested_sheet(self, mock_read_excel, temp_dir):
+        """load_data_file should request and return the selected Excel sheet."""
+
+        target = temp_dir / "workbook.xlsx"
+        target.write_bytes(b"placeholder")
+
+        expected = pl.DataFrame({"text": ["a", "b"]})
+        mock_read_excel.return_value = expected
+
+        result = load_data_file(target, sheet_name="Sheet2")
+
+        mock_read_excel.assert_called_once_with(target, sheet_name="Sheet2")
+        assert isinstance(result, pl.DataFrame)
+        assert result.to_dicts() == expected.to_dicts()
+
+    @patch("ldaca_web_app_backend.core.utils.pl.read_excel")
+    def test_load_excel_file_dict_result_uses_selected_sheet(
+        self, mock_read_excel, temp_dir
+    ):
+        """load_data_file should coerce workbook dict responses to the requested sheet DataFrame."""
+
+        target = temp_dir / "workbook.xlsx"
+        target.write_bytes(b"placeholder")
+
+        sheet1 = pl.DataFrame({"value": [1]})
+        sheet2 = pl.DataFrame({"value": [2]})
+        mock_read_excel.return_value = {"Sheet1": sheet1, "Sheet2": sheet2}
+
+        result = load_data_file(target, sheet_name="Sheet2")
+
+        assert isinstance(result, pl.DataFrame)
+        assert result.to_dicts() == [{"value": 2}]
 
 
 class TestUtilityFunctions:
