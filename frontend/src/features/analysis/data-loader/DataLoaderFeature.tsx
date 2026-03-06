@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Loader2, FolderPlus, Upload, Trash2, Eye, Download as DownloadIcon, Plus, RefreshCcw, LogOut, Quote } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Loader2, FolderPlus, Upload, Trash2, Eye, Download as DownloadIcon, Plus, RefreshCcw, LogOut, Quote, ChevronRightIcon, FileIcon, FolderIcon } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useQueryClient } from '@tanstack/react-query';
@@ -18,9 +18,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 import { Label } from '../../../components/ui/label';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../../components/ui/table';
 import { ScrollArea } from '../../../components/ui/scroll-area';
 import { Badge } from '../../../components/ui/badge';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../../../components/ui/collapsible';
 import { toast } from 'sonner';
 import { getInvalidWorkspaceNameMessage } from '../../../lib/workspaceName';
 import {
@@ -68,9 +68,81 @@ const formatTimestamp = (value?: number | string | null): string => {
 const getWorkspaceId = (workspace: Record<string, any>): string | null =>
   workspace?.id || workspace?.unique_id || null;
 
-const MAX_VISIBLE_FILE_ROWS = 10;
-const FILE_ROW_MIN_HEIGHT_REM = 4;
-const FILE_HEADER_HEIGHT_REM = 3;
+type FileTreeFolder = { name: string; path: string; children: FileTreeNode[] };
+type FileTreeFile = { file: FileInfo };
+type FileTreeNode = FileTreeFolder | FileTreeFile;
+
+function buildFileTree(files: FileInfo[]): FileTreeNode[] {
+  const folderMap = new Map<string, FileInfo[]>();
+  const rootFiles: FileInfo[] = [];
+
+  for (const file of files) {
+    const folder = file.folder?.trim();
+    if (folder) {
+      const existing = folderMap.get(folder);
+      if (existing) {
+        existing.push(file);
+      } else {
+        folderMap.set(folder, [file]);
+      }
+    } else {
+      rootFiles.push(file);
+    }
+  }
+
+  // Build nested folder structure from paths like "sample_data/ADO"
+  const root: FileTreeNode[] = [];
+  const folderNodes = new Map<string, FileTreeFolder>();
+
+  const getOrCreateFolder = (path: string): FileTreeFolder => {
+    const existing = folderNodes.get(path);
+    if (existing) return existing;
+
+    const parts = path.split('/');
+    const name = parts[parts.length - 1];
+    const node: FileTreeFolder = { name, path, children: [] };
+    folderNodes.set(path, node);
+
+    if (parts.length > 1) {
+      const parentPath = parts.slice(0, -1).join('/');
+      const parent = getOrCreateFolder(parentPath);
+      parent.children.push(node);
+    } else {
+      root.push(node);
+    }
+    return node;
+  };
+
+  for (const [folderPath, folderFiles] of folderMap) {
+    const folder = getOrCreateFolder(folderPath);
+    for (const f of folderFiles.sort((a, b) => (a.display_name || a.filename).localeCompare(b.display_name || b.filename))) {
+      folder.children.push({ file: f });
+    }
+  }
+
+  for (const f of rootFiles.sort((a, b) => (a.display_name || a.filename).localeCompare(b.display_name || b.filename))) {
+    root.push({ file: f });
+  }
+
+  // Sort root: folders first, then files
+  root.sort((a, b) => {
+    const aIsFolder = 'children' in a ? 0 : 1;
+    const bIsFolder = 'children' in b ? 0 : 1;
+    if (aIsFolder !== bIsFolder) return aIsFolder - bIsFolder;
+    const aName = 'children' in a ? a.name : (a.file.display_name || a.file.filename);
+    const bName = 'children' in b ? b.name : (b.file.display_name || b.file.filename);
+    return aName.localeCompare(bName);
+  });
+
+  return root;
+}
+
+function countFilesInNode(node: FileTreeNode): number {
+  if ('file' in node) return 1;
+  return node.children.reduce((sum, child) => sum + countFilesInNode(child), 0);
+}
+
+const MAX_FILE_TREE_HEIGHT_REM = 40;
 
 export const DataLoaderFeature: React.FC = () => {
   const queryClient = useQueryClient();
@@ -163,7 +235,7 @@ export const DataLoaderFeature: React.FC = () => {
   });
 
   const sortedFiles = [...files].sort((a: FileInfo, b: FileInfo) => a.filename.localeCompare(b.filename));
-  const fileListMaxHeightRem = FILE_HEADER_HEIGHT_REM + MAX_VISIBLE_FILE_ROWS * FILE_ROW_MIN_HEIGHT_REM;
+  const fileTree = useMemo(() => buildFileTree(sortedFiles), [sortedFiles]);
 
   const currentWorkspace = workspaces.find((ws: any) => getWorkspaceId(ws) === currentWorkspaceId) || null;
 
@@ -430,6 +502,110 @@ export const DataLoaderFeature: React.FC = () => {
 
   const workspaceFolder = fileListResponse?.user_folder || dataFolder || 'data/';
   const workspaceBusy = isLoading.workspaces || isLoading.currentWorkspace;
+
+  const renderFileItem = (file: FileInfo) => (
+    <div
+      key={file.filename}
+      className={`group flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-accent/50 ${
+        selectedFile === file.filename ? 'bg-muted/50' : ''
+      }`}
+    >
+      <FileIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            <span className="truncate text-sm font-medium text-foreground">
+              {file.display_name || file.filename}
+            </span>
+            {Boolean(file.readme?.trim()) && (file.display_name || '').toLowerCase() !== 'readme.md' && (
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-5 w-5 shrink-0 text-muted-foreground hover:text-foreground"
+                aria-label={`View citation for ${file.display_name || file.filename}`}
+                title="View citation"
+                onClick={() => setCitationFile(file)}
+              >
+                <Quote className="h-3 w-3" />
+              </Button>
+            )}
+          </div>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span>{formatBytes(file.size)}</span>
+            <span className="hidden sm:inline">·</span>
+            <span className="hidden sm:inline">{formatTimestamp(file.modified)}</span>
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
+          <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setPreviewFile(file.filename)}>
+            <Eye className="h-3.5 w-3.5" />
+            <span className="hidden lg:inline">Preview</span>
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 px-2"
+            disabled={!hasWorkspaceSelected}
+            onClick={() => {
+              if (!hasWorkspaceSelected) {
+                setWorkspaceAlertOpen(true);
+                return;
+              }
+              setAddFileName(file.filename);
+              setSelectedFile(file.filename);
+            }}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            <span className="hidden lg:inline">Add</span>
+          </Button>
+          <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => handleDownloadFile(file.filename)}>
+            <DownloadIcon className="h-3.5 w-3.5" />
+            <span className="hidden xl:inline">Download</span>
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 px-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
+            onClick={() => handleDeleteFile(file.filename)}
+            disabled={fileActionInFlight}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderFileTreeNode = (node: FileTreeNode): React.ReactNode => {
+    if ('file' in node) {
+      return renderFileItem(node.file);
+    }
+
+    const fileCount = countFilesInNode(node);
+    return (
+      <Collapsible key={node.path} defaultOpen>
+        <CollapsibleTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="group/folder w-full justify-start gap-1 transition-none hover:bg-accent hover:text-accent-foreground"
+          >
+            <ChevronRightIcon className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]/folder:rotate-90" />
+            <FolderIcon className="h-4 w-4 shrink-0" />
+            <span className="truncate">{node.name}</span>
+            <Badge variant="secondary" className="ml-auto text-[10px]">
+              {fileCount}
+            </Badge>
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="ml-5">
+          <div className="flex flex-col gap-0.5 border-l border-border/40 pl-2">
+            {node.children.map((child) => renderFileTreeNode(child))}
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -717,89 +893,16 @@ export const DataLoaderFeature: React.FC = () => {
             <div className="overflow-hidden rounded-md border">
               <ScrollArea
                 className="w-full"
-                style={sortedFiles.length > MAX_VISIBLE_FILE_ROWS ? { maxHeight: `${fileListMaxHeightRem}rem` } : undefined}
+                style={{ maxHeight: `${MAX_FILE_TREE_HEIGHT_REM}rem` }}
               >
-                <Table disableContainer>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead className="hidden md:table-cell">Size</TableHead>
-                      <TableHead className="hidden lg:table-cell">Updated</TableHead>
-                      <TableHead>
-                        <span className="inline-flex items-center gap-1">
-                          Actions
-                          <HelpIcon targetKey="data-loader.add.button" label="Add file to workspace" />
-                        </span>
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sortedFiles.map((file) => (
-                      <TableRow
-                        key={file.filename}
-                        className={`${selectedFile === file.filename ? 'bg-muted/50' : ''} min-h-16`}
-                      >
-                        <TableCell>
-                          <div className="flex items-center gap-1.5 font-medium text-foreground">
-                            <span>{file.display_name || file.filename}</span>
-                            {Boolean(file.readme?.trim()) && (file.display_name || '').toLowerCase() !== 'readme.md' && (
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-6 w-6 text-muted-foreground hover:text-foreground"
-                                aria-label={`View citation for ${file.display_name || file.filename}`}
-                                title="View citation"
-                                onClick={() => setCitationFile(file)}
-                              >
-                                <Quote className="h-3.5 w-3.5" />
-                              </Button>
-                            )}
-                          </div>
-                          <div className="text-xs text-muted-foreground font-mono">{file.filename}</div>
-                        </TableCell>
-                        <TableCell className="hidden text-sm text-muted-foreground md:table-cell">{formatBytes(file.size)}</TableCell>
-                        <TableCell className="hidden text-xs text-muted-foreground lg:table-cell">{formatTimestamp(file.modified)}</TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap gap-2">
-                            <Button size="sm" variant="secondary" onClick={() => setPreviewFile(file.filename)}>
-                              <Eye className="mr-1.5 h-4 w-4" /> Preview
-                            </Button>
-                            <Button
-                              size="sm"
-                              disabled={!hasWorkspaceSelected}
-                              onClick={() => {
-                                if (!hasWorkspaceSelected) {
-                                  setWorkspaceAlertOpen(true);
-                                  return;
-                                }
-                                setAddFileName(file.filename);
-                                setSelectedFile(file.filename);
-                              }}
-                            >
-                              <Plus className="mr-1.5 h-4 w-4" /> Add
-                            </Button>
-                            <Button size="sm" variant="outline" onClick={() => handleDownloadFile(file.filename)}>
-                              <DownloadIcon className="mr-1.5 h-4 w-4" /> Download
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => handleDeleteFile(file.filename)}
-                              disabled={fileActionInFlight}
-                            >
-                              <Trash2 className="mr-1.5 h-4 w-4" /> Delete
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                <div className="flex flex-col gap-0.5 p-2">
+                  {fileTree.map((node) => renderFileTreeNode(node))}
+                </div>
               </ScrollArea>
             </div>
           )}
         </CardContent>
-        <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-6 pb-4 text-xs text-muted-foreground">
           <div>Total files: {sortedFiles.length}</div>
         </div>
       </Card>
