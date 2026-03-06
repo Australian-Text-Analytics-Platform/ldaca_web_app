@@ -21,9 +21,26 @@ export type ViewType =
   | 'ai-annotator'
   | 'export';
 
+export const ALL_VIEWS: ViewType[] = [
+  'data-loader',
+  'filter',
+  'token-frequency',
+  'concordance',
+  'analysis',
+  'topic-modeling',
+  'quotation',
+  'ai-annotator',
+  'export',
+];
+
+export const DEFAULT_VISIBLE_VIEWS: ViewType[] = ALL_VIEWS.filter(
+  (view) => view !== 'ai-annotator'
+);
+
 interface UIState {
   // Current view and navigation
   currentView: ViewType;
+  visibleViews: ViewType[];
   sidebarCollapsed: boolean;
   
   // Loading states - simplified and flattened
@@ -55,6 +72,7 @@ interface UIState {
 interface UIActions {
   // View management
   setCurrentView: (view: ViewType) => void;
+  setViewVisibility: (view: ViewType, visible: boolean) => void;
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   
@@ -97,6 +115,7 @@ export const useUIStore = create<UIStore>()(
       immer((set, get) => ({
       // Initial state
       currentView: 'data-loader',
+      visibleViews: [...DEFAULT_VISIBLE_VIEWS],
       sidebarCollapsed: false,
       isGlobalLoading: false,
       loadingOperations: new Set(),
@@ -119,6 +138,30 @@ export const useUIStore = create<UIStore>()(
           return;
         }
         state.currentView = view;
+      }),
+
+      setViewVisibility: (view, visible) => set((state) => {
+        const currentlyVisible = state.visibleViews.includes(view);
+        if (currentlyVisible === visible) {
+          return;
+        }
+
+        if (visible) {
+          state.visibleViews = ALL_VIEWS.filter(
+            (candidate) => candidate === view || state.visibleViews.includes(candidate)
+          );
+          return;
+        }
+
+        if (state.visibleViews.length <= 1) {
+          return;
+        }
+
+        state.visibleViews = state.visibleViews.filter((candidate) => candidate !== view);
+
+        if (state.currentView === view) {
+          state.currentView = state.visibleViews[0] ?? 'data-loader';
+        }
       }),
       
       toggleSidebar: () => set((state) => {

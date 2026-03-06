@@ -13,6 +13,12 @@ import {
   SidebarTrigger,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { useWorkspaceData } from '@/hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '@/hooks/useWorkspaceSelection';
@@ -83,8 +89,8 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 const Sidebar: React.FC = () => {
-  const { currentView, setCurrentView, openFeedbackModal, openTutorialTarget } = useUIStore(
-    useShallow(({ currentView, setCurrentView, openFeedbackModal, openTutorialTarget }) => ({ currentView, setCurrentView, openFeedbackModal, openTutorialTarget }))
+  const { currentView, visibleViews, setCurrentView, setViewVisibility, openFeedbackModal, openTutorialTarget } = useUIStore(
+    useShallow(({ currentView, visibleViews, setCurrentView, setViewVisibility, openFeedbackModal, openTutorialTarget }) => ({ currentView, visibleViews, setCurrentView, setViewVisibility, openFeedbackModal, openTutorialTarget }))
   );
   const { workspaceGraph, currentWorkspaceId } = useWorkspaceData();
   const { selectedNodeIds } = useWorkspaceSelection();
@@ -184,12 +190,20 @@ const Sidebar: React.FC = () => {
   })();
 
   const isWorkspaceLoaded = Boolean(currentWorkspaceId);
+  const visibleNavItems = NAV_ITEMS.filter(({ id }) => visibleViews.includes(id));
+  const fallbackVisibleView = visibleNavItems[0]?.id ?? 'data-loader';
 
   React.useEffect(() => {
     if (!isWorkspaceLoaded && currentView !== 'data-loader') {
       setCurrentView('data-loader');
     }
   }, [currentView, isWorkspaceLoaded, setCurrentView]);
+
+  React.useEffect(() => {
+    if (!visibleViews.includes(currentView)) {
+      setCurrentView(fallbackVisibleView);
+    }
+  }, [currentView, fallbackVisibleView, setCurrentView, visibleViews]);
 
   const getSectionFlexStyle = (key: SectionKey) => {
     if (collapsedSections[key]) {
@@ -268,7 +282,7 @@ const Sidebar: React.FC = () => {
 
   const renderViewsBody = () => (
     <SidebarMenu>
-      {NAV_ITEMS.map(({ id, label, icon: Icon }) => {
+      {visibleNavItems.map(({ id, label, icon: Icon }) => {
         const isQuotation = id === 'quotation';
         const isDisabled = !isWorkspaceLoaded && id !== 'data-loader';
         return (
@@ -409,6 +423,51 @@ const Sidebar: React.FC = () => {
                       />
                     </div>
                   </button>
+                  {key === 'views' && (
+                    <div className="absolute right-7 top-1/2 -translate-y-1/2">
+                      <DropdownMenu>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 text-muted-foreground"
+                                aria-label="Edit visible views"
+                                onClick={(event) => {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                }}
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                          </TooltipTrigger>
+                          <TooltipContent side="right">Edit visible views</TooltipContent>
+                        </Tooltip>
+                        <DropdownMenuContent align="end" className="w-56">
+                          {NAV_ITEMS.map(({ id, label }) => {
+                            const checked = visibleViews.includes(id);
+                            const isLastVisibleItem = checked && visibleViews.length === 1;
+                            return (
+                              <DropdownMenuCheckboxItem
+                                key={id}
+                                checked={checked}
+                                disabled={isLastVisibleItem}
+                                onSelect={(event) => {
+                                  event.preventDefault();
+                                  setViewVisibility(id, !checked);
+                                }}
+                              >
+                                {label}
+                              </DropdownMenuCheckboxItem>
+                            );
+                          })}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  )}
                 </div>
                 <div
                   className={cn(
