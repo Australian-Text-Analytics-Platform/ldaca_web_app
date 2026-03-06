@@ -8,10 +8,6 @@ import time
 from concurrent.futures import Future, ProcessPoolExecutor
 from typing import Any, Callable, Dict, Optional
 
-from .worker_tasks_ai_annotation import (
-    run_ai_annotation_detach_task,
-    run_ai_annotation_task,
-)
 from .worker_tasks_concordance import run_concordance_detach_task
 from .worker_tasks_download import run_workspace_download_task
 from .worker_tasks_import import run_ldaca_import_task
@@ -242,60 +238,6 @@ def token_frequencies_task(
     )
 
 
-def ai_annotation_task(
-    user_id: str,
-    workspace_id: str,
-    node_corpora: Dict[str, list[str]],
-    node_display_names: Dict[str, str],
-    artifact_dir: str,
-    artifact_prefix: str,
-    classification_config: Dict[str, Any],
-    progress_callback: Optional[Callable[[float, str], None]] = None,
-    progress_queue: Optional[Any] = None,
-) -> Dict[str, Any]:
-    cb = _build_progress_callback(progress_queue, progress_callback)
-    return run_ai_annotation_task(
-        configure_worker_environment=_configure_worker_environment,
-        user_id=user_id,
-        workspace_id=workspace_id,
-        node_corpora=node_corpora,
-        node_display_names=node_display_names,
-        artifact_dir=artifact_dir,
-        artifact_prefix=artifact_prefix,
-        classification_config=classification_config,
-        progress_callback=cb,
-    )
-
-
-def ai_annotation_detach_task(
-    user_id: str,
-    workspace_id: str,
-    node_rows: list[dict[str, Any]],
-    parent_node_id: str,
-    document_column: str,
-    annotation_column: str,
-    classification_config: Dict[str, Any],
-    new_node_name: str,
-    artifact_dir: str,
-    artifact_prefix: str,
-    progress_callback: Optional[Callable[[float, str], None]] = None,
-    progress_queue: Optional[Any] = None,
-) -> Dict[str, Any]:
-    cb = _build_progress_callback(progress_queue, progress_callback)
-    return run_ai_annotation_detach_task(
-        configure_worker_environment=_configure_worker_environment,
-        node_rows=node_rows,
-        parent_node_id=parent_node_id,
-        document_column=document_column,
-        annotation_column=annotation_column,
-        classification_config=classification_config,
-        new_node_name=new_node_name,
-        artifact_dir=artifact_dir,
-        artifact_prefix=artifact_prefix,
-        progress_callback=cb,
-    )
-
-
 TASK_REGISTRY: Dict[str, Any] = {
     "ldaca_import": ldaca_import_task,
     "workspace_download": workspace_download_task,
@@ -303,8 +245,6 @@ TASK_REGISTRY: Dict[str, Any] = {
     "quotation_detach": quotation_detach_task,
     "topic_modeling": topic_modeling_task,
     "token_frequencies": token_frequencies_task,
-    "ai_annotation": ai_annotation_task,
-    "ai_annotation_detach": ai_annotation_detach_task,
 }
 
 _worker_pool: Optional["WorkerTaskManager"] = None

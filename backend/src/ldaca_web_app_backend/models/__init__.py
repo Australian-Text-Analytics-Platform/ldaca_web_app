@@ -16,6 +16,8 @@ from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field, model_validator
 
+from ..analysis.models import BaseAnalysisRequest
+
 # =============================================================================
 # AUTHENTICATION MODELS
 # =============================================================================
@@ -686,7 +688,12 @@ class AiAnnotationExample(BaseModel):
     classification: str
 
 
-class AiAnnotationRequest(BaseModel):
+class AiAnnotationModelsRequest(BaseModel):
+    base_url: Optional[str] = None
+    api_key: Optional[str] = None
+
+
+class AiAnnotationRequest(BaseAnalysisRequest):
     node_ids: List[str]
     node_columns: Dict[str, str]
     annotation_column: Optional[str] = None
@@ -694,21 +701,14 @@ class AiAnnotationRequest(BaseModel):
     classes: List[AiAnnotationClassDef] = Field(min_length=1)
     examples: List[AiAnnotationExample] = Field(default_factory=list)
 
-    technique: Literal["zero_shot", "few_shot", "chain_of_thought"] = "zero_shot"
-    modifier: Literal["no_modifier", "self_consistency"] = "no_modifier"
-
-    provider: Literal["openai", "gemini", "anthropic", "ollama"] = "openai"
     model: str
     api_key: Optional[str] = None
-    endpoint: Optional[str] = None
+    base_url: Optional[str] = None
 
     temperature: float = Field(default=1.0, gt=0)
     top_p: float = Field(default=1.0, gt=0, le=1.0)
-    n_completions: int = Field(default=1, gt=0)
     seed: Optional[int] = 42
-    reasoning_effort: Optional[Literal["low", "medium", "high"]] = None
-    enable_reasoning: bool = False
-    max_reasoning_chars: int = Field(default=150, gt=0)
+    batch_size: int = Field(default=100, ge=1)
 
     page: int = 1
     page_size: int = 20
@@ -730,14 +730,9 @@ class AiAnnotationRequest(BaseModel):
                         "classification": "support",
                     }
                 ],
-                "technique": "few_shot",
-                "modifier": "no_modifier",
-                "provider": "openai",
                 "model": "gpt-4o-mini",
                 "temperature": 0.7,
                 "top_p": 0.9,
-                "enable_reasoning": False,
-                "max_reasoning_chars": 150,
             }
         }
     )
@@ -751,21 +746,14 @@ class AiAnnotationDetachRequest(BaseModel):
     classes: List[AiAnnotationClassDef] = Field(min_length=1)
     examples: List[AiAnnotationExample] = Field(default_factory=list)
 
-    technique: Literal["zero_shot", "few_shot", "chain_of_thought"] = "zero_shot"
-    modifier: Literal["no_modifier", "self_consistency"] = "no_modifier"
-
-    provider: Literal["openai", "gemini", "anthropic", "ollama"] = "openai"
     model: str
     api_key: Optional[str] = None
-    endpoint: Optional[str] = None
+    base_url: Optional[str] = None
 
     temperature: float = Field(default=1.0, gt=0)
     top_p: float = Field(default=1.0, gt=0, le=1.0)
-    n_completions: int = Field(default=1, gt=0)
     seed: Optional[int] = 42
-    reasoning_effort: Optional[Literal["low", "medium", "high"]] = None
-    enable_reasoning: bool = False
-    max_reasoning_chars: int = Field(default=150, gt=0)
+    batch_size: int = Field(default=100, ge=1)
 
 
 class AiAnnotationEdit(BaseModel):
@@ -777,16 +765,6 @@ class AiAnnotationEdit(BaseModel):
 class AiAnnotationSaveRequest(BaseModel):
     annotation_column: Optional[str] = None
     edits: List[AiAnnotationEdit] = Field(default_factory=list)
-
-
-class AiAnnotationResultItem(BaseModel):
-    row_index: int
-    text: str
-    classification: Optional[str] = None
-    confidence: Optional[float] = None
-    reasoning: Optional[str] = None
-    reasoning_content: Optional[str] = None
-    error: Optional[str] = None
 
 
 class AiAnnotationNodeResult(BaseModel):

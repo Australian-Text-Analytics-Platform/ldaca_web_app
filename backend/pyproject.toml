@@ -20,7 +20,6 @@ classifiers = [
 dependencies = [
     "aiosqlite>=0.21.0",
     "bertopic>=0.17.3",
-    "classifier-fastapi",
     "fastapi-users[sqlalchemy]>=14.0.1", # Includes fastapi, python-multipart, sqlalchemy
     "fastapi[standard]>=0.115.14", # Includes uvicorn, pydantic, starlette
     "fastexcel>=0.18.0",
@@ -33,6 +32,7 @@ dependencies = [
     "polars-text",
     "pyarrow>=16.0.0",
     "tbb>=2022.3.1 ; sys_platform != 'darwin'",
+    "openai>=2.26.0",
 ]
 
 [project.optional-dependencies]
@@ -102,7 +102,6 @@ include = ["src/ldaca_web_app_backend/resources/*.txt"]
 "src" = ""
 
 [tool.uv.sources]
-classifier-fastapi = { workspace = true }
 docworkspace = { workspace = true }
 ldaca-loader = { workspace = true }
 polars-text = { workspace = true }

@@ -396,7 +396,6 @@ class WorkerTaskManager:
                 if task_type in [
                     "concordance_detach",
                     "quotation_detach",
-                    "ai_annotation_detach",
                 ]:
                     try:
                         import polars as pl

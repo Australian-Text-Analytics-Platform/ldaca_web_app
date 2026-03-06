@@ -31,22 +31,26 @@ import {
 } from '../../../components/ui/alert-dialog';
 import { normalizeTypeName } from '../../../utils/columnTypes';
 
+type EndpointPreset = 'openai' | 'lmstudio' | 'custom';
+const LMSTUDIO_BASE_URL = 'http://127.0.0.1:1234/v1';
+
+const resolveBaseUrl = (preset: EndpointPreset, customUrl: string): string | null => {
+  if (preset === 'openai') return null;
+  if (preset === 'lmstudio') return LMSTUDIO_BASE_URL;
+  return customUrl.trim() || null;
+};
+
 const DEFAULT_PARAMS = {
-  provider: 'openai' as 'openai' | 'gemini' | 'anthropic' | 'ollama',
-  model: 'gpt-4o-mini',
-  technique: 'zero_shot' as 'zero_shot' | 'few_shot' | 'chain_of_thought',
+  endpointPreset: 'openai' as EndpointPreset,
+  model: '',
   classesText: 'support: Supportive stance\ncritical: Critical stance',
   examplesText: '',
-  modifier: 'no_modifier' as 'no_modifier' | 'self_consistency',
   temperature: '1.0',
   topP: '1.0',
-  nCompletions: '1',
   seed: '42',
   apiKey: '',
-  endpoint: '',
-  enableReasoning: false,
-  maxReasoningChars: '150',
-  reasoningEffort: 'medium' as 'low' | 'medium' | 'high',
+  customBaseUrl: '',
+  batchSize: '100',
 };
 
 const parseClasses = (raw: string) => {
@@ -129,22 +133,17 @@ const AiAnnotatorFeature: React.FC = () => {
   const { getAuthHeaders } = useAuth();
   const currentView = useUIStore((state) => state.currentView);
   const isActiveTab = currentView === 'ai-annotator';
-  const [provider, setProvider] = useState(DEFAULT_PARAMS.provider);
+  const [endpointPreset, setEndpointPreset] = useState<EndpointPreset>(DEFAULT_PARAMS.endpointPreset);
   const [model, setModel] = useState(DEFAULT_PARAMS.model);
-  const [technique, setTechnique] = useState(DEFAULT_PARAMS.technique);
   const [classesText, setClassesText] = useState(DEFAULT_PARAMS.classesText);
   const [examplesText, setExamplesText] = useState(DEFAULT_PARAMS.examplesText);
 
-  const [modifier, setModifier] = useState(DEFAULT_PARAMS.modifier);
   const [temperature, setTemperature] = useState(DEFAULT_PARAMS.temperature);
   const [topP, setTopP] = useState(DEFAULT_PARAMS.topP);
-  const [nCompletions, setNCompletions] = useState(DEFAULT_PARAMS.nCompletions);
   const [seed, setSeed] = useState(DEFAULT_PARAMS.seed);
   const [apiKey, setApiKey] = useState(DEFAULT_PARAMS.apiKey);
-  const [endpoint, setEndpoint] = useState(DEFAULT_PARAMS.endpoint);
-  const [enableReasoning, setEnableReasoning] = useState(DEFAULT_PARAMS.enableReasoning);
-  const [maxReasoningChars, setMaxReasoningChars] = useState(DEFAULT_PARAMS.maxReasoningChars);
-  const [reasoningEffort, setReasoningEffort] = useState(DEFAULT_PARAMS.reasoningEffort);
+  const [customBaseUrl, setCustomBaseUrl] = useState(DEFAULT_PARAMS.customBaseUrl);
+  const [batchSize, setBatchSize] = useState(DEFAULT_PARAMS.batchSize);
 
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
@@ -152,7 +151,7 @@ const AiAnnotatorFeature: React.FC = () => {
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [taskId, setTaskId] = useState<string | null>(null);
-  const [modelsByProvider, setModelsByProvider] = useState<Record<string, string[]>>({});
+  const [availableModels, setAvailableModels] = useState<Array<{ id: string; name: string }>>([]);
   const [resultNodeId, setResultNodeId] = useState<string | null>(null);
   const [resultNode, setResultNode] = useState<AiAnnotationNodeResult | null>(null);
   const [isPaging, setIsPaging] = useState(false);
@@ -236,7 +235,7 @@ const AiAnnotatorFeature: React.FC = () => {
 
   const clearDisabled = !taskId && !statusMessage && !isClearing;
 
-  const applyResponseResult = (response: { data?: Record<string, AiAnnotationNodeResult> | null } | null) => {
+  const applyResponseResult = (response: AiAnnotationResponse | null) => {
     const data = response?.data;
     if (!data || typeof data !== 'object') {
       setResultNodeId(null);
@@ -251,8 +250,13 @@ const AiAnnotatorFeature: React.FC = () => {
       return;
     }
 
+    const nodeData = data[firstNodeId] ?? null;
+    if (nodeData && response?.metadata) {
+      nodeData.metadata = { ...nodeData.metadata, ...response.metadata };
+    }
+
     setResultNodeId(firstNodeId);
-    setResultNode(data[firstNodeId] ?? null);
+    setResultNode(nodeData);
   };
 
   const {
@@ -346,19 +350,16 @@ const AiAnnotatorFeature: React.FC = () => {
   const handleLoadModels = async () => {
     setIsLoadingModels(true);
     try {
-      const response = await textApi.aiAnnotationModels(getAuthHeaders());
-      const providers = response?.data?.providers ?? {};
-      const next: Record<string, string[]> = {};
-      Object.entries(providers).forEach(([providerKey, providerInfo]) => {
-        const models = (providerInfo?.models ?? [])
-          .map((entry) => entry?.name || entry?.full_name || '')
-          .filter((value) => Boolean(value));
-        next[providerKey] = models;
-      });
-      setModelsByProvider(next);
-      const candidate = next[provider]?.[0];
-      if (candidate && !model.trim()) {
-        setModel(candidate);
+      const baseUrl = resolveBaseUrl(endpointPreset, customBaseUrl);
+      const response = await textApi.aiAnnotationModels(
+        { base_url: baseUrl, api_key: apiKey.trim() || null },
+        getAuthHeaders(),
+      );
+      const models = response?.data?.models ?? [];
+      setAvailableModels(models);
+      const modelIds = models.map((m) => m.id);
+      if (models.length > 0 && (!model.trim() || !modelIds.includes(model))) {
+        setModel(models[0].id);
       }
       setStatusMessage(response?.message ?? 'Model catalog loaded.');
     } catch (error) {
@@ -368,22 +369,25 @@ const AiAnnotatorFeature: React.FC = () => {
     }
   };
 
+  // Auto-load models when endpoint or API key changes
+  useEffect(() => {
+    if (!currentWorkspaceId) return;
+    if (endpointPreset === 'custom' && !customBaseUrl.trim()) return;
+    handleLoadModels();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [endpointPreset, customBaseUrl, currentWorkspaceId]);
+
   const resetParameters = () => {
-    setProvider(DEFAULT_PARAMS.provider);
+    setEndpointPreset(DEFAULT_PARAMS.endpointPreset);
     setModel(DEFAULT_PARAMS.model);
-    setTechnique(DEFAULT_PARAMS.technique);
     setClassesText(DEFAULT_PARAMS.classesText);
     setExamplesText(DEFAULT_PARAMS.examplesText);
-    setModifier(DEFAULT_PARAMS.modifier);
     setTemperature(DEFAULT_PARAMS.temperature);
     setTopP(DEFAULT_PARAMS.topP);
-    setNCompletions(DEFAULT_PARAMS.nCompletions);
     setSeed(DEFAULT_PARAMS.seed);
     setApiKey(DEFAULT_PARAMS.apiKey);
-    setEndpoint(DEFAULT_PARAMS.endpoint);
-    setEnableReasoning(DEFAULT_PARAMS.enableReasoning);
-    setMaxReasoningChars(DEFAULT_PARAMS.maxReasoningChars);
-    setReasoningEffort(DEFAULT_PARAMS.reasoningEffort);
+    setCustomBaseUrl(DEFAULT_PARAMS.customBaseUrl);
+    setBatchSize(DEFAULT_PARAMS.batchSize);
     setStatusMessage('Parameters reset to defaults.');
   };
 
@@ -406,19 +410,13 @@ const AiAnnotatorFeature: React.FC = () => {
           annotation_column: aiAnnotationColumn.trim() ? aiAnnotationColumn : null,
           classes: parsedClasses,
           examples: parsedExamples,
-          technique,
-          modifier,
-          provider,
           model: model.trim(),
           api_key: apiKey.trim() || null,
-          endpoint: endpoint.trim() || null,
+          base_url: resolveBaseUrl(endpointPreset, customBaseUrl),
           temperature: Number(temperature),
           top_p: Number(topP),
-          n_completions: Number(nCompletions),
           seed: seed.trim() ? Number(seed) : null,
-          reasoning_effort: reasoningEffort,
-          enable_reasoning: enableReasoning,
-          max_reasoning_chars: Number(maxReasoningChars),
+          batch_size: Number(batchSize) || 100,
         },
         getAuthHeaders(),
       );
@@ -451,19 +449,13 @@ const AiAnnotatorFeature: React.FC = () => {
           annotation_column: aiAnnotationColumn.trim() ? aiAnnotationColumn : null,
           classes: parsedClasses,
           examples: parsedExamples,
-          technique,
-          modifier,
-          provider,
           model: model.trim(),
           api_key: apiKey.trim() || null,
-          endpoint: endpoint.trim() || null,
+          base_url: resolveBaseUrl(endpointPreset, customBaseUrl),
           temperature: Number(temperature),
           top_p: Number(topP),
-          n_completions: Number(nCompletions),
           seed: seed.trim() ? Number(seed) : null,
-          reasoning_effort: reasoningEffort,
-          enable_reasoning: enableReasoning,
-          max_reasoning_chars: Number(maxReasoningChars),
+          batch_size: Number(batchSize) || 100,
           page: 1,
           page_size: DEFAULT_PAGE_SIZE,
           descending: true,
@@ -495,7 +487,7 @@ const AiAnnotatorFeature: React.FC = () => {
     }
   };
 
-  const providerModels = modelsByProvider[provider] ?? [];
+  const modelNames = availableModels.map((m) => m.id);
   const resultRows = resultNode?.data ?? [];
   const resultColumns = resultNode?.columns ?? [];
   const annotationColumns = Array.isArray(resultNode?.metadata?.annotation_columns)
@@ -510,8 +502,8 @@ const AiAnnotatorFeature: React.FC = () => {
     }
 
     const prioritized = [
-      ...(inferredTextColumn ? [inferredTextColumn] : []),
       ...annotationColumns,
+      ...(inferredTextColumn ? [inferredTextColumn] : []),
     ];
     const unique = Array.from(new Set(prioritized.filter(Boolean)));
     return unique.length > 0 ? unique : resultColumns;
@@ -864,7 +856,7 @@ const AiAnnotatorFeature: React.FC = () => {
                 ) : (
                   <>
                     <Sparkles className="mr-2 h-4 w-4" />
-                    Load Models
+                    Refresh Models
                   </>
                 )}
               </Button>
@@ -963,62 +955,66 @@ const AiAnnotatorFeature: React.FC = () => {
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                   <div className="space-y-2">
-                    <Label htmlFor="ai-annotator-provider">Provider</Label>
-                    <Select value={provider} onValueChange={(value) => setProvider(value as 'openai' | 'gemini' | 'anthropic' | 'ollama')}>
-                      <SelectTrigger id="ai-annotator-provider">
-                        <SelectValue placeholder="Select provider" />
+                    <Label htmlFor="ai-annotator-endpoint-preset">Endpoint</Label>
+                    <Select value={endpointPreset} onValueChange={(value) => setEndpointPreset(value as EndpointPreset)}>
+                      <SelectTrigger id="ai-annotator-endpoint-preset">
+                        <SelectValue placeholder="Select endpoint" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="openai">OpenAI</SelectItem>
-                        <SelectItem value="gemini">Gemini</SelectItem>
-                        <SelectItem value="anthropic">Anthropic</SelectItem>
-                        <SelectItem value="ollama">Ollama</SelectItem>
+                        <SelectItem value="lmstudio">http://127.0.0.1:1234 (LM Studio)</SelectItem>
+                        <SelectItem value="custom">Custom</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
-                  <div className="space-y-2 md:col-span-2">
+                  <div className={`space-y-2 ${endpointPreset === 'custom' ? '' : 'md:col-span-2'}`}>
                     <Label htmlFor="ai-annotator-model">Model</Label>
-                    <Input
-                      id="ai-annotator-model"
-                      value={model}
-                      onChange={(event) => setModel(event.target.value)}
-                      placeholder={providerModels[0] || 'e.g. gpt-4o-mini'}
-                      list="ai-annotator-model-suggestions"
-                    />
-                    <datalist id="ai-annotator-model-suggestions">
-                      {providerModels.map((modelName) => (
-                        <option key={modelName} value={modelName} />
-                      ))}
-                    </datalist>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="ai-annotator-technique">Technique</Label>
-                    <Select value={technique} onValueChange={(value) => setTechnique(value as 'zero_shot' | 'few_shot' | 'chain_of_thought')}>
-                      <SelectTrigger id="ai-annotator-technique">
-                        <SelectValue />
+                    <Select value={model} onValueChange={setModel}>
+                      <SelectTrigger id="ai-annotator-model">
+                        <SelectValue placeholder={isLoadingModels ? 'Loading models…' : 'Click "Refresh Models" to load'} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="zero_shot">Zero-shot</SelectItem>
-                        <SelectItem value="few_shot">Few-shot</SelectItem>
-                        <SelectItem value="chain_of_thought">Chain-of-thought</SelectItem>
+                        {modelNames.map((modelName) => (
+                          <SelectItem key={modelName} value={modelName}>{modelName}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="ai-annotator-classes">Classes (one per line, `name: description`)</Label>
-                    <textarea
-                      id="ai-annotator-classes"
-                      value={classesText}
-                      onChange={(event) => setClassesText(event.target.value)}
-                      className="min-h-27.5 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                      placeholder="support: Supportive stance"
-                    />
-                  </div>
+                  {endpointPreset === 'custom' ? (
+                    <div className="space-y-2">
+                      <Label htmlFor="ai-annotator-custom-url">Custom Base URL</Label>
+                      <Input
+                        id="ai-annotator-custom-url"
+                        value={customBaseUrl}
+                        onChange={(event) => setCustomBaseUrl(event.target.value)}
+                        placeholder="e.g. http://localhost:11434/v1"
+                      />
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="ai-annotator-api-key">API Key</Label>
+                  <Input
+                    id="ai-annotator-api-key"
+                    type="password"
+                    value={apiKey}
+                    onChange={(event) => setApiKey(event.target.value)}
+                    placeholder={endpointPreset === 'openai' ? 'Required for OpenAI' : 'Leave blank if not needed'}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="ai-annotator-classes">Classes (one per line, `name: description`)</Label>
+                  <textarea
+                    id="ai-annotator-classes"
+                    value={classesText}
+                    onChange={(event) => setClassesText(event.target.value)}
+                    className="min-h-27.5 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    placeholder="support: Supportive stance"
+                  />
                 </div>
               </section>
 
@@ -1036,20 +1032,7 @@ const AiAnnotatorFeature: React.FC = () => {
 
                 {showAdvanced ? (
                   <div className="space-y-4 rounded-md border border-border/60 bg-muted/20 p-4">
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                      <div className="space-y-2">
-                        <Label htmlFor="ai-annotator-modifier">Modifier</Label>
-                        <Select value={modifier} onValueChange={(value) => setModifier(value as 'no_modifier' | 'self_consistency')}>
-                          <SelectTrigger id="ai-annotator-modifier">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="no_modifier">No modifier</SelectItem>
-                            <SelectItem value="self_consistency">Self consistency</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
                       <div className="space-y-2">
                         <Label htmlFor="ai-annotator-temperature">Temperature</Label>
                         <Input
@@ -1074,19 +1057,6 @@ const AiAnnotatorFeature: React.FC = () => {
                           onChange={(event) => setTopP(event.target.value)}
                         />
                       </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                      <div className="space-y-2">
-                        <Label htmlFor="ai-annotator-n-completions">N completions</Label>
-                        <Input
-                          id="ai-annotator-n-completions"
-                          type="number"
-                          min="1"
-                          value={nCompletions}
-                          onChange={(event) => setNCompletions(event.target.value)}
-                        />
-                      </div>
 
                       <div className="space-y-2">
                         <Label htmlFor="ai-annotator-seed">Seed</Label>
@@ -1099,68 +1069,14 @@ const AiAnnotatorFeature: React.FC = () => {
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="ai-annotator-max-reasoning">Max reasoning chars</Label>
+                        <Label htmlFor="ai-annotator-batch-size">Batch Size</Label>
                         <Input
-                          id="ai-annotator-max-reasoning"
+                          id="ai-annotator-batch-size"
                           type="number"
                           min="1"
-                          value={maxReasoningChars}
-                          onChange={(event) => setMaxReasoningChars(event.target.value)}
+                          value={batchSize}
+                          onChange={(event) => setBatchSize(event.target.value)}
                         />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label htmlFor="ai-annotator-api-key">API Key (optional override)</Label>
-                        <Input
-                          id="ai-annotator-api-key"
-                          type="password"
-                          value={apiKey}
-                          onChange={(event) => setApiKey(event.target.value)}
-                          placeholder="Leave blank to use defaults"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="ai-annotator-endpoint">Endpoint (optional)</Label>
-                        <Input
-                          id="ai-annotator-endpoint"
-                          value={endpoint}
-                          onChange={(event) => setEndpoint(event.target.value)}
-                          placeholder="e.g. http://localhost:11434/v1"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label htmlFor="ai-annotator-reasoning-effort">Reasoning effort</Label>
-                        <Select value={reasoningEffort} onValueChange={(value) => setReasoningEffort(value as 'low' | 'medium' | 'high')}>
-                          <SelectTrigger id="ai-annotator-reasoning-effort">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="low">Low</SelectItem>
-                            <SelectItem value="medium">Medium</SelectItem>
-                            <SelectItem value="high">High</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="ai-annotator-enable-reasoning">Enable reasoning</Label>
-                        <Select
-                          value={enableReasoning ? 'yes' : 'no'}
-                          onValueChange={(value) => setEnableReasoning(value === 'yes')}
-                        >
-                          <SelectTrigger id="ai-annotator-enable-reasoning">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="no">No</SelectItem>
-                            <SelectItem value="yes">Yes</SelectItem>
-                          </SelectContent>
-                        </Select>
                       </div>
                     </div>
 

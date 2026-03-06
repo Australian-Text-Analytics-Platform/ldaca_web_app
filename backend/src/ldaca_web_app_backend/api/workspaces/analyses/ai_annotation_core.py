@@ -1,419 +1,185 @@
-"""Core AI annotation computation helpers shared by route handlers."""
+"""Core helpers for AI annotation using the OpenAI chat completions API."""
 
 from __future__ import annotations
 
-import math
-from typing import Any, Optional
+import logging
+import os
+from typing import Any
 
-import polars as pl
-from fastapi import HTTPException
+from openai import AsyncOpenAI
+from pydantic import BaseModel
 
-from ....core.docworkspace_data_types import (
-    ANNOTATION_POLARS_DTYPE,
-    DocWorkspaceDataTypeUtils,
-)
-from ....core.workspace import workspace_manager
-
-DEFAULT_AI_ANNOTATION_PAGE = 1
-DEFAULT_AI_ANNOTATION_PAGE_SIZE = 20
-DEFAULT_AI_ANNOTATION_DESCENDING = True
-
-_REQUEST_EXCLUDE_KEYS = {
-    "page",
-    "page_size",
-    "sort_by",
-    "descending",
-    "pagination",
-}
+logger = logging.getLogger(__name__)
 
 
-def normalize_saved_request(raw_request: Optional[dict]) -> Optional[dict]:
-    """Normalize stored AI annotation request payloads."""
-    if not raw_request:
-        return None
-    if "node_ids" not in raw_request or "node_columns" not in raw_request:
-        return None
+class ClassificationResult(BaseModel):
+    """Structured output schema: one classification per input text, in order."""
 
-    normalized_request = dict(raw_request)
-    for field in _REQUEST_EXCLUDE_KEYS:
-        normalized_request.pop(field, None)
-
-    return {k: v for k, v in normalized_request.items() if v is not None}
+    classifications: list[str]
 
 
-def _resolve_annotation_column_name(
-    base_lf: pl.LazyFrame,
-    text_column: str,
-    annotation_column: Optional[str] = None,
+def _build_system_prompt(
+    classes: list[dict[str, str]],
+    examples: list[dict[str, str]] | None = None,
 ) -> str:
-    if annotation_column:
-        return annotation_column
+    class_descriptions = "\n".join(
+        f"- {c['name']}: {c['description']}" for c in classes
+    )
+    class_names = ", ".join(c["name"] for c in classes)
 
-    preferred_name = f"{text_column}_annotation"
-    schema = base_lf.collect_schema()
-
-    if preferred_name in schema:
-        preferred_type = schema[preferred_name]
-        if (
-            DocWorkspaceDataTypeUtils.polars_dtype_to_ldaca_dtype(preferred_type)
-            == "annotation"
-        ):
-            return preferred_name
-
-    for column_name, column_type in schema.items():
-        if (
-            DocWorkspaceDataTypeUtils.polars_dtype_to_ldaca_dtype(column_type)
-            == "annotation"
-        ):
-            return column_name
-
-    return preferred_name
-
-
-def _normalize_annotation_list(value: Any) -> list[dict[str, str]]:
-    if not isinstance(value, list):
-        return []
-
-    normalized: list[dict[str, str]] = []
-    for item in value:
-        if isinstance(item, dict):
-            provider = str(item.get("provider") or "").strip()
-            annotation = str(item.get("annotation") or "")
-            if provider:
-                normalized.append({"provider": provider, "annotation": annotation})
-    return normalized
-
-
-def _merge_annotation_entry(
-    existing: Any,
-    *,
-    provider_name: str,
-    annotation_value: Optional[str],
-) -> list[dict[str, str]]:
-    merged = _normalize_annotation_list(existing)
-    annotation_text = "" if annotation_value is None else str(annotation_value)
-
-    replaced = False
-    for entry in merged:
-        if entry.get("provider") == provider_name:
-            entry["annotation"] = annotation_text
-            replaced = True
-            break
-
-    if not replaced:
-        merged.append({"provider": provider_name, "annotation": annotation_text})
-
-    return merged
-
-
-async def _classify_texts(
-    texts: list[str],
-    request: dict[str, Any],
-) -> dict[int, dict[str, Any]]:
-    from classifier_fastapi.core.models import LLMConfig
-    from classifier_fastapi.core.pipeline import a_batch
-    from classifier_fastapi.modifiers import Modifier
-    from classifier_fastapi.providers import LLMProvider
-    from classifier_fastapi.techniques import Technique
-    from classifier_fastapi.techniques.schemas import (
-        CoTClass,
-        CoTExample,
-        CoTUserSchema,
-        FewShotClass,
-        FewShotExample,
-        FewShotUserSchema,
-        ZeroShotClass,
-        ZeroShotUserSchema,
+    base = (
+        "You are a text classification assistant. "
+        "Classify each piece of text into exactly one of the following categories.\n\n"
+        f"Categories:\n{class_descriptions}\n\n"
     )
 
-    provider = LLMProvider(request.get("provider", "openai"))
-    model_name = str(request.get("model") or "")
-    model_props = provider.properties.get_model_props(model_name)
-
-    api_key = request.get("api_key")
-    endpoint = request.get("endpoint")
-    if api_key:
-        model_props.api_key = api_key
-    if endpoint:
-        model_props.endpoint = endpoint
-
-    llm_config = LLMConfig(
-        temperature=float(request.get("temperature", 1.0)),
-        top_p=float(request.get("top_p", 1.0)),
-        n_completions=int(request.get("n_completions", 1)),
-        seed=request.get("seed", 42),
-        reasoning_effort=request.get("reasoning_effort"),
-    )
-
-    technique = Technique(request.get("technique", "zero_shot"))
-    modifier = Modifier(request.get("modifier", "no_modifier"))
-
-    classes = request.get("classes") or []
-    examples = request.get("examples") or []
-
-    if technique == Technique.ZERO_SHOT:
-        user_schema = ZeroShotUserSchema(
-            classes=[
-                ZeroShotClass(name=str(c["name"]), description=str(c["description"]))
-                for c in classes
-            ]
+    if examples:
+        example_lines = "\n".join(
+            f'Text: "{ex["query"]}"\nClassification: {ex["classification"]}'
+            for ex in examples
         )
-    elif technique == Technique.FEW_SHOT:
-        user_schema = FewShotUserSchema(
-            classes=[
-                FewShotClass(name=str(c["name"]), description=str(c["description"]))
-                for c in classes
-            ],
-            examples=[
-                FewShotExample(
-                    query=str(ex["query"]),
-                    classification=str(ex["classification"]),
-                )
-                for ex in examples
-            ],
-        )
-    else:
-        user_schema = CoTUserSchema(
-            classes=[
-                CoTClass(name=str(c["name"]), description=str(c["description"]))
-                for c in classes
-            ],
-            examples=[
-                CoTExample(
-                    query=str(ex["query"]),
-                    classification=str(ex["classification"]),
-                )
-                for ex in examples
-            ],
-        )
+        base += f"Examples:\n{example_lines}\n\n"
 
-    batch_results = await a_batch(
-        texts=texts,
-        model_props=model_props,
-        llm_config=llm_config,
-        technique=technique,
-        user_schema=user_schema,
-        modifier=modifier,
-        enable_reasoning=bool(request.get("enable_reasoning", False)),
-        max_reasoning_chars=int(request.get("max_reasoning_chars", 150)),
+    base += (
+        "You will receive one or more texts, each on its own numbered line "
+        "(e.g. '1: some text'). "
+        "Return the classification for each text in the same order as a list. "
+        f"Valid categories are: {class_names}."
     )
 
-    by_idx: dict[int, dict[str, Any]] = {}
-    for success in batch_results.successes:
-        by_idx[int(success.text_idx)] = {
-            "classification": str(success.classification),
-            "error": None,
-        }
-
-    for fail_idx, fail_error in batch_results.fails:
-        by_idx[int(fail_idx)] = {
-            "classification": None,
-            "error": str(fail_error),
-        }
-
-    return by_idx
+    return base
 
 
-async def compute_annotation_page(
-    base_lf: pl.LazyFrame,
-    column: str,
-    request: dict[str, Any],
-    *,
-    page: int,
-    page_size: int,
-    sort_by: Optional[str],
-    descending: bool,
-    annotation_column_override: Optional[str] = None,
-) -> dict[str, Any]:
-    """Compute one on-demand AI annotation page for a single node source."""
-    working_lf = base_lf
-    total_source_rows = working_lf.select(pl.len()).collect().item()
+def _normalize_classifications(
+    raw_list: list[str],
+    count: int,
+    class_names: list[str],
+) -> list[str | None]:
+    """Normalize and pad/trim a list of classifications to *count* entries."""
+    lower_map = {name.lower(): name for name in class_names}
+    results: list[str | None] = []
 
-    if page < 1:
-        page = DEFAULT_AI_ANNOTATION_PAGE
-    if page_size < 1:
-        page_size = DEFAULT_AI_ANNOTATION_PAGE_SIZE
-
-    effective_sort_by: Optional[str] = None
-    schema = working_lf.collect_schema()
-    if sort_by and sort_by in schema:
-        working_lf = working_lf.sort(sort_by, descending=descending)
-        effective_sort_by = sort_by
-
-    start = (page - 1) * page_size
-    page_df = working_lf.slice(start, page_size).collect()
-
-    annotation_column = _resolve_annotation_column_name(
-        working_lf, column, annotation_column_override
-    )
-
-    texts: list[str] = []
-    for value in page_df.get_column(column).to_list():
-        texts.append("" if value is None else str(value))
-
-    classification_by_idx = await _classify_texts(texts, request)
-    provider_name = str(request.get("model") or request.get("provider") or "unknown")
-
-    has_existing_annotation_column = annotation_column in page_df.columns
-    existing_annotation_values = (
-        page_df.get_column(annotation_column).to_list()
-        if has_existing_annotation_column
-        else [None] * page_df.height
-    )
-
-    annotation_values: list[list[dict[str, str]]] = []
-    for idx, existing in enumerate(existing_annotation_values):
-        result_payload = classification_by_idx.get(idx, {})
-
-        if result_payload.get("error") is None:
-            annotation_value = result_payload.get("classification")
+    for i in range(count):
+        if i < len(raw_list):
+            value = raw_list[i].strip()
+            if value.lower() in lower_map:
+                results.append(lower_map[value.lower()])
+            else:
+                matched = False
+                for name in class_names:
+                    if name.lower() in value.lower():
+                        results.append(name)
+                        matched = True
+                        break
+                if not matched:
+                    results.append(value)
         else:
-            annotation_value = None
+            results.append(None)
 
-        annotation_values.append(
-            _merge_annotation_entry(
-                existing,
-                provider_name=provider_name,
-                annotation_value=annotation_value,
-            )
-        )
+    return results
 
-    page_df = page_df.with_columns(
-        pl.Series(annotation_column, annotation_values).cast(
-            ANNOTATION_POLARS_DTYPE,
-            strict=False,
-        )
+
+async def classify_texts(
+    texts: list[str],
+    classes: list[dict[str, str]],
+    examples: list[dict[str, str]] | None = None,
+    model: str = "gpt-4o-mini",
+    api_key: str | None = None,
+    base_url: str | None = None,
+    temperature: float = 1.0,
+    top_p: float = 1.0,
+    seed: int | None = 42,
+    batch_size: int = 100,
+    text_column_name: str = "text",
+) -> list[dict[str, Any]]:
+    """Classify a list of texts using the OpenAI chat completions API.
+
+    Uses structured outputs so the model returns ``ClassificationResult`` —
+    a simple ``list[str]`` of categories in the same order as the input texts.
+    """
+    resolved_api_key = api_key or os.environ.get("OPENAI_API_KEY", "")
+    client = AsyncOpenAI(
+        api_key=resolved_api_key or "no-key",
+        base_url=base_url or None,
     )
 
-    rows = page_df.to_dicts()
+    system_prompt = _build_system_prompt(classes, examples)
+    class_names = [c["name"] for c in classes]
 
-    columns = list(page_df.columns)
+    all_results: list[dict[str, Any]] = []
 
-    total_source_pages = max(1, math.ceil(total_source_rows / page_size))
+    for batch_start in range(0, len(texts), batch_size):
+        batch_texts = texts[batch_start : batch_start + batch_size]
+        batch_count = len(batch_texts)
 
-    metadata_columns = [c for c in columns if c != annotation_column]
+        numbered_lines = "\n".join(f"{i + 1}: {t}" for i, t in enumerate(batch_texts))
 
-    return {
-        "data": rows,
-        "columns": columns,
-        "metadata": {
-            "annotation_columns": [annotation_column],
-            "metadata_columns": metadata_columns,
-            "all_columns": columns,
-        },
-        "pagination": {
-            "page": page,
-            "page_size": page_size,
-            "total_source_rows": total_source_rows,
-            "total_source_pages": total_source_pages,
-            "result_count": len(rows),
-            "has_next": page < total_source_pages,
-            "has_prev": page > 1,
-        },
-        "sorting": {
-            "sort_by": effective_sort_by,
-            "descending": descending,
-        },
-    }
-
-
-def resolve_node_sources(
-    user_id: str,
-    workspace_id: str,
-    request: dict[str, Any],
-) -> tuple[dict[str, dict[str, Any]], dict[str, str]]:
-    """Resolve workspace nodes into validated AI annotation source metadata."""
-    node_ids = request.get("node_ids") or []
-    node_columns = request.get("node_columns") or {}
-
-    if workspace_manager.get_current_workspace_id(user_id) != workspace_id:
-        if not workspace_manager.set_current_workspace(user_id, workspace_id):
-            raise HTTPException(status_code=404, detail="Workspace not found")
-
-    workspace = workspace_manager.get_current_workspace(user_id)
-    if workspace is None:
-        raise HTTPException(status_code=404, detail="Workspace not found")
-
-    node_sources: dict[str, dict[str, Any]] = {}
-    label_to_node_map: dict[str, str] = {}
-
-    for node_id in node_ids:
-        node = workspace.nodes.get(node_id)
-        if node is None:
-            continue
-
-        node_label = getattr(node, "name", None) or node_id
-        label_to_node_map[node_label] = node_id
-
-        node_data = getattr(node, "data", None)
-        if not isinstance(node_data, pl.LazyFrame):
-            raise HTTPException(
-                status_code=400,
-                detail=f"Node {node_id} data must be a LazyFrame",
+        try:
+            response = await client.chat.completions.parse(
+                model=model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": numbered_lines},
+                ],
+                response_format=ClassificationResult,
+                temperature=temperature,
+                top_p=top_p,
+                seed=seed,
             )
 
-        column = node_columns.get(node_id)
-        if not column:
-            continue
+            message = response.choices[0].message
+            if message.refusal:
+                raise ValueError(f"Model refused structured output: {message.refusal}")
 
-        schema = node_data.collect_schema()
-        if column not in schema:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Column '{column}' not found in node {node_id}",
+            parsed = message.parsed
+            if parsed is None:
+                raise ValueError("Structured output parsing returned no parsed result")
+
+            raw_list = parsed.classifications
+
+            classifications = _normalize_classifications(
+                raw_list, batch_count, class_names
             )
 
-        node_sources[node_id] = {
-            "lf": node_data,
-            "column": column,
-            "label": node_label,
-        }
+            for i, (text, cls) in enumerate(zip(batch_texts, classifications)):
+                all_results.append({
+                    "row_index": batch_start + i,
+                    text_column_name: text,
+                    "classification": cls,
+                    "error": None if cls is not None else "No classification returned",
+                })
+        except Exception as exc:
+            logger.warning(
+                "Batch classification failed for rows %d-%d: %s",
+                batch_start,
+                batch_start + batch_count - 1,
+                exc,
+            )
+            for i, text in enumerate(batch_texts):
+                all_results.append({
+                    "row_index": batch_start + i,
+                    text_column_name: text,
+                    "classification": None,
+                    "error": str(exc),
+                })
 
-    return node_sources, label_to_node_map
+    return all_results
 
 
-async def build_ai_annotation_response(
-    user_id: str,
-    workspace_id: str,
-    request: dict[str, Any],
-) -> dict[str, Any]:
-    """Build the full AI annotation response from a normalized request."""
-    page = int(request.get("page") or DEFAULT_AI_ANNOTATION_PAGE)
-    page_size = int(request.get("page_size") or DEFAULT_AI_ANNOTATION_PAGE_SIZE)
-    sort_by = request.get("sort_by")
-    descending = bool(request.get("descending", DEFAULT_AI_ANNOTATION_DESCENDING))
-    annotation_column_override = request.get("annotation_column") or None
-
-    node_ids = request.get("node_ids") or []
-    node_sources, label_to_node_map = resolve_node_sources(
-        user_id, workspace_id, request
+async def list_models(
+    base_url: str | None = None,
+    api_key: str | None = None,
+) -> list[dict[str, str]]:
+    """List available models from an OpenAI-compatible endpoint."""
+    resolved_api_key = api_key or os.environ.get("OPENAI_API_KEY", "")
+    client = AsyncOpenAI(
+        api_key=resolved_api_key or "no-key",
+        base_url=base_url or None,
     )
 
-    data: dict[str, Any] = {}
-    for node_id in node_ids:
-        src = node_sources.get(node_id)
-        if not src:
-            continue
-
-        data[node_id] = await compute_annotation_page(
-            src["lf"],
-            src["column"],
-            request,
-            page=page,
-            page_size=page_size,
-            sort_by=sort_by,
-            descending=descending,
-            annotation_column_override=annotation_column_override,
-        )
-
-    analysis_params = {k: v for k, v in request.items() if k not in {"api_key"}}
-    if label_to_node_map:
-        analysis_params["label_to_node_map"] = label_to_node_map
-
-    return {
-        "state": "successful",
-        "message": "AI annotation complete",
-        "data": data,
-        "analysis_params": analysis_params,
-        "combinable": False,
-    }
+    try:
+        models_page = await client.models.list()
+        return [{"id": m.id, "name": m.id} for m in models_page.data]
+    except Exception as exc:
+        logger.warning("Failed to list models: %s", exc)
+        return []

@@ -134,19 +134,13 @@ export interface AiAnnotationRequest {
   annotation_column?: string | null;
   classes: AiAnnotationClassDef[];
   examples?: AiAnnotationExample[];
-  technique?: 'zero_shot' | 'few_shot' | 'chain_of_thought';
-  modifier?: 'no_modifier' | 'self_consistency';
-  provider?: 'openai' | 'gemini' | 'anthropic' | 'ollama';
   model: string;
   api_key?: string | null;
-  endpoint?: string | null;
+  base_url?: string | null;
   temperature?: number;
   top_p?: number;
-  n_completions?: number;
   seed?: number | null;
-  reasoning_effort?: 'low' | 'medium' | 'high' | null;
-  enable_reasoning?: boolean;
-  max_reasoning_chars?: number;
+  batch_size?: number;
   page?: number;
   page_size?: number;
   sort_by?: string | null;
@@ -159,19 +153,13 @@ export interface AiAnnotationDetachRequest {
   annotation_column?: string | null;
   classes: AiAnnotationClassDef[];
   examples?: AiAnnotationExample[];
-  technique?: 'zero_shot' | 'few_shot' | 'chain_of_thought';
-  modifier?: 'no_modifier' | 'self_consistency';
-  provider?: 'openai' | 'gemini' | 'anthropic' | 'ollama';
   model: string;
   api_key?: string | null;
-  endpoint?: string | null;
+  base_url?: string | null;
   temperature?: number;
   top_p?: number;
-  n_completions?: number;
   seed?: number | null;
-  reasoning_effort?: 'low' | 'medium' | 'high' | null;
-  enable_reasoning?: boolean;
-  max_reasoning_chars?: number;
+  batch_size?: number;
 }
 
 export interface AiAnnotationEdit {
@@ -220,13 +208,16 @@ export interface AiAnnotationResponse {
   metadata?: { task_id?: string; [k: string]: unknown };
 }
 
+export interface AiAnnotationModelsRequest {
+  base_url?: string | null;
+  api_key?: string | null;
+}
+
 export interface AiAnnotationModelsResponse {
   state: 'successful' | 'failed';
   message: string;
   data?: {
-    providers?: Record<string, { models?: Array<{ name?: string; full_name?: string }> }>;
-    techniques?: Array<{ name?: string; description?: string }>;
-    modifiers?: Array<{ name?: string; description?: string }>;
+    models?: Array<{ id: string; name: string }>;
   };
   metadata?: Record<string, unknown>;
 }
@@ -286,8 +277,8 @@ export const textApi = {
     post<TopicModelingDetachResponse>(`/workspaces/topic-modeling/tasks/${taskId}/detach`, req, headers),
 
   // AI Annotation
-  aiAnnotationModels: (headers: Record<string, string> = {}) =>
-    httpRequest<AiAnnotationModelsResponse>(`/workspaces/ai-annotation/models`, { method: 'GET', headers }),
+  aiAnnotationModels: (body: AiAnnotationModelsRequest, headers: Record<string, string> = {}) =>
+    post<AiAnnotationModelsResponse>(`/workspaces/ai-annotation/models`, body, headers),
   aiAnnotation: (req: AiAnnotationRequest, headers: Record<string, string> = {}) =>
     post<AiAnnotationResponse>(`/workspaces/ai-annotation`, req, headers),
   aiAnnotationDetach: (node: string, req: AiAnnotationDetachRequest, headers: Record<string, string> = {}) =>

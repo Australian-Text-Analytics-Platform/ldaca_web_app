@@ -17,8 +17,8 @@ Refactor note:
 from fastapi import APIRouter
 
 from ...core.workspace import (
-    workspace_manager,
-)  # re-export for test patches expecting api.workspaces.workspace_manager
+    workspace_manager,  # re-export for test patches expecting api.workspaces.workspace_manager
+)
 from . import base, lifecycle, nodes
 from .analyses import (
     ai_annotation,
@@ -34,11 +34,11 @@ router = APIRouter()
 router.include_router(lifecycle.router)
 router.include_router(nodes.router)
 router.include_router(base.router)
-router.include_router(ai_annotation.router)
 router.include_router(token_frequencies.router)
 router.include_router(sequential_analysis.router)
 router.include_router(quotation.router)
 router.include_router(concordance.router)
 router.include_router(topic_modeling.router)
+router.include_router(ai_annotation.router)
 
 __all__ = ["router", "workspace_manager"]

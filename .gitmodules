@@ -4,6 +4,3 @@
 [submodule "backend/polars-text"]
 	path = backend/polars-text
 	url = https://github.com/Australian-Text-Analytics-Platform/polars-text
-[submodule "backend/ai-annotator"]
-	path = backend/ai-annotator
-	url = https://github.com/Australian-Text-Analytics-Platform/ai-annotator
