@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Tooltip, type TooltipProps } from "recharts"
+import { Tooltip } from "recharts"
 
 import { cn } from "@/lib/utils"
 
@@ -70,8 +70,8 @@ const ChartContainer = React.forwardRef<HTMLDivElement, ChartContainerProps>(
 ChartContainer.displayName = "ChartContainer"
 
 interface ChartTooltipProps
-  extends Omit<Partial<TooltipProps<number, string>>, "content"> {
-  content?: TooltipProps<number, string>["content"]
+  extends Omit<React.ComponentProps<typeof Tooltip>, "content"> {
+  content?: React.ComponentProps<typeof Tooltip>["content"]
 }
 
 const ChartTooltip = React.forwardRef<HTMLDivElement, ChartTooltipProps>(

@@ -26,14 +26,8 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
-  optimizeDeps: {
-    include: [
-      '@radix-ui/react-tabs',
-      '@radix-ui/react-toggle',
-      '@radix-ui/react-toggle-group',
-    ],
-  },
   build: {
+    target: 'esnext',
     sourcemap: true,
     outDir: 'build',
     emptyOutDir: true,

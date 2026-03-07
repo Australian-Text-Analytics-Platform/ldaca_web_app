@@ -10,7 +10,6 @@ src
 public
 index.html
 tsconfig.json
-tsconfig.base.json
 components.json
 
 # Build output from other tools
