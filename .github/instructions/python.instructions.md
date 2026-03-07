@@ -1,56 +1,83 @@
 ---
-description: 'Python coding conventions and guidelines'
+description: 'Python coding conventions and guidelines for the LDaCA project'
 applyTo: '**/*.py'
 ---
 
 # Python Coding Conventions
 
-## Python Instructions
+## Environment & Tooling
 
-- Write clear and concise comments for each function.
-- Ensure functions have descriptive names and include type hints.
-- Provide docstrings following PEP 257 conventions.
-- Use the `typing` module for type annotations (e.g., `List[str]`, `Dict[str, int]`).
-- Break down complex functions into smaller, more manageable functions.
+- **Python ≥ 3.14** is required. Use modern syntax features available in 3.14+.
+- **Package manager:** [uv](https://docs.astral.sh/uv/). Never use `pip install` directly.
+  - `uv sync` — install all workspace dependencies (run from repo root).
+  - `uv run <command>` — run any script or tool in the managed environment.
+  - `uv add <package>` — add a dependency to the relevant workspace member.
+- **Never** set `PYTHONPATH=src` — `uv sync` installs packages in editable mode automatically.
 
-## General Instructions
+## Type Annotations
 
-- Always prioritize readability and clarity.
-- For algorithm-related code, include explanations of the approach used.
-- Write code with good maintainability practices, including comments on why certain design decisions were made.
-- Handle edge cases and write clear exception handling.
-- For libraries or external dependencies, mention their usage and purpose in comments.
-- Use consistent naming conventions and follow language-specific best practices.
-- Write concise, efficient, and idiomatic code that is also easily understandable.
+- Use **built-in generics** (PEP 585): `list[str]`, `dict[str, int]`, `tuple[int, ...]`, `set[str]`.
+- Do NOT import `List`, `Dict`, `Tuple`, `Set`, `Optional` from `typing` — use `list`, `dict`, `tuple`, `set`, `X | None` instead.
+- Use `X | None` instead of `Optional[X]` (PEP 604 union syntax).
+- Use `type` statement for type aliases when appropriate (PEP 695).
+- Include type hints on all function signatures and return types.
+
+```python
+# ✅ Modern Python 3.14 style
+def process_items(items: list[str], options: dict[str, int] | None = None) -> list[str]:
+    ...
+
+# ❌ Outdated style — do NOT use
+from typing import List, Dict, Optional
+def process_items(items: List[str], options: Optional[Dict[str, int]] = None) -> List[str]:
+    ...
+```
 
 ## Code Style and Formatting
 
-- Follow the **PEP 8** style guide for Python.
-- Maintain proper indentation (use 4 spaces for each level of indentation).
-- Ensure lines do not exceed 79 characters.
-- Place function and class docstrings immediately after the `def` or `class` keyword.
-- Use blank lines to separate functions, classes, and code blocks where appropriate.
+- Follow **PEP 8** with a relaxed line length (120 characters max, not 79).
+- 4 spaces for indentation.
+- Docstrings follow PEP 257 conventions.
+- Prefer self-documenting code with descriptive names over excessive comments.
 
-## Edge Cases and Testing
+## FastAPI Patterns
 
-- Always include test cases for critical paths of the application.
-- Account for common edge cases like empty inputs, invalid data types, and large datasets.
-- Include comments for edge cases and the expected behavior in those cases.
-- Write unit tests for functions and document them with docstrings explaining the test cases.
-
-## Example of Proper Documentation
+- Keep routers thin — validate via Pydantic models, delegate business logic to `core/`.
+- Use `Depends(get_current_user)` for authentication on all endpoints.
+- Use `async def` for I/O-bound endpoints.
+- Return Pydantic response models or typed dicts.
 
 ```python
-def calculate_area(radius: float) -> float:
-    """
-    Calculate the area of a circle given the radius.
-    
-    Parameters:
-    radius (float): The radius of the circle.
-    
-    Returns:
-    float: The area of the circle, calculated as π * radius^2.
-    """
-    import math
-    return math.pi * radius ** 2
+@router.post("/{workspace_id}/my-analysis/submit")
+async def submit_analysis(
+    workspace_id: str,
+    request: MyAnalysisRequest,
+    current_user=Depends(get_current_user),
+) -> dict:
+    ...
 ```
+
+## Polars (Lazy-First)
+
+- All node data must be `pl.LazyFrame`. Never pass `DataFrame` where `LazyFrame` is expected.
+- Avoid `.collect()` except at I/O boundaries (writing Parquet, serializing final API responses).
+- Use `.lazy()` when creating frames from raw data.
+- Prefer Polars expressions over Python loops for transforms.
+
+## Testing (pytest)
+
+- `asyncio_mode = "auto"` — no need for `@pytest.mark.asyncio` decorators.
+- Run tests from the specific workspace member directory, not the repo root:
+  ```sh
+  cd backend && uv run pytest
+  cd backend/docworkspace && uv run pytest
+  ```
+- Use `authenticated_client` fixture for auth-required endpoints.
+- Use `test_client` fixture for single-user mode endpoints.
+
+## General Principles
+
+- Break complex functions into smaller, focused functions.
+- Handle edge cases with explicit error handling — no silent failures.
+- Use `raise` with specific exception types and meaningful messages.
+- Prefer standard library and built-in data structures (`dict`, `set`, `deque`) for performance.

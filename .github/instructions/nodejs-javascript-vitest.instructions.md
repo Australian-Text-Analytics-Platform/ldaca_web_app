@@ -1,30 +1,61 @@
 ---
-description: "Guidelines for writing Node.js and JavaScript code with Vitest testing"
-applyTo: '**/*.js, **/*.mjs, **/*.cjs'
+description: "Guidelines for writing TypeScript/JavaScript code with Vitest testing in the LDaCA frontend"
+applyTo: '**/*.js, **/*.mjs, **/*.cjs, **/*.ts, **/*.tsx'
 ---
 
-# Code Generation Guidelines
+# Frontend Code & Testing Guidelines
 
-## Coding standards
-- Use JavaScript with ES2022 features and Node.js (20+) ESM modules
-- Use Node.js built-in modules and avoid external dependencies where possible
-- Ask the user if you require any additional dependencies before adding them
-- Always use async/await for asynchronous code, and use 'node:util' promisify function to avoid callbacks
-- Keep the code simple and maintainable
-- Use descriptive variable and function names
-- Do not add comments unless absolutely necessary, the code should be self-explanatory
-- Never use `null`, always use `undefined` for optional values
-- Prefer functions over classes
+## Coding Standards
 
-## Testing
-- Use Vitest for testing
-- Write tests for all new features and bug fixes
-- Ensure tests cover edge cases and error handling
-- NEVER change the original code to make it easier to test, instead, write tests that cover the original code as it is
+- Use **TypeScript** with strict mode. Avoid `any` — use proper types.
+- Use ES2022+ features and ESM modules.
+- Prefer functions over classes.
+- Keep code simple and self-documenting — avoid unnecessary comments.
+- Never use `null` for optional values; prefer `undefined` or `X | undefined`.
+- Use descriptive variable and function names.
 
-## Documentation
-- When adding new features or making significant changes, update the README.md file where necessary
+## Vitest Testing
 
-## User interactions
-- Ask questions if you are unsure about the implementation details, design choices, or need clarification on the requirements
-- Always answer in the same language as the question, but use english for the generated content like code, comments or docs
+- Use **Vitest** as the test runner (configured with `jsdom` environment).
+- Setup file: `src/test/setup.ts` imports `@testing-library/jest-dom/vitest`.
+- Run tests: `cd frontend && npm test` (watch) or `npx vitest run` (CI).
+
+### Test Patterns
+
+```tsx
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { describe, it, expect, vi } from 'vitest';
+
+describe('MyComponent', () => {
+  it('should handle user interaction', async () => {
+    const user = userEvent.setup();
+    render(<MyComponent />);
+
+    await user.click(screen.getByRole('button', { name: /submit/i }));
+    expect(screen.getByText('Success')).toBeInTheDocument();
+  });
+});
+```
+
+### Mocking
+
+```tsx
+// Mock modules
+vi.mock('@/api/http', () => ({
+  get: vi.fn(),
+  post: vi.fn(),
+}));
+
+// Mock functions
+const mockFn = vi.fn();
+```
+
+### Guidelines
+
+- Write tests for all new features and bug fixes.
+- Cover edge cases and error handling.
+- Use `@testing-library/react` for component tests — query by role, label, or text, not by CSS selectors.
+- Use `userEvent` over `fireEvent` for user interactions.
+- Use `waitFor` for async assertions.
+- NEVER change original code just to make it easier to test.

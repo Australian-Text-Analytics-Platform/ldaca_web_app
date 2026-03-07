@@ -31,8 +31,8 @@ Performance isn't just a buzzword—it's the difference between a product people
 ### Rendering and DOM
 - **Minimize DOM Manipulations:** Batch updates where possible. Frequent DOM changes are expensive.
   - *Anti-pattern:* Updating the DOM in a loop. Instead, build a document fragment and append it once.
-- **Virtual DOM Frameworks:** Use React, Vue, or similar efficiently—avoid unnecessary re-renders.
-  - *React Example:* Use `React.memo`, `useMemo`, and `useCallback` to prevent unnecessary renders.
+- **Virtual DOM Frameworks:** Use React efficiently—avoid unnecessary re-renders.
+  - *React Compiler:* This project uses React Compiler, which handles memoization automatically. Do NOT add manual `React.memo`, `useMemo`, or `useCallback` for performance.
 - **Keys in Lists:** Always use stable keys in lists to help virtual DOM diffing. Avoid using array indices as keys unless the list is static.
 - **Avoid Inline Styles:** Inline styles can trigger layout thrashing. Prefer CSS classes.
 - **CSS Animations:** Use CSS transitions/animations over JavaScript for smoother, GPU-accelerated effects.
@@ -41,7 +41,7 @@ Performance isn't just a buzzword—it's the difference between a product people
 ### Asset Optimization
 - **Image Compression:** Use tools like ImageOptim, Squoosh, or TinyPNG. Prefer modern formats (WebP, AVIF) for web delivery.
 - **SVGs for Icons:** SVGs scale well and are often smaller than PNGs for simple graphics.
-- **Minification and Bundling:** Use Webpack, Rollup, or esbuild to bundle and minify JS/CSS. Enable tree-shaking to remove dead code.
+- **Minification and Bundling:** This project uses Vite for bundling and minification. Enable tree-shaking to remove dead code.
 - **Cache Headers:** Set long-lived cache headers for static assets. Use cache busting for updates.
 - **Lazy Loading:** Use `loading="lazy"` for images, and dynamic imports for JS modules/components.
 - **Font Optimization:** Use only the character sets you need. Subset fonts and use `font-display: swap`.
@@ -67,25 +67,19 @@ Performance isn't just a buzzword—it's the difference between a product people
 - **Screen Reader Performance:** Avoid rapid DOM updates that can overwhelm assistive tech.
 
 ### Framework-Specific Tips
-#### React
-- Use `React.memo`, `useMemo`, and `useCallback` to avoid unnecessary renders.
+#### React (with React Compiler)
+- **Do NOT** use `React.memo`, `useMemo`, or `useCallback` for performance — the React Compiler handles memoization automatically.
+- Only use `useMemo`/`useCallback` when identity stability is required at a non-React boundary (add a comment explaining why).
 - Split large components and use code-splitting (`React.lazy`, `Suspense`).
-- Avoid anonymous functions in render; they create new references on every render.
 - Use `ErrorBoundary` to catch and handle errors gracefully.
 - Profile with React DevTools Profiler.
 
-#### Angular
-- Use OnPush change detection for components that don't need frequent updates.
-- Avoid complex expressions in templates; move logic to the component class.
-- Use `trackBy` in `ngFor` for efficient list rendering.
-- Lazy load modules and components with the Angular Router.
-- Profile with Angular DevTools.
-
-#### Vue
-- Use computed properties over methods in templates for caching.
-- Use `v-show` vs `v-if` appropriately (`v-show` is better for toggling visibility frequently).
-- Lazy load components and routes with Vue Router.
-- Profile with Vue Devtools.
+#### Polars (Backend Data Processing)
+- Always use `LazyFrame` — avoid `.collect()` except at I/O boundaries.
+- Prefer Polars expressions and method chaining over Python loops.
+- Use `sink_parquet()` for large output writes.
+- Paginate results on the server — never collect an entire frame to send over the wire.
+- Profile with `explain()` to inspect query plans.
 
 ### Common Frontend Pitfalls
 - Loading large JS bundles on initial page load.

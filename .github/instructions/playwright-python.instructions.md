@@ -5,6 +5,8 @@ applyTo: '**'
 
 # Playwright Python Test Generation Instructions
 
+> **Note:** Playwright E2E tests are not currently in active use in this project. These guidelines are for future E2E testing implementation.
+
 ## Test Writing Guidelines
 
 ### Code Quality Standards
