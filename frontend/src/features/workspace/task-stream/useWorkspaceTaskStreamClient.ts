@@ -1,14 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { TaskItem } from '@/stores/analysisStore';
 import { getApiBase } from '@/api/env';
 
 export type TaskEventPayload =
-  | { type: 'tasks_snapshot'; tasks?: any[] }
-  | { type: 'task_changed'; task?: any; timestamp?: number }
+  | { type: 'tasks_snapshot'; tasks?: TaskItem[]; timestamp?: number }
+  | { type: 'task_changed'; task?: TaskItem; timestamp?: number }
   | { type: 'analysis_save_failed'; task_type?: string; message?: string }
-  | { type: 'task_update'; tasks?: any[] }
+  | { type: 'task_update'; tasks?: TaskItem[]; timestamp?: number }
   | { type: 'error'; message?: string }
   | { type: 'heartbeat' }
-  | { type: string; [key: string]: any };
+  | { type: 'workspace_updated' };
 
 export interface TaskStreamState {
   status: 'idle' | 'connecting' | 'open' | 'error';
@@ -67,11 +68,12 @@ export const useWorkspaceTaskStreamClient = (
     onEventRef.current = onEvent;
   }, [onEvent]);
 
-  const reconnect = useMemo(() => {
+  const reconnect = (() => {
     const fn = () => reconnectRef.current();
     return fn;
-  }, []);
+  })();
 
+  /* eslint-disable react-hooks/set-state-in-effect -- Resetting stream state when disabled; single unconditional reset */
   useEffect(() => {
     if (!enabled) {
       setState({ status: 'idle', error: null, reconnectAttempt: 0, lastEventTimestamp: null });
@@ -108,9 +110,8 @@ export const useWorkspaceTaskStreamClient = (
     };
 
     const invokeOnEvent = (payload: TaskEventPayload) => {
-      const timestamp = typeof (payload as { timestamp?: number }).timestamp === 'number'
-        ? (payload as { timestamp?: number }).timestamp!
-        : Date.now();
+      const rawTimestamp = (payload as { timestamp?: number }).timestamp;
+      const timestamp = typeof rawTimestamp === 'number' ? rawTimestamp : Date.now();
       setState((prev) => ({ ...prev, lastEventTimestamp: timestamp }));
       try {
         onEventRef.current?.(payload);
@@ -180,6 +181,7 @@ export const useWorkspaceTaskStreamClient = (
       setState({ status: 'idle', error: null, reconnectAttempt: 0, lastEventTimestamp: null });
     };
   }, [enabled, getAuthHeaders]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   return { ...state, reconnect };
 };

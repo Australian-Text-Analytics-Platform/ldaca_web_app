@@ -1,4 +1,4 @@
-import { NodeSchemaResponse } from '../../../../types';
+import { type NodeSchemaResponse } from '../../../../types';
 
 export const DATA_TYPES = [
   { value: 'string', label: 'string' },

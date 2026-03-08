@@ -405,9 +405,10 @@ async def get_quotation(
                     detail="Clear current quotation results before starting a new quotation analysis",
                 )
 
-            existing_task.request = analysis_request
-            existing_task.complete(GenericAnalysisResult(result_payload))
-            task_manager.save_task(existing_task)
+            task = existing_task
+            task.request = analysis_request
+            task.complete(GenericAnalysisResult(result_payload))
+            task_manager.save_task(task)
 
         else:
             task_id = task_manager.create_task(analysis_request)
@@ -417,6 +418,7 @@ async def get_quotation(
             task_manager.save_task(task)
             task_manager.set_current_task("quotation", task_id)
 
+        result_payload["metadata"] = {"task_id": task.task_id}
         return result_payload
     except HTTPException:
         raise

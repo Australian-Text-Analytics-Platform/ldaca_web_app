@@ -37,7 +37,7 @@ import {
   TableRow,
 } from '../../../components/ui/table';
 import { ScrollArea } from '../../../components/ui/scroll-area';
-import { ArrowUpDown, Loader2, Search, Trash2, Unlink } from 'lucide-react';
+import { ArrowUpDown, Loader2, Play, Trash2, Unlink } from 'lucide-react';
 import {
   getNodeIdentifier,
   getServerEngineConfig,
@@ -47,13 +47,14 @@ import {
   useAnalysisLock,
   useAnalysisFeature,
   getAnalysisActionState,
+  type WorkspaceNodeLike,
 } from '../common';
 
 import { AnalysisPagination } from '../../../components/AnalysisPagination';
 import { useQuotationTaskFlow } from './hooks/useQuotationTaskFlow';
 
 interface QuotationResultState {
-  rows: any[];
+  rows: Record<string, unknown>[];
   columns: string[];
   pagination: {
     page: number;
@@ -372,14 +373,14 @@ const QuotationFeature: React.FC = () => {
     setEngineError(null);
   }, [engineConfig.type, engineConfig.url]);
 
-  const quotationResultRef = useRef<any>(null);
+  const quotationResultRef = useRef<Record<string, unknown> | null>(null);
 
   const {
     resolveTaskId,
     banner: quotationWaitingBanner,
     hasActiveTask,
     clearResults,
-  } = useAnalysisFeature<any>({
+  } = useAnalysisFeature<Record<string, unknown>>({
     analysisType: 'quotation_analysis',
     taskType: 'quotation',
     workspaceId: currentWorkspaceId,
@@ -393,9 +394,9 @@ const QuotationFeature: React.FC = () => {
     onResultFetched: (result, _taskId) => {
       if (!result) return;
       const targetNode =
-        (isLocked && lockedNodesSnapshot.length ? lockedNodesSnapshot[0] : displayedNodes[0]) as any;
+        (isLocked && lockedNodesSnapshot.length ? lockedNodesSnapshot[0] as WorkspaceNodeLike : displayedNodes[0]);
       const nodeId = targetNode ? getNodeIdentifier(targetNode, 0) : '';
-      const selection = activeSelections.find((s: any) => s.nodeId === nodeId);
+      const selection = activeSelections.find((s) => s.nodeId === nodeId);
       const column = selection?.column ?? '';
       applyContextLengthPreferenceFromResult(result);
       if (nodeId && column) {
@@ -404,7 +405,7 @@ const QuotationFeature: React.FC = () => {
       setHasLoaded(true);
     },
     onHydratedResult: async (resultPayload) => {
-      const res = resultPayload as any;
+      const res = resultPayload;
       if (!res) return;
       const selection = nodeColumnSelections[0];
       const nodeId = selection?.nodeId ?? '';
@@ -415,10 +416,10 @@ const QuotationFeature: React.FC = () => {
       setHasLoaded(true);
     },
     onHydratedRequest: async (requestPayload) => {
-      const requestData = (requestPayload as any)?.data ?? requestPayload;
+      const requestData = ((requestPayload as Record<string, unknown>)?.data ?? requestPayload) as Record<string, unknown> | null;
       if (!requestData) return;
-      const nodeId = requestData?.node_id || requestData?.nodeId;
-      const column = requestData?.column || '';
+      const nodeId = String(requestData?.node_id || requestData?.nodeId || '');
+      const column = String(requestData?.column || '');
       const reqEngine = (requestData?.engine ?? null) as QuotationEngineConfig | null;
       if (!nodeId) return;
       if (reqEngine?.type === 'remote') {
@@ -458,8 +459,9 @@ const QuotationFeature: React.FC = () => {
     },
   });
 
-  const applyContextLengthPreferenceFromResult = (payload: any) => {
-    const prefValue = Number(payload?.preferences?.context_length ?? payload?.preferences?.contextLength);
+  const applyContextLengthPreferenceFromResult = (payload: Record<string, unknown>) => {
+    const prefs = payload?.preferences as Record<string, unknown> | undefined;
+    const prefValue = Number(prefs?.context_length ?? prefs?.contextLength);
     if (!Number.isFinite(prefValue)) {
       return;
     }
@@ -600,8 +602,8 @@ const QuotationFeature: React.FC = () => {
     const decorations = types.map(() => 'underline').join(' ');
     const colors = types.map(t => TYPE_COLORS[t] || '#111827');
     return {
-      textDecorationLine: decorations as any,
-      textDecorationColor: colors.join(' ') as any,
+      textDecorationLine: decorations as string,
+      textDecorationColor: colors.join(' ') as string,
       textDecorationThickness: '2px',
       textUnderlineOffset: '4px',
       textDecorationSkipInk: 'none',
@@ -610,18 +612,18 @@ const QuotationFeature: React.FC = () => {
   };
 
   // Render a single text cell with underline spans using indices and label badges
-  const renderHighlightedText = (text: string, row: any, cellKey: string): React.ReactNode => {
+  const renderHighlightedText = (text: string, row: Record<string, unknown>, cellKey: string): React.ReactNode => {
     try {
       if (typeof text !== 'string' || !text.length) return text ?? '';
       const spans: HighlightSpan[] = [];
-      const addSpan = (start?: any, end?: any, type?: string) => {
-        if (type && Number.isFinite(start) && Number.isFinite(end) && start < end && start >= 0 && end <= text.length) {
+      const addSpan = (start?: unknown, end?: unknown, type?: string) => {
+        if (type && Number.isFinite(start) && Number.isFinite(end) && (start as number) < (end as number) && (start as number) >= 0 && (end as number) <= text.length) {
           spans.push({ start: Number(start), end: Number(end), types: [type] });
         }
       };
       // Prefer aggregated spans if present
       if (Array.isArray(row?.__spans) && row.__spans.length > 0) {
-        row.__spans.forEach((s: any) => addSpan(s?.start, s?.end, s?.type));
+        row.__spans.forEach((s: Record<string, unknown>) => addSpan(s?.start, s?.end, s?.type as string | undefined));
       } else {
         addSpan(row?.speaker_start_idx, row?.speaker_end_idx, 'speaker');
         addSpan(row?.quote_start_idx, row?.quote_end_idx, 'quote');
@@ -668,7 +670,7 @@ const QuotationFeature: React.FC = () => {
             style={{
               color: '#0f172a',
               borderColor: TYPE_COLORS[t] || '#334155',
-              backgroundColor: hoverState && hoverState.key === cellKey && hoverState.segIndex === segIndex && hoverState.type === (t as any)
+              backgroundColor: hoverState && hoverState.key === cellKey && hoverState.segIndex === segIndex && hoverState.type === t
                 ? hexToRgba(TYPE_COLORS[t] || '#cbd5e1', 0.28)
                 : '#f1f5f9',
             }}
@@ -728,16 +730,16 @@ const QuotationFeature: React.FC = () => {
     }
   };
 
-  const normalizeQuotationResult = (result: any, column: string): QuotationResultState => {
+  const normalizeQuotationResult = (result: Record<string, unknown>, column: string): QuotationResultState => {
     const toNumber = (value: unknown, fallback: number) => {
       const num = Number(value);
       return Number.isFinite(num) ? num : fallback;
     };
 
-    const rawRows: any[] = Array.isArray(result?.data) ? result.data : [];
+    const rawRows: Record<string, unknown>[] = Array.isArray(result?.data) ? result.data as Record<string, unknown>[] : [];
     const rows = rawRows.map((row) => {
       const spans: { start: number; end: number; type: string }[] = [];
-      const addSpan = (start?: any, end?: any, type?: string) => {
+      const addSpan = (start?: unknown, end?: unknown, type?: string) => {
         if (!type) return;
         const s = Number(start);
         const e = Number(end);
@@ -786,7 +788,7 @@ const QuotationFeature: React.FC = () => {
     };
   };
 
-  const updateResultState = (nodeId: string, column: string, result: any): QuotationResultState => {
+  const updateResultState = (nodeId: string, column: string, result: Record<string, unknown>): QuotationResultState => {
     const normalized = normalizeQuotationResult(result, column);
     setResultsByNode((prev) => ({ ...prev, [nodeId]: normalized }));
     setNodeState((prev) => ({
@@ -814,7 +816,7 @@ const QuotationFeature: React.FC = () => {
       currentWorkspaceId,
       isLocked,
       hasLoaded,
-      lockedNodesSnapshot,
+      lockedNodesSnapshot: lockedNodesSnapshot as WorkspaceNodeLike[],
       displayedNodes,
       activeSelections,
       nodeState,
@@ -974,45 +976,24 @@ const QuotationFeature: React.FC = () => {
               lockedMessage={ANALYSIS_LOCKED_MESSAGE}
             />
             <div className="flex flex-wrap gap-3">
-              {hasParamsChanged ? (
-                <Button
-                  type="button"
-                  className="w-full sm:w-auto"
-                  onClick={handleSearchAll}
-                  disabled={actionState.runDisabled || !canRunQuotation}
-                >
-                  {isLoadingQuotations ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Updating…
-                    </>
-                  ) : (
-                    <>
-                      <Search className="mr-2 h-4 w-4" />
-                      Update Results
-                    </>
-                  )}
-                </Button>
-              ) : (
-                <Button
-                  type="button"
-                  className="w-full sm:w-auto"
-                  onClick={handleSearchAll}
-                  disabled={actionState.runDisabled || !canRunQuotation}
-                >
-                  {isLoadingQuotations ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Loading…
-                    </>
-                  ) : (
-                    <>
-                      <Search className="mr-2 h-4 w-4" />
-                      Load Quotations
-                    </>
-                  )}
-                </Button>
-              )}
+              <Button
+                type="button"
+                className="w-full sm:w-auto"
+                onClick={handleSearchAll}
+                disabled={actionState.runDisabled || !canRunQuotation}
+              >
+                {isLoadingQuotations ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Running…
+                  </>
+                ) : (
+                  <>
+                    <Play className="mr-2 h-4 w-4" />
+                    {actionState.runLabel}
+                  </>
+                )}
+              </Button>
               <div className="flex items-center gap-2">
                 <Button
                   type="button"
@@ -1125,9 +1106,9 @@ const QuotationFeature: React.FC = () => {
                 const textCol = selection?.column || '';
 
                 const resultState = resultsByNode[nodeId];
-                const fallbackRows: any[] = Array.isArray(nodeData?.data) ? nodeData.data : [];
+                const fallbackRows: Record<string, unknown>[] = Array.isArray(nodeData?.data) ? nodeData.data as Record<string, unknown>[] : [];
                 const rowsForRender = resultState?.rows?.length ? resultState.rows : fallbackRows;
-                const rowsWithQuotes = rowsForRender.filter((row: any) => row?.quote);
+                const rowsWithQuotes = rowsForRender.filter((row) => row?.quote);
 
                 const metaColumns = [
                   'speaker',
@@ -1213,7 +1194,7 @@ const QuotationFeature: React.FC = () => {
                                   </TableCell>
                                 </TableRow>
                               ) : (
-                                rowsWithQuotes.map((row: any, rowIdx: number) => (
+                                rowsWithQuotes.map((row, rowIdx: number) => (
                                   <TableRow
                                     key={rowIdx}
                                     className="border-b border-border/60 last:border-b-0 hover:bg-muted/40"
@@ -1224,7 +1205,7 @@ const QuotationFeature: React.FC = () => {
                                       const shouldHighlight = textCol ? c === textCol : c === 'quote';
                                       const content = shouldHighlight
                                         ? renderHighlightedText(
-                                            typeof val === 'string' ? val : val ?? '',
+                                            typeof val === 'string' ? val : String(val ?? ''),
                                             row,
                                             cellKey,
                                           )

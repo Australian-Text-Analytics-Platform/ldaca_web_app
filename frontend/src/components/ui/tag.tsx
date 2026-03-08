@@ -48,4 +48,5 @@ const Tag = React.forwardRef<React.ElementRef<"span">, TagProps>(
 )
 Tag.displayName = "Tag"
 
+// eslint-disable-next-line react-refresh/only-export-components -- Shadcn UI pattern: CVA variants must be co-exported for consumer styling
 export { Tag, tagVariants }

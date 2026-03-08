@@ -94,11 +94,12 @@ export const normalizeTypeName = (type?: string | null): string => {
  * @returns Type string if found, undefined otherwise
  * @internal
  */
-const extractTypeFromSchemaEntry = (entry: any): string | undefined => {
+const extractTypeFromSchemaEntry = (entry: unknown): string | undefined => {
   if (!entry) return undefined;
   if (typeof entry === 'string') return entry;
-  if (typeof entry === 'object') {
-    return entry.js_type || entry.type || entry.dtype;
+  if (typeof entry === 'object' && entry !== null) {
+    const e = entry as Record<string, unknown>;
+    return (e.js_type as string) || (e.type as string) || (e.dtype as string);
   }
   return undefined;
 };
@@ -116,8 +117,10 @@ const extractTypeFromSchemaEntry = (entry: any): string | undefined => {
  * // [{ name: 'id', dataType: 'integer' }, { name: 'text', dataType: 'string' }]
  * ```
  */
-export const getColumnsWithTypesFromNode = (node: any): ColumnInfo[] => {
+export const getColumnsWithTypesFromNode = (node: unknown): ColumnInfo[] => {
   if (!node) return [];
+
+  const n = node as Record<string, unknown>;
 
   const columnOrder: string[] = [];
   const typeMap = new Map<string, string>();
@@ -144,23 +147,23 @@ export const getColumnsWithTypesFromNode = (node: any): ColumnInfo[] => {
     }
   };
 
-  const schema = node?.data?.schema ?? node?.schema;
+  const schema = (n?.data as Record<string, unknown>)?.schema ?? n?.schema;
   if (Array.isArray(schema)) {
-    schema.forEach((entry: any) => register(entry?.name, entry?.js_type || entry?.type || entry?.dtype));
+    schema.forEach((entry: Record<string, unknown>) => register(entry?.name, entry?.js_type || entry?.type || entry?.dtype));
   } else if (schema && typeof schema === 'object') {
     Object.entries(schema as Record<string, unknown>).forEach(([name, entry]) => {
       register(name, extractTypeFromSchemaEntry(entry));
     });
   }
 
-  const dtypes = node?.data?.dtypes ?? node?.dtypes;
+  const dtypes = (n?.data as Record<string, unknown>)?.dtypes ?? n?.dtypes;
   if (dtypes && typeof dtypes === 'object') {
     Object.entries(dtypes).forEach(([name, dtype]) => register(name, dtype));
   }
 
-  const columns = node?.data?.columns ?? node?.columns;
+  const columns = (n?.data as Record<string, unknown>)?.columns ?? n?.columns;
   if (Array.isArray(columns)) {
-    columns.forEach((name: any) => register(name));
+    columns.forEach((name: unknown) => register(name));
   }
 
   return columnOrder.map((name) => ({ name, dataType: typeMap.get(name) || 'string' }));
@@ -173,7 +176,7 @@ export const filterColumnsByType = (columns: ColumnInfo[], allowedTypes: string[
 };
 
 export const getColumnNamesByType = (
-  node: any,
+  node: unknown,
   allowedTypes: string[],
   options: { fallbackToAll?: boolean } = {}
 ): string[] => {
@@ -185,4 +188,4 @@ export const getColumnNamesByType = (
   return filtered.map((column) => column.name);
 };
 
-export const mapColumnsToInfo = (node: any): ColumnInfo[] => getColumnsWithTypesFromNode(node);
+export const mapColumnsToInfo = (node: unknown): ColumnInfo[] => getColumnsWithTypesFromNode(node);

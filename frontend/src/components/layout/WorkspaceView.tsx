@@ -42,8 +42,7 @@ const WorkspaceView: React.FC = () => {
     const onUp = () => {
       isDraggingRef.current = false;
       // flush any pending frame
-      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-      rafId !== null && cancelAnimationFrame(rafId);
+      if (rafId !== null) cancelAnimationFrame(rafId);
       // Commit final split once after drag ends
       setSplit(livePct);
       window.removeEventListener('mousemove', onMove);

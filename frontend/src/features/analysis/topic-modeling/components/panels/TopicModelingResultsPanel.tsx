@@ -7,6 +7,9 @@ import { AnalysisCardLayout } from '../../../common/components/AnalysisCardLayou
 import { AnalysisRunningStateCard } from '../../../common/components/AnalysisRunningStateCard';
 import type { ZoomDomain } from '../../topicModelingAdapters';
 
+type TopicModelingTopic = { id: number; label: string; size: number[]; total_size: number; x: number; y: number };
+type TopicModelingResult = { state?: string; data?: { topics: TopicModelingTopic[]; corpus_sizes?: number[] }; metadata?: Record<string, unknown>; message?: string } | null;
+
 type Props = {
   topicWaitingBanner: { status: 'running' | 'queued'; taskId: string | null; message?: string } | null;
   runningTask?: {
@@ -15,9 +18,9 @@ type Props = {
     message?: string;
     progress?: number;
   } | null;
-  result: any;
+  result: TopicModelingResult;
   error?: string | null;
-  topics: any[];
+  topics: TopicModelingTopic[];
   containerRef: React.RefObject<HTMLDivElement | null>;
   isDetachLoading: boolean;
   isDetaching: boolean;
@@ -26,7 +29,7 @@ type Props = {
   handleResetZoom: () => void;
   isAtGlobalZoom: boolean;
   bubbleElements: React.ReactNode;
-  tooltip: { topic: any; x: number; y: number };
+  tooltip: { topic: TopicModelingTopic | null; x: number; y: number };
   renderSizeComposition: (size: number[] | undefined, totalSize?: number | null) => React.ReactNode;
   hoveredTopicId: number | null;
   setHoveredTopicId: React.Dispatch<React.SetStateAction<number | null>>;

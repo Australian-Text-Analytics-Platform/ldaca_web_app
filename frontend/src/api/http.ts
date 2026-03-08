@@ -16,14 +16,14 @@ export class ApiError extends Error {
 export interface RequestOptions {
   method?: string;
   headers?: Record<string, string>;
-  params?: Record<string, any>;
-  body?: any;
+  params?: Record<string, unknown>;
+  body?: unknown;
   formData?: FormData;
   expectBlob?: boolean;
   timeoutMs?: number;
 }
 
-function buildQuery(params?: Record<string, any>): string {
+function buildQuery(params?: Record<string, unknown>): string {
   if (!params) return '';
   const usp = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) {
@@ -42,9 +42,10 @@ function buildQuery(params?: Record<string, any>): string {
 
 async function parseResponse(res: Response, expectBlob?: boolean) {
   if (!res.ok) {
-    let detail: any = null;
+    let detail: unknown = null;
     try { detail = await res.json(); } catch { /* ignore */ }
-    const message = detail?.message || detail?.detail || `HTTP ${res.status}`;
+    const parsed = detail as Record<string, unknown> | null;
+    const message = String(parsed?.message || parsed?.detail || `HTTP ${res.status}`);
     throw new ApiError(message, { status: res.status, detail });
   }
   if (expectBlob) return res.blob();
@@ -56,7 +57,7 @@ async function parseResponse(res: Response, expectBlob?: boolean) {
   return res.text();
 }
 
-export async function httpRequest<T=any>(path: string, opts: RequestOptions = {}): Promise<T> {
+export async function httpRequest<T=unknown>(path: string, opts: RequestOptions = {}): Promise<T> {
   const base = getApiBase();
   const { method = 'GET', headers = {}, params, body, formData, expectBlob, timeoutMs = 30000 } = opts;
   const url = `${base}${path}${buildQuery(params)}`;
@@ -71,14 +72,14 @@ export async function httpRequest<T=any>(path: string, opts: RequestOptions = {}
     fetchBody = formData;
   } else if (body !== undefined && body !== null) {
     fetchHeaders['Content-Type'] = fetchHeaders['Content-Type'] || 'application/json';
-    fetchBody = fetchHeaders['Content-Type'] === 'application/json' ? JSON.stringify(body) : body;
+    fetchBody = fetchHeaders['Content-Type'] === 'application/json' ? JSON.stringify(body) : body as BodyInit;
   }
 
   try {
     const res = await fetch(url, { method, headers: fetchHeaders, body: fetchBody, credentials: 'include', signal: controller.signal });
     return await parseResponse(res, expectBlob) as T;
-  } catch (e: any) {
-    if (e?.name === 'AbortError') throw new ApiError('Request timeout', { code: 'TIMEOUT' });
+  } catch (e: unknown) {
+    if (e instanceof DOMException && e.name === 'AbortError') throw new ApiError('Request timeout', { code: 'TIMEOUT' });
     throw e;
   } finally {
     clearTimeout(id);
@@ -86,7 +87,7 @@ export async function httpRequest<T=any>(path: string, opts: RequestOptions = {}
 }
 
 // Convenience helpers
-export const get = <T=any>(path: string, headers?: Record<string,string>, params?: Record<string,any>) => httpRequest<T>(path, { method: 'GET', headers, params });
-export const post = <T=any>(path: string, body?: any, headers?: Record<string,string>, params?: Record<string,any>) => httpRequest<T>(path, { method: 'POST', headers, body, params });
-export const put = <T=any>(path: string, body?: any, headers?: Record<string,string>, params?: Record<string,any>) => httpRequest<T>(path, { method: 'PUT', headers, body, params });
-export const del = <T=any>(path: string, headers?: Record<string,string>, params?: Record<string,any>) => httpRequest<T>(path, { method: 'DELETE', headers, params });
+export const get = <T=unknown>(path: string, headers?: Record<string,string>, params?: Record<string,unknown>) => httpRequest<T>(path, { method: 'GET', headers, params });
+export const post = <T=unknown>(path: string, body?: unknown, headers?: Record<string,string>, params?: Record<string,unknown>) => httpRequest<T>(path, { method: 'POST', headers, body, params });
+export const put = <T=unknown>(path: string, body?: unknown, headers?: Record<string,string>, params?: Record<string,unknown>) => httpRequest<T>(path, { method: 'PUT', headers, body, params });
+export const del = <T=unknown>(path: string, headers?: Record<string,string>, params?: Record<string,unknown>) => httpRequest<T>(path, { method: 'DELETE', headers, params });

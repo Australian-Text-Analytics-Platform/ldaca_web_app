@@ -1,4 +1,3 @@
-import * as React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { textApi } from '../../../../api/text';
 
@@ -44,7 +43,7 @@ export function useAnalysisServerRequestLock({ analysisType, workspaceId, getAut
       }
 
       const current = await textApi.getAnalysisCurrent(analysisType, getAuthHeaders());
-      const taskIds = (current as any)?.task_ids;
+      const taskIds = (current as Record<string, unknown>)?.task_ids;
       const currentTaskId = Array.isArray(taskIds)
         ? taskIds.find((id) => typeof id === 'string' && id.length > 0) ?? null
         : null;
@@ -62,22 +61,12 @@ export function useAnalysisServerRequestLock({ analysisType, workspaceId, getAut
     staleTime: 30_000,
   });
 
-  return React.useMemo(
-    () => ({
-      hasServerRequest: Boolean(query.data?.hasServerRequest),
-      currentTaskId: query.data?.currentTaskId ?? null,
-      serverRequest: query.data?.serverRequest ?? null,
-      isLoading: query.isLoading,
-      isFetching: query.isFetching,
-      refetch: query.refetch,
-    }),
-    [
-      query.data?.hasServerRequest,
-      query.data?.currentTaskId,
-      query.data?.serverRequest,
-      query.isLoading,
-      query.isFetching,
-      query.refetch,
-    ]
-  );
+  return {
+    hasServerRequest: Boolean(query.data?.hasServerRequest),
+    currentTaskId: query.data?.currentTaskId ?? null,
+    serverRequest: query.data?.serverRequest ?? null,
+    isLoading: query.isLoading,
+    isFetching: query.isFetching,
+    refetch: query.refetch,
+  };
 }

@@ -3,10 +3,11 @@ import type {
   QuotationRequest,
   QuotationResultQuery,
   QuotationEngineConfig,
+  QuotationDetachRequest,
 } from '../../../../api/text';
 import { textApi } from '../../../../api/text';
 import { getNodeIdentifier, restoreAnalysisLockFromRequest } from '../../common';
-import type { NodeColumnSelection, NodePaginationState } from '../../common';
+import type { NodeColumnSelection, NodePaginationState, WorkspaceNodeLike } from '../../common';
 
 const DEFAULT_PAGE_SIZE = 100;
 
@@ -22,11 +23,16 @@ type ResolvedEnginePayload =
       failureReason: string | null;
     };
 
-function getErrorMessage(error: any): string {
+function getErrorMessage(error: unknown): string {
+  const err = error as Record<string, unknown> | null | undefined;
+  const response = err?.response as Record<string, unknown> | undefined;
+  const responseData = response?.data as Record<string, unknown> | undefined;
+  const body = err?.body as Record<string, unknown> | undefined;
+  const errData = err?.data as Record<string, unknown> | undefined;
   const detail =
-    error?.response?.data?.detail ??
-    error?.data?.detail ??
-    (error?.body as any)?.detail;
+    responseData?.detail ??
+    errData?.detail ??
+    body?.detail;
   if (typeof detail === 'string' && detail.trim().length) return detail;
   if (detail && typeof detail === 'object') {
     try {
@@ -35,8 +41,8 @@ function getErrorMessage(error: any): string {
       /* ignore */
     }
   }
-  if (typeof error?.message === 'string' && error.message.trim().length)
-    return error.message;
+  if (typeof (err as Record<string, unknown>)?.message === 'string' && ((err as Record<string, unknown>)?.message as string).trim().length)
+    return (err as Record<string, unknown>).message as string;
   return 'An unexpected error occurred while loading quotations.';
 }
 
@@ -44,8 +50,8 @@ interface QuotationState {
   currentWorkspaceId: string | null;
   isLocked: boolean;
   hasLoaded: boolean;
-  lockedNodesSnapshot: any[];
-  displayedNodes: any[];
+  lockedNodesSnapshot: WorkspaceNodeLike[];
+  displayedNodes: WorkspaceNodeLike[];
   activeSelections: NodeColumnSelection[];
   nodeState: Record<string, NodePaginationState>;
   originalColumnsByNode: Record<string, string[]>;
@@ -62,8 +68,8 @@ interface QuotationActions {
   showErrorDialog: (message: string) => void;
   baseHandlePageChange: (page: number) => void;
   baseHandlePageSizeChange: (pageSize: number) => void;
-  updateResultState: (nodeId: string, column: string, result: any) => void;
-  applyContextLengthPreferenceFromResult: (payload: any) => void;
+  updateResultState: (nodeId: string, column: string, result: Record<string, unknown>) => void;
+  applyContextLengthPreferenceFromResult: (payload: Record<string, unknown>) => void;
 }
 
 interface QuotationLock {
@@ -75,8 +81,8 @@ interface QuotationLock {
   quotationSearch: (
     nodeId: string,
     request: QuotationRequest,
-  ) => Promise<any>;
-  detachQuotation: (nodeId: string, request: any) => Promise<void>;
+  ) => Promise<Record<string, unknown>>;
+  detachQuotation: (nodeId: string, request: QuotationDetachRequest) => Promise<void>;
   openEngineDialog: () => void;
 }
 
@@ -128,7 +134,7 @@ export function useQuotationTaskFlow({
   };
 
   const resolveNodeLabel = (nodeId: string): string => {
-    const candidates = (isLocked && lockedNodesSnapshot.length ? lockedNodesSnapshot : displayedNodes) as any[];
+    const candidates = (isLocked && lockedNodesSnapshot.length ? lockedNodesSnapshot : displayedNodes);
     const match = candidates.find((node, idx) => getNodeIdentifier(node, idx) === nodeId);
     const rawLabel = match?.name || match?.label || match?.id || nodeId;
     return String(rawLabel);
@@ -169,7 +175,7 @@ export function useQuotationTaskFlow({
       isLocked && lockedNodesSnapshot.length
         ? lockedNodesSnapshot[0]
         : displayedNodes[0]
-    ) as any;
+    );
     if (!sourceNode) return null;
     const nodeId = getNodeIdentifier(sourceNode, 0);
     const selection = activeSelections.find((sel) => sel.nodeId === nodeId);
@@ -252,7 +258,7 @@ export function useQuotationTaskFlow({
             ? (engineConfigForRequest.url ?? '')
             : null,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to fetch quotations', error);
       showErrorDialog(getErrorMessage(error));
       return null;
@@ -294,7 +300,7 @@ export function useQuotationTaskFlow({
       updateResultState(nodeId, column, response);
       setHasLoaded(true);
       return response;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to refresh quotation results', error);
       showErrorDialog(getErrorMessage(error));
       return null;
@@ -344,7 +350,7 @@ export function useQuotationTaskFlow({
       isLocked && lockedNodesSnapshot.length
         ? lockedNodesSnapshot[0]
         : displayedNodes[0]
-    ) as any;
+    );
     const nodeId = targetNode ? getNodeIdentifier(targetNode, 0) : '';
     if (!nodeId) {
       baseHandlePageChange(newPage);
@@ -363,7 +369,7 @@ export function useQuotationTaskFlow({
       isLocked && lockedNodesSnapshot.length
         ? lockedNodesSnapshot[0]
         : displayedNodes[0]
-    ) as any;
+    );
     const nodeId = targetNode ? getNodeIdentifier(targetNode, 0) : '';
     if (!nodeId) {
       baseHandlePageSizeChange(pageSize);
@@ -425,7 +431,7 @@ export function useQuotationTaskFlow({
             ? { type: 'remote', url: enginePayload.url }
             : { type: 'local' },
       });
-    } catch (e: any) {
+    } catch (e: unknown) {
       showErrorDialog(getErrorMessage(e));
     } finally {
       setNodeDetaching((prev) => ({ ...prev, [nodeId]: false }));

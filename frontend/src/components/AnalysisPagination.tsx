@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { MoreHorizontal } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Button } from './ui/button';
@@ -133,13 +133,16 @@ const PaginationJump = ({ totalPages, onPageChange }: PaginationJumpProps) => {
   // Reset & focus when opened
   useEffect(() => {
     if (!open) return;
-    setValue('');
-    setError(null);
-    requestAnimationFrame(() => inputRef.current?.focus());
+    // Reset via rAF to avoid synchronous setState in effect body (react-hooks/set-state-in-effect)
+    const id = requestAnimationFrame(() => {
+      setValue('');
+      setError(null);
+      inputRef.current?.focus();
+    });
+    return () => cancelAnimationFrame(id);
   }, [open]);
 
-  const handleSubmit = useCallback(
-    (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
       event.preventDefault();
       const trimmed = value.trim();
       if (!/^\d+$/.test(trimmed)) {
@@ -155,9 +158,7 @@ const PaginationJump = ({ totalPages, onPageChange }: PaginationJumpProps) => {
 
       onPageChange(target);
       setOpen(false);
-    },
-    [onPageChange, totalPages, value],
-  );
+    };
 
   return (
     <div ref={containerRef} className="relative">

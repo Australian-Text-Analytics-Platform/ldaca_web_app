@@ -1,12 +1,12 @@
-import { useEffect, useMemo, useCallback } from 'react';
+import { useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   textApi,
-  ConcordanceRequest,
-  ConcordanceDetachRequest,
-  QuotationRequest,
-  QuotationDetachRequest,
-  ConcordanceAnalysisRequest,
+  type ConcordanceRequest,
+  type ConcordanceDetachRequest,
+  type QuotationRequest,
+  type QuotationDetachRequest,
+  type ConcordanceAnalysisRequest,
 } from '../api/text';
 import { queryKeys } from '../lib/queryKeys';
 import { useWorkspaceCore } from './workspace/useWorkspaceCore';
@@ -87,20 +87,18 @@ export const useWorkspaceInternal = () => {
     setOperationError,
   });
 
-  const ensureWorkspaceSelected = useCallback(() => {
+  const ensureWorkspaceSelected = () => {
     if (!currentWorkspaceId) {
       throw new Error('No workspace selected');
     }
     return currentWorkspaceId;
-  }, [currentWorkspaceId]);
+  };
 
   const concordanceMutation = useMutation({
     mutationFn: ({
-      workspaceId,
       nodeId,
       request,
     }: {
-      workspaceId: string;
       nodeId: string;
       request: ConcordanceRequest;
     }) => {
@@ -125,7 +123,7 @@ export const useWorkspaceInternal = () => {
     onSuccess: () => {
       endOperation('concordance');
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       setOperationError('concordance', error.message);
       endOperation('concordance');
     },
@@ -133,20 +131,19 @@ export const useWorkspaceInternal = () => {
 
   const detachConcordanceMutation = useMutation({
     mutationFn: ({
-      workspaceId,
       nodeId,
       request,
     }: {
       workspaceId: string;
       nodeId: string;
       request: ConcordanceDetachRequest;
-    }) => textApi.concordanceDetach(nodeId, request as any, authHeaders),
+    }) => textApi.concordanceDetach(nodeId, request, authHeaders),
     onMutate: () => startOperation('detachConcordance'),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(variables.workspaceId) });
       endOperation('detachConcordance');
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       setOperationError('detachConcordance', error.message);
       endOperation('detachConcordance');
     },
@@ -154,19 +151,17 @@ export const useWorkspaceInternal = () => {
 
   const quotationMutation = useMutation({
     mutationFn: ({
-      workspaceId,
       nodeId,
       request,
     }: {
-      workspaceId: string;
       nodeId: string;
       request: QuotationRequest;
-    }) => textApi.quotation(nodeId, request as any, authHeaders),
+    }) => textApi.quotation(nodeId, request, authHeaders),
     onMutate: () => startOperation('quotation'),
     onSuccess: () => {
       endOperation('quotation');
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       setOperationError('quotation', error.message);
       endOperation('quotation');
     },
@@ -174,36 +169,34 @@ export const useWorkspaceInternal = () => {
 
   const detachQuotationMutation = useMutation({
     mutationFn: ({
-      workspaceId,
       nodeId,
       request,
     }: {
       workspaceId: string;
       nodeId: string;
       request: QuotationDetachRequest;
-    }) => textApi.quotationDetach(nodeId, request as any, authHeaders),
+    }) => textApi.quotationDetach(nodeId, request, authHeaders),
     onMutate: () => startOperation('detachQuotation'),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(variables.workspaceId) });
       endOperation('detachQuotation');
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       setOperationError('detachQuotation', error.message);
       endOperation('detachQuotation');
     },
   });
 
-  const selectionActions = useMemo(() => ({
+  const selectionActions = ({
     selectNode,
     selectNodes: setSelectedNodes,
     toggleNodeSelection,
     clearSelection,
-  }), [selectNode, setSelectedNodes, toggleNodeSelection, clearSelection]);
+  });
 
-  const textActions = useMemo(() => ({
+  const textActions = ({
     concordanceSearch: (nodeId: string, request: ConcordanceRequest) =>
       concordanceMutation.mutateAsync({
-        workspaceId: ensureWorkspaceSelected(),
         nodeId,
         request,
       }),
@@ -215,7 +208,6 @@ export const useWorkspaceInternal = () => {
       }),
     quotationSearch: (nodeId: string, request: QuotationRequest) =>
       quotationMutation.mutateAsync({
-        workspaceId: ensureWorkspaceSelected(),
         nodeId,
         request,
       }),
@@ -225,23 +217,23 @@ export const useWorkspaceInternal = () => {
         nodeId,
         request,
       }),
-  }), [concordanceMutation, detachConcordanceMutation, quotationMutation, detachQuotationMutation, ensureWorkspaceSelected]);
+  });
 
-  const actions = useMemo(() => ({
+  const actions = ({
     ...selectionActions,
     ...nodeActions,
     ...textActions,
-  }), [selectionActions, nodeActions, textActions]);
+  });
 
-  const isLoading = useMemo(() => ({
+  const isLoading = ({
     ...queryLoadingState,
     operations: loadingOperationCount > 0,
-  }), [queryLoadingState, loadingOperationCount]);
+  });
 
-  const errors = useMemo(() => ({
+  const errors = ({
     ...queryErrorState,
     operations: Object.values(operationErrorsRecord)[0] || null,
-  }), [queryErrorState, operationErrorsRecord]);
+  });
 
   return {
     workspaces,

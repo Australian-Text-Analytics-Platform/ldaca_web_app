@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '../../../hooks/useWorkspaceSelection';
 import { useWorkspaceStatus } from '../../../hooks/useWorkspaceStatus';
 import { useAuth } from '../../../hooks/useAuth';
 import { useUIStore } from '../../../stores/uiStore';
 import { useSchemaManagement, applySelectedColumnsToSnapshots } from '../../../hooks/useSchemaManagement';
-import { SequentialFrequency, textApi } from '../../../api/text';
+import { type SequentialFrequency, textApi } from '../../../api/text';
 import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
 import { getNodeInfo } from '../../../lib/nodeInfoCache';
 import { ANALYSIS_LOCKED_MESSAGE } from '../../../components/tabs/AnalysisLockedNotice';
@@ -77,10 +77,7 @@ const SequentialAnalysisFeature: React.FC = () => {
     nodeColumnSelections,
     setNodeColumnSelections,
     displayNodeCount,
-    hasServerRequest,
     serverRequest,
-    unlockSelection,
-    lockWithSnapshots,
     panelSelectedNodes,
   } = useAnalysisLock({
     analysisType: 'sequential_analysis',
@@ -110,11 +107,11 @@ const SequentialAnalysisFeature: React.FC = () => {
     isLocked,
     workspaceId: currentWorkspaceId || undefined,
     getAuthHeaders,
-    nodeData,
-    selectedNode,
+    nodeData: nodeData ?? undefined,
+    selectedNode: selectedNode ?? undefined,
   });
 
-  const [results, resultRef, setResultSafely, setResults] = useSafeResult<any>();
+  const [results, resultRef, setResultSafely, setResults] = useSafeResult<Record<string, unknown>>();
   const [hydratingSelection, setHydratingSelection] = useState(false);
   const hydratedParamsRef = useRef<{
     timeColumn: string;
@@ -127,36 +124,33 @@ const SequentialAnalysisFeature: React.FC = () => {
 
   const {
     resolveTaskId,
-    localTaskId,
     setLocalTaskId,
     isRunning: isAnalyzing,
     setIsRunning: setIsAnalyzing,
-    taskStatus: _seqTaskStatus,
     banner: sequentialWaitingBanner,
     hasActiveTask,
-    lastFetchedRef: _seqLastFetchedRef,
     clearResults,
-  } = useAnalysisFeature<any>({
+  } = useAnalysisFeature<Record<string, unknown>>({
     analysisType: 'sequential_analysis',
     taskType: 'sequential_analysis',
     workspaceId: currentWorkspaceId,
     getAuthHeaders,
     isTabActive: isActiveTab,
-    resultRef: resultRef,
+    resultRef,
     fetchResult: async (taskId, headers) =>
       textApi.getSequentialAnalysisTaskResult(taskId, headers),
     fetchRequest: async (taskId, headers) =>
       textApi.getSequentialAnalysisTaskRequest(taskId, headers),
     onResultFetched: (resultData) => {
       if (!resultData) return;
-      const resolvedChartType = isChartTypeOption((resultData as any)?.chart_type)
-        ? (resultData as any).chart_type
+      const resolvedChartType = isChartTypeOption((resultData as Record<string, unknown>)?.chart_type)
+        ? (resultData as Record<string, unknown>).chart_type as ChartTypeOption
         : chartType;
       setResultSafely({
-        ...(resultData as any),
+        ...(resultData as Record<string, unknown>),
         analysis_params: {
-          ...((results as any)?.analysis_params ?? {}),
-          ...((resultData as any)?.analysis_params ?? {}),
+          ...((results as Record<string, unknown> | null)?.analysis_params as Record<string, unknown> ?? {}),
+          ...((resultData as Record<string, unknown>)?.analysis_params as Record<string, unknown> ?? {}),
         },
         chart_type: resolvedChartType,
       });
@@ -166,9 +160,9 @@ const SequentialAnalysisFeature: React.FC = () => {
       if (!resultPayload) return;
       const hydratedParams = hydratedParamsRef.current;
       const enriched = {
-        ...(resultPayload as any),
+        ...(resultPayload as Record<string, unknown>),
         analysis_params: {
-          ...((resultPayload as any)?.analysis_params ?? {}),
+          ...((resultPayload as Record<string, unknown>)?.analysis_params as Record<string, unknown> ?? {}),
           ...(hydratedParams
             ? {
                 group_by_columns: hydratedParams.groupByColumns,
@@ -181,14 +175,14 @@ const SequentialAnalysisFeature: React.FC = () => {
             : {}),
         },
       };
-      const resolvedChartType = isChartTypeOption((resultPayload as any)?.chart_type)
-        ? (resultPayload as any).chart_type
+      const resolvedChartType = isChartTypeOption((resultPayload as Record<string, unknown>)?.chart_type)
+        ? (resultPayload as Record<string, unknown>).chart_type as ChartTypeOption
         : chartType;
       setResults({ ...enriched, chart_type: resolvedChartType });
       setChartType(resolvedChartType);
     },
     onHydratedRequest: async (requestPayload) => {
-      const req = (requestPayload as any)?.data ?? requestPayload;
+      const req = ((requestPayload as Record<string, unknown>)?.data ?? requestPayload) as Record<string, unknown> | null;
       if (!req) return;
       setHydratingSelection(true);
       const nodeIdStr = String(req.node_id || req.nodeId || '');
@@ -214,7 +208,7 @@ const SequentialAnalysisFeature: React.FC = () => {
         : [];
       setGroupByColumns(normalizedGroups.length ? [...normalizedGroups] : []);
       const validFrequencies: SequentialFrequency[] = ['hourly', 'daily', 'weekly', 'monthly', 'quarterly', 'yearly'];
-      const reqFrequency = typeof req.frequency === 'string' ? (req.frequency as any) : undefined;
+      const reqFrequency = typeof req.frequency === 'string' ? (req.frequency as SequentialFrequency) : undefined;
       const lockedFrequency = reqFrequency && validFrequencies.includes(reqFrequency) ? reqFrequency : frequency;
       setFrequency(lockedFrequency);
       hydratedParamsRef.current = {
@@ -225,9 +219,9 @@ const SequentialAnalysisFeature: React.FC = () => {
         numericOrigin: lockedNumericOrigin,
         numericInterval: lockedNumericInterval,
       };
-      if (nodeIdStr) {
+      if (nodeIdStr && currentWorkspaceId) {
         try {
-          const info = await getNodeInfo({ workspaceId: currentWorkspaceId!, nodeId: nodeIdStr, getAuthHeaders });
+          const info = await getNodeInfo({ workspaceId: currentWorkspaceId, nodeId: nodeIdStr, getAuthHeaders });
           const name = info?.name || info?.data?.name || nodeIdStr;
           const columns = Array.isArray(info?.columns)
             ? info.columns
@@ -241,10 +235,10 @@ const SequentialAnalysisFeature: React.FC = () => {
           if (Object.keys(normalizedSchema).length > 0) {
             setLockedSchema(normalizedSchema);
           } else {
-            setLockedSchema((prev: any) => prev ?? currentSchemaRef.current);
+            setLockedSchema((prev) => prev ?? currentSchemaRef.current);
           }
         } catch {
-          setLockedSchema((prev: any) => prev ?? currentSchemaRef.current);
+          setLockedSchema((prev) => prev ?? currentSchemaRef.current);
         }
       }
       setHydratingSelection(false);
@@ -257,14 +251,12 @@ const SequentialAnalysisFeature: React.FC = () => {
       setNumericOriginInput('');
       setNumericIntervalInput('1');
     },
-    getExtraTaskIdCandidates: () => [(resultRef.current as any)?.metadata?.task_id],
-    getClearTaskIdSources: () => [(resultRef.current as any)?.metadata?.task_id],
-    isResultRunning: (r: any) => r?.state === 'running',
+    getExtraTaskIdCandidates: () => [(resultRef.current as Record<string, unknown> | null)?.metadata as Record<string, unknown> | undefined].map(m => m?.task_id as string | undefined),
+    getClearTaskIdSources: () => [(resultRef.current as Record<string, unknown> | null)?.metadata as Record<string, unknown> | undefined].map(m => m?.task_id as string | undefined),
+    isResultRunning: (r: Record<string, unknown> | null) => Boolean(r) && r?.state === 'running',
   });
 
-  const timeCompatibleColumns = useMemo(
-    () =>
-      availableColumns
+  const timeCompatibleColumns = availableColumns
         .map((column) => ({
           ...column,
           dataType: normalizeTypeName(column.dataType),
@@ -273,18 +265,16 @@ const SequentialAnalysisFeature: React.FC = () => {
         .sort((a, b) => {
           const priority = (type: string) => (type === 'datetime' ? 0 : 1);
           return priority(a.dataType) - priority(b.dataType);
-        }),
-    [availableColumns]
-  );
+        });
 
-  const timeColumnOptions = useMemo(() => timeCompatibleColumns.map((column) => column.name), [timeCompatibleColumns]);
+  const timeColumnOptions = timeCompatibleColumns.map((column) => column.name);
 
   const activeTimeColumn = (() => {
     if (!activeNodeId) return '';
     const selection = nodeColumnSelections.find((s) => s.nodeId === activeNodeId);
     if (selection?.column) return selection.column;
     if (timeColumn) return timeColumn;
-    const hydratedTime = (results?.analysis_params?.time_column as string | undefined) ?? '';
+    const hydratedTime = ((results?.analysis_params as Record<string, unknown> | undefined)?.time_column as string | undefined) ?? '';
     return hydratedTime;
   })();
 
@@ -330,11 +320,16 @@ const SequentialAnalysisFeature: React.FC = () => {
     allowRunWhenLocked: hasParamsChanged,
   });
 
+  /* eslint-disable react-hooks/set-state-in-effect -- Complex sync logic with guards to prevent infinite loops; refactoring to render-time would duplicate guard logic */
   useEffect(() => {
     if (isLocked || hydratingSelection) return;
     if (!selectedNodeId) {
-      setNodeColumnSelections([]);
-      setTimeColumn('');
+      if (nodeColumnSelections.length > 0) {
+        setNodeColumnSelections([], { replace: true });
+      }
+      if (timeColumn !== '') {
+        setTimeColumn('');
+      }
       return;
     }
 
@@ -360,8 +355,8 @@ const SequentialAnalysisFeature: React.FC = () => {
     if (!currentSelection || currentSelection.column !== desired) {
       setNodeColumnSelections([{ nodeId: selectedNodeId, column: desired }]);
     }
-  }, [isLocked, hydratingSelection, selectedNodeId, timeColumnOptions, setNodeColumnSelections]);
-  // nodeColumnSelections and timeColumn intentionally excluded: read inside the effect to prevent loops
+  }, [isLocked, hydratingSelection, selectedNodeId, timeColumnOptions, setNodeColumnSelections, nodeColumnSelections, timeColumn]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleAddGroupByColumn = () => {
     if (groupByColumns.length < 3) {
@@ -418,18 +413,18 @@ const SequentialAnalysisFeature: React.FC = () => {
     lock: { getAuthHeaders },
   });
 
-  const summaryTimeColumn = (results?.analysis_params?.time_column as string | undefined) ?? timeColumn;
-  const summaryGroupBy = (results?.analysis_params?.group_by_columns as string[] | undefined) ?? groupByColumns;
-  const summaryColumnType = (results?.analysis_params?.column_type as 'datetime' | 'numeric' | undefined) ?? derivedColumnType;
+  const summaryTimeColumn = ((results?.analysis_params as Record<string, unknown> | undefined)?.time_column as string | undefined) ?? timeColumn;
+  const summaryGroupBy = ((results?.analysis_params as Record<string, unknown> | undefined)?.group_by_columns as string[] | undefined) ?? groupByColumns;
+  const summaryColumnType = ((results?.analysis_params as Record<string, unknown> | undefined)?.column_type as 'datetime' | 'numeric' | undefined) ?? derivedColumnType;
   const summaryNumericOrigin = summaryColumnType === 'numeric'
-    ? (results?.analysis_params?.numeric_origin as number | null | undefined) ?? numericOriginValue ?? null
+    ? ((results?.analysis_params as Record<string, unknown> | undefined)?.numeric_origin as number | null | undefined) ?? numericOriginValue ?? null
     : null;
   const summaryNumericInterval = summaryColumnType === 'numeric'
-    ? (results?.analysis_params?.numeric_interval as number | null | undefined) ?? numericIntervalValue ?? null
+    ? ((results?.analysis_params as Record<string, unknown> | undefined)?.numeric_interval as number | null | undefined) ?? numericIntervalValue ?? null
     : null;
   const summaryFrequency = summaryColumnType === 'numeric'
     ? 'Numeric bins'
-    : ((results?.analysis_params?.frequency as SequentialFrequency | undefined) ?? frequency);
+    : (((results?.analysis_params as Record<string, unknown> | undefined)?.frequency as SequentialFrequency | undefined) ?? frequency);
   const resultsSummary = summaryTimeColumn
     ? (summaryColumnType === 'numeric'
         ? `Numeric bin counts for ${summaryTimeColumn}`
@@ -522,7 +517,6 @@ const SequentialAnalysisFeature: React.FC = () => {
                     value={numericOriginInput}
                     onChange={(event) => setNumericOriginInput(event.target.value)}
                     placeholder="Auto-detect"
-                    disabled={!!isLocked}
                   />
                   <p className="mt-1 text-xs text-muted-foreground">
                     Optional. Leave blank to auto-detect from the minimum value.
@@ -539,7 +533,6 @@ const SequentialAnalysisFeature: React.FC = () => {
                     value={numericIntervalInput}
                     onChange={(event) => setNumericIntervalInput(event.target.value)}
                     placeholder="e.g. 10"
-                    disabled={!!isLocked}
                   />
                   <p className="mt-1 text-xs text-muted-foreground">
                     Required. Values are bucketed using this interval width.
@@ -605,43 +598,23 @@ const SequentialAnalysisFeature: React.FC = () => {
 
         {/* Action Buttons */}
         <div className="flex flex-wrap items-center gap-3">
-          {hasParamsChanged ? (
-            <Button
-              onClick={handleUpdateResults}
-              disabled={actionState.runDisabled || isLoading.operations || !activeTimeColumn}
-              className="w-full md:w-auto"
-            >
-              {isAnalyzing ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Updating...
-                </>
-              ) : (
-                <>
-                  <Play className="mr-2 h-4 w-4" />
-                  Update Results
-                </>
-              )}
-            </Button>
-          ) : (
-            <Button
-              onClick={handleAnalyze}
-              disabled={actionState.runDisabled || isLoading.operations || !activeTimeColumn}
-              className="w-full md:w-auto"
-            >
-              {isAnalyzing ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Analyzing...
-                </>
-              ) : (
-                <>
-                  <Play className="mr-2 h-4 w-4" />
-                  Run Sequential Analysis
-                </>
-              )}
-            </Button>
-          )}
+          <Button
+            onClick={hasParamsChanged ? handleUpdateResults : handleAnalyze}
+            disabled={actionState.runDisabled || isLoading.operations || !activeTimeColumn}
+            className="w-full md:w-auto"
+          >
+            {isAnalyzing ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Running...
+              </>
+            ) : (
+              <>
+                <Play className="mr-2 h-4 w-4" />
+                {actionState.runLabel}
+              </>
+            )}
+          </Button>
 
           <div className="flex items-center gap-2">
             <Button
@@ -726,7 +699,7 @@ const SequentialAnalysisFeature: React.FC = () => {
                   Total Records
                 </span>
                 <div className="mt-1 text-base font-semibold text-foreground">
-                  {results?.total_records ?? '—'}
+                  {String(results?.total_records ?? '—')}
                 </div>
               </div>
               <div className="rounded-md border border-border/60 p-3">

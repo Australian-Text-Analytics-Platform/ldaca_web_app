@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { clampDisplayTokenLimit } from './utils';
 import { textApi } from '@/api/text';
 
@@ -51,8 +51,8 @@ const normalizePreferencePayload = <TPreferences extends Record<string, unknown>
     delete normalized.tokenLimit;
   }
 
-  if (Array.isArray((normalized as any).stopWords) && !normalized.stop_words) {
-    normalized.stop_words = (normalized as any).stopWords;
+  if (Array.isArray(normalized.stopWords) && !normalized.stop_words) {
+    normalized.stop_words = normalized.stopWords;
     delete normalized.stopWords;
   }
 
@@ -86,6 +86,7 @@ export function useAnalysisHydration<TRequest = unknown, TResult = unknown, TPre
     inflightRef.current = null;
   }, [workspaceId]);
 
+  // Identity stability: used in useEffect dependency array and returned from hook
   const hydrateFromServer = useCallback(async () => {
     if (!workspaceId || inflightRef.current) {
       return inflightRef.current ?? Promise.resolve();
@@ -99,7 +100,7 @@ export function useAnalysisHydration<TRequest = unknown, TResult = unknown, TPre
           taskId = await resolveTaskId();
         } else if (analysisKey && getAuthHeaders && workspaceId) {
           try {
-            const current = await textApi.getAnalysisCurrent(analysisKey, getAuthHeaders()) as any;
+            const current = await textApi.getAnalysisCurrent(analysisKey, getAuthHeaders()) as Record<string, unknown>;
             const currentTaskId = Array.isArray(current?.task_ids) ? current.task_ids[0] : null;
             taskId = typeof currentTaskId === 'string' && currentTaskId.trim().length > 0 ? currentTaskId : null;
           } catch {
@@ -148,7 +149,7 @@ export function useAnalysisHydration<TRequest = unknown, TResult = unknown, TPre
 
     inflightRef.current = inflight;
     await inflight;
-  }, [workspaceId, analysisKey, getAuthHeaders, resolveTaskId, onTaskIdResolved, fetchRequest, fetchResult, applyRequest, applyResult, onHydrationError]);
+  }, [workspaceId, resolveTaskId, analysisKey, getAuthHeaders, onTaskIdResolved, fetchRequest, fetchResult, applyRequest, applyResult, onHydrationError]);
 
   useEffect(() => {
     if (!isBrowser || !workspaceId) return;
@@ -182,21 +183,15 @@ export function useAnalysisHydration<TRequest = unknown, TResult = unknown, TPre
     };
   }, [workspaceId, autoHydrateOnFocus, autoHydrateOnVisibility, hydrateFromServer]);
 
-  const persistPreferencesSafe = useCallback(
-    async (partial: TPreferences) => {
+  const persistPreferencesSafe = async (partial: TPreferences) => {
       if (!persistPreferences || !workspaceId || !partial) return;
       const normalized = normalizePreferencePayload(partial);
       await persistPreferences(normalized);
-    },
-    [persistPreferences, workspaceId]
-  );
+    };
 
-  return useMemo(
-    () => ({
+  return ({
       hydrateFromServer,
       hydrationState,
       persistPreferences: persistPreferencesSafe,
-    }),
-    [hydrateFromServer, hydrationState, persistPreferencesSafe]
-  );
+    });
 }

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { filesApi } from '../api/files';
-import { FileInfo, FileListResponse } from '../types';
+import { type FileInfo, type FileListResponse } from '../types';
 import { queryKeys } from '../lib/queryKeys';
 
 interface UseFilesProps {

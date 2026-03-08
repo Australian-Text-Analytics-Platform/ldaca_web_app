@@ -36,7 +36,7 @@ export function useAnalysisLock(config: UseAnalysisLockConfig) {
 
   useEffect(() => {
     lockState.setIsLocked(serverLock.hasServerRequest);
-  }, [serverLock.hasServerRequest, lockState.setIsLocked]);
+  }, [serverLock.hasServerRequest, lockState]);
 
   return {
     ...lockState,

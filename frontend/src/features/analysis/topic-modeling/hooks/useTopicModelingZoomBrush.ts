@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { computeZoomDomain, type ZoomDomain } from '../topicModelingAdapters';
 
 type BrushRect = {
@@ -43,9 +43,10 @@ export function useTopicModelingZoomBrush<TTopic extends TopicPoint>({
   const chartSvgRef = useRef<SVGSVGElement | null>(null);
   const animationFrameRef = useRef<number | null>(null);
 
-  const fullDomain = useMemo<ZoomDomain | null>(() => computeZoomDomain(topics), [topics]);
+  const fullDomain = computeZoomDomain(topics);
   const activeDomain = zoomDomain ?? fullDomain;
 
+  /* eslint-disable react-hooks/set-state-in-effect -- Resetting zoom domain when topics data changes; no cascading renders */
   useEffect(() => {
     if (!fullDomain) {
       setZoomDomain(null);
@@ -53,6 +54,7 @@ export function useTopicModelingZoomBrush<TTopic extends TopicPoint>({
     }
     setZoomDomain(fullDomain);
   }, [fullDomain]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
     return () => {
@@ -63,7 +65,7 @@ export function useTopicModelingZoomBrush<TTopic extends TopicPoint>({
     };
   }, []);
 
-  const animateDomainTo = useCallback((target: ZoomDomain) => {
+  const animateDomainTo = (target: ZoomDomain) => {
     const start = activeDomain ?? target;
     if (animationFrameRef.current != null) {
       cancelAnimationFrame(animationFrameRef.current);
@@ -93,9 +95,9 @@ export function useTopicModelingZoomBrush<TTopic extends TopicPoint>({
     };
 
     animationFrameRef.current = requestAnimationFrame(step);
-  }, [activeDomain]);
+  };
 
-  const toSvgPoint = useCallback((event: React.MouseEvent<SVGSVGElement>) => {
+  const toSvgPoint = (event: React.MouseEvent<SVGSVGElement>) => {
     const svg = chartSvgRef.current;
     if (!svg) return null;
     const rect = svg.getBoundingClientRect();
@@ -103,9 +105,9 @@ export function useTopicModelingZoomBrush<TTopic extends TopicPoint>({
       x: event.clientX - rect.left,
       y: event.clientY - rect.top,
     };
-  }, []);
+  };
 
-  const handleBrushStart = useCallback((event: React.MouseEvent<SVGSVGElement>) => {
+  const handleBrushStart = (event: React.MouseEvent<SVGSVGElement>) => {
     if (event.button !== 0 || !activeDomain) return;
     const point = toSvgPoint(event);
     if (!point) return;
@@ -119,16 +121,16 @@ export function useTopicModelingZoomBrush<TTopic extends TopicPoint>({
       currentX: point.x,
       currentY: point.y,
     });
-  }, [activeDomain, setHoveredTopicId, setTooltip, toSvgPoint]);
+  };
 
-  const handleBrushMove = useCallback((event: React.MouseEvent<SVGSVGElement>) => {
+  const handleBrushMove = (event: React.MouseEvent<SVGSVGElement>) => {
     if (!isBrushing) return;
     const point = toSvgPoint(event);
     if (!point) return;
     setBrushRect((prev) => (prev ? { ...prev, currentX: point.x, currentY: point.y } : prev));
-  }, [isBrushing, toSvgPoint]);
+  };
 
-  const handleBrushEnd = useCallback(() => {
+  const handleBrushEnd = () => {
     if (!isBrushing || !brushRect || !activeDomain) {
       setIsBrushing(false);
       setBrushRect(null);
@@ -173,14 +175,14 @@ export function useTopicModelingZoomBrush<TTopic extends TopicPoint>({
       yMin: Math.min(ny0, ny1),
       yMax: Math.max(ny0, ny1) + epsilon,
     });
-  }, [activeDomain, animateDomainTo, brushRect, chartHeight, chartPadding, chartWidth, isBrushing]);
+  };
 
-  const handleResetZoom = useCallback(() => {
+  const handleResetZoom = () => {
     if (!fullDomain) return;
     animateDomainTo(fullDomain);
-  }, [animateDomainTo, fullDomain]);
+  };
 
-  const isAtGlobalZoom = useMemo(() => {
+  const isAtGlobalZoom = (() => {
     if (!fullDomain || !activeDomain) return true;
     const eps = 1e-6;
     return (
@@ -189,7 +191,7 @@ export function useTopicModelingZoomBrush<TTopic extends TopicPoint>({
       Math.abs(activeDomain.yMin - fullDomain.yMin) < eps &&
       Math.abs(activeDomain.yMax - fullDomain.yMax) < eps
     );
-  }, [activeDomain, fullDomain]);
+  })();
 
   return {
     activeDomain,

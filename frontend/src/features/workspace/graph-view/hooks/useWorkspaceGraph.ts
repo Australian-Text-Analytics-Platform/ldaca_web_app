@@ -1,16 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
-  Connection,
+  type Connection,
   ConnectionLineType,
-  Edge,
-  Node,
-  NodeMouseHandler,
-  ReactFlowInstance,
+  type Edge,
+  type Node,
+  type NodeChange,
+  type NodeMouseHandler,
+  type ReactFlowInstance,
   useEdgesState,
   useNodesState,
 } from '@xyflow/react';
 
 import CustomNode from '@/components/CustomNode';
+import type { GraphNode, GraphEdge } from '@/types/api';
 import { useWorkspaceActions } from '@/hooks/useWorkspaceActions';
 import { useWorkspaceData } from '@/hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '@/hooks/useWorkspaceSelection';
@@ -34,8 +36,8 @@ export interface WorkspaceGraphViewModel {
   handleEdgesChange: ReturnType<typeof useEdgesState<Edge>>[2];
   handlePaneClick: () => void;
   handleConnect: (connection: Connection) => void;
-  handleConnectStart: (event: any, params: any) => void;
-  handleConnectEnd: (event: any) => void;
+  handleConnectStart: (event: MouseEvent | TouchEvent, params: { nodeId: string | null; handleId: string | null; handleType: string | null }) => void;
+  handleConnectEnd: (event: MouseEvent | TouchEvent) => void;
   handleInit: (instance: ReactFlowInstance) => void;
   clearSelection: (() => void) | undefined;
   connectionLineType: ConnectionLineType;
@@ -67,10 +69,10 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
 
   const DEBUG_GRAPH =
     typeof window !== 'undefined' &&
-    ((window as any).__LDACA_DEBUG_GRAPH || localStorage.getItem('debugGraph') === '1');
-  const dlog = useCallback((...args: any[]) => {
+    ((window as Window & { __LDACA_DEBUG_GRAPH?: boolean }).__LDACA_DEBUG_GRAPH || localStorage.getItem('debugGraph') === '1');
+  const dlog = useCallback((...args: unknown[]) => {
     if (DEBUG_GRAPH) {
-      console.log(...args);
+      console.debug(...args);
     }
   }, [DEBUG_GRAPH]);
   const handleDelete = useCallback(
@@ -130,12 +132,12 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
     }
 
     const positions = computeDagreLayout(
-      workspaceGraph.nodes.map((n: any) => ({ id: n.id })),
-      (workspaceGraph.edges || []).map((edge: any) => ({ source: edge.source, target: edge.target })),
+      workspaceGraph.nodes.map((n: GraphNode) => ({ id: n.id })),
+      (workspaceGraph.edges || []).map((edge: GraphEdge) => ({ source: edge.source, target: edge.target })),
       { rankdir: 'LR', ranksep: 140, nodesep: 100 }
     );
 
-    return workspaceGraph.nodes.map((node: any, index: number) => {
+    return workspaceGraph.nodes.map((node: GraphNode, index: number) => {
       const columns = Array.isArray(node.columns)
         ? node.columns.map((column: unknown) => String(column))
         : [];
@@ -211,7 +213,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
     if (!workspaceGraph?.edges) {
       return [];
     }
-    return workspaceGraph.edges.map((edge: any, index: number) => ({
+    return workspaceGraph.edges.map((edge: GraphEdge & { label?: string }, index: number) => ({
       id: `edge-${edge.source}-${edge.target}-${index}`,
       source: edge.source,
       target: edge.target,
@@ -235,23 +237,25 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
   const newEdgeIds = initialEdges.map((edge: Edge) => `${edge.source}-${edge.target}`).join(',');
 
   const currentNodesSignature = nodes
-    .map((node: any) => {
-      const dt = node?.data?.node?.data_type ?? 'unknown';
-      const docc = node?.data?.node?.document_column || '';
-      const name = node?.data?.node?.name || '';
-      const canUndo = node?.data?.node?.can_undo ? '1' : '0';
-      const canRedo = node?.data?.node?.can_redo ? '1' : '0';
+    .map((node: Node) => {
+      const nd = node.data as { node?: { data_type?: string; document_column?: string; name?: string; can_undo?: boolean; can_redo?: boolean } };
+      const dt = nd?.node?.data_type ?? 'unknown';
+      const docc = nd?.node?.document_column || '';
+      const name = nd?.node?.name || '';
+      const canUndo = nd?.node?.can_undo ? '1' : '0';
+      const canRedo = nd?.node?.can_redo ? '1' : '0';
       return `${node.id}:${dt}:${docc}:${name}:${canUndo}:${canRedo}`;
     })
     .join(',');
 
   const newNodesSignature = initialNodes
-    .map((node: any) => {
-      const dt = node?.data?.node?.data_type ?? 'unknown';
-      const docc = node?.data?.node?.document_column || '';
-      const name = node?.data?.node?.name || '';
-      const canUndo = node?.data?.node?.can_undo ? '1' : '0';
-      const canRedo = node?.data?.node?.can_redo ? '1' : '0';
+    .map((node: Node) => {
+      const nd = node.data as { node?: { data_type?: string; document_column?: string; name?: string; can_undo?: boolean; can_redo?: boolean } };
+      const dt = nd?.node?.data_type ?? 'unknown';
+      const docc = nd?.node?.document_column || '';
+      const name = nd?.node?.name || '';
+      const canUndo = nd?.node?.can_undo ? '1' : '0';
+      const canRedo = nd?.node?.can_redo ? '1' : '0';
       return `${node.id}:${dt}:${docc}:${name}:${canUndo}:${canRedo}`;
     })
     .join(',');
@@ -295,7 +299,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
 
   useEffect(() => {
     setNodes((existing) =>
-      existing.map((node: any) => ({
+      existing.map((node: Node) => ({
         ...node,
         selected: selectedNodeIds?.includes?.(node.id) ?? false,
         data: {
@@ -303,25 +307,25 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
           isMultiSelected:
             (selectedNodeIds?.length || 0) > 1 && Boolean(selectedNodeIds?.includes?.(node.id)),
         },
-      })) as any
+      }))
     );
   }, [selectedNodeIds, setNodes]);
 
   useEffect(() => {
     if (!selectedNodeIds || selectedNodeIds.length === 0) {
       setNodes((existing) =>
-        existing.map((node: any) => ({
+        existing.map((node: Node) => ({
           ...node,
           selected: false,
           data: { ...node.data, isMultiSelected: false },
-        })) as any
+        }))
       );
     }
   }, [selectedNodeIds, setNodes]);
 
   const handleNodesChange = useCallback(
-    (changes: any) => {
-      const normalized = (changes || []).map((change: any) => {
+    (changes: NodeChange[]) => {
+      const normalized = (changes || []).map((change: NodeChange) => {
         if (change.type === 'select') {
           return { ...change, selected: selectedNodeIds?.includes?.(change.id) ?? false };
         }
@@ -334,10 +338,10 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
 
   const handlePaneClick = useCallback(() => {
     setNodes((existing) =>
-      existing.map((node: any) => ({
+      existing.map((node: Node) => ({
         ...node,
         selected: selectedNodeIds?.includes?.(node.id) ?? false,
-      })) as any
+      }))
     );
   }, [selectedNodeIds, setNodes]);
 
@@ -360,14 +364,14 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
   );
 
   const handleConnectStart = useCallback(
-    (_event: any, params: any) => {
+    (_event: MouseEvent | TouchEvent, params: { nodeId: string | null; handleId: string | null; handleType: string | null }) => {
       dlog('WorkspaceGraphView: onConnectStart blocked', params);
     },
     [dlog]
   );
 
   const handleConnectEnd = useCallback(
-    (_event: any) => {
+    (_event: MouseEvent | TouchEvent) => {
       dlog('WorkspaceGraphView: onConnectEnd blocked');
     },
     [dlog]

@@ -39,12 +39,12 @@ export interface FileData {
 }
 
 export interface DataFrameResponse {
-  dataframe: any[];
+  dataframe: Record<string, unknown>[];
   total_pages?: number;
 }
 
 export interface FilePreviewResponse {
-  data: any[];
+  data: Record<string, unknown>[];
   columns: string[];
   total_rows: number;
   preview_rows: number;
@@ -98,7 +98,7 @@ export interface WorkspaceNode {
   name: string;
   shape: NodeShape;
   columns: string[];
-  preview: any[];
+  preview: Record<string, unknown>[];
   is_text_data: boolean;
   can_undo?: boolean;
   can_redo?: boolean;
@@ -122,7 +122,7 @@ export interface CastResponse {
   name: string;
   shape: NodeShape;
   columns: string[];
-  preview: any[];
+  preview: Record<string, unknown>[];
   is_text_data: boolean;
   data_type: string;
   operation: string;
@@ -136,7 +136,7 @@ export interface CastResponse {
 }
 
 export interface NodeDataResponse {
-  data: any[];
+  data: Record<string, unknown>[];
   total_rows: number;
   page: number;
   page_size: number;

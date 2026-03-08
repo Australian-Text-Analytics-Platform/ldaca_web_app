@@ -1,4 +1,4 @@
-import type { NodeResultView, NormalizedNodeResult } from '../../tokenFrequencyAdapters';
+import type { NodeResultView, NormalizedNodeResult, TokenFrequencyStatisticsEntry } from '../../tokenFrequencyAdapters';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,7 +12,7 @@ type TokenFrequencyUnifiedTokenSectionProps = {
   normalizedNodeResults: NormalizedNodeResult[];
   nodeDisplayResults: NodeResultView[];
   lastCompareNodeIds: string[];
-  statistics: any[] | null | undefined;
+  statistics: TokenFrequencyStatisticsEntry[] | null | undefined;
   appliedStopSet: Set<string>;
   effectiveTokenLimit: number;
   defaultTokenLimit: number;
@@ -25,7 +25,7 @@ type TokenFrequencyUnifiedTokenSectionProps = {
   unifiedCloudHeight: number;
   unifiedCloudContainerRef: React.RefObject<HTMLDivElement | null>;
   registerWordCloudRef: (nodeKey: string, element: SVGSVGElement | null) => void;
-  sortedStatistics: any[];
+  sortedStatistics: TokenFrequencyStatisticsEntry[];
   statsSortColumn: string;
   statsSortDirection: 'asc' | 'desc';
   onToggleStatsSort: (column: string) => void;
@@ -33,14 +33,14 @@ type TokenFrequencyUnifiedTokenSectionProps = {
   onStatsPageChange: (page: number) => void;
   statsRowsPerPage: number;
   onStatsRowsPerPageChange: (rows: number) => void;
-  onDownloadFrequencyCsv: (label: string, rows: any[]) => void;
+  onDownloadFrequencyCsv: (label: string, rows: unknown[]) => void;
 };
 
 type StatisticsColumn = {
   key: string;
   label: string;
   className?: string;
-  render?: (value: unknown, row: any) => React.ReactNode;
+  render?: (value: unknown, row: TokenFrequencyStatisticsEntry) => React.ReactNode;
 };
 
 const parseStatisticsNumericValue = (value: unknown): number => {
@@ -206,8 +206,8 @@ export const TokenFrequencyUnifiedTokenSection = ({
 
   const statsSource = Array.isArray(statistics) && statistics.length > 0 ? statistics : sortedStatistics;
   const cloudStats = (Array.isArray(statsSource) ? statsSource : [])
-    .filter((s: any) => !appliedStopSet.has(String(s?.token ?? '').toLowerCase()))
-    .map((s: any) => ({
+    .filter((s) => !appliedStopSet.has(String(s?.token ?? '').toLowerCase()))
+    .map((s) => ({
       token: String(s?.token ?? ''),
       o1: Number(s?.freq_corpus_0) || 0,
       o2: Number(s?.freq_corpus_1) || 0,
@@ -215,7 +215,7 @@ export const TokenFrequencyUnifiedTokenSection = ({
       p2: parseStatisticsNumericValue(s?.percent_corpus_1),
       logratio: parseStatisticsNumericValue(s?.log_ratio),
     }))
-    .map((s: any) => ({
+    .map((s) => ({
       ...s,
       total: s.o1 + s.o2,
       juxRank:
@@ -223,7 +223,7 @@ export const TokenFrequencyUnifiedTokenSection = ({
           ? Math.log10(s.o1 + s.o2) * s.logratio
           : 0,
     }))
-    .filter((s: any) => s.token.length > 0 && s.total > 10);
+    .filter((s) => s.token.length > 0 && s.total > 10);
 
   const sortedByRank = [...cloudStats].sort((a, b) => a.juxRank - b.juxRank);
   const limitForCloudBase = typeof effectiveTokenLimit === 'number' ? effectiveTokenLimit : defaultTokenLimit;
@@ -420,8 +420,8 @@ export const TokenFrequencyUnifiedTokenSection = ({
                 {pagedStatistics.map((stat, idx) => (
                   <tr key={`${stat.token}-${idx}`} className="border-b last:border-b-0">
                     {STATISTICS_COLUMNS.map((column) => {
-                      const rawValue = stat?.[column.key];
-                      const content = column.render ? column.render(rawValue, stat) : (rawValue ?? '');
+                      const rawValue = (stat as Record<string, unknown>)?.[column.key];
+                      const content = column.render ? column.render(rawValue, stat) : String(rawValue ?? '');
                       return (
                         <td key={`${column.key}-${idx}`} className={`px-2 py-1 whitespace-nowrap ${column.className ?? ''}`}>
                           {content}

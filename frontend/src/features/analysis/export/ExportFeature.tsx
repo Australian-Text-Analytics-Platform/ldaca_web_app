@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Download } from 'lucide-react';
+import type { GraphNode } from '../../../types/api';
 import { useWorkspaceSelection } from '../../../hooks/useWorkspaceSelection';
 import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
 import { useAuth } from '../../../hooks/useAuth';
@@ -32,13 +33,17 @@ const ExportFeature: React.FC = () => {
   const [exporting, setExporting] = useState(false);
   const [downloadingIds, setDownloadingIds] = useState<Record<string, DownloadStatus>>({});
 
-  const nodeIds = selectedNodes.map((n: any, idx: number) => n.id || n.node_id || n.data?.id || n.data?.node_id || n.unique_id || `node-${idx}`);
+  const nodeIds = selectedNodes.map((n: GraphNode, idx: number) => {
+    const data = n.data as Record<string, unknown> | undefined;
+    return n.id || String(n.node_id ?? data?.id ?? data?.node_id ?? n.unique_id ?? `node-${idx}`);
+  });
 
   // Best-effort helpers for node display
-  const toDisplay = (n: any) => {
-    const id = n.id || n.node_id || n.data?.id || n.data?.node_id || n.unique_id;
-    const name = n?.data?.nodeName || n?.data?.label || n?.label || n?.name || id;
-    const shapeArr = Array.isArray(n?.data?.shape) ? n.data.shape : null;
+  const toDisplay = (n: GraphNode) => {
+    const data = n.data as Record<string, unknown> | undefined;
+    const id = n.id || String(n.node_id ?? data?.id ?? data?.node_id ?? n.unique_id ?? '');
+    const name = String(data?.nodeName ?? data?.label ?? n.label ?? n.name ?? id);
+    const shapeArr = Array.isArray(data?.shape) ? (data.shape as (number | string | null | undefined)[]) : null;
     const formatDimension = (value: number | string | null | undefined) =>
       typeof value === 'number' || typeof value === 'string' ? value : '?';
     const shape = shapeArr ? `${formatDimension(shapeArr[0])} × ${formatDimension(shapeArr[1])}` : null;
@@ -76,7 +81,7 @@ const ExportFeature: React.FC = () => {
   };
 
   // Download a single node in the selected format
-  const handleDownloadOne = async (node: any) => {
+  const handleDownloadOne = async (node: GraphNode) => {
     if (!currentWorkspaceId) return;
     const { id, name } = toDisplay(node);
     if (!id) return;
@@ -137,7 +142,7 @@ const ExportFeature: React.FC = () => {
                   Choose nodes in the graph sidebar to enable exports.
                 </div>
               )}
-              {selectedNodes.map((n: any) => {
+              {selectedNodes.map((n: GraphNode) => {
                 const info = toDisplay(n);
                 const status = downloadingIds[info.id ?? ''] ?? 'idle';
                 const isDownloading = status === 'downloading';

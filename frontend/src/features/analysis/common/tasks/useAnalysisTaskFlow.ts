@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { getTaskTypeCandidates, normalizeTaskDedupeKey } from '../../../../hooks/analysisTaskUtils';
 import { useAnalysisTaskStatus } from '../../../../hooks/useAnalysisTaskStatus';
 import { shouldRefreshOnCompletion } from './policies';
@@ -19,7 +19,7 @@ export const useAnalysisTaskFlow = (options: UseAnalysisTaskFlowOptions): UseAna
     refreshResults,
   } = options;
 
-  const taskTypeCandidates = useMemo(() => getTaskTypeCandidates(taskType), [taskType]);
+  const taskTypeCandidates = getTaskTypeCandidates(taskType);
   const status = useAnalysisTaskStatus(taskTypeCandidates);
   const effectiveActiveTaskId = manualActiveTaskId ?? status.activeTaskId ?? null;
   const terminalRefreshDedupeRef = useRef<string | null>(null);

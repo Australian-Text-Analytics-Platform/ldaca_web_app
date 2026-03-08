@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState } from 'react';
 
 /**
  * Prevents a "running" result from overwriting an already "successful" one,
@@ -8,16 +8,16 @@ export function useSafeResult<T extends { state?: string } | null>() {
   const [result, setResult] = useState<T | null>(null);
   const resultRef = useRef<T | null>(null);
 
-  const setResultSafely = useCallback((newResult: T | null) => {
+  const setResultSafely = (newResult: T | null) => {
     if (
       resultRef.current?.state === 'successful' &&
-      (newResult as any)?.state === 'running'
+      (newResult as { state?: string } | null)?.state === 'running'
     ) {
       return;
     }
     setResult(newResult);
     resultRef.current = newResult;
-  }, []);
+  };
 
   return [result, resultRef, setResultSafely, setResult] as const;
 }

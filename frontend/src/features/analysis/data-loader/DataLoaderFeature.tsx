@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Loader2, FolderPlus, Upload, Trash2, Eye, Download as DownloadIcon, Plus, RefreshCcw, LogOut, Quote, ChevronRightIcon, FileIcon, FolderIcon } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -11,8 +11,8 @@ import { useFiles } from '../../../hooks/useFiles';
 import { queryKeys } from '../../../lib/queryKeys';
 import { filesApi } from '../../../api/files';
 import { workspacesApi } from '../../../api/workspaces';
-import { useAnalysisStore, TaskItem } from '../../../stores/analysisStore';
-import { FileInfo } from '../../../types';
+import { useAnalysisStore, type TaskItem } from '../../../stores/analysisStore';
+import { type FileInfo } from '../../../types';
 import { AddFilePanel, FilePreviewPanel } from '../../../components/panels';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Button } from '../../../components/ui/button';
@@ -65,8 +65,13 @@ const formatTimestamp = (value?: number | string | null): string => {
   return date ? date.toLocaleString() : '—';
 };
 
-const getWorkspaceId = (workspace: Record<string, any>): string | null =>
-  workspace?.id || workspace?.unique_id || null;
+const getWorkspaceId = (workspace: { id?: string; unique_id?: string }): string | null => {
+  const id = workspace?.id;
+  const uniqueId = workspace?.unique_id;
+  if (typeof id === 'string' && id) return id;
+  if (typeof uniqueId === 'string' && uniqueId) return uniqueId;
+  return null;
+};
 
 type FileTreeFolder = { name: string; path: string; children: FileTreeNode[] };
 type FileTreeFile = { file: FileInfo };
@@ -207,7 +212,7 @@ export const DataLoaderFeature: React.FC = () => {
   };
 
   useEffect(() => {
-    const active = workspaces.find((ws: any) => getWorkspaceId(ws) === currentWorkspaceId);
+    const active = workspaces.find((ws) => getWorkspaceId(ws) === currentWorkspaceId);
     if (active?.name) {
       setRenameValue(active.name);
     }
@@ -228,16 +233,16 @@ export const DataLoaderFeature: React.FC = () => {
     return () => observer.disconnect();
   }, []);
 
-  const sortedWorkspaces = [...workspaces].sort((a: any, b: any) => {
-    const aTime = Date.parse(a?.modified_at || a?.updated_at || a?.created_at || '');
-    const bTime = Date.parse(b?.modified_at || b?.updated_at || b?.created_at || '');
+  const sortedWorkspaces = [...workspaces].sort((a, b) => {
+    const aTime = Date.parse(String(a?.modified_at || a?.updated_at || a?.created_at || ''));
+    const bTime = Date.parse(String(b?.modified_at || b?.updated_at || b?.created_at || ''));
     return (bTime || 0) - (aTime || 0);
   });
 
   const sortedFiles = [...files].sort((a: FileInfo, b: FileInfo) => a.filename.localeCompare(b.filename));
-  const fileTree = useMemo(() => buildFileTree(sortedFiles), [sortedFiles]);
+  const fileTree = buildFileTree(sortedFiles);
 
-  const currentWorkspace = workspaces.find((ws: any) => getWorkspaceId(ws) === currentWorkspaceId) || null;
+  const currentWorkspace = workspaces.find((ws) => getWorkspaceId(ws) === currentWorkspaceId) || null;
 
   const nodeCount =
     workspaceGraph?.nodes?.length ??
@@ -305,7 +310,7 @@ export const DataLoaderFeature: React.FC = () => {
   };
 
   const openDeleteWorkspaceDialog = (workspaceId: string) => {
-    const target = workspaces.find((ws: any) => getWorkspaceId(ws) === workspaceId);
+    const target = workspaces.find((ws) => getWorkspaceId(ws) === workspaceId);
     setWorkspaceToDelete({ id: workspaceId, name: target?.name });
   };
 
@@ -405,8 +410,7 @@ export const DataLoaderFeature: React.FC = () => {
       if (task.state === 'successful') {
         // Remove from pending immediately to prevent double-trigger
         setPendingDownloads((prev) => {
-          const next = { ...prev };
-          delete next[workspaceId];
+          const { [workspaceId]: _, ...next } = prev;
           return next;
         });
         // Fetch the artifact and trigger browser download
@@ -428,8 +432,7 @@ export const DataLoaderFeature: React.FC = () => {
         })();
       } else if (task.state === 'failed' || task.state === 'cancelled') {
         setPendingDownloads((prev) => {
-          const next = { ...prev };
-          delete next[workspaceId];
+          const { [workspaceId]: _, ...next } = prev;
           return next;
         });
         notify('error', task.message || 'Workspace download failed.');
@@ -775,7 +778,7 @@ export const DataLoaderFeature: React.FC = () => {
               </div>
             ) : (
               <div className="space-y-3 overflow-y-auto pr-2">
-                {sortedWorkspaces.map((workspace: any) => {
+                {sortedWorkspaces.map((workspace) => {
                   const workspaceId = getWorkspaceId(workspace);
                   if (!workspaceId) return null;
                   const isActive = workspaceId === currentWorkspaceId;

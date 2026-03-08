@@ -44,8 +44,8 @@ export const deriveBackendTokenLimit = (results?: TokenFrequencyResponse | null)
   if (!results) return null;
   const candidate =
     results.token_limit ??
-    (results.analysis_params as any)?.token_limit ??
-    (results.metadata as any)?.token_limit;
+    (results.analysis_params as Record<string, unknown> | undefined)?.token_limit ??
+    (results.metadata as Record<string, unknown> | undefined)?.token_limit;
   return typeof candidate === 'number' && Number.isFinite(candidate) ? candidate : null;
 };
 

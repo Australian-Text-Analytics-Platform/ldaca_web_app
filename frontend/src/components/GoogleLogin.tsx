@@ -1,4 +1,4 @@
-import { GoogleLogin as OAuthGoogleLogin } from '@react-oauth/google';
+import { GoogleLogin as OAuthGoogleLogin, type CredentialResponse } from '@react-oauth/google';
 
 interface GoogleLoginProps {
   onLogin: (idToken: string) => Promise<void>;
@@ -8,7 +8,7 @@ interface GoogleLoginProps {
 }
 
 function GoogleLogin({ onLogin, onLogout: _onLogout, isLoading, error }: GoogleLoginProps) {
-  const handleGoogleSuccess = async (credentialResponse: any) => {
+  const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
     try {
       if (credentialResponse.credential) {
         await onLogin(credentialResponse.credential);

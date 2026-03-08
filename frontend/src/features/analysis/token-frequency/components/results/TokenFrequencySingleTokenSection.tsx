@@ -11,7 +11,7 @@ type TokenFrequencySingleTokenSectionProps = {
   onTokenClick: (token: string) => void;
   onTokenRightClick: (token: string, event?: React.MouseEvent) => void;
   onDownloadWordCloud: (nodeKey: string, displayName: string) => void;
-  onDownloadFrequencyCsv: (label: string, rows: any[]) => void;
+  onDownloadFrequencyCsv: (label: string, rows: unknown[]) => void;
   registerWordCloudRef: (nodeKey: string, element: SVGSVGElement | null) => void;
 };
 

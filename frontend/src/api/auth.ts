@@ -1,4 +1,4 @@
-import { AuthInfoResponse } from '../types';
+import { type AuthInfoResponse } from '../types';
 import { post, httpRequest } from './http';
 
 export interface GoogleAuthResponse {

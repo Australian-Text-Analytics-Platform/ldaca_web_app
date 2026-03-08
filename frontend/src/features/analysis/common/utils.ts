@@ -81,19 +81,24 @@ export interface ParsedAnalysisNodeRequest {
   selections: AnalysisNodeColumnSelection[];
 }
 
+export interface AnalysisNodeRequestShape {
+  node_ids?: string[];
+  node_columns?: Record<string, string | undefined>;
+}
+
 export const parseAnalysisNodeRequest = (
-  requestData: any,
+  requestData: AnalysisNodeRequestShape | null | undefined,
   maxNodes = 2
 ): ParsedAnalysisNodeRequest => {
   const nodeIds: string[] = Array.isArray(requestData?.node_ids)
     ? requestData.node_ids
         .slice(0, maxNodes)
-        .filter((id: unknown): id is string => typeof id === 'string' && id.trim().length > 0)
+        .filter((id): id is string => typeof id === 'string' && id.trim().length > 0)
     : [];
 
   const nodeColumns: Record<string, string> =
     requestData?.node_columns && typeof requestData.node_columns === 'object'
-      ? requestData.node_columns
+      ? (requestData.node_columns as Record<string, string>)
       : {};
 
   const selections: AnalysisNodeColumnSelection[] = nodeIds.map((nodeId) => ({
@@ -106,7 +111,7 @@ export const parseAnalysisNodeRequest = (
 
 export interface RestoreAnalysisLockFromRequestArgs {
   workspaceId?: string | null;
-  requestData: any;
+  requestData: AnalysisNodeRequestShape | null | undefined;
   getAuthHeaders: () => Record<string, string>;
   lockWithSnapshots: (snapshots: Array<{ id: string; name?: string; columns?: string[] }>) => void;
   maxNodes?: number;

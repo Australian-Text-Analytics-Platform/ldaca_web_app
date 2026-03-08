@@ -3,7 +3,6 @@ import { toast } from 'sonner';
 import { textApi, type TopicModelingRequest, type TopicModelingDetachRequest, type TopicModelingDetachNodeOption } from '../../../../api/text';
 import { queryKeys } from '../../../../lib/queryKeys';
 import { applySelectedColumnsToSnapshots } from '../../../../hooks/useSchemaManagement';
-import { analysisServerRequestLockQueryKey } from '../../common';
 
 type NodeSelection = {
   id?: string;
@@ -145,7 +144,6 @@ export function useTopicModelingTaskFlow({
 
       const res = await textApi.topicModeling(req, getAuthHeaders());
       setResultSafely(res as TopicModelingResponseLike);
-      await queryClient.invalidateQueries({ queryKey: analysisServerRequestLockQueryKey('topic_modeling', currentWorkspaceId) });
 
       if (res.state === 'failed') {
         setIsRunning(false);
@@ -155,8 +153,8 @@ export function useTopicModelingTaskFlow({
       if (res.state !== 'successful' && res.state !== 'running') {
         setError(res.message || 'Topic modeling failed');
       }
-    } catch (error: any) {
-      setError(error?.message || 'Error running topic modeling');
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : 'Error running topic modeling');
       setIsRunning(false);
       runningRef.current = false;
     }
@@ -183,8 +181,8 @@ export function useTopicModelingTaskFlow({
       });
       setSelectedDetachColumns(initialSelections);
       setDetachDialogOpen(true);
-    } catch (error: any) {
-      toast.error(error?.message || 'Failed to load topic detach options');
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Failed to load topic detach options');
     } finally {
       setIsDetachLoading(false);
     }
@@ -240,8 +238,8 @@ export function useTopicModelingTaskFlow({
 
       setDetachDialogOpen(false);
       toast.success('Detached topic node(s) created');
-    } catch (error: any) {
-      toast.error(error?.message || 'Topic detach failed');
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Topic detach failed');
     } finally {
       setIsDetaching(false);
     }

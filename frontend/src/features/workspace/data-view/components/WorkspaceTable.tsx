@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Column as TableColumn } from '@tanstack/react-table';
 import {
-  ColumnDef,
-  ColumnPinningState,
+  type ColumnDef,
+  type ColumnPinningState,
   flexRender,
   getCoreRowModel,
   useReactTable,
@@ -33,6 +33,7 @@ import { DatetimeFormatPanel } from '../../../../components/panels/DatetimeForma
 import { ConfirmDialog } from '../../../../components/ui/confirm-dialog';
 import { TablePaginationControls } from './TablePaginationControls';
 import type { DataRow, PaginationInfo } from '../types';
+import type { NodeSchemaResponse } from '../../../../types';
 import {
   DATA_TYPES,
   extractColumnTypes,
@@ -151,7 +152,7 @@ export function WorkspaceTable({
   const [deleteColumnDialogOpen, setDeleteColumnDialogOpen] = useState(false);
   const [columnToDelete, setColumnToDelete] = useState<string | null>(null);
 
-  const debugEnabled = useMemo(() => {
+  const debugEnabled = (() => {
     if (typeof window === 'undefined') {
       return false;
     }
@@ -161,19 +162,17 @@ export function WorkspaceTable({
       console.debug('WorkspaceTable: unable to read debug flag', error);
       return false;
     }
-  }, []);
+  })();
 
-  const applySchema = useCallback(
-    (schema: unknown) => {
-      const mapping = extractColumnTypes(schema as any);
+  // Identity stability: used in useEffect dependency array
+  const applySchema = useCallback((schema: unknown) => {
+      const mapping = extractColumnTypes(schema as NodeSchemaResponse | null);
       if (debugEnabled) {
         console.debug('WorkspaceTable: loaded column types', mapping);
       }
       setColumnTypes(mapping);
       return mapping;
-    },
-    [debugEnabled]
-  );
+    }, [debugEnabled]);
 
   useEffect(() => {
     if (!workspaceId || !nodeId || !onRefreshSchema) {
@@ -205,17 +204,17 @@ export function WorkspaceTable({
     console.debug('WorkspaceTable: data received', { rowCount: data.length, loading });
   }, [data, loading, debugEnabled]);
 
-  const sanitizedData = useMemo<DataRow[]>(() => (Array.isArray(data) ? data : []), [data]);
+  const sanitizedData = (Array.isArray(data) ? data : []);
 
-  const columns = useMemo<string[]>(() => {
+  const columns = (() => {
     const firstRow = sanitizedData.find((row) => row && typeof row === 'object');
     if (firstRow) {
       return Object.keys(firstRow);
     }
     return Object.keys(columnTypes);
-  }, [sanitizedData, columnTypes]);
+  })();
 
-  const wideColumns = useMemo(() => {
+  const wideColumns = (() => {
     const sampleRows = sanitizedData.slice(0, WIDE_COLUMN_SAMPLE_LIMIT);
     const result = new Set<string>();
 
@@ -239,20 +238,9 @@ export function WorkspaceTable({
     });
 
     return result;
-  }, [columns, sanitizedData]);
+  })();
 
-  const toggleColumnWidth = (columnId: string) => {
-    setExpandedColumns((prev) => {
-      if (prev[columnId]) {
-        const { [columnId]: _removed, ...rest } = prev;
-        return rest;
-      }
-      return { ...prev, [columnId]: true };
-    });
-  };
-
-  const performCast = useCallback(
-    async (column: string, targetType: string, format?: string) => {
+  const performCast = async (column: string, targetType: string, format?: string) => {
       if (!onCast) {
         return;
       }
@@ -273,12 +261,9 @@ export function WorkspaceTable({
       } finally {
         setLoadingCast((prev) => ({ ...prev, [column]: false }));
       }
-    },
-    [onCast, onRefreshSchema, applySchema]
-  );
+    };
 
-  const handleTypeChange = useCallback(
-    (column: string, newType: string) => {
+  const handleTypeChange = (column: string, newType: string) => {
       if (!onCast) {
         return;
       }
@@ -299,26 +284,17 @@ export function WorkspaceTable({
       }
 
       void performCast(column, newType);
-    },
-    [onCast, columnTypes, performCast]
-  );
+    };
 
-  const handleDatetimeFormatConfirm = useCallback(
-    (format?: string) => {
+  const handleDatetimeFormatConfirm = (format?: string) => {
       const { column, targetType } = datetimeModal;
       setDatetimeModal({ isOpen: false, column: '', targetType: '' });
       if (column && targetType) {
         void performCast(column, targetType, format);
       }
-    },
-    [datetimeModal, performCast]
-  );
+    };
 
-  const beginRename = (column: string) => {
-    setRenamingColumn(column);
-  };
-
-  const setColumnBusy = useCallback((column: string, active: boolean) => {
+  const setColumnBusy = (column: string, active: boolean) => {
     setColumnActionLoading((prev) => {
       if (active) {
         if (prev[column]) {
@@ -329,14 +305,12 @@ export function WorkspaceTable({
       if (!(column in prev)) {
         return prev;
       }
-      const next = { ...prev };
-      delete next[column];
+      const { [column]: _, ...next } = prev;
       return next;
     });
-  }, []);
+  };
 
-  const submitRename = useCallback(
-    async (column: string, value: string) => {
+  const submitRename = async (column: string, value: string) => {
       if (!onRenameColumn) {
         setRenamingColumn(null);
         return;
@@ -374,19 +348,9 @@ export function WorkspaceTable({
       } finally {
         setColumnBusy(column, false);
       }
-    },
-    [onRenameColumn, columns, onRefreshSchema, applySchema, setColumnBusy]
-  );
+    };
 
-  const requestDeleteColumn = async (column: string) => {
-    if (!onDeleteColumn) {
-      return;
-    }
-    setColumnToDelete(column);
-    setDeleteColumnDialogOpen(true);
-  };
-
-  const confirmDeleteColumn = useCallback(async () => {
+  const confirmDeleteColumn = async () => {
     if (!columnToDelete || !onDeleteColumn) {
       return;
     }
@@ -406,8 +370,7 @@ export function WorkspaceTable({
           if (!(column in prev)) {
             return prev;
           }
-          const next = { ...prev };
-          delete next[column];
+          const { [column]: _, ...next } = prev;
           return next;
         });
       }
@@ -421,9 +384,29 @@ export function WorkspaceTable({
     } finally {
       setColumnBusy(column, false);
     }
-  }, [columnToDelete, onDeleteColumn, onRefreshSchema, applySchema, renamingColumn, setColumnBusy]);
+  };
 
-  const columnDefs = useMemo<ColumnDef<DataRow, unknown>[]>(() => {
+  const columnDefs = (() => {
+    const toggleColumnWidth = (columnId: string) => {
+      setExpandedColumns((prev) => {
+        if (prev[columnId]) {
+          const { [columnId]: _removed, ...rest } = prev;
+          return rest;
+        }
+        return { ...prev, [columnId]: true };
+      });
+    };
+
+    const beginRename = (column: string) => {
+      setRenamingColumn(column);
+    };
+
+    const requestDeleteColumn = (column: string) => {
+      if (!onDeleteColumn) return;
+      setColumnToDelete(column);
+      setDeleteColumnDialogOpen(true);
+    };
+
     return columns.map((column) => {
       const currentType = normalizeTypeName(columnTypes[column] ?? 'string');
       const isColumnLoading = Boolean(loadingCast[column]);
@@ -623,26 +606,9 @@ export function WorkspaceTable({
         },
       } satisfies ColumnDef<DataRow, unknown>;
     });
-  }, [
-    columns,
-    columnTypes,
-    loadingCast,
-    columnActionLoading,
-    renamingColumn,
-    onRenameColumn,
-    onDeleteColumn,
-    onCast,
-    wideColumns,
-    expandedColumns,
-    toggleColumnWidth,
-    handleTypeChange,
-    submitRename,
-    beginRename,
-    requestDeleteColumn,
-  ]);
+  })();
 
-  const getPinnedStyles = useCallback(
-    (column: TableColumn<DataRow, unknown>, variant: 'header' | 'cell'): React.CSSProperties | undefined => {
+  const getPinnedStyles = (column: TableColumn<DataRow, unknown>, variant: 'header' | 'cell'): React.CSSProperties | undefined => {
       const pinState = column.getIsPinned();
       if (!pinState) {
         return undefined;
@@ -672,9 +638,7 @@ export function WorkspaceTable({
       }
 
       return style;
-    },
-    []
-  );
+    };
 
   const tableInstance = useReactTable({
     data: sanitizedData,

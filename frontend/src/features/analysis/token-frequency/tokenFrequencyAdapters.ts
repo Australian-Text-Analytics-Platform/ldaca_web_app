@@ -1,32 +1,36 @@
 import type { TokenFrequencyResponse } from '@/api/text';
 import { isNonEmptyString } from '../common';
 
+export type TokenFrequencyRow = { token: string; frequency: number };
+
+export type TokenFrequencyStatisticsEntry = NonNullable<TokenFrequencyResponse['statistics']>[number];
+
 export type NormalizedNodeResult = {
   nodeId: string;
   displayName: string;
-  rows: any[];
+  rows: TokenFrequencyRow[];
   metadata: Record<string, unknown>;
 };
 
 export type NodeResultView = NormalizedNodeResult & {
-  filteredRows: any[];
-  displayRows: any[];
+  filteredRows: TokenFrequencyRow[];
+  displayRows: TokenFrequencyRow[];
   filteredOutCount: number;
   appliedDisplayLimit: number | null;
   maxFrequency: number;
 };
 
-export const extractRows = (entry: unknown): any[] => {
+export const extractRows = (entry: unknown): TokenFrequencyRow[] => {
   if (Array.isArray(entry)) {
-    return entry as any[];
+    return entry as TokenFrequencyRow[];
   }
   if (
     entry &&
     typeof entry === 'object' &&
     !Array.isArray(entry) &&
-    Array.isArray((entry as any).data)
+    Array.isArray((entry as Record<string, unknown>).data)
   ) {
-    return (entry as any).data as any[];
+    return (entry as Record<string, unknown>).data as TokenFrequencyRow[];
   }
   return [];
 };
@@ -36,10 +40,10 @@ export const extractMetadata = (entry: unknown): Record<string, unknown> => {
     entry &&
     typeof entry === 'object' &&
     !Array.isArray(entry) &&
-    (entry as any).metadata &&
-    typeof (entry as any).metadata === 'object'
+    (entry as Record<string, unknown>).metadata &&
+    typeof (entry as Record<string, unknown>).metadata === 'object'
   ) {
-    return (entry as any).metadata as Record<string, unknown>;
+    return (entry as Record<string, unknown>).metadata as Record<string, unknown>;
   }
   return {};
 };
@@ -55,7 +59,7 @@ export const maxBy = <T,>(items: T[], selector: (item: T) => number, fallback: n
   return max;
 };
 
-export const STATS_SORT_ACCESSORS: Record<string, (stat: any) => unknown> = {
+export const STATS_SORT_ACCESSORS: Record<string, (stat: TokenFrequencyStatisticsEntry) => unknown> = {
   token: (stat) => stat.token,
   freq_corpus_0: (stat) => stat.freq_corpus_0,
   percent_corpus_0: (stat) => stat.percent_corpus_0,
@@ -204,11 +208,11 @@ export const deriveNodeDisplayResults = (
       ? rawRows.filter((row) => !shouldFilterToken(row?.token))
       : rawRows;
 
-    let displayRows: any[];
+    let displayRows: TokenFrequencyRow[];
     if (normalizedLimit === null || normalizedLimit <= 0) {
       displayRows = filteredRows;
     } else {
-      const limitedRows: any[] = [];
+      const limitedRows: TokenFrequencyRow[] = [];
       for (const row of rawRows) {
         if (shouldFilterToken(row?.token)) continue;
         limitedRows.push(row);
@@ -217,7 +221,7 @@ export const deriveNodeDisplayResults = (
       displayRows = limitedRows;
     }
 
-    const maxFrequencyRaw = rawRows.length > 0 ? maxBy(rawRows, (r: any) => Number(r?.frequency) || 0, 0) : 0;
+    const maxFrequencyRaw = rawRows.length > 0 ? maxBy(rawRows, (r) => Number(r?.frequency) || 0, 0) : 0;
     const maxFrequency = maxFrequencyRaw > 0 ? maxFrequencyRaw : 1;
 
     return {
@@ -232,20 +236,20 @@ export const deriveNodeDisplayResults = (
   });
 };
 
-export const filterStatisticsByStopWords = (statistics: unknown, appliedStopSet: Set<string>): any[] => {
+export const filterStatisticsByStopWords = (statistics: unknown, appliedStopSet: Set<string>): TokenFrequencyStatisticsEntry[] => {
   if (!Array.isArray(statistics)) {
     return [];
   }
-  return statistics
-    .filter((stat: any) => !appliedStopSet.has(String(stat.token || '').toLowerCase()))
-    .filter((stat: any) => Number(stat.log_likelihood_llv) > 0);
+  return (statistics as TokenFrequencyStatisticsEntry[])
+    .filter((stat) => !appliedStopSet.has(String(stat.token || '').toLowerCase()))
+    .filter((stat) => Number(stat.log_likelihood_llv) > 0);
 };
 
 export const sortStatistics = (
-  filteredStatistics: any[],
+  filteredStatistics: TokenFrequencyStatisticsEntry[],
   statsSortColumn: string,
   statsSortDirection: 'asc' | 'desc'
-): any[] => {
+): TokenFrequencyStatisticsEntry[] => {
   if (filteredStatistics.length === 0) {
     return [];
   }
@@ -255,7 +259,7 @@ export const sortStatistics = (
 
   return [...filteredStatistics].sort((a, b) => {
     if (columnKey === 'significance') {
-      const rank = (stat: any) => (stat.significance || '').length;
+      const rank = (stat: TokenFrequencyStatisticsEntry) => (stat.significance || '').length;
       const va = rank(a);
       const vb = rank(b);
       return direction * (va - vb);

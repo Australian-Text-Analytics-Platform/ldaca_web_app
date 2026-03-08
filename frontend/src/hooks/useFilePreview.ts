@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { filesApi } from '../api/files';
 import { useAuth } from './useAuth';
@@ -10,13 +10,14 @@ export const useFilePreview = (filename: string | null, isOpen: boolean) => {
 
   const { getAuthHeaders } = useAuth();
 
-  // Reset pagination and sheet selection when the dialog closes or filename changes
+  /* eslint-disable react-hooks/set-state-in-effect -- Resetting local UI state on prop change; no cascading renders */
   useEffect(() => {
     if (!isOpen) {
       setPage(0);
       setSelectedSheet(null);
     }
   }, [isOpen, filename]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['file-preview', filename, page, pageSize, selectedSheet],
@@ -39,10 +40,10 @@ export const useFilePreview = (filename: string | null, isOpen: boolean) => {
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 
-  const reset = useCallback(() => {
+  const reset = () => {
     setPage(0);
     setSelectedSheet(null);
-  }, []);
+  };
 
   return {
     previewData: data?.preview || [],

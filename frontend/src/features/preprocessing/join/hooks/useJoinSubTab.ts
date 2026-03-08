@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 
 import { nodesApi } from '../../../../api/nodes';
 import type { NodeColumnSelection, WorkspaceNodeLike } from '../../../../components/NodeSelectionPanel';
@@ -21,7 +21,7 @@ export interface JoinSubTabProps {
     leftColumns: string[],
     rightColumns: string[],
     newNodeName?: string,
-  ) => Promise<void>;
+  ) => Promise<unknown>;
   isLoading: {
     operations: boolean;
   };
@@ -110,10 +110,10 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
   const [isJoining, setIsJoining] = useState(false);
   const joinNameAutofillRef = useRef('');
 
-  const workspaceNodeMap = useMemo(() => buildWorkspaceNodeMap(workspaceNodes), [workspaceNodes]);
+  const workspaceNodeMap = buildWorkspaceNodeMap(workspaceNodes);
 
-  const uniqueSelectedNodeIds = useMemo(() => dedupeNodeIds(selectedNodeIds), [selectedNodeIds]);
-  const joinNodeIds = useMemo(() => uniqueSelectedNodeIds.slice(0, MAX_JOIN_NODES), [uniqueSelectedNodeIds]);
+  const uniqueSelectedNodeIds = dedupeNodeIds(selectedNodeIds);
+  const joinNodeIds = uniqueSelectedNodeIds.slice(0, MAX_JOIN_NODES);
   const joinOriginalCount = uniqueSelectedNodeIds.length;
 
   const joinSelectedNodes = (() => {
@@ -122,6 +122,7 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
       .filter((node): node is WorkspaceNodeLike => Boolean(node));
   })();
 
+  // Identity stability: used in useEffect dependency array
   const getNodeColumnsForJoin = useCallback((nodeId: string): string[] => {
     const node = workspaceNodeMap.get(nodeId);
     return extractNodeColumns(node);

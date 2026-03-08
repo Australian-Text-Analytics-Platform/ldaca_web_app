@@ -438,6 +438,7 @@ async def run_sequential_analysis(
             task_manager.save_task(task)
             task_manager.set_current_task("sequential_analysis", task_id)
 
+        result_payload["metadata"] = {"task_id": task.task_id}
         return result_payload
 
     except HTTPException:

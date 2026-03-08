@@ -10,7 +10,7 @@ export interface FeedbackResponseBody {
   success: boolean;
   message: string;
   record_id?: string;
-  meta?: Record<string, any>;
+  meta?: Record<string, unknown>;
 }
 
 export const feedbackApi = {

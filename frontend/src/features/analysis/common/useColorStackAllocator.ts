@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 export interface UseColorStackAllocatorConfig {
   colors: string[];
@@ -26,8 +26,8 @@ export const useColorStackAllocator = (
   config: UseColorStackAllocatorConfig
 ): UseColorStackAllocatorReturn => {
   const { colors, activeNodeIds } = config;
-  const activeNodeIdsKey = useMemo(() => activeNodeIds.join('|'), [activeNodeIds]);
-  const colorsKey = useMemo(() => colors.join('|'), [colors]);
+  const activeNodeIdsKey = activeNodeIds.join('|');
+  const colorsKey = colors.join('|');
 
   // Runtime state: ephemeral node-to-color assignments
   const [nodeColors, setNodeColors] = useState<Record<string, string>>({});
@@ -76,8 +76,10 @@ export const useColorStackAllocator = (
     const toAcquire = activeNodeIds.filter(id => !assignedRef.current.has(id));
     toAcquire.forEach(nodeId => {
       if (stackRef.current.length > 0) {
-        const color = stackRef.current.pop()!;
-        assignedRef.current.set(nodeId, color);
+        const color = stackRef.current.pop();
+        if (color !== undefined) {
+          assignedRef.current.set(nodeId, color);
+        }
       } else {
         // Fallback: if stack exhausted, no assignment (caller handles overflow)
         // This should rarely happen with 2-node max selection
@@ -89,9 +91,9 @@ export const useColorStackAllocator = (
     setNodeColors((prev) => (areColorMapsEqual(prev, nextNodeColors) ? prev : nextNodeColors));
   }, [activeNodeIds, colors, activeNodeIdsKey, colorsKey]);
 
-  const getColorForNode = useCallback((nodeId: string) => {
+  const getColorForNode = (nodeId: string) => {
     return assignedRef.current.get(nodeId);
-  }, []);
+  };
 
   return {
     nodeColors,

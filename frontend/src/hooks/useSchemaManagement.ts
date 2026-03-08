@@ -163,18 +163,21 @@ export function useSchemaManagement(config: SchemaManagementConfig) {
   const schemaQuery = useQuery({
     queryKey: (nodeId && workspaceId) ? queryKeys.nodeSchema(workspaceId, nodeId) : ['_no_schema_'],
     queryFn: async () => {
-      const info = await getNodeInfo({ workspaceId: workspaceId!, nodeId: nodeId!, getAuthHeaders, force: true });
+      if (!workspaceId || !nodeId) return {};
+      const info = await getNodeInfo({ workspaceId, nodeId, getAuthHeaders, force: true });
       return normalizeSchemaFromInfo(info);
     },
     enabled: !!nodeId && !isLocked && !!workspaceId,
     staleTime: 0,
   });
 
+  /* eslint-disable react-hooks/set-state-in-effect -- Syncing query data to local state; no cascading renders */
   useEffect(() => {
     if (schemaQuery.data && Object.keys(schemaQuery.data).length > 0) {
       setCurrentSchema(schemaQuery.data);
     }
   }, [schemaQuery.data]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   /**
    * Get the effective schema (locked if locked, otherwise current)

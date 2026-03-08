@@ -56,6 +56,8 @@ export const DatetimeFormatPanel: React.FC<DatetimeFormatPanelProps> = ({
     if (!open) {
       resetForm();
     }
+    // handleAutoFill is intentionally excluded — it's an event handler whose identity changes every render
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, sampleValues, autoFillTried]);
 
   const handleConfirm = () => {

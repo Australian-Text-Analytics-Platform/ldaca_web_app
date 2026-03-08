@@ -1,4 +1,4 @@
-import { createContext, ReactNode, useContext, useMemo } from 'react';
+import { createContext, type ReactNode, useContext } from 'react';
 import { useWorkspaceInternal } from '../hooks/useWorkspaceInternal';
 
 type WorkspaceInternal = ReturnType<typeof useWorkspaceInternal>;
@@ -44,51 +44,37 @@ interface WorkspaceProviderProps {
 export const WorkspaceProvider = ({ children }: WorkspaceProviderProps) => {
   const workspace = useWorkspaceInternal();
 
-  const data = useMemo<WorkspaceDataSlice>(() => ({
+  const data = ({
     workspaces: workspace.workspaces,
     currentWorkspace: workspace.currentWorkspace,
     currentWorkspaceId: workspace.currentWorkspaceId,
     nodes: workspace.nodes,
     workspaceGraph: workspace.workspaceGraph,
     nodeData: workspace.nodeData,
-  }), [
-    workspace.currentWorkspace,
-    workspace.currentWorkspaceId,
-    workspace.nodeData,
-    workspace.nodes,
-    workspace.workspaces,
-    workspace.workspaceGraph,
-  ]);
+  });
 
-  const selection = useMemo<WorkspaceSelectionSlice>(() => ({
+  const selection = ({
     selectedNode: workspace.selectedNode,
     selectedNodes: workspace.selectedNodes,
     selectedNodeId: workspace.selectedNodeId,
     selectedNodeIds: workspace.selectedNodeIds,
     handlePageChange: workspace.handlePageChange,
     handlePageSizeChange: workspace.handlePageSizeChange,
-  }), [
-    workspace.handlePageChange,
-    workspace.handlePageSizeChange,
-    workspace.selectedNode,
-    workspace.selectedNodeId,
-    workspace.selectedNodeIds,
-    workspace.selectedNodes,
-  ]);
+  });
 
-  const status = useMemo<WorkspaceStatusSlice>(() => ({
+  const status = ({
     isLoading: workspace.isLoading,
     errors: workspace.errors,
-  }), [workspace.errors, workspace.isLoading]);
+  });
 
-  const actions = useMemo<WorkspaceActionsSlice>(() => workspace.actions, [workspace.actions]);
+  const actions = workspace.actions;
 
-  const value = useMemo<WorkspaceContextValue>(() => ({
+  const value = ({
     data,
     selection,
     actions,
     status,
-  }), [actions, data, selection, status]);
+  });
 
   return (
     <WorkspaceContext.Provider value={value}>

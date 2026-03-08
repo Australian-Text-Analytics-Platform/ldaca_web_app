@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { useAnalysisStore } from '../stores/analysisStore';
 import type { TaskItem } from '../stores/analysisStore';
 import { getTaskTypeCandidates } from './analysisTaskUtils';
@@ -105,32 +104,17 @@ export const useAnalysisTaskStatus = (taskType: string | string[]): AnalysisTask
         ? activeCandidate.message
         : undefined;
 
-  return useMemo(
-    () => ({
-      tasks: sortedTasks,
-      runningTask,
-      queuedTask,
-      successfulTask,
-      failedTask,
-      cancelledTask,
-      terminalTask,
-      activeTaskId,
-      bannerStatus,
-      bannerTaskId,
-      bannerMessage,
-    }),
-    [
-      sortedTasks.map((t) => `${t.task_id}:${t.state}`).join(','),
-      runningTask?.task_id ?? '',
-      queuedTask?.task_id ?? '',
-      successfulTask?.task_id ?? '',
-      failedTask?.task_id ?? '',
-      cancelledTask?.task_id ?? '',
-      terminalTask?.task_id ?? '',
-      activeTaskId,
-      bannerStatus,
-      bannerTaskId,
-      bannerMessage,
-    ]
-  );
+  return {
+    tasks: sortedTasks,
+    runningTask,
+    queuedTask,
+    successfulTask,
+    failedTask,
+    cancelledTask,
+    terminalTask,
+    activeTaskId,
+    bannerStatus,
+    bannerTaskId,
+    bannerMessage,
+  };
 };

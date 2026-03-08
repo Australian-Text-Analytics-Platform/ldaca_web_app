@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from './useAuth';
-import { ColumnInfo, mapColumnsToInfo } from '../utils/columnTypes';
+import { type ColumnInfo, mapColumnsToInfo } from '../utils/columnTypes';
 import { getNodeInfo } from '../lib/nodeInfoCache';
 
-type NodeLike = Record<string, unknown> & {
+export type NodeLike = Record<string, unknown> & {
   id?: string;
   node_id?: string;
   data?: Record<string, unknown> & {
@@ -60,8 +60,9 @@ export const useNodeColumnInfos = (
 
   useEffect(() => {
     if (!enabled || !workspaceId) return;
+    const effectNodeIds = nodeIdsKey ? nodeIdsKey.split('|') : [];
     const pendingSet = pendingRef.current;
-    const idsToFetch = nodeIds.filter((id) => id && !cache[id] && !pendingSet.has(id));
+    const idsToFetch = effectNodeIds.filter((id) => id && !cache[id] && !pendingSet.has(id));
     if (!idsToFetch.length) return;
 
     let cancelled = false;

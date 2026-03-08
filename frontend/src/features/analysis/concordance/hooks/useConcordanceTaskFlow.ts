@@ -1,9 +1,10 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { toast } from 'sonner';
 import {
-  ConcordanceAnalysisRequest,
-  ConcordanceAnalysisResponse,
-  ConcordanceResultQuery,
+  type ConcordanceAnalysisRequest,
+  type ConcordanceAnalysisResponse,
+  type ConcordanceDetachRequest,
+  type ConcordanceResultQuery,
   textApi,
 } from '../../../../api/text';
 import { restoreAnalysisLockFromRequest } from '../../common';
@@ -43,7 +44,7 @@ interface ConcordanceLock {
   getAuthHeaders: () => Record<string, string>;
   lockWithSnapshots: (snapshots: Array<{ id: string; name?: string; columns?: string[] }>) => void;
   resolveTaskId: () => Promise<string | null>;
-  detachConcordance: (nodeId: string, request: any) => Promise<void>;
+  detachConcordance: (nodeId: string, request: ConcordanceDetachRequest) => Promise<void>;
 }
 
 type Params = {
@@ -227,7 +228,7 @@ export function useConcordanceTaskFlow({
 
         response = await textApi.concordance(request, authHeaders);
         setResults(response);
-        const responseTaskId = (response as any)?.metadata?.task_id;
+        const responseTaskId = response?.metadata?.task_id;
         if (typeof responseTaskId === 'string' && responseTaskId.trim().length > 0) {
           setLocalTaskId(responseTaskId);
         }
@@ -254,7 +255,7 @@ export function useConcordanceTaskFlow({
         state: 'failed',
         message: error instanceof Error ? error.message : 'Unknown error occurred',
         data: {},
-      } as any);
+      } as ConcordanceAnalysisResponse);
     } finally {
       setIsSearching(false);
     }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import type { WorkspaceNodeLike } from '../../../../components/NodeSelectionPanel';
 import type {
@@ -169,7 +169,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     refreshNodeSchema,
   } = props;
 
-  const effectiveNodes = useMemo(() => {
+  const effectiveNodes = (() => {
     if (selectedNodes?.length) {
       return selectedNodes.slice(0, 1);
     }
@@ -186,9 +186,9 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       }
     }
     return [] as WorkspaceNodeLike[];
-  }, [selectedNodes, selectedNodeId, workspaceNodes]);
+  })();
 
-  const limitedNodeId = useMemo(() => {
+  const limitedNodeId = (() => {
     if (!effectiveNodes.length) return null;
     const first = effectiveNodes[0];
     return (
@@ -196,7 +196,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       first.node_id ||
       null
     );
-  }, [effectiveNodes]);
+  })();
 
   const [expression, setExpression] = useState('');
   const [columnName, setColumnName] = useState('');
@@ -259,54 +259,50 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     }
   }, [expressionMode]);
 
-  const workspaceNodeMap = useMemo(() => {
+  const workspaceNodeMap = (() => {
     const map = new Map<string, WorkspaceNodeLike>();
     workspaceNodes.forEach((node, idx) => {
       const id = node.id || node.node_id || `node-${idx}`;
       if (id) map.set(id, node);
     });
     return map;
-  }, [workspaceNodes]);
+  })();
 
-  const effectiveSelectedNodes = useMemo(() => {
+  const effectiveSelectedNodes = (() => {
     if (!limitedNodeId) return [] as WorkspaceNodeLike[];
     const node = workspaceNodeMap.get(limitedNodeId);
     return node ? [node] : [];
-  }, [limitedNodeId, workspaceNodeMap]);
+  })();
 
-  const activeNodeId = useMemo(() => {
+  const activeNodeId = (() => {
     return limitedNodeId ?? selectedNodeId ?? null;
-  }, [limitedNodeId, selectedNodeId]);
+  })();
 
   const hasSelection = Boolean(activeNodeId);
   const trimmedExpression = latestExpressionRef.current.trim();
   const canApply = hasSelection && trimmedExpression.length > 0 && !applyLoading && !isLoading.operations;
   const basicDisabled = !hasSelection || isLoading.operations;
 
-  const availableColumns = useMemo(() => {
+  const availableColumns = (() => {
     if (!effectiveSelectedNodes.length) return [] as string[];
     const [node] = effectiveSelectedNodes;
     return mapColumnsToInfo(node)
       .map((info) => info.name)
       .filter((name): name is string => typeof name === 'string' && name.length > 0);
-  }, [effectiveSelectedNodes]);
+  })();
 
-  const formatColumnName = useCallback((name: string) => {
+  const formatColumnName = (name: string) => {
     if (!name) return '';
     const safe = name.replace(/"/g, '\\"');
     if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
       return name;
     }
     return `"${safe}"`;
-  }, []);
+  };
 
-  const escapeLiteralValue = useCallback(
-    (value: string) => value.replace(/\\/g, '\\\\').replace(/"/g, '\\"'),
-    [],
-  );
+  const escapeLiteralValue = (value: string) => value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 
-  const formatCustomToken = useCallback(
-    (rawValue: string) => {
+  const formatCustomToken = (rawValue: string) => {
       if (!rawValue.length) {
         return '""';
       }
@@ -318,12 +314,9 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
         return trimmed;
       }
       return `"${escapeLiteralValue(rawValue)}"`;
-    },
-    [escapeLiteralValue],
-  );
+    };
 
-  const tokensToExpression = useCallback(
-    (tokens: BasicToken[]) =>
+  const tokensToExpression = (tokens: BasicToken[]) =>
       tokens
         .map((token) => {
           if (token.kind === 'column') {
@@ -331,11 +324,9 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
           }
           return formatCustomToken(token.value);
         })
-        .join(' + '),
-    [formatColumnName, formatCustomToken],
-  );
+        .join(' + ');
 
-  const setExpressionAndMarkDirty = useCallback((nextExpression: string) => {
+  const setExpressionAndMarkDirty = (nextExpression: string) => {
     const normalizedExpression = normalizeSmartCharacters(nextExpression);
     latestExpressionRef.current = normalizedExpression;
     setExpression(normalizedExpression);
@@ -347,10 +338,9 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     } else {
       setPreviewStale(true);
     }
-  }, []);
+  };
 
-  const applyBasicTokenUpdate = useCallback(
-    (updater: (prev: BasicToken[]) => BasicToken[]) => {
+  const applyBasicTokenUpdate = (updater: (prev: BasicToken[]) => BasicToken[]) => {
       setBasicTokens((prev) => {
         const next = updater(prev);
         if (next === prev) return prev;
@@ -362,19 +352,17 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
         setExpressionAndMarkDirty(nextExpression);
         return sameOrder ? prev : next;
       });
-    },
-    [tokensToExpression, setExpressionAndMarkDirty, trimmedExpression],
-  );
+    };
 
-  const buildRequest = useCallback((): ExpressionTransformRequest => {
+  const buildRequest = (): ExpressionTransformRequest => {
     const expressionValue = latestExpressionRef.current.trim();
     const columnValue = latestColumnNameRef.current.trim();
     const payload: ExpressionTransformRequest = { expression: expressionValue };
     if (columnValue.length > 0) payload.new_column_name = columnValue;
     return payload;
-  }, []);
+  };
 
-  const handlePreview = useCallback(async () => {
+  const handlePreview = async () => {
     const currentExpression = latestExpressionRef.current.trim();
     if (!activeNodeId || currentExpression.length === 0) {
       setPreviewData(null);
@@ -399,9 +387,9 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     } finally {
       setPreviewLoading(false);
     }
-  }, [activeNodeId, buildRequest, computeColumnPreview]);
+  };
 
-  const requestPreview = useCallback(() => {
+  const requestPreview = () => {
     if (!hasSelection) return;
     if (latestExpressionRef.current.trim().length === 0) {
       setPreviewData(null);
@@ -410,9 +398,9 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       return;
     }
     void handlePreview();
-  }, [hasSelection, handlePreview]);
+  };
 
-  const schedulePreview = useCallback(() => {
+  const schedulePreview = () => {
     if (!hasSelection) return;
     if (typeof window === 'undefined') return;
     if (previewTimeoutRef.current) {
@@ -422,7 +410,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       previewTimeoutRef.current = null;
       requestPreview();
     }, 250);
-  }, [hasSelection, requestPreview]);
+  };
 
   const clampIndex = (value: number, max: number) => {
     if (Number.isNaN(value)) return max;
@@ -431,8 +419,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     return value;
   };
 
-  const addColumnToken = useCallback(
-    (column: string, index?: number) => {
+  const addColumnToken = (column: string, index?: number) => {
       if (basicDisabled || !column) return;
       applyBasicTokenUpdate((prev) => {
         const next = [...prev];
@@ -441,12 +428,9 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
         return next;
       });
       schedulePreview();
-    },
-    [basicDisabled, applyBasicTokenUpdate, schedulePreview],
-  );
+    };
 
-  const addCustomToken = useCallback(
-    (index?: number) => {
+  const addCustomToken = (index?: number) => {
       if (basicDisabled) return;
       const tokenId = createTokenId();
       applyBasicTokenUpdate((prev) => {
@@ -458,12 +442,9 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       setEditingTokenId(tokenId);
       setCustomDraft('');
       customOriginalRef.current = '';
-    },
-    [basicDisabled, applyBasicTokenUpdate],
-  );
+    };
 
-  const removeBasicToken = useCallback(
-    (tokenId: string) => {
+  const removeBasicToken = (tokenId: string) => {
       if (basicDisabled) return;
       applyBasicTokenUpdate((prev) => {
         const idx = prev.findIndex((token) => token.id === tokenId);
@@ -473,12 +454,9 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
         return next;
       });
       schedulePreview();
-    },
-    [basicDisabled, applyBasicTokenUpdate, schedulePreview],
-  );
+    };
 
-  const moveBasicToken = useCallback(
-    (tokenId: string, index: number) => {
+  const moveBasicToken = (tokenId: string, index: number) => {
       if (basicDisabled) return;
       applyBasicTokenUpdate((prev) => {
         const currentIndex = prev.findIndex((token) => token.id === tokenId);
@@ -496,12 +474,9 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
         return next;
       });
       schedulePreview();
-    },
-    [basicDisabled, applyBasicTokenUpdate, schedulePreview],
-  );
+    };
 
-  const startEditingCustomToken = useCallback(
-    (tokenId: string) => {
+  const startEditingCustomToken = (tokenId: string) => {
       if (basicDisabled) return;
       const target = basicTokens.find(
         (token): token is Extract<BasicToken, { kind: 'custom' }> => token.id === tokenId && token.kind === 'custom',
@@ -511,12 +486,9 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       setEditingTokenId(tokenId);
       setCustomDraft(normalizedValue);
       customOriginalRef.current = normalizedValue;
-    },
-    [basicTokens, basicDisabled],
-  );
+    };
 
-  const finishCustomEdit = useCallback(
-    (commit: boolean) => {
+  const finishCustomEdit = (commit: boolean) => {
       if (!editingTokenId) {
         setCustomDraft('');
         return;
@@ -540,11 +512,9 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       }
       setEditingTokenId(null);
       setCustomDraft('');
-    },
-    [editingTokenId, customDraft, applyBasicTokenUpdate, schedulePreview],
-  );
+    };
 
-  const clearBasicBuilder = useCallback(() => {
+  const clearBasicBuilder = () => {
     if (basicDisabled) return;
     if (basicTokens.length === 0) {
       setExpressionAndMarkDirty('');
@@ -553,10 +523,9 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     }
     applyBasicTokenUpdate(() => []);
     schedulePreview();
-  }, [basicDisabled, basicTokens.length, applyBasicTokenUpdate, schedulePreview, setExpressionAndMarkDirty]);
+  };
 
-  const parseDragPayload = useCallback(
-    (event: React.DragEvent): DragPayload | null => {
+  const parseDragPayload = (event: React.DragEvent): DragPayload | null => {
       const decode = (raw: string | null | undefined): DragPayload | null => {
         if (!raw) return null;
         try {
@@ -581,9 +550,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       }
 
       return lastDragPayloadRef.current;
-    },
-    [lastDragPayloadRef],
-  );
+    };
 
   const setDragPayload = (dataTransfer: DataTransfer, payload: DragPayload, plainText: string): void => {
     const BASIC_TOKEN_MIME = 'application/x-ldaca-builder-token';
@@ -605,8 +572,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     }
   };
 
-  const handleColumnDragStart = useCallback(
-    (event: React.DragEvent<HTMLButtonElement>, column: string) => {
+  const handleColumnDragStart = (event: React.DragEvent<HTMLButtonElement>, column: string) => {
       if (basicDisabled) {
         event.preventDefault();
         return;
@@ -618,12 +584,9 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       setDragPayload(dt, payload, column);
       dt.effectAllowed = 'copy';
       setBasicDragActive(true);
-    },
-    [basicDisabled],
-  );
+    };
 
-  const handleCustomDragStart = useCallback(
-    (event: React.DragEvent<HTMLButtonElement>) => {
+  const handleCustomDragStart = (event: React.DragEvent<HTMLButtonElement>) => {
       if (basicDisabled) {
         event.preventDefault();
         return;
@@ -635,12 +598,9 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       setDragPayload(dt, payload, 'Custom token');
       dt.effectAllowed = 'copy';
       setBasicDragActive(true);
-    },
-    [basicDisabled],
-  );
+    };
 
-  const handleExistingTokenDragStart = useCallback(
-    (event: React.DragEvent<HTMLDivElement>, tokenId: string) => {
+  const handleExistingTokenDragStart = (event: React.DragEvent<HTMLDivElement>, tokenId: string) => {
       if (basicDisabled) {
         event.preventDefault();
         return;
@@ -655,33 +615,27 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       setDragPayload(dt, payload, 'Column token');
       dt.effectAllowed = 'move';
       setBasicDragActive(true);
-    },
-    [basicDisabled, editingTokenId, finishCustomEdit],
-  );
+    };
 
-  const handleExistingTokenDragEnd = useCallback(() => {
+  const handleExistingTokenDragEnd = () => {
     setBasicDragActive(false);
     setDropIndicator(null);
-  }, []);
+  };
 
-  const handlePaletteDragEnd = useCallback(() => {
+  const handlePaletteDragEnd = () => {
     setBasicDragActive(false);
     setDropIndicator(null);
-  }, []);
+  };
 
-  const handleTokenDragOver = useCallback(
-    (tokenId: string, event: React.DragEvent<HTMLDivElement>) => {
+  const handleTokenDragOver = (tokenId: string, event: React.DragEvent<HTMLDivElement>) => {
       if (basicDisabled) return;
       event.preventDefault();
       const rect = event.currentTarget.getBoundingClientRect();
       const isBefore = event.clientX < rect.left + rect.width / 2;
       setDropIndicator({ tokenId, position: isBefore ? 'before' : 'after' });
-    },
-    [basicDisabled],
-  );
+    };
 
-  const handleBuilderDragOver = useCallback(
-    (event: React.DragEvent<HTMLDivElement>) => {
+  const handleBuilderDragOver = (event: React.DragEvent<HTMLDivElement>) => {
       if (basicDisabled) return;
       event.preventDefault();
       const dt = event.dataTransfer;
@@ -689,20 +643,17 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
         dt.dropEffect = dt.effectAllowed === 'move' ? 'move' : 'copy';
       }
       setBasicDragActive(true);
-    },
-    [basicDisabled],
-  );
+    };
 
-  const handleBuilderDragLeave = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+  const handleBuilderDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
     if (!dropZoneRef.current) return;
     const related = event.relatedTarget as Node | null;
     if (related && dropZoneRef.current.contains(related)) return;
     setBasicDragActive(false);
     setDropIndicator(null);
-  }, []);
+  };
 
-  const handleBuilderDrop = useCallback(
-    (event: React.DragEvent<HTMLDivElement>) => {
+  const handleBuilderDrop = (event: React.DragEvent<HTMLDivElement>) => {
       if (basicDisabled) return;
       event.preventDefault();
       setBasicDragActive(false);
@@ -735,11 +686,9 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
         moveBasicToken(payload.id, insertIndex);
       }
       lastDragPayloadRef.current = null;
-    },
-    [basicDisabled, dropIndicator, basicTokens, addColumnToken, addCustomToken, moveBasicToken, parseDragPayload],
-  );
+    };
 
-  const handleApply = useCallback(async () => {
+  const handleApply = async () => {
     const currentExpression = latestExpressionRef.current.trim();
     if (!activeNodeId || currentExpression.length === 0) return;
     setApplyLoading(true);
@@ -756,10 +705,9 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     } finally {
       setApplyLoading(false);
     }
-  }, [activeNodeId, buildRequest, computeColumn, onAlert, refreshNodeSchema, handlePreview]);
+  };
 
-  const handleExpressionChange = useCallback(
-    (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+  const handleExpressionChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
       const next = event.target.value;
       setExpressionAndMarkDirty(next);
       setBasicTokens([]);
@@ -767,12 +715,9 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       setDropIndicator(null);
       setBasicDragActive(false);
       setCustomDraft('');
-    },
-    [setExpressionAndMarkDirty],
-  );
+    };
 
-  const handleColumnNameChange = useCallback(
-    (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleColumnNameChange = (event: React.ChangeEvent<HTMLInputElement>) => {
       const next = normalizeSmartCharacters(event.target.value);
       latestColumnNameRef.current = next;
       setColumnName(next);
@@ -781,34 +726,31 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
         return;
       }
       setPreviewStale(true);
-    },
-    [trimmedExpression],
-  );
+    };
 
-  const handleExpressionBlur = useCallback(() => {
+  const handleExpressionBlur = () => {
     setExpressionFocused(false);
     requestPreview();
-  }, [requestPreview]);
+  };
 
-  const handleColumnBlur = useCallback(() => {
+  const handleColumnBlur = () => {
     setColumnNameFocused(false);
     requestPreview();
-  }, [requestPreview]);
+  };
 
-  const handleExpressionFocus = useCallback(() => {
+  const handleExpressionFocus = () => {
     setExpressionFocused(true);
-  }, []);
+  };
 
-  const handleColumnFocus = useCallback(() => {
+  const handleColumnFocus = () => {
     setColumnNameFocused(true);
-  }, []);
+  };
 
-  const handleCustomDraftChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCustomDraftChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setCustomDraft(normalizeSmartCharacters(event.target.value));
-  }, []);
+  };
 
-  const handleCustomInputKeyDown = useCallback(
-    (event: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleCustomInputKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
       if (event.key === 'Enter') {
         event.preventDefault();
         finishCustomEdit(true);
@@ -816,20 +758,15 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
         event.preventDefault();
         finishCustomEdit(false);
       }
-    },
-    [finishCustomEdit],
-  );
+    };
 
-  const basicExpressionPreview = useMemo(() => tokensToExpression(basicTokens), [basicTokens, tokensToExpression]);
+  const basicExpressionPreview = tokensToExpression(basicTokens);
   const manualExpressionActive = basicTokens.length === 0 && trimmedExpression.length > 0;
   const currentExpressionMatchesApplied = lastAppliedExpression && lastAppliedExpression === trimmedExpression;
 
-  const nodeColumnSelections = useMemo(
-    () => (limitedNodeId ? [{ nodeId: limitedNodeId, column: '' }] : []),
-    [limitedNodeId],
-  );
+  const nodeColumnSelections = (limitedNodeId ? [{ nodeId: limitedNodeId, column: '' }] : []);
 
-  const nodeColors = useMemo(() => (limitedNodeId ? { [limitedNodeId]: DEFAULT_PALETTE[0] } : {}), [limitedNodeId]);
+  const nodeColors = (limitedNodeId ? { [limitedNodeId]: DEFAULT_PALETTE[0] } : {});
 
   return {
     activeNodeId,

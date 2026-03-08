@@ -1,14 +1,15 @@
-import { Dispatch, SetStateAction } from 'react';
-import { QueryClient, useMutation } from '@tanstack/react-query';
+import { type Dispatch, type SetStateAction } from 'react';
+import { type QueryClient, useMutation } from '@tanstack/react-query';
 import { workspacesApi } from '../../api/workspaces';
 import {
   nodesApi,
-  FilterRequest,
-  SliceRequest,
-  ExpressionTransformRequest,
+  type FilterRequest,
+  type SliceRequest,
+  type ExpressionTransformRequest,
 } from '../../api/nodes';
 import { queryKeys } from '../../lib/queryKeys';
-import { NodeSchemaResponse } from '../../types';
+import { type NodeSchemaResponse } from '../../types';
+import { type WorkspaceGraphResponse } from '../../types/api';
 import { getNodeInfo, invalidateNodeInfo } from '../../lib/nodeInfoCache';
 import { normalizeSchemaFromInfo } from '../useSchemaManagement';
 
@@ -49,7 +50,7 @@ export const useWorkspaceNodeMutations = ({
     queryClient.invalidateQueries({ queryKey: queryKeys.currentWorkspace });
   };
 
-  const setCurrentWorkspaceMutation = useMutation<any, unknown, string | null, { previousId: string | null }>({
+  const setCurrentWorkspaceMutation = useMutation<Record<string, unknown>, Error, string | null, { previousId: string | null }>({
     mutationFn: (workspaceId: string | null) => workspacesApi.current.set(workspaceId, authHeaders),
     onMutate: async (workspaceId: string | null) => {
       startOperation('setCurrentWorkspace');
@@ -93,7 +94,7 @@ export const useWorkspaceNodeMutations = ({
       queryClient.invalidateQueries({ queryKey: queryKeys.currentWorkspace });
       endOperation('setCurrentWorkspace');
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       setOperationError('setCurrentWorkspace', error.message);
       endOperation('setCurrentWorkspace');
     },
@@ -109,7 +110,7 @@ export const useWorkspaceNodeMutations = ({
       queryClient.invalidateQueries({ queryKey: queryKeys.workspaces });
       endOperation('createWorkspace');
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       setOperationError('createWorkspace', error.message);
       endOperation('createWorkspace');
     },
@@ -125,8 +126,8 @@ export const useWorkspaceNodeMutations = ({
     onMutate: () => {
       startOperation('deleteWorkspace');
     },
-    onSuccess: (data: any, workspaceId) => {
-      const deletedWorkspaceId = data?.id ?? workspaceId;
+    onSuccess: (data: Record<string, unknown>, workspaceId) => {
+      const deletedWorkspaceId = (data?.id as string | undefined) ?? workspaceId;
       if (currentWorkspaceId && deletedWorkspaceId === currentWorkspaceId) {
         setCurrentWorkspaceId(null);
         clearSelection();
@@ -135,7 +136,7 @@ export const useWorkspaceNodeMutations = ({
       queryClient.invalidateQueries({ queryKey: queryKeys.currentWorkspace });
       endOperation('deleteWorkspace');
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       setOperationError('deleteWorkspace', error.message);
       endOperation('deleteWorkspace');
     },
@@ -150,7 +151,7 @@ export const useWorkspaceNodeMutations = ({
     onSuccess: () => {
       endOperation('saveWorkspace');
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       setOperationError('saveWorkspace', error.message);
       endOperation('saveWorkspace');
     },
@@ -162,12 +163,12 @@ export const useWorkspaceNodeMutations = ({
       return workspacesApi.saveAs(filename, authHeaders);
     },
     onMutate: () => startOperation('saveWorkspaceAs'),
-    onSuccess: (data: any) => {
+    onSuccess: (data: Record<string, unknown>) => {
       const newWorkspace = data?.new_workspace;
       if (newWorkspace) {
-        queryClient.setQueryData(queryKeys.workspaces, (old: any) => {
+        queryClient.setQueryData(queryKeys.workspaces, (old: Record<string, unknown>[] | undefined) => {
           if (!old) return [newWorkspace];
-          const exists = old.some((workspace: any) => workspace.id === newWorkspace.id);
+          const exists = old.some((workspace: Record<string, unknown>) => workspace.id === (newWorkspace as Record<string, unknown>).id);
           return exists ? old : [...old, newWorkspace];
         });
       } else {
@@ -175,7 +176,7 @@ export const useWorkspaceNodeMutations = ({
       }
       endOperation('saveWorkspaceAs');
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       setOperationError('saveWorkspaceAs', error.message);
       endOperation('saveWorkspaceAs');
     },
@@ -192,14 +193,14 @@ export const useWorkspaceNodeMutations = ({
       queryClient.invalidateQueries({ queryKey: queryKeys.currentWorkspace });
       endOperation('updateWorkspaceName');
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       setOperationError('updateWorkspaceName', error.message);
       endOperation('updateWorkspaceName');
     },
   });
 
   const renameNodeMutation = useMutation({
-    mutationFn: ({ workspaceId, nodeId, newName }: { workspaceId: string; nodeId: string; newName: string }) =>
+    mutationFn: ({ nodeId, newName }: { nodeId: string; newName: string }) =>
       nodesApi.rename(nodeId, newName, authHeaders),
     onMutate: () => {
       startOperation('renameNode');
@@ -210,14 +211,14 @@ export const useWorkspaceNodeMutations = ({
       }
       endOperation('renameNode');
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       setOperationError('renameNode', error.message);
       endOperation('renameNode');
     },
   });
 
   const copyNodeMutation = useMutation({
-    mutationFn: ({ workspaceId, nodeId }: { workspaceId: string; nodeId: string }) =>
+    mutationFn: ({ nodeId }: { nodeId: string }) =>
       nodesApi.clone(nodeId, authHeaders),
     onMutate: () => {
       startOperation('copyNode');
@@ -229,14 +230,14 @@ export const useWorkspaceNodeMutations = ({
       invalidateWorkspaceSummaries();
       endOperation('copyNode');
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       setOperationError('copyNode', error.message);
       endOperation('copyNode');
     },
   });
 
   const deleteNodeMutation = useMutation({
-    mutationFn: ({ workspaceId, nodeId }: { workspaceId: string; nodeId: string }) =>
+    mutationFn: ({ nodeId }: { nodeId: string }) =>
       nodesApi.delete(nodeId, authHeaders),
     onMutate: () => {
       startOperation('deleteNode');
@@ -252,7 +253,7 @@ export const useWorkspaceNodeMutations = ({
       invalidateWorkspaceSummaries();
       endOperation('deleteNode');
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       setOperationError('deleteNode', error.message);
       endOperation('deleteNode');
     },
@@ -272,7 +273,7 @@ export const useWorkspaceNodeMutations = ({
       }
       endOperation('undoNode');
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       setOperationError('undoNode', error.message);
       endOperation('undoNode');
     },
@@ -292,7 +293,7 @@ export const useWorkspaceNodeMutations = ({
       }
       endOperation('redoNode');
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       setOperationError('redoNode', error.message);
       endOperation('redoNode');
     },
@@ -300,11 +301,9 @@ export const useWorkspaceNodeMutations = ({
 
   const createNodeMutation = useMutation({
     mutationFn: ({
-      workspaceId,
       filename,
       sheetName,
     }: {
-      workspaceId: string;
       filename: string;
       sheetName?: string;
     }) =>
@@ -319,7 +318,7 @@ export const useWorkspaceNodeMutations = ({
       invalidateWorkspaceSummaries();
       endOperation('createNode');
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       setOperationError('createNode', error.message);
       endOperation('createNode');
     },
@@ -327,7 +326,6 @@ export const useWorkspaceNodeMutations = ({
 
   const joinNodesMutation = useMutation({
     mutationFn: ({
-      workspaceId,
       leftNodeId,
       rightNodeId,
       joinType,
@@ -335,7 +333,6 @@ export const useWorkspaceNodeMutations = ({
       rightColumns,
       newNodeName,
     }: {
-      workspaceId: string;
       leftNodeId: string;
       rightNodeId: string;
       joinType: string;
@@ -351,15 +348,15 @@ export const useWorkspaceNodeMutations = ({
         how: joinType as 'inner' | 'left' | 'right' | 'full' | 'semi' | 'anti' | 'cross',
         new_node_name: newNodeName,
       };
-      return nodesApi.join(request as any, authHeaders);
+      return nodesApi.join(request, authHeaders);
     },
     onMutate: async () => {
       startOperation('joinNodes');
       let previousNodeIds: string[] = [];
       try {
         if (currentWorkspaceId) {
-          const previousGraph: any = queryClient.getQueryData(queryKeys.workspaceGraph(currentWorkspaceId));
-          previousNodeIds = (previousGraph?.nodes || []).map((node: any) => node.id);
+          const previousGraph = queryClient.getQueryData<WorkspaceGraphResponse>(queryKeys.workspaceGraph(currentWorkspaceId));
+          previousNodeIds = (previousGraph?.nodes || []).map((node) => node.id);
         }
       } catch {
         // ignore snapshot errors
@@ -367,15 +364,15 @@ export const useWorkspaceNodeMutations = ({
       clearSelection();
       return { previousNodeIds };
     },
-    onSuccess: async (createdNode: any, _vars, context: any) => {
+    onSuccess: async (createdNode: Record<string, unknown>, _vars, context) => {
       try {
-        let newId = createdNode?.node_id || createdNode?.id;
+        let newId = (createdNode?.node_id as string | undefined) || (createdNode?.id as string | undefined);
         if (!newId && currentWorkspaceId) {
           await queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
-          const freshGraph: any = queryClient.getQueryData(queryKeys.workspaceGraph(currentWorkspaceId));
+          const freshGraph = queryClient.getQueryData<WorkspaceGraphResponse>(queryKeys.workspaceGraph(currentWorkspaceId));
           if (freshGraph?.nodes) {
             const prevIds: string[] = context?.previousNodeIds || [];
-            const diff = freshGraph.nodes.map((node: any) => node.id).filter((id: string) => !prevIds.includes(id));
+            const diff = freshGraph.nodes.map((node) => node.id).filter((id: string) => !prevIds.includes(id));
             if (diff.length === 1) newId = diff[0];
           }
         }
@@ -392,22 +389,22 @@ export const useWorkspaceNodeMutations = ({
       }
       endOperation('joinNodes');
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       setOperationError('joinNodes', error.message);
       endOperation('joinNodes');
     },
   });
 
   const concatNodesMutation = useMutation({
-    mutationFn: ({ workspaceId, nodeIds, newNodeName }: { workspaceId: string; nodeIds: string[]; newNodeName?: string }) =>
+    mutationFn: ({ nodeIds, newNodeName }: { nodeIds: string[]; newNodeName?: string }) =>
       nodesApi.concat({ node_ids: nodeIds, new_node_name: newNodeName }, authHeaders),
     onMutate: async () => {
       startOperation('concatNodes');
       let previousNodeIds: string[] = [];
       try {
         if (currentWorkspaceId) {
-          const previousGraph: any = queryClient.getQueryData(queryKeys.workspaceGraph(currentWorkspaceId));
-          previousNodeIds = (previousGraph?.nodes || []).map((node: any) => node.id);
+          const previousGraph = queryClient.getQueryData<WorkspaceGraphResponse>(queryKeys.workspaceGraph(currentWorkspaceId));
+          previousNodeIds = (previousGraph?.nodes || []).map((node) => node.id);
         }
       } catch {
         // ignore snapshot errors
@@ -415,15 +412,15 @@ export const useWorkspaceNodeMutations = ({
       clearSelection();
       return { previousNodeIds };
     },
-    onSuccess: async (createdNode: any, _vars, context: any) => {
+    onSuccess: async (createdNode: Record<string, unknown>, _vars, context) => {
       try {
-        let newId = createdNode?.node_id || createdNode?.id;
+        let newId = (createdNode?.node_id as string | undefined) || (createdNode?.id as string | undefined);
         if (!newId && currentWorkspaceId) {
           await queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
-          const freshGraph: any = queryClient.getQueryData(queryKeys.workspaceGraph(currentWorkspaceId));
+          const freshGraph = queryClient.getQueryData<WorkspaceGraphResponse>(queryKeys.workspaceGraph(currentWorkspaceId));
           if (freshGraph?.nodes) {
             const prevIds: string[] = context?.previousNodeIds || [];
-            const diff = freshGraph.nodes.map((node: any) => node.id).filter((id: string) => !prevIds.includes(id));
+            const diff = freshGraph.nodes.map((node) => node.id).filter((id: string) => !prevIds.includes(id));
             if (diff.length === 1) newId = diff[0];
           }
         }
@@ -440,14 +437,14 @@ export const useWorkspaceNodeMutations = ({
       }
       endOperation('concatNodes');
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       setOperationError('concatNodes', error.message);
       endOperation('concatNodes');
     },
   });
 
   const filterNodeMutation = useMutation({
-    mutationFn: ({ workspaceId, nodeId, request }: { workspaceId: string; nodeId: string; request: FilterRequest }) =>
+    mutationFn: ({ nodeId, request }: { nodeId: string; request: FilterRequest }) =>
       nodesApi.filter(nodeId, request, authHeaders),
     onMutate: () => {
       startOperation('filterNode');
@@ -458,14 +455,14 @@ export const useWorkspaceNodeMutations = ({
       }
       endOperation('filterNode');
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       setOperationError('filterNode', error.message);
       endOperation('filterNode');
     },
   });
 
   const computeColumnMutation = useMutation({
-    mutationFn: ({ workspaceId, nodeId, request }: { workspaceId: string; nodeId: string; request: ExpressionTransformRequest }) =>
+    mutationFn: ({ nodeId, request }: { nodeId: string; request: ExpressionTransformRequest }) =>
       nodesApi.computeColumn(nodeId, request, authHeaders),
     onMutate: () => {
       startOperation('computeColumn');
@@ -480,14 +477,14 @@ export const useWorkspaceNodeMutations = ({
       }
       endOperation('computeColumn');
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       setOperationError('computeColumn', error.message);
       endOperation('computeColumn');
     },
   });
 
   const sliceNodeMutation = useMutation({
-    mutationFn: ({ workspaceId, nodeId, request }: { workspaceId: string; nodeId: string; request: SliceRequest }) =>
+    mutationFn: ({ nodeId, request }: { nodeId: string; request: SliceRequest }) =>
       nodesApi.slice(nodeId, request, authHeaders),
     onMutate: () => {
       startOperation('sliceNode');
@@ -498,7 +495,7 @@ export const useWorkspaceNodeMutations = ({
       }
       endOperation('sliceNode');
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       setOperationError('sliceNode', error.message);
       endOperation('sliceNode');
     },
@@ -519,7 +516,7 @@ export const useWorkspaceNodeMutations = ({
       }
       endOperation('castNode');
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       setOperationError('castNode', error.message);
       endOperation('castNode');
     },
@@ -541,7 +538,7 @@ export const useWorkspaceNodeMutations = ({
       }
       endOperation('renameColumn');
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       setOperationError('renameColumn', error.message);
       endOperation('renameColumn');
     },
@@ -563,7 +560,7 @@ export const useWorkspaceNodeMutations = ({
       }
       endOperation('deleteColumn');
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       setOperationError('deleteColumn', error.message);
       endOperation('deleteColumn');
     },
@@ -577,18 +574,17 @@ export const useWorkspaceNodeMutations = ({
     saveWorkspaceAs: (filename: string) => saveWorkspaceAsMutation.mutateAsync(filename),
     renameWorkspace: (newName: string) => updateWorkspaceNameMutation.mutateAsync(newName),
     renameNode: (nodeId: string, newName: string) =>
-      renameNodeMutation.mutateAsync({ workspaceId: ensureWorkspaceSelected(), nodeId, newName }),
+      renameNodeMutation.mutateAsync({ nodeId, newName }),
     undoNode: (nodeId: string) =>
       undoNodeMutation.mutateAsync({ nodeId }),
     redoNode: (nodeId: string) =>
       redoNodeMutation.mutateAsync({ nodeId }),
     copyNode: (nodeId: string) =>
-      copyNodeMutation.mutateAsync({ workspaceId: ensureWorkspaceSelected(), nodeId }),
+      copyNodeMutation.mutateAsync({ nodeId }),
     deleteNode: (nodeId: string) =>
-      deleteNodeMutation.mutateAsync({ workspaceId: ensureWorkspaceSelected(), nodeId }),
+      deleteNodeMutation.mutateAsync({ nodeId }),
     createNodeFromFile: (filename: string, sheetName?: string) =>
       createNodeMutation.mutateAsync({
-        workspaceId: ensureWorkspaceSelected(),
         filename,
         sheetName,
       }),
@@ -601,7 +597,6 @@ export const useWorkspaceNodeMutations = ({
       newNodeName?: string
     ) =>
       joinNodesMutation.mutateAsync({
-        workspaceId: ensureWorkspaceSelected(),
         leftNodeId,
         rightNodeId,
         joinType,
@@ -610,19 +605,19 @@ export const useWorkspaceNodeMutations = ({
         newNodeName,
       }),
     concatNodes: (nodeIds: string[], newNodeName?: string) =>
-      concatNodesMutation.mutateAsync({ workspaceId: ensureWorkspaceSelected(), nodeIds, newNodeName }),
+      concatNodesMutation.mutateAsync({ nodeIds, newNodeName }),
     concatPreview: (nodeIds: string[], page = 1, pageSize = 10) =>
       nodesApi.concatPreview({ node_ids: nodeIds }, page, pageSize, authHeaders),
     filterNode: (nodeId: string, request: FilterRequest) =>
-      filterNodeMutation.mutateAsync({ workspaceId: ensureWorkspaceSelected(), nodeId, request }),
+      filterNodeMutation.mutateAsync({ nodeId, request }),
     filterPreview: (nodeId: string, request: FilterRequest, page = 1, pageSize = 10) =>
       nodesApi.filterPreview(nodeId, request, page, pageSize, authHeaders),
     sliceNode: (nodeId: string, request: SliceRequest) =>
-      sliceNodeMutation.mutateAsync({ workspaceId: ensureWorkspaceSelected(), nodeId, request }),
+      sliceNodeMutation.mutateAsync({ nodeId, request }),
     slicePreview: (nodeId: string, request: SliceRequest, page = 1, pageSize = 10) =>
       nodesApi.slicePreview(nodeId, request, page, pageSize, authHeaders),
     computeColumn: (nodeId: string, request: ExpressionTransformRequest) =>
-      computeColumnMutation.mutateAsync({ workspaceId: ensureWorkspaceSelected(), nodeId, request }),
+      computeColumnMutation.mutateAsync({ nodeId, request }),
     computeColumnPreview: (nodeId: string, request: ExpressionTransformRequest) =>
       nodesApi.computeColumnPreview(nodeId, request, authHeaders),
     castColumn: (nodeId: string, column: string, targetType: string, format?: string) =>
@@ -632,12 +627,12 @@ export const useWorkspaceNodeMutations = ({
     deleteColumn: (nodeId: string, column: string) => deleteColumnMutation.mutateAsync({ nodeId, column }),
     refreshNodeSchema: async (nodeId: string): Promise<NodeSchemaResponse | null> => {
       if (!currentWorkspaceId) return null;
-      const graphData = queryClient.getQueryData(queryKeys.workspaceGraph(currentWorkspaceId)) as any;
+      const graphData = queryClient.getQueryData<WorkspaceGraphResponse>(queryKeys.workspaceGraph(currentWorkspaceId));
       const existingNodes = graphData?.nodes || [];
-      const nodeExists = existingNodes.some((node: any) => node.id === nodeId);
+      const nodeExists = existingNodes.some((node) => node.id === nodeId);
       if (!nodeExists) {
         if (typeof window !== 'undefined' && localStorage.getItem('debugGraph') === '1') {
-          console.log(`Node ${nodeId} no longer exists, skipping schema refresh`);
+          console.debug(`Node ${nodeId} no longer exists, skipping schema refresh`);
         }
         return null;
       }

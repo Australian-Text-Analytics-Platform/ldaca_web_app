@@ -3,7 +3,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useAuth } from '../useAuth';
 import { useSelectionStore } from '../../stores/selectionStore';
 import { useUIStore } from '../../stores/uiStore';
-import { PaginationMap, PaginationState, createDefaultPagination } from './types';
+import { type PaginationMap, type PaginationState, createDefaultPagination } from './types';
 
 const normalizeOperationErrors = (operationErrors: Map<string, string> | Record<string, string> | null | undefined) => {
   if (!operationErrors) {
@@ -107,6 +107,7 @@ export const useWorkspaceCore = () => {
   };
 
   const previousWorkspaceIdRef = useRef<string | null>(null);
+  /* eslint-disable react-hooks/set-state-in-effect -- Resetting selection/pagination on workspace change; guarded by ref comparison */
   useEffect(() => {
     const previous = previousWorkspaceIdRef.current;
     if (previous !== currentWorkspaceId) {
@@ -117,7 +118,9 @@ export const useWorkspaceCore = () => {
       previousWorkspaceIdRef.current = currentWorkspaceId;
     }
   }, [clearAllSelections, currentWorkspaceId]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
+  /* eslint-disable react-hooks/set-state-in-effect -- Initializing pagination for newly selected node; guarded to prevent infinite loop */
   useEffect(() => {
     const nodeId = selectedNodeId;
     if (nodeId && !pagination[nodeId]) {
@@ -132,6 +135,7 @@ export const useWorkspaceCore = () => {
       });
     }
   }, [pagination, selectedNodeId]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handlePageChange = (page: number) => {
     if (!selectedNodeId) return;

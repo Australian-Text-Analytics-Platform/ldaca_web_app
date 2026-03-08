@@ -8,6 +8,7 @@ import {
   Controls,
   MiniMap,
   ReactFlow,
+  type NodeTypes,
 } from '@xyflow/react';
 import { Loader2, Network } from 'lucide-react';
 
@@ -115,7 +116,7 @@ export function WorkspaceGraphFeature({ fallback }: WorkspaceGraphFeatureProps) 
       <ReactFlow
         nodes={graph.nodes}
         edges={graph.edges}
-        nodeTypes={graph.nodeTypes as any}
+        nodeTypes={graph.nodeTypes as unknown as NodeTypes}
         onNodesChange={graph.handleNodesChange}
         onEdgesChange={graph.handleEdgesChange}
         onNodeClick={graph.handleNodeClick}

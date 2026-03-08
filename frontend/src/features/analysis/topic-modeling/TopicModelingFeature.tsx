@@ -1,11 +1,11 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '../../../hooks/useWorkspaceSelection';
 import { useAuth } from '../../../hooks/useAuth';
 // Updated to use modular API object pattern
 import { textApi } from '../../../api/text';
-import { useAnalysisStore } from '../../../stores/analysisStore';
+import { useAnalysisStore, type TaskItem } from '../../../stores/analysisStore';
 import { useUIStore } from '../../../stores';
 import useNodeColumnInfos from '../../../hooks/useNodeColumnInfos';
 import { pruneTasksById } from '../../../hooks/analysisTaskUtils';
@@ -27,7 +27,7 @@ import { useTopicModelingTaskFlow } from './hooks/useTopicModelingTaskFlow';
 import { useTopicModelingZoomBrush } from './hooks/useTopicModelingZoomBrush';
 import { useTopicModelingBubbleChart } from './hooks/useTopicModelingBubbleChart';
 interface TopicModelingTopic { id: number; label: string; size: number[]; total_size: number; x: number; y: number; }
-interface TopicModelingResponse { state?: 'running' | 'successful' | 'failed' | 'cancelled'; message?: string; data?: { topics: TopicModelingTopic[]; corpus_sizes?: number[] }; metadata?: { task_id?: string; [k: string]: any } }
+interface TopicModelingResponse { state?: 'running' | 'successful' | 'failed' | 'cancelled'; message?: string; data?: { topics: TopicModelingTopic[]; corpus_sizes?: number[] }; metadata?: { task_id?: string; [k: string]: unknown } }
 
 const TopicModelingFeature: React.FC = () => {
   const { selectedNodes } = useWorkspaceSelection();
@@ -64,7 +64,7 @@ const TopicModelingFeature: React.FC = () => {
     | null;
   const currentView = useUIStore((state) => state.currentView);
   const isActiveTab = currentView === 'topic-modeling';
-  const setTasks = useAnalysisStore((state: any) => state.setTasks);
+  const setTasks = useAnalysisStore((state) => state.setTasks);
   const [error, setError] = useState<string | null>(null);
   const [result, resultRef, setResultSafely] = useSafeResult<TopicModelingResponse>();
   
@@ -118,10 +118,10 @@ const TopicModelingFeature: React.FC = () => {
       }
     },
     onHydratedRequest: async (requestPayload) => {
-      const req = (requestPayload as any)?.data ?? requestPayload;
+      const req = ((requestPayload as Record<string, unknown>)?.data ?? requestPayload) as Record<string, unknown>;
       if (!req) return;
-      const nodeIds: string[] = Array.isArray(req.node_ids) ? req.node_ids.slice(0, 2) : [];
-      const node_columns: Record<string, string> = req.node_columns || {};
+      const nodeIds: string[] = Array.isArray(req.node_ids) ? (req.node_ids as string[]).slice(0, 2) : [];
+      const node_columns = (req.node_columns || {}) as Record<string, string>;
       const sels = nodeIds.map((id: string) => ({ nodeId: id, column: node_columns[id] || '' }));
       setNodeColumnSelections(sels, { replace: true });
       setMinTopicSize(Number(req.min_topic_size ?? 10));
@@ -143,32 +143,32 @@ const TopicModelingFeature: React.FC = () => {
       resetAnalysisSelectionAfterClear({ unlockSelection });
     },
     pruneGlobalTasks: (taskIds) =>
-      setTasks((prev: any[]) => Array.isArray(prev) ? pruneTasksById(prev, taskIds) : prev),
-    getExtraTaskIdCandidates: () => [(resultRef.current as any)?.metadata?.task_id],
-    getClearTaskIdSources: () => [(resultRef.current as any)?.metadata?.task_id],
+      setTasks((prev: TaskItem[]) => Array.isArray(prev) ? pruneTasksById(prev, taskIds) : prev),
+    getExtraTaskIdCandidates: () => [(resultRef.current as TopicModelingResponse | null)?.metadata?.task_id],
+    getClearTaskIdSources: () => [(resultRef.current as TopicModelingResponse | null)?.metadata?.task_id],
     isResultRunning: (r) => r?.state === 'running',
   });
 
-  const handleClear = useCallback(async () => {
+  const handleClear = async () => {
     setIsClearing(true);
     await clearResults();
     setSelectedTopicIds(new Set());
     setTopicSearchQuery('');
     setIsClearing(false);
-  }, [clearResults]);
+  };
 
-  const handleToggleTopicSelection = useCallback((id: number) => {
+  const handleToggleTopicSelection = (id: number) => {
     setSelectedTopicIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
-  }, []);
+  };
 
-  const handleClearTopicSelection = useCallback(() => {
+  const handleClearTopicSelection = () => {
     setSelectedTopicIds(new Set());
-  }, []);
+  };
 
   const topicRunningTask = taskStatus.runningTask;
   const panelNodeIds = panelSelectedNodes
@@ -237,7 +237,7 @@ const TopicModelingFeature: React.FC = () => {
     if (!isLocked && panelNodeIds.length > 0 && nodeColumnSelections.length === 0) {
       recomputeAutoColumns();
     }
-  }, [isLocked, panelNodeIdsKey, nodeColumnSelections.length, recomputeAutoColumns]);
+  }, [isLocked, panelNodeIdsKey, nodeColumnSelections.length, recomputeAutoColumns, panelNodeIds.length]);
 
   const handleColumnChange = (nodeId: string, column: string) => {
     if (isLocked) return;

@@ -86,7 +86,7 @@ export const columnPersistence = {
     if (column && column.trim().length > 0) {
       map[entityId] = column;
     } else {
-      delete map[entityId];
+      Reflect.deleteProperty(map, entityId);
     }
     writeRaw(context, map);
   },
@@ -105,7 +105,7 @@ export const columnPersistence = {
 
     const map = readRaw(context);
     if (Object.prototype.hasOwnProperty.call(map, entityId)) {
-      delete map[entityId];
+      Reflect.deleteProperty(map, entityId);
       writeRaw(context, map);
     }
   },

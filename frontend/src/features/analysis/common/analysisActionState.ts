@@ -11,6 +11,7 @@ export type AnalysisActionStateInput = {
 export type AnalysisActionState = {
   runDisabled: boolean;
   clearDisabled: boolean;
+  runLabel: 'Run' | 'Update';
 };
 
 export const getAnalysisActionState = ({
@@ -26,11 +27,12 @@ export const getAnalysisActionState = ({
     !hasWorkspace ||
     !hasSelection ||
     isBusy ||
-    hasActiveTask ||
-    (isLocked && !allowRunWhenLocked);
+    ((isLocked || hasActiveTask) && !allowRunWhenLocked);
 
   const clearDisabled =
     !hasWorkspace || (!hasResults && !isLocked && !hasActiveTask);
 
-  return { runDisabled, clearDisabled };
+  const runLabel: 'Run' | 'Update' = allowRunWhenLocked ? 'Update' : 'Run';
+
+  return { runDisabled, clearDisabled, runLabel };
 };

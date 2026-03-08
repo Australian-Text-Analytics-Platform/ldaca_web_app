@@ -1,7 +1,7 @@
 import { useEffect, useSyncExternalStore, useCallback } from 'react';
-import { AuthInfoResponse } from '../types';
+import { type AuthInfoResponse } from '../types';
 import { authApi } from '../api/auth';
-import { configApi, ConfigResponse } from '../api/config';
+import { configApi, type ConfigResponse } from '../api/config';
 
 if (import.meta.env.DEV) {
   console.debug('[useAuth] module loaded', import.meta.url);
@@ -132,7 +132,8 @@ const runAuthFetch = (reason: FetchReason): Promise<void> => {
       setPhase({ status: 'ready', info });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Authentication failed';
-      const status = typeof (error as any)?.status === 'number' ? (error as any).status : null;
+      const errorObj = error != null && typeof error === 'object' ? (error as Record<string, unknown>) : null;
+      const status = typeof errorObj?.status === 'number' ? errorObj.status : null;
       const unauthorized = status === 401 || status === 403;
       const failureTime = Date.now();
 
@@ -230,7 +231,7 @@ export const useAuth = (options: UseAuthOptions = {}) => {
       await runAuthFetch('bootstrap');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Google login failed';
-      throw new Error(message);
+      throw new Error(message, { cause: error });
     }
   };
 

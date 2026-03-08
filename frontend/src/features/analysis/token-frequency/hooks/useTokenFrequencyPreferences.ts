@@ -32,6 +32,7 @@ export const useTokenFrequencyPreferences = ({
   const [tokenLimitError, setTokenLimitError] = useState<string | null>(null);
   const [isApplyingTokenLimit, setIsApplyingTokenLimit] = useState(false);
 
+  // Identity stability: used in useEffect dependency array
   const applyTokenLimitState = useCallback((rawLimit: number | null | undefined) => {
     const target = typeof rawLimit === 'number' && Number.isFinite(rawLimit) && rawLimit > 0
       ? rawLimit
@@ -86,7 +87,7 @@ export const useTokenFrequencyPreferences = ({
     const taskId = await resolveTokenFrequencyTaskId();
     if (!taskId) return;
 
-    const payload: Record<string, any> = {};
+    const payload: Record<string, unknown> = {};
     if (prefs.token_limit !== undefined) {
       payload.token_limit = Math.min(
         clampDisplayTokenLimit(prefs.token_limit).limit,
@@ -105,8 +106,8 @@ export const useTokenFrequencyPreferences = ({
     setResults((prev) => {
       if (!prev) return prev;
 
-      const metadata = { ...(((prev as any)?.metadata) ?? {}) } as Record<string, any>;
-      const analysisParams = { ...(prev.analysis_params ?? {}) } as Record<string, any>;
+      const metadata = { ...((prev.metadata) ?? {}) } as Record<string, unknown>;
+      const analysisParams = { ...(prev.analysis_params ?? {}) } as Record<string, unknown>;
 
       let nextTokenLimit: number | undefined;
       const existingTokenLimit =
@@ -245,7 +246,7 @@ export const useTokenFrequencyPreferences = ({
     setIsLoadingStopWords(true);
     try {
       const response = await textApi.defaultStopWords(getAuthHeaders());
-      const defaultWords = response?.stopwords ?? (response as any)?.data;
+      const defaultWords = response?.stopwords ?? (response as Record<string, unknown>)?.data;
       if (Array.isArray(defaultWords) && defaultWords.length) {
         const joined = defaultWords.join(', ');
         setStopWords(joined);

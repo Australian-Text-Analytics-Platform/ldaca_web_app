@@ -48,7 +48,7 @@ import {
   FileText,
   Filter,
   FolderOpen,
-  LucideIcon,
+  type LucideIcon,
   MessageSquare,
   Puzzle,
   Quote,

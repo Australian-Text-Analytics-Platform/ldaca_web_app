@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { useAnalysisStore } from '@/stores/analysisStore';
@@ -178,8 +178,7 @@ export const useWorkspaceTaskInbox = (
     return eventSequenceRef.current;
   };
 
-  const handlePayload = useCallback(
-    (payload: TaskEventPayload) => {
+  const handlePayload = (payload: TaskEventPayload) => {
       if (payload.type !== 'analysis_save_failed' && payload.type !== 'error') {
         setTransientError(null);
       }
@@ -206,13 +205,14 @@ export const useWorkspaceTaskInbox = (
           break;
         }
         case 'tasks_snapshot': {
-          if (Array.isArray(payload.tasks)) {
+          const snapshotTasks = payload.tasks;
+          if (Array.isArray(snapshotTasks)) {
             const seq = nextEventSequence();
-            const eventTimestamp = normalizeTimestamp((payload as any)?.timestamp);
+            const eventTimestamp = normalizeTimestamp(payload.timestamp);
             setTasks((prevTasks: TaskItem[]) =>
               mergeTaskUpdates(
                 prevTasks,
-                payload.tasks.map((task: any) => ({
+                snapshotTasks.map((task: TaskItem) => ({
                   task,
                   eventTimestamp,
                   eventSequence: seq,
@@ -226,7 +226,7 @@ export const useWorkspaceTaskInbox = (
         case 'task_changed': {
           if (payload.task) {
             const seq = nextEventSequence();
-            const eventTimestamp = normalizeTimestamp((payload as any)?.timestamp);
+            const eventTimestamp = normalizeTimestamp(payload.timestamp);
             setTasks((prevTasks: TaskItem[]) =>
               mergeTaskUpdates(prevTasks, [
                 {
@@ -259,13 +259,14 @@ export const useWorkspaceTaskInbox = (
           break;
         }
         case 'task_update': {
-          if (Array.isArray(payload.tasks)) {
+          const updateTasks = payload.tasks;
+          if (Array.isArray(updateTasks)) {
             const seq = nextEventSequence();
-            const eventTimestamp = normalizeTimestamp((payload as any)?.timestamp);
+            const eventTimestamp = normalizeTimestamp(payload.timestamp);
             setTasks((prevTasks: TaskItem[]) =>
               mergeTaskUpdates(
                 prevTasks,
-                payload.tasks.map((task: any) => ({
+                updateTasks.map((task: TaskItem) => ({
                   task,
                   eventTimestamp,
                   eventSequence: seq,
@@ -284,9 +285,7 @@ export const useWorkspaceTaskInbox = (
           break;
         }
       }
-    },
-    [setTasks, setTransientError, queryClient, workspaceId]
-  );
+    };
 
   const clientState = useWorkspaceTaskStreamClient({
     enabled: true,

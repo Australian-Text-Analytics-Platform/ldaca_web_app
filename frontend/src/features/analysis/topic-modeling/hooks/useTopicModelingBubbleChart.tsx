@@ -119,7 +119,7 @@ export function useTopicModelingBubbleChart({
     );
   };
 
-  const bubbleElements = React.useMemo(() => {
+  const bubbleElements = (() => {
     if (!topics.length || !activeDomain) return null;
 
     const width = chartWidth;
@@ -264,33 +264,7 @@ export function useTopicModelingBubbleChart({
         )}
       </svg>
     );
-  }, [
-    topics,
-    activeDomain,
-    chartWidth,
-    chartHeight,
-    chartPadding,
-    brushRect,
-    chartSvgRef,
-    isBrushing,
-    handleBrushStart,
-    handleBrushMove,
-    handleBrushEnd,
-    handleResetZoom,
-    setHoveredTopicId,
-    setTooltip,
-    corpusCount,
-    fallbackPrimaryColor,
-    fallbackSecondaryColor,
-    hoveredTopicId,
-    chartRef,
-    panelNodeIds,
-    nodeColors,
-    defaultPalette,
-    selectedTopicIds,
-    onToggleTopicSelection,
-    topicSearchQuery,
-  ]);
+  })();
 
   return {
     bubbleElements,

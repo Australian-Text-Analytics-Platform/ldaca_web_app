@@ -2,24 +2,26 @@ import NodeSelectionPanel from '@/components/NodeSelectionPanel';
 import { ANALYSIS_LOCKED_MESSAGE } from '@/components/tabs/AnalysisLockedNotice';
 import type { NodeColumnSelection } from '@/hooks/useAutoNodeColumns';
 import { AnalysisCardLayout } from '../../../common/components/AnalysisCardLayout';
+import type { WorkspaceNodeLike, NodeColumnSource } from '../../../common/nodeSelectionTypes';
 
 type TokenFrequencyParameterPanelProps = {
-  panelSelectedNodes: any[];
+  panelSelectedNodes: WorkspaceNodeLike[];
   effectiveNodeColumnSelections: NodeColumnSelection[];
   onColumnChange: (nodeId: string, column: string) => void;
   nodeColors: Record<string, string>;
   onColorChange: (nodeId: string, color: string) => void;
   defaultPalette: string[];
   isLocked: boolean;
-  getNodeColumns: (node: any, idx?: number) => any[];
+  getNodeColumns: (node: WorkspaceNodeLike, idx?: number) => NodeColumnSource;
   displayNodeCount: number;
-  actionState: { runDisabled: boolean; clearDisabled: boolean };
+  actionState: { runDisabled: boolean; clearDisabled: boolean; runLabel: string };
   isAnalyzing: boolean;
   onAnalyze: () => void;
   onClearResults: () => void;
   hasIncompleteSelections: boolean;
   appliedStopCount: number;
   hasResults: boolean;
+  runLabel?: string;
 };
 
 export const TokenFrequencyParameterPanel = ({
@@ -39,6 +41,7 @@ export const TokenFrequencyParameterPanel = ({
   hasIncompleteSelections,
   appliedStopCount,
   hasResults,
+  runLabel,
 }: TokenFrequencyParameterPanelProps) => {
   return (
     <AnalysisCardLayout
@@ -55,6 +58,7 @@ export const TokenFrequencyParameterPanel = ({
         clearDisabled: actionState.clearDisabled,
         isRunning: isAnalyzing,
         hasResult: hasResults,
+        runLabel,
         runHelp: { targetKey: 'analysis.token-frequency.run', label: 'Run token frequency' },
         clearHelp: { targetKey: 'analysis.token-frequency.clear-results', label: 'Clear results' },
         extraContent: appliedStopCount > 0 ? (

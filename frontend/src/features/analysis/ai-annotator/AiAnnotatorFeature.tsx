@@ -374,6 +374,7 @@ const AiAnnotatorFeature: React.FC = () => {
     if (!currentWorkspaceId) return;
     if (endpointPreset === 'custom' && !customBaseUrl.trim()) return;
     handleLoadModels();
+    // handleLoadModels is intentionally excluded — it's an event handler whose identity changes every render
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [endpointPreset, customBaseUrl, currentWorkspaceId]);
 

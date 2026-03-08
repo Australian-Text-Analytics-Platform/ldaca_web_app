@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { } from 'react';
 import type { ColumnInfo } from '@/utils/columnTypes';
 import { filterColumnsByType, mapColumnsToInfo, normalizeTypeName } from '@/utils/columnTypes';
 import type { NodeColumnSource, WorkspaceNodeLike } from './nodeSelectionTypes';
@@ -92,12 +92,9 @@ export const buildNodeColumnOptionsMap = ({
     const nodeId = getNodeIdentifier(node, index);
     if (!nodeId) return acc;
 
-    let infos: ColumnInfo[] = [];
-    if (getNodeColumns) {
-      infos = normalizeColumnInfos(getNodeColumns(node));
-    } else {
-      infos = mapColumnsToInfo(node as Record<string, unknown>);
-    }
+    const infos = getNodeColumns
+      ? normalizeColumnInfos(getNodeColumns(node))
+      : mapColumnsToInfo(node as Record<string, unknown>);
 
     acc[nodeId] = buildEntry(nodeId, infos, allowedDataTypes, fallbackToAllColumns);
     return acc;
@@ -109,14 +106,10 @@ export const useNodeColumnOptions = (
 ): NodeColumnOptionsMap => {
   const { nodes = [], getNodeColumns, allowedDataTypes, fallbackToAllColumns } = config;
 
-  return useMemo(
-    () =>
-      buildNodeColumnOptionsMap({
+  return buildNodeColumnOptionsMap({
         nodes,
         getNodeColumns,
         allowedDataTypes,
         fallbackToAllColumns,
-      }),
-    [nodes, getNodeColumns, allowedDataTypes, fallbackToAllColumns]
-  );
+      });
 };

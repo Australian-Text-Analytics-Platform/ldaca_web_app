@@ -7,15 +7,15 @@ import testingLibrary from 'eslint-plugin-testing-library';
 
 export default tseslint.config([
   { ignores: ['dist', 'build', 'node_modules', '**/*.config.js'] },
+
+  // ── Main: TypeScript + React ────────────────────────────────────
   {
-    extends: [js.configs.recommended, ...tseslint.configs.recommended],
+    extends: [js.configs.recommended, ...tseslint.configs.strict],
     files: ['**/*.{ts,tsx}'],
     languageOptions: {
       globals: globals.browser,
       parserOptions: {
-        ecmaFeatures: {
-          jsx: true,
-        },
+        ecmaFeatures: { jsx: true },
       },
     },
     plugins: {
@@ -23,25 +23,48 @@ export default tseslint.config([
       'react-refresh': reactRefresh,
     },
     rules: {
-      ...reactHooks.configs.recommended.rules,
+      // React Hooks — all recommended-latest rules, then dial back the
+      // two new React 19 rules that many legitimate patterns still trigger.
+      ...reactHooks.configs['recommended-latest'].rules,
+      'react-hooks/set-state-in-effect': 'warn',
+      'react-hooks/purity': 'warn',
+
+      // The strict preset sets no-unused-vars to 'error' but without
+      // ignore patterns. The patterns below are the universally-standard
+      // config (used by typescript-eslint itself, Next.js, Remix, etc.):
+      //   - `_`-prefixed args/vars for intentionally unused bindings
+      //   - rest-siblings for `const { unwanted, ...rest } = obj`
       '@typescript-eslint/no-unused-vars': [
         'error',
         {
           argsIgnorePattern: '^_',
-          ignoreRestSiblings: true,
           varsIgnorePattern: '^_',
           caughtErrorsIgnorePattern: '^_',
+          ignoreRestSiblings: true,
         },
       ],
-      '@typescript-eslint/no-explicit-any': 'off',
-      'react-hooks/set-state-in-effect': 'off',
-      'react-hooks/exhaustive-deps': 'off',
-      'react-hooks/purity': 'off',
-      'no-console': 'off',
-      'react-refresh/only-export-components': 'off',
+
+      '@typescript-eslint/consistent-type-imports': [
+        'error',
+        { prefer: 'type-imports', fixStyle: 'inline-type-imports' },
+      ],
+
+      // Code quality
+      'no-console': ['error', { allow: ['warn', 'error', 'debug'] }],
+      eqeqeq: ['error', 'always', { null: 'ignore' }],
+      'prefer-const': 'error',
+      'no-var': 'error',
+      'object-shorthand': ['error', 'always'],
+
+      // React Refresh — warn-only; constant exports are fine (e.g. queryKeys)
+      'react-refresh/only-export-components': [
+        'warn',
+        { allowConstantExport: true },
+      ],
     },
   },
-  // Test files configuration
+
+  // ── Test files ──────────────────────────────────────────────────
   {
     files: ['**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}', '**/__tests__/**/*.{ts,tsx}'],
     plugins: {
@@ -49,6 +72,9 @@ export default tseslint.config([
     },
     rules: {
       ...testingLibrary.configs['flat/react'].rules,
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-non-null-assertion': 'off',
+      'no-console': 'off',
     },
   },
 ]);

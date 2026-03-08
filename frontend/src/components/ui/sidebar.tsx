@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
-import { cva, VariantProps } from "class-variance-authority"
+import { cva, type VariantProps } from "class-variance-authority"
 import { PanelLeftIcon } from "lucide-react"
 
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -560,8 +560,10 @@ function SidebarMenuSkeleton({
 }: React.ComponentProps<"div"> & {
   showIcon?: boolean
 }) {
-  // Random width between 50 to 90%.
-  const width = `${Math.floor(Math.random() * 40) + 50}%`
+  // Stable random width computed once per component instance
+  // eslint-disable-next-line react-hooks/purity -- Intentional: one-time random initialization for visual variety in skeletons
+  const widthRef = React.useRef(`${Math.floor(Math.random() * 40) + 50}%`)
+  const width = widthRef.current
 
   return (
     <div
@@ -671,5 +673,6 @@ export {
   SidebarRail,
   SidebarSeparator,
   SidebarTrigger,
+  // eslint-disable-next-line react-refresh/only-export-components -- Hook must be co-exported with provider component
   useSidebar,
 }

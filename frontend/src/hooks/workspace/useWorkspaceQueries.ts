@@ -1,9 +1,10 @@
-import { useMemo } from 'react';
+import { } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { workspacesApi } from '../../api/workspaces';
 import { nodesApi } from '../../api/nodes';
 import { queryKeys } from '../../lib/queryKeys';
-import { PaginationState } from './types';
+import type { GraphNode, NodeDataResponse } from '../../types/api';
+import { type PaginationState } from './types';
 
 interface WorkspaceQueriesParams {
   authHeaders: Record<string, string>;
@@ -16,19 +17,19 @@ interface WorkspaceQueriesParams {
 
 const DEBUG_GRAPH_KEY = 'debugGraph';
 
-const logGraphDebug = (result: any) => {
+const logGraphDebug = (result: { nodes?: GraphNode[]; edges?: { source: string; target: string }[] }) => {
   if (typeof window === 'undefined') return;
   if (localStorage.getItem(DEBUG_GRAPH_KEY) !== '1') return;
 
-  console.log('=== API Response Success ===');
-  console.log('API response structure:', {
+  console.debug('=== API Response Success ===');
+  console.debug('API response structure:', {
     nodes: result?.nodes?.length || 0,
     edges: result?.edges?.length || 0,
   });
 
   if (result?.nodes && result.nodes.length > 0) {
     const sampleNode = result.nodes[0];
-    console.log('Sample node structure:', {
+    console.debug('Sample node structure:', {
       id: sampleNode.id,
       name: sampleNode.name,
       operation: sampleNode.operation,
@@ -74,14 +75,15 @@ export const useWorkspaceQueries = ({
 
   const nodeDataQuery = useQuery({
     queryKey: queryKeys.nodeData(
-      currentWorkspaceId!,
-      selectedNodeId!,
+      currentWorkspaceId ?? '',
+      selectedNodeId ?? '',
       getPaginationForNode(selectedNodeId).currentPage,
       getPaginationForNode(selectedNodeId).pageSize
     ),
     queryFn: () => {
+      if (!currentWorkspaceId || !selectedNodeId) throw new Error('Missing workspace or node ID');
       const { currentPage, pageSize } = getPaginationForNode(selectedNodeId);
-      return nodesApi.data(selectedNodeId!, currentPage, pageSize, authHeaders);
+      return nodesApi.data(selectedNodeId, currentPage, pageSize, authHeaders);
     },
     enabled: isAuthenticated && !!currentWorkspaceId && !!selectedNodeId,
     staleTime: 30 * 1000,
@@ -89,56 +91,33 @@ export const useWorkspaceQueries = ({
 
   const workspaces = workspacesQuery.data || [];
   const currentWorkspace =
-    workspaces.find((workspace: any) => workspace.id === currentWorkspaceId) || null;
+    workspaces.find((workspace) => workspace.id === currentWorkspaceId) || null;
   const workspaceGraph = graphQuery.data || null;
 
-  const nodes = useMemo(() => workspaceGraph?.nodes ?? [], [workspaceGraph]);
-  const selectedNode = useMemo(
-    () => nodes.find((node: any) => node.id === selectedNodeId) || null,
-    [nodes, selectedNodeId]
-  );
+  const nodes = workspaceGraph?.nodes ?? [];
+  const selectedNode = nodes.find((node) => node.id === selectedNodeId) || null;
 
-  const selectedNodes = useMemo(
-    () =>
-      selectedNodeIds
-        .map((id: string) => nodes.find((node: any) => node.id === id))
-        .filter(Boolean),
-    [selectedNodeIds, nodes]
-  );
+  const selectedNodes = selectedNodeIds
+        .map((id: string) => nodes.find((node) => node.id === id))
+        .filter((n): n is GraphNode => Boolean(n));
 
-  const nodeData = nodeDataQuery.data || { data: [], page: 0, total_pages: 0 };
+  const nodeData: NodeDataResponse = nodeDataQuery.data || { data: [], pagination: { page: 0, page_size: 20, total_rows: 0, total_pages: 0, has_next: false, has_prev: false }, columns: [], dtypes: {} };
 
-  const queryLoadingState = useMemo(
-    () => ({
+  const queryLoadingState = ({
       workspaces: workspacesQuery.isLoading,
       currentWorkspace: currentWorkspaceQuery.isLoading,
       nodes: graphQuery.isLoading,
       graph: graphQuery.isLoading,
       nodeData: nodeDataQuery.isLoading,
-    }),
-    [
-      workspacesQuery.isLoading,
-      currentWorkspaceQuery.isLoading,
-      graphQuery.isLoading,
-      nodeDataQuery.isLoading,
-    ]
-  );
+    });
 
-  const queryErrorState = useMemo(
-    () => ({
+  const queryErrorState = ({
       workspaces: workspacesQuery.error?.message || null,
       currentWorkspace: currentWorkspaceQuery.error?.message || null,
       nodes: graphQuery.error?.message || null,
       graph: graphQuery.error?.message || null,
       nodeData: nodeDataQuery.error?.message || null,
-    }),
-    [
-      workspacesQuery.error?.message,
-      currentWorkspaceQuery.error?.message,
-      graphQuery.error?.message,
-      nodeDataQuery.error?.message,
-    ]
-  );
+    });
 
   return {
     workspacesQuery,

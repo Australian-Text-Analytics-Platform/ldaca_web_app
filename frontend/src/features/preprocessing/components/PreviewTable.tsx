@@ -5,7 +5,7 @@ import { Button } from '../../../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
 import { formatPreviewValue } from '../utils/typeUtils';
-import { PreviewRow, PreviewPagination, PREVIEW_PAGE_SIZE_OPTIONS } from '../types';
+import { type PreviewRow, type PreviewPagination, PREVIEW_PAGE_SIZE_OPTIONS } from '../types';
 
 interface PreviewTableProps {
   title: React.ReactNode;

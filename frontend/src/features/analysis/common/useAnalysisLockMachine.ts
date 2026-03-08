@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useState } from 'react';
 import type { WorkspaceNodeLike } from '@/components/NodeSelectionPanel';
 import { useWorkspaceSelection } from '@/hooks/useWorkspaceSelection';
 import { useWorkspaceData } from '@/hooks/useWorkspaceData';
@@ -57,30 +57,30 @@ export const useAnalysisLockCore = (config: AnalysisLockConfig) => {
     storageScope,
   });
 
-  const nodeIdToName = useMemo(() => {
+  const nodeIdToName = (() => {
     const map: Record<string, string> = {};
     selectedNodes.forEach((n) => {
-      const name = n.name || n.data?.name || n.data?.label || n.data?.nodeName || n.id;
+      const data = n.data as Record<string, unknown> | undefined;
+      const name = n.name || data?.name || data?.label || data?.nodeName || n.id;
       map[n.id] = String(name);
     });
     return map;
-  }, [selectedNodes]);
+  })();
 
-  const lockedNodeNameMap = useMemo(() => {
+  const lockedNodeNameMap = (() => {
     const map: Record<string, string> = {};
     lockedNodesSnapshot.forEach(({ id, name }) => {
       map[id] = name;
     });
     return map;
-  }, [lockedNodesSnapshot]);
+  })();
 
-  const unlockSelection = useCallback(() => {
+  const unlockSelection = () => {
     setIsLocked(false);
     setLockedNodesSnapshot([]);
-  }, []);
+  };
 
-  const lockWithSnapshots = useCallback(
-    (
+  const lockWithSnapshots = (
       snapshotInput:
         | Array<{ id: string; name?: string; columns?: string[] | null }>
         | { id: string; name?: string; columns?: string[] | null }
@@ -110,37 +110,35 @@ export const useAnalysisLockCore = (config: AnalysisLockConfig) => {
 
       setLockedNodesSnapshot(normalized);
       setIsLocked(true);
-    },
-    [unlockSelection]
-  );
+    };
 
-  const lockSelection = useCallback(() => {
+  const lockSelection = () => {
     const snapshot = nodeColumnSelections.map((sel) => ({
       id: sel.nodeId,
       name: nodeIdToName[sel.nodeId] || sel.nodeId,
       columns: sel.column ? [sel.column] : [],
     }));
     lockWithSnapshots(snapshot);
-  }, [nodeColumnSelections, nodeIdToName, lockWithSnapshots]);
+  };
 
-  const toggleLock = useCallback(() => {
+  const toggleLock = () => {
     if (isLocked) {
       unlockSelection();
     } else {
       lockSelection();
     }
-  }, [isLocked, lockSelection, unlockSelection]);
+  };
 
-  const activeNodeIds = useMemo(() => {
+  const activeNodeIds = (() => {
     if (isLocked && lockedNodesSnapshot.length > 0) {
       return lockedNodesSnapshot.map((n) => n.id);
     }
     return selectedNodes.map((n) => n.id);
-  }, [isLocked, lockedNodesSnapshot, selectedNodes]);
+  })();
 
-  const activeNodeId = useMemo(() => activeNodeIds[0] ?? '', [activeNodeIds]);
+  const activeNodeId = activeNodeIds[0] ?? '';
 
-  const activeNodeColumnSelections = useMemo(() => {
+  const activeNodeColumnSelections = (() => {
     if (isLocked && lockedNodesSnapshot.length > 0) {
       return lockedNodesSnapshot.map((n) => ({
         nodeId: n.id,
@@ -148,23 +146,23 @@ export const useAnalysisLockCore = (config: AnalysisLockConfig) => {
       }));
     }
     return nodeColumnSelections;
-  }, [isLocked, lockedNodesSnapshot, nodeColumnSelections]);
+  })();
 
-  const activeNodeNames = useMemo(() => {
+  const activeNodeNames = (() => {
     if (isLocked) {
       return lockedNodeNameMap;
     }
     return nodeIdToName;
-  }, [isLocked, lockedNodeNameMap, nodeIdToName]);
+  })();
 
-  const displayNodeCount = useMemo(() => {
+  const displayNodeCount = (() => {
     if (isLocked && lockedNodesSnapshot.length > 0) {
       return lockedNodesSnapshot.length;
     }
     return selectedNodes.length;
-  }, [isLocked, lockedNodesSnapshot, selectedNodes]);
+  })();
 
-  const panelSelectedNodes = useMemo<WorkspaceNodeLike[]>(() => {
+  const panelSelectedNodes: WorkspaceNodeLike[] = (() => {
     if (isLocked && lockedNodesSnapshot.length > 0) {
       return lockedNodesSnapshot.map((snapshot) => ({
         id: snapshot.id,
@@ -181,7 +179,7 @@ export const useAnalysisLockCore = (config: AnalysisLockConfig) => {
     }
 
     return selectedNodes as WorkspaceNodeLike[];
-  }, [isLocked, lockedNodesSnapshot, selectedNodes]);
+  })();
 
   return {
     isLocked,
@@ -224,8 +222,7 @@ export const useAnalysisLockMachine = (config: UseAnalysisLockMachineConfig) => 
   const lockState = useAnalysisLockCore(lockConfig);
   const { activeNodeIds, lockWithSnapshots } = lockState;
 
-  const captureSnapshotsForNodes = useCallback(
-    async (
+  const captureSnapshotsForNodes = async (
       nodeIds: string[],
       columnMap?: Record<string, string>
     ) => {
@@ -246,12 +243,9 @@ export const useAnalysisLockMachine = (config: UseAnalysisLockMachineConfig) => 
         console.error('Failed to capture node snapshots', error);
         return [];
       }
-    },
-    [workspaceId, getAuthHeaders]
-  );
+    };
 
-  const lockWithCurrentNodes = useCallback(
-    async (columnMap?: Record<string, string>) => {
+  const lockWithCurrentNodes = async (columnMap?: Record<string, string>) => {
       const nodeIds = activeNodeIds;
       if (!nodeIds.length) {
         lockWithSnapshots(null);
@@ -261,9 +255,7 @@ export const useAnalysisLockMachine = (config: UseAnalysisLockMachineConfig) => 
       if (snapshots.length) {
         lockWithSnapshots(snapshots);
       }
-    },
-    [captureSnapshotsForNodes, activeNodeIds, lockWithSnapshots]
-  );
+    };
 
   return {
     ...lockState,

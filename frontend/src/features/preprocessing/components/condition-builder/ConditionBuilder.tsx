@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button } from '../../../../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../../components/ui/select';
-import { ConditionColumnOption } from '../../types';
+import { type ConditionColumnOption } from '../../types';
 
 export interface ConditionBuilderItem {
   id: string;

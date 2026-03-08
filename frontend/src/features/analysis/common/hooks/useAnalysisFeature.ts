@@ -10,8 +10,14 @@ import type {
   AnalysisTaskFlowRefreshContext,
   CanonicalAnalysisTaskType,
 } from '../tasks/types';
-import type { ServerLockAnalysisType } from './useAnalysisServerRequestLock';
+import { analysisServerRequestLockQueryKey, type ServerLockAnalysisType } from './useAnalysisServerRequestLock';
 import type { AnalysisTaskStatus } from '@/hooks/useAnalysisTaskStatus';
+
+/** Minimal shape for accessing common result fields via type assertion */
+interface AnalysisResultLike {
+  state?: string;
+  metadata?: { task_id?: string };
+}
 
 // ---------------------------------------------------------------------------
 // Config
@@ -106,6 +112,7 @@ export function useAnalysisFeature<TResult = unknown>(
   // ---- Running state ----
   const [isRunning, setIsRunningState] = useState(false);
   const runningRef = useRef(false);
+  // Identity stability: used in useEffect dependency array
   const setIsRunning = useCallback((value: boolean) => {
     setIsRunningState(value);
     runningRef.current = value;
@@ -124,16 +131,29 @@ export function useAnalysisFeature<TResult = unknown>(
     setLocalTaskId(null);
   }, [config.workspaceId]);
 
+  // ---- Refresh server request lock after a task is created/changed ----
+  // Synchronous analysis flows (Sequential, Concordance) return results
+  // directly from the API and never emit SSE task_changed events, so the
+  // polling-based handleTaskRefresh never fires for them. Invalidating
+  // when localTaskId changes covers both sync and async flows.
+  useEffect(() => {
+    if (localTaskId && config.workspaceId) {
+      void queryClient.invalidateQueries({
+        queryKey: analysisServerRequestLockQueryKey(config.analysisType, config.workspaceId),
+      });
+    }
+  }, [localTaskId, config.workspaceId, config.analysisType, queryClient]);
+
   // ---- Task status ref (for async access inside resolveTaskId) ----
   const taskStatusRef = useRef<AnalysisTaskStatus | null>(null);
 
   // ---- Task ID resolution ----
-  const resolveTaskId = useCallback(async (): Promise<string | null> => {
+  const resolveTaskId = async (): Promise<string | null> => {
     const cfg = configRef.current;
     if (!cfg.workspaceId) return null;
 
     const metadataTaskId =
-      (cfg.resultRef.current as Record<string, any>)?.metadata?.task_id ?? null;
+      (cfg.resultRef.current as AnalysisResultLike)?.metadata?.task_id ?? null;
     const status = taskStatusRef.current;
     const extra = cfg.getExtraTaskIdCandidates?.() ?? [];
 
@@ -160,11 +180,10 @@ export function useAnalysisFeature<TResult = unknown>(
       },
       onResolved: setLocalTaskId,
     });
-  }, []); // stable — uses refs internally
+  }; // stable — uses refs internally
 
   // ---- Result fetch with dedup ----
-  const fetchAndApplyResult = useCallback(
-    async (
+  const fetchAndApplyResult = async (
       taskId: string | null,
       expectedState: 'successful' | 'failed',
     ): Promise<void> => {
@@ -200,7 +219,7 @@ export function useAnalysisFeature<TResult = unknown>(
 
         cfg.onResultFetched(result, resolvedTaskId);
 
-        const state = (result as Record<string, any>)?.state as string | undefined;
+        const state = (result as AnalysisResultLike)?.state as string | undefined;
         if (state === 'successful' || state === 'failed') {
           setIsRunning(false);
           lastFetchedRef.current = { taskId: resolvedTaskId, state };
@@ -210,13 +229,10 @@ export function useAnalysisFeature<TResult = unknown>(
       } finally {
         fetchingTaskIdRef.current = null;
       }
-    },
-    [resolveTaskId, setIsRunning],
-  );
+    };
 
   // ---- Task flow refresh callback (wired into useAnalysisTaskFlow) ----
-  const handleTaskRefresh = useCallback(
-    async (context: AnalysisTaskFlowRefreshContext): Promise<void> => {
+  const handleTaskRefresh = async (context: AnalysisTaskFlowRefreshContext): Promise<void> => {
       if (context.reason !== 'terminal') return;
       if (!configRef.current.isTabActive) return;
       if (context.taskState !== 'successful' && context.taskState !== 'failed') return;
@@ -224,30 +240,25 @@ export function useAnalysisFeature<TResult = unknown>(
         context.taskId ?? null,
         context.taskState as 'successful' | 'failed',
       );
-    },
-    [fetchAndApplyResult],
-  );
+    };
 
   // ---- Fallback banner ----
-  const fallbackRunningBanner = useCallback(
-    (status: AnalysisTaskStatus) => {
+  const fallbackRunningBanner = (status: AnalysisTaskStatus) => {
       const cfg = configRef.current;
       const resultRunning = cfg.isResultRunning
         ? cfg.isResultRunning(cfg.resultRef.current)
-        : (cfg.resultRef.current as Record<string, any>)?.state === 'running';
+        : (cfg.resultRef.current as AnalysisResultLike)?.state === 'running';
 
       if (!resultRunning) return null;
 
       return {
         taskId:
-          (cfg.resultRef.current as Record<string, any>)?.metadata?.task_id ??
+          (cfg.resultRef.current as AnalysisResultLike)?.metadata?.task_id ??
           status.activeTaskId ??
           null,
         message: status.bannerMessage?.trim() || undefined,
       };
-    },
-    [], // stable — uses configRef
-  );
+    };
 
   // ---- Task flow ----
   const {
@@ -289,7 +300,7 @@ export function useAnalysisFeature<TResult = unknown>(
     fetchRequest: config.fetchRequest
       ? (taskId) =>
           taskId
-            ? configRef.current.fetchRequest!(taskId, configRef.current.getAuthHeaders())
+            ? configRef.current.fetchRequest?.(taskId, configRef.current.getAuthHeaders()) ?? null
             : null
       : undefined,
     fetchResult: (taskId) =>
@@ -298,11 +309,11 @@ export function useAnalysisFeature<TResult = unknown>(
         : null,
     applyRequest: config.onHydratedRequest
       ? (request: unknown | null | undefined) =>
-          configRef.current.onHydratedRequest!(request ?? null)
+          configRef.current.onHydratedRequest?.(request ?? null)
       : undefined,
     applyResult: config.onHydratedResult
       ? (result: TResult | null | undefined) =>
-          configRef.current.onHydratedResult!(result ?? null)
+          configRef.current.onHydratedResult?.(result ?? null)
       : undefined,
     autoHydrateOnFocus: false,
     autoHydrateOnVisibility: false,
@@ -320,7 +331,7 @@ export function useAnalysisFeature<TResult = unknown>(
     hydratedOnceRef.current = true;
     void hydrateFromServer().then(() => {
       // Update dedup ref so fetchAndApplyResult won't re-fetch what hydration already loaded
-      const result = configRef.current.resultRef.current as Record<string, any> | null;
+      const result = configRef.current.resultRef.current as AnalysisResultLike | null;
       const state = result?.state as string | undefined;
       const taskId = result?.metadata?.task_id as string | undefined;
       if (taskId && (state === 'successful' || state === 'failed')) {
@@ -330,7 +341,7 @@ export function useAnalysisFeature<TResult = unknown>(
   }, [config.isTabActive, config.workspaceId, hydrateFromServer]);
 
   // ---- Clear ----
-  const clearResults = useCallback(async (): Promise<void> => {
+  const clearResults = async (): Promise<void> => {
     const cfg = configRef.current;
     if (!cfg.workspaceId) return;
 
@@ -343,7 +354,7 @@ export function useAnalysisFeature<TResult = unknown>(
       queryClient,
       taskIdSources: [
         localTaskIdRef.current,
-        (cfg.resultRef.current as Record<string, any>)?.metadata?.task_id,
+        (cfg.resultRef.current as AnalysisResultLike)?.metadata?.task_id,
         status?.activeTaskId,
         status?.runningTask?.task_id,
         status?.successfulTask?.task_id,
@@ -360,7 +371,7 @@ export function useAnalysisFeature<TResult = unknown>(
         cfg.onCleared(taskIds);
       },
     });
-  }, [queryClient, resolveTaskId, setIsRunning]);
+  };
 
   return {
     localTaskId,

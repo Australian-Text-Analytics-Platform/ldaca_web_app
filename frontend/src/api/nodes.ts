@@ -1,4 +1,5 @@
 import { get, post, del, httpRequest } from './http';
+import type { NodeDataResponse } from '../types/api';
 
 export interface ColumnUniqueValuesResponse {
   column_name: string;
@@ -13,17 +14,17 @@ export interface ColumnDescribeResponse {
   null_count?: number;
   mean?: number;
   std?: number;
-  min?: any;
-  percentile_25?: any;
-  median?: any;
-  percentile_75?: any;
-  max?: any;
+  min?: string | number | null;
+  percentile_25?: string | number | null;
+  median?: string | number | null;
+  percentile_75?: string | number | null;
+  max?: string | number | null;
 }
 
 export interface FilterCondition {
   column: string;
   operator: 'eq' | 'gte' | 'lte' | 'contains' | 'startswith' | 'endswith' | 'is_null' | 'between' | 'in';
-  value: any;
+  value: unknown;
   negate?: boolean;
   regex?: boolean;
 }
@@ -35,7 +36,7 @@ export interface CastNodeRequest { column: string; target_type: string; format?:
 export interface ConcatPreviewRequest { node_ids: string[]; }
 export interface ConcatRequest extends ConcatPreviewRequest { new_node_name?: string }
 export interface FilterPreviewResponse {
-  data: any[];
+  data: Record<string, unknown>[];
   columns: string[];
   dtypes: Record<string, string>;
   pagination: {
@@ -58,7 +59,7 @@ export interface ExpressionTransformRequest {
 export interface ExpressionPreviewResponse {
   columns: string[];
   dtypes: Record<string, string>;
-  data: any[];
+  data: Record<string, unknown>[];
 }
 
 export interface ExpressionApplyResponse {
@@ -85,33 +86,33 @@ export interface NodeInfoResponse {
 }
 
 export const nodesApi = {
-  info: (node: string, headers: Record<string,string> = {}) => get(`/workspaces/nodes/${node}`, headers),
-  data: (node: string, page = 0, pageSize = 20, headers: Record<string,string> = {}) => httpRequest(`/workspaces/nodes/${node}/data`, { method: 'GET', headers, params: { page, page_size: pageSize } }),
-  shape: (node: string, headers: Record<string,string> = {}) => get(`/workspaces/nodes/${node}/shape`, headers),
+  info: (node: string, headers: Record<string,string> = {}) => get<NodeInfoResponse>(`/workspaces/nodes/${node}`, headers),
+  data: (node: string, page = 0, pageSize = 20, headers: Record<string,string> = {}) => httpRequest<NodeDataResponse>(`/workspaces/nodes/${node}/data`, { method: 'GET', headers, params: { page, page_size: pageSize } }),
+  shape: (node: string, headers: Record<string,string> = {}) => get<Record<string, unknown>>(`/workspaces/nodes/${node}/shape`, headers),
   uniqueValues: (node: string, col: string, headers: Record<string,string> = {}) => get<ColumnUniqueValuesResponse>(`/workspaces/nodes/${node}/columns/${col}/unique`, headers),
   describeColumn: (node: string, col: string, headers: Record<string,string> = {}) => get<ColumnDescribeResponse>(`/workspaces/nodes/${node}/columns/${col}/describe`, headers),
-  delete: (node: string, headers: Record<string,string> = {}) => del(`/workspaces/nodes/${node}`, headers),
-  rename: (node: string, newName: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/nodes/${node}/name`, { method: 'PUT', headers, params: { new_name: newName } }),
-  clone: (node: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/nodes/${node}/clone`, { method: 'POST', headers }),
+  delete: (node: string, headers: Record<string,string> = {}) => del<Record<string, unknown>>(`/workspaces/nodes/${node}`, headers),
+  rename: (node: string, newName: string, headers: Record<string,string> = {}) => httpRequest<Record<string, unknown>>(`/workspaces/nodes/${node}/name`, { method: 'PUT', headers, params: { new_name: newName } }),
+  clone: (node: string, headers: Record<string,string> = {}) => httpRequest<Record<string, unknown>>(`/workspaces/nodes/${node}/clone`, { method: 'POST', headers }),
   // Backward-compatible alias for older call sites.
-  copy: (node: string, headers: Record<string,string> = {}) => httpRequest(`/workspaces/nodes/${node}/clone`, { method: 'POST', headers }),
+  copy: (node: string, headers: Record<string,string> = {}) => httpRequest<Record<string, unknown>>(`/workspaces/nodes/${node}/clone`, { method: 'POST', headers }),
   undo: (node: string, headers: Record<string, string> = {}) =>
     httpRequest<NodeInfoResponse>(`/workspaces/nodes/${node}/undo`, { method: 'POST', headers }),
   redo: (node: string, headers: Record<string, string> = {}) =>
     httpRequest<NodeInfoResponse>(`/workspaces/nodes/${node}/redo`, { method: 'POST', headers }),
   renameColumn: (node: string, column: string, newName: string, headers: Record<string,string> = {}) =>
-    httpRequest(`/workspaces/nodes/${node}/columns/${encodeURIComponent(column)}`, {
+    httpRequest<Record<string, unknown>>(`/workspaces/nodes/${node}/columns/${encodeURIComponent(column)}`, {
       method: 'PUT',
       headers,
       body: { new_name: newName },
     }),
   deleteColumn: (node: string, column: string, headers: Record<string,string> = {}) =>
-    httpRequest(`/workspaces/nodes/${node}/columns/${encodeURIComponent(column)}`, {
+    httpRequest<Record<string, unknown>>(`/workspaces/nodes/${node}/columns/${encodeURIComponent(column)}`, {
       method: 'DELETE',
       headers,
     }),
   createFromFile: (filename: string, nodeName?: string, headers: Record<string,string> = {}, sheetName?: string) =>
-    httpRequest(`/workspaces/nodes`, {
+    httpRequest<Record<string, unknown>>(`/workspaces/nodes`, {
       method: 'POST',
       headers,
       params: {
@@ -121,7 +122,7 @@ export const nodesApi = {
         ...(sheetName ? { sheet_name: sheetName } : {}),
       },
     }),
-  join: (req: JoinNodesRequest, headers: Record<string,string> = {}) => httpRequest(`/workspaces/nodes/join`, { method: 'POST', headers, params: req }),
+  join: (req: JoinNodesRequest, headers: Record<string,string> = {}) => httpRequest<Record<string, unknown>>(`/workspaces/nodes/join`, { method: 'POST', headers, params: req as unknown as Record<string, unknown> }),
   joinPreview: (
     req: JoinPreviewParams,
     page = 1,
@@ -151,9 +152,9 @@ export const nodesApi = {
     `/workspaces/nodes/concat/preview`,
     { method: 'POST', headers, params: { page, page_size: pageSize }, body: req }
   ),
-  concat: (req: ConcatRequest, headers: Record<string,string> = {}) => post(`/workspaces/nodes/concat`, req, headers),
-  cast: (node: string, req: CastNodeRequest, headers: Record<string,string> = {}) => post(`/workspaces/nodes/${node}/cast`, req, headers),
-  filter: (node: string, req: FilterRequest, headers: Record<string,string> = {}) => post(`/workspaces/nodes/${node}/filter`, req, headers),
+  concat: (req: ConcatRequest, headers: Record<string,string> = {}) => post<Record<string, unknown>>(`/workspaces/nodes/concat`, req, headers),
+  cast: (node: string, req: CastNodeRequest, headers: Record<string,string> = {}) => post<Record<string, unknown>>(`/workspaces/nodes/${node}/cast`, req, headers),
+  filter: async (node: string, req: FilterRequest, headers: Record<string,string> = {}): Promise<void> => { await post(`/workspaces/nodes/${node}/filter`, req, headers); },
   filterPreview: (node: string, req: FilterRequest, page = 1, pageSize = 10, headers: Record<string,string> = {}) => httpRequest<FilterPreviewResponse>(
     `/workspaces/nodes/${node}/filter/preview`,
     { method: 'POST', headers, params: { page, page_size: pageSize }, body: req }
@@ -162,7 +163,7 @@ export const nodesApi = {
     `/workspaces/nodes/${node}/slice/preview`,
     { method: 'POST', headers, params: { page, page_size: pageSize }, body: req }
   ),
-  slice: (node: string, req: SliceRequest, headers: Record<string,string> = {}) => post(`/workspaces/nodes/${node}/slice`, req, headers),
+  slice: (node: string, req: SliceRequest, headers: Record<string,string> = {}) => post<Record<string, unknown>>(`/workspaces/nodes/${node}/slice`, req, headers),
   computeColumnPreview: (
     node: string,
     req: ExpressionTransformRequest,

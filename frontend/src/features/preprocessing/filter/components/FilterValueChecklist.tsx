@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { Loader2 } from 'lucide-react';
 import { Button } from '../../../../components/ui/button';
 import { Checkbox } from '../../../../components/ui/checkbox';
@@ -43,10 +43,7 @@ export const FilterValueChecklist: React.FC<FilterValueChecklistProps> = ({
   onClearAll,
   onRetry,
 }) => {
-  const filteredOptions = useMemo(
-    () => options.filter((option) => matchChecklistOption(option.label, searchQuery)),
-    [options, searchQuery],
-  );
+  const filteredOptions = options.filter((option) => matchChecklistOption(option.label, searchQuery));
 
   const hasActiveSearch = searchQuery.trim().length > 0;
   const selectLabel = hasActiveSearch ? 'Select All Filtered' : 'Select all';

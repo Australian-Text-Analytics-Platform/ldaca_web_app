@@ -3,6 +3,8 @@ import { Input } from '../../../../../components/ui/input';
 import HelpIcon from '../../../../../components/help/HelpIcon';
 import NodeSelectionPanel from '../../../../../components/NodeSelectionPanel';
 import type { NodeColumnSelection } from '../../../../../hooks/useAutoNodeColumns';
+import type { ColumnInfo } from '../../../../../utils/columnTypes';
+import type { NodeLike } from '../../../../../hooks/useNodeColumnInfos';
 import { AnalysisCardLayout } from '../../../common/components/AnalysisCardLayout';
 
 type Props = {
@@ -13,8 +15,8 @@ type Props = {
   onNodeColorChange: (nodeId: string, color: string) => void;
   defaultPalette: string[];
   isLocked: boolean;
-  getNodeColumns: (node: any, idx?: number) => any[];
-  actionState: { runDisabled: boolean; clearDisabled: boolean };
+  getNodeColumns: (node: NodeLike | null | undefined, idx?: number) => ColumnInfo[];
+  actionState: { runDisabled: boolean; clearDisabled: boolean; runLabel: string };
   minTopicSize: number;
   onMinTopicSizeChange: (value: number) => void;
   isRunning: boolean;
@@ -55,6 +57,7 @@ export function TopicModelingParameterPanel({
         isRunning,
         isClearing,
         hasResult: resultState === 'successful' || resultState === 'failed',
+        runLabel: actionState.runLabel,
       }}
     >
       <NodeSelectionPanel

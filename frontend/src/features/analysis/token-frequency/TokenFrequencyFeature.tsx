@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { textApi, type TokenFrequencyResponse } from '../../../api/text';
 import { useAuth } from '../../../hooks/useAuth';
 import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
@@ -7,13 +7,11 @@ import { useWorkspaceActions } from '../../../hooks/useWorkspaceActions';
 
 import { useNodeColumnInfos } from '../../../hooks/useNodeColumnInfos';
 import {
-  hasLockedParameterDiff,
-  normalizeCommaSeparatedWords,
-  normalizeRequestStopWords,
   parseAnalysisNodeRequest,
   getNodeIdentifier,
   resetAnalysisSelectionAfterClear,
   restoreAnalysisLockFromRequest,
+  getAnalysisActionState,
 } from '../common';
 import {
   buildResponseDisplayNameHints,
@@ -23,7 +21,7 @@ import {
   normalizeNodeResults,
   sortStatistics,
 } from './tokenFrequencyAdapters';
-import { buildSelectionNameById, deriveBackendStopWordsKey, deriveBackendTokenLimit } from './tokenFrequencyUtils';
+import { buildSelectionNameById, deriveBackendStopWordsKey, deriveBackendTokenLimit, type NodeNameEntry } from './tokenFrequencyUtils';
 import { downloadFrequencyRowsAsCsv, downloadWordCloudSvgAsPng } from './tokenFrequencyExport';
 import { useTokenFrequencyPreferences } from './hooks/useTokenFrequencyPreferences';
 import { useTokenFrequencyTaskFlow } from './hooks/useTokenFrequencyTaskFlow';
@@ -51,7 +49,6 @@ const TokenFrequencyFeature = () => {
   const { currentWorkspace } = useWorkspaceData();
   const {
     isLocked,
-    serverRequest,
     unlockSelection,
     lockWithSnapshots,
     nodeColumnSelections,
@@ -103,6 +100,7 @@ const TokenFrequencyFeature = () => {
     setIsRunning,
     runningRef,
     taskStatus,
+    hasActiveTask,
     lastFetchedRef,
     clearResults,
     setLocalTaskId,
@@ -120,7 +118,7 @@ const TokenFrequencyFeature = () => {
     onResultFetched: (result) => setResultSafely(result),
     onHydratedResult: (result) => {
       if (!result) return;
-      const requestData = (result as any)?.analysis_params ?? {};
+      const requestData = result?.analysis_params ?? {};
       const { nodeIds, selections } = parseAnalysisNodeRequest(requestData, 2);
       setNodeColumnSelections(selections, { replace: true });
       setLastCompareNodeIds(nodeIds);
@@ -137,10 +135,12 @@ const TokenFrequencyFeature = () => {
       }
     },
     onHydratedRequest: async (requestPayload) => {
-      const req = (requestPayload as any)?.data ?? requestPayload;
-      if (!req) return;
-      const nodeIds: string[] = Array.isArray(req.node_ids) ? req.node_ids.slice(0, 2) : [];
-      const node_columns: Record<string, string> = req.node_columns || {};
+      const raw = requestPayload as Record<string, unknown> | null;
+      const req = raw?.data ?? raw;
+      if (!req || typeof req !== 'object') return;
+      const reqObj = req as Record<string, unknown>;
+      const nodeIds: string[] = Array.isArray(reqObj.node_ids) ? (reqObj.node_ids as string[]).slice(0, 2) : [];
+      const node_columns: Record<string, string> = (reqObj.node_columns as Record<string, string>) || {};
       const sels = nodeIds.map((id: string) => ({ nodeId: id, column: node_columns[id] || '' }));
       setNodeColumnSelections(sels, { replace: true });
       if (nodeIds.length && currentWorkspaceId) {
@@ -162,7 +162,7 @@ const TokenFrequencyFeature = () => {
       resetPreferenceUiState();
     },
     pruneGlobalTasks: (taskIds) =>
-      setTasks((prev: any[]) =>
+      setTasks((prev) =>
         Array.isArray(prev) ? pruneTasksById(prev, taskIds) : prev,
       ),
   });
@@ -203,12 +203,14 @@ const TokenFrequencyFeature = () => {
     maxTokenLimitInput: MAX_TOKEN_LIMIT_INPUT,
   });
 
-  const lockedNodeNameMap = isLocked ? buildSelectionNameById(panelSelectedNodes as any, panelSelectedNodes as any) : {};
+  const lockedNodeNameMap = isLocked ? buildSelectionNameById(panelSelectedNodes as NodeNameEntry[], panelSelectedNodes as NodeNameEntry[]) : {};
 
   const nodeIdToName = (() => {
     const map: Record<string, string> = {};
-    panelSelectedNodes.forEach((node: any) => {
-      map[node.id] = node.name || node.label || node.id;
+    panelSelectedNodes.forEach((node) => {
+      const nodeId = typeof node.id === 'string' ? node.id : '';
+      if (!nodeId) return;
+      map[nodeId] = (node.name || node.label || nodeId) as string;
     });
     return map;
   })();
@@ -272,13 +274,13 @@ const TokenFrequencyFeature = () => {
   const filteredStatistics = filterStatisticsByStopWords(results?.statistics, appliedStopSet);
   const sortedStatistics = sortStatistics(filteredStatistics, statsSortColumn, statsSortDirection);
 
-  const registerWordCloudRef = useCallback((nodeKey: string, element: SVGSVGElement | null) => {
+  const registerWordCloudRef = (nodeKey: string, element: SVGSVGElement | null) => {
     if (!element) {
-      delete wordCloudRefs.current[nodeKey];
+      Reflect.deleteProperty(wordCloudRefs.current, nodeKey);
       return;
     }
     wordCloudRefs.current[nodeKey] = element;
-  }, []);
+  };
 
   const handleDownloadWordCloud = (nodeKey: string, displayName: string) => {
     const svg = wordCloudRefs.current[nodeKey];
@@ -290,8 +292,8 @@ const TokenFrequencyFeature = () => {
     });
   };
 
-  const handleDownloadFrequencyCsv = (label: string, rows: any[]) => {
-    downloadFrequencyRowsAsCsv(label, rows);
+  const handleDownloadFrequencyCsv = (label: string, rows: unknown[]) => {
+    downloadFrequencyRowsAsCsv(label, rows as Array<Record<string, unknown>>);
   };
 
   const handleApplyStopWords = () => {
@@ -310,23 +312,15 @@ const TokenFrequencyFeature = () => {
 
   const hasIncompleteSelections = effectiveNodeColumnSelections.some((selection) => !selection.column);
   const displayNodeCount = panelSelectedNodes.length;
-  const typedServerRequest = serverRequest as
-    | {
-        node_ids?: string[];
-        node_columns?: Record<string, string>;
-        stop_words?: string[];
-      }
-    | null;
 
-  const hasLockedParameterChanges = hasLockedParameterDiff({
+  const actionState = getAnalysisActionState({
+    hasWorkspace: Boolean(currentWorkspaceId),
+    hasSelection: panelSelectedNodes.length > 0 && !hasIncompleteSelections,
     isLocked,
-    serverRequest: typedServerRequest,
-    currentParams: {
-      stop_words: normalizeCommaSeparatedWords(stopWords),
-    },
-    getServerParams: (request) => ({
-      stop_words: normalizeRequestStopWords(request.stop_words),
-    }),
+    hasResults: Boolean(results),
+    isBusy: isRunning,
+    hasActiveTask,
+    allowRunWhenLocked: false,
   });
 
   const handleColumnChange = (nodeId: string, column: string) => {
@@ -336,36 +330,30 @@ const TokenFrequencyFeature = () => {
 
   const { getColumnInfos } = useNodeColumnInfos({
     workspaceId: currentWorkspaceId,
-    nodes: selectedNodes as any,
+    nodes: selectedNodes,
     enabled: true,
   });
 
   return (
     <div className="space-y-6">
       <TokenFrequencyParameterPanel
-        panelSelectedNodes={panelSelectedNodes as any[]}
+        panelSelectedNodes={panelSelectedNodes}
         effectiveNodeColumnSelections={effectiveNodeColumnSelections}
         onColumnChange={handleColumnChange}
         nodeColors={nodeColors}
         onColorChange={handleColorChange}
         defaultPalette={defaultPalette}
         isLocked={isLocked}
-        getNodeColumns={getColumnInfos as any}
+        getNodeColumns={getColumnInfos}
         displayNodeCount={displayNodeCount}
-        actionState={{
-          runDisabled:
-            panelSelectedNodes.length === 0 ||
-            isRunning ||
-            hasIncompleteSelections ||
-            (isLocked && !hasLockedParameterChanges),
-          clearDisabled: !results && !isRunning,
-        }}
+        actionState={actionState}
         isAnalyzing={isRunning}
         onAnalyze={handleAnalyze}
         onClearResults={clearResults}
         hasIncompleteSelections={hasIncompleteSelections}
         appliedStopCount={appliedStopSet.size}
         hasResults={Boolean(results)}
+        runLabel={actionState.runLabel}
       />
 
       <TokenFrequencyResultsPanel

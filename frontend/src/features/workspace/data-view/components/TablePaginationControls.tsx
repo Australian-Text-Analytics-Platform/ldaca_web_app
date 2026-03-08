@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { MoreHorizontal } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
 import { Button } from '../../../../components/ui/button';
@@ -92,15 +92,16 @@ const PaginationJump = ({ totalPages, onPageChange }: PaginationJumpProps) => {
     if (!open) {
       return;
     }
-    setValue('');
-    setError(null);
-    requestAnimationFrame(() => {
+    // Reset via rAF to avoid synchronous setState in effect body (react-hooks/set-state-in-effect)
+    const id = requestAnimationFrame(() => {
+      setValue('');
+      setError(null);
       inputRef.current?.focus();
     });
+    return () => cancelAnimationFrame(id);
   }, [open]);
 
-  const handleSubmit = useCallback(
-    (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
       event.preventDefault();
       const trimmed = value.trim();
       const numericPattern = /^\d+$/;
@@ -118,9 +119,7 @@ const PaginationJump = ({ totalPages, onPageChange }: PaginationJumpProps) => {
 
       onPageChange(targetPage);
       setOpen(false);
-    },
-    [onPageChange, totalPages, value]
-  );
+    };
 
   return (
     <div ref={containerRef} className="relative">
@@ -190,7 +189,7 @@ export const TablePaginationControls = ({
   onPageSizeChange,
   pageSizeOptions = DEFAULT_PAGE_SIZE_OPTIONS,
 }: TablePaginationControlsProps) => {
-  const controls = useMemo(() => {
+  const controls = (() => {
     if (!pagination || !onPageChange || !onPageSizeChange) {
       return null;
     }
@@ -275,7 +274,7 @@ export const TablePaginationControls = ({
         </Pagination>
       </div>
     );
-  }, [pagination, onPageChange, onPageSizeChange, pageSizeOptions]);
+  })();
 
   return controls;
 };

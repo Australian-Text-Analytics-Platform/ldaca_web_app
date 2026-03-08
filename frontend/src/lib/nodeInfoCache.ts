@@ -79,7 +79,7 @@ export async function getNodeInfo(options: NodeInfoRequestOptions): Promise<Node
   const headers = resolveHeaders(options);
   const request = nodesApi
     .info(nodeId, headers)
-    .then((info) => finalize(key, info))
+    .then((info) => finalize(key, info as unknown as NodeInfo))
     .catch((error) => handleFailure(key, error));
 
   inflight.set(key, request);

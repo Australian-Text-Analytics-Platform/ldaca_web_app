@@ -6,7 +6,7 @@
 export type ApiNodeShape = [number | null, number | null];
 
 // API Response Types
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   state: 'running' | 'successful' | 'failed' | 'cancelled';
   data?: T;
   message?: string;
@@ -16,17 +16,20 @@ export interface ApiResponse<T = any> {
 export interface ApiError {
   message: string;
   code?: string;
-  details?: any;
+  details?: unknown;
 }
 
 // Workspace Types
 export interface WorkspaceInfo {
   id: string;
   name: string;
-  description: string;  
+  description: string;
   created_at: string;
   modified_at: string;
   total_nodes: number;
+  dataframe_count?: number;
+  updated_at?: string;
+  workspace_size_Byte?: number;
 }
 
 export interface WorkspaceListResponse {
@@ -51,16 +54,22 @@ export interface NodeInfo {
   parent_ids?: string[];
 }
 
-export interface NodeData {
-  [key: string]: any;
+export interface NodeDataPagination {
+  page: number;
+  page_size: number;
+  total_rows: number;
+  total_pages: number;
+  has_next: boolean;
+  has_prev: boolean;
+  [key: string]: unknown;
 }
 
 export interface NodeDataResponse {
-  data: NodeData[];
-  total_rows: number;
-  page: number;
-  page_size: number;
-  total_pages: number;
+  data: Record<string, unknown>[];
+  pagination: NodeDataPagination;
+  columns: string[];
+  dtypes: Record<string, string>;
+  [key: string]: unknown;
 }
 
 // Graph Types
@@ -69,6 +78,7 @@ export interface GraphNode {
   name: string;
   operation: string;
   shape?: [number, number] | [number | null, number | null] | number[];
+  [key: string]: unknown;
 }
 
 export interface GraphEdge {
@@ -85,7 +95,7 @@ export interface WorkspaceGraphResponse {
 export interface FilterCondition {
   column: string;
   operator: string;
-  value: any;
+  value: string | number | boolean | null;
   negate?: boolean;
   regex?: boolean;
   id?: string;
@@ -173,7 +183,7 @@ export interface QueryOptions {
   retry?: boolean | number;
 }
 
-export interface MutationOptions<TData = any, TError = ApiError, TVariables = any> {
+export interface MutationOptions<TData = unknown, TError = ApiError, TVariables = unknown> {
   onSuccess?: (data: TData, variables: TVariables) => void;
   onError?: (error: TError, variables: TVariables) => void;
   onSettled?: (data: TData | undefined, error: TError | null, variables: TVariables) => void;
@@ -198,7 +208,7 @@ export type LoadingState = 'idle' | 'loading' | 'successful' | 'failed' | 'cance
 export interface OperationState {
   state: LoadingState;
   error?: string;
-  data?: any;
+  data?: unknown;
 }
 
 // Utility Types
@@ -206,7 +216,7 @@ export type RequiredBy<T, K extends keyof T> = T & Required<Pick<T, K>>;
 export type OptionalBy<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
 
 // Generic API operation result
-export interface OperationResult<T = any> {
+export interface OperationResult<T = unknown> {
   state: 'running' | 'successful' | 'failed' | 'cancelled';
   data?: T;
   error?: string;

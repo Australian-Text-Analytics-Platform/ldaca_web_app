@@ -1,12 +1,12 @@
-import { useMemo } from 'react';
 import { toast } from 'sonner';
 import {
-  SequentialAnalysisRequest,
-  SequentialFrequency,
+  type SequentialAnalysisRequest,
+  type SequentialFrequency,
   textApi,
 } from '../../../../api/text';
 import { createNodeSnapshot, applySelectedColumnsToSnapshots } from '../../../../hooks/useSchemaManagement';
 import type { ChartConfig } from '../../../../components/ui/chart';
+import type { LockedNodesSnapshot } from '../../common/useAnalysisLockMachine';
 
 export type SequentialAnalysisDatum = Record<string, unknown>;
 
@@ -51,18 +51,18 @@ interface SequentialAnalysisState {
   numericOriginValue: number | null;
   numericIntervalValue: number | null;
   numericOriginInput: string;
-  results: any;
+  results: Record<string, unknown> | null;
 }
 
 interface SequentialAnalysisActions {
   setIsAnalyzing: (value: boolean) => void;
-  setResults: (value: any) => void;
+  setResults: (value: Record<string, unknown> | null | ((prev: Record<string, unknown> | null) => Record<string, unknown> | null)) => void;
   setChartType: (value: ChartTypeOption) => void;
   setLocalTaskId: (value: string | null) => void;
   setNodeColumnSelections: (selections: Array<{ nodeId: string; column: string }>) => void;
   setTimeColumn: (value: string) => void;
-  setLockedNodesSnapshot: (snapshots: any[]) => void;
-  lockCurrentSchema: (schema: any) => void;
+  setLockedNodesSnapshot: (snapshots: LockedNodesSnapshot[]) => void;
+  lockCurrentSchema: (schema?: Record<string, string>) => void;
   resolveTaskId: () => Promise<string | null>;
   clearResults: () => Promise<void>;
 }
@@ -116,7 +116,7 @@ export function useSequentialAnalysisTaskFlow({
     const picked =
       nodeColumnSelections.find((s) => s.nodeId === nodeIdForAnalysis)?.column ||
       timeColumn ||
-      (results?.analysis_params?.time_column as string | undefined) ||
+      ((results?.analysis_params as Record<string, unknown> | undefined)?.time_column as string | undefined) ||
       '';
     if (!picked) {
       toast.error('Please select a time column');
@@ -158,16 +158,18 @@ export function useSequentialAnalysisTaskFlow({
           : {};
       const result = await textApi.sequentialAnalysis(nodeIdForAnalysis, request, headers);
       const taskIdFromResponse =
-        (result as any)?.metadata?.task_id ??
-        (result as any)?.metadata?.taskId ??
-        null;
+        (result as Record<string, unknown>)?.metadata != null
+          ? ((result as Record<string, unknown>).metadata as Record<string, unknown>)?.task_id ??
+            ((result as Record<string, unknown>).metadata as Record<string, unknown>)?.taskId ??
+            null
+          : null;
       if (typeof taskIdFromResponse === 'string' && taskIdFromResponse.trim().length > 0) {
         setLocalTaskId(taskIdFromResponse);
       }
       const enrichedResult = {
         ...result,
         analysis_params: {
-          ...(result as any)?.analysis_params,
+          ...(result as Record<string, unknown>)?.analysis_params as Record<string, unknown>,
           group_by_columns: validGroupByColumns,
           time_column: picked,
           frequency,
@@ -176,8 +178,8 @@ export function useSequentialAnalysisTaskFlow({
           numeric_interval: numericIntervalValue,
         },
       };
-      const resolvedChartType = isChartTypeOption((enrichedResult as any)?.chart_type)
-        ? (enrichedResult as any).chart_type
+      const resolvedChartType = isChartTypeOption((enrichedResult as Record<string, unknown>)?.chart_type)
+        ? (enrichedResult as Record<string, unknown>).chart_type as ChartTypeOption
         : chartType;
       const normalizedResult = { ...enrichedResult, chart_type: resolvedChartType };
       setResults(normalizedResult);
@@ -226,7 +228,7 @@ export function useSequentialAnalysisTaskFlow({
 
   const handleChartTypeChange = async (value: ChartTypeOption) => {
     setChartType(value);
-    setResults((prev: any) => (prev ? { ...prev, chart_type: value } : prev));
+    setResults((prev: Record<string, unknown> | null) => (prev ? { ...prev, chart_type: value } : prev));
 
     if (!currentWorkspaceId) return;
     const authHeaders = getAuthHeaders();
@@ -243,10 +245,10 @@ export function useSequentialAnalysisTaskFlow({
     }
   };
 
-  const chartData = useMemo<SequentialAnalysisDatum[]>(() => {
+  const chartData = (() => {
     if (!results?.data || !Array.isArray(results.data)) return [];
 
-    const groupingColumns = results?.analysis_params?.group_by_columns;
+    const groupingColumns = (results?.analysis_params as Record<string, unknown> | undefined)?.group_by_columns;
     const effectiveGroupColumns = Array.isArray(groupingColumns)
       ? groupingColumns
       : groupByColumns.length
@@ -286,10 +288,10 @@ export function useSequentialAnalysisTaskFlow({
       const bTime = String(b.time_period ?? '');
       return aTime.localeCompare(bTime);
     });
-  }, [results, groupByColumns]);
+  })();
 
-  const groupKeys = useMemo(() => {
-    const groupingColumns = results?.analysis_params?.group_by_columns;
+  const groupKeys = (() => {
+    const groupingColumns = (results?.analysis_params as Record<string, unknown> | undefined)?.group_by_columns;
     const effectiveGroupColumns = Array.isArray(groupingColumns)
       ? groupingColumns
       : groupByColumns.length
@@ -299,15 +301,15 @@ export function useSequentialAnalysisTaskFlow({
     if (!effectiveGroupColumns.length || !chartData.length) return ['sequential_count'];
 
     const keys = new Set<string>();
-    chartData.forEach((item: any) => {
+    chartData.forEach((item: Record<string, unknown>) => {
       Object.keys(item).forEach((key) => {
         if (key !== 'time_period') keys.add(key);
       });
     });
     return Array.from(keys);
-  }, [results, chartData, groupByColumns]);
+  })();
 
-  const chartConfig = useMemo<ChartConfig>(() => {
+  const chartConfig = (() => {
     if (!groupKeys.length || (groupKeys.length === 1 && groupKeys[0] === 'sequential_count')) {
       return {
         sequential_count: { label: 'Sequential Count', color: getPaletteColor(0) },
@@ -317,9 +319,9 @@ export function useSequentialAnalysisTaskFlow({
       acc[key] = { label: key, color: getPaletteColor(index) };
       return acc;
     }, {});
-  }, [groupKeys]);
+  })();
 
-  const groupPointCounts = useMemo(() => {
+  const groupPointCounts = (() => {
     if (!chartData.length) return {} as Record<string, number>;
     const counts: Record<string, number> = {};
     chartData.forEach((row) => {
@@ -332,7 +334,7 @@ export function useSequentialAnalysisTaskFlow({
       });
     });
     return counts;
-  }, [chartData, groupKeys]);
+  })();
 
   return {
     handleAnalyze,

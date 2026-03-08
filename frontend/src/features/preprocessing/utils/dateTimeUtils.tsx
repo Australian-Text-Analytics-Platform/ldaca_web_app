@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React from 'react';
 import { CalendarIcon, Clock2Icon } from 'lucide-react';
 import { Calendar } from '../../../components/ui/calendar';
 import { Card, CardContent, CardFooter } from '../../../components/ui/card';
@@ -48,14 +48,14 @@ export const IsoDateInput = React.forwardRef<HTMLInputElement, IsoDateInputProps
   }, [committedValue, focused]);
 
   const innerRef = React.useRef<HTMLInputElement | null>(null);
-  const setRefs = React.useCallback((el: HTMLInputElement | null) => {
+  const setRefs = (el: HTMLInputElement | null) => {
     innerRef.current = el;
     if (typeof externalRef === 'function') {
       externalRef(el);
     } else if (externalRef) {
       (externalRef as React.MutableRefObject<HTMLInputElement | null>).current = el;
     }
-  }, [externalRef]);
+  };
 
   const commitNormalized = (text: string, { syncDraft = false }: { syncDraft?: boolean } = {}) => {
     const trimmed = text.trim();
@@ -135,7 +135,7 @@ interface DateTimePickerFieldProps {
 export const DateTimePickerField: React.FC<DateTimePickerFieldProps> = ({ value, onChange, placeholder = ISO_PLACEHOLDER, disabled = false }) => {
   const containerRef = React.useRef<HTMLDivElement | null>(null);
   const [open, setOpen] = React.useState(false);
-  const parsedValue = React.useMemo(() => (value ? parseIsoToLocalDate(value) : null), [value]);
+  const parsedValue = value ? parseIsoToLocalDate(value) : null;
   const [draftDate, setDraftDate] = React.useState<Date | undefined>(parsedValue ?? undefined);
   const [timeValue, setTimeValue] = React.useState<string>(formatTimeInputValue(parsedValue));
   const timeInputId = React.useId();
@@ -168,19 +168,15 @@ export const DateTimePickerField: React.FC<DateTimePickerFieldProps> = ({ value,
     };
   }, [open]);
 
-  const commitDate = useCallback(
-    (date: Date | undefined) => {
+  const commitDate = (date: Date | undefined) => {
       if (!date) {
         onChange('');
         return;
       }
       onChange(toIsoUtcString(date));
-    },
-    [onChange]
-  );
+    };
 
-  const handleSelectDate = useCallback(
-    (day: Date | undefined) => {
+  const handleSelectDate = (day: Date | undefined) => {
       if (!day) {
         setDraftDate(undefined);
         commitDate(undefined);
@@ -189,12 +185,9 @@ export const DateTimePickerField: React.FC<DateTimePickerFieldProps> = ({ value,
       const combined = combineDateAndTime(day, timeValue);
       setDraftDate(combined);
       commitDate(combined);
-    },
-    [commitDate, timeValue]
-  );
+    };
 
-  const handleTimeChange = useCallback(
-    (nextValue: string) => {
+  const handleTimeChange = (nextValue: string) => {
       const normalized = normalizeTimeValue(nextValue);
       setTimeValue(normalized);
       setDraftDate((current) => {
@@ -205,9 +198,7 @@ export const DateTimePickerField: React.FC<DateTimePickerFieldProps> = ({ value,
         commitDate(updated);
         return updated;
       });
-    },
-    [commitDate]
-  );
+    };
 
   const selectedDate = draftDate ?? parsedValue ?? undefined;
 

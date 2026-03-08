@@ -173,7 +173,7 @@ export const useSelectionStore = create<SelectionStore>()(
       }),
       
       resetNodePagination: (nodeId) => set((state) => {
-        delete state.nodePagination[nodeId];
+        Reflect.deleteProperty(state.nodePagination, nodeId);
       }),
       
       getNodePagination: (nodeId) => {

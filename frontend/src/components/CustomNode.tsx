@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import { NodeProps, Handle, Position, useStore } from '@xyflow/react';
+import { type NodeProps, Handle, Position, useStore, type Node as ReactFlowNode } from '@xyflow/react';
 import { Settings2, Trash2, Copy, Check } from 'lucide-react';
-import { WorkspaceNode } from '../types';
+import { type WorkspaceNode } from '../types';
 
 type DebugWindow = Window & { __LDACA_DEBUG_GRAPH?: boolean };
 
-interface CustomNodeData {
+interface CustomNodeData extends Record<string, unknown> {
   node: WorkspaceNode;
   isMultiSelected?: boolean;
   onDelete: (nodeId: string) => void;
@@ -15,10 +15,8 @@ interface CustomNodeData {
   onRedo?: (nodeId: string) => void;
 }
 
-function CustomNode({ data, selected }: NodeProps<any>) {
-  const { node: initialNode, isMultiSelected = false, onDelete, onRename, onCopy, onUndo, onRedo } = data as CustomNodeData;
-  // Keep a local state but always sync with props to prevent staleness after in-place updates
-  const [node, setNode] = useState(initialNode);
+function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>) {
+  const { node, isMultiSelected = false, onDelete, onRename, onCopy, onUndo, onRedo } = data;
   const [showMenu, setShowMenu] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
   const [newName, setNewName] = useState('');
@@ -36,14 +34,13 @@ function CustomNode({ data, selected }: NodeProps<any>) {
   };
 
   useEffect(() => {
-    dlog('CustomNode: node updated', {
-      nodeId: initialNode?.node_id,
-      dataType: initialNode?.data_type,
-      nodeName: initialNode?.name,
+    if (DEBUG_GRAPH) console.debug('CustomNode: node updated', {
+      nodeId: node?.node_id,
+      dataType: node?.data_type,
+      nodeName: node?.name,
       isRendering: true
     });
-    setNode(initialNode);
-  }, [initialNode, dlog]);
+  }, [node, DEBUG_GRAPH]);
 
   const nodeName = node?.name || 'Loading...';
   const nodeShape = node?.shape;

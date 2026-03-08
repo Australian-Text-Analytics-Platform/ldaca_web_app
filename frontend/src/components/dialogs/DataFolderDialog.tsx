@@ -41,9 +41,9 @@ export const DataFolderDialog: React.FC<DataFolderDialogProps> = ({
       toast.success('Working directory updated');
       await refreshAuth();
       onOpenChange(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to update config:', error);
-      toast.error(error.message || 'Failed to update working directory');
+      toast.error(error instanceof Error ? error.message : 'Failed to update working directory');
     } finally {
       setIsLoading(false);
     }

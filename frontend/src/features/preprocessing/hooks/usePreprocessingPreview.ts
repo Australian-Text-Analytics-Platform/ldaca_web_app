@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { PreviewPagination, PreviewRow } from '../types';
 
 export interface PreviewFetcherResult<Row = PreviewRow> {
@@ -73,19 +73,22 @@ export const usePreprocessingPreview = <RequestPayload, Row = PreviewRow>(
   // Use refs for fetcher and request to avoid re-triggering the effect on
   // every render — callers typically pass inline functions/objects.
   const fetcherRef = useRef(fetcher);
-  fetcherRef.current = fetcher;
   const requestRef = useRef(request);
-  requestRef.current = request;
+  useEffect(() => {
+    fetcherRef.current = fetcher;
+    requestRef.current = request;
+  });
 
-  const derivedSignature = useMemo(() => {
+  const derivedSignature = (() => {
     if (!ready || !request) return 'disabled';
     if (signature) return signature;
     try {
       return JSON.stringify(request);
     } catch {
+      // eslint-disable-next-line react-hooks/purity -- Fallback for non-serializable requests; only reached when JSON.stringify throws
       return `preview-signature-${Date.now()}`;
     }
-  }, [ready, request, signature]);
+  })();
 
   // Reset pagination when the request payload changes materially.
   useEffect(() => {
@@ -143,14 +146,14 @@ export const usePreprocessingPreview = <RequestPayload, Row = PreviewRow>(
     };
   }, [ready, page, pageSize, debounceMs, refreshKey, derivedSignature]);
 
-  const handleSetPageSize = useCallback((size: number) => {
+  const handleSetPageSize = (size: number) => {
     setPageSize(size);
     setPage(1);
-  }, []);
+  };
 
-  const refresh = useCallback(() => {
+  const refresh = () => {
     setRefreshKey((current) => current + 1);
-  }, []);
+  };
 
   return {
     data,

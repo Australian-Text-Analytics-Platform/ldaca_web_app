@@ -90,7 +90,7 @@ export const downloadWordCloudSvgAsPng = (
   image.src = url;
 };
 
-export const downloadFrequencyRowsAsCsv = (label: string, rows: any[]) => {
+export const downloadFrequencyRowsAsCsv = (label: string, rows: Array<Record<string, unknown>>) => {
   if (typeof window === 'undefined') return;
   const csvLines = [
     ['word', 'count'],

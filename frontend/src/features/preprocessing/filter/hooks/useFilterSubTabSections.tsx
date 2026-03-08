@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useCallback, useState, useEffect, useRef } from 'react';
 import { nodesApi } from '../../../../api/nodes';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../../components/ui/select';
 import { Checkbox } from '../../../../components/ui/checkbox';
@@ -177,7 +177,7 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
   const categoricalOptionsRef = useRef(categoricalOptions);
   categoricalOptionsRef.current = categoricalOptions;
 
-  const availableColumns = useMemo(() => {
+  const availableColumns = (() => {
     const columns: ConditionColumnOption[] = [];
     const dtypes =
       nodeData?.dtypes && typeof nodeData.dtypes === 'object'
@@ -202,14 +202,14 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     }
 
     return columns;
-  }, [nodeData, selectedNode]);
+  })();
 
   const hasSelection = Boolean(selectedNodeId);
   const hasSchema = availableColumns.length > 0;
   const isSchemaLoading = hasSelection && !hasSchema && (isLoading.nodeData || isLoading.graph);
   const isConfigDisabled = !hasSelection || !hasSchema;
 
-  const workspaceNodeMap = useMemo(() => {
+  const workspaceNodeMap = (() => {
     const map = new Map<string, WorkspaceNodeLike>();
     workspaceNodes.forEach((node: WorkspaceNodeLike) => {
       const key = (node.id as string | undefined) ?? ((node as Record<string, unknown>).node_id as string | undefined);
@@ -218,7 +218,7 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
       }
     });
     return map;
-  }, [workspaceNodes]);
+  })();
 
   const filterSelectedNodesForPanel = (() => {
     if (!selectedNodeId) return [];
@@ -226,13 +226,11 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     return node ? [node] : [];
   })();
 
-  const getCategoricalKey = useCallback(
-    (column: string) => `${currentWorkspaceId ?? 'none'}::${selectedNodeId ?? 'none'}::${column}`,
-    [currentWorkspaceId, selectedNodeId]
-  );
+  // Identity stability: used in useEffect dependency array via ensureCategoricalOptions
+  const getCategoricalKey = useCallback((column: string) => `${currentWorkspaceId ?? 'none'}::${selectedNodeId ?? 'none'}::${column}`, [currentWorkspaceId, selectedNodeId]);
 
-  const ensureCategoricalOptions = useCallback(
-    async (column: string, dataType: string) => {
+  // Identity stability: used in useEffect dependency array
+  const ensureCategoricalOptions = useCallback(async (column: string, dataType: string) => {
       if (!currentWorkspaceId || !selectedNodeId || !column) {
         return;
       }
@@ -308,9 +306,7 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
           },
         }));
       }
-    },
-    [currentWorkspaceId, selectedNodeId, getCategoricalKey]
-  );
+    }, [getCategoricalKey, currentWorkspaceId, selectedNodeId]);
 
   const filterDefaultPalette = ['#2563eb', '#dc2626', '#16a34a', '#f97316', '#d946ef', '#0ea5e9'];
 
@@ -457,8 +453,7 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     if (conditions.length > 1) {
       setConditions(conditions.filter(c => c.id !== id));
       setOptionSearchQueries((prev) => {
-        const next = { ...prev };
-        delete next[id];
+        const { [id]: _, ...next } = prev;
         return next;
       });
     }
@@ -610,7 +605,7 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
       setConditions(prev => prev.map(c => {
         if (c.id !== conditionId) return c;
         
-        let newValue: ConditionValue = '';
+        let newValue: ConditionValue;
         
         switch (operator) {
           case 'eq':

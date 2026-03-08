@@ -100,7 +100,7 @@ const TutorialView: React.FC<{ onClose?: () => void; target?: TutorialTarget | n
   useEffect(() => {
     if (!target) return;
     setCurrentTarget(target);
-  }, [target?.file, target?.anchor]);
+  }, [target]);
 
   useEffect(() => {
     if (!activeAnchor || loading || error) return;
@@ -172,15 +172,16 @@ const TutorialView: React.FC<{ onClose?: () => void; target?: TutorialTarget | n
 
   // Keyboard shortcuts: Cmd/Ctrl +/- and 0 to reset
   useEffect(() => {
+    const clampZoom = (v: number) => Math.min(2, Math.max(0.5, v));
     const onKeyDown = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey)) return;
-      if (e.key === '+' || e.key === '=') { e.preventDefault(); zoomIn(); }
-      else if (e.key === '-' || e.key === '_') { e.preventDefault(); zoomOut(); }
-      else if (e.key === '0') { e.preventDefault(); zoomReset(); }
+      if (e.key === '+' || e.key === '=') { e.preventDefault(); setZoom((z) => clampZoom(parseFloat((z + 0.1).toFixed(2)))); }
+      else if (e.key === '-' || e.key === '_') { e.preventDefault(); setZoom((z) => clampZoom(parseFloat((z - 0.1).toFixed(2)))); }
+      else if (e.key === '0') { e.preventDefault(); setZoom(1); }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [zoomIn, zoomOut, zoomReset]);
+  }, []);
 
   return (
     <div className="min-h-screen bg-linear-to-br from-slate-50 to-blue-50">

@@ -273,8 +273,8 @@ export const useUIStore = create<UIStore>()(
       }),
       
       closeAllModals: () => set((state) => {
-        Object.keys(state.modals).forEach(key => {
-          (state.modals as any)[key] = false;
+        (Object.keys(state.modals) as Array<keyof typeof state.modals>).forEach(key => {
+          state.modals[key] = false;
         });
       }),
     })),

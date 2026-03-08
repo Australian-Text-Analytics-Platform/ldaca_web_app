@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useWorkspaceActions } from '../../../../hooks/useWorkspaceActions';
 import { useWorkspaceData } from '../../../../hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '../../../../hooks/useWorkspaceSelection';
@@ -59,6 +59,8 @@ const resolveNodeDisplayLabel = (node: WorkspaceNodeDisplayLike | null | undefin
   return node.name || node.id;
 };
 
+const EMPTY_NODE_IDS: string[] = [];
+
 export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
   const { currentWorkspaceId, nodeData } = useWorkspaceData();
   const {
@@ -78,13 +80,13 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
   } = useWorkspaceActions();
   const { isLoading } = useWorkspaceStatus();
 
-  const normalizedSelectedNodeIds = selectedNodeIds ?? [];
-  const multiSelectedNodes = useMemo(() => selectedNodes.filter(Boolean), [selectedNodes]);
+  const normalizedSelectedNodeIds = selectedNodeIds ?? EMPTY_NODE_IDS;
+  const multiSelectedNodes = selectedNodes.filter(Boolean);
   const shouldShowTabs = multiSelectedNodes.length > 1;
   const activeNodeId = selectedNode?.id ?? multiSelectedNodes[0]?.id ?? null;
 
   const [tabOrder, setTabOrder] = useState<string[]>(() => [...normalizedSelectedNodeIds]);
-  const nodeById = useMemo(() => {
+  const nodeById = (() => {
     const map = new Map<string, (typeof multiSelectedNodes)[number]>();
     multiSelectedNodes.forEach((node) => {
       if (node?.id) {
@@ -92,8 +94,9 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
       }
     });
     return map;
-  }, [multiSelectedNodes]);
+  })();
 
+  /* eslint-disable react-hooks/set-state-in-effect -- Syncing tab order with selected node IDs; updater avoids unnecessary re-renders */
   useEffect(() => {
     setTabOrder((current) => {
       const filtered = current.filter((id) => normalizedSelectedNodeIds.includes(id));
@@ -108,41 +111,30 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
       return [...filtered, ...additions];
     });
   }, [normalizedSelectedNodeIds]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
-  const displayTabIds = useMemo(
-    () => (shouldShowTabs ? tabOrder.filter((id) => nodeById.has(id)) : []),
-    [shouldShowTabs, tabOrder, nodeById]
-  );
+  const displayTabIds = (shouldShowTabs ? tabOrder.filter((id) => nodeById.has(id)) : []);
 
-  const activeTabIndex = useMemo(
-    () => displayTabIds.findIndex((id) => id === activeNodeId),
-    [activeNodeId, displayTabIds]
-  );
+  const activeTabIndex = displayTabIds.findIndex((id) => id === activeNodeId);
   const tabPosition = activeTabIndex >= 0 ? activeTabIndex + 1 : displayTabIds.length > 0 ? 1 : 0;
 
-  const handleTabChange = useCallback(
-    (nodeId: string) => {
+  const handleTabChange = (nodeId: string) => {
       if (!nodeId || nodeId === activeNodeId || !normalizedSelectedNodeIds.includes(nodeId)) {
         return;
       }
       const reordered = [...normalizedSelectedNodeIds.filter((id) => id !== nodeId), nodeId];
       selectNodes(reordered);
-    },
-    [activeNodeId, selectNodes, normalizedSelectedNodeIds]
-  );
+    };
 
-  const handleTabClose = useCallback(
-    (nodeId: string) => {
+  const handleTabClose = (nodeId: string) => {
       if (!nodeId) {
         return;
       }
       setTabOrder((current) => current.filter((id) => id !== nodeId));
       toggleNodeSelection(nodeId);
-    },
-    [toggleNodeSelection]
-  );
+    };
 
-  const displayShape = useMemo(() => {
+  const displayShape = (() => {
     if (Array.isArray(selectedNode?.shape)) {
       const [rows, cols] = selectedNode.shape;
       const formatPart = (value: number | null | undefined) =>
@@ -150,9 +142,9 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
       return [formatPart(rows), formatPart(cols)] as [string, string];
     }
     return ['?', '?'] as [string, string];
-  }, [selectedNode]);
+  })();
 
-  const rowsLoaded = useMemo(() => (Array.isArray(nodeData.data) ? nodeData.data.length : 0), [nodeData.data]);
+  const rowsLoaded = (Array.isArray(nodeData.data) ? nodeData.data.length : 0);
 
   const header: WorkspaceDataTableHeaderInfo = {
     nodeLabel: resolveNodeDisplayLabel(selectedNode) || 'Unknown node',

@@ -7,7 +7,7 @@ import { useWorkspaceStatus } from '../../../hooks/useWorkspaceStatus';
 import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
 import { useWorkspaceActions } from '../../../hooks/useWorkspaceActions';
 import { useAuth } from '../../../hooks/useAuth';
-import { ConcordanceAnalysisResponse, textApi } from '../../../api/text';
+import { type ConcordanceAnalysisResponse, type ConcordanceResultEntry, textApi } from '../../../api/text';
 import { useAnalysisStore } from '../../../stores/analysisStore';
 import { useUIStore } from '../../../stores';
 import useNodeColumnInfos from '../../../hooks/useNodeColumnInfos';
@@ -37,6 +37,7 @@ import {
   EXTENDED_PALETTE,
   getAnalysisActionState,
 } from '../common';
+import type { WorkspaceNodeLike } from '../common/nodeSelectionTypes';
 import {
   pruneTasksById,
 } from '../../../hooks/analysisTaskUtils';
@@ -148,7 +149,6 @@ const ConcordanceFeature: React.FC = () => {
     activeNodeIds,
     panelSelectedNodes,
     displayNodeCount,
-    hasServerRequest,
     serverRequest,
   } = useAnalysisLock({
     analysisType: 'concordance_analysis',
@@ -169,7 +169,7 @@ const ConcordanceFeature: React.FC = () => {
   const [showMetadata, setShowMetadata] = useState(false);
   const [results, setResults] = useState<ConcordanceAnalysisResponse | null>(null);
   const labelToNodeId = (() => {
-    const params = (results as any)?.analysis_params;
+    const params = results?.analysis_params;
     const mapping = params?.label_to_node_map;
     if (mapping && typeof mapping === 'object') {
       const normalized: Record<string, string> = {};
@@ -199,7 +199,7 @@ const ConcordanceFeature: React.FC = () => {
     panelSelectedNodes.forEach((node, idx) => {
       const candidateIds = [
         node.id,
-        (node as any)?.node_id,
+        node.node_id,
       ].map((val) => (typeof val === 'string' ? val : null)).filter(Boolean) as string[];
       const primaryId = candidateIds[0] ?? `node-${idx}`;
       const assigned = nodeColors[primaryId] || defaultPalette[idx % defaultPalette.length];
@@ -207,9 +207,9 @@ const ConcordanceFeature: React.FC = () => {
       [
         primaryId,
         node.name,
-        (node as any)?.name,
+        node.name,
         node.label,
-        (node as any)?.label,
+        node.label,
       ].forEach((value) => {
         if (typeof value === 'string' && value.trim()) {
           variants.add(value);
@@ -237,7 +237,7 @@ const ConcordanceFeature: React.FC = () => {
   const [globalPageSize, setGlobalPageSize] = useState(20);
   
   // Detail view state
-  const [selectedDetail, setSelectedDetail] = useState<any>(null);
+  const [selectedDetail, setSelectedDetail] = useState<Record<string, unknown> | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   
   // State for auto-triggering search from TokenFrequencyTab
@@ -248,7 +248,6 @@ const ConcordanceFeature: React.FC = () => {
 
   const {
     resolveTaskId,
-    localTaskId: localConcordanceTaskId,
     setLocalTaskId: setLocalConcordanceTaskId,
     isRunning: isSearching,
     setIsRunning: setIsSearching,
@@ -273,24 +272,25 @@ const ConcordanceFeature: React.FC = () => {
       }
     },
     onHydratedResult: (resultPayload) => {
-      const res = (resultPayload as any)?.data ?? resultPayload;
+      const res = resultPayload?.data ?? resultPayload;
       if (res) {
         setResults(resultPayload as ConcordanceAnalysisResponse);
       }
     },
     onHydratedRequest: async (requestPayload) => {
-      const req = (requestPayload as any)?.data ?? requestPayload;
-      if (!req) return;
-      const nodeIds: string[] = Array.isArray(req.node_ids) ? req.node_ids.slice(0, 2) : [];
-      const node_columns: Record<string, string> = req.node_columns || {};
+      const req = (requestPayload as Record<string, unknown>)?.data ?? requestPayload;
+      if (!req || typeof req !== 'object') return;
+      const reqObj = req as Record<string, unknown>;
+      const nodeIds: string[] = Array.isArray(reqObj.node_ids) ? reqObj.node_ids.slice(0, 2) : [];
+      const node_columns: Record<string, string> = (reqObj.node_columns as Record<string, string>) || {};
       const sels = nodeIds.map((id: string) => ({ nodeId: id, column: node_columns[id] || '' }));
       setNodeColumnSelections(sels, { replace: true });
-      setSearchWord(String(req.search_word || ''));
-      setNumLeftTokens(Number(req.num_left_tokens ?? 10));
-      setNumRightTokens(Number(req.num_right_tokens ?? 10));
-      setRegex(!!req.regex);
-      setCaseSensitive(!!req.case_sensitive);
-      const hydratedMode: 'separated' | 'combined' = req.combined && req.combinable !== false ? 'combined' : 'separated';
+      setSearchWord(String(reqObj.search_word || ''));
+      setNumLeftTokens(Number(reqObj.num_left_tokens ?? 10));
+      setNumRightTokens(Number(reqObj.num_right_tokens ?? 10));
+      setRegex(!!reqObj.regex);
+      setCaseSensitive(!!reqObj.case_sensitive);
+      const hydratedMode: 'separated' | 'combined' = reqObj.combined && reqObj.combinable !== false ? 'combined' : 'separated';
       setViewMode(hydratedMode);
       try {
         await restoreAnalysisLockFromRequest({
@@ -411,8 +411,8 @@ const ConcordanceFeature: React.FC = () => {
       return;
     }
 
-    const analysisParams = (results as any)?.analysis_params ?? {};
-    const preferenceSource = (results as any)?.preferences ?? analysisParams?.preferences ?? {};
+    const analysisParams = results?.analysis_params ?? {};
+    const preferenceSource = results?.preferences ?? (analysisParams as Record<string, unknown>)?.preferences as Record<string, unknown> | undefined ?? {};
 
     const nextPageSize = preferenceSource?.page_size ?? analysisParams?.page_size;
     if (typeof nextPageSize === 'number' && Number.isFinite(nextPageSize) && nextPageSize > 0 && nextPageSize !== globalPageSize) {
@@ -447,19 +447,19 @@ const ConcordanceFeature: React.FC = () => {
       setResults(null);
     }
     prevSelectedNodeIdsRef.current = curr;
-  }, [selectedNodeIdsKey, isLocked]);
+  }, [selectedNodeIdsKey, isLocked, selectedNodeIds]);
 
   useEffect(() => {
     if (!currentWorkspaceId) {
       setLocalConcordanceTaskId(null);
     }
-  }, [currentWorkspaceId]);
+  }, [currentWorkspaceId, setLocalConcordanceTaskId]);
 
   useEffect(() => {
     if (concordanceTaskStatus.tasks.length === 0) {
       setLocalConcordanceTaskId(null);
     }
-  }, [concordanceTaskStatus.tasks.length]);
+  }, [concordanceTaskStatus.tasks.length, setLocalConcordanceTaskId]);
 
   // React to pending concordance handoff from TokenFrequencyTab
   useEffect(() => {
@@ -522,7 +522,7 @@ const ConcordanceFeature: React.FC = () => {
         window.clearTimeout(timeoutId);
       }
     };
-  }, [pendingConcordance, selectedNodes, setNodeColumnSelections, clearPendingConcordance, selectNodes]);
+  }, [pendingConcordance, selectedNodes, setNodeColumnSelections, clearPendingConcordance, selectNodes, handleColorChange]);
 
   // Recompute auto columns if unlocked and selections empty but nodes exist
   useEffect(() => {
@@ -629,8 +629,8 @@ const ConcordanceFeature: React.FC = () => {
       return;
     }
     const taskId =
-      (results as any)?.metadata?.task_id ??
-      (results as any)?.metadata?.taskId ??
+      results?.metadata?.task_id ??
+      (results?.metadata as Record<string, unknown> | undefined)?.taskId ??
       '';
     const key = `${taskId}|${combinedPage}|${combinedPageSize}`;
     if (lastCombinedQueryRef.current === key) {
@@ -641,7 +641,7 @@ const ConcordanceFeature: React.FC = () => {
   }, [viewMode, results, combinedPage, combinedPageSize, updateStoredResult]);
 
 
-  const handleRowClick = (row: any, nodeId: string, column: string) => {
+  const handleRowClick = (row: Record<string, unknown>, nodeId: string, column: string) => {
     if (!currentWorkspaceId) return;
 
     const record = { ...row };
@@ -714,7 +714,7 @@ const ConcordanceFeature: React.FC = () => {
 
   const renderConcordanceTable = (
     nodeKey: string,
-    nodeData: any,
+    nodeData: ConcordanceResultEntry,
     context: { nodeId: string; paginationKey: string; requestNodeId: string; column: string }
   ) => {
     const { nodeId: actualNodeId, paginationKey, requestNodeId, column } = context;
@@ -787,13 +787,13 @@ const ConcordanceFeature: React.FC = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {rows.map((row:any, idx:number) => {
+                  {rows.map((row: Record<string, unknown>, idx:number) => {
                     const rawSrc = row.__source_node;
                     const normalized = rawSrc ? rawSrc.toString().toLowerCase() : undefined;
                     let color = normalized ? sourceColorMap[normalized] : undefined;
-                    if (!color && rawSrc) {
+                    if (!color && rawSrc && normalized) {
                       // Fallback: attempt partial / loose match (startsWith) if exact failed
-                      const entry = Object.entries(sourceColorMap).find(([k]) => k.includes(normalized!));
+                      const entry = Object.entries(sourceColorMap).find(([k]) => k.includes(normalized));
                       color = entry ? entry[1] : undefined;
                     }
                     if (!color) {
@@ -811,8 +811,8 @@ const ConcordanceFeature: React.FC = () => {
                       <TableRow key={idx} className="cursor-pointer" style={{ backgroundColor: bg }} onClick={() => {
                         if (rawSrc) {
                   const nodesForDetail = panelSelectedNodes;
-                    const nodeObj = nodesForDetail.find((n: any) => {
-                            const candidates = [n.id, n.name, (n as any).name, n.data?.name, (n as any).label, n.data?.label].filter(Boolean).map(v=>v.toString().toLowerCase());
+                    const nodeObj = nodesForDetail.find((n: WorkspaceNodeLike) => {
+                            const candidates = [n.id, n.name, n.name, (n as Record<string, unknown>).data && typeof (n as Record<string, unknown>).data === 'object' ? ((n as Record<string, unknown>).data as Record<string, unknown>)?.name : undefined, n.label, (n as Record<string, unknown>).data && typeof (n as Record<string, unknown>).data === 'object' ? ((n as Record<string, unknown>).data as Record<string, unknown>)?.label : undefined].filter(Boolean).map(v=>String(v).toLowerCase());
                             return candidates.includes(rawSrc.toString().toLowerCase());
                           });
                           const sel = nodeObj && effectiveNodeColumnSelections.find(s => s.nodeId === nodeObj.id);
@@ -906,7 +906,7 @@ const ConcordanceFeature: React.FC = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {nodeData.data.map((row: any, index: number) => (
+                {nodeData.data.map((row: Record<string, unknown>, index: number) => (
                   <TableRow 
                     key={index} 
                     className={`cursor-pointer ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
@@ -1040,7 +1040,6 @@ const ConcordanceFeature: React.FC = () => {
                   value={searchWord}
                   onChange={(e) => setSearchWord(e.target.value)}
                   placeholder="Enter word or phrase to search for"
-                  disabled={!!isLocked}
                   className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
                 />
               </div>
@@ -1053,7 +1052,6 @@ const ConcordanceFeature: React.FC = () => {
                     onChange={(e) => setNumLeftTokens(parseInt(e.target.value) || 10)}
                     min="1"
                     max="50"
-                    disabled={!!isLocked}
                     className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
                   />
                 </div>
@@ -1065,7 +1063,6 @@ const ConcordanceFeature: React.FC = () => {
                     onChange={(e) => setNumRightTokens(parseInt(e.target.value) || 10)}
                     min="1"
                     max="50"
-                    disabled={!!isLocked}
                     className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
                   />
                 </div>
@@ -1080,7 +1077,6 @@ const ConcordanceFeature: React.FC = () => {
                     checked={regex}
                     onChange={(e) => setRegex(e.target.checked)}
                     className="h-4 w-4"
-                    disabled={!!isLocked}
                   />
                   <span className="text-sm text-foreground">Use regular expression</span>
                 </label>
@@ -1092,7 +1088,6 @@ const ConcordanceFeature: React.FC = () => {
                   checked={caseSensitive}
                   onChange={(e) => setCaseSensitive(e.target.checked)}
                   className="h-4 w-4"
-                  disabled={!!isLocked}
                 />
                 <span className="text-sm text-foreground">Case sensitive</span>
               </label>
@@ -1110,9 +1105,9 @@ const ConcordanceFeature: React.FC = () => {
             className="w-full md:w-auto"
           >
             {isSearching ? (
-              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Searching...</>
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Running...</>
             ) : (
-              <><Play className="mr-2 h-4 w-4" />Search</>
+              <><Play className="mr-2 h-4 w-4" />{actionState.runLabel}</>
             )}
           </Button>
 
@@ -1216,19 +1211,19 @@ const ConcordanceFeature: React.FC = () => {
                       const nodesForDetail = panelSelectedNodes;
                       const keyedOrder = Object.keys(results.data);
                       const approxIndex = keyedOrder.indexOf(nodeName);
-                      let node = nodesForDetail.find((n: any) => (n.data?.name || n.id) === nodeName);
+                      let node = nodesForDetail.find((n: WorkspaceNodeLike) => {const d = n.data as Record<string,unknown> | undefined; return ((d?.name as string | undefined) || n.id) === nodeName;});
                       if (!node) {
-                        node = nodesForDetail.find((n: any) => n.id === nodeName);
+                        node = nodesForDetail.find((n: WorkspaceNodeLike) => n.id === nodeName);
                       }
                       if (!node) {
-                        node = nodesForDetail.find((n: any) => n.name === nodeName);
+                        node = nodesForDetail.find((n: WorkspaceNodeLike) => n.name === nodeName);
                       }
                       const mappedNodeId = labelToNodeId?.[nodeName];
                       if (!node && mappedNodeId) {
-                        node = nodesForDetail.find((n: any) => n.id === mappedNodeId);
+                        node = nodesForDetail.find((n: WorkspaceNodeLike) => n.id === mappedNodeId);
                       }
                       if (!node) {
-                        node = (nodesForDetail as any)[approxIndex];
+                        node = nodesForDetail[approxIndex];
                       }
                       
                       const resolvedNodeId = node?.id || mappedNodeId || '';
@@ -1280,17 +1275,17 @@ const ConcordanceFeature: React.FC = () => {
                 </div>
                 <div>
                   <span className="font-medium text-gray-700">L1 Word:</span>
-                  <span className="ml-2">{selectedDetail.l1}</span>
+                  <span className="ml-2">{String(selectedDetail.l1 ?? '')}</span>
                 </div>
                 <div>
                   <span className="font-medium text-gray-700">R1 Word:</span>
-                  <span className="ml-2">{selectedDetail.r1}</span>
+                  <span className="ml-2">{String(selectedDetail.r1 ?? '')}</span>
                 </div>
               </div>
 
               {/* Full Text */}
               <div className="mb-6">
-                <h4 className="font-medium text-gray-700 mb-2">Full Text from Column: {selectedDetail.column}</h4>
+                <h4 className="font-medium text-gray-700 mb-2">Full Text from Column: {String(selectedDetail.column ?? '')}</h4>
                 <div className="bg-gray-50 p-4 rounded-lg border">
                   <div className="font-mono text-sm whitespace-pre-wrap max-h-96 overflow-y-auto">
                     {detailFullTextInfo.text
@@ -1312,7 +1307,7 @@ const ConcordanceFeature: React.FC = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {selectedDetail.record && Object.entries(selectedDetail.record).map(([key, value]) => {
+                      {(selectedDetail.record && typeof selectedDetail.record === 'object') ? Object.entries(selectedDetail.record as Record<string, unknown>).map(([key, value]) => {
                         if (key === selectedDetail.column) {
                           return null;
                         }
@@ -1342,7 +1337,7 @@ const ConcordanceFeature: React.FC = () => {
                             </TableCell>
                           </TableRow>
                         );
-                      })}
+                      }) : null}
                     </TableBody>
                   </Table>
                 </div>

@@ -3,6 +3,8 @@ import { textApi, type TokenFrequencyRequest, type TokenFrequencyResponse } from
 import type { NodeColumnSelection } from '@/hooks/useAutoNodeColumns';
 import { resolveTokenFrequencyNodeContext, type TokenFrequencyAnalysisParams } from '@/components/tabs/tokenFrequencyHelpers';
 import { restoreAnalysisLockFromRequest, type WorkspaceNodeLike } from '../../common';
+import type { PendingConcordance } from '@/stores/analysisStore';
+import type { ViewType } from '@/stores/uiStore';
 
 interface AnalysisState {
   currentWorkspaceId: string | null;
@@ -21,7 +23,7 @@ interface AnalysisActions {
   setLocalTaskId: (value: string | null) => void;
   setIsRunning: (value: boolean) => void;
   runningRef: React.MutableRefObject<boolean>;
-  setResultsSafely: (value: any) => void;
+  setResultsSafely: (value: TokenFrequencyResponse | null) => void;
   setLastCompareNodeIds: React.Dispatch<React.SetStateAction<string[]>>;
   setAppliedStopSet: React.Dispatch<React.SetStateAction<Set<string>>>;
   setStopWords: React.Dispatch<React.SetStateAction<string>>;
@@ -30,13 +32,13 @@ interface AnalysisActions {
 
 interface LockActions {
   getAuthHeaders: () => Record<string, string>;
-  lockWithSnapshots: (nodes: any[]) => void;
+  lockWithSnapshots: (nodes: Array<{ id: string; name?: string; columns?: string[] | null }>) => void;
 }
 
 interface NavigationActions {
   selectNodes: (nodeIds: string[]) => void;
-  setPendingConcordance: (payload: any) => void;
-  setCurrentView: (view: any) => void;
+  setPendingConcordance: (payload: PendingConcordance) => void;
+  setCurrentView: (view: ViewType) => void;
   applyStopSetFromText: (text: string) => void;
   getColorForNode: (nodeId: string, index?: number) => string;
 }
@@ -136,7 +138,7 @@ export const useTokenFrequencyTaskFlow = ({
       const response = await textApi.tokenFrequencies(request, getAuthHeaders());
       setResultsSafely(response);
 
-      const responseTaskId = (response as any)?.metadata?.task_id;
+      const responseTaskId = (response.metadata as Record<string, unknown> | null | undefined)?.task_id;
       if (typeof responseTaskId === 'string' && responseTaskId.trim()) {
         setLocalTaskId(responseTaskId);
       }
@@ -162,7 +164,7 @@ export const useTokenFrequencyTaskFlow = ({
         state: 'failed',
         message: error instanceof Error ? error.message : 'Unknown error occurred',
         data: null,
-      } as any);
+      } as TokenFrequencyResponse);
       setIsRunning(false);
       runningRef.current = false;
     }

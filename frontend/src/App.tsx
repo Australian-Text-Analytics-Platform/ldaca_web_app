@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, Suspense, lazy, type ReactNode } from 'react';
-import { useAuth, AuthPhase, REFRESH_FAILURE_THRESHOLD } from './hooks/useAuth';
+import { useAuth, type AuthPhase, REFRESH_FAILURE_THRESHOLD } from './hooks/useAuth';
 import { useBackendHealth } from './hooks/useBackendHealth';
 import { QueryProvider } from './providers/QueryProvider';
 import { WorkspaceProvider } from './providers/WorkspaceProvider';
@@ -65,8 +65,10 @@ const WorkspaceShell: React.FC = () => {
       isMultiUserMode,
     });
   }
-  const [showLaggingHint, setShowLaggingHint] = useState(false);
-  const [refreshChipVisible, setRefreshChipVisible] = useState(false);
+  const [laggingHintReady, setLaggingHintReady] = useState(false);
+  const [refreshChipReady, setRefreshChipReady] = useState(false);
+  const showLaggingHint = laggingHintReady && phase.status === 'bootstrapping';
+  const refreshChipVisible = refreshChipReady && phase.status === 'refreshing';
 
   // Right panel width and resize handlers must be declared before any early returns (React Hooks rule)
   const [rightWidth, setRightWidth] = useState<number>(40); // percentage of total width
@@ -79,22 +81,21 @@ const WorkspaceShell: React.FC = () => {
   const rightWidthLiveRef = useRef<number>(rightWidth);
 
   useEffect(() => {
-    if (phase.status !== 'bootstrapping') {
-      setShowLaggingHint(false);
-      return;
-    }
-    const timeoutId = window.setTimeout(() => setShowLaggingHint(true), LAG_HINT_DELAY_MS);
-    return () => window.clearTimeout(timeoutId);
+    if (phase.status !== 'bootstrapping') return;
+    const timeoutId = window.setTimeout(() => setLaggingHintReady(true), LAG_HINT_DELAY_MS);
+    return () => {
+      window.clearTimeout(timeoutId);
+      setLaggingHintReady(false);
+    };
   }, [phase.status]);
 
   useEffect(() => {
-    if (phase.status !== 'refreshing') {
-      setRefreshChipVisible(false);
-      return;
-    }
-    setRefreshChipVisible(false);
-    const timeoutId = window.setTimeout(() => setRefreshChipVisible(true), REFRESH_CHIP_DELAY_MS);
-    return () => window.clearTimeout(timeoutId);
+    if (phase.status !== 'refreshing') return;
+    const timeoutId = window.setTimeout(() => setRefreshChipReady(true), REFRESH_CHIP_DELAY_MS);
+    return () => {
+      window.clearTimeout(timeoutId);
+      setRefreshChipReady(false);
+    };
   }, [phase.status]);
 
   const blockingCopy = getBlockingCopy(phase, showLaggingHint);
@@ -150,7 +151,7 @@ const WorkspaceShell: React.FC = () => {
   }, [isRightCollapsed, rightWidth, setIsResizing, setRightWidth, layoutRef]);
 
   // Collapse/expand the entire right panel (Outlook-like behavior)
-  const toggleRightPanel = useCallback(() => {
+  const toggleRightPanel = () => {
     setIsRightCollapsed((prev) => {
       const next = !prev;
       if (next) {
@@ -161,7 +162,7 @@ const WorkspaceShell: React.FC = () => {
       }
       return next;
     });
-  }, [rightWidth, lastRightWidth]);
+  };
 
   if (blockingCopy) {
     return (

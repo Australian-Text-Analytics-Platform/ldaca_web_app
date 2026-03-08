@@ -13,7 +13,7 @@ export type ConditionValue =
   | Array<string | number | boolean | Date | null>;
 
 export interface FilterCondition {
-  [key: string]: any;
+  [key: string]: ConditionValue | string | boolean | undefined;
   column: string;
   operator: 'eq' | 'gte' | 'lte' | 'contains' | 'startswith' | 'endswith' | 'is_null' | 'between' | 'in';
   value: ConditionValue;
@@ -42,7 +42,7 @@ export interface FilterConditionWithId {
   negate?: boolean;
   regex?: boolean;
   dataType?: string;
-  [key: string]: any;
+  [key: string]: ConditionValue | string | boolean | undefined;
 }
 
 export type PreviewPagination = {

@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import React from 'react';
 
-// Create a query client with optimized defaults
+// eslint-disable-next-line react-refresh/only-export-components -- queryClient must be accessible for cache invalidation outside React tree
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {

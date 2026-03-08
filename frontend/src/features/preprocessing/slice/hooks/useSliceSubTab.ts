@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { SliceRequest as SliceRequestPayload, FilterPreviewResponse } from '../../../../api/nodes';
 import type { NodeColumnSelection, WorkspaceNodeLike } from '../../../../components/NodeSelectionPanel';
 import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
@@ -121,7 +121,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
   const [isSlicing, setIsSlicing] = useState(false);
   const [lastResult, setLastResult] = useState<SliceHistory | null>(null);
 
-  const workspaceNodeMap = useMemo(() => buildWorkspaceNodeMap(workspaceNodes), [workspaceNodes]);
+  const workspaceNodeMap = buildWorkspaceNodeMap(workspaceNodes);
 
   const activeNode = (() => {
     if (selectedNode) return selectedNode;
@@ -129,10 +129,10 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
     return workspaceNodeMap.get(selectedNodeId) ?? null;
   })() as WorkspaceNodeLike | null;
 
-  const selectedNodeLabel = useMemo(() => {
+  const selectedNodeLabel = (() => {
     if (!selectedNodeId) return '';
     return deriveNodeLabel(activeNode) || selectedNodeId;
-  }, [selectedNodeId, activeNode]);
+  })();
 
   useEffect(() => {
     setInlineError(null);
