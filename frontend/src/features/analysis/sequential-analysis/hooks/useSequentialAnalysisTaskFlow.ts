@@ -4,9 +4,8 @@ import {
   type SequentialFrequency,
   textApi,
 } from '../../../../api/text';
-import { createNodeSnapshot, applySelectedColumnsToSnapshots } from '../../../../hooks/useSchemaManagement';
 import type { ChartConfig } from '../../../../components/ui/chart';
-import type { LockedNodesSnapshot } from '../../common/useAnalysisLockMachine';
+import { extractAndSetTaskId, restoreAnalysisLockFromRequest } from '../../common';
 
 export type SequentialAnalysisDatum = Record<string, unknown>;
 
@@ -61,7 +60,7 @@ interface SequentialAnalysisActions {
   setLocalTaskId: (value: string | null) => void;
   setNodeColumnSelections: (selections: Array<{ nodeId: string; column: string }>) => void;
   setTimeColumn: (value: string) => void;
-  setLockedNodesSnapshot: (snapshots: LockedNodesSnapshot[]) => void;
+  lockWithSnapshots: (snapshots: Array<{ id: string; name?: string; columns?: string[] }>) => void;
   lockCurrentSchema: (schema?: Record<string, string>) => void;
   resolveTaskId: () => Promise<string | null>;
   clearResults: () => Promise<void>;
@@ -99,7 +98,7 @@ export function useSequentialAnalysisTaskFlow({
     setLocalTaskId,
     setNodeColumnSelections,
     setTimeColumn,
-    setLockedNodesSnapshot,
+    lockWithSnapshots,
     lockCurrentSchema,
     resolveTaskId,
     clearResults,
@@ -157,15 +156,7 @@ export function useSequentialAnalysisTaskFlow({
           ? (authHeaders as Record<string, string>)
           : {};
       const result = await textApi.sequentialAnalysis(nodeIdForAnalysis, request, headers);
-      const taskIdFromResponse =
-        (result as Record<string, unknown>)?.metadata != null
-          ? ((result as Record<string, unknown>).metadata as Record<string, unknown>)?.task_id ??
-            ((result as Record<string, unknown>).metadata as Record<string, unknown>)?.taskId ??
-            null
-          : null;
-      if (typeof taskIdFromResponse === 'string' && taskIdFromResponse.trim().length > 0) {
-        setLocalTaskId(taskIdFromResponse);
-      }
+      extractAndSetTaskId(result, setLocalTaskId);
       const enrichedResult = {
         ...result,
         analysis_params: {
@@ -186,24 +177,14 @@ export function useSequentialAnalysisTaskFlow({
       setChartType(resolvedChartType);
 
       try {
-        const snapshot = await createNodeSnapshot(
-          currentWorkspaceId,
-          nodeIdForAnalysis,
-          () => getAuthHeaders(),
-        );
-        const [normalizedSnapshot] = applySelectedColumnsToSnapshots([snapshot], {
-          [nodeIdForAnalysis]: picked,
+        await restoreAnalysisLockFromRequest({
+          workspaceId: currentWorkspaceId,
+          requestData: { node_ids: [nodeIdForAnalysis], node_columns: { [nodeIdForAnalysis]: picked } },
+          getAuthHeaders,
+          lockWithSnapshots,
+          maxNodes: 1,
         });
-        if (normalizedSnapshot) {
-          setLockedNodesSnapshot([
-            {
-              id: normalizedSnapshot.id,
-              name: normalizedSnapshot.name,
-              columns: normalizedSnapshot.columns,
-            },
-          ]);
-          lockCurrentSchema(normalizedSnapshot.schema);
-        }
+        lockCurrentSchema();
       } catch {
         /* ignore */
       }

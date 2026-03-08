@@ -4,12 +4,13 @@ import { useWorkspaceSelection } from '../../../hooks/useWorkspaceSelection';
 import { useWorkspaceStatus } from '../../../hooks/useWorkspaceStatus';
 import { useAuth } from '../../../hooks/useAuth';
 import { useUIStore } from '../../../stores/uiStore';
-import { useSchemaManagement, applySelectedColumnsToSnapshots } from '../../../hooks/useSchemaManagement';
+import { useSchemaManagement } from '../../../hooks/useSchemaManagement';
 import { type SequentialFrequency, textApi } from '../../../api/text';
 import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
-import { getNodeInfo } from '../../../lib/nodeInfoCache';
+
 import { ANALYSIS_LOCKED_MESSAGE } from '../../../components/tabs/AnalysisLockedNotice';
 import { normalizeSchemaFromInfo } from '../../../hooks/useSchemaManagement';
+import { getNodeInfo } from '../../../lib/nodeInfoCache';
 import { Button } from '../../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Input } from '../../../components/ui/input';
@@ -32,6 +33,8 @@ import {
   useAnalysisFeature,
   getAnalysisActionState,
   useSafeResult,
+  restoreAnalysisLockFromRequest,
+  resetAnalysisSelectionAfterClear,
 } from '../common';
 import {
   useSequentialAnalysisTaskFlow,
@@ -71,8 +74,8 @@ const SequentialAnalysisFeature: React.FC = () => {
   const { getAuthHeaders } = useAuth();
   const {
     isLocked,
-    lockedNodesSnapshot,
-    setLockedNodesSnapshot,
+    lockWithSnapshots,
+    unlockSelection,
     activeNodeId,
     nodeColumnSelections,
     setNodeColumnSelections,
@@ -221,16 +224,14 @@ const SequentialAnalysisFeature: React.FC = () => {
       };
       if (nodeIdStr && currentWorkspaceId) {
         try {
+          await restoreAnalysisLockFromRequest({
+            workspaceId: currentWorkspaceId,
+            requestData: { node_ids: [nodeIdStr], node_columns: { [nodeIdStr]: reqTimeColumn } },
+            getAuthHeaders,
+            lockWithSnapshots,
+            maxNodes: 1,
+          });
           const info = await getNodeInfo({ workspaceId: currentWorkspaceId, nodeId: nodeIdStr, getAuthHeaders });
-          const name = info?.name || info?.data?.name || nodeIdStr;
-          const columns = Array.isArray(info?.columns)
-            ? info.columns
-            : (Array.isArray(info?.data?.columns) ? info.data.columns : []);
-          const [normalizedSnapshot] = applySelectedColumnsToSnapshots(
-            [{ id: nodeIdStr, name: String(name), columns }],
-            { [nodeIdStr]: reqTimeColumn }
-          );
-          setLockedNodesSnapshot([{ id: normalizedSnapshot.id, name: normalizedSnapshot.name, columns: normalizedSnapshot.columns }]);
           const normalizedSchema = normalizeSchemaFromInfo(info);
           if (Object.keys(normalizedSchema).length > 0) {
             setLockedSchema(normalizedSchema);
@@ -245,7 +246,7 @@ const SequentialAnalysisFeature: React.FC = () => {
     },
     onCleared: () => {
       setResultSafely(null);
-      setLockedNodesSnapshot([]);
+      resetAnalysisSelectionAfterClear({ unlockSelection });
       setLockedSchema(null);
       setChartType('line');
       setNumericOriginInput('');
@@ -405,7 +406,7 @@ const SequentialAnalysisFeature: React.FC = () => {
       setLocalTaskId,
       setNodeColumnSelections,
       setTimeColumn,
-      setLockedNodesSnapshot,
+      lockWithSnapshots,
       lockCurrentSchema,
       resolveTaskId,
       clearResults,
@@ -579,7 +580,7 @@ const SequentialAnalysisFeature: React.FC = () => {
                 {column && (
                   <UniqueValueCount 
                     workspaceId={currentWorkspaceId || ''} 
-                    nodeId={(isLocked && lockedNodesSnapshot.length ? lockedNodesSnapshot[0].id : (selectedNodeId || ''))} 
+                    nodeId={activeNodeId || selectedNodeId || ''} 
                     columnName={column} 
                   />
                 )}

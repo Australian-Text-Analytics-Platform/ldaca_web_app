@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import { textApi, type TopicModelingRequest, type TopicModelingDetachRequest, type TopicModelingDetachNodeOption } from '../../../../api/text';
 import { queryKeys } from '../../../../lib/queryKeys';
 import { applySelectedColumnsToSnapshots } from '../../../../hooks/useSchemaManagement';
+import { extractAndSetTaskId } from '../../common';
 
 type NodeSelection = {
   id?: string;
@@ -38,6 +39,7 @@ interface TopicModelingActions {
   setResultSafely: (value: TopicModelingResponseLike | null) => void;
   lastFetchedRef: React.MutableRefObject<{ taskId: string | null; state: string | null }>;
   resolveTopicModelingTaskId: () => Promise<string | null>;
+  setLocalTaskId: (id: string | null) => void;
 }
 
 interface TopicModelingLock {
@@ -69,6 +71,7 @@ export function useTopicModelingTaskFlow({
     setResultSafely,
     lastFetchedRef,
     resolveTopicModelingTaskId,
+    setLocalTaskId,
   },
   lock: {
     getAuthHeaders,
@@ -143,6 +146,7 @@ export function useTopicModelingTaskFlow({
       };
 
       const res = await textApi.topicModeling(req, getAuthHeaders());
+      extractAndSetTaskId(res, setLocalTaskId);
       setResultSafely(res as TopicModelingResponseLike);
 
       if (res.state === 'failed') {

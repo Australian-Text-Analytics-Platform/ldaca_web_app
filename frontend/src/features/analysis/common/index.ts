@@ -12,5 +12,6 @@ export * from './tasks/types';
 export * from './tasks/policies';
 export * from './useSafeResult';
 export * from './analysisActionState';
+export * from './extractTaskId';
 export * from './palette';
 export * from './useNodeColorManagement';

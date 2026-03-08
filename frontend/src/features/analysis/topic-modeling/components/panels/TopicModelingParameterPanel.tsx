@@ -2,6 +2,7 @@ import { Label } from '../../../../../components/ui/label';
 import { Input } from '../../../../../components/ui/input';
 import HelpIcon from '../../../../../components/help/HelpIcon';
 import NodeSelectionPanel from '../../../../../components/NodeSelectionPanel';
+import { ANALYSIS_LOCKED_MESSAGE } from '../../../../../components/tabs/AnalysisLockedNotice';
 import type { NodeColumnSelection } from '../../../../../hooks/useAutoNodeColumns';
 import type { ColumnInfo } from '../../../../../utils/columnTypes';
 import type { NodeLike } from '../../../../../hooks/useNodeColumnInfos';
@@ -69,8 +70,12 @@ export function TopicModelingParameterPanel({
         defaultPalette={defaultPalette}
         getNodeColumns={getNodeColumns}
         maxCompare={2}
+        showShape
         disabled={isLocked}
         locked={isLocked}
+        allowedDataTypes={['string']}
+        lockedMessage={ANALYSIS_LOCKED_MESSAGE}
+        originalCount={selectedNodes.length}
       />
 
       <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">

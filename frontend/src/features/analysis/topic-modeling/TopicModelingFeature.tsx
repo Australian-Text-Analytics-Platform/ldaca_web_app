@@ -86,7 +86,7 @@ const TopicModelingFeature: React.FC = () => {
     taskStatus,
     lastFetchedRef,
     clearResults,
-    setLocalTaskId: _setLocalTaskId,
+    setLocalTaskId,
     banner: topicWaitingBanner,
     hasActiveTask,
   } = useAnalysisFeature<TopicModelingResponse>({
@@ -272,6 +272,7 @@ const TopicModelingFeature: React.FC = () => {
       setResultSafely,
       lastFetchedRef,
       resolveTopicModelingTaskId: resolveTaskId,
+      setLocalTaskId,
     },
     lock: {
       getAuthHeaders,

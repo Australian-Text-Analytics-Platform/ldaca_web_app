@@ -2,7 +2,7 @@ import { toast } from 'sonner';
 import { textApi, type TokenFrequencyRequest, type TokenFrequencyResponse } from '@/api/text';
 import type { NodeColumnSelection } from '@/hooks/useAutoNodeColumns';
 import { resolveTokenFrequencyNodeContext, type TokenFrequencyAnalysisParams } from '@/components/tabs/tokenFrequencyHelpers';
-import { restoreAnalysisLockFromRequest, type WorkspaceNodeLike } from '../../common';
+import { restoreAnalysisLockFromRequest, extractAndSetTaskId, type WorkspaceNodeLike } from '../../common';
 import type { PendingConcordance } from '@/stores/analysisStore';
 import type { ViewType } from '@/stores/uiStore';
 
@@ -138,10 +138,7 @@ export const useTokenFrequencyTaskFlow = ({
       const response = await textApi.tokenFrequencies(request, getAuthHeaders());
       setResultsSafely(response);
 
-      const responseTaskId = (response.metadata as Record<string, unknown> | null | undefined)?.task_id;
-      if (typeof responseTaskId === 'string' && responseTaskId.trim()) {
-        setLocalTaskId(responseTaskId);
-      }
+      extractAndSetTaskId(response, setLocalTaskId);
 
       setLastCompareNodeIds(request.node_ids);
 

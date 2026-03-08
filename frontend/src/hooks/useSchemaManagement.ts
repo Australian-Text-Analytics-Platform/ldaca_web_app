@@ -9,6 +9,7 @@ export interface NodeSnapshot {
   name: string;
   columns: string[];
   schema: Record<string, string>;
+  shape?: [number | null, number | null] | number[];
 }
 
 /**
@@ -50,11 +51,14 @@ export async function createNodeSnapshot(
     : (Array.isArray(info?.data?.columns) ? info.data.columns : []);
   const schema = normalizeSchemaFromInfo(info);
   
+  const shape = (info as Record<string, unknown>)?.shape as [number | null, number | null] | number[] | undefined;
+
   return {
     id: nodeId,
     name: String(name),
     columns,
     schema,
+    shape: shape ?? undefined,
   };
 }
 

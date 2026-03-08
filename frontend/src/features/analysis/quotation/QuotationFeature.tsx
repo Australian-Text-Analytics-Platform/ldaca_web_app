@@ -377,6 +377,7 @@ const QuotationFeature: React.FC = () => {
 
   const {
     resolveTaskId,
+    setLocalTaskId,
     banner: quotationWaitingBanner,
     hasActiveTask,
     clearResults,
@@ -835,6 +836,7 @@ const QuotationFeature: React.FC = () => {
       baseHandlePageSizeChange,
       updateResultState,
       applyContextLengthPreferenceFromResult,
+      setLocalTaskId,
     },
     lock: {
       getAuthHeaders,

@@ -7,7 +7,7 @@ import {
   type ConcordanceResultQuery,
   textApi,
 } from '../../../../api/text';
-import { restoreAnalysisLockFromRequest } from '../../common';
+import { restoreAnalysisLockFromRequest, extractAndSetTaskId } from '../../common';
 import type { NodeColumnSelection, NodePaginationState } from '../../common';
 
 export type PaginationState = Record<string, NodePaginationState>;
@@ -228,10 +228,7 @@ export function useConcordanceTaskFlow({
 
         response = await textApi.concordance(request, authHeaders);
         setResults(response);
-        const responseTaskId = response?.metadata?.task_id;
-        if (typeof responseTaskId === 'string' && responseTaskId.trim().length > 0) {
-          setLocalTaskId(responseTaskId);
-        }
+        extractAndSetTaskId(response, setLocalTaskId);
 
         try {
           await restoreAnalysisLockFromRequest({

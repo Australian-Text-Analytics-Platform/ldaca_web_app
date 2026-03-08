@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { AnalysisCardLayout } from '../common/components/AnalysisCardLayout';
 import AnalysisTaskBanner from '../../../components/tabs/AnalysisTaskBanner';
 import { useUIStore } from '../../../stores/uiStore';
-import { getNodeIdentifier, useAnalysisFeature, useAnalysisLockMachine } from '../common';
+import { getNodeIdentifier, useAnalysisFeature, useAnalysisLockMachine, extractAndSetTaskId } from '../common';
 import { ChevronDown, ChevronUp, Loader2, Plus, RotateCcw, Sparkles, Wrench } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../components/ui/card';
 import { ScrollArea } from '../../../components/ui/scroll-area';
@@ -150,7 +150,6 @@ const AiAnnotatorFeature: React.FC = () => {
   const [isClearing, setIsClearing] = useState(false);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [taskId, setTaskId] = useState<string | null>(null);
   const [availableModels, setAvailableModels] = useState<Array<{ id: string; name: string }>>([]);
   const [resultNodeId, setResultNodeId] = useState<string | null>(null);
   const [resultNode, setResultNode] = useState<AiAnnotationNodeResult | null>(null);
@@ -233,7 +232,6 @@ const AiAnnotatorFeature: React.FC = () => {
     parsedClasses.length === 0 ||
     isRunning;
 
-  const clearDisabled = !taskId && !statusMessage && !isClearing;
 
   const applyResponseResult = (response: AiAnnotationResponse | null) => {
     const data = response?.data;
@@ -261,6 +259,7 @@ const AiAnnotatorFeature: React.FC = () => {
 
   const {
     resolveTaskId,
+    localTaskId,
     setLocalTaskId,
     clearResults,
     banner: aiAnnotationWaitingBanner,
@@ -273,16 +272,14 @@ const AiAnnotatorFeature: React.FC = () => {
     resultRef: aiAnnotationResultRef,
     fetchResult: async (taskId, headers) => textApi.getAiAnnotationTaskResult(taskId, headers),
     fetchRequest: async (taskId, headers) => textApi.getAiAnnotationTaskRequest(taskId, headers),
-    onResultFetched: (result, fetchedTaskId) => {
+    onResultFetched: (result, _fetchedTaskId) => {
       aiAnnotationResultRef.current = result;
-      setTaskId(fetchedTaskId);
       applyResponseResult(result ?? null);
       setStatusMessage(result?.message ?? 'AI annotation results loaded.');
     },
     onHydratedResult: async (resultPayload) => {
       const hydrated = resultPayload ?? null;
       aiAnnotationResultRef.current = hydrated;
-      setTaskId(hydrated?.metadata?.task_id ?? null);
       applyResponseResult(hydrated);
       if (hydrated?.message) {
         setStatusMessage(hydrated.message);
@@ -312,15 +309,16 @@ const AiAnnotatorFeature: React.FC = () => {
     },
     onCleared: () => {
       aiAnnotationResultRef.current = null;
-      setTaskId(null);
       setResultNodeId(null);
       setResultNode(null);
       setStatusMessage('AI annotation state cleared.');
     },
   });
 
+  const clearDisabled = !localTaskId && !statusMessage && !isClearing;
+
   const loadResultPage = async (page: number, pageSize: number) => {
-    const resolvedTaskId = taskId ?? (await resolveTaskId());
+    const resolvedTaskId = localTaskId ?? (await resolveTaskId());
     if (!resolvedTaskId) {
       return;
     }
@@ -334,7 +332,7 @@ const AiAnnotatorFeature: React.FC = () => {
         },
         getAuthHeaders(),
       );
-      setTaskId(response?.metadata?.task_id ?? resolvedTaskId);
+      setLocalTaskId(response?.metadata?.task_id ?? resolvedTaskId);
       aiAnnotationResultRef.current = response ?? null;
       applyResponseResult(response ?? null);
       setStatusMessage(response?.message ?? 'AI annotation results updated.');
@@ -464,9 +462,7 @@ const AiAnnotatorFeature: React.FC = () => {
         getAuthHeaders(),
       );
 
-      const nextTaskId = response?.metadata?.task_id ?? null;
-      setTaskId(nextTaskId);
-      setLocalTaskId(nextTaskId);
+      extractAndSetTaskId(response, setLocalTaskId);
       aiAnnotationResultRef.current = response ?? null;
       applyResponseResult(response ?? null);
       setStatusMessage(response?.message ?? 'AI annotation request submitted.');
@@ -840,7 +836,7 @@ const AiAnnotatorFeature: React.FC = () => {
           clearDisabled,
           isRunning,
           isClearing,
-          hasResult: Boolean(taskId),
+          hasResult: Boolean(localTaskId),
           extraContent: (
             <div className="flex flex-wrap items-center gap-2">
               <Button
@@ -1158,7 +1154,7 @@ const AiAnnotatorFeature: React.FC = () => {
         {statusMessage ? (
           <div className="mt-4 rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
             {statusMessage}
-            {taskId ? <span className="ml-2 font-mono text-xs">Task: {taskId}</span> : null}
+            {localTaskId ? <span className="ml-2 font-mono text-xs">Task: {localTaskId}</span> : null}
           </div>
         ) : null}
       </AnalysisCardLayout>

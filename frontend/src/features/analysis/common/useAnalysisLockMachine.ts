@@ -20,6 +20,7 @@ export interface LockedNodesSnapshot {
   id: string;
   name: string;
   columns: string[];
+  shape?: [number | null, number | null] | number[];
 }
 
 export const useAnalysisLockCore = (config: AnalysisLockConfig) => {
@@ -82,8 +83,8 @@ export const useAnalysisLockCore = (config: AnalysisLockConfig) => {
 
   const lockWithSnapshots = (
       snapshotInput:
-        | Array<{ id: string; name?: string; columns?: string[] | null }>
-        | { id: string; name?: string; columns?: string[] | null }
+        | Array<{ id: string; name?: string; columns?: string[] | null; shape?: [number | null, number | null] | number[] }>
+        | { id: string; name?: string; columns?: string[] | null; shape?: [number | null, number | null] | number[] }
         | null
         | undefined
     ) => {
@@ -94,13 +95,14 @@ export const useAnalysisLockCore = (config: AnalysisLockConfig) => {
 
       const snapshotArray = Array.isArray(snapshotInput) ? snapshotInput : [snapshotInput];
       const normalized: LockedNodesSnapshot[] = snapshotArray
-        .filter((snap): snap is { id: string; name?: string; columns?: string[] | null } => Boolean(snap?.id))
+        .filter((snap): snap is { id: string; name?: string; columns?: string[] | null; shape?: [number | null, number | null] | number[] } => Boolean(snap?.id))
         .map((snap) => ({
           id: snap.id,
           name: snap.name ?? snap.id,
           columns: Array.isArray(snap.columns)
             ? snap.columns.filter((col): col is string => typeof col === 'string')
             : [],
+          shape: snap.shape,
         }));
 
       if (!normalized.length) {
@@ -113,11 +115,15 @@ export const useAnalysisLockCore = (config: AnalysisLockConfig) => {
     };
 
   const lockSelection = () => {
-    const snapshot = nodeColumnSelections.map((sel) => ({
-      id: sel.nodeId,
-      name: nodeIdToName[sel.nodeId] || sel.nodeId,
-      columns: sel.column ? [sel.column] : [],
-    }));
+    const snapshot = nodeColumnSelections.map((sel) => {
+      const node = selectedNodes.find((n) => n.id === sel.nodeId);
+      return {
+        id: sel.nodeId,
+        name: nodeIdToName[sel.nodeId] || sel.nodeId,
+        columns: sel.column ? [sel.column] : [],
+        shape: (node as Record<string, unknown> | undefined)?.shape as [number | null, number | null] | number[] | undefined,
+      };
+    });
     lockWithSnapshots(snapshot);
   };
 
@@ -167,6 +173,7 @@ export const useAnalysisLockCore = (config: AnalysisLockConfig) => {
       return lockedNodesSnapshot.map((snapshot) => ({
         id: snapshot.id,
         name: snapshot.name,
+        shape: snapshot.shape,
         data: {
           id: snapshot.id,
           name: snapshot.name,

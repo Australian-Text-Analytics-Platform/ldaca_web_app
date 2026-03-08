@@ -6,7 +6,7 @@ import type {
   QuotationDetachRequest,
 } from '../../../../api/text';
 import { textApi } from '../../../../api/text';
-import { getNodeIdentifier, restoreAnalysisLockFromRequest } from '../../common';
+import { getNodeIdentifier, restoreAnalysisLockFromRequest, extractAndSetTaskId } from '../../common';
 import type { NodeColumnSelection, NodePaginationState, WorkspaceNodeLike } from '../../common';
 
 const DEFAULT_PAGE_SIZE = 100;
@@ -70,6 +70,7 @@ interface QuotationActions {
   baseHandlePageSizeChange: (pageSize: number) => void;
   updateResultState: (nodeId: string, column: string, result: Record<string, unknown>) => void;
   applyContextLengthPreferenceFromResult: (payload: Record<string, unknown>) => void;
+  setLocalTaskId: (id: string | null) => void;
 }
 
 interface QuotationLock {
@@ -116,6 +117,7 @@ export function useQuotationTaskFlow({
     baseHandlePageSizeChange,
     updateResultState,
     applyContextLengthPreferenceFromResult,
+    setLocalTaskId,
   },
   lock: {
     getAuthHeaders,
@@ -244,6 +246,7 @@ export function useQuotationTaskFlow({
 
     try {
       const result = await quotationSearch(nodeId, requestPayload);
+      extractAndSetTaskId(result, setLocalTaskId);
       applyContextLengthPreferenceFromResult(result);
       updateResultState(nodeId, column, result);
       return {
