@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { AnalysisCardLayout } from '../common/components/AnalysisCardLayout';
 import AnalysisTaskBanner from '../../../components/tabs/AnalysisTaskBanner';
 import { useUIStore } from '../../../stores/uiStore';
-import { getNodeIdentifier, useAnalysisFeature, useAnalysisLockMachine, extractAndSetTaskId } from '../common';
+import { getNodeIdentifier, useAnalysisFeature, useAnalysisLockMachine, extractAndSetTaskId, restoreAnalysisLockFromRequest, resetAnalysisSelectionAfterClear } from '../common';
 import { ChevronDown, ChevronUp, Loader2, Plus, RotateCcw, Sparkles, Wrench } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../components/ui/card';
 import { ScrollArea } from '../../../components/ui/scroll-area';
@@ -193,6 +193,8 @@ const AiAnnotatorFeature: React.FC = () => {
     nodeColumnSelections,
     activeNodeColumnSelections,
     setNodeColumnSelection,
+    lockWithSnapshots,
+    unlockSelection,
   } = useAnalysisLockMachine({
     workspaceId: currentWorkspaceId,
     getAuthHeaders,
@@ -291,27 +293,29 @@ const AiAnnotatorFeature: React.FC = () => {
         return;
       }
 
-      const nodeIds = Array.isArray(requestData.node_ids) ? (requestData.node_ids as string[]) : [];
-      const requestNodeColumns =
-        requestData.node_columns && typeof requestData.node_columns === 'object'
-          ? (requestData.node_columns as Record<string, string>)
-          : {};
-
-      const hydratedNodeId = nodeIds[0];
-      if (hydratedNodeId && requestNodeColumns[hydratedNodeId]) {
-        setNodeColumnSelection(hydratedNodeId, requestNodeColumns[hydratedNodeId]);
-      }
-
       const hydratedAnnotationColumn = requestData.annotation_column;
       setAiAnnotationColumn(
         typeof hydratedAnnotationColumn === 'string' ? hydratedAnnotationColumn : '',
       );
+
+      try {
+        await restoreAnalysisLockFromRequest({
+          workspaceId: currentWorkspaceId,
+          requestData: requestData as { node_ids?: string[]; node_columns?: Record<string, string> },
+          getAuthHeaders,
+          lockWithSnapshots,
+          maxNodes: 1,
+        });
+      } catch {
+        // best-effort lock restoration
+      }
     },
     onCleared: () => {
       aiAnnotationResultRef.current = null;
       setResultNodeId(null);
       setResultNode(null);
       setStatusMessage('AI annotation state cleared.');
+      resetAnalysisSelectionAfterClear({ unlockSelection });
     },
   });
 
@@ -466,6 +470,21 @@ const AiAnnotatorFeature: React.FC = () => {
       aiAnnotationResultRef.current = response ?? null;
       applyResponseResult(response ?? null);
       setStatusMessage(response?.message ?? 'AI annotation request submitted.');
+
+      try {
+        await restoreAnalysisLockFromRequest({
+          workspaceId: currentWorkspaceId,
+          requestData: {
+            node_ids: [selectedNodeId],
+            node_columns: { [selectedNodeId]: selectedColumn },
+          },
+          getAuthHeaders,
+          lockWithSnapshots,
+          maxNodes: 1,
+        });
+      } catch {
+        // best-effort lock after run
+      }
     } catch (error) {
       setStatusMessage(`Failed to run AI annotation: ${error instanceof Error ? error.message : String(error)}`);
     } finally {

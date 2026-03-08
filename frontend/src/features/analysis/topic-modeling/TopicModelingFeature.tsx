@@ -259,7 +259,6 @@ const TopicModelingFeature: React.FC = () => {
     state: {
       currentWorkspaceId,
       panelNodeIds,
-      panelSelectedNodes,
       panelHasMissingColumns,
       effectiveNodeColumnSelections,
       minTopicSize,

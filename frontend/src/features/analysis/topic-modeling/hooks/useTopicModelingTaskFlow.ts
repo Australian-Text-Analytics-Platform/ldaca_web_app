@@ -2,14 +2,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { textApi, type TopicModelingRequest, type TopicModelingDetachRequest, type TopicModelingDetachNodeOption } from '../../../../api/text';
 import { queryKeys } from '../../../../lib/queryKeys';
-import { applySelectedColumnsToSnapshots } from '../../../../hooks/useSchemaManagement';
-import { extractAndSetTaskId } from '../../common';
-
-type NodeSelection = {
-  id?: string;
-  name?: string;
-  columns?: unknown;
-};
+import { restoreAnalysisLockFromRequest, extractAndSetTaskId } from '../../common';
 
 type NodeColumnSelection = {
   nodeId: string;
@@ -25,7 +18,6 @@ type TopicModelingResponseLike = {
 interface TopicModelingState {
   currentWorkspaceId: string | null;
   panelNodeIds: string[];
-  panelSelectedNodes: NodeSelection[];
   panelHasMissingColumns: boolean;
   effectiveNodeColumnSelections: NodeColumnSelection[];
   minTopicSize: number;
@@ -58,7 +50,6 @@ export function useTopicModelingTaskFlow({
   state: {
     currentWorkspaceId,
     panelNodeIds,
-    panelSelectedNodes,
     panelHasMissingColumns,
     effectiveNodeColumnSelections,
     minTopicSize,
@@ -115,35 +106,25 @@ export function useTopicModelingTaskFlow({
         }
       });
 
-      const snapshotById = new Map<string, { id: string; name: string; columns: string[] }>(
-        panelSelectedNodes
-          .filter((node): node is NodeSelection & { id: string } => typeof node.id === 'string' && node.id.length > 0)
-          .map((node) => [
-            node.id,
-            {
-              id: node.id,
-              name: String(node.name || node.id),
-              columns: Array.isArray(node.columns)
-                ? node.columns.filter((col): col is string => typeof col === 'string')
-                : [],
-            },
-          ])
-      );
-
-      const lockSnapshots = requestNodeIds.map((id) => snapshotById.get(id) || {
-        id,
-        name: id,
-        columns: [],
-      });
-
-      const normalizedSnapshots = applySelectedColumnsToSnapshots(lockSnapshots, nodeColumns);
-      lockWithSnapshots(normalizedSnapshots);
-
       const req: TopicModelingRequest = {
         node_ids: requestNodeIds,
         node_columns: nodeColumns,
         min_topic_size: minTopicSize,
       };
+
+      try {
+        if (req.node_ids.length) {
+          await restoreAnalysisLockFromRequest({
+            workspaceId: currentWorkspaceId,
+            requestData: req,
+            getAuthHeaders,
+            lockWithSnapshots,
+            maxNodes: 2,
+          });
+        }
+      } catch {
+        /* best effort lock */
+      }
 
       const res = await textApi.topicModeling(req, getAuthHeaders());
       extractAndSetTaskId(res, setLocalTaskId);
