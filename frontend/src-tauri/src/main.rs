@@ -7,7 +7,7 @@ use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tauri::{path::BaseDirectory, AppHandle, Manager, State};
 
 #[cfg(target_os = "windows")]
