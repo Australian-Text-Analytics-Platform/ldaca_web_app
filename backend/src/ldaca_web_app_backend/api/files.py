@@ -275,6 +275,7 @@ async def get_user_files(current_user: dict = Depends(get_current_user)):
             relative_path = file_path.relative_to(data_folder)
             rel_str = str(relative_path)
             is_sample = rel_str.startswith("sample_data/")
+            is_ldaca = rel_str.startswith("LDaCA/")
             folder_rel = (
                 str(relative_path.parent) if str(relative_path.parent) != "." else ""
             )
@@ -284,7 +285,7 @@ async def get_user_files(current_user: dict = Depends(get_current_user)):
             if is_readme_row:
                 continue
 
-            if is_sample and not is_readme_row:
+            if (is_sample or is_ldaca) and not is_readme_row:
                 if folder_rel not in folder_readme_cache:
                     folder_readme_cache[folder_rel] = _read_sample_folder_readme(
                         data_folder / relative_path.parent / README_FILENAME

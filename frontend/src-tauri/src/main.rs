@@ -725,6 +725,7 @@ fn main() {
 
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .manage(backend_state)
         .invoke_handler(tauri::generate_handler![get_backend_url])
         .setup(move |app| {

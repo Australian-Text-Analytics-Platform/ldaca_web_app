@@ -13,6 +13,9 @@ import { Label } from '@/components/ui/label';
 import { configApi } from '@/api/config';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import { FolderOpen } from 'lucide-react';
+
+const isTauri = () => typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
 interface DataFolderDialogProps {
   open: boolean;
@@ -33,8 +36,30 @@ export const DataFolderDialog: React.FC<DataFolderDialogProps> = ({
     }
   }, [open, dataFolder]);
 
+  const handleBrowse = async () => {
+    if (isTauri()) {
+      try {
+        const { open: openDialog } = await import('@tauri-apps/plugin-dialog');
+        const selected = await openDialog({
+          directory: true,
+          title: 'Select Working Directory',
+          defaultPath: path || undefined,
+        });
+        if (selected) {
+          setPath(selected);
+        }
+      } catch (error) {
+        console.error('Failed to open folder picker:', error);
+        toast.error('Failed to open folder picker');
+      }
+    } else {
+      toast.info('Type the full path to your data folder, or use the desktop app for a folder picker.');
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!path.trim()) return;
     setIsLoading(true);
     try {
       await configApi.updateConfig({ data_root: path });
@@ -64,20 +89,25 @@ export const DataFolderDialog: React.FC<DataFolderDialogProps> = ({
               <Label htmlFor="path" className="text-right">
                 Path
               </Label>
-              <Input
-                id="path"
-                value={path}
-                onChange={(e) => setPath(e.target.value)}
-                className="col-span-3"
-                placeholder="/path/to/data"
-              />
+              <div className="col-span-3 flex gap-2">
+                <Input
+                  id="path"
+                  value={path}
+                  onChange={(e) => setPath(e.target.value)}
+                  className="flex-1"
+                  placeholder="/path/to/data"
+                />
+                <Button type="button" variant="outline" size="icon" onClick={handleBrowse} title="Browse...">
+                  <FolderOpen className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading}>
+            <Button type="submit" disabled={isLoading || !path.trim()}>
               {isLoading ? 'Saving...' : 'Save changes'}
             </Button>
           </DialogFooter>

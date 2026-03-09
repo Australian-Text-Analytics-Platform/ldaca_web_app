@@ -1091,6 +1091,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "89a09f22a6c6069a18470eb92d2298acf25463f14256d24778e1230d789a2aec"
 dependencies = [
  "bitflags 2.10.0",
+ "block2",
+ "libc",
  "objc2",
 ]
 
@@ -2689,6 +2691,7 @@ dependencies = [
  "serde_json",
  "tauri",
  "tauri-build",
+ "tauri-plugin-dialog",
  "tauri-plugin-opener",
  "ureq 3.1.4",
 ]
@@ -2756,7 +2759,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "87b84e47ca7a9d63f5be24c104e216c8263bfada38080cbdfe1082e611a81fd3"
 dependencies = [
  "approx",
- "ndarray 0.16.1",
+ "ndarray",
  "num-traits",
  "rand 0.8.5",
  "sprs",
@@ -2772,7 +2775,7 @@ dependencies = [
  "linfa",
  "linfa-linalg",
  "linfa-nn",
- "ndarray 0.16.1",
+ "ndarray",
  "ndarray-rand",
  "ndarray-stats",
  "noisy_float",
@@ -2788,7 +2791,7 @@ version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "02a834c0ec063937688a0d13573aa515ab8c425bd8de3154b908dd3b9c197dc4"
 dependencies = [
- "ndarray 0.16.1",
+ "ndarray",
  "num-traits",
  "thiserror 1.0.69",
 ]
@@ -2801,7 +2804,7 @@ checksum = "d7ba257f89880df17b486e67731ef20c4a748a5f5f5eaace010853f69a0beee3"
 dependencies = [
  "kdtree",
  "linfa",
- "ndarray 0.16.1",
+ "ndarray",
  "ndarray-stats",
  "noisy_float",
  "num-traits",
@@ -3044,19 +3047,6 @@ dependencies = [
 
 [[package]]
 name = "ndarray"
-version = "0.15.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "adb12d4e967ec485a5f71c6311fe28158e9d6f4bc4a447b474184d0f91a8fa32"
-dependencies = [
- "matrixmultiply",
- "num-complex",
- "num-integer",
- "num-traits",
- "rawpointer",
-]
-
-[[package]]
-name = "ndarray"
 version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "882ed72dce9365842bf196bdeedf5055305f11fc8c03dee7bb0194a6cad34841"
@@ -3078,7 +3068,7 @@ version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f093b3db6fd194718dcdeea6bd8c829417deae904e3fcc7732dabcd4416d25d8"
 dependencies = [
- "ndarray 0.16.1",
+ "ndarray",
  "rand 0.8.5",
  "rand_distr 0.4.3",
 ]
@@ -3091,7 +3081,7 @@ checksum = "17ebbe97acce52d06aebed4cd4a87c0941f4b2519b59b82b4feb5bd0ce003dfd"
 dependencies = [
  "indexmap 2.13.0",
  "itertools 0.13.0",
- "ndarray 0.16.1",
+ "ndarray",
  "noisy_float",
  "num-integer",
  "num-traits",
@@ -4314,7 +4304,7 @@ dependencies = [
  "hf-hub",
  "linfa",
  "linfa-clustering",
- "ndarray 0.16.1",
+ "ndarray",
  "once_cell",
  "polars",
  "pyo3",
@@ -4970,6 +4960,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "rfd"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a15ad77d9e70a92437d8f74c35d99b4e4691128df018833e99f90bcd36152672"
+dependencies = [
+ "block2",
+ "dispatch2",
+ "glib-sys",
+ "gobject-sys",
+ "gtk-sys",
+ "js-sys",
+ "log",
+ "objc2",
+ "objc2-app-kit",
+ "objc2-core-foundation",
+ "objc2-foundation",
+ "raw-window-handle",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+ "windows-sys 0.60.2",
+]
+
+[[package]]
 name = "ring"
 version = "0.17.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5598,7 +5612,7 @@ version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "704ef26d974e8a452313ed629828cd9d4e4fa34667ca1ad9d6b1fffa43c6e166"
 dependencies = [
- "ndarray 0.15.6",
+ "ndarray",
  "num-complex",
  "num-traits",
  "smallvec",
@@ -5992,6 +6006,46 @@ dependencies = [
  "tauri-utils",
  "toml 0.9.11+spec-1.1.0",
  "walkdir",
+]
+
+[[package]]
+name = "tauri-plugin-dialog"
+version = "2.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9204b425d9be8d12aa60c2a83a289cf7d1caae40f57f336ed1155b3a5c0e359b"
+dependencies = [
+ "log",
+ "raw-window-handle",
+ "rfd",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
+ "tauri-plugin-fs",
+ "thiserror 2.0.18",
+ "url",
+]
+
+[[package]]
+name = "tauri-plugin-fs"
+version = "2.4.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ed390cc669f937afeb8b28032ce837bac8ea023d975a2e207375ec05afaf1804"
+dependencies = [
+ "anyhow",
+ "dunce",
+ "glob",
+ "percent-encoding",
+ "schemars 0.8.22",
+ "serde",
+ "serde_json",
+ "serde_repr",
+ "tauri",
+ "tauri-plugin",
+ "tauri-utils",
+ "thiserror 2.0.18",
+ "toml 0.9.11+spec-1.1.0",
+ "url",
 ]
 
 [[package]]

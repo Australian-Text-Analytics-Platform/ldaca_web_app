@@ -13,6 +13,6 @@ export const configApi = {
   getConfig: () => httpRequest<ConfigResponse>('/config/', { method: 'GET' }),
   updateConfig: (data: UpdateConfigRequest) => httpRequest<ConfigResponse>('/config/', {
     method: 'POST',
-    body: JSON.stringify(data),
+    body: data,
   }),
 };

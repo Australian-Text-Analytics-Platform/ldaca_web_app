@@ -16,6 +16,8 @@
     "core:webview:allow-set-webview-size",
     "core:webview:allow-set-webview-zoom",
     "core:webview:allow-print",
-    "opener:default"
+    "opener:default",
+    "dialog:default",
+    "dialog:allow-open"
   ]
 }
