@@ -1,4 +1,4 @@
-import { useWorkspaceContext } from '../providers/WorkspaceProvider';
+import { useWorkspaceContext } from '../providers/useWorkspaceContext';
 
 export const useWorkspaceData = () => {
   const { data } = useWorkspaceContext();

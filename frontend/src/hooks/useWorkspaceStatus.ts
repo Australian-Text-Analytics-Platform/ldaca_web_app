@@ -1,4 +1,4 @@
-import { useWorkspaceContext } from '../providers/WorkspaceProvider';
+import { useWorkspaceContext } from '../providers/useWorkspaceContext';
 
 export const useWorkspaceStatus = () => {
   const { status } = useWorkspaceContext();

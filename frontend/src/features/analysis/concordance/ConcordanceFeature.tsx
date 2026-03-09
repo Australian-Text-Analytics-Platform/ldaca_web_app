@@ -34,6 +34,7 @@ import {
   useAnalysisLock,
   useAnalysisFeature,
   useNodeColorManagement,
+  useSafeResult,
   EXTENDED_PALETTE,
   getAnalysisActionState,
 } from '../common';
@@ -168,7 +169,7 @@ const ConcordanceFeature: React.FC = () => {
   const [regex, setRegex] = useState(false);
   const [caseSensitive, setCaseSensitive] = useState(false);
   const [showMetadata, setShowMetadata] = useState(false);
-  const [results, setResults] = useState<ConcordanceAnalysisResponse | null>(null);
+  const [results, concordanceResultsRef, _setResultSafely, setResults] = useSafeResult<ConcordanceAnalysisResponse>();
   const labelToNodeId = (() => {
     const params = results?.analysis_params;
     const mapping = params?.label_to_node_map;
@@ -249,8 +250,7 @@ const ConcordanceFeature: React.FC = () => {
   // State for auto-triggering search from TokenFrequencyTab
   const [shouldAutoSearch, setShouldAutoSearch] = useState(false);
 
-  const concordanceResultsRef = useRef<ConcordanceAnalysisResponse | null>(null);
-  concordanceResultsRef.current = results;
+
 
   const {
     resolveTaskId,
@@ -408,7 +408,9 @@ const ConcordanceFeature: React.FC = () => {
 
   useEffect(() => {
     if (viewMode === 'combined' && results && results.combinable === false) {
-      setViewMode('separated');
+      // Defer to avoid synchronous setState in effect body (react-hooks/set-state-in-effect)
+      const id = requestAnimationFrame(() => setViewMode('separated'));
+      return () => cancelAnimationFrame(id);
     }
   }, [viewMode, results]);
 
@@ -422,22 +424,27 @@ const ConcordanceFeature: React.FC = () => {
 
     const nextPageSize = preferenceSource?.page_size ?? analysisParams?.page_size;
     if (typeof nextPageSize === 'number' && Number.isFinite(nextPageSize) && nextPageSize > 0 && nextPageSize !== globalPageSize) {
-      setGlobalPageSize(nextPageSize);
-      setNodePagination(prev => {
-        const updated = { ...prev };
-        Object.keys(updated).forEach((nodeId) => {
-          updated[nodeId] = {
-            ...updated[nodeId],
-            pageSize: nextPageSize,
-          };
+      // Defer to avoid synchronous setState in effect body (react-hooks/set-state-in-effect)
+      const id = requestAnimationFrame(() => {
+        setGlobalPageSize(nextPageSize);
+        setNodePagination(prev => {
+          const updated = { ...prev };
+          Object.keys(updated).forEach((nodeId) => {
+            updated[nodeId] = {
+              ...updated[nodeId],
+              pageSize: nextPageSize,
+            };
+          });
+          return updated;
         });
-        return updated;
       });
+      return () => cancelAnimationFrame(id);
     }
 
     const nextShowMetadata = preferenceSource?.show_metadata ?? analysisParams?.show_metadata;
     if (typeof nextShowMetadata === 'boolean' && nextShowMetadata !== showMetadata) {
-      setShowMetadata(nextShowMetadata);
+      const id = requestAnimationFrame(() => setShowMetadata(nextShowMetadata));
+      return () => cancelAnimationFrame(id);
     }
   }, [results, globalPageSize, showMetadata, setNodePagination]);
 
@@ -453,7 +460,7 @@ const ConcordanceFeature: React.FC = () => {
       setResults(null);
     }
     prevSelectedNodeIdsRef.current = curr;
-  }, [selectedNodeIdsKey, isLocked, selectedNodeIds]);
+  }, [selectedNodeIdsKey, isLocked, selectedNodeIds, setResults]);
 
   useEffect(() => {
     if (!currentWorkspaceId) {
@@ -475,8 +482,11 @@ const ConcordanceFeature: React.FC = () => {
     }
     lastPendingConcordanceRef.current = pendingConcordance.timestamp ?? null;
 
-    if (pendingConcordance.searchWord) {
-      setSearchWord(pendingConcordance.searchWord);
+    // Defer to avoid synchronous setState in effect body (react-hooks/set-state-in-effect)
+    const rafIds: number[] = [];
+    const word = pendingConcordance.searchWord;
+    if (word) {
+      rafIds.push(requestAnimationFrame(() => setSearchWord(word)));
     }
 
     if (Array.isArray(pendingConcordance.selectedNodes) && pendingConcordance.selectedNodes.length > 0) {
@@ -527,6 +537,7 @@ const ConcordanceFeature: React.FC = () => {
       if (timeoutId !== null) {
         window.clearTimeout(timeoutId);
       }
+      rafIds.forEach(cancelAnimationFrame);
     };
   }, [pendingConcordance, selectedNodes, setNodeColumnSelections, clearPendingConcordance, selectNodes, handleColorChange]);
 
@@ -549,8 +560,12 @@ const ConcordanceFeature: React.FC = () => {
     if (!shouldAutoSearch) {
       return;
     }
-    setShouldAutoSearch(false);
-    void handleSearch(true);
+    // Defer to avoid synchronous setState in effect body (react-hooks/set-state-in-effect)
+    const id = requestAnimationFrame(() => {
+      setShouldAutoSearch(false);
+      void handleSearch(true);
+    });
+    return () => cancelAnimationFrame(id);
   }, [shouldAutoSearch, handleSearch]);
 
   const handleClearResults = async () => {
