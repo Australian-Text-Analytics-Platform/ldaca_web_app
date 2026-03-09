@@ -370,7 +370,7 @@ export function useConcordanceTaskFlow({
     }
   };
 
-  const handleDetach = async (nodeId: string, column: string, nodeLabel?: string) => {
+  const handleDetach = async (nodeId: string, column: string, nodeLabel?: string, selectedColumns?: string[]) => {
     if (!currentWorkspaceId || !searchWord.trim()) return;
 
     setNodeDetaching(prev => ({ ...prev, [nodeId]: true }));
@@ -387,6 +387,7 @@ export function useConcordanceTaskFlow({
         regex,
         case_sensitive: caseSensitive,
         new_node_name: buildDetachNodeName(resolvedNodeLabel, '_conc'),
+        ...(selectedColumns && selectedColumns.length > 0 ? { selected_columns: selectedColumns } : {}),
       };
       await detachConcordance(nodeId, request);
     } catch (error) {

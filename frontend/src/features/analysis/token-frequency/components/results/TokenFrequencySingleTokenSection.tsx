@@ -52,7 +52,7 @@ export const TokenFrequencySingleTokenSection = ({
                 <div className="flex items-center gap-2">
                   <Button variant="outline" size="sm" onClick={() => onDownloadWordCloud(nodeKey, result.displayName)}>
                     <Download className="mr-2 h-4 w-4" />
-                    Cloud
+                    Word Cloud
                   </Button>
                   <Button
                     variant="outline"
@@ -60,7 +60,7 @@ export const TokenFrequencySingleTokenSection = ({
                     onClick={() => onDownloadFrequencyCsv(result.displayName, Array.isArray(result.filteredRows) ? result.filteredRows : result.rows)}
                   >
                     <Download className="mr-2 h-4 w-4" />
-                    CSV
+                    Frequencies
                   </Button>
                 </div>
               </div>

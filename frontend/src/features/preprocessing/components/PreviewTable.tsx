@@ -1,6 +1,7 @@
 import React from 'react';
 import { Loader2 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../../components/ui/table';
+import { ScrollArea } from '../../../components/ui/scroll-area';
 import { Button } from '../../../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
@@ -99,9 +100,8 @@ export const PreviewTable: React.FC<PreviewTableProps> = ({
             {error}
           </div>
         ) : (
-          <div className="overflow-hidden rounded-lg border border-border">
-            <div className="overflow-x-auto">
-              <Table>
+          <ScrollArea type="always" scrollbars="horizontal" className="rounded-lg border border-border">
+              <Table disableContainer>
                 <TableHeader className="bg-muted/40">
                   <TableRow>
                     {columnsToRender.length > 0 ? (
@@ -156,8 +156,7 @@ export const PreviewTable: React.FC<PreviewTableProps> = ({
                   )}
                 </TableBody>
               </Table>
-            </div>
-          </div>
+          </ScrollArea>
         )}
       </CardContent>
       {ready && !error && data.length > 0 && (

@@ -18,6 +18,7 @@ def run_concordance_detach_task(
     new_node_name: str,
     artifact_dir: str,
     artifact_prefix: str,
+    extra_columns_data: Optional[Dict[str, list]] = None,
     progress_callback: Optional[Callable[[float, str], None]] = None,
 ) -> Dict[str, Any]:
     """Run concordance detach with API-prepared corpus and write artifact parquet."""
@@ -36,12 +37,23 @@ def run_concordance_detach_task(
             progress_callback(0.2, "Preparing corpus...")
 
         corpus = [str(v) if v is not None else "" for v in (node_corpus or [])]
-        corpus = [value for value in corpus if value.strip()]
+
+        # Build aligned mask for non-empty rows
+        non_empty_mask = [bool(v.strip()) for v in corpus]
+        corpus = [v for v, keep in zip(corpus, non_empty_mask) if keep]
 
         if progress_callback:
             progress_callback(0.5, "Generating concordance...")
 
-        df = pl.DataFrame({document_column: corpus})
+        data: dict[str, list] = {document_column: corpus}
+        extra_col_names: list[str] = []
+        if extra_columns_data:
+            for col_name, col_values in extra_columns_data.items():
+                filtered = [v for v, keep in zip(col_values, non_empty_mask) if keep]
+                data[col_name] = filtered
+                extra_col_names.append(col_name)
+
+        df = pl.DataFrame(data)
         result = (
             df
             .select([
@@ -83,7 +95,8 @@ def run_concordance_detach_task(
                 "new_node_name": new_node_name,
                 "parent_node_id": parent_node_id,
                 "document_column": document_column,
-                "output_columns": ["left_context", "matched_text", "right_context"],
+                "output_columns": ["left_context", "matched_text", "right_context"]
+                + extra_col_names,
                 "record_count": len(result),
             },
             "message": "Concordance detach completed successfully",

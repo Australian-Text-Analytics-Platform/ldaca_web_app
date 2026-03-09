@@ -387,6 +387,7 @@ class ConcordanceDetachRequest(BaseModel):
     regex: bool = False
     case_sensitive: bool = False
     new_node_name: Optional[str] = None  # If not provided, will be auto-generated
+    selected_columns: Optional[list[str]] = None
 
 
 # Quotation requests (mirror concordance shape but without search parameters)

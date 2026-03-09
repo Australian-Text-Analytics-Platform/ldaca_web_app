@@ -44,6 +44,7 @@ import {
 import { useConcordanceTaskFlow, type PaginationState } from './hooks/useConcordanceTaskFlow';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../../components/ui/dialog';
 import { AnalysisPagination } from '../../../components/AnalysisPagination';
+import { ConcordanceDetachDialog, type DetachNodeOption } from './components/ConcordanceDetachDialog';
 
 
 const CORE_COLS = [
@@ -232,6 +233,11 @@ const ConcordanceFeature: React.FC = () => {
   
   // Individual node detaching states
   const [nodeDetaching, setNodeDetaching] = useState<Record<string, boolean>>({});
+  
+  // Detach dialog state
+  const [detachDialogOpen, setDetachDialogOpen] = useState(false);
+  const [pendingDetachNodes, setPendingDetachNodes] = useState<{ nodeId: string; column: string; nodeLabel: string }[]>([]);
+  const [selectedDetachColumns, setSelectedDetachColumns] = useState<Record<string, string[]>>({});
   
   // Global page size setting
   const [globalPageSize, setGlobalPageSize] = useState(20);
@@ -692,6 +698,52 @@ const ConcordanceFeature: React.FC = () => {
     return { text: textCandidate, highlighted };
   })();
 
+  // --- Detach dialog helpers ---
+  const openDetachDialog = (nodes: { nodeId: string; column: string; nodeLabel: string }[]) => {
+    setPendingDetachNodes(nodes);
+    // Pre-select the concordance text column for each node (it's always included)
+    const initial: Record<string, string[]> = {};
+    for (const n of nodes) {
+      initial[n.nodeId] = [];
+    }
+    setSelectedDetachColumns(initial);
+    setDetachDialogOpen(true);
+  };
+
+  const toggleDetachColumn = (nodeId: string, column: string, checked: boolean) => {
+    setSelectedDetachColumns(prev => {
+      const current = prev[nodeId] || [];
+      const next = checked
+        ? [...current, column]
+        : current.filter(c => c !== column);
+      return { ...prev, [nodeId]: next };
+    });
+  };
+
+  const handleDetachConfirm = async () => {
+    for (const n of pendingDetachNodes) {
+      const cols = selectedDetachColumns[n.nodeId] || [];
+      await handleDetach(n.nodeId, n.column, n.nodeLabel, cols);
+    }
+    setDetachDialogOpen(false);
+    setPendingDetachNodes([]);
+    setSelectedDetachColumns({});
+  };
+
+  const detachNodeOptions: DetachNodeOption[] = pendingDetachNodes.map(n => {
+    const nodeObj = panelSelectedNodes.find(p => p.id === n.nodeId);
+    const infos = nodeObj ? getColumnInfos(nodeObj, panelSelectedNodes.indexOf(nodeObj)) : [];
+    const available = infos.map(i => i.name).filter(c => c !== n.column);
+    return {
+      node_id: n.nodeId,
+      node_name: (nodeObj?.name || n.nodeLabel) as string,
+      available_columns: available,
+      concordance_column: n.column,
+    };
+  });
+
+  const anyNodeDetaching = pendingDetachNodes.some(n => Boolean(nodeDetaching[n.nodeId]));
+
   const SortableHeader: React.FC<{ columnKey: string; label: string; paginationKey: string; requestNodeId: string }> = ({ columnKey, label, paginationKey, requestNodeId }) => {
     const nodeState = nodePagination[paginationKey] || { sortBy: '', descending: false };
     const isSorted = nodeState.sortBy === columnKey;
@@ -741,21 +793,16 @@ const ConcordanceFeature: React.FC = () => {
             <div className="ml-auto flex items-center space-x-2">
               <span className="text-xs text-gray-500">Rows colored by source node</span>
               <Button
-                onClick={async () => {
-                  // Use locked snapshot when locked so actions are stable
+                onClick={() => {
                   const nodeIdsForDetach = selectedNodes.slice(0,2).map(n => n.id);
                   if (nodeIdsForDetach.length === 0 || !searchWord.trim()) return;
-                  setCombinedLoading(true);
-                  try {
-                    for (const nid of nodeIdsForDetach.slice(0,2)) {
-                      // Prefer lockedNodeColumns when available to ensure correct column
-                      const col = effectiveNodeColumnSelections.find(s => s.nodeId === nid)?.column || '';
-                      if (!col) continue;
-                      const sourceNode = panelSelectedNodes.find((node, idx) => getNodeIdentifier(node, idx) === nid);
-                      const sourceLabel = (sourceNode?.name || sourceNode?.id || nid) as string;
-                      await handleDetach(nid, col, sourceLabel);
-                    }
-                  } finally { setCombinedLoading(false); }
+                  const nodes = nodeIdsForDetach.map(nid => {
+                    const col = effectiveNodeColumnSelections.find(s => s.nodeId === nid)?.column || '';
+                    const sourceNode = panelSelectedNodes.find((node, idx) => getNodeIdentifier(node, idx) === nid);
+                    const sourceLabel = (sourceNode?.name || sourceNode?.id || nid) as string;
+                    return { nodeId: nid, column: col, nodeLabel: sourceLabel };
+                  }).filter(n => n.column);
+                  openDetachDialog(nodes);
                 }}
                 disabled={combinedLoading || !searchWord.trim()}
                 size="sm"
@@ -972,7 +1019,7 @@ const ConcordanceFeature: React.FC = () => {
               if (detachNodeId) {
                 const detachNode = panelSelectedNodes.find((n) => n.id === detachNodeId);
                 const detachLabel = (detachNode?.name || nodeKey) as string;
-                handleDetach(detachNodeId, column, detachLabel);
+                openDetachDialog([{ nodeId: detachNodeId, column, nodeLabel: detachLabel }]);
               }
             }}
             disabled={nodeIsLoading || isDetaching || !searchWord.trim() || !canDetach || !detachNodeId}
@@ -1354,6 +1401,17 @@ const ConcordanceFeature: React.FC = () => {
           <p className="text-gray-600 mt-2">Loading workspace...</p>
         </div>
       )}
+
+      {/* Detach column selection dialog */}
+      <ConcordanceDetachDialog
+        open={detachDialogOpen}
+        onOpenChange={setDetachDialogOpen}
+        isDetaching={anyNodeDetaching}
+        detachNodeOptions={detachNodeOptions}
+        selectedDetachColumns={selectedDetachColumns}
+        toggleDetachColumn={toggleDetachColumn}
+        handleDetachConfirm={handleDetachConfirm}
+      />
     </div>
   );
 };

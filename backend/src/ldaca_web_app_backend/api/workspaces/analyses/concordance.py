@@ -325,9 +325,16 @@ async def detach_concordance(
             status_code=400, detail=f"Column '{request.column}' not found"
         )
 
+    schema_names = node_data.collect_schema().names()
+    columns_to_select = [request.column]
+    if request.selected_columns:
+        for col in request.selected_columns:
+            if col != request.column and col in schema_names:
+                columns_to_select.append(col)
+
     corpus_df = (
         node_data
-        .select(pl.col(request.column))
+        .select([pl.col(c) for c in columns_to_select])
         .filter(
             pl
             .col(request.column)
@@ -343,6 +350,11 @@ async def detach_concordance(
         str(value) if value is not None else ""
         for value in corpus_df.get_column(request.column).to_list()
     ]
+
+    extra_columns_data: dict[str, list] = {}
+    for col in columns_to_select:
+        if col != request.column:
+            extra_columns_data[col] = corpus_df.get_column(col).to_list()
 
     artifact_dir, artifact_prefix = _prepare_concordance_artifact_target(
         user_id, workspace_id
@@ -365,6 +377,9 @@ async def detach_concordance(
                 "new_node_name": request.new_node_name,
                 "artifact_dir": artifact_dir,
                 "artifact_prefix": artifact_prefix,
+                "extra_columns_data": extra_columns_data
+                if extra_columns_data
+                else None,
             },
         )
 

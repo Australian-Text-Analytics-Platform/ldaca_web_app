@@ -22,7 +22,8 @@ import {
   sortStatistics,
 } from './tokenFrequencyAdapters';
 import { buildSelectionNameById, deriveBackendStopWordsKey, deriveBackendTokenLimit, type NodeNameEntry } from './tokenFrequencyUtils';
-import { downloadFrequencyRowsAsCsv, downloadWordCloudSvgAsPng } from './tokenFrequencyExport';
+import { downloadWordCloudAs, downloadFrequencyRowsAs, downloadStopWordsAsTxt, type WordCloudFormat, type FrequencyFormat } from './tokenFrequencyExport';
+import { TokenFrequencyDownloadDialog, type DownloadDialogMode } from './components/TokenFrequencyDownloadDialog';
 import { useTokenFrequencyPreferences } from './hooks/useTokenFrequencyPreferences';
 import { useTokenFrequencyTaskFlow } from './hooks/useTokenFrequencyTaskFlow';
 import {
@@ -282,18 +283,55 @@ const TokenFrequencyFeature = () => {
     wordCloudRefs.current[nodeKey] = element;
   };
 
+  const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
+  const [downloadDialogMode, setDownloadDialogMode] = useState<DownloadDialogMode>('wordcloud');
+  const pendingDownloadRef = useRef<{
+    mode: DownloadDialogMode;
+    nodeKey?: string;
+    displayName?: string;
+    rows?: unknown[];
+    label?: string;
+  } | null>(null);
+
   const handleDownloadWordCloud = (nodeKey: string, displayName: string) => {
-    const svg = wordCloudRefs.current[nodeKey];
-    if (!svg) return;
-    downloadWordCloudSvgAsPng(svg, {
-      displayName,
-      fallbackKey: nodeKey,
-      scale: 3,
-    });
+    pendingDownloadRef.current = { mode: 'wordcloud', nodeKey, displayName };
+    setDownloadDialogMode('wordcloud');
+    setDownloadDialogOpen(true);
   };
 
   const handleDownloadFrequencyCsv = (label: string, rows: unknown[]) => {
-    downloadFrequencyRowsAsCsv(label, rows as Array<Record<string, unknown>>);
+    pendingDownloadRef.current = { mode: 'frequencies', label, rows };
+    setDownloadDialogMode('frequencies');
+    setDownloadDialogOpen(true);
+  };
+
+  const handleDownloadConfirm = ({ format, includeStopWords }: { format: string; includeStopWords: boolean }) => {
+    const ctx = pendingDownloadRef.current;
+    if (!ctx) return;
+
+    if (ctx.mode === 'wordcloud' && ctx.nodeKey) {
+      const svg = wordCloudRefs.current[ctx.nodeKey];
+      if (svg) {
+        downloadWordCloudAs(svg, {
+          displayName: ctx.displayName || ctx.nodeKey,
+          fallbackKey: ctx.nodeKey,
+          format: format as WordCloudFormat,
+          scale: 3,
+        });
+      }
+    } else if (ctx.mode === 'frequencies' && ctx.rows) {
+      downloadFrequencyRowsAs(
+        ctx.label || 'frequencies',
+        ctx.rows as Array<Record<string, unknown>>,
+        format as FrequencyFormat,
+      );
+    }
+
+    if (includeStopWords && stopWords) {
+      downloadStopWordsAsTxt(stopWords, ctx.label || ctx.displayName || 'analysis');
+    }
+
+    pendingDownloadRef.current = null;
   };
 
   const handleApplyStopWords = () => {
@@ -395,6 +433,13 @@ const TokenFrequencyFeature = () => {
         onStatsPageChange={setStatsPage}
         statsRowsPerPage={statsRowsPerPage}
         onStatsRowsPerPageChange={setStatsRowsPerPage}
+      />
+
+      <TokenFrequencyDownloadDialog
+        open={downloadDialogOpen}
+        onOpenChange={setDownloadDialogOpen}
+        mode={downloadDialogMode}
+        onConfirm={handleDownloadConfirm}
       />
     </div>
   );

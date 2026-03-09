@@ -299,7 +299,7 @@ export const TokenFrequencyUnifiedTokenSection = ({
             </div>
             <Button variant="outline" size="sm" onClick={() => onDownloadWordCloud('unified', 'Unified Word Cloud')}>
               <Download className="mr-2 h-4 w-4" />
-              Cloud
+              Word Cloud
             </Button>
           </div>
         </CardHeader>
@@ -393,7 +393,7 @@ export const TokenFrequencyUnifiedTokenSection = ({
               onClick={() => onDownloadFrequencyCsv('token-keyness', sortedStatistics)}
             >
               <Download className="mr-2 h-4 w-4" />
-              Export stats (CSV)
+              Frequencies
             </Button>
           </div>
 
