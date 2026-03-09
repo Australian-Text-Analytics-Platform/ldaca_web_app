@@ -30,8 +30,12 @@ export const TokenFrequencySingleTokenSection = ({
   onDownloadFrequencyCsv,
   registerWordCloudRef,
 }: TokenFrequencySingleTokenSectionProps) => {
+  const singleNodeLayoutClassName = nodeDisplayResults.length <= 1
+    ? 'grid grid-cols-1 gap-6'
+    : 'grid grid-cols-1 gap-6 xl:grid-cols-2';
+
   return (
-    <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+    <div className={singleNodeLayoutClassName}>
       {nodeDisplayResults.map((result, index) => {
         const nodeKey = result.nodeId || result.displayName || `node-${index}`;
         const color = getColorForNode(result.nodeId || result.displayName, index);
@@ -47,9 +51,11 @@ export const TokenFrequencySingleTokenSection = ({
         return (
           <Card key={`${result.nodeId || result.displayName}-${index}`} className="h-full">
             <CardHeader className="pb-3">
-              <div className="flex items-center justify-between gap-2">
-                <CardTitle className="text-base font-semibold">{result.displayName}</CardTitle>
-                <div className="flex items-center gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <CardTitle className="min-w-0 flex-1 break-words whitespace-normal text-base font-semibold [overflow-wrap:anywhere]">
+                  {result.displayName}
+                </CardTitle>
+                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                   <Button variant="outline" size="sm" onClick={() => onDownloadWordCloud(nodeKey, result.displayName)}>
                     <Download className="mr-2 h-4 w-4" />
                     Word Cloud

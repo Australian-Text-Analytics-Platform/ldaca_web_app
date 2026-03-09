@@ -187,6 +187,12 @@ export const TokenFrequencyUnifiedTokenSection = ({
   onStatsRowsPerPageChange,
   onDownloadFrequencyCsv,
 }: TokenFrequencyUnifiedTokenSectionProps) => {
+  const hasMultipleNodes = normalizedNodeResults.length >= 2 || nodeDisplayResults.length >= 2 || lastCompareNodeIds.length >= 2;
+
+  if (!hasMultipleNodes) {
+    return null;
+  }
+
   const statisticsPageCount = Math.max(1, Math.ceil(sortedStatistics.length / statsRowsPerPage));
   const safeStatsPage = Math.min(statsPage, statisticsPageCount);
   const pagedStatistics = sortedStatistics.slice(
