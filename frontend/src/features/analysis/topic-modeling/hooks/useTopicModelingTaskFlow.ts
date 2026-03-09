@@ -36,7 +36,7 @@ interface TopicModelingActions {
 
 interface TopicModelingLock {
   getAuthHeaders: () => Record<string, string>;
-  lockWithSnapshots: (snapshots: Array<{ id: string; name: string; columns: string[] }>) => void;
+  lockWithSnapshots: (snapshots: Array<{ id: string; name?: string; columns?: string[] }>) => void;
   queryClient: { invalidateQueries: (params: { queryKey: readonly unknown[] }) => Promise<unknown> };
 }
 
