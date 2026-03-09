@@ -447,7 +447,7 @@ const Sidebar: React.FC = () => {
                           <TooltipContent side="right">Edit visible views</TooltipContent>
                         </Tooltip>
                         <DropdownMenuContent align="end" className="w-56">
-                          {NAV_ITEMS.map(({ id, label }) => {
+                          {NAV_ITEMS.filter(({ id }) => id !== 'data-loader').map(({ id, label }) => {
                             const checked = visibleViews.includes(id);
                             const isLastVisibleItem = checked && visibleViews.length === 1;
                             return (

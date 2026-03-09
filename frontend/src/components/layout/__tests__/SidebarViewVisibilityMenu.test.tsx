@@ -111,7 +111,7 @@ describe('Sidebar view visibility menu', () => {
     expect(screen.queryByRole('button', { name: 'AI Annotator' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Data Loader' })).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: /edit visible views/i }));
+    await user.click(screen.getAllByRole('button', { name: /edit visible views/i })[0]);
 
     const aiAnnotatorToggle = screen.getByRole('menuitemcheckbox', { name: 'AI Annotator' });
     expect(aiAnnotatorToggle).not.toBeChecked();
@@ -122,5 +122,18 @@ describe('Sidebar view visibility menu', () => {
     await user.keyboard('{Escape}');
 
     expect(await screen.findByRole('button', { name: 'AI Annotator' })).toBeInTheDocument();
+  });
+
+  it('keeps Data Loader out of the views editor so it always remains visible', async () => {
+    const user = userEvent.setup();
+
+    renderSidebar();
+
+    await user.click(screen.getAllByRole('button', { name: /edit visible views/i })[0]);
+
+    expect(screen.queryByRole('menuitemcheckbox', { name: 'Data Loader' })).not.toBeInTheDocument();
+    expect(screen.getByRole('menuitemcheckbox', { name: 'Data Structuring' })).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    expect(screen.getAllByRole('button', { name: 'Data Loader' }).length).toBeGreaterThan(0);
   });
 });
