@@ -44,7 +44,7 @@ export function TopicModelingDetachDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>Detach Topic Results</AlertDialogTitle>
           <AlertDialogDescription>
-            Select metadata columns to include with the detached topic column. Existing source <code>topic</code> columns are shown but cannot be selected.
+            Select optional source columns to include with the detached topic results. Required output columns stay checked automatically.
           </AlertDialogDescription>
         </AlertDialogHeader>
 
@@ -55,7 +55,7 @@ export function TopicModelingDetachDialog({
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {node.available_columns.map((column) => {
                   const disabled = (node.disabled_columns || []).includes(column);
-                  const checked = (selectedDetachColumns[node.node_id] || []).includes(column);
+                  const checked = disabled || (selectedDetachColumns[node.node_id] || []).includes(column);
                   return (
                     <label key={`${node.node_id}-${column}`} className={`flex items-center gap-2 text-sm ${disabled ? 'opacity-60' : ''}`}>
                       <Checkbox
@@ -63,7 +63,7 @@ export function TopicModelingDetachDialog({
                         onCheckedChange={(value: boolean | 'indeterminate') => toggleDetachColumn(node.node_id, column, value === true)}
                         disabled={disabled || isDetaching}
                       />
-                      <span>{column}{disabled ? ' (disabled)' : ''}</span>
+                      <span>{column}{disabled ? ' (required)' : ''}</span>
                     </label>
                   );
                 })}

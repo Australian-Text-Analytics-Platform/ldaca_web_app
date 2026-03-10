@@ -20,6 +20,10 @@ type Props = {
   actionState: { runDisabled: boolean; clearDisabled: boolean; runLabel: string };
   minTopicSize: number;
   onMinTopicSizeChange: (value: number) => void;
+  randomSeed: number;
+  onRandomSeedChange: (value: number) => void;
+  representativeWordsCount: number;
+  onRepresentativeWordsCountChange: (value: number) => void;
   isRunning: boolean;
   isClearing: boolean;
   onRun: () => void | Promise<void>;
@@ -40,6 +44,10 @@ export function TopicModelingParameterPanel({
   actionState,
   minTopicSize,
   onMinTopicSizeChange,
+  randomSeed,
+  onRandomSeedChange,
+  representativeWordsCount,
+  onRepresentativeWordsCountChange,
   isRunning,
   isClearing,
   onRun,
@@ -78,7 +86,7 @@ export function TopicModelingParameterPanel({
         originalCount={selectedNodes.length}
       />
 
-      <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
         <div className="space-y-2">
           <div className="flex items-center gap-1">
             <Label htmlFor="min-topic-size">Min Topic Size</Label>
@@ -92,6 +100,31 @@ export function TopicModelingParameterPanel({
             step={1}
             value={minTopicSize}
             onChange={(event) => onMinTopicSizeChange(Math.max(2, Number(event.target.value) || 0))}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="random-seed">Random Seed</Label>
+          <Input
+            id="random-seed"
+            type="number"
+            min={0}
+            step={1}
+            value={randomSeed}
+            onChange={(event) => onRandomSeedChange(Math.max(0, Number(event.target.value) || 0))}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="representative-words-count">Representative Words to Show</Label>
+          <Input
+            id="representative-words-count"
+            type="number"
+            min={1}
+            max={50}
+            step={1}
+            value={representativeWordsCount}
+            onChange={(event) => onRepresentativeWordsCountChange(Math.max(1, Number(event.target.value) || 0))}
           />
         </div>
       </div>

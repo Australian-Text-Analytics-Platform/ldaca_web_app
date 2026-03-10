@@ -219,6 +219,8 @@ async def run_topic_modeling(
                 "artifact_dir": str(artifact_dir),
                 "artifact_prefix": artifact_prefix,
                 "min_topic_size": request.min_topic_size,
+                "random_seed": request.random_seed,
+                "representative_words_count": request.representative_words_count,
             },
             task_name="Topic Modeling",
         )
@@ -228,6 +230,8 @@ async def run_topic_modeling(
         node_ids=request.node_ids,
         node_columns=request.node_columns,
         min_topic_size=request.min_topic_size,
+        random_seed=request.random_seed,
+        representative_words_count=request.representative_words_count,
     )
     analysis_tm.save_task(
         AnalysisTask(
@@ -344,7 +348,7 @@ async def topic_modeling_task_result(
 
 
 def _resolve_topic_column_name(base_name: str, existing_columns: set[str]) -> str:
-    """Return a unique output column name for detached topic labels.
+    """Return a unique output column name for detached topic data.
 
     Used by:
     - `detach_topic_modeling`
@@ -412,12 +416,13 @@ async def topic_modeling_detach_options(
         if not isinstance(source_data, pl.LazyFrame):
             continue
         original_columns = list(source_data.collect_schema().names())
+        topic_column_name = _resolve_topic_column_name("topic", set(original_columns))
         nodes.append({
             "node_id": source_node.id,
             "node_name": payload.get("node_name") or node_id,
             "text_column": payload.get("text_column"),
-            "available_columns": original_columns,
-            "disabled_columns": [],
+            "available_columns": [topic_column_name, *original_columns],
+            "disabled_columns": [topic_column_name],
         })
 
     return TopicModelingDetachOptionsResponse(
@@ -484,7 +489,7 @@ async def detach_topic_modeling(
         meanings_lf.filter(pl.col("topic").is_in(selected_topic_ids))
         if selected_topic_ids
         else meanings_lf
-    )
+    ).select(pl.col("topic"), pl.col("topic_meaning"))
 
     target_node_ids = request.node_ids or list(assignments_by_node_id.keys())
     if not target_node_ids:

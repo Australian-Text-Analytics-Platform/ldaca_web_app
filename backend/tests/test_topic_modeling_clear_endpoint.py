@@ -28,6 +28,7 @@ async def test_topic_modeling_result_returns_payload(
             {
                 "id": 0,
                 "label": "topic",
+                "representative_words": ["alpha", "beta", "gamma"],
                 "size": [1],
                 "total_size": 1,
                 "x": 0.0,
@@ -56,3 +57,8 @@ async def test_topic_modeling_result_returns_payload(
     body = response.json()
     assert body["state"] == "successful"
     assert body["data"]["topics"][0]["label"] == "topic"
+    assert body["data"]["topics"][0]["representative_words"] == [
+        "alpha",
+        "beta",
+        "gamma",
+    ]

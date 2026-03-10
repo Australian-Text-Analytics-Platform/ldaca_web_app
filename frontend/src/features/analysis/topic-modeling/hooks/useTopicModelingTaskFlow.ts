@@ -1,6 +1,12 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { textApi, type TopicModelingRequest, type TopicModelingDetachRequest, type TopicModelingDetachNodeOption } from '../../../../api/text';
+import {
+  textApi,
+  type TopicModelingRequest,
+  type TopicModelingResponse,
+  type TopicModelingDetachRequest,
+  type TopicModelingDetachNodeOption,
+} from '../../../../api/text';
 import { queryKeys } from '../../../../lib/queryKeys';
 import { restoreAnalysisLockFromRequest, extractAndSetTaskId } from '../../common';
 
@@ -9,18 +15,14 @@ type NodeColumnSelection = {
   column: string;
 };
 
-type TopicModelingResponseLike = {
-  state?: 'running' | 'successful' | 'failed' | 'cancelled';
-  message?: string;
-  metadata?: { task_id?: string; [key: string]: unknown };
-};
-
 interface TopicModelingState {
   currentWorkspaceId: string | null;
   panelNodeIds: string[];
   panelHasMissingColumns: boolean;
   effectiveNodeColumnSelections: NodeColumnSelection[];
   minTopicSize: number;
+  randomSeed: number;
+  representativeWordsCount: number;
   selectedTopicIds: Set<number>;
 }
 
@@ -28,7 +30,7 @@ interface TopicModelingActions {
   setIsRunning: (value: boolean) => void;
   runningRef: React.MutableRefObject<boolean>;
   setError: (value: string | null) => void;
-  setResultSafely: (value: TopicModelingResponseLike | null) => void;
+  setResultSafely: (value: TopicModelingResponse | null) => void;
   lastFetchedRef: React.MutableRefObject<{ taskId: string | null; state: string | null }>;
   resolveTopicModelingTaskId: () => Promise<string | null>;
   setLocalTaskId: (id: string | null) => void;
@@ -53,6 +55,8 @@ export function useTopicModelingTaskFlow({
     panelHasMissingColumns,
     effectiveNodeColumnSelections,
     minTopicSize,
+    randomSeed,
+    representativeWordsCount,
     selectedTopicIds,
   },
   actions: {
@@ -110,6 +114,8 @@ export function useTopicModelingTaskFlow({
         node_ids: requestNodeIds,
         node_columns: nodeColumns,
         min_topic_size: minTopicSize,
+        random_seed: randomSeed,
+        representative_words_count: representativeWordsCount,
       };
 
       try {
@@ -128,7 +134,7 @@ export function useTopicModelingTaskFlow({
 
       const res = await textApi.topicModeling(req, getAuthHeaders());
       extractAndSetTaskId(res, setLocalTaskId);
-      setResultSafely(res as TopicModelingResponseLike);
+      setResultSafely(res);
 
       if (res.state === 'failed') {
         setIsRunning(false);
@@ -160,9 +166,7 @@ export function useTopicModelingTaskFlow({
       setDetachNodeOptions(nodes);
       const initialSelections: Record<string, string[]> = {};
       nodes.forEach((node) => {
-        initialSelections[node.node_id] = (node.available_columns || []).filter(
-          (col) => !(node.disabled_columns || []).includes(col)
-        );
+        initialSelections[node.node_id] = [];
       });
       setSelectedDetachColumns(initialSelections);
       setDetachDialogOpen(true);
@@ -191,11 +195,6 @@ export function useTopicModelingTaskFlow({
     }
 
     const nodeIds = detachNodeOptions.map((node) => node.node_id);
-    const hasSelections = nodeIds.every((nodeId) => (selectedDetachColumns[nodeId] || []).length > 0);
-    if (!hasSelections) {
-      toast.error('Please select at least one column for each node');
-      return;
-    }
 
     try {
       setIsDetaching(true);

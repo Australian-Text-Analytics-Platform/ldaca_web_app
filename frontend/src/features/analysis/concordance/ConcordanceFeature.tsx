@@ -1,5 +1,6 @@
 // NodeSelectionPanel now handles color selection UI inline
 import React, { useState, useEffect, useRef } from 'react';
+import { toast } from 'sonner';
 import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
 import { Tabs, TabsList, TabsTrigger } from '../../../components/ui/tabs';
 import { useWorkspaceSelection } from '../../../hooks/useWorkspaceSelection';
@@ -7,10 +8,10 @@ import { useWorkspaceStatus } from '../../../hooks/useWorkspaceStatus';
 import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
 import { useWorkspaceActions } from '../../../hooks/useWorkspaceActions';
 import { useAuth } from '../../../hooks/useAuth';
+import useNodeColumnInfos from '../../../hooks/useNodeColumnInfos';
 import { type ConcordanceAnalysisResponse, type ConcordanceResultEntry, textApi } from '../../../api/text';
 import { useAnalysisStore } from '../../../stores/analysisStore';
 import { useUIStore } from '../../../stores';
-import useNodeColumnInfos from '../../../hooks/useNodeColumnInfos';
 import { Button } from '../../../components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Play, Loader2, Trash2, Link as LinkIcon } from 'lucide-react';
@@ -132,7 +133,6 @@ const ConcordanceFeature: React.FC = () => {
   const { detachConcordance, selectNodes } = useWorkspaceActions();
   const currentView = useUIStore((state) => state.currentView);
   const isActiveTab = currentView === 'concordance';
-
   const { getColumnInfos } = useNodeColumnInfos({
     workspaceId: currentWorkspaceId,
     nodes: selectedNodes,
@@ -239,6 +239,7 @@ const ConcordanceFeature: React.FC = () => {
   const [detachDialogOpen, setDetachDialogOpen] = useState(false);
   const [pendingDetachNodes, setPendingDetachNodes] = useState<{ nodeId: string; column: string; nodeLabel: string }[]>([]);
   const [selectedDetachColumns, setSelectedDetachColumns] = useState<Record<string, string[]>>({});
+  const [detachNodeOptions, setDetachNodeOptions] = useState<DetachNodeOption[]>([]);
   
   // Global page size setting
   const [globalPageSize, setGlobalPageSize] = useState(20);
@@ -714,15 +715,27 @@ const ConcordanceFeature: React.FC = () => {
   })();
 
   // --- Detach dialog helpers ---
-  const openDetachDialog = (nodes: { nodeId: string; column: string; nodeLabel: string }[]) => {
+  const openDetachDialog = async (nodes: { nodeId: string; column: string; nodeLabel: string }[]) => {
     setPendingDetachNodes(nodes);
-    // Pre-select the concordance text column for each node (it's always included)
-    const initial: Record<string, string[]> = {};
-    for (const n of nodes) {
-      initial[n.nodeId] = [];
+
+    try {
+      const responses = await Promise.all(
+        nodes.map((node) => textApi.getConcordanceDetachOptions(node.nodeId, node.column, getAuthHeaders()))
+      );
+      const options = responses.flatMap((response) => response.data?.nodes ?? []);
+      const initial: Record<string, string[]> = {};
+      options.forEach((node) => {
+        initial[node.node_id] = [];
+      });
+      setSelectedDetachColumns(initial);
+      setDetachNodeOptions(options);
+      setDetachDialogOpen(true);
+    } catch (error) {
+      console.error('Failed to load concordance detach options:', error);
+      toast.error(`Failed to load concordance detach options: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setPendingDetachNodes([]);
+      setSelectedDetachColumns({});
     }
-    setSelectedDetachColumns(initial);
-    setDetachDialogOpen(true);
   };
 
   const toggleDetachColumn = (nodeId: string, column: string, checked: boolean) => {
@@ -743,19 +756,8 @@ const ConcordanceFeature: React.FC = () => {
     setDetachDialogOpen(false);
     setPendingDetachNodes([]);
     setSelectedDetachColumns({});
+    setDetachNodeOptions([]);
   };
-
-  const detachNodeOptions: DetachNodeOption[] = pendingDetachNodes.map(n => {
-    const nodeObj = panelSelectedNodes.find(p => p.id === n.nodeId);
-    const infos = nodeObj ? getColumnInfos(nodeObj, panelSelectedNodes.indexOf(nodeObj)) : [];
-    const available = infos.map(i => i.name).filter(c => c !== n.column);
-    return {
-      node_id: n.nodeId,
-      node_name: (nodeObj?.name || n.nodeLabel) as string,
-      available_columns: available,
-      concordance_column: n.column,
-    };
-  });
 
   const anyNodeDetaching = pendingDetachNodes.some(n => Boolean(nodeDetaching[n.nodeId]));
 
@@ -817,7 +819,7 @@ const ConcordanceFeature: React.FC = () => {
                     const sourceLabel = (sourceNode?.name || sourceNode?.id || nid) as string;
                     return { nodeId: nid, column: col, nodeLabel: sourceLabel };
                   }).filter(n => n.column);
-                  openDetachDialog(nodes);
+                  void openDetachDialog(nodes);
                 }}
                 disabled={combinedLoading || !searchWord.trim()}
                 size="sm"
@@ -1034,7 +1036,7 @@ const ConcordanceFeature: React.FC = () => {
               if (detachNodeId) {
                 const detachNode = panelSelectedNodes.find((n) => n.id === detachNodeId);
                 const detachLabel = (detachNode?.name || nodeKey) as string;
-                openDetachDialog([{ nodeId: detachNodeId, column, nodeLabel: detachLabel }]);
+                void openDetachDialog([{ nodeId: detachNodeId, column, nodeLabel: detachLabel }]);
               }
             }}
             disabled={nodeIsLoading || isDetaching || !searchWord.trim() || !canDetach || !detachNodeId}

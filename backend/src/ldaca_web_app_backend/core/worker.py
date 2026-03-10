@@ -138,6 +138,8 @@ def concordance_detach_task(
     new_node_name: str,
     artifact_dir: str,
     artifact_prefix: str,
+    include_document_column: bool = False,
+    extra_columns_data: Optional[Dict[str, list]] = None,
     progress_callback: Optional[Callable[[float, str], None]] = None,
     progress_queue: Optional[Any] = None,
 ) -> Dict[str, Any]:
@@ -155,6 +157,8 @@ def concordance_detach_task(
         new_node_name,
         artifact_dir,
         artifact_prefix,
+        include_document_column,
+        extra_columns_data,
         cb,
     )
 
@@ -194,6 +198,8 @@ def topic_modeling_task(
     artifact_dir: str,
     artifact_prefix: str,
     min_topic_size: int,
+    random_seed: int = 42,
+    representative_words_count: int = 5,
     progress_callback: Optional[Callable[[float, str], None]] = None,
     progress_queue: Optional[Any] = None,
 ) -> Dict[str, Any]:
@@ -207,6 +213,8 @@ def topic_modeling_task(
         artifact_dir=artifact_dir,
         artifact_prefix=artifact_prefix,
         min_topic_size=min_topic_size,
+        random_seed=random_seed,
+        representative_words_count=representative_words_count,
         progress_callback=cb,
     )
 

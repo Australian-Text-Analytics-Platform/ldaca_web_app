@@ -16,8 +16,7 @@ export type DetachNodeOption = {
   node_id: string;
   node_name: string;
   available_columns: string[];
-  /** The text column used for concordance — always included, shown disabled */
-  concordance_column: string;
+  disabled_columns?: string[];
 };
 
 type Props = {
@@ -45,8 +44,8 @@ export function ConcordanceDetachDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>Detach Concordance Results</AlertDialogTitle>
           <AlertDialogDescription>
-            Select metadata columns to include alongside the concordance results.
-            The text column used for concordance is always included.
+            Select optional source columns to include alongside the concordance results.
+            Required output columns stay checked automatically.
           </AlertDialogDescription>
         </AlertDialogHeader>
 
@@ -56,7 +55,7 @@ export function ConcordanceDetachDialog({
               <div className="mb-2 text-sm font-semibold text-foreground">{node.node_name}</div>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {node.available_columns.map((column) => {
-                  const disabled = column === node.concordance_column;
+                  const disabled = (node.disabled_columns || []).includes(column);
                   const checked = disabled || (selectedDetachColumns[node.node_id] || []).includes(column);
                   return (
                     <label key={`${node.node_id}-${column}`} className={`flex items-center gap-2 text-sm ${disabled ? 'opacity-60' : ''}`}>
@@ -65,7 +64,7 @@ export function ConcordanceDetachDialog({
                         onCheckedChange={(value: boolean | 'indeterminate') => toggleDetachColumn(node.node_id, column, value === true)}
                         disabled={disabled || isDetaching}
                       />
-                      <span>{column}{disabled ? ' (concordance column)' : ''}</span>
+                      <span>{column}{disabled ? ' (required)' : ''}</span>
                     </label>
                   );
                 })}

@@ -40,3 +40,56 @@ async def test_concordance_detach_starts_task(authenticated_client, workspace_id
     payload = resp.json()
     assert payload.get("state") == "running"
     assert payload.get("metadata", {}).get("task_id")
+
+
+@pytest.mark.anyio
+async def test_concordance_detach_options_include_mandatory_and_optional_columns(
+    authenticated_client, workspace_id
+):
+    df = pl.DataFrame({
+        "text": ["alpha beta", "beta gamma", "alpha gamma"],
+        "speaker": ["a", "b", "c"],
+    })
+    workspace = workspace_manager.get_current_workspace("test")
+    assert workspace is not None
+
+    node = Node(
+        data=df.lazy(),
+        name="text_node",
+        workspace=workspace,
+        operation="test_add",
+        parents=[],
+    )
+    workspace.add_node(node)
+
+    resp = await authenticated_client.get(
+        f"/api/workspaces/nodes/{node.id}/concordance/detach-options",
+        params={"column": "text"},
+    )
+
+    assert resp.status_code == 200, resp.text
+    payload = resp.json()
+    node_option = payload["data"]["nodes"][0]
+
+    assert node_option["node_id"] == node.id
+    assert node_option["text_column"] == "text"
+    assert node_option["available_columns"] == [
+        "text",
+        "left_context",
+        "matched_text",
+        "right_context",
+        "start_idx",
+        "end_idx",
+        "l1",
+        "r1",
+        "speaker",
+    ]
+    assert node_option["disabled_columns"] == [
+        "left_context",
+        "matched_text",
+        "right_context",
+        "start_idx",
+        "end_idx",
+        "l1",
+        "r1",
+    ]

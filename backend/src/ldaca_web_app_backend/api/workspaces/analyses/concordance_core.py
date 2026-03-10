@@ -13,7 +13,7 @@ from ....core.workspace import workspace_manager
 
 logger = logging.getLogger(__name__)
 
-CORE_CONCORDANCE_COLUMNS = {
+CORE_CONCORDANCE_COLUMNS = (
     "left_context",
     "matched_text",
     "right_context",
@@ -21,7 +21,7 @@ CORE_CONCORDANCE_COLUMNS = {
     "end_idx",
     "l1",
     "r1",
-}
+)
 
 DEFAULT_CONCORDANCE_PAGE = 1
 DEFAULT_CONCORDANCE_PAGE_SIZE = 20

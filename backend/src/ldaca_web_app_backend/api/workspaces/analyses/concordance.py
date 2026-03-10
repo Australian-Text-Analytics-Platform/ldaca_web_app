@@ -21,8 +21,14 @@ from ....analysis.models import AnalysisStatus, AnalysisTask
 from ....analysis.results import GenericAnalysisResult
 from ....core.auth import get_current_user
 from ....core.workspace import workspace_manager
-from ....models import ConcordanceAnalysisRequest, ConcordanceDetachRequest
+from ....models import (
+    ConcordanceAnalysisRequest,
+    ConcordanceDetachNodeOption,
+    ConcordanceDetachOptionsResponse,
+    ConcordanceDetachRequest,
+)
 from .concordance_core import (
+    CORE_CONCORDANCE_COLUMNS,
     DEFAULT_CONCORDANCE_PAGE,
     DEFAULT_CONCORDANCE_PAGE_SIZE,
     build_concordance_response,
@@ -326,15 +332,19 @@ async def detach_concordance(
         )
 
     schema_names = node_data.collect_schema().names()
-    columns_to_select = [request.column]
+    include_document_column = False
+    columns_to_select: list[str] = []
     if request.selected_columns:
         for col in request.selected_columns:
-            if col != request.column and col in schema_names:
+            if col == request.column:
+                include_document_column = True
+                continue
+            if col in schema_names:
                 columns_to_select.append(col)
 
     corpus_df = (
         node_data
-        .select([pl.col(c) for c in columns_to_select])
+        .select([pl.col(request.column)] + [pl.col(c) for c in columns_to_select])
         .filter(
             pl
             .col(request.column)
@@ -377,6 +387,7 @@ async def detach_concordance(
                 "new_node_name": request.new_node_name,
                 "artifact_dir": artifact_dir,
                 "artifact_prefix": artifact_prefix,
+                "include_document_column": include_document_column,
                 "extra_columns_data": extra_columns_data
                 if extra_columns_data
                 else None,
@@ -394,3 +405,70 @@ async def detach_concordance(
         raise HTTPException(
             status_code=500, detail=f"Error submitting detach task: {exc}"
         )
+
+
+@router.get(
+    "/nodes/{node_id}/concordance/detach-options",
+    response_model=ConcordanceDetachOptionsResponse,
+)
+async def concordance_detach_options(
+    node_id: str,
+    column: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Return detachable concordance columns for one node.
+
+    Used by:
+    - Frontend concordance detach dialog
+
+    Why:
+    - Keeps mandatory generated concordance columns and optional metadata
+      columns aligned with backend detach behavior.
+    """
+    user_id = current_user["id"]
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    ws = workspace_manager.get_current_workspace(user_id)
+    if not workspace_id or ws is None:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+
+    try:
+        node = ws.nodes[node_id]
+    except Exception:
+        raise HTTPException(status_code=404, detail=f"Node {node_id} not found")
+
+    node_data = getattr(node, "data", None)
+    if not isinstance(node_data, pl.LazyFrame):
+        raise HTTPException(
+            status_code=400, detail="Selected node data must be a LazyFrame"
+        )
+
+    available_schema_columns = list(node_data.collect_schema().names())
+    if column not in available_schema_columns:
+        raise HTTPException(status_code=400, detail=f"Column '{column}' not found")
+
+    mandatory_columns = list(CORE_CONCORDANCE_COLUMNS)
+    mandatory_set = set(mandatory_columns)
+    optional_columns = [
+        col for col in [column, *available_schema_columns] if col not in mandatory_set
+    ]
+    ordered_available_columns = list(
+        dict.fromkeys(mandatory_columns + optional_columns)
+    )
+    ordered_available_columns = [
+        column,
+        *[col for col in ordered_available_columns if col != column],
+    ]
+    node_option = ConcordanceDetachNodeOption(
+        node_id=node_id,
+        node_name=getattr(node, "name", None) or node_id,
+        text_column=column,
+        available_columns=ordered_available_columns,
+        disabled_columns=mandatory_columns,
+    )
+
+    return ConcordanceDetachOptionsResponse(
+        state="successful",
+        message="Concordance detach options loaded",
+        data={"nodes": [node_option]},
+        metadata=None,
+    )

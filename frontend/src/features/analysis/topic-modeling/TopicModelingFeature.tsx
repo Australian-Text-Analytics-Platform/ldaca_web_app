@@ -4,7 +4,7 @@ import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '../../../hooks/useWorkspaceSelection';
 import { useAuth } from '../../../hooks/useAuth';
 // Updated to use modular API object pattern
-import { textApi } from '../../../api/text';
+import { textApi, type TopicModelingResponse, type TopicModelingTopic } from '../../../api/text';
 import { useAnalysisStore, type TaskItem } from '../../../stores/analysisStore';
 import { useUIStore } from '../../../stores';
 import useNodeColumnInfos from '../../../hooks/useNodeColumnInfos';
@@ -26,8 +26,6 @@ import { TopicModelingResultsPanel } from './components/panels/TopicModelingResu
 import { useTopicModelingTaskFlow } from './hooks/useTopicModelingTaskFlow';
 import { useTopicModelingZoomBrush } from './hooks/useTopicModelingZoomBrush';
 import { useTopicModelingBubbleChart } from './hooks/useTopicModelingBubbleChart';
-interface TopicModelingTopic { id: number; label: string; size: number[]; total_size: number; x: number; y: number; }
-interface TopicModelingResponse { state?: 'running' | 'successful' | 'failed' | 'cancelled'; message?: string; data?: { topics: TopicModelingTopic[]; corpus_sizes?: number[] }; metadata?: { task_id?: string; [k: string]: unknown } }
 
 const TopicModelingFeature: React.FC = () => {
   const { selectedNodes } = useWorkspaceSelection();
@@ -60,6 +58,8 @@ const TopicModelingFeature: React.FC = () => {
         node_ids?: string[];
         node_columns?: Record<string, string>;
         min_topic_size?: number;
+        random_seed?: number;
+        representative_words_count?: number;
       }
     | null;
   const currentView = useUIStore((state) => state.currentView);
@@ -69,6 +69,8 @@ const TopicModelingFeature: React.FC = () => {
   const [result, resultRef, setResultSafely] = useSafeResult<TopicModelingResponse>();
   
   const [minTopicSize, setMinTopicSize] = useState(10);
+  const [randomSeed, setRandomSeed] = useState(42);
+  const [representativeWordsCount, setRepresentativeWordsCount] = useState(5);
   const [hoveredTopicId, setHoveredTopicId] = useState<number | null>(null);
   const [tooltip, setTooltip] = useState<{x:number;y:number; topic: TopicModelingTopic | null}>({x:0,y:0,topic:null});
   const [selectedTopicIds, setSelectedTopicIds] = useState<Set<number>>(new Set());
@@ -125,6 +127,8 @@ const TopicModelingFeature: React.FC = () => {
       const sels = nodeIds.map((id: string) => ({ nodeId: id, column: node_columns[id] || '' }));
       setNodeColumnSelections(sels, { replace: true });
       setMinTopicSize(Number(req.min_topic_size ?? 10));
+      setRandomSeed(Number(req.random_seed ?? 42));
+      setRepresentativeWordsCount(Number(req.representative_words_count ?? 5));
       if (nodeIds.length && currentWorkspaceId) {
         try {
           await restoreAnalysisLockFromRequest({
@@ -215,9 +219,13 @@ const TopicModelingFeature: React.FC = () => {
     serverRequest: typedServerRequest,
     currentParams: {
       min_topic_size: Number(minTopicSize),
+      random_seed: Number(randomSeed),
+      representative_words_count: Number(representativeWordsCount),
     },
     getServerParams: (request) => ({
       min_topic_size: Number(request.min_topic_size),
+      random_seed: Number(request.random_seed),
+      representative_words_count: Number(request.representative_words_count),
     }),
   });
 
@@ -262,6 +270,8 @@ const TopicModelingFeature: React.FC = () => {
       panelHasMissingColumns,
       effectiveNodeColumnSelections,
       minTopicSize,
+      randomSeed,
+      representativeWordsCount,
       selectedTopicIds,
     },
     actions: {
@@ -348,6 +358,10 @@ const TopicModelingFeature: React.FC = () => {
         actionState={actionState}
         minTopicSize={minTopicSize}
         onMinTopicSizeChange={setMinTopicSize}
+        randomSeed={randomSeed}
+        onRandomSeedChange={setRandomSeed}
+        representativeWordsCount={representativeWordsCount}
+        onRepresentativeWordsCountChange={setRepresentativeWordsCount}
         isRunning={isRunning}
         isClearing={isClearing}
         onRun={handleRun}

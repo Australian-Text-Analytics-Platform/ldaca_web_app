@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import random
 from typing import Any, Callable, Dict, Optional
 
 _EMBEDDER_CACHE: dict[str, Any] = {}
@@ -30,6 +31,8 @@ def run_topic_modeling_task(
     artifact_dir: str,
     artifact_prefix: str,
     min_topic_size: int = 5,
+    random_seed: int = 42,
+    representative_words_count: int = 5,
     progress_callback: Optional[Callable[[float, str], None]] = None,
 ) -> Dict[str, Any]:
     """Execute topic modeling in a worker process.
@@ -86,7 +89,7 @@ def run_topic_modeling_task(
                     artifact_root / f"{artifact_prefix}_topic_meanings.parquet"
                 )
                 pl.DataFrame(
-                    schema={"topic": pl.Int64, "topic_meaning": pl.Utf8}
+                    schema={"topic": pl.Int64, "topic_meaning": pl.List(pl.String)}
                 ).lazy().sink_parquet(topic_meanings_path)
 
                 node_artifacts: list[dict[str, Any]] = []
@@ -131,8 +134,20 @@ def run_topic_modeling_task(
             if any(size == 0 for size in corpus_sizes):
                 raise ValueError("All corpora must contain at least one document.")
 
-            random_state = 42
+            random_state = int(random_seed)
+            max_representative_words = max(1, int(representative_words_count))
             embedding_model_name = "all-MiniLM-L6-v2"
+
+            random.seed(random_state)
+            np.random.seed(random_state)
+            try:
+                import torch
+
+                torch.manual_seed(random_state)
+                if torch.cuda.is_available():
+                    torch.cuda.manual_seed_all(random_state)
+            except ImportError:
+                pass
 
             # Build embeddings once for BERTopic fitting.
             embedder = _get_embedder(embedding_model_name)
@@ -140,10 +155,19 @@ def run_topic_modeling_task(
 
             # Reuse the same loaded embedder instance to avoid loading model
             # weights twice in a single task.
+            from umap import UMAP
+
             topic_model = BERTopic(
                 verbose=False,
                 min_topic_size=int(min_topic_size),
                 embedding_model=embedder,
+                umap_model=UMAP(
+                    n_neighbors=15,
+                    n_components=5,
+                    min_dist=0.0,
+                    metric="cosine",
+                    random_state=random_state,
+                ),
             )
             assigned_topics, _ = topic_model.fit_transform(all_docs, all_embeddings)
 
@@ -210,12 +234,16 @@ def run_topic_modeling_task(
                     if isinstance(topic_id, (int, np.integer))
                 ]
 
+            representative_words_by_topic: list[list[str]] = []
             labels: list[str] = []
             for topic_id in topic_ids:
                 words = topic_model.get_topic(topic_id) or []
                 top_words = [
-                    word for word, _score in words[:5] if isinstance(word, str) and word
+                    word
+                    for word, _score in words[:max_representative_words]
+                    if isinstance(word, str) and word
                 ]
+                representative_words_by_topic.append(top_words)
                 labels.append(
                     " | ".join(top_words) if top_words else f"Topic {topic_id}"
                 )
@@ -311,6 +339,9 @@ def run_topic_modeling_task(
                 topic_payloads.append({
                     "id": topic_id,
                     "label": labels[i] if i < len(labels) else f"Topic {topic_id}",
+                    "representative_words": representative_words_by_topic[i]
+                    if i < len(representative_words_by_topic)
+                    else [],
                     "size": per_sizes,
                     "total_size": int(sum(per_sizes)),
                     "x": float(coords[i, 0]) if i < len(coords) else 0.0,
@@ -323,9 +354,9 @@ def run_topic_modeling_task(
             pl.DataFrame(
                 {
                     "topic": topic_ids,
-                    "topic_meaning": labels,
+                    "topic_meaning": representative_words_by_topic,
                 },
-                schema={"topic": pl.Int64, "topic_meaning": pl.Utf8},
+                schema={"topic": pl.Int64, "topic_meaning": pl.List(pl.String)},
             ).lazy().sink_parquet(topic_meanings_path)
 
             return {
@@ -343,6 +374,7 @@ def run_topic_modeling_task(
                     "embedding_model": embedding_model_name,
                     "embeddings_from_ctfidf": bool(c_tfidf_used),
                     "min_topic_size": int(min_topic_size),
+                    "representative_words_count": max_representative_words,
                     "total_topics_incl_outlier": int(topic_freq.height),
                     "random_state": random_state,
                 },

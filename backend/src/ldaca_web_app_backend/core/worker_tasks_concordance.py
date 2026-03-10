@@ -18,6 +18,7 @@ def run_concordance_detach_task(
     new_node_name: str,
     artifact_dir: str,
     artifact_prefix: str,
+    include_document_column: bool = False,
     extra_columns_data: Optional[Dict[str, list]] = None,
     progress_callback: Optional[Callable[[float, str], None]] = None,
 ) -> Dict[str, Any]:
@@ -45,21 +46,32 @@ def run_concordance_detach_task(
         if progress_callback:
             progress_callback(0.5, "Generating concordance...")
 
-        data: dict[str, list] = {document_column: corpus}
+        source_column_name = "__concordance_source__"
+        data: dict[str, list] = {source_column_name: corpus}
+        base_columns: list[pl.Expr] = []
+        output_columns: list[str] = []
+
+        if include_document_column:
+            data[document_column] = corpus
+            base_columns.append(pl.col(document_column))
+            output_columns.append(document_column)
+
         extra_col_names: list[str] = []
         if extra_columns_data:
             for col_name, col_values in extra_columns_data.items():
                 filtered = [v for v, keep in zip(col_values, non_empty_mask) if keep]
                 data[col_name] = filtered
                 extra_col_names.append(col_name)
+                base_columns.append(pl.col(col_name))
+                output_columns.append(col_name)
 
         df = pl.DataFrame(data)
         result = (
             df
             .select([
-                pl.all(),
+                *base_columns,
                 pt.concordance(
-                    pl.col(document_column),
+                    pl.col(source_column_name),
                     search_word,
                     num_left_tokens=num_left_tokens,
                     num_right_tokens=num_right_tokens,
@@ -95,8 +107,16 @@ def run_concordance_detach_task(
                 "new_node_name": new_node_name,
                 "parent_node_id": parent_node_id,
                 "document_column": document_column,
-                "output_columns": ["left_context", "matched_text", "right_context"]
-                + extra_col_names,
+                "output_columns": output_columns
+                + [
+                    "left_context",
+                    "matched_text",
+                    "right_context",
+                    "start_idx",
+                    "end_idx",
+                    "l1",
+                    "r1",
+                ],
                 "record_count": len(result),
             },
             "message": "Concordance detach completed successfully",

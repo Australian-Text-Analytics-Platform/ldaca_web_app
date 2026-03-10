@@ -390,6 +390,21 @@ class ConcordanceDetachRequest(BaseModel):
     selected_columns: Optional[list[str]] = None
 
 
+class ConcordanceDetachNodeOption(BaseModel):
+    node_id: str
+    node_name: str
+    text_column: Optional[str] = None
+    available_columns: List[str]
+    disabled_columns: List[str] = Field(default_factory=list)
+
+
+class ConcordanceDetachOptionsResponse(BaseModel):
+    state: str
+    message: str
+    data: Dict[str, List[ConcordanceDetachNodeOption]]
+    metadata: Optional[Dict[str, Any]] = None
+
+
 # Quotation requests (mirror concordance shape but without search parameters)
 class QuotationEngineType(str, Enum):
     LOCAL = "local"
@@ -803,6 +818,8 @@ class TopicModelingRequest(BaseModel):
     node_ids: List[str]  # 1 or 2 node IDs
     node_columns: Dict[str, str]  # Maps node_id -> column_name
     min_topic_size: Optional[int] = 10  # BERTopic minimum topic size
+    random_seed: Optional[int] = 42
+    representative_words_count: Optional[int] = 5
 
     # Pydantic v2 model config
     model_config = ConfigDict(
@@ -811,6 +828,8 @@ class TopicModelingRequest(BaseModel):
                 "node_ids": ["node1", "node2"],
                 "node_columns": {"node1": "text", "node2": "content"},
                 "min_topic_size": 10,
+                "random_seed": 42,
+                "representative_words_count": 5,
             }
         }
     )
@@ -819,6 +838,7 @@ class TopicModelingRequest(BaseModel):
 class TopicModelingTopic(BaseModel):
     id: int
     label: str
+    representative_words: List[str] = Field(default_factory=list)
     size: List[int]  # per-corpus sizes aligned to request.node_ids order
     total_size: int
     x: float

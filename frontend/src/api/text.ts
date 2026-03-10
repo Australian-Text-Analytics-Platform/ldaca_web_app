@@ -10,6 +10,19 @@ export interface ConcordanceMetadata {
 
 export interface ConcordanceRequest { column: string; search_word: string; num_left_tokens?: number; num_right_tokens?: number; regex?: boolean; case_sensitive?: boolean; sort_by?: string; }
 export interface ConcordanceDetachRequest { node_id: string; column: string; search_word: string; num_left_tokens?: number; num_right_tokens?: number; regex?: boolean; case_sensitive?: boolean; new_node_name?: string; selected_columns?: string[]; }
+export interface ConcordanceDetachNodeOption {
+  node_id: string;
+  node_name: string;
+  text_column?: string | null;
+  available_columns: string[];
+  disabled_columns: string[];
+}
+export interface ConcordanceDetachOptionsResponse {
+  state: 'running' | 'successful' | 'failed' | 'cancelled';
+  message: string;
+  data?: { nodes: ConcordanceDetachNodeOption[] };
+  metadata?: { task_id?: string; [key: string]: unknown };
+}
 export interface ConcordanceAnalysisRequest { node_ids: string[]; node_columns: Record<string,string>; search_word: string; num_left_tokens?: number; num_right_tokens?: number; regex?: boolean; case_sensitive?: boolean; sort_by?: string; combined?: boolean; }
 export interface ConcordanceResultQuery { node_id?: string; combined?: boolean; page?: number; page_number?: number; page_size?: number; sort_by?: string; descending?: boolean; show_metadata?: boolean; update_only?: boolean; }
 export interface ConcordanceResultEntry {
@@ -90,8 +103,28 @@ export interface TokenFrequencyResponse {
     significance?: string;
   }>;
 }
-export interface TopicModelingRequest { node_ids: string[]; node_columns?: Record<string,string>; min_topic_size?: number; }
-export interface TopicModelingResponse { state: 'running' | 'successful' | 'failed' | 'cancelled'; message: string; data?: { topics: Record<string, unknown>[]; corpus_sizes?: number[] }; metadata?: { task_id?: string; [k: string]: unknown } }
+export interface TopicModelingRequest {
+  node_ids: string[];
+  node_columns?: Record<string, string>;
+  min_topic_size?: number;
+  random_seed?: number;
+  representative_words_count?: number;
+}
+export interface TopicModelingTopic {
+  id: number;
+  label: string;
+  representative_words?: string[];
+  size: number[];
+  total_size: number;
+  x: number;
+  y: number;
+}
+export interface TopicModelingResponse {
+  state: 'running' | 'successful' | 'failed' | 'cancelled';
+  message: string;
+  data?: { topics: TopicModelingTopic[]; corpus_sizes?: number[] };
+  metadata?: { task_id?: string; [k: string]: unknown };
+}
 export interface TopicModelingDetachNodeOption {
   node_id: string;
   node_name: string;
@@ -244,6 +277,8 @@ export interface AiAnnotationCategoriesResponse {
 export const textApi = {
   concordance: (req: ConcordanceAnalysisRequest, headers: Record<string,string> = {}) => post<ConcordanceAnalysisResponse>(`/workspaces/concordance`, req, headers),
   concordanceDetach: async (node: string, req: ConcordanceDetachRequest, headers: Record<string,string> = {}): Promise<void> => { await post(`/workspaces/nodes/${node}/concordance/detach`, req, headers); },
+  getConcordanceDetachOptions: (node: string, column: string, headers: Record<string,string> = {}) =>
+    httpRequest<ConcordanceDetachOptionsResponse>(`/workspaces/nodes/${node}/concordance/detach-options`, { method: 'GET', headers, params: { column } }),
   getConcordanceTaskRequest: (taskId: string, headers: Record<string,string> = {}) => httpRequest<Record<string, unknown>>(`/workspaces/concordance/tasks/${taskId}/request`, { method: 'GET', headers }),
   getConcordanceTaskResult: (taskId: string, headers: Record<string,string> = {}) => httpRequest<ConcordanceAnalysisResponse>(`/workspaces/concordance/tasks/${taskId}/result`, { method: 'GET', headers }),
   postConcordanceTaskResult: (taskId: string, body: ConcordanceResultQuery, headers: Record<string,string> = {}) => post<ConcordanceAnalysisResponse>(`/workspaces/concordance/tasks/${taskId}/result`, body, headers),
