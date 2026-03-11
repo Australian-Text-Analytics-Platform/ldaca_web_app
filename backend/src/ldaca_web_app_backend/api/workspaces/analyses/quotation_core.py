@@ -8,6 +8,23 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 import polars as pl
 
 from ....models import QuotationEngineConfig, QuotationEngineType
+from .generated_columns import (
+    QUOTE_COLUMN_NAMES,
+    QUOTE_IS_FLOATING_COLUMN,
+    QUOTE_QUOTE_COLUMN,
+    QUOTE_QUOTE_END_IDX_COLUMN,
+    QUOTE_QUOTE_START_IDX_COLUMN,
+    QUOTE_ROW_IDX_COLUMN,
+    QUOTE_SPEAKER_COLUMN,
+    QUOTE_SPEAKER_END_IDX_COLUMN,
+    QUOTE_SPEAKER_START_IDX_COLUMN,
+    QUOTE_TOKEN_COUNT_COLUMN,
+    QUOTE_TYPE_COLUMN,
+    QUOTE_VERB_COLUMN,
+    QUOTE_VERB_END_IDX_COLUMN,
+    QUOTE_VERB_START_IDX_COLUMN,
+    quotation_struct_projection,
+)
 
 DEFAULT_CONTEXT_LENGTH = 20
 MAX_CONTEXT_LENGTH = 2000
@@ -102,19 +119,35 @@ def empty_quote_dataframe(text_column: Optional[str] = None) -> pl.DataFrame:
     - Ensures callers always receive a predictable schema, even with no quotes.
     """
     columns: Dict[str, pl.Series] = {
-        "speaker": pl.Series("speaker", [], dtype=pl.Utf8),
-        "speaker_start_idx": pl.Series("speaker_start_idx", [], dtype=pl.Int64),
-        "speaker_end_idx": pl.Series("speaker_end_idx", [], dtype=pl.Int64),
-        "quote": pl.Series("quote", [], dtype=pl.Utf8),
-        "quote_start_idx": pl.Series("quote_start_idx", [], dtype=pl.Int64),
-        "quote_end_idx": pl.Series("quote_end_idx", [], dtype=pl.Int64),
-        "verb": pl.Series("verb", [], dtype=pl.Utf8),
-        "verb_start_idx": pl.Series("verb_start_idx", [], dtype=pl.Int64),
-        "verb_end_idx": pl.Series("verb_end_idx", [], dtype=pl.Int64),
-        "quote_type": pl.Series("quote_type", [], dtype=pl.Utf8),
-        "quote_token_count": pl.Series("quote_token_count", [], dtype=pl.Int64),
-        "is_floating_quote": pl.Series("is_floating_quote", [], dtype=pl.Boolean),
-        "quote_row_idx": pl.Series("quote_row_idx", [], dtype=pl.Int64),
+        QUOTE_SPEAKER_COLUMN: pl.Series(QUOTE_SPEAKER_COLUMN, [], dtype=pl.Utf8),
+        QUOTE_SPEAKER_START_IDX_COLUMN: pl.Series(
+            QUOTE_SPEAKER_START_IDX_COLUMN, [], dtype=pl.Int64
+        ),
+        QUOTE_SPEAKER_END_IDX_COLUMN: pl.Series(
+            QUOTE_SPEAKER_END_IDX_COLUMN, [], dtype=pl.Int64
+        ),
+        QUOTE_QUOTE_COLUMN: pl.Series(QUOTE_QUOTE_COLUMN, [], dtype=pl.Utf8),
+        QUOTE_QUOTE_START_IDX_COLUMN: pl.Series(
+            QUOTE_QUOTE_START_IDX_COLUMN, [], dtype=pl.Int64
+        ),
+        QUOTE_QUOTE_END_IDX_COLUMN: pl.Series(
+            QUOTE_QUOTE_END_IDX_COLUMN, [], dtype=pl.Int64
+        ),
+        QUOTE_VERB_COLUMN: pl.Series(QUOTE_VERB_COLUMN, [], dtype=pl.Utf8),
+        QUOTE_VERB_START_IDX_COLUMN: pl.Series(
+            QUOTE_VERB_START_IDX_COLUMN, [], dtype=pl.Int64
+        ),
+        QUOTE_VERB_END_IDX_COLUMN: pl.Series(
+            QUOTE_VERB_END_IDX_COLUMN, [], dtype=pl.Int64
+        ),
+        QUOTE_TYPE_COLUMN: pl.Series(QUOTE_TYPE_COLUMN, [], dtype=pl.Utf8),
+        QUOTE_TOKEN_COUNT_COLUMN: pl.Series(
+            QUOTE_TOKEN_COUNT_COLUMN, [], dtype=pl.Int64
+        ),
+        QUOTE_IS_FLOATING_COLUMN: pl.Series(
+            QUOTE_IS_FLOATING_COLUMN, [], dtype=pl.Boolean
+        ),
+        QUOTE_ROW_IDX_COLUMN: pl.Series(QUOTE_ROW_IDX_COLUMN, [], dtype=pl.Int64),
     }
 
     if text_column:
@@ -138,23 +171,23 @@ def ensure_quote_dataframe(
     """
     result = df
 
-    if "quote_row_idx" not in result.columns:
+    if QUOTE_ROW_IDX_COLUMN not in result.columns:
         result = result.with_columns(
             pl
             .arange(0, result.height, eager=True)
             .cast(pl.Int64)
-            .alias("quote_row_idx")
+            .alias(QUOTE_ROW_IDX_COLUMN)
         )
 
     cast_map = {
-        "speaker_start_idx": pl.Int64,
-        "speaker_end_idx": pl.Int64,
-        "quote_start_idx": pl.Int64,
-        "quote_end_idx": pl.Int64,
-        "verb_start_idx": pl.Int64,
-        "verb_end_idx": pl.Int64,
-        "quote_token_count": pl.Int64,
-        "quote_row_idx": pl.Int64,
+        QUOTE_SPEAKER_START_IDX_COLUMN: pl.Int64,
+        QUOTE_SPEAKER_END_IDX_COLUMN: pl.Int64,
+        QUOTE_QUOTE_START_IDX_COLUMN: pl.Int64,
+        QUOTE_QUOTE_END_IDX_COLUMN: pl.Int64,
+        QUOTE_VERB_START_IDX_COLUMN: pl.Int64,
+        QUOTE_VERB_END_IDX_COLUMN: pl.Int64,
+        QUOTE_TOKEN_COUNT_COLUMN: pl.Int64,
+        QUOTE_ROW_IDX_COLUMN: pl.Int64,
     }
     numeric_exprs = [
         pl.col(col).cast(dtype, strict=False)
@@ -162,8 +195,10 @@ def ensure_quote_dataframe(
         if col in result.columns
     ]
     boolean_exprs = []
-    if "is_floating_quote" in result.columns:
-        boolean_exprs.append(pl.col("is_floating_quote").cast(pl.Boolean, strict=False))
+    if QUOTE_IS_FLOATING_COLUMN in result.columns:
+        boolean_exprs.append(
+            pl.col(QUOTE_IS_FLOATING_COLUMN).cast(pl.Boolean, strict=False)
+        )
     if numeric_exprs or boolean_exprs:
         result = result.with_columns(*numeric_exprs, *boolean_exprs)
 
@@ -220,19 +255,19 @@ def remote_payload_to_dataframe(payload: Dict[str, Any]) -> pl.DataFrame:
             if not isinstance(quote, dict):
                 continue
             rows.append({
-                "quote_row_idx": quote_idx,
-                "speaker": quote.get("speaker"),
-                "speaker_start_idx": quote.get("speaker_start_idx"),
-                "speaker_end_idx": quote.get("speaker_end_idx"),
-                "quote": quote.get("quote"),
-                "quote_start_idx": quote.get("quote_start_idx"),
-                "quote_end_idx": quote.get("quote_end_idx"),
-                "verb": quote.get("verb"),
-                "verb_start_idx": quote.get("verb_start_idx"),
-                "verb_end_idx": quote.get("verb_end_idx"),
-                "quote_type": quote.get("quote_type"),
-                "quote_token_count": quote.get("quote_token_count"),
-                "is_floating_quote": quote.get("is_floating_quote"),
+                QUOTE_ROW_IDX_COLUMN: quote_idx,
+                QUOTE_SPEAKER_COLUMN: quote.get("speaker"),
+                QUOTE_SPEAKER_START_IDX_COLUMN: quote.get("speaker_start_idx"),
+                QUOTE_SPEAKER_END_IDX_COLUMN: quote.get("speaker_end_idx"),
+                QUOTE_QUOTE_COLUMN: quote.get("quote"),
+                QUOTE_QUOTE_START_IDX_COLUMN: quote.get("quote_start_idx"),
+                QUOTE_QUOTE_END_IDX_COLUMN: quote.get("quote_end_idx"),
+                QUOTE_VERB_COLUMN: quote.get("verb"),
+                QUOTE_VERB_START_IDX_COLUMN: quote.get("verb_start_idx"),
+                QUOTE_VERB_END_IDX_COLUMN: quote.get("verb_end_idx"),
+                QUOTE_TYPE_COLUMN: quote.get("quote_type"),
+                QUOTE_TOKEN_COUNT_COLUMN: quote.get("quote_token_count"),
+                QUOTE_IS_FLOATING_COLUMN: quote.get("is_floating_quote"),
             })
 
     if not rows:
@@ -353,7 +388,10 @@ def quotation_via_polars_text(df: pl.DataFrame, column: str) -> pl.DataFrame:
     """
     tmp = df.with_columns(pl.col(column).text.quotation().alias("__quotation__"))
     exploded = tmp.explode("__quotation__")
-    return exploded.unnest("__quotation__")
+    return exploded.select([
+        pl.exclude("__quotation__"),
+        *quotation_struct_projection("__quotation__"),
+    ])
 
 
 async def compute_quote_dataframe(
@@ -457,8 +495,8 @@ async def compute_on_demand_page(
     )
     quote_df = ensure_quote_dataframe(quote_df, text_column=column)
 
-    if "quote" in quote_df.columns:
-        quote_df = quote_df.filter(pl.col("quote").is_not_null())
+    if QUOTE_QUOTE_COLUMN in quote_df.columns:
+        quote_df = quote_df.filter(pl.col(QUOTE_QUOTE_COLUMN).is_not_null())
 
     result_count = quote_df.height
 

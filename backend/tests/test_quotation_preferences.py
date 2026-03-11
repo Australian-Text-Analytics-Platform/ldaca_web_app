@@ -188,9 +188,9 @@ async def test_quotation_current_result_respects_page_params(
         rows = []
         for text in doc_texts:
             if "alpha" in text:
-                rows.append({"quote": "alpha"})
+                rows.append({"QUOTE_quote": "alpha"})
             elif "beta" in text:
-                rows.append({"quote": "beta"})
+                rows.append({"QUOTE_quote": "beta"})
         return pl.DataFrame(rows)
 
     monkeypatch.setattr(
@@ -204,7 +204,7 @@ async def test_quotation_current_result_respects_page_params(
     assert response.status_code == 200
     payload = response.json()
     assert payload["pagination"]["page"] == 2
-    assert payload["data"][0]["quote"] == "beta"
+    assert payload["data"][0]["QUOTE_quote"] == "beta"
 
 
 @pytest.mark.asyncio
@@ -226,9 +226,9 @@ async def test_update_quotation_current_result_returns_page_payload(
         rows = []
         for text in doc_texts:
             if "alpha" in text:
-                rows.append({"quote": "alpha"})
+                rows.append({"QUOTE_quote": "alpha"})
             elif "beta" in text:
-                rows.append({"quote": "beta"})
+                rows.append({"QUOTE_quote": "beta"})
         return pl.DataFrame(rows)
 
     monkeypatch.setattr(
@@ -242,7 +242,7 @@ async def test_update_quotation_current_result_returns_page_payload(
     assert response.status_code == 200
     payload = response.json()
     assert payload["pagination"]["page"] == 2
-    assert payload["data"][0]["quote"] == "beta"
+    assert payload["data"][0]["QUOTE_quote"] == "beta"
 
 
 @pytest.mark.asyncio
@@ -265,10 +265,10 @@ async def test_quotation_current_result_returns_all_quotes_for_document_page(
         rows = []
         for text in doc_texts:
             if "alpha" in text:
-                rows.append({"quote": "alpha-1", "quote_row_idx": 0})
-                rows.append({"quote": "alpha-2", "quote_row_idx": 1})
+                rows.append({"QUOTE_quote": "alpha-1", "QUOTE_quote_row_idx": 0})
+                rows.append({"QUOTE_quote": "alpha-2", "QUOTE_quote_row_idx": 1})
             elif "beta" in text:
-                rows.append({"quote": "beta-1", "quote_row_idx": 0})
+                rows.append({"QUOTE_quote": "beta-1", "QUOTE_quote_row_idx": 0})
         return pl.DataFrame(rows)
 
     monkeypatch.setattr(
@@ -284,7 +284,7 @@ async def test_quotation_current_result_returns_all_quotes_for_document_page(
     payload = response.json()
     assert payload["pagination"]["page"] == 1
     assert payload["pagination"]["page_size"] == 1
-    assert [row["quote"] for row in payload["data"]] == ["alpha-1", "alpha-2"]
+    assert [row["QUOTE_quote"] for row in payload["data"]] == ["alpha-1", "alpha-2"]
 
 
 @pytest.mark.asyncio
@@ -329,9 +329,9 @@ async def test_quotation_endpoint_recomputes_on_demand(
         rows = []
         for text in doc_texts:
             if "alpha" in text:
-                rows.append({"quote": "alpha"})
+                rows.append({"QUOTE_quote": "alpha"})
             elif "beta" in text:
-                rows.append({"quote": "beta"})
+                rows.append({"QUOTE_quote": "beta"})
         return pl.DataFrame(rows)
 
     monkeypatch.setattr(
@@ -347,6 +347,7 @@ async def test_quotation_endpoint_recomputes_on_demand(
     assert response.status_code == 200
     payload = response.json()
     assert payload["pagination"]["page"] == 2
-    assert payload["data"][0]["quote"] == "beta"
+    assert payload["data"][0]["QUOTE_quote"] == "beta"
+    assert recompute_called is True
     assert recompute_called is True
     assert recompute_called is True

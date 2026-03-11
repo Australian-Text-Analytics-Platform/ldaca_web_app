@@ -885,7 +885,7 @@ class TopicModelingDetachRequest(BaseModel):
     node_ids: Optional[List[str]] = None
     selected_columns: Dict[str, List[str]] = Field(default_factory=dict)
     new_node_names: Optional[Dict[str, str]] = None
-    topic_column_name: Optional[str] = "topic"
+    topic_column_name: Optional[str] = "TOPIC_topic"
     topic_ids: Optional[List[int]] = None
 
 
@@ -917,7 +917,7 @@ class ConcordanceMetadata(BaseModel):
 
     concordance_columns: List[
         str
-    ]  # Core concordance columns (left_context, matched_text, right_context, etc.)
+    ]  # Core concordance columns (CONC_left_context, CONC_matched_text, CONC_right_context, etc.)
     metadata_columns: List[str]  # Original document metadata columns
     all_columns: List[str]  # All available columns
 

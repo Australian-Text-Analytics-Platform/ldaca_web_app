@@ -35,13 +35,20 @@ type TokenFrequencyDownloadDialogProps = {
   onConfirm: (options: { format: string; includeStopWords: boolean }) => void;
 };
 
-export const TokenFrequencyDownloadDialog = ({
-  open,
-  onOpenChange,
+const getDefaultFormat = (mode: DownloadDialogMode) => (mode === 'wordcloud' ? 'png' : 'csv');
+
+type TokenFrequencyDownloadDialogContentProps = {
+  mode: DownloadDialogMode;
+  onConfirm: (options: { format: string; includeStopWords: boolean }) => void;
+  onOpenChange: (open: boolean) => void;
+};
+
+const TokenFrequencyDownloadDialogContent = ({
   mode,
   onConfirm,
-}: TokenFrequencyDownloadDialogProps) => {
-  const [selectedFormat, setSelectedFormat] = useState<string>(mode === 'wordcloud' ? 'png' : 'csv');
+  onOpenChange,
+}: TokenFrequencyDownloadDialogContentProps) => {
+  const [selectedFormat, setSelectedFormat] = useState<string>(getDefaultFormat(mode));
   const [includeStopWords, setIncludeStopWords] = useState(true);
 
   const formats = mode === 'wordcloud' ? WORD_CLOUD_FORMATS : FREQUENCY_FORMATS;
@@ -57,57 +64,67 @@ export const TokenFrequencyDownloadDialog = ({
     onOpenChange(false);
   };
 
-  const handleOpenChange = (nextOpen: boolean) => {
-    if (nextOpen) {
-      setSelectedFormat(mode === 'wordcloud' ? 'png' : 'csv');
-      setIncludeStopWords(true);
-    }
-    onOpenChange(nextOpen);
-  };
-
   return (
-    <AlertDialog open={open} onOpenChange={handleOpenChange}>
-      <AlertDialogContent className="max-w-sm">
-        <AlertDialogHeader>
-          <AlertDialogTitle>{title}</AlertDialogTitle>
-          <AlertDialogDescription>{description}</AlertDialogDescription>
-        </AlertDialogHeader>
+    <AlertDialogContent className="max-w-sm">
+      <AlertDialogHeader>
+        <AlertDialogTitle>{title}</AlertDialogTitle>
+        <AlertDialogDescription>{description}</AlertDialogDescription>
+      </AlertDialogHeader>
 
-        <div className="space-y-4 py-2">
-          <div className="space-y-2">
-            <Label className="text-sm font-medium">Format</Label>
-            <div className="flex flex-wrap gap-3">
-              {formats.map((fmt) => (
-                <label key={fmt.value} className="flex items-center gap-2 cursor-pointer">
-                  <Checkbox
-                    checked={selectedFormat === fmt.value}
-                    onCheckedChange={(checked) => {
-                      if (checked) setSelectedFormat(fmt.value);
-                    }}
-                  />
-                  <span className="text-sm">{fmt.label}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 pt-1">
-            <Checkbox
-              id="include-stop-words"
-              checked={includeStopWords}
-              onCheckedChange={(checked) => setIncludeStopWords(checked === true)}
-            />
-            <Label htmlFor="include-stop-words" className="text-sm cursor-pointer">
-              Download stop words as well
-            </Label>
+      <div className="space-y-4 py-2">
+        <div className="space-y-2">
+          <Label className="text-sm font-medium">Format</Label>
+          <div className="flex flex-wrap gap-3">
+            {formats.map((fmt) => (
+              <label key={fmt.value} className="flex items-center gap-2 cursor-pointer">
+                <Checkbox
+                  checked={selectedFormat === fmt.value}
+                  onCheckedChange={(checked) => {
+                    if (checked) setSelectedFormat(fmt.value);
+                  }}
+                />
+                <span className="text-sm">{fmt.label}</span>
+              </label>
+            ))}
           </div>
         </div>
 
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={handleConfirm}>Download</AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
+        <div className="flex items-center gap-2 pt-1">
+          <Checkbox
+            id="include-stop-words"
+            checked={includeStopWords}
+            onCheckedChange={(checked) => setIncludeStopWords(checked === true)}
+          />
+          <Label htmlFor="include-stop-words" className="text-sm cursor-pointer">
+            Download stop words as well
+          </Label>
+        </div>
+      </div>
+
+      <AlertDialogFooter>
+        <AlertDialogCancel>Cancel</AlertDialogCancel>
+        <AlertDialogAction onClick={handleConfirm}>Download</AlertDialogAction>
+      </AlertDialogFooter>
+    </AlertDialogContent>
+  );
+};
+
+export const TokenFrequencyDownloadDialog = ({
+  open,
+  onOpenChange,
+  mode,
+  onConfirm,
+}: TokenFrequencyDownloadDialogProps) => {
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      {open ? (
+        <TokenFrequencyDownloadDialogContent
+          key={mode}
+          mode={mode}
+          onConfirm={onConfirm}
+          onOpenChange={onOpenChange}
+        />
+      ) : null}
     </AlertDialog>
   );
 };

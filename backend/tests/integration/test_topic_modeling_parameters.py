@@ -103,18 +103,21 @@ async def test_topic_modeling_detach_keeps_topic_meaning_only_on_support_node(
     pl.DataFrame(
         {
             "__row_nr__": [0, 1],
-            "_tm_topic": [0, 0],
+            "TOPIC_topic": [0, 0],
         },
-        schema={"__row_nr__": pl.Int64, "_tm_topic": pl.Int64},
+        schema={"__row_nr__": pl.Int64, "TOPIC_topic": pl.Int64},
     ).write_parquet(assignments_path)
 
     meanings_path = tmp_path / "topic_meanings.parquet"
     pl.DataFrame(
         {
-            "topic": [0],
-            "topic_meaning": [["alpha", "beta", "gamma"]],
+            "TOPIC_topic": [0],
+            "TOPIC_topic_meaning": [["alpha", "beta", "gamma"]],
         },
-        schema={"topic": pl.Int64, "topic_meaning": pl.List(pl.String)},
+        schema={
+            "TOPIC_topic": pl.Int64,
+            "TOPIC_topic_meaning": pl.List(pl.String),
+        },
     ).write_parquet(meanings_path)
 
     task_id = "completed-topic-task"
@@ -203,6 +206,6 @@ async def test_topic_modeling_detach_keeps_topic_meaning_only_on_support_node(
         else support_raw_schema
     )
 
-    assert "topic_meaning" not in detached_schema
-    assert support_schema["topic_meaning"] in {"list_string", "List(String)"}
-    assert set(support_schema) == {"topic", "topic_meaning"}
+    assert "TOPIC_topic_meaning" not in detached_schema
+    assert support_schema["TOPIC_topic_meaning"] in {"list_string", "List(String)"}
+    assert set(support_schema) == {"TOPIC_topic", "TOPIC_topic_meaning"}

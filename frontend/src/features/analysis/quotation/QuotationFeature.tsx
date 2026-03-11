@@ -52,6 +52,7 @@ import {
 
 import { AnalysisPagination } from '../../../components/AnalysisPagination';
 import { useQuotationTaskFlow } from './hooks/useQuotationTaskFlow';
+import { QUOTATION_COLUMN_KEYS } from '../generatedColumns';
 
 interface QuotationResultState {
   rows: Record<string, unknown>[];
@@ -626,9 +627,9 @@ const QuotationFeature: React.FC = () => {
       if (Array.isArray(row?.__spans) && row.__spans.length > 0) {
         row.__spans.forEach((s: Record<string, unknown>) => addSpan(s?.start, s?.end, s?.type as string | undefined));
       } else {
-        addSpan(row?.speaker_start_idx, row?.speaker_end_idx, 'speaker');
-        addSpan(row?.quote_start_idx, row?.quote_end_idx, 'quote');
-        addSpan(row?.verb_start_idx, row?.verb_end_idx, 'verb');
+        addSpan(row?.[QUOTATION_COLUMN_KEYS.speakerStartIdx], row?.[QUOTATION_COLUMN_KEYS.speakerEndIdx], 'speaker');
+        addSpan(row?.[QUOTATION_COLUMN_KEYS.quoteStartIdx], row?.[QUOTATION_COLUMN_KEYS.quoteEndIdx], 'quote');
+        addSpan(row?.[QUOTATION_COLUMN_KEYS.verbStartIdx], row?.[QUOTATION_COLUMN_KEYS.verbEndIdx], 'verb');
       }
 
       if (!spans.length) return text;
@@ -721,8 +722,8 @@ const QuotationFeature: React.FC = () => {
             );
           })}
           {clipped.suffixEllipsis && <span className="ml-1 text-muted-foreground">...</span>}
-          {row?.quote_type ? (
-            <span className="ml-1 align-baseline text-[10px] px-1 py-0.5 rounded bg-gray-100 text-gray-600 border border-gray-200">{String(row.quote_type)}</span>
+          {row?.[QUOTATION_COLUMN_KEYS.quoteType] ? (
+            <span className="ml-1 align-baseline text-[10px] px-1 py-0.5 rounded bg-gray-100 text-gray-600 border border-gray-200">{String(row[QUOTATION_COLUMN_KEYS.quoteType])}</span>
           ) : null}
         </span>
       );
@@ -748,9 +749,9 @@ const QuotationFeature: React.FC = () => {
           spans.push({ start: s, end: e, type });
         }
       };
-      addSpan(row?.speaker_start_idx, row?.speaker_end_idx, 'speaker');
-      addSpan(row?.quote_start_idx, row?.quote_end_idx, 'quote');
-      addSpan(row?.verb_start_idx, row?.verb_end_idx, 'verb');
+      addSpan(row?.[QUOTATION_COLUMN_KEYS.speakerStartIdx], row?.[QUOTATION_COLUMN_KEYS.speakerEndIdx], 'speaker');
+      addSpan(row?.[QUOTATION_COLUMN_KEYS.quoteStartIdx], row?.[QUOTATION_COLUMN_KEYS.quoteEndIdx], 'quote');
+      addSpan(row?.[QUOTATION_COLUMN_KEYS.verbStartIdx], row?.[QUOTATION_COLUMN_KEYS.verbEndIdx], 'verb');
       return { ...row, __spans: spans };
     });
 
@@ -1110,21 +1111,21 @@ const QuotationFeature: React.FC = () => {
                 const resultState = resultsByNode[nodeId];
                 const fallbackRows: Record<string, unknown>[] = Array.isArray(nodeData?.data) ? nodeData.data as Record<string, unknown>[] : [];
                 const rowsForRender = resultState?.rows?.length ? resultState.rows : fallbackRows;
-                const rowsWithQuotes = rowsForRender.filter((row) => row?.quote);
+                const rowsWithQuotes = rowsForRender.filter((row) => row?.[QUOTATION_COLUMN_KEYS.quote]);
 
                 const metaColumns = [
-                  'speaker',
-                  'speaker_start_idx',
-                  'speaker_end_idx',
-                  'quote_start_idx',
-                  'quote_end_idx',
-                  'verb',
-                  'verb_start_idx',
-                  'verb_end_idx',
-                  'quote_type',
-                  'quote_token_count',
-                  'is_floating_quote',
-                  'quote_row_idx',
+                  QUOTATION_COLUMN_KEYS.speaker,
+                  QUOTATION_COLUMN_KEYS.speakerStartIdx,
+                  QUOTATION_COLUMN_KEYS.speakerEndIdx,
+                  QUOTATION_COLUMN_KEYS.quoteStartIdx,
+                  QUOTATION_COLUMN_KEYS.quoteEndIdx,
+                  QUOTATION_COLUMN_KEYS.verb,
+                  QUOTATION_COLUMN_KEYS.verbStartIdx,
+                  QUOTATION_COLUMN_KEYS.verbEndIdx,
+                  QUOTATION_COLUMN_KEYS.quoteType,
+                  QUOTATION_COLUMN_KEYS.quoteTokenCount,
+                  QUOTATION_COLUMN_KEYS.isFloatingQuote,
+                  QUOTATION_COLUMN_KEYS.quoteRowIdx,
                 ];
 
                 const allCols = (() => {
@@ -1137,7 +1138,7 @@ const QuotationFeature: React.FC = () => {
                   return [] as string[];
                 })();
 
-                const mainColumn = textCol || (allCols.includes('quote') ? 'quote' : allCols[0] || 'quote');
+                const mainColumn = textCol || (allCols.includes(QUOTATION_COLUMN_KEYS.quote) ? QUOTATION_COLUMN_KEYS.quote : allCols[0] || QUOTATION_COLUMN_KEYS.quote);
                 const baseColumns = (originalColumnsByNode[nodeId] || []).filter((c) => c !== textCol && !c.startsWith('__'));
                 const presentMeta = metaColumns.filter((c) => allCols.includes(c));
 
@@ -1204,7 +1205,7 @@ const QuotationFeature: React.FC = () => {
                                     {cols.map((c: string, cellIdx: number) => {
                                       const val = row?.[c];
                                       const cellKey = `${nodeId}:${rowIdx}:${cellIdx}`;
-                                      const shouldHighlight = textCol ? c === textCol : c === 'quote';
+                                      const shouldHighlight = textCol ? c === textCol : c === QUOTATION_COLUMN_KEYS.quote;
                                       const content = shouldHighlight
                                         ? renderHighlightedText(
                                             typeof val === 'string' ? val : String(val ?? ''),

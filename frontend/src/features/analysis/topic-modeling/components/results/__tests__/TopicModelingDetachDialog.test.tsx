@@ -15,8 +15,8 @@ describe('TopicModelingDetachDialog', () => {
           {
             node_id: 'node-1',
             node_name: 'Node 1',
-            available_columns: ['topic', 'document', 'speaker'],
-            disabled_columns: ['topic'],
+            available_columns: ['TOPIC_topic', 'document', 'speaker'],
+            disabled_columns: ['TOPIC_topic'],
           },
         ]}
         selectedDetachColumns={{ 'node-1': [] }}
@@ -25,7 +25,7 @@ describe('TopicModelingDetachDialog', () => {
       />
     );
 
-    const topicCheckbox = screen.getByRole('checkbox', { name: /topic/i });
+    const topicCheckbox = screen.getByRole('checkbox', { name: /TOPIC_topic/i });
     const documentCheckbox = screen.getByRole('checkbox', { name: /document/i });
     const speakerCheckbox = screen.getByRole('checkbox', { name: /speaker/i });
 

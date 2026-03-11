@@ -1,3 +1,5 @@
+import JSZip from 'jszip';
+
 const toSafeExportFilename = (label: string, suffix: string, extension: string) => {
   const base = (label || 'token-frequency')
     .toString()
@@ -9,21 +11,273 @@ const toSafeExportFilename = (label: string, suffix: string, extension: string) 
   return `${base}-${suffix}.${extension}`;
 };
 
-const triggerFileDownload = (href: string, filename: string) => {
+export type ExportedDownloadFile = {
+  filename: string;
+  blob: Blob;
+};
+
+const scheduleDownloadCleanup = (link: HTMLAnchorElement, urlToRevoke?: string) => {
+  if (typeof window === 'undefined') return;
+
+  window.setTimeout(() => {
+    if (link.parentNode) {
+      link.parentNode.removeChild(link);
+    }
+    if (urlToRevoke) {
+      URL.revokeObjectURL(urlToRevoke);
+    }
+  }, 0);
+};
+
+const triggerFileDownload = (href: string, filename: string, urlToRevoke?: string) => {
   if (typeof document === 'undefined') return;
+
   const link = document.createElement('a');
   link.href = href;
   link.download = filename;
   link.style.display = 'none';
   document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+
+  try {
+    link.click();
+  } finally {
+    scheduleDownloadCleanup(link, urlToRevoke);
+  }
 };
 
 const triggerBlobDownload = (blob: Blob, filename: string) => {
   const url = URL.createObjectURL(blob);
-  triggerFileDownload(url, filename);
-  if (typeof window !== 'undefined') window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  triggerFileDownload(url, filename, url);
+};
+
+const downloadExportedFile = (file: ExportedDownloadFile) => {
+  triggerBlobDownload(file.blob, file.filename);
+};
+
+const DEFAULT_TOKEN_COLUMNS = ['token', 'frequency'] as const;
+
+const deriveExportColumns = (rows: Array<Record<string, unknown>>) => {
+  const seen = new Set<string>();
+  const columns: string[] = [];
+
+  for (const row of rows) {
+    for (const key of Object.keys(row ?? {})) {
+      if (seen.has(key)) continue;
+      seen.add(key);
+      columns.push(key);
+    }
+  }
+
+  if (columns.length === 0) {
+    return {
+      columns: [...DEFAULT_TOKEN_COLUMNS],
+      isDefaultTokenFrequencyShape: true,
+    };
+  }
+
+  const isDefaultTokenFrequencyShape =
+    columns.length === DEFAULT_TOKEN_COLUMNS.length &&
+    DEFAULT_TOKEN_COLUMNS.every((key) => seen.has(key));
+
+  return {
+    columns,
+    isDefaultTokenFrequencyShape,
+  };
+};
+
+const getExportHeaders = (columns: string[], isDefaultTokenFrequencyShape: boolean) => {
+  if (isDefaultTokenFrequencyShape) {
+    return {
+      csv: ['word', 'count'],
+      markdown: ['Word', 'Count'],
+    };
+  }
+
+  return {
+    csv: columns,
+    markdown: columns,
+  };
+};
+
+const toCellString = (value: unknown) => {
+  if (value === null || value === undefined) {
+    return '';
+  }
+  return String(value);
+};
+
+const getRowValues = (
+  row: Record<string, unknown>,
+  columns: string[],
+  isDefaultTokenFrequencyShape: boolean
+) => {
+  if (isDefaultTokenFrequencyShape) {
+    return [toCellString(row?.token), toCellString(row?.frequency)];
+  }
+
+  return columns.map((column) => toCellString(row?.[column]));
+};
+
+const escapeCsvValue = (value: string) => `"${value.replace(/"/g, '""')}"`;
+
+const escapeMarkdownValue = (value: string) => value.replace(/[\r\n]+/g, '<br />').replace(/\|/g, '\\|');
+
+const serializeRowsAsCsv = (rows: Array<Record<string, unknown>>) => {
+  const { columns, isDefaultTokenFrequencyShape } = deriveExportColumns(rows);
+  const headers = getExportHeaders(columns, isDefaultTokenFrequencyShape);
+
+  return [
+    headers.csv,
+    ...rows.map((row) => getRowValues(row, columns, isDefaultTokenFrequencyShape)),
+  ].map((line) => line.map((value) => escapeCsvValue(toCellString(value))).join(',')).join('\r\n');
+};
+
+const serializeRowsAsMarkdown = (rows: Array<Record<string, unknown>>) => {
+  const { columns, isDefaultTokenFrequencyShape } = deriveExportColumns(rows);
+  const headers = getExportHeaders(columns, isDefaultTokenFrequencyShape);
+
+  const lines = [
+    `| ${headers.markdown.join(' | ')} |`,
+    `| ${headers.markdown.map(() => '---').join(' | ')} |`,
+  ];
+
+  for (const row of rows) {
+    const values = getRowValues(row, columns, isDefaultTokenFrequencyShape).map((value) =>
+      escapeMarkdownValue(toCellString(value))
+    );
+    lines.push(`| ${values.join(' | ')} |`);
+  }
+
+  return lines.join('\n');
+};
+
+const renderWordCloudBitmap = (
+  svgString: string,
+  width: number,
+  height: number,
+  options: { format: Exclude<WordCloudFormat, 'svg'>; scale?: number }
+) => new Promise<Blob>((resolve, reject) => {
+  const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const image = new Image();
+
+  image.onload = () => {
+    try {
+      const canvas = document.createElement('canvas');
+      const exportScale = options.scale ?? 3;
+      const scale = Number.isFinite(exportScale) && exportScale > 1 ? exportScale : 1;
+      canvas.width = Math.max(1, Math.round(width * scale));
+      canvas.height = Math.max(1, Math.round(height * scale));
+
+      const context = canvas.getContext('2d');
+      if (!context) {
+        reject(new Error('Canvas 2D context is not available for export'));
+        return;
+      }
+
+      context.fillStyle = '#ffffff';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      if (scale > 1) {
+        context.imageSmoothingEnabled = true;
+        context.imageSmoothingQuality = 'high';
+      }
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+      canvas.toBlob(
+        (output) => {
+          if (!output) {
+            reject(new Error(`Failed to create ${options.format} export blob`));
+            return;
+          }
+          resolve(output);
+        },
+        options.format === 'jpeg' ? 'image/jpeg' : 'image/png',
+        options.format === 'jpeg' ? 0.92 : undefined,
+      );
+    } catch (error) {
+      reject(error instanceof Error ? error : new Error('Failed to render word cloud export'));
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  };
+
+  image.onerror = () => {
+    URL.revokeObjectURL(url);
+    reject(new Error('Failed to load serialized SVG for export'));
+  };
+
+  image.src = url;
+});
+
+export const buildWordCloudExportFile = async (
+  svg: SVGSVGElement,
+  options: { displayName: string; fallbackKey: string; format: WordCloudFormat; scale?: number }
+): Promise<ExportedDownloadFile> => {
+  const { svgString, width, height } = serializeSvg(svg);
+  const label = options.displayName || options.fallbackKey;
+
+  if (options.format === 'svg') {
+    return {
+      filename: toSafeExportFilename(label, 'wordcloud', 'svg'),
+      blob: new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' }),
+    };
+  }
+
+  const bitmapBlob = await renderWordCloudBitmap(svgString, width, height, {
+    format: options.format,
+    scale: options.scale,
+  });
+
+  return {
+    filename: toSafeExportFilename(label, 'wordcloud', options.format),
+    blob: bitmapBlob,
+  };
+};
+
+export const buildFrequencyExportFile = (
+  label: string,
+  rows: Array<Record<string, unknown>>,
+  format: FrequencyFormat
+): ExportedDownloadFile => {
+  if (format === 'markdown') {
+    return {
+      filename: toSafeExportFilename(label, 'frequencies', 'md'),
+      blob: new Blob([serializeRowsAsMarkdown(rows)], { type: 'text/markdown;charset=utf-8;' }),
+    };
+  }
+
+  return {
+    filename: toSafeExportFilename(label, 'frequencies', 'csv'),
+    blob: new Blob([serializeRowsAsCsv(rows)], { type: 'text/csv;charset=utf-8;' }),
+  };
+};
+
+export const buildStopWordsExportFile = (stopWordsText: string, label: string): ExportedDownloadFile => {
+  const words = stopWordsText
+    .split(',')
+    .map((w) => w.trim())
+    .filter(Boolean);
+
+  return {
+    filename: toSafeExportFilename(label, 'stopwords', 'txt'),
+    blob: new Blob([words.join('\n')], { type: 'text/plain;charset=utf-8;' }),
+  };
+};
+
+export const downloadExportBundleAsZip = async (label: string, files: ExportedDownloadFile[]) => {
+  if (files.length === 0) return;
+  if (files.length === 1) {
+    downloadExportedFile(files[0]);
+    return;
+  }
+
+  const zip = new JSZip();
+  for (const file of files) {
+    zip.file(file.filename, file.blob);
+  }
+
+  const zipBlob = await zip.generateAsync({ type: 'blob' });
+  triggerBlobDownload(zipBlob, toSafeExportFilename(label, 'download', 'zip'));
 };
 
 export const downloadWordCloudSvgAsPng = (
@@ -98,24 +352,7 @@ export const downloadWordCloudSvgAsPng = (
 
 export const downloadFrequencyRowsAsCsv = (label: string, rows: Array<Record<string, unknown>>) => {
   if (typeof window === 'undefined') return;
-  const csvLines = [
-    ['word', 'count'],
-    ...rows.map((item) => [
-      String(item?.token ?? ''),
-      String(item?.frequency ?? ''),
-    ]),
-  ].map((line) =>
-    line
-      .map((value) => {
-        const str = String(value).replace(/"/g, '""');
-        return `"${str}"`;
-      })
-      .join(',')
-  );
-
-  const csvContent = csvLines.join('\r\n');
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  triggerBlobDownload(blob, toSafeExportFilename(label, 'frequencies', 'csv'));
+  downloadExportedFile(buildFrequencyExportFile(label, rows, 'csv'));
 };
 
 export type WordCloudFormat = 'png' | 'jpeg' | 'svg';
@@ -147,42 +384,17 @@ export const downloadWordCloudAs = (
   options: { displayName: string; fallbackKey: string; format: WordCloudFormat; scale?: number }
 ) => {
   if (typeof window === 'undefined') return;
-  const { svgString, width, height } = serializeSvg(svg);
-  const label = options.displayName || options.fallbackKey;
-
   if (options.format === 'svg') {
-    const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-    triggerBlobDownload(blob, toSafeExportFilename(label, 'wordcloud', 'svg'));
+    const { svgString } = serializeSvg(svg);
+    const label = options.displayName || options.fallbackKey;
+    downloadExportedFile({
+      filename: toSafeExportFilename(label, 'wordcloud', 'svg'),
+      blob: new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' }),
+    });
     return;
   }
 
-  const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const image = new Image();
-
-  image.onload = () => {
-    const canvas = document.createElement('canvas');
-    const exportScale = options.scale ?? 3;
-    const scale = Number.isFinite(exportScale) && exportScale > 1 ? exportScale : 1;
-    canvas.width = Math.max(1, Math.round(width * scale));
-    canvas.height = Math.max(1, Math.round(height * scale));
-
-    const context = canvas.getContext('2d');
-    if (!context) { URL.revokeObjectURL(url); return; }
-
-    context.fillStyle = '#ffffff';
-    context.fillRect(0, 0, canvas.width, canvas.height);
-    if (scale > 1) { context.imageSmoothingEnabled = true; context.imageSmoothingQuality = 'high'; }
-    context.drawImage(image, 0, 0, canvas.width, canvas.height);
-    URL.revokeObjectURL(url);
-
-    const mimeType = options.format === 'jpeg' ? 'image/jpeg' : 'image/png';
-    const dataUrl = canvas.toDataURL(mimeType, options.format === 'jpeg' ? 0.92 : undefined);
-    triggerFileDownload(dataUrl, toSafeExportFilename(label, 'wordcloud', options.format));
-  };
-
-  image.onerror = () => URL.revokeObjectURL(url);
-  image.src = url;
+  void buildWordCloudExportFile(svg, options).then(downloadExportedFile);
 };
 
 export const downloadFrequencyRowsAs = (
@@ -191,28 +403,10 @@ export const downloadFrequencyRowsAs = (
   format: FrequencyFormat
 ) => {
   if (typeof window === 'undefined') return;
-
-  if (format === 'markdown') {
-    const lines = ['| Word | Count |', '| --- | --- |'];
-    for (const item of rows) {
-      const word = String(item?.token ?? '').replace(/\|/g, '\\|');
-      const count = String(item?.frequency ?? '');
-      lines.push(`| ${word} | ${count} |`);
-    }
-    const blob = new Blob([lines.join('\n')], { type: 'text/markdown;charset=utf-8;' });
-    triggerBlobDownload(blob, toSafeExportFilename(label, 'frequencies', 'md'));
-    return;
-  }
-
-  downloadFrequencyRowsAsCsv(label, rows);
+  downloadExportedFile(buildFrequencyExportFile(label, rows, format));
 };
 
 export const downloadStopWordsAsTxt = (stopWordsText: string, label: string) => {
   if (typeof window === 'undefined') return;
-  const words = stopWordsText
-    .split(',')
-    .map((w) => w.trim())
-    .filter(Boolean);
-  const blob = new Blob([words.join('\n')], { type: 'text/plain;charset=utf-8;' });
-  triggerBlobDownload(blob, toSafeExportFilename(label, 'stopwords', 'txt'));
+  downloadExportedFile(buildStopWordsExportFile(stopWordsText, label));
 };

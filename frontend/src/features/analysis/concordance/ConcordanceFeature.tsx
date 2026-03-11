@@ -47,12 +47,13 @@ import { useConcordanceTaskFlow, type PaginationState } from './hooks/useConcord
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../../components/ui/dialog';
 import { AnalysisPagination } from '../../../components/AnalysisPagination';
 import { ConcordanceDetachDialog, type DetachNodeOption } from './components/ConcordanceDetachDialog';
+import {
+  CONCORDANCE_COLUMN_KEYS,
+  CONCORDANCE_CORE_COLUMNS,
+} from '../generatedColumns';
 
 
-const CORE_COLS = [
-  'left_context', 'matched_text', 'right_context', 'start_idx',
-  'end_idx', 'l1', 'r1',
-];
+const CORE_COLS = [...CONCORDANCE_CORE_COLUMNS];
 
 const dedupeColumns = (cols: string[]): string[] => {
   const seen = new Set<string>();
@@ -701,12 +702,13 @@ const ConcordanceFeature: React.FC = () => {
       return { text: null as string | null, highlighted: null as React.ReactNode };
     }
 
+    const matchedTextValue = selectedDetail[CONCORDANCE_COLUMN_KEYS.matchedText];
     const highlighted = highlightMatchInText(
       textCandidate,
-      selectedDetail.start_idx,
-      selectedDetail.end_idx,
-      (typeof selectedDetail.matched_text === 'string' && selectedDetail.matched_text.length > 0)
-        ? selectedDetail.matched_text
+      selectedDetail[CONCORDANCE_COLUMN_KEYS.startIdx],
+      selectedDetail[CONCORDANCE_COLUMN_KEYS.endIdx],
+      (typeof matchedTextValue === 'string' && matchedTextValue.length > 0)
+        ? matchedTextValue
         : searchWord,
       typeof selectedDetail.case_sensitive === 'boolean' ? selectedDetail.case_sensitive : caseSensitive
     );
@@ -796,7 +798,7 @@ const ConcordanceFeature: React.FC = () => {
       const combinedHasPrev = Boolean(nodeData.pagination?.has_prev);
       const combinedHasNext = Boolean(nodeData.pagination?.has_next);
       // Derive display columns: core first, then metadata (columns minus core and internal)
-      const coreSet = new Set(CORE_COLS);
+      const coreSet = new Set<string>(CORE_COLS);
       const metaCols = columns.filter(c => !coreSet.has(c) && c !== '__source_node');
       const rawDisplayColumns = showMetadata
         ? [...CORE_COLS.filter(c => columns.includes(c)), ...metaCols]
@@ -907,7 +909,7 @@ const ConcordanceFeature: React.FC = () => {
     // Build per-node display columns using metadata
     const rows = nodeData.data || [];
     const allCols: string[] = (nodeData.columns || (rows.length ? Object.keys(rows[0]) : [])) as string[];
-    const metaCols: string[] = (nodeData.metadata?.metadata_columns as string[] | undefined) ?? allCols.filter(c => !CORE_COLS.includes(c));
+    const metaCols: string[] = (nodeData.metadata?.metadata_columns as string[] | undefined) ?? allCols.filter(c => !new Set<string>(CORE_COLS).has(c));
     const rawDisplayColumns = showMetadata
       ? [...CORE_COLS.filter(c => allCols.includes(c)), ...metaCols.filter(c => allCols.includes(c))]
       : CORE_COLS.filter(c => allCols.includes(c));
@@ -1339,11 +1341,11 @@ const ConcordanceFeature: React.FC = () => {
                 </div>
                 <div>
                   <span className="font-medium text-gray-700">L1 Word:</span>
-                  <span className="ml-2">{String(selectedDetail.l1 ?? '')}</span>
+                  <span className="ml-2">{String(selectedDetail[CONCORDANCE_COLUMN_KEYS.leftToken] ?? '')}</span>
                 </div>
                 <div>
                   <span className="font-medium text-gray-700">R1 Word:</span>
-                  <span className="ml-2">{String(selectedDetail.r1 ?? '')}</span>
+                  <span className="ml-2">{String(selectedDetail[CONCORDANCE_COLUMN_KEYS.rightToken] ?? '')}</span>
                 </div>
               </div>
 

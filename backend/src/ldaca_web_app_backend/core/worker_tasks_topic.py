@@ -6,6 +6,11 @@ import os
 import random
 from typing import Any, Callable, Dict, Optional
 
+from ..api.workspaces.analyses.generated_columns import (
+    TOPIC_COLUMN,
+    TOPIC_MEANING_COLUMN,
+)
+
 _EMBEDDER_CACHE: dict[str, Any] = {}
 
 
@@ -89,7 +94,10 @@ def run_topic_modeling_task(
                     artifact_root / f"{artifact_prefix}_topic_meanings.parquet"
                 )
                 pl.DataFrame(
-                    schema={"topic": pl.Int64, "topic_meaning": pl.List(pl.String)}
+                    schema={
+                        TOPIC_COLUMN: pl.Int64,
+                        TOPIC_MEANING_COLUMN: pl.List(pl.String),
+                    }
                 ).lazy().sink_parquet(topic_meanings_path)
 
                 node_artifacts: list[dict[str, Any]] = []
@@ -106,10 +114,10 @@ def run_topic_modeling_task(
                     )
                     pl.DataFrame({
                         "__row_nr__": list(range(len(corpus))),
-                        "_tm_topic": [],
+                        TOPIC_COLUMN: [],
                     }).with_columns([
                         pl.col("__row_nr__").cast(pl.Int64),
-                        pl.col("_tm_topic").cast(pl.Int64),
+                        pl.col(TOPIC_COLUMN).cast(pl.Int64),
                     ]).lazy().sink_parquet(assignments_path)
                     node_artifacts.append({
                         "node_id": node_id,
@@ -194,10 +202,10 @@ def run_topic_modeling_task(
                 )
                 pl.DataFrame({
                     "__row_nr__": list(range(size)),
-                    "_tm_topic": normalized_topics,
+                    TOPIC_COLUMN: normalized_topics,
                 }).with_columns([
                     pl.col("__row_nr__").cast(pl.Int64),
-                    pl.col("_tm_topic").cast(pl.Int64),
+                    pl.col(TOPIC_COLUMN).cast(pl.Int64),
                 ]).lazy().sink_parquet(assignments_path)
                 node_artifacts.append({
                     "node_id": node_id,
@@ -353,10 +361,13 @@ def run_topic_modeling_task(
             )
             pl.DataFrame(
                 {
-                    "topic": topic_ids,
-                    "topic_meaning": representative_words_by_topic,
+                    TOPIC_COLUMN: topic_ids,
+                    TOPIC_MEANING_COLUMN: representative_words_by_topic,
                 },
-                schema={"topic": pl.Int64, "topic_meaning": pl.List(pl.String)},
+                schema={
+                    TOPIC_COLUMN: pl.Int64,
+                    TOPIC_MEANING_COLUMN: pl.List(pl.String),
+                },
             ).lazy().sink_parquet(topic_meanings_path)
 
             return {

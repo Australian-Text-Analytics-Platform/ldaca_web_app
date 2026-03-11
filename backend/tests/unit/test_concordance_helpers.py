@@ -1,6 +1,7 @@
 import polars as pl
 import pytest
 from ldaca_web_app_backend.api.workspaces.analyses.concordance_core import (
+    CORE_CONCORDANCE_COLUMNS,
     concordance_non_empty_expr,
     normalize_saved_request,
     sanitize_request_for_storage,
@@ -56,11 +57,23 @@ def test_normalize_saved_request_coerces_legacy_shape():
 
 def test_filter_concordance_rows_removes_blank_entries():
     df = pl.DataFrame({
-        "matched_text": ["alpha", None, "   ", ""],
-        "left_context": ["", "", "", ""],
-        "right_context": ["", "context", "\t", None],
+        "CONC_matched_text": ["alpha", None, "   ", ""],
+        "CONC_left_context": ["", "", "", ""],
+        "CONC_right_context": ["", "context", "\t", None],
     })
 
     filtered = df.filter(concordance_non_empty_expr())
 
     assert filtered.height == 2
+
+
+def test_core_concordance_columns_use_prefixed_names():
+    assert CORE_CONCORDANCE_COLUMNS == (
+        "CONC_left_context",
+        "CONC_matched_text",
+        "CONC_right_context",
+        "CONC_start_idx",
+        "CONC_end_idx",
+        "CONC_l1",
+        "CONC_r1",
+    )

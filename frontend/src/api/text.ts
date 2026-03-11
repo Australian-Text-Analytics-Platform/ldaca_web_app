@@ -3,7 +3,7 @@ import { post, get, httpRequest } from './http';
 // Concordance / Quotation / Token Frequency / Topic Modeling grouped
 
 export interface ConcordanceMetadata {
-  concordance_columns: string[];  // Core concordance columns (left_context, matched_text, right_context, etc.)
+  concordance_columns: string[];  // Core concordance columns (CONC_left_context, CONC_matched_text, CONC_right_context, etc.)
   metadata_columns: string[];     // Original document metadata columns  
   all_columns: string[];          // All available columns
 }

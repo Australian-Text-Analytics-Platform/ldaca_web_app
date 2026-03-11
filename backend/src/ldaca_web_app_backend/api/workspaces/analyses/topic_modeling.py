@@ -27,6 +27,7 @@ from ....models import (
 )
 from ..utils import ensure_task_synced, update_workspace
 from .current_tasks import get_current_task_ids_for_analysis
+from .generated_columns import TOPIC_COLUMN, TOPIC_MEANING_COLUMN
 
 router = APIRouter(prefix="/workspaces", tags=["topic-modeling"])
 logger = logging.getLogger(__name__)
@@ -356,7 +357,7 @@ def _resolve_topic_column_name(base_name: str, existing_columns: set[str]) -> st
     Why:
     - Prevents overwriting source columns when attaching generated topic labels.
     """
-    candidate = base_name.strip() or "topic"
+    candidate = base_name.strip() or TOPIC_COLUMN
     if candidate not in existing_columns:
         return candidate
     idx = 1
@@ -416,7 +417,9 @@ async def topic_modeling_detach_options(
         if not isinstance(source_data, pl.LazyFrame):
             continue
         original_columns = list(source_data.collect_schema().names())
-        topic_column_name = _resolve_topic_column_name("topic", set(original_columns))
+        topic_column_name = _resolve_topic_column_name(
+            TOPIC_COLUMN, set(original_columns)
+        )
         nodes.append({
             "node_id": source_node.id,
             "node_name": payload.get("node_name") or node_id,
@@ -486,10 +489,10 @@ async def detach_topic_modeling(
         int(topic_id) for topic_id in (request.topic_ids or [])
     })
     filtered_meanings_lf = (
-        meanings_lf.filter(pl.col("topic").is_in(selected_topic_ids))
+        meanings_lf.filter(pl.col(TOPIC_COLUMN).is_in(selected_topic_ids))
         if selected_topic_ids
         else meanings_lf
-    ).select(pl.col("topic"), pl.col("topic_meaning"))
+    ).select(pl.col(TOPIC_COLUMN), pl.col(TOPIC_MEANING_COLUMN))
 
     target_node_ids = request.node_ids or list(assignments_by_node_id.keys())
     if not target_node_ids:
@@ -516,7 +519,7 @@ async def detach_topic_modeling(
         join_how = "left"
         if selected_topic_ids:
             assignments_lf = assignments_lf.filter(
-                pl.col("_tm_topic").is_in(selected_topic_ids)
+                pl.col(TOPIC_COLUMN).is_in(selected_topic_ids)
             )
             join_how = "inner"
 
@@ -547,7 +550,7 @@ async def detach_topic_modeling(
             )
 
         topic_column_name = _resolve_topic_column_name(
-            request.topic_column_name or "topic",
+            request.topic_column_name or TOPIC_COLUMN,
             set(original_columns) | set(selected_columns),
         )
 
@@ -557,7 +560,7 @@ async def detach_topic_modeling(
             .join(assignments_lf, on="__row_nr__", how=join_how)
             .select(
                 [pl.col(col) for col in selected_columns]
-                + [pl.col("_tm_topic").alias(topic_column_name)]
+                + [pl.col(TOPIC_COLUMN).alias(topic_column_name)]
             )
         )
 

@@ -75,12 +75,16 @@ def test_run_topic_modeling_task_emits_representative_words_as_list_string(
     )
 
     meanings = pl.read_parquet(tmp_path / "topic_modeling_test_topic_meanings.parquet")
+    assignments = pl.read_parquet(
+        tmp_path / "topic_modeling_test_topic_assignments_node-1.parquet"
+    )
 
-    assert meanings.schema["topic_meaning"] == pl.List(pl.String)
+    assert assignments.columns == ["__row_nr__", "TOPIC_topic"]
+    assert meanings.schema["TOPIC_topic_meaning"] == pl.List(pl.String)
     assert meanings.to_dicts() == [
         {
-            "topic": 0,
-            "topic_meaning": ["alpha", "beta", "gamma"],
+            "TOPIC_topic": 0,
+            "TOPIC_topic_meaning": ["alpha", "beta", "gamma"],
         }
     ]
     assert result["topics"][0]["representative_words"] == ["alpha", "beta", "gamma"]

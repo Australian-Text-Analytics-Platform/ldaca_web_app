@@ -10,18 +10,15 @@ import polars as pl
 from fastapi import HTTPException
 
 from ....core.workspace import workspace_manager
+from .generated_columns import (
+    CONC_LEFT_CONTEXT_COLUMN,
+    CONC_MATCHED_TEXT_COLUMN,
+    CONC_RIGHT_CONTEXT_COLUMN,
+    CORE_CONCORDANCE_COLUMNS,
+    concordance_struct_projection,
+)
 
 logger = logging.getLogger(__name__)
-
-CORE_CONCORDANCE_COLUMNS = (
-    "left_context",
-    "matched_text",
-    "right_context",
-    "start_idx",
-    "end_idx",
-    "l1",
-    "r1",
-)
 
 DEFAULT_CONCORDANCE_PAGE = 1
 DEFAULT_CONCORDANCE_PAGE_SIZE = 20
@@ -87,21 +84,21 @@ def concordance_non_empty_expr() -> pl.Expr:
     """
     return pl.any_horizontal([
         pl
-        .col("matched_text")
+        .col(CONC_MATCHED_TEXT_COLUMN)
         .cast(pl.Utf8, strict=False)
         .str.strip_chars()
         .str.len_chars()
         .fill_null(0)
         > 0,
         pl
-        .col("left_context")
+        .col(CONC_LEFT_CONTEXT_COLUMN)
         .cast(pl.Utf8, strict=False)
         .str.strip_chars()
         .str.len_chars()
         .fill_null(0)
         > 0,
         pl
-        .col("right_context")
+        .col(CONC_RIGHT_CONTEXT_COLUMN)
         .cast(pl.Utf8, strict=False)
         .str.strip_chars()
         .str.len_chars()
@@ -138,7 +135,10 @@ def build_concordance_lazyframe(
         node_data
         .select([pl.all(), expr.alias("concordance")])
         .explode("concordance")
-        .unnest("concordance")
+        .select([
+            pl.exclude("concordance"),
+            *concordance_struct_projection("concordance"),
+        ])
         .filter(concordance_non_empty_expr())
     )
 

@@ -15,8 +15,8 @@ describe('ConcordanceDetachDialog', () => {
           {
             node_id: 'node-1',
             node_name: 'Node 1',
-            available_columns: ['text', 'left_context', 'matched_text', 'right_context', 'speaker'],
-            disabled_columns: ['left_context', 'matched_text', 'right_context'],
+            available_columns: ['text', 'CONC_left_context', 'CONC_matched_text', 'CONC_right_context', 'speaker'],
+            disabled_columns: ['CONC_left_context', 'CONC_matched_text', 'CONC_right_context'],
           },
         ]}
         selectedDetachColumns={{ 'node-1': [] }}
@@ -27,9 +27,9 @@ describe('ConcordanceDetachDialog', () => {
 
     expect(screen.getByRole('checkbox', { name: /^text/i })).not.toBeChecked();
     expect(screen.getByRole('checkbox', { name: /^text/i })).not.toBeDisabled();
-    expect(screen.getByRole('checkbox', { name: /left_context/i })).toBeChecked();
-    expect(screen.getByRole('checkbox', { name: /matched_text/i })).toBeChecked();
-    expect(screen.getByRole('checkbox', { name: /right_context/i })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /CONC_left_context/i })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /CONC_matched_text/i })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /CONC_right_context/i })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: /speaker/i })).not.toBeChecked();
   });
 });

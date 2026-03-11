@@ -4,6 +4,12 @@ from __future__ import annotations
 
 from typing import Any, Callable, Dict, Optional
 
+from ..api.workspaces.analyses.generated_columns import (
+    CONC_MATCHED_TEXT_COLUMN,
+    CORE_CONCORDANCE_COLUMNS,
+    concordance_struct_projection,
+)
+
 
 def run_concordance_detach_task(
     configure_worker_environment,
@@ -80,8 +86,11 @@ def run_concordance_detach_task(
                 ).alias("concordance"),
             ])
             .explode("concordance")
-            .unnest("concordance")
-            .filter(pl.col("matched_text").is_not_null())
+            .select([
+                pl.exclude("concordance"),
+                *concordance_struct_projection("concordance"),
+            ])
+            .filter(pl.col(CONC_MATCHED_TEXT_COLUMN).is_not_null())
         )
 
         if progress_callback:
@@ -107,16 +116,7 @@ def run_concordance_detach_task(
                 "new_node_name": new_node_name,
                 "parent_node_id": parent_node_id,
                 "document_column": document_column,
-                "output_columns": output_columns
-                + [
-                    "left_context",
-                    "matched_text",
-                    "right_context",
-                    "start_idx",
-                    "end_idx",
-                    "l1",
-                    "r1",
-                ],
+                "output_columns": output_columns + list(CORE_CONCORDANCE_COLUMNS),
                 "record_count": len(result),
             },
             "message": "Concordance detach completed successfully",

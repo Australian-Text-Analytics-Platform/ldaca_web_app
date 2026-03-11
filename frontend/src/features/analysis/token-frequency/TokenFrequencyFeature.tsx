@@ -22,7 +22,17 @@ import {
   sortStatistics,
 } from './tokenFrequencyAdapters';
 import { buildSelectionNameById, deriveBackendStopWordsKey, deriveBackendTokenLimit, type NodeNameEntry } from './tokenFrequencyUtils';
-import { downloadWordCloudAs, downloadFrequencyRowsAs, downloadStopWordsAsTxt, type WordCloudFormat, type FrequencyFormat } from './tokenFrequencyExport';
+import {
+  buildFrequencyExportFile,
+  buildStopWordsExportFile,
+  buildWordCloudExportFile,
+  downloadExportBundleAsZip,
+  downloadFrequencyRowsAs,
+  downloadStopWordsAsTxt,
+  downloadWordCloudAs,
+  type FrequencyFormat,
+  type WordCloudFormat,
+} from './tokenFrequencyExport';
 import { TokenFrequencyDownloadDialog, type DownloadDialogMode } from './components/TokenFrequencyDownloadDialog';
 import { useTokenFrequencyPreferences } from './hooks/useTokenFrequencyPreferences';
 import { useTokenFrequencyTaskFlow } from './hooks/useTokenFrequencyTaskFlow';
@@ -305,33 +315,61 @@ const TokenFrequencyFeature = () => {
     setDownloadDialogOpen(true);
   };
 
-  const handleDownloadConfirm = ({ format, includeStopWords }: { format: string; includeStopWords: boolean }) => {
+  const handleDownloadConfirm = async ({ format, includeStopWords }: { format: string; includeStopWords: boolean }) => {
     const ctx = pendingDownloadRef.current;
     if (!ctx) return;
 
-    if (ctx.mode === 'wordcloud' && ctx.nodeKey) {
-      const svg = wordCloudRefs.current[ctx.nodeKey];
-      if (svg) {
-        downloadWordCloudAs(svg, {
-          displayName: ctx.displayName || ctx.nodeKey,
-          fallbackKey: ctx.nodeKey,
-          format: format as WordCloudFormat,
-          scale: 3,
-        });
+    const archiveLabel = ctx.label || ctx.displayName || ctx.nodeKey || 'analysis';
+    const shouldBundleStopWords = includeStopWords && Boolean(stopWords);
+
+    try {
+      if (ctx.mode === 'wordcloud' && ctx.nodeKey) {
+        const svg = wordCloudRefs.current[ctx.nodeKey];
+        if (svg) {
+          if (shouldBundleStopWords) {
+            const primaryFile = await buildWordCloudExportFile(svg, {
+              displayName: ctx.displayName || ctx.nodeKey,
+              fallbackKey: ctx.nodeKey,
+              format: format as WordCloudFormat,
+              scale: 3,
+            });
+
+            await downloadExportBundleAsZip(archiveLabel, [
+              primaryFile,
+              buildStopWordsExportFile(stopWords, archiveLabel),
+            ]);
+          } else {
+            downloadWordCloudAs(svg, {
+              displayName: ctx.displayName || ctx.nodeKey,
+              fallbackKey: ctx.nodeKey,
+              format: format as WordCloudFormat,
+              scale: 3,
+            });
+          }
+        }
+      } else if (ctx.mode === 'frequencies' && ctx.rows) {
+        if (shouldBundleStopWords) {
+          await downloadExportBundleAsZip(archiveLabel, [
+            buildFrequencyExportFile(
+              ctx.label || 'frequencies',
+              ctx.rows as Array<Record<string, unknown>>,
+              format as FrequencyFormat,
+            ),
+            buildStopWordsExportFile(stopWords, archiveLabel),
+          ]);
+        } else {
+          downloadFrequencyRowsAs(
+            ctx.label || 'frequencies',
+            ctx.rows as Array<Record<string, unknown>>,
+            format as FrequencyFormat,
+          );
+        }
+      } else if (shouldBundleStopWords) {
+        downloadStopWordsAsTxt(stopWords, archiveLabel);
       }
-    } else if (ctx.mode === 'frequencies' && ctx.rows) {
-      downloadFrequencyRowsAs(
-        ctx.label || 'frequencies',
-        ctx.rows as Array<Record<string, unknown>>,
-        format as FrequencyFormat,
-      );
+    } finally {
+      pendingDownloadRef.current = null;
     }
-
-    if (includeStopWords && stopWords) {
-      downloadStopWordsAsTxt(stopWords, ctx.label || ctx.displayName || 'analysis');
-    }
-
-    pendingDownloadRef.current = null;
   };
 
   const handleApplyStopWords = () => {
