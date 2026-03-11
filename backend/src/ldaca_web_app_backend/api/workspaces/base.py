@@ -7,6 +7,7 @@ All business logic is handled by the DocWorkspace library itself.
 
 import logging
 import os
+from datetime import datetime
 from typing import Optional
 
 import polars as pl
@@ -732,6 +733,20 @@ async def export_nodes(
     if not ids:
         raise HTTPException(status_code=400, detail="No node_ids provided")
 
+    def build_timestamp_fragment() -> str:
+        now = datetime.now()
+        return (
+            f"{now.month:02d}-{now.day:02d}_"
+            f"{now.hour:02d}-{now.minute:02d}-{now.second:02d}"
+        )
+
+    def sanitize_archive_label(value: str) -> str:
+        cleaned = "".join(
+            "_" if (ord(ch) < 32 or ch in '<>:"/\\|?*') else ch
+            for ch in (value or "workspace").strip()
+        ).strip()
+        return cleaned or "workspace"
+
     # Helper to materialize node data as Polars DataFrame.
     def node_to_df(node):
         data = getattr(node, "data", None)
@@ -795,7 +810,10 @@ async def export_nodes(
         zip_buf,
         media_type="application/zip",
         headers={
-            "Content-Disposition": f"attachment; filename=export_{workspace_id}.{fmt}.zip"
+            "Content-Disposition": (
+                f"attachment; filename={build_timestamp_fragment()}_"
+                f"{sanitize_archive_label(getattr(ws, 'name', None) or workspace_id)}.zip"
+            )
         },
     )
 

@@ -23,6 +23,7 @@ import {
 } from './tokenFrequencyAdapters';
 import { buildSelectionNameById, deriveBackendStopWordsKey, deriveBackendTokenLimit, type NodeNameEntry } from './tokenFrequencyUtils';
 import {
+  buildTokenFrequencyZipFilename,
   buildFrequencyExportFile,
   buildStopWordsExportFile,
   buildWordCloudExportFile,
@@ -321,6 +322,9 @@ const TokenFrequencyFeature = () => {
 
     const archiveLabel = ctx.label || ctx.displayName || ctx.nodeKey || 'analysis';
     const shouldBundleStopWords = includeStopWords && Boolean(stopWords);
+    const comparisonArchiveLabels = analysisNodeIds
+      .slice(0, 2)
+      .map((nodeId, index) => computeDisplayName(nodeId, `node-${index + 1}`));
 
     try {
       if (ctx.mode === 'wordcloud' && ctx.nodeKey) {
@@ -334,7 +338,11 @@ const TokenFrequencyFeature = () => {
               scale: 3,
             });
 
-            await downloadExportBundleAsZip(archiveLabel, [
+            const zipFilename = ctx.nodeKey === 'unified'
+              ? buildTokenFrequencyZipFilename(comparisonArchiveLabels)
+              : buildTokenFrequencyZipFilename([archiveLabel]);
+
+            await downloadExportBundleAsZip(zipFilename, [
               primaryFile,
               buildStopWordsExportFile(stopWords, archiveLabel),
             ]);
@@ -349,7 +357,7 @@ const TokenFrequencyFeature = () => {
         }
       } else if (ctx.mode === 'frequencies' && ctx.rows) {
         if (shouldBundleStopWords) {
-          await downloadExportBundleAsZip(archiveLabel, [
+          await downloadExportBundleAsZip(buildTokenFrequencyZipFilename([archiveLabel]), [
             buildFrequencyExportFile(
               ctx.label || 'frequencies',
               ctx.rows as Array<Record<string, unknown>>,

@@ -11,6 +11,35 @@ const toSafeExportFilename = (label: string, suffix: string, extension: string) 
   return `${base}-${suffix}.${extension}`;
 };
 
+const padFilenamePart = (value: number) => String(value).padStart(2, '0');
+
+const buildTimestampFragment = (date: Date = new Date()) =>
+  `${padFilenamePart(date.getMonth() + 1)}-${padFilenamePart(date.getDate())}_${padFilenamePart(date.getHours())}-${padFilenamePart(date.getMinutes())}-${padFilenamePart(date.getSeconds())}`;
+
+const toRawStandaloneFilename = (label: string, suffix: string, extension: string) => {
+  const base = (label || 'token-frequency').toString().trim() || 'token-frequency';
+  return `${base}_${suffix}.${extension}`;
+};
+
+const toArchiveNameSegment = (label: string, maxLength = 20) => {
+  const raw = (label || 'analysis').toString().trim() || 'analysis';
+  const tail = raw.split('/').pop()?.trim() || raw;
+  const safe = tail
+    .replace(/[<>:"\\|?*\u0000-\u001F]+/g, '_')
+    .replace(/\s+/g, ' ')
+    .trim() || 'analysis';
+  const truncated = safe.slice(0, maxLength).replace(/[_\-. ]+$/g, '').trim();
+  return truncated || 'analysis';
+};
+
+export const buildTokenFrequencyZipFilename = (labels: string[], date: Date = new Date()) => {
+  const segments = labels
+    .map((label) => toArchiveNameSegment(label))
+    .filter(Boolean);
+  const base = segments.length > 0 ? segments.join('_') : 'analysis';
+  return `${buildTimestampFragment(date)}_${base}.zip`;
+};
+
 export type ExportedDownloadFile = {
   filename: string;
   blob: Blob;
@@ -50,8 +79,8 @@ const triggerBlobDownload = (blob: Blob, filename: string) => {
   triggerFileDownload(url, filename, url);
 };
 
-const downloadExportedFile = (file: ExportedDownloadFile) => {
-  triggerBlobDownload(file.blob, file.filename);
+const downloadExportedFile = (file: ExportedDownloadFile, overrideFilename?: string) => {
+  triggerBlobDownload(file.blob, overrideFilename || file.filename);
 };
 
 const DEFAULT_TOKEN_COLUMNS = ['token', 'frequency'] as const;
@@ -264,7 +293,7 @@ export const buildStopWordsExportFile = (stopWordsText: string, label: string): 
   };
 };
 
-export const downloadExportBundleAsZip = async (label: string, files: ExportedDownloadFile[]) => {
+export const downloadExportBundleAsZip = async (zipFilename: string, files: ExportedDownloadFile[]) => {
   if (files.length === 0) return;
   if (files.length === 1) {
     downloadExportedFile(files[0]);
@@ -277,7 +306,7 @@ export const downloadExportBundleAsZip = async (label: string, files: ExportedDo
   }
 
   const zipBlob = await zip.generateAsync({ type: 'blob' });
-  triggerBlobDownload(zipBlob, toSafeExportFilename(label, 'download', 'zip'));
+  triggerBlobDownload(zipBlob, zipFilename);
 };
 
 export const downloadWordCloudSvgAsPng = (
@@ -340,7 +369,7 @@ export const downloadWordCloudSvgAsPng = (
     const dataUrl = canvas.toDataURL('image/png');
     triggerFileDownload(
       dataUrl,
-      toSafeExportFilename(options.displayName || options.fallbackKey, 'wordcloud', 'png')
+      toRawStandaloneFilename(options.displayName || options.fallbackKey, 'wordcloud', 'png')
     );
   };
 
@@ -390,11 +419,16 @@ export const downloadWordCloudAs = (
     downloadExportedFile({
       filename: toSafeExportFilename(label, 'wordcloud', 'svg'),
       blob: new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' }),
-    });
+    }, toRawStandaloneFilename(label, 'wordcloud', 'svg'));
     return;
   }
 
-  void buildWordCloudExportFile(svg, options).then(downloadExportedFile);
+  void buildWordCloudExportFile(svg, options).then((file) => {
+    downloadExportedFile(
+      file,
+      toRawStandaloneFilename(options.displayName || options.fallbackKey, 'wordcloud', options.format)
+    );
+  });
 };
 
 export const downloadFrequencyRowsAs = (
@@ -403,10 +437,16 @@ export const downloadFrequencyRowsAs = (
   format: FrequencyFormat
 ) => {
   if (typeof window === 'undefined') return;
-  downloadExportedFile(buildFrequencyExportFile(label, rows, format));
+  downloadExportedFile(
+    buildFrequencyExportFile(label, rows, format),
+    toRawStandaloneFilename(label, 'frequencies', format === 'markdown' ? 'md' : 'csv')
+  );
 };
 
 export const downloadStopWordsAsTxt = (stopWordsText: string, label: string) => {
   if (typeof window === 'undefined') return;
-  downloadExportedFile(buildStopWordsExportFile(stopWordsText, label));
+  downloadExportedFile(
+    buildStopWordsExportFile(stopWordsText, label),
+    toRawStandaloneFilename(label, 'stopwords', 'txt')
+  );
 };

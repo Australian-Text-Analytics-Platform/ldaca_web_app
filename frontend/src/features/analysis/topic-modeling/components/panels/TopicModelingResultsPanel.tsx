@@ -44,6 +44,8 @@ type Props = {
   detachNodeOptions: Array<{ node_id: string; node_name: string; available_columns: string[]; disabled_columns?: string[] }>;
   selectedDetachColumns: Record<string, string[]>;
   toggleDetachColumn: (nodeId: string, column: string, checked: boolean) => void;
+  selectAllDetachColumns: () => void;
+  deselectAllDetachColumns: () => void;
   handleDetachConfirm: () => Promise<void> | void;
 };
 
@@ -76,6 +78,8 @@ export function TopicModelingResultsPanel({
   detachNodeOptions,
   selectedDetachColumns,
   toggleDetachColumn,
+  selectAllDetachColumns,
+  deselectAllDetachColumns,
   handleDetachConfirm,
 }: Props) {
   const isRunningState = Boolean(topicWaitingBanner) || result?.state === 'running';
@@ -165,6 +169,8 @@ export function TopicModelingResultsPanel({
         detachNodeOptions={detachNodeOptions}
         selectedDetachColumns={selectedDetachColumns}
         toggleDetachColumn={toggleDetachColumn}
+        selectAllDetachColumns={selectAllDetachColumns}
+        deselectAllDetachColumns={deselectAllDetachColumns}
         handleDetachConfirm={handleDetachConfirm}
       />
     </>

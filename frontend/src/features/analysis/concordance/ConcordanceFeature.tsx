@@ -24,7 +24,6 @@ import {
   TableHeader,
   TableRow,
 } from '../../../components/ui/table';
-import { ScrollArea } from '../../../components/ui/scroll-area';
 import { ANALYSIS_LOCKED_MESSAGE } from '../../../components/tabs/AnalysisLockedNotice';
 import AnalysisTaskBanner from '../../../components/tabs/AnalysisTaskBanner';
 import {
@@ -38,6 +37,7 @@ import {
   useSafeResult,
   EXTENDED_PALETTE,
   getAnalysisActionState,
+  executeAnalysisRunOrUpdate,
 } from '../common';
 import type { WorkspaceNodeLike } from '../common/nodeSelectionTypes';
 import {
@@ -46,6 +46,7 @@ import {
 import { useConcordanceTaskFlow, type PaginationState } from './hooks/useConcordanceTaskFlow';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../../components/ui/dialog';
 import { AnalysisPagination } from '../../../components/AnalysisPagination';
+import { AnalysisTableScrollArea } from '../../../components/AnalysisTableScrollArea';
 import { ConcordanceDetachDialog, type DetachNodeOption } from './components/ConcordanceDetachDialog';
 import {
   CONCORDANCE_COLUMN_KEYS,
@@ -575,6 +576,22 @@ const ConcordanceFeature: React.FC = () => {
     await clearResults();
   };
 
+  const handleRunOrUpdate = async () => {
+    await executeAnalysisRunOrUpdate({
+      hasLockedParameterChanges,
+      clearResults: handleClearResults,
+      runFreshAnalysis: () =>
+        handleSearch(
+          true,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          hasLockedParameterChanges,
+        ),
+    });
+  };
+
   const handleViewModeChange = (nextMode: 'separated' | 'combined') => {
     if (nextMode === viewMode) {
       return;
@@ -597,7 +614,7 @@ const ConcordanceFeature: React.FC = () => {
         const prevScrollY = window.scrollY;
 
         setCombinedLoading(true);
-        handleSearch(true, undefined, 'combined', undefined, undefined, true).finally(() => {
+        updateStoredResult({ combined: true, page: combinedPage, page_size: combinedPageSize }).finally(() => {
           setCombinedLoading(false);
           requestAnimationFrame(() => {
             requestAnimationFrame(() => {
@@ -625,7 +642,7 @@ const ConcordanceFeature: React.FC = () => {
       const prevTop = prevAnchor?.getBoundingClientRect().top ?? 0;
       const prevScrollY = window.scrollY;
 
-      handleSearch(true, undefined, 'separated', undefined, undefined, true).finally(() => {
+      updateStoredResult({ combined: false, page: 1, page_size: globalPageSize }).finally(() => {
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
             const newAnchor = resultsRef.current;
@@ -750,6 +767,28 @@ const ConcordanceFeature: React.FC = () => {
     });
   };
 
+  const selectAllDetachColumns = () => {
+    setSelectedDetachColumns((prev) => {
+      const next = { ...prev };
+      detachNodeOptions.forEach((node) => {
+        next[node.node_id] = node.available_columns.filter(
+          (column) => !(node.disabled_columns || []).includes(column)
+        );
+      });
+      return next;
+    });
+  };
+
+  const deselectAllDetachColumns = () => {
+    setSelectedDetachColumns((prev) => {
+      const next = { ...prev };
+      detachNodeOptions.forEach((node) => {
+        next[node.node_id] = [];
+      });
+      return next;
+    });
+  };
+
   const handleDetachConfirm = async () => {
     for (const n of pendingDetachNodes) {
       const cols = selectedDetachColumns[n.nodeId] || [];
@@ -833,12 +872,7 @@ const ConcordanceFeature: React.FC = () => {
             </div>
           </div>
           <div className="rounded-lg border border-border bg-card">
-            <ScrollArea
-              type="hover"
-              scrollbars="both"
-              className="h-100"
-            >
-              <div className="min-w-max">
+            <AnalysisTableScrollArea maxHeightClass="max-h-100">
                 <Table className="min-w-180" disableContainer>
                 <TableHeader className="bg-gray-50 sticky top-0 z-10">
                   <TableRow>
@@ -853,46 +887,53 @@ const ConcordanceFeature: React.FC = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {rows.map((row: Record<string, unknown>, idx:number) => {
-                    const rawSrc = row.__source_node;
-                    const normalized = rawSrc ? rawSrc.toString().toLowerCase() : undefined;
-                    let color = normalized ? sourceColorMap[normalized] : undefined;
-                    if (!color && rawSrc && normalized) {
-                      // Fallback: attempt partial / loose match (startsWith) if exact failed
-                      const entry = Object.entries(sourceColorMap).find(([k]) => k.includes(normalized));
-                      color = entry ? entry[1] : undefined;
-                    }
-                    if (!color) {
-                      // Final fallback: deterministic by hashing source string
-                      if (rawSrc) {
-                        const chars = Array.from(rawSrc.toString()) as string[];
-                        const hash = chars.reduce((a, c) => a + c.charCodeAt(0), 0);
-                        color = defaultPalette[hash % defaultPalette.length];
-                      } else {
-                        color = '#ffffff';
+                  {rows.length === 0 ? (
+                    <TableRow>
+                      <TableCell className="h-24 text-center text-muted-foreground" colSpan={displayColumns.length || 1}>
+                        No results on this page for &quot;{searchWord}&quot;
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    rows.map((row: Record<string, unknown>, idx:number) => {
+                      const rawSrc = row.__source_node;
+                      const normalized = rawSrc ? rawSrc.toString().toLowerCase() : undefined;
+                      let color = normalized ? sourceColorMap[normalized] : undefined;
+                      if (!color && rawSrc && normalized) {
+                        // Fallback: attempt partial / loose match (startsWith) if exact failed
+                        const entry = Object.entries(sourceColorMap).find(([k]) => k.includes(normalized));
+                        color = entry ? entry[1] : undefined;
                       }
-                    }
-                    const bg = `${color}20`; // light tint
-                    return (
-                      <TableRow key={idx} className="cursor-pointer" style={{ backgroundColor: bg }} onClick={() => {
+                      if (!color) {
+                        // Final fallback: deterministic by hashing source string
                         if (rawSrc) {
-                  const nodesForDetail = panelSelectedNodes;
-                    const nodeObj = nodesForDetail.find((n: WorkspaceNodeLike) => {
-                            const candidates = [n.id, n.name, n.name, (n as Record<string, unknown>).data && typeof (n as Record<string, unknown>).data === 'object' ? ((n as Record<string, unknown>).data as Record<string, unknown>)?.name : undefined, n.label, (n as Record<string, unknown>).data && typeof (n as Record<string, unknown>).data === 'object' ? ((n as Record<string, unknown>).data as Record<string, unknown>)?.label : undefined].filter(Boolean).map(v=>String(v).toLowerCase());
-                            return candidates.includes(rawSrc.toString().toLowerCase());
-                          });
-                          const sel = nodeObj && effectiveNodeColumnSelections.find(s => s.nodeId === nodeObj.id);
-                          if (nodeObj && sel?.column) handleRowClick(row, String(nodeObj.id ?? ''), sel.column);
+                          const chars = Array.from(rawSrc.toString()) as string[];
+                          const hash = chars.reduce((a, c) => a + c.charCodeAt(0), 0);
+                          color = defaultPalette[hash % defaultPalette.length];
+                        } else {
+                          color = '#ffffff';
                         }
-                      }}>
-                        {displayColumns.map((c: string, i: number) => <TableCell key={i}>{row[c] !== undefined && row[c] !== null ? String(row[c]) : ''}</TableCell>)}
-                      </TableRow>
-                    );
-                  })}
+                      }
+                      const bg = `${color}20`; // light tint
+                      return (
+                        <TableRow key={idx} className="cursor-pointer" style={{ backgroundColor: bg }} onClick={() => {
+                          if (rawSrc) {
+                    const nodesForDetail = panelSelectedNodes;
+                      const nodeObj = nodesForDetail.find((n: WorkspaceNodeLike) => {
+                              const candidates = [n.id, n.name, n.name, (n as Record<string, unknown>).data && typeof (n as Record<string, unknown>).data === 'object' ? ((n as Record<string, unknown>).data as Record<string, unknown>)?.name : undefined, n.label, (n as Record<string, unknown>).data && typeof (n as Record<string, unknown>).data === 'object' ? ((n as Record<string, unknown>).data as Record<string, unknown>)?.label : undefined].filter(Boolean).map(v=>String(v).toLowerCase());
+                              return candidates.includes(rawSrc.toString().toLowerCase());
+                            });
+                            const sel = nodeObj && effectiveNodeColumnSelections.find(s => s.nodeId === nodeObj.id);
+                            if (nodeObj && sel?.column) handleRowClick(row, String(nodeObj.id ?? ''), sel.column);
+                          }
+                        }}>
+                          {displayColumns.map((c: string, i: number) => <TableCell key={i}>{row[c] !== undefined && row[c] !== null ? String(row[c]) : ''}</TableCell>)}
+                        </TableRow>
+                      );
+                    })
+                  )}
                 </TableBody>
                 </Table>
-              </div>
-            </ScrollArea>
+            </AnalysisTableScrollArea>
             <AnalysisPagination
               page={combinedPage}
               pageSize={combinedPageSize}
@@ -900,6 +941,7 @@ const ConcordanceFeature: React.FC = () => {
               hasPrev={combinedHasPrev}
               totalPages={nodeData.pagination?.total_source_pages}
               onPageChange={(newPage) => setCombinedPage(newPage)}
+              pageSizeLabel="Documents searched per page"
               loading={combinedLoading}
             />
           </div>
@@ -914,6 +956,7 @@ const ConcordanceFeature: React.FC = () => {
       ? [...CORE_COLS.filter(c => allCols.includes(c)), ...metaCols.filter(c => allCols.includes(c))]
       : CORE_COLS.filter(c => allCols.includes(c));
     const displayColumns = dedupeColumns(rawDisplayColumns);
+    const tableColumns = displayColumns.length > 0 ? displayColumns : allCols;
     const sortableColumns = new Set(metaCols);
 
     const currentNodePagination = nodePagination[paginationKey];
@@ -922,44 +965,17 @@ const ConcordanceFeature: React.FC = () => {
     const hasPrev = Boolean(nodeData.pagination?.has_prev) || currentPage > 1;
     const hasNext = Boolean(nodeData.pagination?.has_next);
 
-    if (!nodeData.data || nodeData.data.length === 0) {
-      return (
-        <div key={nodeKey} className="mb-6">
-          <div className="bg-white p-4 rounded-lg border">
-            <div className="text-center text-gray-500">
-              No results on this page for &quot;{searchWord}&quot;
-            </div>
-          </div>
-          {hasPrev && (
-            <AnalysisPagination
-              page={currentPage}
-              pageSize={currentNodePagination?.pageSize ?? globalPageSize}
-              hasNext={hasNext}
-              hasPrev={hasPrev}
-              totalPages={nodeData.pagination?.total_source_pages}
-              onPageChange={(newPage) => handlePageChange(newPage, paginationKey, requestNodeId)}
-              loading={nodeIsLoading}
-            />
-          )}
-        </div>
-      );
-    }
     const detachingKey = detachNodeId ?? "";
     const isDetaching = detachingKey ? Boolean(nodeDetaching[detachingKey]) : false;
 
     return (
       <div key={nodeKey} className="mb-6">
         <div className="rounded-lg border border-border bg-card">
-          <ScrollArea
-            type="hover"
-            scrollbars="both"
-            className="h-100"
-          >
-            <div className="min-w-max">
+          <AnalysisTableScrollArea maxHeightClass="max-h-100">
               <Table className="min-w-180" disableContainer>
               <TableHeader className="bg-gray-50 sticky top-0 z-10">
                 <TableRow>
-                  {displayColumns.map(key => {
+                  {tableColumns.map(key => {
                     const isSortable = showMetadata && sortableColumns.has(key);
                     return isSortable ? (
                       <SortableHeader key={key} columnKey={key} label={key} paginationKey={paginationKey} requestNodeId={requestNodeId} />
@@ -972,25 +988,32 @@ const ConcordanceFeature: React.FC = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {nodeData.data.map((row: Record<string, unknown>, index: number) => (
-                  <TableRow 
-                    key={index} 
-                    className={`cursor-pointer ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
-                    onClick={() => {
-                      handleRowClick(row, effectiveNodeId, column);
-                    }}
-                  >
-                    {displayColumns.map((colKey: string, cellIndex) => (
-                      <TableCell key={cellIndex}>
-                        {row[colKey] !== null && row[colKey] !== undefined ? String(row[colKey]) : ''}
-                      </TableCell>
-                    ))}
+                {nodeData.data.length === 0 ? (
+                  <TableRow>
+                    <TableCell className="h-24 text-center text-muted-foreground" colSpan={tableColumns.length || 1}>
+                      No results on this page for &quot;{searchWord}&quot;
+                    </TableCell>
                   </TableRow>
-                ))}
+                ) : (
+                  nodeData.data.map((row: Record<string, unknown>, index: number) => (
+                    <TableRow 
+                      key={index} 
+                      className={`cursor-pointer ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                      onClick={() => {
+                        handleRowClick(row, effectiveNodeId, column);
+                      }}
+                    >
+                      {tableColumns.map((colKey: string, cellIndex) => (
+                        <TableCell key={cellIndex}>
+                          {row[colKey] !== null && row[colKey] !== undefined ? String(row[colKey]) : ''}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
               </Table>
-            </div>
-          </ScrollArea>
+          </AnalysisTableScrollArea>
         </div>
 
         <AnalysisPagination
@@ -1029,6 +1052,7 @@ const ConcordanceFeature: React.FC = () => {
               }
             })();
           }}
+          pageSizeLabel="Documents searched per page"
           pageSizeOptions={[10, 20, 50, 100]}
           loading={nodeIsLoading}
         >
@@ -1162,7 +1186,9 @@ const ConcordanceFeature: React.FC = () => {
         </CardContent>
         <CardFooter className="flex flex-wrap items-center gap-3 pt-0">
           <Button
-            onClick={() => handleSearch(true)}
+            onClick={() => {
+              void handleRunOrUpdate();
+            }}
             disabled={
               actionState.runDisabled ||
               !searchWord.trim() ||
@@ -1429,6 +1455,8 @@ const ConcordanceFeature: React.FC = () => {
         detachNodeOptions={detachNodeOptions}
         selectedDetachColumns={selectedDetachColumns}
         toggleDetachColumn={toggleDetachColumn}
+        selectAllDetachColumns={selectAllDetachColumns}
+        deselectAllDetachColumns={deselectAllDetachColumns}
         handleDetachConfirm={handleDetachConfirm}
       />
     </div>

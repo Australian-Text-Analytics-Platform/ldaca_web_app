@@ -415,7 +415,7 @@ export function useQuotationTaskFlow({
     });
   };
 
-  const handleDetach = async (nodeId: string) => {
+  const handleDetach = async (nodeId: string, selectedColumns?: string[]) => {
     const selection = activeSelections.find((s) => s.nodeId === nodeId);
     if (!selection?.column) return;
     setNodeDetaching((prev) => ({ ...prev, [nodeId]: true }));
@@ -433,6 +433,7 @@ export function useQuotationTaskFlow({
           enginePayload.type === 'remote'
             ? { type: 'remote', url: enginePayload.url }
             : { type: 'local' },
+        ...(selectedColumns && selectedColumns.length > 0 ? { selected_columns: selectedColumns } : {}),
       });
     } catch (e: unknown) {
       showErrorDialog(getErrorMessage(e));

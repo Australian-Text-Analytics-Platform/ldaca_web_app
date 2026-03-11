@@ -5,13 +5,13 @@ import {
   type DetachDialogNodeOption,
 } from '../../components/DetachColumnsDialog';
 
-export type DetachNodeOption = DetachDialogNodeOption;
+export type QuotationDetachNodeOption = DetachDialogNodeOption;
 
 type Props = {
   open: boolean;
   onOpenChange: Dispatch<SetStateAction<boolean>>;
   isDetaching: boolean;
-  detachNodeOptions: DetachNodeOption[];
+  detachNodeOptions: QuotationDetachNodeOption[];
   selectedDetachColumns: Record<string, string[]>;
   toggleDetachColumn: (nodeId: string, column: string, checked: boolean) => void;
   selectAllDetachColumns: () => void;
@@ -19,7 +19,7 @@ type Props = {
   handleDetachConfirm: () => Promise<void> | void;
 };
 
-export function ConcordanceDetachDialog({
+export function QuotationDetachDialog({
   open,
   onOpenChange,
   isDetaching,
@@ -35,8 +35,8 @@ export function ConcordanceDetachDialog({
       open={open}
       onOpenChange={onOpenChange}
       isDetaching={isDetaching}
-      title="Detach Concordance Results"
-      description="Select optional source columns to include alongside the concordance results. Required output columns stay checked automatically."
+      title="Detach Quotation Results"
+      description="Select optional source columns to include alongside the quotation results. Required output columns stay checked automatically."
       detachNodeOptions={detachNodeOptions}
       selectedDetachColumns={selectedDetachColumns}
       toggleDetachColumn={toggleDetachColumn}

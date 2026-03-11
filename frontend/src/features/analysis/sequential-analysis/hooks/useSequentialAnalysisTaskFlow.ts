@@ -198,11 +198,6 @@ export function useSequentialAnalysisTaskFlow({
     }
   };
 
-  const handleUpdateResults = async () => {
-    await clearResults();
-    await handleAnalyze();
-  };
-
   const handleClearResults = async () => {
     await clearResults();
   };
@@ -319,7 +314,6 @@ export function useSequentialAnalysisTaskFlow({
 
   return {
     handleAnalyze,
-    handleUpdateResults,
     handleClearResults,
     handleChartTypeChange,
     chartData,

@@ -23,6 +23,8 @@ from ....core.services.quotation_client import (
 from ....core.workspace import workspace_manager
 from ....models import (
     QuotationDetachRequest,
+    QuotationDetachOptionsResponse,
+    QuotationDetachNodeOption,
     QuotationEngineConfig,
     QuotationRequest,
     QuotationResultQuery,
@@ -37,6 +39,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_CONTEXT_LENGTH = qcore.DEFAULT_CONTEXT_LENGTH
 DEFAULT_PAGE_SIZE = qcore.DEFAULT_PAGE_SIZE
 DEFAULT_DESCENDING = qcore.DEFAULT_DESCENDING
+CORE_QUOTATION_COLUMNS = list(qcore.QUOTE_COLUMN_NAMES)
 
 
 async def _compute_on_demand_page(
@@ -431,6 +434,68 @@ async def get_quotation(
         raise HTTPException(status_code=500, detail=f"Internal server error: {exc}")
 
 
+@router.get(
+    "/nodes/{node_id}/quotation/detach-options",
+    response_model=QuotationDetachOptionsResponse,
+)
+async def quotation_detach_options(
+    node_id: str,
+    column: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Return detachable quotation columns for one node.
+
+    Used by:
+    - Frontend quotation detach dialog
+
+    Why:
+    - Keeps mandatory generated quotation columns and optional source columns
+      aligned with backend detach behavior.
+    """
+    user_id = current_user["id"]
+    workspace_id = workspace_manager.get_current_workspace_id(user_id)
+    ws = workspace_manager.get_current_workspace(user_id)
+    if not workspace_id or ws is None:
+        raise HTTPException(status_code=404, detail="No active workspace selected")
+
+    try:
+        node = ws.nodes[node_id]
+    except Exception:
+        raise HTTPException(status_code=404, detail=f"Node {node_id} not found")
+
+    node_data = getattr(node, "data", None)
+    if not isinstance(node_data, pl.LazyFrame):
+        raise HTTPException(
+            status_code=400, detail="Selected node data must be a LazyFrame"
+        )
+
+    available_schema_columns = list(node_data.collect_schema().names())
+    if column not in available_schema_columns:
+        raise HTTPException(status_code=400, detail=f"Column '{column}' not found")
+
+    mandatory_set = set(CORE_QUOTATION_COLUMNS)
+    optional_columns = [
+        col for col in [column, *available_schema_columns] if col not in mandatory_set
+    ]
+    ordered_available_columns = list(
+        dict.fromkeys([column, *CORE_QUOTATION_COLUMNS, *optional_columns])
+    )
+    node_option = QuotationDetachNodeOption(
+        node_id=node_id,
+        node_name=getattr(node, "name", None) or node_id,
+        text_column=column,
+        available_columns=ordered_available_columns,
+        disabled_columns=CORE_QUOTATION_COLUMNS,
+    )
+
+    return QuotationDetachOptionsResponse(
+        state="successful",
+        message="Quotation detach options loaded",
+        data={"nodes": [node_option]},
+        metadata=None,
+    )
+
+
 @router.post("/nodes/{node_id}/quotation/detach")
 async def detach_quotation(
     node_id: str,
@@ -468,9 +533,20 @@ async def detach_quotation(
             status_code=400, detail=f"Column '{request.column}' not found"
         )
 
+    schema_names = node_data.collect_schema().names()
+    include_document_column = False
+    columns_to_select: list[str] = []
+    if request.selected_columns:
+        for col in request.selected_columns:
+            if col == request.column:
+                include_document_column = True
+                continue
+            if col in schema_names:
+                columns_to_select.append(col)
+
     corpus_df = (
         node_data
-        .select(pl.col(request.column))
+        .select([pl.col(request.column)] + [pl.col(col) for col in columns_to_select])
         .filter(
             pl
             .col(request.column)
@@ -486,6 +562,9 @@ async def detach_quotation(
         str(value) if value is not None else ""
         for value in corpus_df.get_column(request.column).to_list()
     ]
+    extra_columns_data: dict[str, list] = {}
+    for col in columns_to_select:
+        extra_columns_data[col] = corpus_df.get_column(col).to_list()
 
     artifact_dir, artifact_prefix = _prepare_quotation_artifact_target(
         user_id, workspace_id
@@ -504,6 +583,8 @@ async def detach_quotation(
                 "new_node_name": request.new_node_name,
                 "artifact_dir": artifact_dir,
                 "artifact_prefix": artifact_prefix,
+                "include_document_column": include_document_column,
+                "extra_columns_data": extra_columns_data or None,
             },
             task_name="Detach Quotation",
         )

@@ -15,3 +15,4 @@ export * from './analysisActionState';
 export * from './extractTaskId';
 export * from './palette';
 export * from './useNodeColorManagement';
+export * from './runOrUpdate';

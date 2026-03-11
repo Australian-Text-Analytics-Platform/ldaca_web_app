@@ -445,8 +445,24 @@ class QuotationDetachRequest(BaseModel):
     column: str
     new_node_name: Optional[str] = None  # If not provided, will be auto-generated
     engine: Optional[QuotationEngineConfig] = None
+    selected_columns: Optional[list[str]] = None
 
     model_config = ConfigDict(extra="forbid")
+
+
+class QuotationDetachNodeOption(BaseModel):
+    node_id: str
+    node_name: str
+    text_column: Optional[str] = None
+    available_columns: List[str]
+    disabled_columns: List[str] = Field(default_factory=list)
+
+
+class QuotationDetachOptionsResponse(BaseModel):
+    state: str
+    message: str
+    data: Dict[str, List[QuotationDetachNodeOption]]
+    metadata: Optional[Dict[str, Any]] = None
 
 
 class QuotationResultQuery(BaseModel):

@@ -36,7 +36,7 @@ import {
   TableHeader,
   TableRow,
 } from '../../../components/ui/table';
-import { ScrollArea } from '../../../components/ui/scroll-area';
+import { AnalysisTableScrollArea } from '../../../components/AnalysisTableScrollArea';
 import { ArrowUpDown, Loader2, Play, Trash2, Unlink } from 'lucide-react';
 import {
   getNodeIdentifier,
@@ -47,12 +47,17 @@ import {
   useAnalysisLock,
   useAnalysisFeature,
   getAnalysisActionState,
+  executeAnalysisRunOrUpdate,
   type WorkspaceNodeLike,
 } from '../common';
 
 import { AnalysisPagination } from '../../../components/AnalysisPagination';
 import { useQuotationTaskFlow } from './hooks/useQuotationTaskFlow';
 import { QUOTATION_COLUMN_KEYS } from '../generatedColumns';
+import {
+  QuotationDetachDialog,
+  type QuotationDetachNodeOption,
+} from './components/QuotationDetachDialog';
 
 interface QuotationResultState {
   rows: Record<string, unknown>[];
@@ -532,6 +537,10 @@ const QuotationFeature: React.FC = () => {
   }>>({});
   // Deprecated per-node loading indicator; rely on DataView-like UX
   const [nodeDetaching, setNodeDetaching] = useState<Record<string, boolean>>({});
+  const [detachDialogOpen, setDetachDialogOpen] = useState(false);
+  const [pendingDetachNodeId, setPendingDetachNodeId] = useState<string | null>(null);
+  const [detachNodeOptions, setDetachNodeOptions] = useState<QuotationDetachNodeOption[]>([]);
+  const [selectedDetachColumns, setSelectedDetachColumns] = useState<Record<string, string[]>>({});
   const [resultsByNode, setResultsByNode] = useState<Record<string, QuotationResultState>>({});
 
   const hasParamsChanged = hasLockedParameterDiff({
@@ -857,6 +866,80 @@ const QuotationFeature: React.FC = () => {
     closeEngineDialog();
   };
 
+  const openDetachDialog = async (nodeId: string) => {
+    const selection = activeSelections.find((item) => item.nodeId === nodeId);
+    if (!selection?.column) return;
+
+    try {
+      const response = await textApi.getQuotationDetachOptions(
+        nodeId,
+        selection.column,
+        getAuthHeaders(),
+      );
+      const nodes = response.data?.nodes ?? [];
+      const initialSelections: Record<string, string[]> = {};
+      nodes.forEach((node) => {
+        initialSelections[node.node_id] = [];
+      });
+      setPendingDetachNodeId(nodeId);
+      setDetachNodeOptions(nodes);
+      setSelectedDetachColumns(initialSelections);
+      setDetachDialogOpen(true);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to load quotation detach options';
+      showErrorDialog(message);
+    }
+  };
+
+  const toggleDetachColumn = (nodeId: string, column: string, checked: boolean) => {
+    setSelectedDetachColumns((prev) => {
+      const current = new Set(prev[nodeId] || []);
+      if (checked) current.add(column);
+      else current.delete(column);
+      return { ...prev, [nodeId]: Array.from(current) };
+    });
+  };
+
+  const selectAllDetachColumns = () => {
+    setSelectedDetachColumns((prev) => {
+      const next = { ...prev };
+      detachNodeOptions.forEach((node) => {
+        next[node.node_id] = node.available_columns.filter(
+          (column) => !(node.disabled_columns || []).includes(column)
+        );
+      });
+      return next;
+    });
+  };
+
+  const deselectAllDetachColumns = () => {
+    setSelectedDetachColumns((prev) => {
+      const next = { ...prev };
+      detachNodeOptions.forEach((node) => {
+        next[node.node_id] = [];
+      });
+      return next;
+    });
+  };
+
+  const handleDetachConfirm = async () => {
+    if (!pendingDetachNodeId) return;
+    const selectedColumns = selectedDetachColumns[pendingDetachNodeId] || [];
+    await handleDetach(pendingDetachNodeId, selectedColumns);
+    setDetachDialogOpen(false);
+    setPendingDetachNodeId(null);
+    setDetachNodeOptions([]);
+    setSelectedDetachColumns({});
+  };
+
+  const handleRunOrUpdate = async () => {
+    await executeAnalysisRunOrUpdate({
+      hasLockedParameterChanges: hasParamsChanged,
+      clearResults,
+      runFreshAnalysis: handleSearchAll,
+    });
+  };
+
   return (
     <>
       <Dialog open={engineDialogOpen} onOpenChange={setEngineDialogOpen}>
@@ -982,7 +1065,9 @@ const QuotationFeature: React.FC = () => {
               <Button
                 type="button"
                 className="w-full sm:w-auto"
-                onClick={handleSearchAll}
+                onClick={() => {
+                  void handleRunOrUpdate();
+                }}
                 disabled={actionState.runDisabled || !canRunQuotation}
               >
                 {isLoadingQuotations ? (
@@ -1161,11 +1246,10 @@ const QuotationFeature: React.FC = () => {
                     </div>
 
                     <div className="rounded-lg border border-border bg-card">
-                      <ScrollArea
-                        scrollbars="both"
-                        className="max-h-[70vh]"
+                      <AnalysisTableScrollArea
+                        maxHeightClass="max-h-[70vh]"
+                        contentClassName="min-w-max h-full"
                       >
-                        <div className="min-w-max h-full">
                           <Table className="min-w-full text-sm" disableContainer>
                             <TableHeader className="bg-muted sticky top-0 z-10">
                               <TableRow className="border-b border-border/60">
@@ -1229,8 +1313,7 @@ const QuotationFeature: React.FC = () => {
                               )}
                             </TableBody>
                           </Table>
-                        </div>
-                      </ScrollArea>
+                      </AnalysisTableScrollArea>
                     </div>
 
                     <AnalysisPagination
@@ -1241,12 +1324,13 @@ const QuotationFeature: React.FC = () => {
                       totalPages={resultState?.pagination?.total_source_pages}
                       onPageChange={(newPage) => handlePageChange(newPage)}
                       onPageSizeChange={(newSize) => handlePageSizeChange(newSize)}
+                      pageSizeLabel="Documents searched per page"
                       pageSizeOptions={[50, 100, 200, 400]}
                     >
                       <Button
                         type="button"
                         size="sm"
-                        onClick={() => handleDetach(nodeId)}
+                        onClick={() => void openDetachDialog(nodeId)}
                         disabled={Boolean(nodeDetaching[nodeId])}
                         className="bg-green-600 text-white hover:bg-green-700"
                       >
@@ -1284,6 +1368,18 @@ const QuotationFeature: React.FC = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <QuotationDetachDialog
+        open={detachDialogOpen}
+        onOpenChange={setDetachDialogOpen}
+        isDetaching={Boolean(pendingDetachNodeId && nodeDetaching[pendingDetachNodeId])}
+        detachNodeOptions={detachNodeOptions}
+        selectedDetachColumns={selectedDetachColumns}
+        toggleDetachColumn={toggleDetachColumn}
+        selectAllDetachColumns={selectAllDetachColumns}
+        deselectAllDetachColumns={deselectAllDetachColumns}
+        handleDetachConfirm={handleDetachConfirm}
+      />
     </>
   );
 };

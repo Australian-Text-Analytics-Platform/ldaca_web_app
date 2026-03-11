@@ -2,6 +2,7 @@ import JSZip from 'jszip';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  buildTokenFrequencyZipFilename,
   buildFrequencyExportFile,
   buildStopWordsExportFile,
   downloadExportBundleAsZip,
@@ -18,6 +19,7 @@ describe('tokenFrequencyExport', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     usingFakeTimers = true;
+    vi.setSystemTime(new Date('2026-03-12T10:15:07'));
     createObjectURLMock = vi.fn(() => 'blob:mock-export-url');
     revokeObjectURLMock = vi.fn();
     clickMock = vi.fn();
@@ -55,7 +57,7 @@ describe('tokenFrequencyExport', () => {
 
     downloadFrequencyRowsAs('My Corpus', [{ token: 'alpha', frequency: 3 }], 'csv');
 
-    const link = document.body.querySelector('a[download="my-corpus-frequencies.csv"]');
+    const link = document.body.querySelector('a[download="My Corpus_frequencies.csv"]');
 
     expect(link).toBeInTheDocument();
     expect(clickMock).toHaveBeenCalledTimes(1);
@@ -63,7 +65,7 @@ describe('tokenFrequencyExport', () => {
 
     vi.runAllTimers();
 
-    expect(document.body.querySelector('a[download="my-corpus-frequencies.csv"]')).not.toBeInTheDocument();
+    expect(document.body.querySelector('a[download="My Corpus_frequencies.csv"]')).not.toBeInTheDocument();
     expect(revokeObjectURLMock).toHaveBeenCalledWith('blob:csv-export');
   });
 
@@ -117,7 +119,7 @@ describe('tokenFrequencyExport', () => {
       format: 'svg',
     });
 
-    const link = document.body.querySelector('a[download="sample-node-wordcloud.svg"]');
+    const link = document.body.querySelector('a[download="Sample Node_wordcloud.svg"]');
 
     expect(link).toBeInTheDocument();
     expect(clickMock).toHaveBeenCalledTimes(1);
@@ -125,7 +127,7 @@ describe('tokenFrequencyExport', () => {
 
     vi.runAllTimers();
 
-    expect(document.body.querySelector('a[download="sample-node-wordcloud.svg"]')).not.toBeInTheDocument();
+    expect(document.body.querySelector('a[download="Sample Node_wordcloud.svg"]')).not.toBeInTheDocument();
     expect(revokeObjectURLMock).toHaveBeenCalledWith('blob:svg-export');
   });
 
@@ -134,12 +136,12 @@ describe('tokenFrequencyExport', () => {
     usingFakeTimers = false;
     createObjectURLMock.mockReturnValueOnce('blob:zip-export');
 
-    await downloadExportBundleAsZip('My Corpus', [
+    await downloadExportBundleAsZip('03-12_10-15-07_Corpus.zip', [
       buildFrequencyExportFile('My Corpus', [{ token: 'alpha', frequency: 3 }], 'csv'),
       buildStopWordsExportFile('the, and', 'My Corpus'),
     ]);
 
-    const link = document.body.querySelector('a[download="my-corpus-download.zip"]');
+    const link = document.body.querySelector('a[download="03-12_10-15-07_Corpus.zip"]');
     expect(link).toBeInTheDocument();
     expect(clickMock).toHaveBeenCalledTimes(1);
 
@@ -155,7 +157,19 @@ describe('tokenFrequencyExport', () => {
 
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    expect(document.body.querySelector('a[download="my-corpus-download.zip"]')).not.toBeInTheDocument();
+    expect(document.body.querySelector('a[download="03-12_10-15-07_Corpus.zip"]')).not.toBeInTheDocument();
     expect(revokeObjectURLMock).toHaveBeenCalledWith('blob:zip-export');
+  });
+
+  it('builds token frequency zip names from node leaf names and truncates them', () => {
+    expect(
+      buildTokenFrequencyZipFilename(
+        [
+          'sample_data/ADO/qldelection2020_candidate_tweets',
+          'other/path/another_really_long_node_name_here',
+        ],
+        new Date('2026-03-12T10:15:07')
+      )
+    ).toBe('03-12_10-15-07_qldelection2020_cand_another_really_long.zip');
   });
 });

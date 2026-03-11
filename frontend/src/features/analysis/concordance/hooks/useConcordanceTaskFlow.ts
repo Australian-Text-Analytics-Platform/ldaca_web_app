@@ -185,66 +185,41 @@ export function useConcordanceTaskFlow({
     try {
       const authHeaders = getAuthHeaders();
       const isCombinedQuery = effectiveMode === 'combined';
-      const useStoredResult = forceMode !== undefined || (isLocked && allowWhenLocked);
-      let response: ConcordanceAnalysisResponse | null = null;
+      const request: ConcordanceAnalysisRequest = {
+        node_ids: requestNodeIds,
+        node_columns: nodeColumns,
+        search_word: trimmedSearch,
+        num_left_tokens: numLeftTokens,
+        num_right_tokens: numRightTokens,
+        regex,
+        case_sensitive: caseSensitive,
+      };
+      if (isCombinedQuery) {
+        request.combined = true;
+      }
+      const requestedSortBy = overrideSortBy ?? firstNodePagination.sortBy;
+      if (requestedSortBy) {
+        request.sort_by = requestedSortBy;
+      }
 
-      if (useStoredResult) {
-        const overrides: ConcordanceResultQuery = {
-          combined: isCombinedQuery,
-          sort_by: (overrideSortBy ?? firstNodePagination.sortBy) || undefined,
-          descending: overrideDescending ?? firstNodePagination.descending,
-        };
+      const response = await textApi.concordance(request, authHeaders);
+      setResults(response);
+      extractAndSetTaskId(response, setLocalTaskId);
 
-        if (isCombinedQuery) {
-          overrides.page = combinedPage;
-          overrides.page_size = combinedPageSize;
-        } else {
-          overrides.page = firstNodePagination.currentPage;
-          overrides.page_size = firstNodePagination.pageSize;
-        }
+      try {
+        await restoreAnalysisLockFromRequest({
+          workspaceId: currentWorkspaceId,
+          requestData: { node_ids: requestNodeIds, node_columns: nodeColumns },
+          getAuthHeaders,
+          lockWithSnapshots,
+          maxNodes: 2,
+        });
+      } catch {
+        /* ignore */
+      }
 
-        response = await updateStoredResult(overrides as ConcordanceResultQuery);
-
-        if (isCombinedQuery && response && response.combinable === false) {
-          setViewMode('separated');
-        }
-      } else {
-        const request: ConcordanceAnalysisRequest = {
-          node_ids: requestNodeIds,
-          node_columns: nodeColumns,
-          search_word: trimmedSearch,
-          num_left_tokens: numLeftTokens,
-          num_right_tokens: numRightTokens,
-          regex,
-          case_sensitive: caseSensitive,
-        };
-        if (isCombinedQuery) {
-          request.combined = true;
-        }
-        const requestedSortBy = overrideSortBy ?? firstNodePagination.sortBy;
-        if (requestedSortBy) {
-          request.sort_by = requestedSortBy;
-        }
-
-        response = await textApi.concordance(request, authHeaders);
-        setResults(response);
-        extractAndSetTaskId(response, setLocalTaskId);
-
-        try {
-          await restoreAnalysisLockFromRequest({
-            workspaceId: currentWorkspaceId,
-            requestData: { node_ids: requestNodeIds, node_columns: nodeColumns },
-            getAuthHeaders,
-            lockWithSnapshots,
-            maxNodes: 2,
-          });
-        } catch {
-          /* ignore */
-        }
-
-        if (response?.combinable === false && viewMode === 'combined') {
-          setViewMode('separated');
-        }
+      if (response?.combinable === false && viewMode === 'combined') {
+        setViewMode('separated');
       }
     } catch (error) {
       console.error('Error performing concordance search:', error);

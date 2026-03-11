@@ -186,6 +186,28 @@ export function useTopicModelingTaskFlow({
     });
   };
 
+  const selectAllDetachColumns = () => {
+    setSelectedDetachColumns((prev) => {
+      const next = { ...prev };
+      detachNodeOptions.forEach((node) => {
+        next[node.node_id] = node.available_columns.filter(
+          (column) => !(node.disabled_columns || []).includes(column)
+        );
+      });
+      return next;
+    });
+  };
+
+  const deselectAllDetachColumns = () => {
+    setSelectedDetachColumns((prev) => {
+      const next = { ...prev };
+      detachNodeOptions.forEach((node) => {
+        next[node.node_id] = [];
+      });
+      return next;
+    });
+  };
+
   const handleDetachConfirm = async () => {
     if (!currentWorkspaceId) return;
     const taskId = await resolveTopicModelingTaskId();
@@ -233,6 +255,8 @@ export function useTopicModelingTaskFlow({
     handleRun,
     openDetachDialog,
     toggleDetachColumn,
+    selectAllDetachColumns,
+    deselectAllDetachColumns,
     handleDetachConfirm,
     isDetachLoading,
     isDetaching,

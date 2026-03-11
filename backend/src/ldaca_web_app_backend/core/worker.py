@@ -173,6 +173,8 @@ def quotation_detach_task(
     new_node_name: str,
     artifact_dir: str,
     artifact_prefix: str,
+    include_document_column: bool = False,
+    extra_columns_data: Optional[Dict[str, list]] = None,
     progress_callback: Optional[Callable[[float, str], None]] = None,
     progress_queue: Optional[Any] = None,
 ) -> Dict[str, Any]:
@@ -186,6 +188,8 @@ def quotation_detach_task(
         new_node_name,
         artifact_dir,
         artifact_prefix,
+        include_document_column,
+        extra_columns_data,
         cb,
     )
 

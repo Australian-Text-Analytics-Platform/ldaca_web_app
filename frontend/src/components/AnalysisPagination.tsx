@@ -234,6 +234,8 @@ export interface AnalysisPaginationProps {
   onPageChange: (page: number) => void;
   /** Called when the user changes the page size. Pass `undefined` to hide the selector. */
   onPageSizeChange?: (pageSize: number) => void;
+  /** Context-specific label for the page-size selector. */
+  pageSizeLabel?: string;
   /** Options shown in the page-size dropdown. */
   pageSizeOptions?: number[];
   /** Show a loading indicator. */
@@ -252,6 +254,7 @@ export const AnalysisPagination = ({
   totalPages,
   onPageChange,
   onPageSizeChange,
+  pageSizeLabel = 'Rows per page',
   pageSizeOptions = DEFAULT_PAGE_SIZE_OPTIONS,
   loading = false,
   children,
@@ -272,12 +275,12 @@ export const AnalysisPagination = ({
         className,
       )}
     >
-      {/* Left: Rows per page */}
+      {/* Left: Page size selector */}
       <div className="flex items-center gap-2">
         {onPageSizeChange && (
           <>
             <Label htmlFor="analysis-rows-per-page" className="text-sm text-muted-foreground whitespace-nowrap">
-              Rows per page
+              {pageSizeLabel}
             </Label>
             <Select
               value={String(pageSize)}

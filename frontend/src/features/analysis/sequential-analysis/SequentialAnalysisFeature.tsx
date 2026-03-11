@@ -35,6 +35,7 @@ import {
   useSafeResult,
   restoreAnalysisLockFromRequest,
   resetAnalysisSelectionAfterClear,
+  executeAnalysisRunOrUpdate,
 } from '../common';
 import {
   useSequentialAnalysisTaskFlow,
@@ -377,7 +378,6 @@ const SequentialAnalysisFeature: React.FC = () => {
 
   const {
     handleAnalyze,
-    handleUpdateResults,
     handleClearResults,
     handleChartTypeChange,
     chartData,
@@ -413,6 +413,14 @@ const SequentialAnalysisFeature: React.FC = () => {
     },
     lock: { getAuthHeaders },
   });
+
+  const handleRunOrUpdate = async () => {
+    await executeAnalysisRunOrUpdate({
+      hasLockedParameterChanges: hasParamsChanged,
+      clearResults,
+      runFreshAnalysis: handleAnalyze,
+    });
+  };
 
   const summaryTimeColumn = ((results?.analysis_params as Record<string, unknown> | undefined)?.time_column as string | undefined) ?? timeColumn;
   const summaryGroupBy = ((results?.analysis_params as Record<string, unknown> | undefined)?.group_by_columns as string[] | undefined) ?? groupByColumns;
@@ -600,7 +608,9 @@ const SequentialAnalysisFeature: React.FC = () => {
         {/* Action Buttons */}
         <div className="flex flex-wrap items-center gap-3">
           <Button
-            onClick={hasParamsChanged ? handleUpdateResults : handleAnalyze}
+            onClick={() => {
+              void handleRunOrUpdate();
+            }}
             disabled={actionState.runDisabled || isLoading.operations || !activeTimeColumn}
             className="w-full md:w-auto"
           >

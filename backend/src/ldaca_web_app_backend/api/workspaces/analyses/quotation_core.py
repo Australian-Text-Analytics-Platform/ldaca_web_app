@@ -23,7 +23,6 @@ from .generated_columns import (
     QUOTE_VERB_COLUMN,
     QUOTE_VERB_END_IDX_COLUMN,
     QUOTE_VERB_START_IDX_COLUMN,
-    quotation_struct_projection,
 )
 
 DEFAULT_CONTEXT_LENGTH = 20
@@ -388,9 +387,38 @@ def quotation_via_polars_text(df: pl.DataFrame, column: str) -> pl.DataFrame:
     """
     tmp = df.with_columns(pl.col(column).text.quotation().alias("__quotation__"))
     exploded = tmp.explode("__quotation__")
+    quote_dtype = exploded.schema.get("__quotation__")
+    available_fields: set[str] = set()
+    if isinstance(quote_dtype, pl.Struct):
+        try:
+            available_fields = set(quote_dtype.to_schema().keys())
+        except Exception:
+            available_fields = set()
+
+    projection_by_field = {
+        "speaker": QUOTE_SPEAKER_COLUMN,
+        "speaker_start_idx": QUOTE_SPEAKER_START_IDX_COLUMN,
+        "speaker_end_idx": QUOTE_SPEAKER_END_IDX_COLUMN,
+        "quote": QUOTE_QUOTE_COLUMN,
+        "quote_start_idx": QUOTE_QUOTE_START_IDX_COLUMN,
+        "quote_end_idx": QUOTE_QUOTE_END_IDX_COLUMN,
+        "verb": QUOTE_VERB_COLUMN,
+        "verb_start_idx": QUOTE_VERB_START_IDX_COLUMN,
+        "verb_end_idx": QUOTE_VERB_END_IDX_COLUMN,
+        "quote_type": QUOTE_TYPE_COLUMN,
+        "quote_token_count": QUOTE_TOKEN_COUNT_COLUMN,
+        "is_floating_quote": QUOTE_IS_FLOATING_COLUMN,
+        "quote_row_idx": QUOTE_ROW_IDX_COLUMN,
+    }
+    struct_projection = [
+        pl.col("__quotation__").struct.field(field_name).alias(alias)
+        for field_name, alias in projection_by_field.items()
+        if field_name in available_fields
+    ]
+
     return exploded.select([
         pl.exclude("__quotation__"),
-        *quotation_struct_projection("__quotation__"),
+        *struct_projection,
     ])
 
 

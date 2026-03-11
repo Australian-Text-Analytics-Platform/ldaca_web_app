@@ -1,14 +1,14 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
 import type { Dispatch, SetStateAction } from 'react';
+import { describe, expect, it, vi } from 'vitest';
 
-import { ConcordanceDetachDialog } from '../ConcordanceDetachDialog';
+import { QuotationDetachDialog } from '../QuotationDetachDialog';
 
-describe('ConcordanceDetachDialog', () => {
-  it('shows generated concordance columns as mandatory and leaves optional metadata unchecked', () => {
+describe('QuotationDetachDialog', () => {
+  it('shows generated quotation columns as mandatory and leaves optional metadata unchecked', () => {
     render(
-      <ConcordanceDetachDialog
+      <QuotationDetachDialog
         open
         onOpenChange={vi.fn() as Dispatch<SetStateAction<boolean>>}
         isDetaching={false}
@@ -16,8 +16,8 @@ describe('ConcordanceDetachDialog', () => {
           {
             node_id: 'node-1',
             node_name: 'Node 1',
-            available_columns: ['text', 'CONC_left_context', 'CONC_matched_text', 'CONC_right_context', 'speaker'],
-            disabled_columns: ['CONC_left_context', 'CONC_matched_text', 'CONC_right_context'],
+            available_columns: ['text', 'QUOTE_quote', 'QUOTE_speaker', 'speaker_role'],
+            disabled_columns: ['QUOTE_quote', 'QUOTE_speaker'],
           },
         ]}
         selectedDetachColumns={{ 'node-1': [] }}
@@ -29,11 +29,10 @@ describe('ConcordanceDetachDialog', () => {
     );
 
     expect(screen.getByRole('checkbox', { name: /^text/i })).not.toBeChecked();
-    expect(screen.getByRole('checkbox', { name: /^text/i })).not.toBeDisabled();
-    expect(screen.getByRole('checkbox', { name: /CONC_left_context/i })).toBeChecked();
-    expect(screen.getByRole('checkbox', { name: /CONC_matched_text/i })).toBeChecked();
-    expect(screen.getByRole('checkbox', { name: /CONC_right_context/i })).toBeChecked();
-    expect(screen.getByRole('checkbox', { name: /speaker/i })).not.toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /QUOTE_quote/i })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /QUOTE_quote/i })).toBeDisabled();
+    expect(screen.getByRole('checkbox', { name: /QUOTE_speaker/i })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /speaker_role/i })).not.toBeChecked();
   });
 
   it('renders a select all button and triggers the callback', async () => {
@@ -41,7 +40,7 @@ describe('ConcordanceDetachDialog', () => {
     const selectAllDetachColumns = vi.fn();
 
     render(
-      <ConcordanceDetachDialog
+      <QuotationDetachDialog
         open
         onOpenChange={vi.fn() as Dispatch<SetStateAction<boolean>>}
         isDetaching={false}
@@ -49,7 +48,7 @@ describe('ConcordanceDetachDialog', () => {
           {
             node_id: 'node-1',
             node_name: 'Node 1',
-            available_columns: ['text', 'speaker'],
+            available_columns: ['text', 'speaker_role'],
             disabled_columns: [],
           },
         ]}
@@ -70,7 +69,7 @@ describe('ConcordanceDetachDialog', () => {
     const deselectAllDetachColumns = vi.fn();
 
     render(
-      <ConcordanceDetachDialog
+      <QuotationDetachDialog
         open
         onOpenChange={vi.fn() as Dispatch<SetStateAction<boolean>>}
         isDetaching={false}
@@ -78,7 +77,7 @@ describe('ConcordanceDetachDialog', () => {
           {
             node_id: 'node-1',
             node_name: 'Node 1',
-            available_columns: ['text', 'speaker'],
+            available_columns: ['text', 'speaker_role'],
             disabled_columns: [],
           },
         ]}

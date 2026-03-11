@@ -24,9 +24,19 @@ const FORMATS = [
   { value: 'ipc', label: 'Arrow IPC (.arrow)' },
 ];
 
+const padFilenamePart = (value: number) => String(value).padStart(2, '0');
+
+const buildTimestampFragment = (date: Date = new Date()) =>
+  `${padFilenamePart(date.getMonth() + 1)}-${padFilenamePart(date.getDate())}_${padFilenamePart(date.getHours())}-${padFilenamePart(date.getMinutes())}-${padFilenamePart(date.getSeconds())}`;
+
+const toSafeArchiveLabel = (value: string) =>
+  (value || 'workspace')
+    .trim()
+    .replace(/[<>:"/\\|?*\u0000-\u001F]+/g, '_') || 'workspace';
+
 const ExportFeature: React.FC = () => {
   const { selectedNodes: rawSelectedNodes } = useWorkspaceSelection();
-  const { currentWorkspaceId } = useWorkspaceData();
+  const { currentWorkspaceId, currentWorkspace } = useWorkspaceData();
   const selectedNodes = rawSelectedNodes ?? [];
   const { getAuthHeaders } = useAuth();
   const [format, setFormat] = useState('csv');
@@ -64,7 +74,9 @@ const ExportFeature: React.FC = () => {
       const blob = await resp.blob();
       const multiple = nodeIds.length > 1;
       const ext = multiple ? 'zip' : 'csv';
-      const filename = multiple ? `export_${currentWorkspaceId}.csv.zip` : `${(toDisplay(selectedNodes[0]).name || nodeIds[0])}.${ext}`;
+      const filename = multiple
+        ? `${buildTimestampFragment()}_${toSafeArchiveLabel(currentWorkspace?.name || currentWorkspaceId || 'workspace')}.zip`
+        : `${(toDisplay(selectedNodes[0]).name || nodeIds[0])}.${ext}`;
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;

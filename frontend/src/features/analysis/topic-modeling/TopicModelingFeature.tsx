@@ -20,6 +20,7 @@ import {
   useNodeColorManagement,
   DEFAULT_PALETTE,
   getAnalysisActionState,
+  executeAnalysisRunOrUpdate,
 } from '../common';
 import { TopicModelingParameterPanel } from './components/panels/TopicModelingParameterPanel';
 import { TopicModelingResultsPanel } from './components/panels/TopicModelingResultsPanel';
@@ -256,6 +257,8 @@ const TopicModelingFeature: React.FC = () => {
     handleRun,
     openDetachDialog,
     toggleDetachColumn,
+    selectAllDetachColumns,
+    deselectAllDetachColumns,
     handleDetachConfirm,
     isDetachLoading,
     isDetaching,
@@ -342,6 +345,14 @@ const TopicModelingFeature: React.FC = () => {
     handleResetZoom,
   });
 
+  const handleRunOrUpdate = async () => {
+    await executeAnalysisRunOrUpdate({
+      hasLockedParameterChanges: hasLockedParameterChanges,
+      clearResults,
+      runFreshAnalysis: handleRun,
+    });
+  };
+
   const shouldShowResultsPanel = Boolean(topicWaitingBanner || result || error);
 
   return (
@@ -364,7 +375,7 @@ const TopicModelingFeature: React.FC = () => {
         onRepresentativeWordsCountChange={setRepresentativeWordsCount}
         isRunning={isRunning}
         isClearing={isClearing}
-        onRun={handleRun}
+        onRun={handleRunOrUpdate}
         onClear={handleClear}
         hasMissingColumns={panelHasMissingColumns}
         resultState={result?.state}
@@ -400,6 +411,8 @@ const TopicModelingFeature: React.FC = () => {
           detachNodeOptions={detachNodeOptions}
           selectedDetachColumns={selectedDetachColumns}
           toggleDetachColumn={toggleDetachColumn}
+          selectAllDetachColumns={selectAllDetachColumns}
+          deselectAllDetachColumns={deselectAllDetachColumns}
           handleDetachConfirm={handleDetachConfirm}
         />
       )}
