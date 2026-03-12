@@ -63,6 +63,23 @@ EXPORT_FORMAT_SPECS: dict[str, dict[str, str | None]] = {
 }
 
 
+def _stringify_value_for_csv(value: object) -> str | None:
+    if isinstance(value, pl.Series):
+        return str(value.to_list())
+    return None if value is None else str(value)
+
+
+def _stringify_lazyframe_for_csv(data: pl.LazyFrame) -> pl.LazyFrame:
+    """Convert every column to string for CSV exports only."""
+    return data.select(
+        pl
+        .col(column_name)
+        .map_elements(_stringify_value_for_csv, return_dtype=pl.String)
+        .alias(column_name)
+        for column_name in data.collect_schema().names()
+    )
+
+
 def _sanitize_export_label(value: str | None, fallback: str) -> str:
     cleaned = "".join(
         "_" if (ord(ch) < 32 or ch in '<>:"/\\|?*') else ch
@@ -104,11 +121,12 @@ def _export_node_artifact(
     stem = _sanitize_export_label(getattr(node, "name", None), node_id)
     archive_name = f"{stem}.{spec['extension']}"
     output_path = _allocate_export_path(export_dir, stem, str(spec["extension"]))
+    export_data = _stringify_lazyframe_for_csv(data) if fmt == "csv" else data
 
     try:
         sink_method_name = spec["sink_method"]
         if sink_method_name is not None:
-            sink_method = getattr(data, sink_method_name, None)
+            sink_method = getattr(export_data, sink_method_name, None)
             if sink_method is None:
                 raise HTTPException(
                     status_code=500,
@@ -121,7 +139,7 @@ def _export_node_artifact(
         else:
             # Polars does not currently expose LazyFrame.sink_json, so JSON
             # remains the single explicit eager export path.
-            data.collect().write_json(output_path)
+            export_data.collect().write_json(output_path)
     except HTTPException:
         raise
     except Exception as exc:

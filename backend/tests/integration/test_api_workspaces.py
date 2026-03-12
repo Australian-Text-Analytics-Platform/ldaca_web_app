@@ -5,6 +5,7 @@ Integration tests for workspace API endpoints
 import io
 import json
 import zipfile
+from csv import DictReader
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
@@ -439,6 +440,39 @@ class TestWorkspaceAPI:
         assert exported.shape == (2, 1)
         assert exported.columns == ["document"]
         assert exported["document"].to_list() == ["Hello world.", "Another sentence."]
+
+    async def test_export_single_node_as_csv_stringifies_nested_columns(
+        self,
+        authenticated_client,
+        tiny_node_id,
+    ):
+        """CSV export should stringify unsupported nested column values."""
+        from ldaca_web_app_backend.core.workspace import workspace_manager
+
+        workspace = workspace_manager.get_current_workspace("test")
+        node = workspace.nodes[tiny_node_id]
+        node.data = pl.DataFrame(
+            {
+                "document": ["alpha", "beta"],
+                "tags": [["one", "two"], ["three"]],
+                "meta": [{"rank": 1}, {"rank": 2}],
+            }
+        ).lazy()
+
+        response = await authenticated_client.get(
+            "/api/workspaces/export",
+            params={"node_ids": tiny_node_id, "format": "csv"},
+        )
+
+        assert response.status_code == 200, response.text
+        assert response.headers["content-type"] == "text/csv; charset=utf-8"
+        assert response.headers["content-disposition"].endswith(".csv")
+
+        rows = list(DictReader(io.StringIO(response.text)))
+        assert rows == [
+            {"document": "alpha", "tags": "['one', 'two']", "meta": "{'rank': 1}"},
+            {"document": "beta", "tags": "['three']", "meta": "{'rank': 2}"},
+        ]
 
     async def test_export_multiple_nodes_as_parquet_zip(
         self,
