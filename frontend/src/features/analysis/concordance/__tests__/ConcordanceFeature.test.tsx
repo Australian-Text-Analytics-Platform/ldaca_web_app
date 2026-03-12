@@ -4,6 +4,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const handleSearchMock = vi.fn();
 const clearResultsMock = vi.fn(async () => {});
+let mockPendingConcordance: Record<string, unknown> | null = null;
+let mockHydrationState = { status: 'idle' as const, lastHydratedAt: 1 };
+let mockInitialResult: Record<string, unknown> | null = null;
+let mockSetSafeResult: React.Dispatch<React.SetStateAction<Record<string, unknown> | null>> | null = null;
 
 vi.mock('sonner', () => ({
   toast: {
@@ -35,6 +39,42 @@ vi.mock('@/components/ui/dialog', () => ({
   DialogContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   DialogHeader: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   DialogTitle: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+}));
+
+vi.mock('@/components/ui/confirm-dialog', () => ({
+  ConfirmDialog: ({
+    open,
+    title,
+    description,
+    confirmText = 'Continue',
+    cancelText = 'Cancel',
+    onConfirm,
+    onOpenChange,
+  }: {
+    open: boolean;
+    title: string;
+    description: string;
+    confirmText?: string;
+    cancelText?: string;
+    onConfirm: () => void;
+    onOpenChange: (open: boolean) => void;
+  }) =>
+    open ? (
+      <div>
+        <div>{title}</div>
+        <div>{description}</div>
+        <button type="button" onClick={() => onOpenChange(false)}>{cancelText}</button>
+        <button
+          type="button"
+          onClick={() => {
+            onConfirm();
+            onOpenChange(false);
+          }}
+        >
+          {confirmText}
+        </button>
+      </div>
+    ) : null,
 }));
 
 vi.mock('@/hooks/useWorkspaceSelection', () => ({
@@ -71,7 +111,7 @@ vi.mock('@/hooks/useNodeColumnInfos', () => ({
 vi.mock('@/stores/analysisStore', () => ({
   useAnalysisStore: (selector: (state: Record<string, unknown>) => unknown) =>
     selector({
-      pendingConcordance: null,
+      pendingConcordance: mockPendingConcordance,
       clearPendingConcordance: vi.fn(),
       setTasks: vi.fn(),
     }),
@@ -152,6 +192,7 @@ vi.mock('../../common', async () => {
       taskStatus: { tasks: [] },
       banner: null,
       hasActiveTask: false,
+      hydrationState: mockHydrationState,
       clearResults: clearResultsMock,
     }),
     useNodeColorManagement: () => ({
@@ -160,8 +201,13 @@ vi.mock('../../common', async () => {
       defaultPalette: ['#000000'],
     }),
     useSafeResult: () => {
-      const ref = ReactModule.createRef();
-      return [null, ref, vi.fn(), vi.fn()];
+      const [result, setResult] = ReactModule.useState<Record<string, unknown> | null>(mockInitialResult);
+      const ref = ReactModule.useRef<Record<string, unknown> | null>(result);
+      ReactModule.useEffect(() => {
+        ref.current = result;
+        mockSetSafeResult = setResult;
+      }, [result, setResult]);
+      return [result, ref, vi.fn(), setResult];
     },
     EXTENDED_PALETTE: ['#000000'],
     executeAnalysisRunOrUpdate: vi.fn(async ({
@@ -192,10 +238,17 @@ describe('ConcordanceFeature', () => {
   beforeEach(() => {
     handleSearchMock.mockClear();
     clearResultsMock.mockClear();
+    mockPendingConcordance = null;
+    mockHydrationState = { status: 'idle', lastHydratedAt: 1 };
+    mockInitialResult = null;
+    mockSetSafeResult = null;
+    clearResultsMock.mockImplementation(async () => {
+      mockSetSafeResult?.(null);
+    });
   });
 
   it('clears previous results before rerunning when clicking Update', () => {
-    render(<ConcordanceFeature />);
+    const { unmount } = render(<ConcordanceFeature />);
 
     fireEvent.change(screen.getAllByPlaceholderText('Enter word or phrase to search for')[0], {
       target: { value: 'new value' },
@@ -206,11 +259,11 @@ describe('ConcordanceFeature', () => {
     return waitFor(() => {
       expect(clearResultsMock).toHaveBeenCalledTimes(1);
       expect(handleSearchMock).toHaveBeenCalledTimes(1);
-    });
+    }).finally(unmount);
   });
 
   it('passes the locked-update flag when clicking Update', () => {
-    render(<ConcordanceFeature />);
+    const { unmount } = render(<ConcordanceFeature />);
 
     fireEvent.change(screen.getAllByPlaceholderText('Enter word or phrase to search for')[0], {
       target: { value: 'new value' },
@@ -220,6 +273,65 @@ describe('ConcordanceFeature', () => {
 
     return waitFor(() => {
       expect(handleSearchMock).toHaveBeenCalledWith(true, undefined, undefined, undefined, undefined, true);
+    }).finally(unmount);
+  });
+
+  it('fills the concordance search box from a pending token handoff when no results exist', async () => {
+    mockPendingConcordance = {
+      searchWord: 'keyword',
+      selectedNodes: [{ id: 'node-1', name: 'Node 1' }],
+      nodeColumnSelections: [{ nodeId: 'node-1', column: 'text' }],
+      autoRun: false,
+      timestamp: 1,
+    };
+
+    const { unmount } = render(<ConcordanceFeature />);
+
+    await waitFor(() => {
+      expect(screen.getAllByPlaceholderText('Enter word or phrase to search for')[0]).toHaveValue('keyword');
     });
+
+    unmount();
+  });
+
+  it('asks for confirmation before replacing existing concordance results from a token handoff', async () => {
+    mockPendingConcordance = {
+      searchWord: 'replacement',
+      selectedNodes: [{ id: 'node-1', name: 'Node 1' }],
+      nodeColumnSelections: [{ nodeId: 'node-1', column: 'text' }],
+      autoRun: false,
+      timestamp: 2,
+    };
+    mockInitialResult = {
+      state: 'successful',
+      data: {
+        'node-1': {
+          data: [],
+          columns: [],
+          pagination: {
+            has_prev: false,
+            has_next: false,
+          },
+        },
+      },
+    };
+
+    const { unmount } = render(<ConcordanceFeature />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Replace concordance results?')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear and fill token' }));
+
+    await waitFor(() => {
+      expect(clearResultsMock).toHaveBeenCalledWith({ preserveLocalState: true });
+    });
+
+    await waitFor(() => {
+      expect(screen.getAllByPlaceholderText('Enter word or phrase to search for')[0]).toHaveValue('replacement');
+    });
+
+    unmount();
   });
 });

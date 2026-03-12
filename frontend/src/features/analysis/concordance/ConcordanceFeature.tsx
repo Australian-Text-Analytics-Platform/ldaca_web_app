@@ -45,6 +45,7 @@ import {
 } from '../../../hooks/analysisTaskUtils';
 import { useConcordanceTaskFlow, type PaginationState } from './hooks/useConcordanceTaskFlow';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../../components/ui/dialog';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { AnalysisPagination } from '../../../components/AnalysisPagination';
 import { AnalysisTableScrollArea } from '../../../components/AnalysisTableScrollArea';
 import { ConcordanceDetachDialog, type DetachNodeOption } from './components/ConcordanceDetachDialog';
@@ -66,6 +67,9 @@ const dedupeColumns = (cols: string[]): string[] => {
     return true;
   });
 };
+
+const hasSuccessfulConcordanceResults = (result: ConcordanceAnalysisResponse | null): boolean =>
+  Boolean(result && result.state === 'successful');
 
 const highlightMatchInText = (
   textValue: string,
@@ -252,6 +256,9 @@ const ConcordanceFeature: React.FC = () => {
   
   // State for auto-triggering search from TokenFrequencyTab
   const [shouldAutoSearch, setShouldAutoSearch] = useState(false);
+  const [queuedPendingConcordance, setQueuedPendingConcordance] = useState(pendingConcordance);
+  const [handoffConfirmOpen, setHandoffConfirmOpen] = useState(false);
+  const handoffConfirmingRef = useRef(false);
 
 
 
@@ -263,6 +270,7 @@ const ConcordanceFeature: React.FC = () => {
     taskStatus: concordanceTaskStatus,
     banner: concordanceWaitingBanner,
     hasActiveTask,
+    hydrationState,
     clearResults,
   } = useAnalysisFeature<ConcordanceAnalysisResponse>({
     analysisType: 'concordance_analysis',
@@ -311,10 +319,13 @@ const ConcordanceFeature: React.FC = () => {
         });
       } catch { /* ignore */ }
     },
-    onCleared: () => {
+    onCleared: (_, options) => {
       setResults(null);
       setNodePagination({});
       setCombinedPage(1);
+      if (options?.preserveLocalState) {
+        return;
+      }
       resetAnalysisSelectionAfterClear({ unlockSelection });
     },
     pruneGlobalTasks: (taskIds) => {
@@ -477,23 +488,52 @@ const ConcordanceFeature: React.FC = () => {
     }
   }, [concordanceTaskStatus.tasks.length, setLocalConcordanceTaskId]);
 
-  // React to pending concordance handoff from TokenFrequencyTab
+  // Queue concordance handoffs from TokenFrequencyTab so hydration can settle first.
   useEffect(() => {
     if (!pendingConcordance) return;
     if (lastPendingConcordanceRef.current === pendingConcordance.timestamp) {
       return;
     }
     lastPendingConcordanceRef.current = pendingConcordance.timestamp ?? null;
+    const id = requestAnimationFrame(() => {
+      setQueuedPendingConcordance(pendingConcordance);
+      clearPendingConcordance();
+    });
+    return () => cancelAnimationFrame(id);
+  }, [pendingConcordance, clearPendingConcordance]);
 
-    // Defer to avoid synchronous setState in effect body (react-hooks/set-state-in-effect)
+  useEffect(() => {
+    if (!queuedPendingConcordance) {
+      if (handoffConfirmOpen) {
+        const id = requestAnimationFrame(() => setHandoffConfirmOpen(false));
+        return () => cancelAnimationFrame(id);
+      }
+      return;
+    }
+
+    const hydrationSettled =
+      hydrationState.status === 'error' ||
+      (hydrationState.status === 'idle' && typeof hydrationState.lastHydratedAt === 'number');
+    if (!hydrationSettled) {
+      return;
+    }
+
+    if (hasSuccessfulConcordanceResults(results)) {
+      if (!handoffConfirmOpen) {
+        const id = requestAnimationFrame(() => setHandoffConfirmOpen(true));
+        return () => cancelAnimationFrame(id);
+      }
+      return;
+    }
+
     const rafIds: number[] = [];
-    const word = pendingConcordance.searchWord;
+    const word = queuedPendingConcordance.searchWord;
     if (word) {
       rafIds.push(requestAnimationFrame(() => setSearchWord(word)));
     }
 
-    if (Array.isArray(pendingConcordance.selectedNodes) && pendingConcordance.selectedNodes.length > 0) {
-      const targetIds = pendingConcordance.selectedNodes
+    if (Array.isArray(queuedPendingConcordance.selectedNodes) && queuedPendingConcordance.selectedNodes.length > 0) {
+      const targetIds = queuedPendingConcordance.selectedNodes
         .map((node) => (typeof node?.id === 'string' ? node.id : ''))
         .filter((id): id is string => id.trim().length > 0)
         .slice(0, 2);
@@ -512,37 +552,50 @@ const ConcordanceFeature: React.FC = () => {
       }
     }
 
-    if (pendingConcordance.nodeColumnSelections?.length) {
-      setNodeColumnSelections(pendingConcordance.nodeColumnSelections, { replace: true });
+    if (queuedPendingConcordance.nodeColumnSelections?.length) {
+      setNodeColumnSelections(queuedPendingConcordance.nodeColumnSelections, { replace: true });
     }
 
-    if (pendingConcordance.nodeColors) {
-      Object.entries(pendingConcordance.nodeColors).forEach(([nodeId, color]) => {
+    if (queuedPendingConcordance.nodeColors) {
+      Object.entries(queuedPendingConcordance.nodeColors).forEach(([nodeId, color]) => {
         handleColorChange(nodeId, color as string);
       });
     }
 
-    const shouldAutoRun = pendingConcordance.autoRun === true;
     let timeoutId: number | null = null;
     const hasNodeTargets =
       selectedNodes.length > 0 ||
-      (pendingConcordance.selectedNodes?.length ?? 0) > 0 ||
-      (pendingConcordance.nodeColumnSelections?.length ?? 0) > 0;
-    if (shouldAutoRun && pendingConcordance.searchWord && hasNodeTargets) {
-      const delay = 50;
+      (queuedPendingConcordance.selectedNodes?.length ?? 0) > 0 ||
+      (queuedPendingConcordance.nodeColumnSelections?.length ?? 0) > 0;
+    if (queuedPendingConcordance.autoRun === true && queuedPendingConcordance.searchWord && hasNodeTargets) {
       timeoutId = window.setTimeout(() => {
         setShouldAutoSearch(true);
-      }, delay);
+      }, 50);
     }
 
-    clearPendingConcordance();
+    const resetId = requestAnimationFrame(() => {
+      setQueuedPendingConcordance(null);
+      setHandoffConfirmOpen(false);
+    });
+
     return () => {
       if (timeoutId !== null) {
         window.clearTimeout(timeoutId);
       }
       rafIds.forEach(cancelAnimationFrame);
+      cancelAnimationFrame(resetId);
     };
-  }, [pendingConcordance, selectedNodes, setNodeColumnSelections, clearPendingConcordance, selectNodes, handleColorChange]);
+  }, [
+    queuedPendingConcordance,
+    hydrationState.status,
+    hydrationState.lastHydratedAt,
+    results,
+    handoffConfirmOpen,
+    selectedNodes,
+    setNodeColumnSelections,
+    selectNodes,
+    handleColorChange,
+  ]);
 
   // Recompute auto columns if unlocked and selections empty but nodes exist
   useEffect(() => {
@@ -574,6 +627,25 @@ const ConcordanceFeature: React.FC = () => {
   const handleClearResults = async () => {
     if (!currentWorkspaceId) return;
     await clearResults();
+  };
+
+  const handleConfirmPendingConcordance = async () => {
+    if (!queuedPendingConcordance) {
+      setHandoffConfirmOpen(false);
+      return;
+    }
+    handoffConfirmingRef.current = true;
+    try {
+      await clearResults({ preserveLocalState: true });
+      setHandoffConfirmOpen(false);
+    } finally {
+      handoffConfirmingRef.current = false;
+    }
+  };
+
+  const handleCancelPendingConcordance = () => {
+    setQueuedPendingConcordance(null);
+    setHandoffConfirmOpen(false);
   };
 
   const handleRunOrUpdate = async () => {
@@ -1458,6 +1530,22 @@ const ConcordanceFeature: React.FC = () => {
         selectAllDetachColumns={selectAllDetachColumns}
         deselectAllDetachColumns={deselectAllDetachColumns}
         handleDetachConfirm={handleDetachConfirm}
+      />
+      <ConfirmDialog
+        open={handoffConfirmOpen}
+        onOpenChange={(open) => {
+          setHandoffConfirmOpen(open);
+          if (!open && queuedPendingConcordance && !handoffConfirmingRef.current) {
+            handleCancelPendingConcordance();
+          }
+        }}
+        title="Replace concordance results?"
+        description="This will clear the current concordance results and fill the clicked token into the search box."
+        confirmText="Clear and fill token"
+        cancelText="Keep current results"
+        onConfirm={() => {
+          void handleConfirmPendingConcordance();
+        }}
       />
     </div>
   );
