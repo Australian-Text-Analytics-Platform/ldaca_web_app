@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import { type FormEvent, useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Dialog,
   DialogContent,
@@ -12,6 +13,9 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { configApi } from '@/api/config';
 import { useAuth } from '@/hooks/useAuth';
+import { useWorkspaceActions } from '@/hooks/useWorkspaceActions';
+import { useWorkspaceData } from '@/hooks/useWorkspaceData';
+import { queryKeys } from '@/lib/queryKeys';
 import { toast } from 'sonner';
 import { FolderOpen } from 'lucide-react';
 
@@ -22,11 +26,14 @@ interface DataFolderDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-export const DataFolderDialog: React.FC<DataFolderDialogProps> = ({
+export function DataFolderDialog({
   open,
   onOpenChange,
-}) => {
+}: DataFolderDialogProps) {
+  const queryClient = useQueryClient();
   const { dataFolder, refreshAuth } = useAuth();
+  const { currentWorkspaceId } = useWorkspaceData();
+  const { setCurrentWorkspace } = useWorkspaceActions();
   const [path, setPath] = useState(dataFolder || '');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -57,14 +64,32 @@ export const DataFolderDialog: React.FC<DataFolderDialogProps> = ({
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!path.trim()) return;
+    const nextPath = path.trim();
+    if (!nextPath) return;
+
     setIsLoading(true);
     try {
-      await configApi.updateConfig({ data_root: path });
+      const currentPath = dataFolder?.trim() ?? '';
+      const isDirectoryChanging = nextPath !== currentPath;
+
+      if (isDirectoryChanging && currentWorkspaceId) {
+        await setCurrentWorkspace(null);
+      }
+
+      await configApi.updateConfig({ data_root: nextPath });
       toast.success('Working directory updated');
       await refreshAuth();
+      await Promise.all([
+        queryClient.refetchQueries({
+          queryKey: queryKeys.workspaces,
+          exact: true,
+        }),
+        queryClient.refetchQueries({
+          queryKey: queryKeys.files,
+        }),
+      ]);
       onOpenChange(false);
     } catch (error: unknown) {
       console.error('Failed to update config:', error);
@@ -115,4 +140,4 @@ export const DataFolderDialog: React.FC<DataFolderDialogProps> = ({
       </DialogContent>
     </Dialog>
   );
-};
+}

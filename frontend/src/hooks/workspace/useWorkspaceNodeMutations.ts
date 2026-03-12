@@ -567,7 +567,7 @@ export const useWorkspaceNodeMutations = ({
   });
 
   const actions = {
-    setCurrentWorkspace: (workspaceId: string | null) => setCurrentWorkspaceMutation.mutate(workspaceId),
+    setCurrentWorkspace: (workspaceId: string | null) => setCurrentWorkspaceMutation.mutateAsync(workspaceId),
     createWorkspace: (name: string, description?: string) => createWorkspaceMutation.mutateAsync({ name, description }),
     deleteWorkspace: (workspaceId: string) => deleteWorkspaceMutation.mutateAsync(workspaceId),
     saveWorkspace: () => saveWorkspaceMutation.mutateAsync(),
