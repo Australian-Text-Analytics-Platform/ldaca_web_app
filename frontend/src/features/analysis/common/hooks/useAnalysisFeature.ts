@@ -19,6 +19,10 @@ interface AnalysisResultLike {
   metadata?: { task_id?: string };
 }
 
+export interface ClearAnalysisUiOptions {
+  preserveLocalState?: boolean;
+}
+
 // ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------
@@ -45,7 +49,7 @@ export interface UseAnalysisFeatureConfig<TResult = unknown> {
   /** Called during hydration with the server request */
   onHydratedRequest?: (request: unknown | null) => void | Promise<void>;
   /** Called after the clear lifecycle completes */
-  onCleared: (clearedTaskIds: string[]) => void;
+  onCleared: (clearedTaskIds: string[], options?: ClearAnalysisUiOptions) => void;
 
   /**
    * Optional callback to prune global task store entries for the cleared task IDs.
@@ -88,7 +92,7 @@ export interface UseAnalysisFeatureReturn {
   hydrateFromServer: () => Promise<void>;
   hydrationState: HydrationState;
 
-  clearResults: () => Promise<void>;
+  clearResults: (options?: ClearAnalysisUiOptions) => Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -341,7 +345,7 @@ export function useAnalysisFeature<TResult = unknown>(
   }, [config.isTabActive, config.workspaceId, hydrateFromServer]);
 
   // ---- Clear ----
-  const clearResults = async (): Promise<void> => {
+  const clearResults = async (options?: ClearAnalysisUiOptions): Promise<void> => {
     const cfg = configRef.current;
     if (!cfg.workspaceId) return;
 
@@ -368,7 +372,7 @@ export function useAnalysisFeature<TResult = unknown>(
         lastFetchedRef.current = { taskId: null, state: null };
         setIsRunning(false);
         cfg.pruneGlobalTasks?.(taskIds);
-        cfg.onCleared(taskIds);
+        cfg.onCleared(taskIds, options);
       },
     });
   };

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '../../../hooks/useWorkspaceSelection';
 import { useWorkspaceStatus } from '../../../hooks/useWorkspaceStatus';
@@ -65,7 +65,7 @@ const parseNumericInput = (value: string): number | null => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
-const SequentialAnalysisFeature: React.FC = () => {
+const SequentialAnalysisFeature = () => {
   const { selectedNodeId, selectedNode } = useWorkspaceSelection();
   const { nodeData, currentWorkspaceId } = useWorkspaceData();
   const { isLoading } = useWorkspaceStatus();
@@ -245,8 +245,11 @@ const SequentialAnalysisFeature: React.FC = () => {
       }
       setHydratingSelection(false);
     },
-    onCleared: () => {
+    onCleared: (_, options) => {
       setResultSafely(null);
+      if (options?.preserveLocalState) {
+        return;
+      }
       resetAnalysisSelectionAfterClear({ unlockSelection });
       setLockedSchema(null);
       setChartType('line');
@@ -419,6 +422,7 @@ const SequentialAnalysisFeature: React.FC = () => {
       hasLockedParameterChanges: hasParamsChanged,
       clearResults,
       runFreshAnalysis: handleAnalyze,
+      clearOptionsOnUpdate: { preserveLocalState: true },
     });
   };
 

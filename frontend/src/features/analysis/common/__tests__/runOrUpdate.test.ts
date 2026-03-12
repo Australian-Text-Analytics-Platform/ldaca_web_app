@@ -32,4 +32,17 @@ describe('executeAnalysisRunOrUpdate', () => {
     expect(clearResults).not.toHaveBeenCalled();
     expect(runFreshAnalysis).toHaveBeenCalledTimes(1);
   });
+
+  it('passes update clear options through to clearResults', async () => {
+    const clearResults = vi.fn(async () => {});
+
+    await executeAnalysisRunOrUpdate({
+      hasLockedParameterChanges: true,
+      clearResults,
+      runFreshAnalysis: vi.fn(async () => {}),
+      clearOptionsOnUpdate: { preserveLocalState: true },
+    });
+
+    expect(clearResults).toHaveBeenCalledWith({ preserveLocalState: true });
+  });
 });
