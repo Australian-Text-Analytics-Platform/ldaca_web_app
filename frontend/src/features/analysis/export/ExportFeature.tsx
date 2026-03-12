@@ -9,7 +9,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui
 import { Button } from '../../../components/ui/button';
 import { Badge } from '../../../components/ui/badge';
 import { Label } from '../../../components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../../components/ui/select';
 import { toast } from 'sonner';
 import HelpIcon from '../../../components/help/HelpIcon';
 
@@ -30,9 +36,13 @@ const buildTimestampFragment = (date: Date = new Date()) =>
   `${padFilenamePart(date.getMonth() + 1)}-${padFilenamePart(date.getDate())}_${padFilenamePart(date.getHours())}-${padFilenamePart(date.getMinutes())}-${padFilenamePart(date.getSeconds())}`;
 
 const toSafeArchiveLabel = (value: string) =>
-  (value || 'workspace')
-    .trim()
-    .replace(/[<>:"/\\|?*\u0000-\u001F]+/g, '_') || 'workspace';
+  Array.from((value || 'workspace').trim())
+    .map((char) => (char.charCodeAt(0) < 32 || '<>:"/\\|?*'.includes(char) ? '_' : char))
+    .join('')
+    .trim() || 'workspace';
+
+const getDownloadExtension = (selectedFormat: string) =>
+  selectedFormat === 'ipc' ? 'arrow' : selectedFormat;
 
 const ExportFeature: React.FC = () => {
   const { selectedNodes: rawSelectedNodes } = useWorkspaceSelection();
@@ -53,37 +63,44 @@ const ExportFeature: React.FC = () => {
     const data = n.data as Record<string, unknown> | undefined;
     const id = n.id || String(n.node_id ?? data?.id ?? data?.node_id ?? n.unique_id ?? '');
     const name = String(data?.nodeName ?? data?.label ?? n.label ?? n.name ?? id);
-    const shapeArr = Array.isArray(data?.shape) ? (data.shape as (number | string | null | undefined)[]) : null;
+    const shapeArr = Array.isArray(data?.shape)
+      ? (data.shape as (number | string | null | undefined)[])
+      : null;
     const formatDimension = (value: number | string | null | undefined) =>
       typeof value === 'number' || typeof value === 'string' ? value : '?';
-    const shape = shapeArr ? `${formatDimension(shapeArr[0])} × ${formatDimension(shapeArr[1])}` : null;
+    const shape = shapeArr
+      ? `${formatDimension(shapeArr[0])} × ${formatDimension(shapeArr[1])}`
+      : null;
     return { id, name, shape };
   };
 
-  // Export all as CSV (zip when multiple)
+  // Export all selected nodes in the requested format (zip when multiple)
   const handleExportAll = async () => {
     if (!currentWorkspaceId || nodeIds.length === 0) return;
     setExporting(true);
     try {
-  const params = new URLSearchParams({ node_ids: nodeIds.join(','), format: 'csv' });
-  const apiBase = getApiBase();
-  const resp = await fetch(`${apiBase}/workspaces/export?` + params.toString(), {
+      const params = new URLSearchParams({ node_ids: nodeIds.join(','), format });
+      const apiBase = getApiBase();
+      const resp = await fetch(`${apiBase}/workspaces/export?` + params.toString(), {
         headers: getAuthHeaders(),
       });
       if (!resp.ok) throw new Error('Export failed');
       const blob = await resp.blob();
       const multiple = nodeIds.length > 1;
-      const ext = multiple ? 'zip' : 'csv';
+      const ext = multiple ? 'zip' : getDownloadExtension(format);
       const filename = multiple
         ? `${buildTimestampFragment()}_${toSafeArchiveLabel(currentWorkspace?.name || currentWorkspaceId || 'workspace')}.zip`
-        : `${(toDisplay(selectedNodes[0]).name || nodeIds[0])}.${ext}`;
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
+        : `${toDisplay(selectedNodes[0]).name || nodeIds[0]}.${ext}`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        URL.revokeObjectURL(url);
+        a.remove();
+      }, 0);
     } catch (e) {
       console.error(e);
       toast.error('Failed to export nodes');
@@ -97,7 +114,7 @@ const ExportFeature: React.FC = () => {
     if (!currentWorkspaceId) return;
     const { id, name } = toDisplay(node);
     if (!id) return;
-  setDownloadingIds((s) => ({ ...s, [id]: 'downloading' }));
+    setDownloadingIds((s) => ({ ...s, [id]: 'downloading' }));
     try {
       const params = new URLSearchParams({ node_ids: id, format });
       const apiBase = getApiBase();
@@ -106,15 +123,18 @@ const ExportFeature: React.FC = () => {
       });
       if (!resp.ok) throw new Error('Download failed');
       const blob = await resp.blob();
-      const ext = format === 'ipc' ? 'arrow' : format;
+      const ext = getDownloadExtension(format);
       const filename = `${name || id}.${ext}`;
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        URL.revokeObjectURL(url);
+        a.remove();
+      }, 0);
     } catch (e) {
       console.error(e);
       toast.error('Failed to download node');
@@ -137,20 +157,23 @@ const ExportFeature: React.FC = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed border-border/50 bg-muted/40 px-4 py-3">
-            <div className="text-sm text-muted-foreground">
-              Workspace ID: <span className="font-mono text-foreground">{currentWorkspaceId ?? '—'}</span>
+          <div className="border-border/50 bg-muted/40 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed px-4 py-3">
+            <div className="text-muted-foreground text-sm">
+              Workspace ID:{' '}
+              <span className="text-foreground font-mono">{currentWorkspaceId ?? '—'}</span>
             </div>
             <Badge variant={selectedNodes.length ? 'default' : 'outline'}>
-              {selectedNodes.length ? `${selectedNodes.length} data block${selectedNodes.length > 1 ? 's' : ''} selected` : 'No data blocks selected'}
+              {selectedNodes.length
+                ? `${selectedNodes.length} data block${selectedNodes.length > 1 ? 's' : ''} selected`
+                : 'No data blocks selected'}
             </Badge>
           </div>
 
           <div className="space-y-3">
             <Label className="text-sm font-medium">Selected Data Blocks</Label>
-            <div className="max-h-104 space-y-2 overflow-y-auto rounded-lg border border-border/60 bg-background p-2 shadow-sm">
+            <div className="border-border/60 bg-background max-h-104 space-y-2 overflow-y-auto rounded-lg border p-2 shadow-sm">
               {selectedNodes.length === 0 && (
-                <div className="flex items-center justify-center rounded-md border border-dashed border-border/40 bg-muted/30 py-10 text-sm text-muted-foreground">
+                <div className="border-border/40 bg-muted/30 text-muted-foreground flex items-center justify-center rounded-md border border-dashed py-10 text-sm">
                   Choose nodes in the graph sidebar to enable exports.
                 </div>
               )}
@@ -161,12 +184,14 @@ const ExportFeature: React.FC = () => {
                 return (
                   <div
                     key={info.id}
-                    className="flex flex-col gap-3 rounded-md border border-border/40 bg-card/60 p-3 transition hover:bg-card/80 md:flex-row md:items-center md:justify-between"
+                    className="border-border/40 bg-card/60 hover:bg-card/80 flex flex-col gap-3 rounded-md border p-3 transition md:flex-row md:items-center md:justify-between"
                   >
                     <div className="space-y-1">
-                      <p className="text-sm font-semibold text-foreground">{info.name}</p>
-                      <p className="font-mono text-[11px] text-muted-foreground">{info.id}</p>
-                      {info.shape && <p className="text-xs text-muted-foreground">Shape: {info.shape}</p>}
+                      <p className="text-foreground text-sm font-semibold">{info.name}</p>
+                      <p className="text-muted-foreground font-mono text-[11px]">{info.id}</p>
+                      {info.shape && (
+                        <p className="text-muted-foreground text-xs">Shape: {info.shape}</p>
+                      )}
                     </div>
                     <Button
                       size="sm"
@@ -187,7 +212,7 @@ const ExportFeature: React.FC = () => {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
             <div className="w-full max-w-xs">
               <div className="mb-2 flex items-center gap-2">
-                <Label className="block text-sm font-medium text-foreground">Format</Label>
+                <Label className="text-foreground block text-sm font-medium">Format</Label>
                 <HelpIcon targetKey="analysis.export.format" label="Export format selector" />
               </div>
               <Select value={format} onValueChange={(value) => setFormat(value)}>
@@ -221,8 +246,8 @@ const ExportFeature: React.FC = () => {
       </Card>
 
       {!selectedNodes.length && (
-        <Card className="border-dashed border-border/50 bg-muted/30">
-          <CardContent className="py-8 text-center text-sm text-muted-foreground">
+        <Card className="border-border/50 bg-muted/30 border-dashed">
+          <CardContent className="text-muted-foreground py-8 text-center text-sm">
             Tip: open the Data tab and use the data block checkbox to mark items for export.
           </CardContent>
         </Card>

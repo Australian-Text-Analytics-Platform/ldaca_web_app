@@ -7,7 +7,9 @@ All business logic is handled by the DocWorkspace library itself.
 
 import logging
 import os
+import tempfile
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
 import polars as pl
@@ -31,6 +33,104 @@ from .utils import stage_dataframe_as_lazy, update_workspace
 router = APIRouter(prefix="/workspaces", tags=["workspace"])
 
 logger = logging.getLogger(__name__)
+
+EXPORT_FORMAT_SPECS: dict[str, dict[str, str | None]] = {
+    "csv": {
+        "extension": "csv",
+        "media_type": "text/csv; charset=utf-8",
+        "sink_method": "sink_csv",
+    },
+    "json": {
+        "extension": "json",
+        "media_type": "application/json",
+        "sink_method": None,
+    },
+    "parquet": {
+        "extension": "parquet",
+        "media_type": "application/octet-stream",
+        "sink_method": "sink_parquet",
+    },
+    "ipc": {
+        "extension": "arrow",
+        "media_type": "application/vnd.apache.arrow.file",
+        "sink_method": "sink_ipc",
+    },
+    "ndjson": {
+        "extension": "ndjson",
+        "media_type": "application/x-ndjson",
+        "sink_method": "sink_ndjson",
+    },
+}
+
+
+def _sanitize_export_label(value: str | None, fallback: str) -> str:
+    cleaned = "".join(
+        "_" if (ord(ch) < 32 or ch in '<>:"/\\|?*') else ch
+        for ch in (value or fallback).strip()
+    ).strip()
+    return cleaned or fallback
+
+
+def _allocate_export_path(export_dir: Path, stem: str, extension: str) -> Path:
+    candidate = export_dir / f"{stem}.{extension}"
+    suffix = 1
+    while candidate.exists():
+        candidate = export_dir / f"{stem}_{suffix}.{extension}"
+        suffix += 1
+    return candidate
+
+
+def _export_node_artifact(
+    node: Node,
+    node_id: str,
+    export_dir: Path,
+    fmt: str,
+) -> tuple[str, Path]:
+    data = getattr(node, "data", None)
+    if data is None:
+        raise HTTPException(
+            status_code=400, detail=f"Node '{node_id}' has no data to export"
+        )
+    if not isinstance(data, pl.LazyFrame):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Export requires LazyFrame node data for node '{node_id}', "
+                f"got {type(data).__name__}"
+            ),
+        )
+
+    spec = EXPORT_FORMAT_SPECS[fmt]
+    stem = _sanitize_export_label(getattr(node, "name", None), node_id)
+    archive_name = f"{stem}.{spec['extension']}"
+    output_path = _allocate_export_path(export_dir, stem, str(spec["extension"]))
+
+    try:
+        sink_method_name = spec["sink_method"]
+        if sink_method_name is not None:
+            sink_method = getattr(data, sink_method_name, None)
+            if sink_method is None:
+                raise HTTPException(
+                    status_code=500,
+                    detail=(
+                        f"LazyFrame export method '{sink_method_name}' is not "
+                        f"available for format '{fmt}'"
+                    ),
+                )
+            sink_method(output_path)
+        else:
+            # Polars does not currently expose LazyFrame.sink_json, so JSON
+            # remains the single explicit eager export path.
+            data.collect().write_json(output_path)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to export node '{node_id}' as {fmt}: {exc}",
+        ) from exc
+
+    return archive_name, output_path
 
 
 @router.delete("/nodes/{node_id}/columns/{column_name}")
@@ -708,7 +808,7 @@ async def export_nodes(
     """Export one or more workspace nodes as downloadable file(s).
 
     If multiple node_ids are provided, a ZIP archive is returned.
-    Supported formats (mapped to Polars write_* APIs): csv, json, parquet, ipc, ndjson.
+    Supported formats: csv, json, parquet, ipc, ndjson.
     """
     import io
     import zipfile
@@ -722,11 +822,14 @@ async def export_nodes(
     if not workspace_id or ws is None:
         raise HTTPException(status_code=404, detail="No active workspace selected")
     fmt = format.lower()
-    supported = {"csv", "json", "parquet", "ipc", "ndjson"}
-    if fmt not in supported:
+    spec = EXPORT_FORMAT_SPECS.get(fmt)
+    if spec is None:
         raise HTTPException(
             status_code=400,
-            detail=f"Unsupported format '{format}'. Supported: {sorted(supported)}",
+            detail=(
+                f"Unsupported format '{format}'. Supported: "
+                f"{sorted(EXPORT_FORMAT_SPECS)}"
+            ),
         )
 
     ids = [nid.strip() for nid in node_ids.split(",") if nid.strip()]
@@ -740,82 +843,46 @@ async def export_nodes(
             f"{now.hour:02d}-{now.minute:02d}-{now.second:02d}"
         )
 
-    def sanitize_archive_label(value: str) -> str:
-        cleaned = "".join(
-            "_" if (ord(ch) < 32 or ch in '<>:"/\\|?*') else ch
-            for ch in (value or "workspace").strip()
-        ).strip()
-        return cleaned or "workspace"
+    with tempfile.TemporaryDirectory(prefix=f"workspace_export_{workspace_id}_") as temp_dir:
+        export_dir = Path(temp_dir)
+        exported: list[tuple[str, Path]] = []
 
-    # Helper to materialize node data as Polars DataFrame.
-    def node_to_df(node):
-        data = getattr(node, "data", None)
-        if data is None:
-            raise HTTPException(status_code=400, detail="Node has no data")
-        try:
-            if not isinstance(data, pl.LazyFrame):
-                raise TypeError(
-                    f"Export requires LazyFrame node data, got {type(data).__name__}"
+        for nid in ids:
+            node = ws.nodes.get(nid)
+            if node is None:
+                raise HTTPException(status_code=404, detail=f"Node '{nid}' not found")
+            exported.append(
+                _export_node_artifact(
+                    node=node,
+                    node_id=nid,
+                    export_dir=export_dir,
+                    fmt=fmt,
                 )
-            collected = data.collect()
-        except Exception as e:  # pragma: no cover
-            raise HTTPException(
-                status_code=500, detail=f"Failed to materialize node data: {e}"
             )
-        return collected
 
-    exported: list[tuple[str, bytes]] = []
-    for nid in ids:
-        node = ws.nodes[nid]
-        df = node_to_df(node)
-        buf = io.BytesIO()
-        # Dispatch by format
-        if fmt == "csv":
-            df.write_csv(buf)
-            ext = "csv"
-        elif fmt == "json":
-            # write_json writes entire df JSON lines by default; use to_json if available else manual
-            try:
-                df.write_json(buf)
-            except Exception:
-                buf.write(df.to_pandas().to_json().encode())  # fallback
-            ext = "json"
-        elif fmt == "parquet":
-            df.write_parquet(buf)
-            ext = "parquet"
-        elif fmt == "ipc":
-            df.write_ipc(buf)
-            ext = "arrow"
-        elif fmt == "ndjson":
-            df.write_ndjson(buf)
-            ext = "ndjson"
-        else:  # pragma: no cover - already validated
-            raise HTTPException(status_code=400, detail="Unsupported format")
-        exported.append((f"{getattr(node, 'name', nid) or nid}.{ext}", buf.getvalue()))
+        if len(exported) == 1:
+            filename, artifact_path = exported[0]
+            return Response(
+                content=artifact_path.read_bytes(),
+                media_type=str(spec["media_type"]),
+                headers={"Content-Disposition": f"attachment; filename={filename}"},
+            )
 
-    if len(exported) == 1:
-        filename, data_bytes = exported[0]
-        return Response(
-            content=data_bytes,
-            media_type="application/octet-stream",
-            headers={"Content-Disposition": f"attachment; filename={filename}"},
+        zip_buf = io.BytesIO()
+        with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            for archive_name, artifact_path in exported:
+                zf.write(artifact_path, arcname=archive_name)
+        zip_buf.seek(0)
+        return StreamingResponse(
+            zip_buf,
+            media_type="application/zip",
+            headers={
+                "Content-Disposition": (
+                    f"attachment; filename={build_timestamp_fragment()}_"
+                    f"{_sanitize_export_label(getattr(ws, 'name', None), workspace_id)}.zip"
+                )
+            },
         )
-    # Zip multiple
-    zip_buf = io.BytesIO()
-    with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        for fname, data_bytes in exported:
-            zf.writestr(fname, data_bytes)
-    zip_buf.seek(0)
-    return StreamingResponse(
-        zip_buf,
-        media_type="application/zip",
-        headers={
-            "Content-Disposition": (
-                f"attachment; filename={build_timestamp_fragment()}_"
-                f"{sanitize_archive_label(getattr(ws, 'name', None) or workspace_id)}.zip"
-            )
-        },
-    )
 
 
 # ============================================================================

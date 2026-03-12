@@ -8,6 +8,7 @@ import zipfile
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
+import polars as pl
 import pytest
 
 
@@ -418,6 +419,57 @@ class TestWorkspaceAPI:
             assert payload["workspace"]["id"] == "imported-id"
             assert (target_dir / "metadata.json").exists()
             assert (target_dir / "data" / "example.parquet").exists()
+
+    async def test_export_single_node_as_parquet(
+        self,
+        authenticated_client,
+        tiny_node_id,
+    ):
+        """Single-node export should produce parquet bytes when parquet is requested."""
+        response = await authenticated_client.get(
+            "/api/workspaces/export",
+            params={"node_ids": tiny_node_id, "format": "parquet"},
+        )
+
+        assert response.status_code == 200, response.text
+        assert response.headers["content-type"] == "application/octet-stream"
+        assert response.headers["content-disposition"].endswith(".parquet")
+
+        exported = pl.read_parquet(io.BytesIO(response.content))
+        assert exported.shape == (2, 1)
+        assert exported.columns == ["document"]
+        assert exported["document"].to_list() == ["Hello world.", "Another sentence."]
+
+    async def test_export_multiple_nodes_as_parquet_zip(
+        self,
+        authenticated_client,
+        tiny_node_id,
+        sample_node_id,
+    ):
+        """Multi-node export should zip parquet artifacts rather than csv output."""
+        response = await authenticated_client.get(
+            "/api/workspaces/export",
+            params={
+                "node_ids": f"{tiny_node_id},{sample_node_id}",
+                "format": "parquet",
+            },
+        )
+
+        assert response.status_code == 200, response.text
+        assert response.headers["content-type"] == "application/zip"
+        assert response.headers["content-disposition"].endswith(".zip")
+
+        with zipfile.ZipFile(io.BytesIO(response.content), "r") as archive:
+            names = sorted(archive.namelist())
+            assert len(names) == 2
+            assert all(name.endswith(".parquet") for name in names)
+            assert not any(name.endswith(".csv") for name in names)
+
+            exported_shapes = sorted(
+                pl.read_parquet(io.BytesIO(archive.read(name))).shape for name in names
+            )
+
+        assert exported_shapes == [(2, 1), (4, 1)]
 
     async def test_unload_workspace(self, authenticated_client):
         """Test unloading an existing workspace"""
