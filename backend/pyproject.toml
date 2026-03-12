@@ -88,6 +88,13 @@ dev = [
     "pytest-asyncio>=0.23.0",
 ]
 
+[tool.uv.workspace]
+members = [
+    "docworkspace",
+    "ldaca-tabulator",
+    "polars-text",
+]
+
 [tool.hatch.build.targets.sdist]
 include = [
     "/src",

@@ -58,12 +58,12 @@
 #### Python (uv workspace)
 
 - **Minimum Python:** `>=3.14`.
-- **Package manager:** [uv](https://docs.astral.sh/uv/). All Python workspace members are declared in the root `pyproject.toml` under `[tool.uv.workspace]`.
-- **Install all deps:** `uv sync` from the repo root. This installs every workspace member in editable mode — no need to set `PYTHONPATH`.
+- **Package manager:** [uv](https://docs.astral.sh/uv/). The Python package workspace is rooted at `backend/` under `[tool.uv.workspace]`; the repo root `pyproject.toml` is only a thin top-level entry project.
+- **Install all Python deps:** `cd backend && uv sync`. This installs the backend plus `docworkspace`, `ldaca-tabulator`, and `polars-text` in editable mode — no need to set `PYTHONPATH`.
 - **Run any script/command:** `uv run <command>`. Examples:
   ```sh
   # Start backend dev server
-  uv run uvicorn ldaca_web_app_backend.main:app --reload --port 8001
+  cd backend && uv run uvicorn ldaca_web_app_backend.main:app --reload --port 8001
 
   # Run backend tests
   cd backend && uv run pytest
@@ -71,7 +71,7 @@
   # Run docworkspace tests
   cd backend/docworkspace && uv run pytest
   ```
-- **Add a dependency:** `uv add <package>` in the relevant workspace member directory.
+- **Add a dependency:** `uv add <package>` in the relevant workspace member directory under `backend/`.
 - **Never** set `PYTHONPATH=src` — uv handles package resolution via editable installs.
 
 #### Node.js (npm workspace)

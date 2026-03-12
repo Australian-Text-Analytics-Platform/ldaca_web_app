@@ -7,16 +7,27 @@ current metadata.json + binary node-payload persistence format.
 from __future__ import annotations
 
 import json
-import warnings
+import os
+from contextlib import contextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, Union
-
-import polars as pl
 
 if TYPE_CHECKING:  # pragma: no cover
     from .core import Workspace
 
 from ..node import Node
+from ..node.io import from_dict as node_from_dict
+from ..node.io import to_dict as node_to_dict
+
+
+@contextmanager
+def _working_directory(path: Path):
+    previous = Path.cwd()
+    os.chdir(path)
+    try:
+        yield
+    finally:
+        os.chdir(previous)
 
 
 def _resolve_metadata_path(path: Path) -> Path:
@@ -25,36 +36,6 @@ def _resolve_metadata_path(path: Path) -> Path:
     if path.suffix.lower() == ".json":
         return path
     raise ValueError("Workspace path must be a directory or a .json file")
-
-
-def _serialize_node_data_to_file(node: Node, root_dir: Path) -> str:
-    """Serialize a node's data into a binary file under root_dir/data.
-
-    Returns a POSIX-style relative path (e.g. "data/<node_id>.plbin").
-    """
-
-    data_dir = root_dir / "data"
-    data_dir.mkdir(parents=True, exist_ok=True)
-
-    # Always serialize the underlying Polars LazyFrame. The document metadata
-    # is reconstructed from `node.document` on load.
-    lf = node.data
-    if not isinstance(lf, pl.LazyFrame):
-        # Defensive: Node inputs are normalized to LazyFrame,
-        # but keep a clear error if something unexpected slips through.
-        raise TypeError(
-            f"Unsupported node.data type for binary persistence: {type(node.data).__name__}"
-        )
-
-    rel_path = Path("data") / f"{node.id}.plbin"
-    abs_path = (root_dir / rel_path).resolve()
-
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", UserWarning)
-        payload = lf.serialize(format="binary")
-
-    abs_path.write_bytes(payload)
-    return rel_path.as_posix()
 
 
 def write_workspace(workspace: "Workspace", path: Union[str, Path]) -> None:
@@ -69,22 +50,11 @@ def write_workspace(workspace: "Workspace", path: Union[str, Path]) -> None:
 
     nodes_data: list[dict[str, Any]] = []
     expected_node_files: set[str] = set()
-    for node in workspace.nodes.values():
-        rel_data_path = _serialize_node_data_to_file(node, target.parent)
-        expected_node_files.add(Path(rel_data_path).name)
-        node_metadata: Dict[str, Any] = {
-            "id": node.id,
-            "name": node.name,
-            "operation": node.operation,
-            "data_type": "LazyFrame",
-            "document": node.document,
-            "parents": [p.id for p in node.parents],
-        }
-        nodes_data.append({
-            "node_metadata": node_metadata,
-            "data_path": rel_data_path,
-            "data_format": "polars-binary-v1",
-        })
+    with _working_directory(target.parent):
+        for node in workspace.nodes.values():
+            node_payload = node_to_dict(node)
+            expected_node_files.add(Path(str(node_payload["data_path"])).name)
+            nodes_data.append(node_payload)
 
     workspace_metadata: Dict[str, Any] = {
         "id": workspace.id,
@@ -140,33 +110,10 @@ def read_workspace(path: Union[str, Path]) -> "Workspace":
     workspace.modified_at = ws_meta.get("modified_at")
 
     node_map: dict[str, Node] = {}
-    for node_entry in data.get("nodes", []):
-        node_meta = node_entry.get("node_metadata", {})
-        data_path = node_entry.get("data_path")
-        if not data_path:
-            raise ValueError("Missing node data_path in workspace metadata")
-
-        file_path = (target.parent / str(data_path)).resolve()
-        if not file_path.exists():
-            raise FileNotFoundError(f"Missing node data file: {file_path}")
-
-        with file_path.open("rb") as fh:
-            lf = pl.LazyFrame.deserialize(fh, format="binary")
-
-        node = Node.__new__(Node)
-        node.id = node_meta["id"]
-        node.name = node_meta["name"]
-        node._undo_stack = []
-        node._redo_stack = []
-        node._data = lf
-        node._document_column = node_meta.get("document")
-        node.parents = []
-        node.children = []
-        node.workspace = workspace
-        node.operation = node_meta.get("operation")
-
-        workspace.nodes[node.id] = node
-        node_map[node.id] = node
+    with _working_directory(target.parent):
+        for node_entry in data.get("nodes", []):
+            node = node_from_dict(node_entry, workspace=workspace)
+            node_map[node.id] = node
 
     for node_entry in data.get("nodes", []):
         node_meta = node_entry.get("node_metadata", {})
@@ -178,8 +125,6 @@ def read_workspace(path: Union[str, Path]) -> "Workspace":
             parent = node_map.get(parent_id)
             if parent is None:
                 continue
-            if node not in parent.children:
-                parent.children.append(node)
             if parent not in node.parents:
                 node.parents.append(parent)
 

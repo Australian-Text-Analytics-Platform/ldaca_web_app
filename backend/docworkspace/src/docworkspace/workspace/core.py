@@ -47,21 +47,29 @@ class Workspace:
     def add_node(self, node: Node) -> Node:
         if node.id in self.nodes:
             return node
-        if getattr(node, "workspace", None) is not None and node.workspace is not self:
-            if node.id in node.workspace.nodes:
-                del node.workspace.nodes[node.id]
+        source_workspace = getattr(node, "workspace", None)
+        if source_workspace is not None and source_workspace is not self:
+            if node.id in source_workspace.nodes:
+                del source_workspace.nodes[node.id]
         self.nodes[node.id] = node
         node.workspace = self
 
         def move_children_recursive(current: Node) -> None:
-            for child in current.children:
+            if source_workspace is None:
+                return
+            child_nodes = [
+                candidate
+                for candidate in source_workspace.nodes.values()
+                if current in candidate.parents
+            ]
+            for child in child_nodes:
                 if child.id not in self.nodes:
                     if child.workspace is not None and child.workspace is not self:
                         if child.id in child.workspace.nodes:
                             del child.workspace.nodes[child.id]
                     self.nodes[child.id] = child
                     child.workspace = self
-                    move_children_recursive(child)
+                move_children_recursive(child)
 
         move_children_recursive(node)
         return node
@@ -80,17 +88,10 @@ class Workspace:
             for parent in parent_nodes:
                 if parent is child:
                     continue
-                if child not in parent.children:
-                    parent.children.append(child)
                 if parent not in child.parents:
                     child.parents.append(parent)
 
-        for parent in parent_nodes:
-            if node in parent.children:
-                parent.children.remove(node)
-
         node.parents = []
-        node.children = []
         del self.nodes[node_id]
 
         # Best-effort cleanup for on-disk persisted node payloads.

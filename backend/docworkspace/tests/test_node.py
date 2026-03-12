@@ -321,6 +321,19 @@ class TestNodeRelationships:
         assert child2 in parent.children
         assert child3 in parent.children
 
+    def test_children_property_reflects_parent_relationship_changes(
+        self, workspace, sample_df
+    ):
+        """Children should be derived from workspace parent links, not cached state."""
+        parent = Node(sample_df.lazy(), "parent", workspace)
+        child = parent.filter(pl.col("category") == "A")
+
+        assert child in parent.children
+
+        child.parents = []
+
+        assert parent.children == []
+
     def test_merge_multiple_parents(self, workspace):
         """Test that merge creates a node with multiple parents."""
         df1 = pl.DataFrame({"key": [1, 2], "val1": ["a", "b"]})

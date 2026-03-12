@@ -7,16 +7,21 @@ and core dataframe operations (join/filter/slice/dynamic delegation).
 from __future__ import annotations
 
 import uuid
-from typing import Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, Literal, Optional, cast
 
 import polars as pl
 
-if False:  # TYPE_CHECKING replacement to avoid runtime import cycle
+if TYPE_CHECKING:  # pragma: no cover
     from ..workspace.core import Workspace  # pragma: no cover
 
 
 class Node:
     MAX_UNDO_DEPTH = 50
+
+    @staticmethod
+    def _lazyframe_height(data: pl.LazyFrame) -> int:
+        collected = cast(pl.DataFrame, data.select(pl.len()).collect())
+        return int(collected.item())
 
     def __init__(
         self,
@@ -25,10 +30,12 @@ class Node:
         workspace: Optional["Workspace"] = None,
         parents: list["Node"] | None = None,
         operation: str | None = None,
+        id: str | None = None,
+        document: str | None = None,
     ) -> None:
         from ..workspace.core import Workspace  # local import to avoid cycle
 
-        self.id = str(uuid.uuid4())
+        self.id = id or str(uuid.uuid4())
         self.name = name or f"node_{self.id[:8]}"
 
         if not isinstance(data, pl.LazyFrame):
@@ -39,20 +46,16 @@ class Node:
         self._undo_stack: list[pl.LazyFrame] = []
         self._redo_stack: list[pl.LazyFrame] = []
         self._data: pl.LazyFrame = data
-        self._document_column: Optional[str] = None
+        self._document_column: Optional[str] = document
         self.parents: list[Node] = parents or []
-        self.children: list[Node] = []
 
         if workspace is None:
             workspace = Workspace(name=f"workspace_for_{self.name}")
-        self.workspace: Workspace = workspace  # type: ignore
+        self.workspace: Workspace = workspace
         self.operation = operation
 
         if self.id not in self.workspace.nodes:
             self.workspace.add_node(self)
-
-        for parent in self.parents:
-            parent.children.append(self)
 
     def __getattr__(self, item: str) -> Any:  # pragma: no cover - thin wrapper
         # Delegate attribute access to underlying data object. Callable
@@ -79,7 +82,7 @@ class Node:
     # Commonly accessed convenience properties (explicit to avoid delegation surprises)
     @property
     def shape(self) -> tuple[int, int]:
-        height = int(self.data.select(pl.len()).collect().item())
+        height = self._lazyframe_height(self.data)
         return (height, self.data.collect_schema().len())
 
     @property
@@ -110,6 +113,14 @@ class Node:
     def columns(self):  # pragma: no cover
         return self.data.collect_schema().names()
 
+    @property
+    def children(self) -> list["Node"]:
+        return [
+            candidate
+            for candidate in self.workspace.nodes.values()
+            if self in candidate.parents
+        ]
+
     # ------------------------------------------------------------------
     # Explicit graph-producing dataframe operations
     # ------------------------------------------------------------------
@@ -137,7 +148,16 @@ class Node:
         self,
         other: "Node",
         on: Any = None,
-        how: str = "inner",
+        how: Literal[
+            "inner",
+            "left",
+            "right",
+            "full",
+            "semi",
+            "anti",
+            "cross",
+            "outer",
+        ] = "inner",
         **kwargs: Any,
     ) -> "Node":
         result = self.data.join(other.data, on=on, how=how, **kwargs)
@@ -266,7 +286,7 @@ class Node:
         additional conversion.
         """
         schema = self.data.collect_schema()
-        height = self.data.select(pl.len()).collect().item()
+        height = self._lazyframe_height(self.data)
         return {
             "id": self.id,
             "name": self.name,

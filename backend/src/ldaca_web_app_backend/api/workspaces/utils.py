@@ -3,6 +3,7 @@
 import logging
 import os
 import re
+import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
@@ -14,6 +15,44 @@ from ...analysis.models import AnalysisStatus
 from ...core.workspace import workspace_manager
 
 logger = logging.getLogger(__name__)
+
+
+def _safe_workspace_data_stem(name: str) -> str:
+    return re.sub(r"[^A-Za-z0-9_.-]+", "_", name).strip("._") or "data"
+
+
+def _allocate_workspace_data_path(
+    workspace_dir: Path, *, stem: str, suffix: str = ".parquet"
+) -> Path:
+    data_dir = workspace_dir / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+
+    candidate = data_dir / f"{stem}{suffix}"
+    suffix_index = 1
+    while candidate.exists():
+        candidate = data_dir / f"{stem}_{suffix_index}{suffix}"
+        suffix_index += 1
+    return candidate
+
+
+def _scan_workspace_parquet(parquet_path: Path, workspace_dir: Path):
+    try:
+        relative_path = parquet_path.relative_to(workspace_dir)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to compute relative parquet path: {exc}",
+        )
+
+    try:
+        os.chdir(workspace_dir)
+        lazy_data: Any = pl.scan_parquet(relative_path)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to reload parquet as LazyFrame: {exc}"
+        )
+
+    return lazy_data
 
 
 def update_workspace(
@@ -168,20 +207,10 @@ def stage_dataframe_as_lazy(
     This mirrors the lazy serialize/reload pattern used by the base add-node endpoint
     so that detached/derived nodes remain portable and lazy by default.
     """
-
-    data_dir = workspace_dir / "data"
-    data_dir.mkdir(parents=True, exist_ok=True)
-
-    def _safe_stem(name: str) -> str:
-        stem = re.sub(r"[^A-Za-z0-9_.-]+", "_", name).strip("._") or "data"
-        return stem
-
-    base_stem = _safe_stem(node_name)
-    parquet_path = data_dir / f"{base_stem}.parquet"
-    suffix = 1
-    while parquet_path.exists():
-        parquet_path = data_dir / f"{base_stem}_{suffix}.parquet"
-        suffix += 1
+    parquet_path = _allocate_workspace_data_path(
+        workspace_dir,
+        stem=_safe_workspace_data_stem(node_name),
+    )
 
     if not isinstance(data, pl.DataFrame):
         raise HTTPException(
@@ -197,23 +226,43 @@ def stage_dataframe_as_lazy(
             status_code=500, detail=f"Failed to persist parquet for workspace: {exc}"
         )
 
+    return _scan_workspace_parquet(parquet_path, workspace_dir)
+
+
+def stage_parquet_artifact_as_lazy(
+    artifact_path: str | Path,
+    workspace_dir: Path,
+    node_name: str,
+) -> tuple[Any, Path]:
+    """Copy a temporary parquet artifact into workspace data and reload lazily.
+
+    Background workers write ephemeral parquet artifacts under `data/artifacts`.
+    Before attaching a derived node to the workspace, the main process must copy
+    that parquet into durable workspace storage so the node survives artifact
+    cleanup on unload.
+    """
+
+    source_path = Path(artifact_path)
+    if not source_path.exists() or not source_path.is_file():
+        raise HTTPException(
+            status_code=404,
+            detail=f"Artifact parquet not found: {source_path}",
+        )
+
+    persisted_path = _allocate_workspace_data_path(
+        workspace_dir,
+        stem=_safe_workspace_data_stem(node_name or source_path.stem),
+    )
+
     try:
-        relative_path = parquet_path.relative_to(workspace_dir)
+        shutil.copy2(source_path, persisted_path)
     except Exception as exc:
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to compute relative parquet path: {exc}",
+            detail=f"Failed to copy artifact parquet into workspace data: {exc}",
         )
 
-    try:
-        os.chdir(workspace_dir)
-        lazy_data: Any = pl.scan_parquet(relative_path)
-    except Exception as exc:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to reload parquet as LazyFrame: {exc}"
-        )
-
-    return lazy_data
+    return _scan_workspace_parquet(persisted_path, workspace_dir), persisted_path
 
 
 __all__ = [
@@ -222,4 +271,5 @@ __all__ = [
     "failed",
     "update_workspace",
     "stage_dataframe_as_lazy",
+    "stage_parquet_artifact_as_lazy",
 ]

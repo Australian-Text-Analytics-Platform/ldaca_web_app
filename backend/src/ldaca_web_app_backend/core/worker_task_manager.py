@@ -398,9 +398,11 @@ class WorkerTaskManager:
                     "quotation_detach",
                 ]:
                     try:
-                        import polars as pl
+                        from pathlib import Path
+
                         from docworkspace import Node
 
+                        from ..api.workspaces.utils import stage_parquet_artifact_as_lazy
                         from .workspace import workspace_manager
 
                         # Worker contract: {"state": "successful", "result": {...}}
@@ -422,8 +424,7 @@ class WorkerTaskManager:
 
                         if not parquet_path:
                             raise ValueError("Task result missing parquet_path")
-
-                        lazy_df = pl.scan_parquet(parquet_path)
+                        artifact_path = Path(str(parquet_path))
 
                         if (
                             workspace_manager.get_current_workspace_id(user_id)
@@ -437,6 +438,20 @@ class WorkerTaskManager:
                         if workspace is None:
                             raise RuntimeError("Workspace not found")
 
+                        target_dir = workspace_manager._resolve_workspace_dir(
+                            user_id=user_id,
+                            workspace_id=workspace_id,
+                            workspace_name=workspace.name,
+                        )
+                        workspace_manager._attach_workspace_dir(workspace, target_dir)
+                        workspace_manager._set_working_dir(target_dir)
+
+                        lazy_df, _ = stage_parquet_artifact_as_lazy(
+                            artifact_path=artifact_path,
+                            workspace_dir=target_dir,
+                            node_name=str(new_node_name or artifact_path.stem),
+                        )
+
                         parent_node = workspace.nodes.get(parent_id)
 
                         new_node = Node(
@@ -448,12 +463,6 @@ class WorkerTaskManager:
                         )
                         workspace.add_node(new_node)
                         workspace.modified_at = datetime.now().isoformat()
-                        target_dir = workspace_manager._resolve_workspace_dir(
-                            user_id=user_id,
-                            workspace_id=workspace_id,
-                            workspace_name=workspace.name,
-                        )
-                        workspace_manager._attach_workspace_dir(workspace, target_dir)
                         workspace.save(target_dir)
                         workspace_manager._set_cached_path(
                             user_id, workspace_id, target_dir
@@ -469,6 +478,9 @@ class WorkerTaskManager:
                                     getattr(new_node, "id", "unknown"),
                                     exc,
                                 )
+
+                        if artifact_path.exists():
+                            artifact_path.unlink(missing_ok=True)
 
                         result_persisted = True
                         await self.emit(
