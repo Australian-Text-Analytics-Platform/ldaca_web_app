@@ -1,3 +1,4 @@
+import { useEffect, useState, type FocusEvent } from 'react';
 import { Label } from '../../../../../components/ui/label';
 import { Input } from '../../../../../components/ui/input';
 import HelpIcon from '../../../../../components/help/HelpIcon';
@@ -7,6 +8,7 @@ import type { NodeColumnSelection } from '../../../../../hooks/useAutoNodeColumn
 import type { ColumnInfo } from '../../../../../utils/columnTypes';
 import type { NodeLike } from '../../../../../hooks/useNodeColumnInfos';
 import { AnalysisCardLayout } from '../../../common/components/AnalysisCardLayout';
+import { sanitizeMinTopicSizeInput } from './minTopicSize';
 
 type Props = {
   selectedNodes: Array<{ id?: string; name?: string }>;
@@ -55,6 +57,22 @@ export function TopicModelingParameterPanel({
   hasMissingColumns,
   resultState,
 }: Props) {
+  const [minTopicSizeDraft, setMinTopicSizeDraft] = useState(() => String(minTopicSize));
+
+  useEffect(() => {
+    setMinTopicSizeDraft(String(minTopicSize));
+  }, [minTopicSize]);
+
+  const handleMinTopicSizeBlur = (event: FocusEvent<HTMLInputElement>) => {
+    const nextValue = sanitizeMinTopicSizeInput(event.currentTarget.value);
+
+    setMinTopicSizeDraft(String(nextValue));
+
+    if (nextValue !== minTopicSize) {
+      onMinTopicSizeChange(nextValue);
+    }
+  };
+
   return (
     <AnalysisCardLayout
       title="Topic Modeling Parameters"
@@ -98,8 +116,9 @@ export function TopicModelingParameterPanel({
             min={2}
             max={100}
             step={1}
-            value={minTopicSize}
-            onChange={(event) => onMinTopicSizeChange(Math.max(2, Number(event.target.value) || 0))}
+            value={minTopicSizeDraft}
+            onChange={(event) => setMinTopicSizeDraft(event.target.value)}
+            onBlur={handleMinTopicSizeBlur}
           />
         </div>
 

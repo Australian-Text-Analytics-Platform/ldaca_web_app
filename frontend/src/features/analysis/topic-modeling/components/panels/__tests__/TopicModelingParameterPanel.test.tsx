@@ -1,8 +1,9 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { TopicModelingParameterPanel } from '../TopicModelingParameterPanel';
+import { sanitizeMinTopicSizeInput } from '../minTopicSize';
 
 vi.mock('../../../../../../components/help/HelpIcon', () => ({
   default: () => null,
@@ -45,5 +46,46 @@ describe('TopicModelingParameterPanel', () => {
 
     expect(screen.getByLabelText('Random Seed')).toBeInTheDocument();
     expect(screen.getByLabelText('Representative Words to Show')).toBeInTheDocument();
+  });
+
+  it('keeps the raw min topic size input while editing', () => {
+    render(
+      <TopicModelingParameterPanel
+        selectedNodes={[]}
+        nodeColumnSelections={[]}
+        onColumnChange={vi.fn()}
+        nodeColors={{}}
+        onNodeColorChange={vi.fn()}
+        defaultPalette={[]}
+        isLocked={false}
+        getNodeColumns={() => []}
+        actionState={{ runDisabled: false, clearDisabled: false, runLabel: 'Run Analysis' }}
+        minTopicSize={10}
+        onMinTopicSizeChange={vi.fn()}
+        randomSeed={42}
+        onRandomSeedChange={vi.fn()}
+        representativeWordsCount={5}
+        onRepresentativeWordsCountChange={vi.fn()}
+        isRunning={false}
+        isClearing={false}
+        onRun={vi.fn()}
+        onClear={vi.fn()}
+        hasMissingColumns={false}
+      />
+    );
+
+    const input = screen.getByLabelText('Min Topic Size') as HTMLInputElement;
+
+    fireEvent.change(input, { target: { value: '' } });
+    expect(input.value).toBe('');
+
+    fireEvent.change(input, { target: { value: '15' } });
+    expect(input.value).toBe('15');
+  });
+
+  it('sanitizes min topic size values on commit', () => {
+    expect(sanitizeMinTopicSizeInput('')).toBe(2);
+    expect(sanitizeMinTopicSizeInput('1')).toBe(2);
+    expect(sanitizeMinTopicSizeInput('15')).toBe(15);
   });
 });
