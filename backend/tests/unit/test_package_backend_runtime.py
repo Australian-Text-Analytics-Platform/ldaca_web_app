@@ -7,7 +7,9 @@ from pathlib import Path
 def _load_package_backend_runtime_module():
     repo_root = Path(__file__).resolve().parents[3]
     module_path = repo_root / "backend" / "scripts" / "package_backend_runtime.py"
-    spec = importlib.util.spec_from_file_location("package_backend_runtime", module_path)
+    spec = importlib.util.spec_from_file_location(
+        "package_backend_runtime", module_path
+    )
     assert spec is not None
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
