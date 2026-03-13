@@ -1553,7 +1553,7 @@ requires-dist = [
     { name = "beautifulsoup4", specifier = ">=4.14.2" },
     { name = "pandas", specifier = ">=2.3.3" },
     { name = "requests", specifier = ">=2.32.5" },
-    { name = "rocrate-tabular", git = "https://github.com/Sydney-Informatics-Hub/rocrate-tabular.git" },
+    { name = "rocrate-tabular", git = "https://github.com/AttiqUrRehmann/rocrate-tabular.git?rev=optimise_entity_table" },
 ]
 
 [package.metadata.requires-dev]
@@ -2981,7 +2981,7 @@ wheels = [
 [[package]]
 name = "rocrate-tabular"
 version = "0.1.4"
-source = { git = "https://github.com/Sydney-Informatics-Hub/rocrate-tabular.git#6a671d5e4577c6e1d4e6d0fe89363d4f56656488" }
+source = { git = "https://github.com/AttiqUrRehmann/rocrate-tabular.git?rev=optimise_entity_table#79e7f0beb8bf132cb5f1111ad11e813413f08fa4" }
 dependencies = [
     { name = "requests" },
     { name = "sqlite-utils" },
@@ -3364,15 +3364,15 @@ wheels = [
 
 [[package]]
 name = "tinycrate"
-version = "0.1.2"
+version = "0.1.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "requests" },
     { name = "types-requests" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/1f/40/ede4d6566efc7fbc6b87d3d8a43fd8f4cfe50befeb9053425e19b49ff4bc/tinycrate-0.1.2.tar.gz", hash = "sha256:7ed3c720643f1bd967c6ded8658496ba8319669215a10a7eb1515a596320474c", size = 60307, upload-time = "2025-06-06T07:32:25.73Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/dc/06/54d337009d9e2820e982a37e7573cb057ecc495c2625ee1fd692de2b05ab/tinycrate-0.1.5.tar.gz", hash = "sha256:77000044048c8f097416bf9f9d87299d661cf90e6c7c505bdf27ef2e0745d9c2", size = 62231, upload-time = "2026-01-28T22:37:19.656Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/aa/7b/d6ba447136d8c9e0a43c2e95e903245c61cb427748cc897f8c304c68711a/tinycrate-0.1.2-py3-none-any.whl", hash = "sha256:28c74950c9759c99d49aa3e8f3d6e12ca347c7b313cb234ae3c988e04857ab0c", size = 6998, upload-time = "2025-06-06T07:32:24.72Z" },
+    { url = "https://files.pythonhosted.org/packages/bf/af/a50500471c8330c2e819ec93721f876d671e771c0fa64b91314b418490ad/tinycrate-0.1.5-py3-none-any.whl", hash = "sha256:f3ff9ddda2e7395c1d993b2d3f1d8cd9e2d88b20321e6f979d0720a7696c0353", size = 7005, upload-time = "2026-01-28T22:37:18.227Z" },
 ]
 
 [[package]]

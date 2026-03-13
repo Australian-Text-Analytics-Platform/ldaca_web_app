@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import os
+from contextlib import chdir
 from typing import Any, Callable, Dict, Optional
+
+from ldaca_web_app_backend.settings import settings
 
 
 def _extract_corpus_name(url: str) -> str | None:
@@ -90,39 +93,43 @@ def run_ldaca_import_task(
         if progress_callback:
             progress_callback(0.3, "Downloading and extracting...")
 
+        cache_dir = settings.get_data_root() / "ldaca_cache"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+
         try:
-            ldac_tb = LDaCATabulator(url)
+            with chdir(cache_dir):
+                ldac_tb = LDaCATabulator(url)
+
+                # Extract authentic corpus name from the RO-Crate HTML
+                corpus_name = _extract_corpus_name(url)
+                if corpus_name:
+                    sanitized = _sanitize_name(corpus_name)
+                else:
+                    # Fallback to URL-derived name
+                    sanitized = _sanitize_name(
+                        re.sub(
+                            r"\.zip$",
+                            "",
+                            re.sub(r"^arcp://", "", url.split("/")[-1]),
+                            flags=re.IGNORECASE,
+                        )
+                    )
+
+                # Get corpus metadata markdown
+                try:
+                    corpus_info_md = ldac_tb.get_corpus_info()
+                except Exception:
+                    corpus_info_md = None
+
+                if progress_callback:
+                    progress_callback(0.6, "Converting to DataFrame...")
+
+                try:
+                    df = ldac_tb.get_text()
+                except Exception as e:
+                    raise ValueError(f"Failed to extract text DataFrame: {e}")
         except Exception as e:
             raise ValueError(f"Failed to download/init LDaCATabulator: {e}")
-
-        # Extract authentic corpus name from the RO-Crate HTML
-        corpus_name = _extract_corpus_name(url)
-        if corpus_name:
-            sanitized = _sanitize_name(corpus_name)
-        else:
-            # Fallback to URL-derived name
-            sanitized = _sanitize_name(
-                re.sub(
-                    r"\.zip$",
-                    "",
-                    re.sub(r"^arcp://", "", url.split("/")[-1]),
-                    flags=re.IGNORECASE,
-                )
-            )
-
-        # Get corpus metadata markdown
-        try:
-            corpus_info_md = ldac_tb.get_corpus_info()
-        except Exception:
-            corpus_info_md = None
-
-        if progress_callback:
-            progress_callback(0.6, "Converting to DataFrame...")
-
-        try:
-            df = ldac_tb.get_text()
-        except Exception as e:
-            raise ValueError(f"Failed to extract text DataFrame: {e}")
 
         if progress_callback:
             progress_callback(0.8, "Saving to user data...")
