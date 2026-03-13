@@ -195,7 +195,6 @@ src-tauri/.cargo/
 
 # npm Workspaces - Root level
 node_modules/
-package-lock.json
 
 # npm Workspaces - Workspace members have their own node_modules
 frontend/node_modules/
