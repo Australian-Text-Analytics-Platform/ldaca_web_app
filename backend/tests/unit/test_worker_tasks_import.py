@@ -23,6 +23,10 @@ def test_run_ldaca_import_task_uses_data_root_cache_and_restores_cwd(
             assert url == "https://example.org/dataset.zip"
             observed_cwds.append(Path.cwd())
 
+        def get_name(self) -> str:
+            observed_cwds.append(Path.cwd())
+            return "Corpus Name"
+
         def get_corpus_info(self) -> str:
             observed_cwds.append(Path.cwd())
             return "# Corpus info"
@@ -47,11 +51,6 @@ def test_run_ldaca_import_task_uses_data_root_cache_and_restores_cwd(
         "ldaca_web_app_backend.core.utils.get_user_data_folder",
         lambda _user_id: user_data_dir,
     )
-    monkeypatch.setattr(
-        worker_tasks_import,
-        "_extract_corpus_name",
-        lambda _url: "Corpus Name",
-    )
 
     result = worker_tasks_import.run_ldaca_import_task(
         configure_worker_environment=lambda: None,
@@ -60,7 +59,7 @@ def test_run_ldaca_import_task_uses_data_root_cache_and_restores_cwd(
         url="https://example.org/dataset.zip",
     )
 
-    assert observed_cwds == [cache_dir, cache_dir, cache_dir]
+    assert observed_cwds == [cache_dir, cache_dir, cache_dir, cache_dir]
     assert cache_dir.is_dir()
     assert Path.cwd() == original_cwd
     assert result["message"] == "Successfully imported Corpus Name"

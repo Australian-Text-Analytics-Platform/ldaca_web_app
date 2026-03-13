@@ -46,6 +46,41 @@ README_FILENAME = "README.md"
 README_MAX_BYTES = 200_000
 
 
+def _delete_parent_folder_if_redundant(file_path: Path, data_folder: Path) -> None:
+    """Delete the file's parent folder when it becomes empty or README-only.
+
+    Used by:
+    - `delete_file`
+
+    Why:
+    - Imported datasets often live in their own wrapper folder with a data file
+      plus `README.md`. When the data file is deleted, removing the now-empty
+      wrapper avoids leaving behind dead folders in the file browser.
+    """
+    parent = file_path.parent
+    if parent == data_folder or not parent.exists() or not parent.is_dir():
+        return
+
+    if not validate_file_path(parent, data_folder):
+        return
+
+    remaining_entries = list(parent.iterdir())
+    if not remaining_entries:
+        parent.rmdir()
+        return
+
+    if len(remaining_entries) != 1:
+        return
+
+    remaining_entry = remaining_entries[0]
+    if (
+        remaining_entry.is_file()
+        and remaining_entry.name.lower() == README_FILENAME.lower()
+    ):
+        remaining_entry.unlink()
+        parent.rmdir()
+
+
 def _read_sample_folder_readme(readme_path: Path) -> Optional[str]:
     """Read a sample-folder README safely for citation display.
 
@@ -366,6 +401,7 @@ async def delete_file(filename: str, current_user: dict = Depends(get_current_us
 
     try:
         file_path.unlink()
+        _delete_parent_folder_if_redundant(file_path, data_folder)
         return {"message": f"File {filename} deleted successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to delete file: {str(e)}")
