@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "backend/polars-text",
+    "polars-text",
     "frontend/src-tauri",
 ]
 resolver = "2"

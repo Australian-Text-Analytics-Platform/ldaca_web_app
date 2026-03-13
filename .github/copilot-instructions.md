@@ -18,10 +18,10 @@
 │   │   ├── settings.py     ← pydantic-settings (env vars, no hardcoded secrets)
 │   │   ├── db.py           ← SQLAlchemy models (User, UserSession)
 │   │   └── main.py         ← FastAPI app lifecycle (startup/shutdown)
-│   ├── docworkspace/       ← workspace graph library (Workspace, Node)
-│   ├── polars-text/        ← Rust/PyO3 text-analysis extensions for Polars
-│   ├── ldaca-tabulator/    ← RO-Crate import/export utilities
 │   └── tests/
+├── docworkspace/           ← workspace graph library (Workspace, Node)
+├── polars-text/            ← Rust/PyO3 text-analysis extensions for Polars
+├── ldaca-tabulator/        ← RO-Crate import/export utilities
 ├── frontend/               ← React 19 + Vite + TanStack + Shadcn/Radix
 │   ├── src/
 │   │   ├── api/            ← HTTP client & service modules
@@ -34,7 +34,7 @@
 │   │   └── types/          ← shared TypeScript types
 │   └── src-tauri/          ← Tauri v2 desktop shell (Rust)
 ├── package.json            ← npm workspace root (delegates to frontend/)
-└── pyproject.toml          ← uv workspace root (members: backend/*)
+└── pyproject.toml          ← uv workspace root (members: backend + local packages)
 ```
 
 **Key libraries:**
@@ -58,8 +58,8 @@
 #### Python (uv workspace)
 
 - **Minimum Python:** `>=3.14`.
-- **Package manager:** [uv](https://docs.astral.sh/uv/). The Python package workspace is rooted at `backend/` under `[tool.uv.workspace]`; the repo root `pyproject.toml` is only a thin top-level entry project.
-- **Install all Python deps:** `cd backend && uv sync`. This installs the backend plus `docworkspace`, `ldaca-tabulator`, and `polars-text` in editable mode — no need to set `PYTHONPATH`.
+- **Package manager:** [uv](https://docs.astral.sh/uv/). The Python package workspace is rooted at the repository `pyproject.toml` under `[tool.uv.workspace]`.
+- **Install all Python deps:** `uv sync` from the repo root. This installs the backend plus `docworkspace`, `ldaca-tabulator`, and `polars-text` in editable mode — no need to set `PYTHONPATH`.
 - **Run any script/command:** `uv run <command>`. Examples:
   ```sh
   # Start backend dev server
@@ -69,7 +69,7 @@
   cd backend && uv run pytest
 
   # Run docworkspace tests
-  cd backend/docworkspace && uv run pytest
+  cd docworkspace && uv run pytest
   ```
 - **Add a dependency:** `uv add <package>` in the relevant workspace member directory under `backend/`.
 - **Never** set `PYTHONPATH=src` — uv handles package resolution via editable installs.
@@ -397,7 +397,7 @@ The Tauri v2 shell (`frontend/src-tauri/`) launches a bundled Python backend as 
 cd backend && uv run pytest                   # all backend tests
 cd backend && uv run pytest tests/unit/       # unit tests only
 cd backend && uv run pytest tests/integration/ # integration tests only
-cd backend/docworkspace && uv run pytest      # docworkspace tests
+cd docworkspace && uv run pytest              # docworkspace tests
 ```
 
 - `asyncio_mode = "auto"` — all async tests run automatically without `@pytest.mark.asyncio`.

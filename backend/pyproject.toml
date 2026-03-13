@@ -50,8 +50,8 @@ addopts = [
     "-ra",
     "--strict-markers",
     "--strict-config",
-    "--ignore=polars-text",
-    "--ignore=ldaca-tabulator",
+    "--ignore=../polars-text",
+    "--ignore=../ldaca-tabulator",
 ]
 pythonpath = ["src"]
 testpaths = ["tests"]
@@ -86,13 +86,6 @@ build-backend = "hatchling.build"
 dev = [
     "twine>=6.2.0",
     "pytest-asyncio>=0.23.0",
-]
-
-[tool.uv.workspace]
-members = [
-    "docworkspace",
-    "ldaca-tabulator",
-    "polars-text",
 ]
 
 [tool.hatch.build.targets.sdist]

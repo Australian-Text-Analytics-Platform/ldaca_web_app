@@ -1,6 +1,6 @@
-[submodule "backend/ldaca-tabulator"]
-	path = backend/ldaca-tabulator
+[submodule "ldaca-tabulator"]
+	path = ldaca-tabulator
 	url = https://github.com/Australian-Text-Analytics-Platform/ldaca-tabulator
-[submodule "backend/polars-text"]
-	path = backend/polars-text
+[submodule "polars-text"]
+	path = polars-text
 	url = https://github.com/Australian-Text-Analytics-Platform/polars-text

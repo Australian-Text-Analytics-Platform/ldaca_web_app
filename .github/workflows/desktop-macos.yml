@@ -48,7 +48,7 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.toml', 'frontend/src-tauri/Cargo.lock', 'backend/polars-text/Cargo.toml', 'backend/polars-text/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.toml', 'frontend/src-tauri/Cargo.lock', 'polars-text/Cargo.toml', 'polars-text/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
 
@@ -56,7 +56,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.rustup
-          key: ${{ runner.os }}-rustup-${{ hashFiles('Cargo.toml', 'frontend/src-tauri/Cargo.lock', 'backend/polars-text/Cargo.toml', 'backend/polars-text/Cargo.lock') }}
+          key: ${{ runner.os }}-rustup-${{ hashFiles('Cargo.toml', 'frontend/src-tauri/Cargo.lock', 'polars-text/Cargo.toml', 'polars-text/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-rustup-
 

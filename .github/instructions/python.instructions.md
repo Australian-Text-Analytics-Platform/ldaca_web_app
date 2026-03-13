@@ -70,7 +70,7 @@ async def submit_analysis(
 - Run tests from the specific workspace member directory, not the repo root:
   ```sh
   cd backend && uv run pytest
-  cd backend/docworkspace && uv run pytest
+  cd docworkspace && uv run pytest
   ```
 - Use `authenticated_client` fixture for auth-required endpoints.
 - Use `test_client` fixture for single-user mode endpoints.
