@@ -5,9 +5,8 @@ import { QueryProvider } from './providers/QueryProvider';
 import { WorkspaceProvider } from './providers/WorkspaceProvider';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import GoogleLogin from './components/GoogleLogin';
-import { WorkspaceView, Sidebar } from './components/layout';
+import Sidebar from './components/layout/Sidebar';
 import BlockingScreen from './components/startup/BlockingScreen';
-import FeedbackPanel from './components/panels/FeedbackPanel';
 import { useUIStore } from './stores';
 import { useShallow } from 'zustand/react/shallow';
 import { SidebarInset, SidebarProvider, SidebarTrigger } from './components/ui/sidebar';
@@ -16,6 +15,8 @@ import { Dialog, DialogContent, DialogTitle } from './components/ui/dialog';
 
 // Lazy load components for code splitting
 const TutorialView = lazy(() => import('./components/TutorialView'));
+const FeedbackPanel = lazy(() => import('./components/panels/FeedbackPanel'));
+const WorkspaceView = lazy(() => import('./components/layout/WorkspaceView'));
 const DataLoaderFeature = lazy(() => import('./features/analysis/data-loader/DataLoaderFeature'));
 const DataPreprocessingFeature = lazy(() => import('./features/analysis/data-preprocessing/DataPreprocessingFeature'));
 const ConcordanceFeature = lazy(() => import('./features/analysis/concordance/ConcordanceFeature'));
@@ -256,7 +257,9 @@ const WorkspaceShell: React.FC = () => {
               </ErrorBoundary>
 
               <SidebarInset className="flex h-screen flex-1 flex-col overflow-hidden bg-transparent">
-                <FeedbackPanel open={feedbackOpen} onClose={closeFeedbackModal} />
+                <Suspense fallback={null}>
+                  <FeedbackPanel open={feedbackOpen} onClose={closeFeedbackModal} />
+                </Suspense>
 
                 <header className="border-b border-border/40 bg-white px-4 py-3 md:hidden">
                   <div className="flex items-center justify-between">
@@ -324,7 +327,17 @@ const WorkspaceShell: React.FC = () => {
                         </button>
                       )}
                       <ErrorBoundary>
-                        {!isRightCollapsed && <WorkspaceView />}
+                        {!isRightCollapsed && (
+                          <Suspense
+                            fallback={(
+                              <div className="flex h-full items-center justify-center bg-white text-sm text-muted-foreground">
+                                Loading workspace view…
+                              </div>
+                            )}
+                          >
+                            <WorkspaceView />
+                          </Suspense>
+                        )}
                       </ErrorBoundary>
                     </aside>
 

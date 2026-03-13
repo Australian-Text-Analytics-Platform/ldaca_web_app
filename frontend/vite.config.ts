@@ -1,55 +1,49 @@
-import { defineConfig } from 'vitest/config';
-import react from '@vitejs/plugin-react';
-import tailwindcss from '@tailwindcss/vite';
-import path from 'path';
+/// <reference types="vitest/config" />
 
-const reactWithCompiler = react({
-  babel: {
-    plugins: [
-      [
-        'babel-plugin-react-compiler',
-        {
-          target: '19',
-          runtimeModule: 'react-compiler-runtime',
-          throwIfUnsupported: false,
-        },
-      ],
-    ],
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { defineConfig, type ServerOptions } from 'vite';
+import react, { reactCompilerPreset } from '@vitejs/plugin-react';
+import babel from '@rolldown/plugin-babel';
+import tailwindcss from '@tailwindcss/postcss';
+
+const frontendRootDir = path.dirname(fileURLToPath(import.meta.url));
+
+const serverConfig = {
+  port: Number(process.env.FRONTEND_PORT ?? 3000),
+  host: '0.0.0.0',
+  forwardConsole: {
+    unhandledErrors: true,
+    logLevels: ['warn', 'error'],
   },
-});
+} as unknown as ServerOptions;
 
 export default defineConfig({
   base: './',
-  plugins: [reactWithCompiler, tailwindcss()],
+  plugins: [
+    react(),
+    babel({
+      presets: [reactCompilerPreset()],
+    } as Parameters<typeof babel>[0]),
+  ],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      '@': path.resolve(frontendRootDir, './src'),
+    },
+  },
+  css: {
+    postcss: {
+      plugins: [tailwindcss()],
     },
   },
   build: {
     target: 'esnext',
+    cssMinify: 'esbuild',
     sourcemap: true,
     outDir: 'build',
     emptyOutDir: true,
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          // Group vendor libraries
-          'vendor-react': ['react', 'react-dom'],
-          'vendor-query': ['@tanstack/react-query'],
-          'vendor-ui': ['@xyflow/react', 'dagre'],
-          'vendor-charts': ['recharts'],
-          'vendor-markdown': ['react-markdown', 'rehype-raw'],
-          'vendor-auth': ['@react-oauth/google'],
-          'vendor-utils': ['zustand']
-        }
-      }
-    }
   },
-  server: {
-    port: Number(process.env.FRONTEND_PORT ?? 3000),
-    host: '0.0.0.0',
-  },
+  server: serverConfig,
   preview: {
     port: Number(process.env.FRONTEND_PORT ?? 3000),
   },
@@ -57,5 +51,6 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
+    reporters: ['default'],
   },
 });
