@@ -4,6 +4,11 @@ from __future__ import annotations
 
 from typing import Any, Callable, Dict, Optional
 
+from ..api.workspaces.analyses.generated_columns import (
+    QUOTE_COLUMN_NAMES,
+    QUOTE_QUOTE_COLUMN,
+)
+
 
 def run_quotation_detach_task(
     configure_worker_environment,
@@ -25,7 +30,6 @@ def run_quotation_detach_task(
 
         import polars as pl
         from docworkspace import Node
-
         from ldaca_web_app_backend.api.workspaces.analyses.quotation_core import (
             ensure_quote_dataframe,
             quotation_via_polars_text,
@@ -42,10 +46,12 @@ def run_quotation_detach_task(
 
         source_column_name = "__quotation_source__"
         data: dict[str, list] = {source_column_name: filtered_corpus}
+        selected_columns: list[str] = []
         output_columns: list[str] = []
 
         if include_document_column:
             data[document_column] = filtered_corpus
+            selected_columns.append(document_column)
             output_columns.append(document_column)
 
         if extra_columns_data:
@@ -54,6 +60,7 @@ def run_quotation_detach_task(
                     value for value, keep in zip(col_values, non_empty_mask) if keep
                 ]
                 data[col_name] = filtered_values
+                selected_columns.append(col_name)
                 output_columns.append(col_name)
 
         input_df = pl.DataFrame(data)
@@ -63,6 +70,15 @@ def run_quotation_detach_task(
 
         quote_df = quotation_via_polars_text(input_df, source_column_name)
         quote_df = ensure_quote_dataframe(quote_df)
+        generated_columns = [
+            column_name
+            for column_name in QUOTE_COLUMN_NAMES
+            if column_name in quote_df.columns
+        ]
+        quote_df = quote_df.select(selected_columns + generated_columns)
+
+        if QUOTE_QUOTE_COLUMN in quote_df.columns:
+            quote_df = quote_df.filter(pl.col(QUOTE_QUOTE_COLUMN).is_not_null())
 
         if progress_callback:
             progress_callback(0.8, "Serializing detached node...")
@@ -86,7 +102,7 @@ def run_quotation_detach_task(
             "state": "successful",
             "result": {
                 "node_payload": node_payload,
-                "output_columns": output_columns,
+                "output_columns": output_columns + generated_columns,
                 "record_count": int(quote_df.height),
                 "engine_config": engine_config,
             },
