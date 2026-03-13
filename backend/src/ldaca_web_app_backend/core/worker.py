@@ -127,6 +127,7 @@ def workspace_download_task(
 def concordance_detach_task(
     user_id: str,
     workspace_id: str,
+    workspace_dir: str,
     node_corpus: list[str],
     parent_node_id: str,
     document_column: str,
@@ -136,8 +137,6 @@ def concordance_detach_task(
     regex: bool,
     case_sensitive: bool,
     new_node_name: str,
-    artifact_dir: str,
-    artifact_prefix: str,
     include_document_column: bool = False,
     extra_columns_data: Optional[Dict[str, list]] = None,
     progress_callback: Optional[Callable[[float, str], None]] = None,
@@ -146,6 +145,7 @@ def concordance_detach_task(
     cb = _build_progress_callback(progress_queue, progress_callback)
     return run_concordance_detach_task(
         _configure_worker_environment,
+        workspace_dir,
         node_corpus,
         parent_node_id,
         document_column,
@@ -155,8 +155,6 @@ def concordance_detach_task(
         regex,
         case_sensitive,
         new_node_name,
-        artifact_dir,
-        artifact_prefix,
         include_document_column,
         extra_columns_data,
         cb,
@@ -166,13 +164,12 @@ def concordance_detach_task(
 def quotation_detach_task(
     user_id: str,
     workspace_id: str,
+    workspace_dir: str,
     node_corpus: list[str],
     parent_node_id: str,
     document_column: str,
     engine_config: Dict[str, Any],
     new_node_name: str,
-    artifact_dir: str,
-    artifact_prefix: str,
     include_document_column: bool = False,
     extra_columns_data: Optional[Dict[str, list]] = None,
     progress_callback: Optional[Callable[[float, str], None]] = None,
@@ -181,13 +178,12 @@ def quotation_detach_task(
     cb = _build_progress_callback(progress_queue, progress_callback)
     return run_quotation_detach_task(
         _configure_worker_environment,
+        workspace_dir,
         node_corpus,
         parent_node_id,
         document_column,
         engine_config,
         new_node_name,
-        artifact_dir,
-        artifact_prefix,
         include_document_column,
         extra_columns_data,
         cb,

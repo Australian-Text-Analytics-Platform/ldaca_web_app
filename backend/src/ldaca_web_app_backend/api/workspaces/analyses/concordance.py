@@ -61,16 +61,6 @@ class ConcordanceResultQuery(BaseModel):
     update_only: bool = False
 
 
-def _prepare_concordance_artifact_target(
-    user_id: str, workspace_id: str
-) -> tuple[str, str]:
-    artifact_dir = workspace_manager.ensure_workspace_artifacts_dir(
-        user_id, workspace_id
-    )
-    artifact_prefix = f"concordance_detach_{uuid4().hex}"
-    return str(artifact_dir), artifact_prefix
-
-
 def _apply_result_query_overrides(
     normalized_request: dict[str, Any],
     query: ConcordanceResultQuery,
@@ -366,9 +356,9 @@ async def detach_concordance(
         if col != request.column:
             extra_columns_data[col] = corpus_df.get_column(col).to_list()
 
-    artifact_dir, artifact_prefix = _prepare_concordance_artifact_target(
-        user_id, workspace_id
-    )
+    workspace_dir = workspace_manager.get_workspace_dir(user_id, workspace_id)
+    if workspace_dir is None:
+        raise HTTPException(status_code=404, detail="Workspace not found")
 
     try:
         task_info = await tm.submit_task(
@@ -376,6 +366,7 @@ async def detach_concordance(
             workspace_id=workspace_id,
             task_type="concordance_detach",
             task_args={
+                "workspace_dir": str(workspace_dir),
                 "node_corpus": node_corpus,
                 "parent_node_id": node_id,
                 "document_column": request.column,
@@ -385,8 +376,6 @@ async def detach_concordance(
                 "regex": request.regex,
                 "case_sensitive": request.case_sensitive,
                 "new_node_name": request.new_node_name,
-                "artifact_dir": artifact_dir,
-                "artifact_prefix": artifact_prefix,
                 "include_document_column": include_document_column,
                 "extra_columns_data": extra_columns_data
                 if extra_columns_data

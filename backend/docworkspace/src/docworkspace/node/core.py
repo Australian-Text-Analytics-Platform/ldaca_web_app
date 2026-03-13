@@ -7,6 +7,7 @@ and core dataframe operations (join/filter/slice/dynamic delegation).
 from __future__ import annotations
 
 import uuid
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, Literal, Optional, cast
 
 import polars as pl
@@ -28,13 +29,11 @@ class Node:
         data: pl.LazyFrame,
         name: str | None = None,
         workspace: Optional["Workspace"] = None,
-        parents: list["Node"] | None = None,
+        parents: list["Node | str"] | None = None,
         operation: str | None = None,
         id: str | None = None,
         document: str | None = None,
     ) -> None:
-        from ..workspace.core import Workspace  # local import to avoid cycle
-
         self.id = id or str(uuid.uuid4())
         self.name = name or f"node_{self.id[:8]}"
 
@@ -47,15 +46,20 @@ class Node:
         self._redo_stack: list[pl.LazyFrame] = []
         self._data: pl.LazyFrame = data
         self._document_column: Optional[str] = document
-        self.parents: list[Node] = parents or []
-
-        if workspace is None:
-            workspace = Workspace(name=f"workspace_for_{self.name}")
-        self.workspace: Workspace = workspace
+        self.parents: list[Node | str] = list(parents or [])
+        self.workspace: Optional[Workspace] = workspace
         self.operation = operation
 
-        if self.id not in self.workspace.nodes:
+        if self.workspace is not None and self.id not in self.workspace.nodes:
             self.workspace.add_node(self)
+
+    @staticmethod
+    def _parent_id(parent: "Node | str") -> str:
+        return parent.id if isinstance(parent, Node) else str(parent)
+
+    @staticmethod
+    def _parent_matches(parent: "Node | str", node: "Node") -> bool:
+        return parent is node if isinstance(parent, Node) else str(parent) == node.id
 
     def __getattr__(self, item: str) -> Any:  # pragma: no cover - thin wrapper
         # Delegate attribute access to underlying data object. Callable
@@ -115,10 +119,12 @@ class Node:
 
     @property
     def children(self) -> list["Node"]:
+        if self.workspace is None:
+            return []
         return [
             candidate
             for candidate in self.workspace.nodes.values()
-            if self in candidate.parents
+            if any(self._parent_matches(parent, self) for parent in candidate.parents)
         ]
 
     # ------------------------------------------------------------------
@@ -291,7 +297,7 @@ class Node:
             "id": self.id,
             "name": self.name,
             "operation": self.operation,
-            "parent_ids": [p.id for p in self.parents],
+            "parent_ids": [self._parent_id(parent) for parent in self.parents],
             "child_ids": [c.id for c in self.children],
             "document": self.document,
             "shape": (height, self.data.collect_schema().len()),
@@ -300,6 +306,23 @@ class Node:
             "can_undo": self.can_undo,
             "can_redo": self.can_redo,
         }
+
+    def to_dict(self, *, base_dir: str | Path | None = None) -> Dict[str, Any]:
+        from .io import to_dict
+
+        return to_dict(self, base_dir=base_dir)
+
+    @classmethod
+    def from_dict(
+        cls,
+        payload: Dict[str, Any],
+        *,
+        workspace: Optional["Workspace"] = None,
+        base_dir: str | Path | None = None,
+    ) -> "Node":
+        from .io import from_dict
+
+        return from_dict(payload, workspace=workspace, base_dir=base_dir)
 
     # Representation --------------------------------------------------
     def __repr__(self) -> str:  # pragma: no cover

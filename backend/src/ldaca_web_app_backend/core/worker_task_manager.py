@@ -398,11 +398,8 @@ class WorkerTaskManager:
                     "quotation_detach",
                 ]:
                     try:
-                        from pathlib import Path
+                        from docworkspace.node.io import from_dict as node_from_dict
 
-                        from docworkspace import Node
-
-                        from ..api.workspaces.utils import stage_parquet_artifact_as_lazy
                         from .workspace import workspace_manager
 
                         # Worker contract: {"state": "successful", "result": {...}}
@@ -417,14 +414,9 @@ class WorkerTaskManager:
                                 "Detach task result missing structured result payload"
                             )
 
-                        parquet_path = data.get("parquet_path")
-                        new_node_name = data.get("new_node_name")
-                        parent_id = data.get("parent_node_id")
-                        doc_col = data.get("document_column")
-
-                        if not parquet_path:
-                            raise ValueError("Task result missing parquet_path")
-                        artifact_path = Path(str(parquet_path))
+                        node_payload = data.get("node_payload")
+                        if not isinstance(node_payload, dict):
+                            raise ValueError("Task result missing node_payload")
 
                         if (
                             workspace_manager.get_current_workspace_id(user_id)
@@ -446,41 +438,13 @@ class WorkerTaskManager:
                         workspace_manager._attach_workspace_dir(workspace, target_dir)
                         workspace_manager._set_working_dir(target_dir)
 
-                        lazy_df, _ = stage_parquet_artifact_as_lazy(
-                            artifact_path=artifact_path,
-                            workspace_dir=target_dir,
-                            node_name=str(new_node_name or artifact_path.stem),
-                        )
-
-                        parent_node = workspace.nodes.get(parent_id)
-
-                        new_node = Node(
-                            data=lazy_df,
-                            name=new_node_name,
-                            workspace=workspace,
-                            operation=task_type,
-                            parents=[parent_node] if parent_node else [],
-                        )
+                        new_node = node_from_dict(node_payload, base_dir=target_dir)
                         workspace.add_node(new_node)
                         workspace.modified_at = datetime.now().isoformat()
                         workspace.save(target_dir)
                         workspace_manager._set_cached_path(
                             user_id, workspace_id, target_dir
                         )
-
-                        if new_node and doc_col:
-                            try:
-                                new_node.document = doc_col
-                            except Exception as exc:
-                                logger.debug(
-                                    "Failed to set document column '%s' for new node %s: %s",
-                                    doc_col,
-                                    getattr(new_node, "id", "unknown"),
-                                    exc,
-                                )
-
-                        if artifact_path.exists():
-                            artifact_path.unlink(missing_ok=True)
 
                         result_persisted = True
                         await self.emit(
@@ -912,4 +876,7 @@ class WorkerTaskManager:
             for task_id in task_ids_to_remove:
                 del self._tasks[task_id]
                 self._progress_store.pop(task_id, None)
+                self._cleanup_progress_queue(task_id)
+                self._progress_store.pop(task_id, None)
+                self._cleanup_progress_queue(task_id)
                 self._cleanup_progress_queue(task_id)

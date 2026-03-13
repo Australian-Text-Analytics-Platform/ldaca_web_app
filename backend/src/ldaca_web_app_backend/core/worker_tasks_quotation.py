@@ -7,25 +7,24 @@ from typing import Any, Callable, Dict, Optional
 
 def run_quotation_detach_task(
     configure_worker_environment,
+    workspace_dir: str,
     node_corpus: list[str],
     parent_node_id: str,
     document_column: str,
     engine_config: Dict[str, Any],
     new_node_name: str,
-    artifact_dir: str,
-    artifact_prefix: str,
     include_document_column: bool = False,
     extra_columns_data: Optional[Dict[str, list]] = None,
     progress_callback: Optional[Callable[[float, str], None]] = None,
 ) -> Dict[str, Any]:
-    """Run quotation detach with API-prepared corpus and write artifact parquet."""
+    """Run quotation detach and return a serialized detached node payload."""
     configure_worker_environment()
 
     try:
         import os
-        from pathlib import Path
 
         import polars as pl
+        from docworkspace import Node
 
         from ldaca_web_app_backend.api.workspaces.analyses.quotation_core import (
             ensure_quote_dataframe,
@@ -39,9 +38,7 @@ def run_quotation_detach_task(
 
         corpus = [str(v) if v is not None else "" for v in (node_corpus or [])]
         non_empty_mask = [bool(value.strip()) for value in corpus]
-        filtered_corpus = [
-            value for value, keep in zip(corpus, non_empty_mask) if keep
-        ]
+        filtered_corpus = [value for value, keep in zip(corpus, non_empty_mask) if keep]
 
         source_column_name = "__quotation_source__"
         data: dict[str, list] = {source_column_name: filtered_corpus}
@@ -68,13 +65,17 @@ def run_quotation_detach_task(
         quote_df = ensure_quote_dataframe(quote_df)
 
         if progress_callback:
-            progress_callback(0.8, "Writing artifact...")
+            progress_callback(0.8, "Serializing detached node...")
 
-        artifact_root = Path(artifact_dir)
-        artifact_root.mkdir(parents=True, exist_ok=True)
-        prefix = (artifact_prefix or "quotation_detach").strip() or "quotation_detach"
-        output_file = artifact_root / f"{prefix}.parquet"
-        quote_df.write_parquet(str(output_file))
+        detached_node = Node(
+            data=quote_df.lazy(),
+            name=new_node_name,
+            workspace=None,
+            operation="quotation_detach",
+            parents=[parent_node_id],
+            document=document_column,
+        )
+        node_payload = detached_node.to_dict(base_dir=workspace_dir)
 
         if progress_callback:
             progress_callback(1.0, "Task completed successfully")
@@ -84,10 +85,7 @@ def run_quotation_detach_task(
         return {
             "state": "successful",
             "result": {
-                "parquet_path": str(output_file),
-                "new_node_name": new_node_name,
-                "parent_node_id": parent_node_id,
-                "document_column": document_column,
+                "node_payload": node_payload,
                 "output_columns": output_columns,
                 "record_count": int(quote_df.height),
                 "engine_config": engine_config,

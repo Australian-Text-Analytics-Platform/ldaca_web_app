@@ -13,6 +13,7 @@ from ..api.workspaces.analyses.generated_columns import (
 
 def run_concordance_detach_task(
     configure_worker_environment,
+    workspace_dir: str,
     node_corpus: list[str],
     parent_node_id: str,
     document_column: str,
@@ -22,21 +23,19 @@ def run_concordance_detach_task(
     regex: bool,
     case_sensitive: bool,
     new_node_name: str,
-    artifact_dir: str,
-    artifact_prefix: str,
     include_document_column: bool = False,
     extra_columns_data: Optional[Dict[str, list]] = None,
     progress_callback: Optional[Callable[[float, str], None]] = None,
 ) -> Dict[str, Any]:
-    """Run concordance detach with API-prepared corpus and write artifact parquet."""
+    """Run concordance detach and return a serialized detached node payload."""
     configure_worker_environment()
 
     try:
         import os
-        from pathlib import Path
 
         import polars as pl
         import polars_text as pt
+        from docworkspace import Node
 
         print(f"[Worker {os.getpid()}] Starting concordance detach task")
 
@@ -94,15 +93,17 @@ def run_concordance_detach_task(
         )
 
         if progress_callback:
-            progress_callback(0.8, "Writing artifact...")
+            progress_callback(0.8, "Serializing detached node...")
 
-        artifact_root = Path(artifact_dir)
-        artifact_root.mkdir(parents=True, exist_ok=True)
-        prefix = (
-            artifact_prefix or "concordance_detach"
-        ).strip() or "concordance_detach"
-        output_file = artifact_root / f"{prefix}.parquet"
-        result.write_parquet(str(output_file))
+        detached_node = Node(
+            data=result.lazy(),
+            name=new_node_name,
+            workspace=None,
+            operation="concordance_detach",
+            parents=[parent_node_id],
+            document=document_column,
+        )
+        node_payload = detached_node.to_dict(base_dir=workspace_dir)
 
         if progress_callback:
             progress_callback(1.0, "Task completed successfully")
@@ -112,10 +113,7 @@ def run_concordance_detach_task(
         return {
             "state": "successful",
             "result": {
-                "parquet_path": str(output_file),
-                "new_node_name": new_node_name,
-                "parent_node_id": parent_node_id,
-                "document_column": document_column,
+                "node_payload": node_payload,
                 "output_columns": output_columns + list(CORE_CONCORDANCE_COLUMNS),
                 "record_count": len(result),
             },

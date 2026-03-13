@@ -9,6 +9,7 @@ from docworkspace.node.io import dumps, from_dict, loads, to_dict
 
 def test_node_to_dict_persists_lazyframe_payload(tmp_path: Path):
     workspace = Workspace("node_io")
+    workspace.ws_root_dir = tmp_path
     node = workspace.add_node(
         Node(
             data=pl.DataFrame({"text": ["a", "b"], "value": [1, 2]}).lazy(),
@@ -19,12 +20,7 @@ def test_node_to_dict_persists_lazyframe_payload(tmp_path: Path):
     )
     node.document = "text"
 
-    previous_cwd = Path.cwd()
-    os.chdir(tmp_path)
-    try:
-        payload = to_dict(node)
-    finally:
-        os.chdir(previous_cwd)
+    payload = to_dict(node, base_dir=tmp_path)
 
     assert payload == {
         "node_metadata": {
@@ -46,8 +42,9 @@ def test_node_to_dict_persists_lazyframe_payload(tmp_path: Path):
     }
 
 
-def test_node_dumps_returns_json_payload_and_persists_data_file(tmp_path: Path):
+def test_node_exposes_instance_and_class_serialization_helpers(tmp_path: Path):
     workspace = Workspace("node_io")
+    workspace.ws_root_dir = tmp_path
     node = workspace.add_node(
         Node(
             data=pl.DataFrame({"value": [1, 2, 3]}).lazy(),
@@ -56,12 +53,30 @@ def test_node_dumps_returns_json_payload_and_persists_data_file(tmp_path: Path):
         )
     )
 
-    previous_cwd = Path.cwd()
-    os.chdir(tmp_path)
-    try:
-        serialized = dumps(node)
-    finally:
-        os.chdir(previous_cwd)
+    payload = node.to_dict(base_dir=tmp_path)
+    restored = Node.from_dict(
+        payload,
+        workspace=Workspace("restored", ws_root_dir=tmp_path),
+        base_dir=tmp_path,
+    )
+
+    assert payload["node_metadata"]["id"] == node.id
+    assert restored.id == node.id
+    assert restored.data.collect().to_dict(as_series=False) == {"value": [1, 2, 3]}
+
+
+def test_node_dumps_returns_json_payload_and_persists_data_file(tmp_path: Path):
+    workspace = Workspace("node_io")
+    workspace.ws_root_dir = tmp_path
+    node = workspace.add_node(
+        Node(
+            data=pl.DataFrame({"value": [1, 2, 3]}).lazy(),
+            name="root",
+            workspace=workspace,
+        )
+    )
+
+    serialized = dumps(node, base_dir=tmp_path)
     payload = json.loads(serialized)
 
     assert payload["node_metadata"]["id"] == node.id
@@ -71,6 +86,7 @@ def test_node_dumps_returns_json_payload_and_persists_data_file(tmp_path: Path):
 
 def test_node_from_dict_restores_node_state(tmp_path: Path):
     source_workspace = Workspace("source")
+    source_workspace.ws_root_dir = tmp_path
     node = source_workspace.add_node(
         Node(
             data=pl.DataFrame({"text": ["x", "y"], "value": [10, 20]}).lazy(),
@@ -80,15 +96,10 @@ def test_node_from_dict_restores_node_state(tmp_path: Path):
         )
     )
     node.document = "text"
-    previous_cwd = Path.cwd()
-    os.chdir(tmp_path)
-    try:
-        payload = to_dict(node)
+    payload = to_dict(node, base_dir=tmp_path)
 
-        restored_workspace = Workspace("restored")
-        restored = from_dict(payload, workspace=restored_workspace)
-    finally:
-        os.chdir(previous_cwd)
+    restored_workspace = Workspace("restored", ws_root_dir=tmp_path)
+    restored = from_dict(payload, workspace=restored_workspace, base_dir=tmp_path)
 
     assert restored.id == node.id
     assert restored.name == "restorable"
@@ -107,6 +118,7 @@ def test_node_from_dict_restores_node_state(tmp_path: Path):
 
 def test_node_loads_round_trip_from_json_string(tmp_path: Path):
     source_workspace = Workspace("source")
+    source_workspace.ws_root_dir = tmp_path
     node = source_workspace.add_node(
         Node(
             data=pl.DataFrame({"value": [3, 4]}).lazy(),
@@ -115,13 +127,12 @@ def test_node_loads_round_trip_from_json_string(tmp_path: Path):
         )
     )
 
-    previous_cwd = Path.cwd()
-    os.chdir(tmp_path)
-    try:
-        serialized = dumps(node)
-        restored = loads(serialized, workspace=Workspace("restored"))
-    finally:
-        os.chdir(previous_cwd)
+    serialized = dumps(node, base_dir=tmp_path)
+    restored = loads(
+        serialized,
+        workspace=Workspace("restored", ws_root_dir=tmp_path),
+        base_dir=tmp_path,
+    )
 
     assert restored.id == node.id
     assert restored.name == "round_trip"
@@ -130,6 +141,7 @@ def test_node_loads_round_trip_from_json_string(tmp_path: Path):
 
 def test_node_from_dict_uses_constructor_defaults_for_runtime_state(tmp_path: Path):
     source_workspace = Workspace("source")
+    source_workspace.ws_root_dir = tmp_path
     node = source_workspace.add_node(
         Node(
             data=pl.DataFrame({"value": [1, 2]}).lazy(),
@@ -137,13 +149,12 @@ def test_node_from_dict_uses_constructor_defaults_for_runtime_state(tmp_path: Pa
             workspace=source_workspace,
         )
     )
-    previous_cwd = Path.cwd()
-    os.chdir(tmp_path)
-    try:
-        payload = to_dict(node)
-        restored = from_dict(payload, workspace=Workspace("restored"))
-    finally:
-        os.chdir(previous_cwd)
+    payload = to_dict(node, base_dir=tmp_path)
+    restored = from_dict(
+        payload,
+        workspace=Workspace("restored", ws_root_dir=tmp_path),
+        base_dir=tmp_path,
+    )
 
     restored.data = restored.data.with_columns(pl.lit(9).alias("extra"))
     assert restored.can_undo is True
@@ -151,6 +162,7 @@ def test_node_from_dict_uses_constructor_defaults_for_runtime_state(tmp_path: Pa
 
 def test_node_from_dict_restores_existing_parent_nodes_by_id(tmp_path: Path):
     workspace = Workspace("source")
+    workspace.ws_root_dir = tmp_path
     parent = workspace.add_node(
         Node(
             data=pl.DataFrame({"value": [1]}).lazy(), name="parent", workspace=workspace
@@ -158,40 +170,59 @@ def test_node_from_dict_restores_existing_parent_nodes_by_id(tmp_path: Path):
     )
     child = parent.filter(pl.col("value") > 0)
 
-    previous_cwd = Path.cwd()
-    os.chdir(tmp_path)
-    try:
-        payload = to_dict(child)
-        restored_workspace = Workspace("restored")
-        restored_parent = Node(
-            data=pl.DataFrame({"value": [1]}).lazy(),
-            name="parent",
-            workspace=restored_workspace,
-            id=parent.id,
-        )
+    payload = to_dict(child, base_dir=tmp_path)
+    restored_workspace = Workspace("restored", ws_root_dir=tmp_path)
+    restored_parent = Node(
+        data=pl.DataFrame({"value": [1]}).lazy(),
+        name="parent",
+        workspace=restored_workspace,
+        id=parent.id,
+    )
 
-        restored_child = from_dict(payload, workspace=restored_workspace)
-    finally:
-        os.chdir(previous_cwd)
+    restored_child = from_dict(payload, workspace=restored_workspace, base_dir=tmp_path)
 
     assert restored_child.parents == [restored_parent]
 
 
+def test_node_from_dict_without_workspace_preserves_parent_ids(tmp_path: Path):
+    workspace = Workspace("source")
+    workspace.ws_root_dir = tmp_path
+    parent = workspace.add_node(
+        Node(
+            data=pl.DataFrame({"value": [1]}).lazy(),
+            name="parent",
+            workspace=workspace,
+        )
+    )
+    child = Node(
+        data=pl.DataFrame({"value": [2]}).lazy(),
+        name="child",
+        workspace=None,
+        parents=[parent.id],
+    )
+
+    payload = to_dict(child, base_dir=tmp_path)
+    restored = from_dict(payload, base_dir=tmp_path)
+
+    assert restored.workspace is None
+    assert restored.parents == [parent.id]
+
+
 def test_node_from_dict_ignores_missing_parent_ids(tmp_path: Path):
     workspace = Workspace("source")
+    workspace.ws_root_dir = tmp_path
     node = workspace.add_node(
         Node(
             data=pl.DataFrame({"value": [1]}).lazy(), name="child", workspace=workspace
         )
     )
 
-    previous_cwd = Path.cwd()
-    os.chdir(tmp_path)
-    try:
-        payload = to_dict(node)
-        payload["node_metadata"]["parents"] = ["missing-parent-id"]
-        restored = from_dict(payload, workspace=Workspace("restored"))
-    finally:
-        os.chdir(previous_cwd)
+    payload = to_dict(node, base_dir=tmp_path)
+    payload["node_metadata"]["parents"] = ["missing-parent-id"]
+    restored = from_dict(
+        payload,
+        workspace=Workspace("restored", ws_root_dir=tmp_path),
+        base_dir=tmp_path,
+    )
 
     assert restored.parents == []

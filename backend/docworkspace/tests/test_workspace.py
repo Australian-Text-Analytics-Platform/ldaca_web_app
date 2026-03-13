@@ -28,6 +28,7 @@ class TestWorkspace:
         assert workspace.name == "test_workspace"
         assert len(workspace.nodes) == 0
         assert workspace.id is not None
+        assert workspace.ws_root_dir.exists()
 
     def test_workspace_creation_default_name(self):
         """Test creating a Workspace with default name."""
@@ -325,11 +326,7 @@ class TestWorkspaceSerialization:
             Workspace.load({"workspace_metadata": {}, "nodes": []})
 
     def test_workspace_serialized_file_structure(self, populated_workspace):
-        """Validate on-disk JSON structure contains expected envelope keys.
-
-        Node payloads are persisted as separate binary files under ./data and
-        referenced via `data_path` in metadata.json.
-        """
+        """Validate on-disk JSON structure contains expected envelope keys."""
         with tempfile.TemporaryDirectory() as tmpdir:
             meta_path = Path(tmpdir) / "metadata.json"
             populated_workspace.save(meta_path)
@@ -347,28 +344,20 @@ class TestWorkspaceSerialization:
                 assert "serialized_data" not in n
                 rel_path = n["data_path"]
                 assert isinstance(rel_path, str)
-                # Ensure the referenced file exists on disk
                 abs_path = (Path(tmpdir) / rel_path).resolve()
                 assert abs_path.exists(), f"Missing node data file: {abs_path}"
                 assert abs_path.stat().st_size > 0
 
     def test_remove_node_deletes_binary_file_when_workspace_dir_attached(self):
-        """Removing a node should delete its persisted data/<node_id>.plbin file.
-
-        This is a best-effort cleanup that only runs when the workspace has a
-        `_workspace_dir` attached (the backend attaches this when persisting).
-        """
+        """Removing a node should delete its persisted data/<node_id>.plbin file."""
         workspace = Workspace("ws")
         df = pl.DataFrame({"a": [1, 2, 3]})
         node = workspace.add_node(Node(data=df.lazy(), name="n", workspace=workspace))
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            # Persist once to create the binary file
             meta_path = Path(tmpdir) / "metadata.json"
             workspace.save(meta_path)
-
-            # Simulate backend behavior: attach workspace dir for file cleanup
-            setattr(workspace, "_workspace_dir", Path(tmpdir))
+            workspace.ws_root_dir = Path(tmpdir)
 
             payload_file = Path(tmpdir) / "data" / f"{node.id}.plbin"
             assert payload_file.exists()
@@ -391,7 +380,6 @@ class TestWorkspaceSerialization:
             orphan.write_bytes(b"not a real polars payload")
             assert orphan.exists()
 
-            # Re-save; should remove orphan
             workspace.save(meta_path)
             assert not orphan.exists()
 

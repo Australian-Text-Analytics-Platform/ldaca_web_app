@@ -15,6 +15,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 from pathlib import Path
+from tempfile import mkdtemp
 from typing import Any, Dict, Iterator, List, Optional
 
 import polars_text  # noqa: F401  (register text namespace side-effects)
@@ -31,6 +32,7 @@ class Workspace:
         workspace_id: Optional[str] = None,
         created_at: Optional[str] = None,
         modified_at: Optional[str] = None,
+        ws_root_dir: str | Path | None = None,
     ) -> None:
         now = datetime.now().isoformat()
 
@@ -41,11 +43,62 @@ class Workspace:
         self.created_at: Optional[str] = created_at or now
         self.modified_at: Optional[str] = modified_at or now
         self.analysis: Any = None  # Placeholder for analysis storage/manager
+        self.ws_root_dir = (
+            Path(ws_root_dir)
+            if ws_root_dir is not None
+            else Path(mkdtemp(prefix=f"docworkspace_{self.id}_"))
+        )
+        self.ws_root_dir.mkdir(parents=True, exist_ok=True)
 
     # Node management -------------------------------------------------
 
+    @staticmethod
+    def _dedupe_parent_refs(parents: list[Node | str]) -> list[Node | str]:
+        deduped: list[Node | str] = []
+        seen: set[str] = set()
+        for parent in parents:
+            key = parent.id if isinstance(parent, Node) else str(parent)
+            if key in seen:
+                continue
+            seen.add(key)
+            deduped.append(parent)
+        return deduped
+
+    def _resolve_node_parents(self, node: Node) -> None:
+        resolved: list[Node | str] = []
+        for parent in node.parents:
+            if isinstance(parent, Node):
+                resolved.append(parent)
+                continue
+
+            parent_id = str(parent)
+            parent_node = self.nodes.get(parent_id)
+            resolved.append(parent_node if parent_node is not None else parent_id)
+
+        node.parents = self._dedupe_parent_refs(resolved)
+
+    def _resolve_existing_parent_references(self, parent_node: Node) -> None:
+        for candidate in self.nodes.values():
+            if candidate is parent_node:
+                continue
+
+            replaced = False
+            new_parents: list[Node | str] = []
+            for parent in candidate.parents:
+                if isinstance(parent, str) and parent == parent_node.id:
+                    new_parents.append(parent_node)
+                    replaced = True
+                else:
+                    new_parents.append(parent)
+
+            if replaced:
+                candidate.parents = self._dedupe_parent_refs(new_parents)
+
     def add_node(self, node: Node) -> Node:
         if node.id in self.nodes:
+            node.workspace = self
+            self._resolve_node_parents(node)
+            self._resolve_existing_parent_references(node)
             return node
         source_workspace = getattr(node, "workspace", None)
         if source_workspace is not None and source_workspace is not self:
@@ -53,6 +106,8 @@ class Workspace:
                 del source_workspace.nodes[node.id]
         self.nodes[node.id] = node
         node.workspace = self
+        self._resolve_node_parents(node)
+        self._resolve_existing_parent_references(node)
 
         def move_children_recursive(current: Node) -> None:
             if source_workspace is None:
@@ -60,7 +115,10 @@ class Workspace:
             child_nodes = [
                 candidate
                 for candidate in source_workspace.nodes.values()
-                if current in candidate.parents
+                if any(
+                    candidate._parent_matches(parent, current)
+                    for parent in candidate.parents
+                )
             ]
             for child in child_nodes:
                 if child.id not in self.nodes:
@@ -83,26 +141,27 @@ class Workspace:
 
         # Rewire graph so children inherit the removed node's parents.
         for child in child_nodes:
-            if node in child.parents:
-                child.parents.remove(node)
+            child.parents = [
+                parent
+                for parent in child.parents
+                if not child._parent_matches(parent, node)
+            ]
             for parent in parent_nodes:
-                if parent is child:
+                if (isinstance(parent, Node) and parent is child) or (
+                    isinstance(parent, str) and parent == child.id
+                ):
                     continue
                 if parent not in child.parents:
                     child.parents.append(parent)
+            child.parents = self._dedupe_parent_refs(child.parents)
 
         node.parents = []
         del self.nodes[node_id]
 
-        # Best-effort cleanup for on-disk persisted node payloads.
-        # The core library remains usable without any persistence context; the
-        # backend attaches `_workspace_dir` when a workspace is loaded/saved.
         try:
-            ws_dir = getattr(self, "_workspace_dir", None)
-            if ws_dir is not None:
-                data_file = Path(ws_dir) / "data" / f"{node_id}.plbin"
-                if data_file.exists():
-                    data_file.unlink()
+            data_file = self.ws_root_dir / "data" / f"{node_id}.plbin"
+            if data_file.exists():
+                data_file.unlink()
         except Exception:
             pass
         return True

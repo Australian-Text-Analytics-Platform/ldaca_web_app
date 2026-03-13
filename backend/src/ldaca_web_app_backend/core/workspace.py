@@ -90,7 +90,7 @@ class WorkspaceManager:
 
     def _attach_workspace_dir(self, workspace: Workspace, path: Path) -> None:
         try:
-            setattr(workspace, "_workspace_dir", path)
+            setattr(workspace, "ws_root_dir", path)
         except Exception as exc:
             logger.debug(
                 "Failed to attach workspace_dir metadata to workspace object: %s", exc

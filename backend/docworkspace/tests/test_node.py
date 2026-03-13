@@ -30,14 +30,25 @@ class TestNode:
         assert node.workspace == workspace
 
     def test_node_creation_without_workspace(self, sample_df):
-        """Test creating a Node without workspace (should create one automatically)."""
+        """Test creating a Node without workspace keeps it unattached."""
         node = Node(sample_df.lazy(), "test_node")
 
         assert node.name == "test_node"
         assert isinstance(node.data, pl.LazyFrame)
-        assert node.workspace is not None
-        assert isinstance(node.workspace, Workspace)
-        assert node.id in node.workspace.nodes
+        assert node.workspace is None
+
+    def test_node_creation_with_string_parent_ids_without_workspace(self, sample_df):
+        """Test creating an unattached Node with unresolved parent ids."""
+        node = Node(
+            sample_df.lazy(),
+            "child_node",
+            workspace=None,
+            parents=["parent-123"],
+        )
+
+        assert node.workspace is None
+        assert node.parents == ["parent-123"]
+        assert node.children == []
 
     def test_node_lazy_status_polars_dataframe(self, sample_df):
         """Test lazy status for polars DataFrame."""
@@ -333,6 +344,22 @@ class TestNodeRelationships:
         child.parents = []
 
         assert parent.children == []
+
+    def test_add_node_resolves_string_parent_ids(self, workspace, sample_df):
+        """Attaching an unattached node should resolve matching parent ids."""
+        parent = Node(sample_df.lazy(), "parent", workspace)
+        child = Node(
+            sample_df.lazy(),
+            "child",
+            workspace=None,
+            parents=[parent.id],
+        )
+
+        workspace.add_node(child)
+
+        assert child.workspace == workspace
+        assert child.parents == [parent]
+        assert child in parent.children
 
     def test_merge_multiple_parents(self, workspace):
         """Test that merge creates a node with multiple parents."""
