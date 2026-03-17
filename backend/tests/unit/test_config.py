@@ -67,6 +67,15 @@ class TestSettings:
         with patch.dict(
             os.environ,
             {
+                "DEBUG": "release",
+            },
+        ):
+            test_settings = Settings()
+            assert test_settings.debug is False
+
+        with patch.dict(
+            os.environ,
+            {
                 "DEBUG": "1",
                 "CORS_ALLOW_CREDENTIALS": "0",
             },

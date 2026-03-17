@@ -6,13 +6,26 @@ Users are responsible for setting environment variables themselves.
 
 from pathlib import Path
 from secrets import token_urlsafe
+from typing import Any
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables with defaults."""
+
+    @field_validator("debug", mode="before")
+    @classmethod
+    def normalize_debug_value(cls, value: Any) -> Any:
+        """Normalize common deployment debug strings before bool parsing."""
+        if isinstance(value, str):
+            normalized_value = value.strip().lower()
+            if normalized_value in {"release", "prod", "production"}:
+                return False
+            if normalized_value in {"debug", "dev", "development"}:
+                return True
+        return value
 
     # Root for all data-related storage (folders and DB)
     data_root: str | Path = Field(

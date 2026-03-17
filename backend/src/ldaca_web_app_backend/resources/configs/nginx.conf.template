@@ -7,7 +7,7 @@ events {
 }
 
 http {
-    include       /etc/nginx/mime.types;
+    include       ${MIME_TYPES_PATH};
 
     sendfile        on;
     keepalive_timeout  1800;
