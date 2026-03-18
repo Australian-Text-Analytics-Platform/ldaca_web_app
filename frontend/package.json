@@ -86,11 +86,12 @@
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css,json}\"",
     "tauri": "tauri",
     "clean": "cd src-tauri && cargo clean",
+    "package:backend-runtime": "cd ../ldaca_web_app_backend && uv run --python 3.14 python scripts/package_backend_runtime.py --clean --python-version 3.14",
     "stage:backend-runtime": "node scripts/stage-backend-runtime.mjs",
-    "prepare:backend": "cd ../backend && uv run python scripts/package_backend_runtime.py --clean && cd ../frontend && npm run stage:backend-runtime",
-    "desktop:dev": "cd .. && npm install && cd frontend && npm run prepare:backend && npm run build && tauri dev",
-    "desktop:build:mac": "cd .. && npm install && cd frontend && npm run prepare:backend && tauri build && npx create-dmg \"../target/release/bundle/macos/LDaCA Text Analytics.app\" \"../target/release/bundle/macos/\" --overwrite --no-code-sign",
-    "desktop:build:windows": "echo 'Run this on Windows to build .msi' && cd .. && npm install && cd frontend && npm run prepare:backend && tauri build"
+    "prepare:backend-runtime": "npm run package:backend-runtime && npm run stage:backend-runtime",
+    "desktop:dev": "npm run prepare:backend-runtime && tauri dev",
+    "desktop:build:mac": "npm run prepare:backend-runtime && tauri build && npx create-dmg \"../target/release/bundle/macos/LDaCA Text Analytics.app\" \"../target/release/bundle/macos/\" --overwrite --no-code-sign",
+    "desktop:build:windows": "npm run prepare:backend-runtime && tauri build --bundles nsis"
   },
   "devDependencies": {
     "@babel/core": "^7.29.0",

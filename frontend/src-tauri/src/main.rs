@@ -80,7 +80,7 @@ impl BackendProcessHandle {
 
 const DEV_BACKEND_RUNTIME: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../../backend/dist-tauri/backend-runtime"
+    "/../../ldaca_web_app_backend/dist-tauri/backend-runtime"
 );
 
 const BACKEND_HOST: &str = "127.0.0.1";
@@ -90,9 +90,9 @@ const BUNDLE_RUNTIME_CANDIDATES: &[&str] = &[
     "backend-runtime",
     "_up_/backend-runtime",
     "_up_/_up_/backend-runtime",
-    "backend/dist-tauri/backend-runtime",
-    "_up_/backend/dist-tauri/backend-runtime",
-    "_up_/_up_/backend/dist-tauri/backend-runtime",
+    "ldaca_web_app_backend/dist-tauri/backend-runtime",
+    "_up_/ldaca_web_app_backend/dist-tauri/backend-runtime",
+    "_up_/_up_/ldaca_web_app_backend/dist-tauri/backend-runtime",
 ];
 
 fn make_error(message: impl Into<String>) -> Box<dyn std::error::Error> {
@@ -120,12 +120,16 @@ fn locate_backend_runtime(app: &AppHandle) -> Result<BackendRuntime, Box<dyn std
         .or_else(|| detect_runtime_dir(app))
         .ok_or_else(|| {
             make_error(
-                "Backend runtime not found. Run `npm run prepare:backend` and ensure the bundle includes resources/backend-runtime.",
+                "Backend runtime not found. Run `npm run prepare:backend-runtime` and ensure the bundle includes resources/backend-runtime.",
             )
         })?;
 
-    let python_path = locate_python_binary(&runtime_dir)
-        .ok_or_else(|| make_error(format!("No python interpreter found in {}", runtime_dir.display())))?;
+    let python_path = locate_python_binary(&runtime_dir).ok_or_else(|| {
+        make_error(format!(
+            "No python interpreter found in {}",
+            runtime_dir.display()
+        ))
+    })?;
 
     Ok(BackendRuntime {
         root: runtime_dir,
@@ -284,13 +288,15 @@ fn path_from_env(var: &str) -> Option<PathBuf> {
 }
 
 fn runtime_from_launcher_env() -> Option<PathBuf> {
-    std::env::var_os("LDACA_BACKEND_LAUNCHER").map(PathBuf::from).and_then(|launcher| {
-        if launcher.exists() {
-            launcher.parent().map(Path::to_path_buf)
-        } else {
-            None
-        }
-    })
+    std::env::var_os("LDACA_BACKEND_LAUNCHER")
+        .map(PathBuf::from)
+        .and_then(|launcher| {
+            if launcher.exists() {
+                launcher.parent().map(Path::to_path_buf)
+            } else {
+                None
+            }
+        })
 }
 
 fn locate_python_binary(runtime_dir: &Path) -> Option<PathBuf> {
@@ -308,7 +314,10 @@ fn locate_python_binary(runtime_dir: &Path) -> Option<PathBuf> {
     let candidates = [
         runtime_dir.join("python").join("bin").join("python3"),
         runtime_dir.join("python").join("bin").join("python"),
-        runtime_dir.join("python").join("Scripts").join("python.exe"),
+        runtime_dir
+            .join("python")
+            .join("Scripts")
+            .join("python.exe"),
         runtime_dir.join("python").join("python.exe"),
         runtime_dir.join("python").join("python3.exe"),
         runtime_dir.join("venv").join("bin").join("python"),
@@ -767,10 +776,7 @@ fn main() {
                 return Err(Box::new(err));
             }
 
-            println!(
-                "Backend ready at: {} (pid {})",
-                backend_url, backend_pid
-            );
+            println!("Backend ready at: {} (pid {})", backend_url, backend_pid);
 
             Ok(())
         })
@@ -816,11 +822,8 @@ fn main() {
                 if let tauri::RunEvent::ExitRequested { .. } = event {
                     if let Some(state) = app_handle.try_state::<BackendState>() {
                         println!("App exiting - waiting for backend to terminate gracefully...");
-                        if let Some(process) = state
-                            .process
-                            .lock()
-                            .ok()
-                            .and_then(|mut guard| guard.take())
+                        if let Some(process) =
+                            state.process.lock().ok().and_then(|mut guard| guard.take())
                         {
                             process.shutdown();
                         }

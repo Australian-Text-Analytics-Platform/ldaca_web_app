@@ -12,6 +12,6 @@
     "desktop:dev": "npm run desktop:dev -w frontend",
     "desktop:build:mac": "npm run desktop:build:mac -w frontend",
     "desktop:build:windows": "npm run desktop:build:windows -w frontend",
-    "prepare:backend": "npm run prepare:backend -w frontend"
+    "prepare:backend-runtime": "npm run prepare:backend-runtime -w frontend"
   }
 }

@@ -26,7 +26,7 @@ jobs:
           # Enable long path support for Git and Windows
           git config --global core.longpaths true
           New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" -Name "LongPathsEnabled" -Value 1 -PropertyType DWORD -Force -ErrorAction SilentlyContinue
-          
+
       - name: Checkout repository with submodules
         uses: actions/checkout@v4
         with:
@@ -43,12 +43,6 @@ jobs:
           toolchain: stable
           targets: x86_64-pc-windows-msvc
 
-      - name: Install WiX Toolset dependencies
-        shell: pwsh
-        run: |
-          # WiX requires .NET Framework 3.5
-          Write-Host "Installing .NET Framework dependencies..."
-          
       - name: Prepare cache directories
         shell: pwsh
         run: |
@@ -87,13 +81,19 @@ jobs:
         with:
           path: |
             ~/AppData/Local/uv
-          key: ${{ runner.os }}-uv-${{ hashFiles('backend/pyproject.toml') }}
+          key: ${{ runner.os }}-uv-${{ hashFiles('ldaca_web_app_backend/uv.lock', 'ldaca_web_app_backend/pyproject.toml') }}
           restore-keys: |
             ${{ runner.os }}-uv-
 
+      - name: Install Node workspace dependencies
+        shell: pwsh
+        run: |
+          Set-StrictMode -Version Latest
+          npm ci
+
       - name: Package backend runtime
         shell: pwsh
-        working-directory: backend
+        working-directory: ldaca_web_app_backend
         run: |
           Set-StrictMode -Version Latest
           [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
@@ -103,11 +103,11 @@ jobs:
 
       - name: Clean up PyTorch unnecessary files for Windows bundling
         shell: pwsh
-        working-directory: backend
+        working-directory: ldaca_web_app_backend
         run: |
           Set-StrictMode -Version Latest
           $runtimeDir = "dist-tauri\backend-runtime\python"
-          
+
           # Remove CUDA headers and other unnecessary files to avoid path length issues
           $patterns = @(
             "Lib\site-packages\torch\include\**",
@@ -118,13 +118,13 @@ jobs:
             "Lib\site-packages\**\tests\**",
             "Lib\site-packages\**\test\**"
           )
-          
+
           foreach ($pattern in $patterns) {
             $fullPattern = Join-Path $runtimeDir $pattern
             Write-Host "Removing: $pattern"
             Get-ChildItem -Path $fullPattern -Recurse -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
           }
-          
+
           Write-Host "Cleanup completed"
 
       - name: Stage backend runtime for Tauri
@@ -134,20 +134,6 @@ jobs:
           Set-StrictMode -Version Latest
           node scripts/stage-backend-runtime.mjs
 
-      - name: Install frontend dependencies
-        shell: pwsh
-        working-directory: frontend
-        run: |
-          Set-StrictMode -Version Latest
-          npm install
-
-      - name: Build frontend
-        shell: pwsh
-        working-directory: frontend
-        run: |
-          Set-StrictMode -Version Latest
-          npm run build
-
       - name: Build Tauri desktop application
         shell: pwsh
         working-directory: frontend
@@ -156,6 +142,31 @@ jobs:
           [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
           Write-Host "Building Tauri application with NSIS..."
           npx tauri build --bundles nsis
+
+      - name: Validate bundled backend runtime
+        shell: pwsh
+        run: |
+          Set-StrictMode -Version Latest
+          $runtimeDir = "target\release\backend-runtime"
+          $pythonExe = Join-Path $runtimeDir "python\Scripts\python.exe"
+
+          if (-not (Test-Path $runtimeDir)) {
+            Write-Error "Bundled backend runtime not found at $runtimeDir"
+            exit 1
+          }
+
+          if (-not (Test-Path (Join-Path $runtimeDir "runtime-manifest.json"))) {
+            Write-Error "runtime-manifest.json missing from bundled runtime"
+            exit 1
+          }
+
+          if (-not (Test-Path $pythonExe)) {
+            Write-Error "Bundled Python interpreter not found at $pythonExe"
+            exit 1
+          }
+
+          & $pythonExe -c "import encodings, ldaca_web_app_backend, polars_text, sys; print(sys.version)"
+          Write-Host "Bundled runtime validation succeeded: $runtimeDir"
 
       - name: Gather Windows bundles
         id: gather-bundles
@@ -167,18 +178,18 @@ jobs:
             Write-Error "Bundle output not found at $bundleRoot"
             exit 1
           }
-          
+
           # List all available bundles
           Write-Host "Available bundle directories:"
           Get-ChildItem -Path $bundleRoot -Directory | ForEach-Object { Write-Host "  $($_.Name)" }
-          
+
           # Find installer files
           $archives = @(Get-ChildItem -Path $bundleRoot -Recurse -Include *.exe,*.msi -ErrorAction SilentlyContinue)
           if ($archives.Count -eq 0) {
             Write-Error "No Windows installer artifacts found"
             exit 1
           }
-          
+
           Write-Host "`nFound installers:"
           $archives | ForEach-Object { Write-Host "  $($_.FullName)" }
 
@@ -191,7 +202,7 @@ jobs:
             target/release/bundle/msi/*.msi
           if-no-files-found: ignore
           retention-days: 14
-      
+
       - name: Upload NSIS installer (primary)
         uses: actions/upload-artifact@v4
         with:

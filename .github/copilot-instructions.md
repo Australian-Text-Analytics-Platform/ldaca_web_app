@@ -8,7 +8,7 @@
 
 ```
 /                           ← npm + uv workspace root
-├── backend/                ← FastAPI backend (Python ≥ 3.14)
+├── ldaca_web_app_backend/  ← FastAPI backend (Python ≥ 3.14)
 │   ├── src/ldaca_web_app_backend/
 │   │   ├── api/            ← FastAPI routers (all routes under /api/*)
 │   │   │   └── workspaces/
@@ -34,22 +34,22 @@
 │   │   └── types/          ← shared TypeScript types
 │   └── src-tauri/          ← Tauri v2 desktop shell (Rust)
 ├── package.json            ← npm workspace root (delegates to frontend/)
-└── pyproject.toml          ← uv workspace root (members: backend + local packages)
+└── pyproject.toml          ← root Python env shim (backend resolved from PyPI; ldaca-loader sourced from git)
 ```
 
 **Key libraries:**
 
-| Layer | Package | Role |
-|-------|---------|------|
-| Backend | `docworkspace` | Lazy workspace graph — `Workspace` + `Node` containers for Polars `LazyFrame` data |
-| Backend | `polars-text` | Rust-backed Polars plugin for concordance, token frequencies, etc. |
-| Backend | `ldaca-loader` (ldaca-tabulator) | RO-Crate / CSV / Excel import/export |
-| Frontend | `@tanstack/react-query` v5 | Server-state caching, polling, mutations |
-| Frontend | `@tanstack/react-router` v1 | Client router (single-route SPA; navigation via Zustand `currentView`) |
-| Frontend | `@tanstack/react-table` v8 | Data table rendering (sorting, pagination, column management) |
-| Frontend | `zustand` v5 | Global UI + analysis task state |
-| Frontend | `@xyflow/react` | Workspace graph visualization |
-| Frontend | Shadcn/Radix + Tailwind v4 | Component library + styling |
+| Layer    | Package                          | Role                                                                               |
+| -------- | -------------------------------- | ---------------------------------------------------------------------------------- |
+| Backend  | `docworkspace`                   | Lazy workspace graph — `Workspace` + `Node` containers for Polars `LazyFrame` data |
+| Backend  | `polars-text`                    | Rust-backed Polars plugin for concordance, token frequencies, etc.                 |
+| Backend  | `ldaca-loader` (ldaca-tabulator) | RO-Crate / CSV / Excel import/export                                               |
+| Frontend | `@tanstack/react-query` v5       | Server-state caching, polling, mutations                                           |
+| Frontend | `@tanstack/react-router` v1      | Client router (single-route SPA; navigation via Zustand `currentView`)             |
+| Frontend | `@tanstack/react-table` v8       | Data table rendering (sorting, pagination, column management)                      |
+| Frontend | `zustand` v5                     | Global UI + analysis task state                                                    |
+| Frontend | `@xyflow/react`                  | Workspace graph visualization                                                      |
+| Frontend | Shadcn/Radix + Tailwind v4       | Component library + styling                                                        |
 
 ---
 
@@ -58,20 +58,22 @@
 #### Python (uv workspace)
 
 - **Minimum Python:** `>=3.14`.
-- **Package manager:** [uv](https://docs.astral.sh/uv/). The Python package workspace is rooted at the repository `pyproject.toml` under `[tool.uv.workspace]`.
-- **Install all Python deps:** `uv sync` from the repo root. This installs the backend plus `docworkspace`, `ldaca-tabulator`, and `polars-text` in editable mode — no need to set `PYTHONPATH`.
+- **Package manager:** [uv](https://docs.astral.sh/uv/). The repo root provides a thin Python environment shim in `pyproject.toml`; the backend package also maintains its own `uv.lock`.
+- **Install all Python deps:** `uv sync` from the repo root. This installs `ldaca-web-app-backend` from PyPI, includes `ldaca-loader` explicitly in the root environment via the pinned `ldaca-tabulator` git branch, and resolves `docworkspace` and `polars-text` from PyPI — no need to set `PYTHONPATH`.
 - **Run any script/command:** `uv run <command>`. Examples:
+
   ```sh
   # Start backend dev server
-  cd backend && uv run uvicorn ldaca_web_app_backend.main:app --reload --port 8001
+  cd ldaca_web_app_backend && uv run uvicorn ldaca_web_app_backend.main:app --reload --port 8001
 
   # Run backend tests
-  cd backend && uv run pytest
+  cd ldaca_web_app_backend && uv run pytest
 
   # Run docworkspace tests
   cd docworkspace && uv run pytest
   ```
-- **Add a dependency:** `uv add <package>` in the relevant workspace member directory under `backend/`.
+
+- **Add a dependency:** `uv add <package>` in the relevant package directory. `ldaca_web_app_backend/` is maintained in its own package repo and keeps its own Python lockfile.
 - **Never** set `PYTHONPATH=src` — uv handles package resolution via editable installs.
 
 #### Node.js (npm workspace)
@@ -84,7 +86,7 @@
 
 #### Configuration
 
-- Backend settings live in `backend/src/ldaca_web_app_backend/settings.py` — a `pydantic-settings` `BaseSettings` class that reads environment variables.
+- Backend settings live in `ldaca_web_app_backend/src/ldaca_web_app_backend/settings.py` — a `pydantic-settings` `BaseSettings` class that reads environment variables.
 - Key env vars: `DATA_ROOT` (defaults to `~/Documents/ldaca`), `MULTI_USER` (bool), `GOOGLE_CLIENT_ID`, `BACKEND_PORT` (default 8001).
 - **No hardcoded secrets.** API keys, OAuth secrets, etc. must come from environment variables.
 - User data lives under `DATA_ROOT/users/` — never commit data file contents.
@@ -118,7 +120,7 @@ class Node:
 
 #### 3.3 FastAPI Router Pattern
 
-All routers live under `backend/src/ldaca_web_app_backend/api/` and are mounted with a `/api` prefix in `main.py`:
+All routers live under `ldaca_web_app_backend/src/ldaca_web_app_backend/api/` and are mounted with a `/api` prefix in `main.py`:
 
 ```python
 app.include_router(workspaces_router, prefix="/api", tags=["workspace_management"])
@@ -211,43 +213,48 @@ The project uses **React Compiler** (`babel-plugin-react-compiler`) targeting Re
 const reactWithCompiler = react({
   babel: {
     plugins: [
-      ['babel-plugin-react-compiler', { target: '19', runtimeModule: 'react-compiler-runtime' }],
+      [
+        "babel-plugin-react-compiler",
+        { target: "19", runtimeModule: "react-compiler-runtime" },
+      ],
     ],
   },
 });
 ```
 
 **Rules:**
+
 - **Do NOT use** `useMemo`, `useCallback`, or `React.memo` for performance. The compiler handles memoization automatically.
 - It is acceptable to use `useMemo` / `useCallback` only when semantics require identity stability at a system boundary (e.g., passing a callback to a non-React library that compares by reference). Add a comment explaining why.
 - Do NOT add `useCallback` to event handlers, `useMemo` to derived values, or `React.memo` to components — the compiler does this better.
 
 #### 4.2 State Management Stack
 
-| Concern | Tool | Location |
-|---------|------|----------|
-| Server state (workspace data, task results) | TanStack Query v5 | `providers/QueryProvider.tsx`, hooks under `hooks/` |
-| Global UI state (current view, modals, loading) | Zustand v5 (+ immer + devtools + persist) | `stores/uiStore.ts` |
-| Analysis task tracking | Zustand | `stores/analysisStore.ts` |
-| Workspace data + selection + actions | React Context (`WorkspaceProvider`) | `providers/WorkspaceProvider.tsx` |
-| Per-feature local state | `useState` / `useRef` | Inside feature components |
+| Concern                                         | Tool                                      | Location                                            |
+| ----------------------------------------------- | ----------------------------------------- | --------------------------------------------------- |
+| Server state (workspace data, task results)     | TanStack Query v5                         | `providers/QueryProvider.tsx`, hooks under `hooks/` |
+| Global UI state (current view, modals, loading) | Zustand v5 (+ immer + devtools + persist) | `stores/uiStore.ts`                                 |
+| Analysis task tracking                          | Zustand                                   | `stores/analysisStore.ts`                           |
+| Workspace data + selection + actions            | React Context (`WorkspaceProvider`)       | `providers/WorkspaceProvider.tsx`                   |
+| Per-feature local state                         | `useState` / `useRef`                     | Inside feature components                           |
 
 **Query key factory** in `lib/queryKeys.ts`:
 
 ```ts
 export const queryKeys = {
-  workspaces: () => ['workspaces'],
-  workspace: (id: string) => ['workspace', id],
-  nodes: (workspaceId: string) => ['workspace', workspaceId, 'nodes'],
-  nodeData: (nodeId: string) => ['node', nodeId, 'data'],
-  taskResult: (taskId: string) => ['task', taskId, 'result'],
-  taskStatus: (taskId: string) => ['task', taskId, 'status'],
+  workspaces: () => ["workspaces"],
+  workspace: (id: string) => ["workspace", id],
+  nodes: (workspaceId: string) => ["workspace", workspaceId, "nodes"],
+  nodeData: (nodeId: string) => ["node", nodeId, "data"],
+  taskResult: (taskId: string) => ["task", taskId, "result"],
+  taskStatus: (taskId: string) => ["task", taskId, "status"],
 };
 ```
 
 #### 4.3 API Layer
 
 All HTTP calls go through `api/http.ts` which provides `get`, `post`, `put`, `del` helpers wrapping `fetch` with:
+
 - Automatic JSON serialization/parsing
 - Timeout via `AbortController` (default 30s)
 - `ApiError` class with status, code, and detail
@@ -257,13 +264,16 @@ Service modules (`api/text.ts`, `api/workspaces.ts`, `api/nodes.ts`, etc.) expor
 
 ```ts
 export const textApi = {
-  tokenFrequencies: (req, headers?) => post('/text/token-frequencies', req, headers),
-  getTokenFrequenciesTaskResult: (taskId, headers?) => get(`/tasks/${taskId}/result`, headers),
+  tokenFrequencies: (req, headers?) =>
+    post("/text/token-frequencies", req, headers),
+  getTokenFrequenciesTaskResult: (taskId, headers?) =>
+    get(`/tasks/${taskId}/result`, headers),
   // ...
 };
 ```
 
 **Backend URL detection** (`api/env.ts`) handles multiple environments automatically:
+
 1. Tauri desktop app (`window.__BACKEND_URL__`)
 2. `VITE_BACKEND_API_BASE` env var
 3. Jupyter/Binder proxy paths
@@ -347,12 +357,14 @@ const MyAnalysisFeature = () => {
 ```
 
 **Key shared hooks** in `features/analysis/common/`:
+
 - `useAnalysisLock` — composes server lock query + local lock machine; persists parameters while a task is running so the user can't accidentally change them.
 - `useAnalysisFeature` — manages the full task lifecycle: task ID resolution, polling, result fetching, hydration from server state, clearing.
 - `useSafeResult` — ref-based result caching to avoid stale closures.
 - `useNodeColorManagement` — assigns consistent colors to nodes across visualizations.
 
 **Shared UI components** in `features/analysis/common/components/`:
+
 - `AnalysisCardLayout` — Card wrapper with title, help icon, run/clear buttons, loading states.
 - `AnalysisRunningStateCard` — display while a task is in progress.
 - `NodeColumnSelector`, `NodeSelectionList`, `NodeColorPicker` — reusable selection widgets.
@@ -370,7 +382,7 @@ const MyAnalysisFeature = () => {
 Navigation is **not URL-based** — the app is a single-route SPA. The sidebar drives navigation via Zustand:
 
 ```ts
-const currentView = useUIStore((s) => s.currentView);  // e.g. 'token-frequency', 'concordance'
+const currentView = useUIStore((s) => s.currentView); // e.g. 'token-frequency', 'concordance'
 const setCurrentView = useUIStore((s) => s.setCurrentView);
 ```
 
@@ -385,7 +397,7 @@ The Tauri v2 shell (`frontend/src-tauri/`) launches a bundled Python backend as 
 - **Runtime detection:** `main.rs` searches for the backend runtime in multiple candidate paths (bare, `_up_/`, `_up_/_up_/`, etc.) to handle macOS `.app` bundle layouts.
 - **Backend URL injection:** The Rust side injects the backend URL into the webview via `window.__BACKEND_URL__`, which `api/env.ts` picks up.
 - **Never** add platform-specific filesystem shortcuts — all data operations go through the backend over HTTP.
-- **Build:** `npm run desktop:build:mac` (or `desktop:build:windows`) — requires running `scripts/package_backend_runtime.py` first to create the portable Python runtime.
+- **Build:** `npm run desktop:build:mac` (or `desktop:build:windows`) — these scripts package and stage the backend runtime before invoking the Tauri build.
 
 ---
 

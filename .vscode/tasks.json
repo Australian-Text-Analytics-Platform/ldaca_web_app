@@ -8,9 +8,9 @@
             "type": "shell",
             "command": "uv run uvicorn ldaca_web_app_backend.main:app --reload --port 8001",
             "options": {
-                "cwd": "${workspaceFolder}/backend",
+                "cwd": "${workspaceFolder}/ldaca_web_app_backend",
                 "env": {
-                    "PYTHONPATH": "${workspaceFolder}/backend/src"
+                    "PYTHONPATH": "${workspaceFolder}/ldaca_web_app_backend/src"
                 }
             },
             "problemMatcher": [],
@@ -53,7 +53,7 @@
             "type": "shell",
             "command": "uv run python scripts/package_backend_runtime.py --clean",
             "options": {
-                "cwd": "${workspaceFolder}/backend"
+                "cwd": "${workspaceFolder}/ldaca_web_app_backend"
             },
             "problemMatcher": [],
             "presentation": {

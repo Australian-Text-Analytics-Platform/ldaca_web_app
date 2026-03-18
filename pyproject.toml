@@ -3,17 +3,7 @@ name = "ldaca-web-app-workspace"
 version = "0.0.1"
 description = "LDaCA Web App Workspace"
 requires-python = ">=3.14"
-dependencies = [
-    "ldaca-web-app-backend",
-]
-
-[tool.uv.workspace]
-members = [
-    "backend",
-    "docworkspace",
-    "ldaca-tabulator",
-    "polars-text",
-]
+dependencies = ["ldaca-web-app-backend>=0.2.0", "ldaca-loader"]
 
 [tool.uv.sources]
-ldaca-web-app-backend = { workspace = true }
+ldaca-loader = { git = "https://github.com/Australian-Text-Analytics-Platform/ldaca-tabulator", branch = "ldaca_web_app_integration" }

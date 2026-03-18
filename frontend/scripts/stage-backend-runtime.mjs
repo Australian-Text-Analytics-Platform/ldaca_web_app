@@ -7,7 +7,7 @@ const __dirname = path.dirname(__filename);
 
 const frontendRoot = path.resolve(__dirname, '..');
 const repoRoot = path.resolve(frontendRoot, '..');
-const sourceRuntime = path.join(repoRoot, 'backend', 'dist-tauri', 'backend-runtime');
+const sourceRuntime = path.join(repoRoot, 'ldaca_web_app_backend', 'dist-tauri', 'backend-runtime');
 const targetRuntime = path.join(
   frontendRoot,
   'src-tauri',
@@ -55,7 +55,7 @@ function pruneTree(dir) {
     if (entry.isDirectory()) {
       // Remove __pycache__ and test/tests directories inside site-packages
       if (entry.name === '__pycache__' ||
-          (dir.includes('site-packages') && (entry.name === 'tests' || entry.name === 'test'))) {
+        (dir.includes('site-packages') && (entry.name === 'tests' || entry.name === 'test'))) {
         const stat = fs.statSync(fullPath, { bigint: false });
         fs.rmSync(fullPath, { recursive: true, force: true });
         prunedDirs++;

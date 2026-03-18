@@ -4,5 +4,5 @@ Multi‑platform text analytics application with a FastAPI backend and React fro
 
 ## Start here
 
-- Backend docs: `ldaca_web_app/backend/docs/index.md`
+- Backend docs: `ldaca_web_app/ldaca_web_app_backend/docs/index.md`
 - Frontend docs: `ldaca_web_app/frontend/docs/index.md`
