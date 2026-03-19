@@ -101,32 +101,6 @@ jobs:
           $env:PYTHONIOENCODING = "utf-8"
           uv run --python 3.14 python scripts/package_backend_runtime.py --clean --python-version 3.14
 
-      - name: Clean up PyTorch unnecessary files for Windows bundling
-        shell: pwsh
-        working-directory: ldaca_web_app_backend
-        run: |
-          Set-StrictMode -Version Latest
-          $runtimeDir = "dist-tauri\backend-runtime\python"
-
-          # Remove CUDA headers and other unnecessary files to avoid path length issues
-          $patterns = @(
-            "Lib\site-packages\torch\include\**",
-            "Lib\site-packages\torch\share\**",
-            "Lib\site-packages\torch\test\**",
-            "Lib\site-packages\torch\bin\*.pdb",
-            "Lib\site-packages\torchvision\**\*.pdb",
-            "Lib\site-packages\**\tests\**",
-            "Lib\site-packages\**\test\**"
-          )
-
-          foreach ($pattern in $patterns) {
-            $fullPattern = Join-Path $runtimeDir $pattern
-            Write-Host "Removing: $pattern"
-            Get-ChildItem -Path $fullPattern -Recurse -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-          }
-
-          Write-Host "Cleanup completed"
-
       - name: Stage backend runtime for Tauri
         shell: pwsh
         working-directory: frontend
