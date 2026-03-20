@@ -84,7 +84,7 @@ if (manifest.python_executable) {
   } else {
     // Fallback if managed-python not found
     manifest.python_executable = process.platform === 'win32'
-      ? 'python/Scripts/python.exe'
+      ? 'python/python.exe'
       : 'python/bin/python3';
   }
 }

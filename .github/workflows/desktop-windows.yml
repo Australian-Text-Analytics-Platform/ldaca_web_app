@@ -122,7 +122,12 @@ jobs:
         run: |
           Set-StrictMode -Version Latest
           $runtimeDir = "target\release\backend-runtime"
-          $pythonExe = Join-Path $runtimeDir "python\Scripts\python.exe"
+          $managedPython = @(Get-ChildItem -Path (Join-Path $runtimeDir "managed-python") -Directory -Filter "cpython-*" -ErrorAction SilentlyContinue | Select-Object -First 1)
+          if ($managedPython.Count -gt 0) {
+            $pythonExe = Join-Path $managedPython[0].FullName "python.exe"
+          } else {
+            $pythonExe = Join-Path $runtimeDir "python\Scripts\python.exe"
+          }
 
           if (-not (Test-Path $runtimeDir)) {
             Write-Error "Bundled backend runtime not found at $runtimeDir"
