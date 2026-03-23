@@ -27,7 +27,7 @@ export const NodeColumnSelector: React.FC<NodeColumnSelectorProps> = ({
   placeholder = 'Select column',
   clearOptionValue,
   clearOptionLabel = 'Select column…',
-  noColumnsMessage = 'No columns available for this node',
+  noColumnsMessage = 'No columns available for this data block',
   preserveValue,
   className,
   triggerClassName,

@@ -143,5 +143,6 @@ describe('DataLoaderFeature citation UI', () => {
 
     expect(screen.getByRole('button', { name: /upload workspace/i })).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: /download/i }).length).toBeGreaterThan(0);
+    expect(screen.getAllByText('0 data blocks').length).toBeGreaterThan(0);
   });
 });

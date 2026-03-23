@@ -12,7 +12,7 @@ Token frequency counts how often words or tokens appear in your text data. It is
 
 <h2 id="help-token-frequency-parameters">Parameter panel</h2>
 
-Use the parameter panel to choose what text to analyze, how many tokens to display, and which stop words should be filtered from the view.
+Use the parameter panel to choose which data blocks and text columns to analyze. Stop-word filtering and token display limits are adjusted after the run in the results panel.
 
 <h3 id="help-token-frequency-stop-words">Stop words input</h3>
 
@@ -20,19 +20,20 @@ Use the parameter panel to choose what text to analyze, how many tokens to displ
 
 Stop words are words you want to ignore (like “the”, “and”, or domain-specific filler). Add them here to clean your results.
 
+Use **Fill Default** to load the app's bundled English stop-word list from packaged resource files. You can edit that list freely before or after applying it.
+
 **Q: Why remove stop words?**
 
 High-frequency filler terms can hide the meaningful terms you want to study.
 
 <h3 id="help-token-frequency-run">Run token frequency</h3>
 
-This action runs the token frequency analysis on the selected dataset.
+This action runs the token frequency analysis on the selected data block or comparison pair.
 
 - Results appear in a table and can be downloaded.
-- You can re-run after adjusting stop words.
+- After the run completes, you can adjust stop words and token display limits in the results panel without rerunning the analysis.
 
 <h2 id="help-token-frequency-results">Result panel</h2>
-
 
 Use the result panel to inspect token lists, compare two data blocks, and review the statistical summary. Click any token to jump to concordance.
 
@@ -63,7 +64,7 @@ The statistical table summarizes token differences between the two datasets.
   - **RRisk:** relative risk ratio.
   - **LogRatio:** log of relative frequencies.
   - **OddsRatio:** odds ratio between datasets.
-  - **Significance:** **** $p < 0.0001$, *** $p < 0.001$, ** $p < 0.01$, * $p < 0.05$.
+  - **Significance:** \***_ $p < 0.0001$, _** $p < 0.001$, \*_ $p < 0.01$, _ $p < 0.05$.
 
 <h3 id="help-token-frequency-clear-results">Clear results</h3>
 
@@ -73,6 +74,6 @@ Token frequency results are saved in the backend so this tab can reload and keep
 
 1. Run token frequency with default settings.
 2. Add 3 extra stop words that look like noise.
-3. Run again and compare the top 10 tokens.
+3. Apply them and compare the top 10 tokens.
 
 [← Back to tutorial index](./index.md)

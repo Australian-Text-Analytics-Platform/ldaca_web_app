@@ -34,9 +34,9 @@ export interface ConditionBuilderProps<Condition extends ConditionBuilderItem> {
 }
 
 const defaultMessages = {
-  noSelection: 'Select a node to configure conditions.',
+  noSelection: 'Select a data block to configure conditions.',
   schemaLoading: 'Retrieving column metadata…',
-  noSchema: 'No schema information is available yet for this node.',
+  noSchema: 'No schema information is available yet for this data block.',
 };
 
 export function ConditionBuilder<Condition extends ConditionBuilderItem>(props: ConditionBuilderProps<Condition>) {

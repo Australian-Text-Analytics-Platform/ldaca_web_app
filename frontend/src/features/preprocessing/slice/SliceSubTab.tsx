@@ -38,7 +38,7 @@ export const SliceSubTab: React.FC<SliceSubTabProps> = (props) => {
                 <HelpIcon
                   targetKey="preprocessing.slice.tab"
                   label="Slice sub-tab overview"
-                  tooltip="Extract a contiguous range of rows from the selected node."
+                  tooltip="Extract a contiguous range of rows from the selected data block."
                 />
               </CardTitle>
               
@@ -112,7 +112,7 @@ export const SliceSubTab: React.FC<SliceSubTabProps> = (props) => {
 
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <Label htmlFor="slice-new-node-name">New node name</Label>
+              <Label htmlFor="slice-new-node-name">New data block name</Label>
               <HelpIcon targetKey="preprocessing.slice.new-node-name" label="Slice output name" />
             </div>
             <Input
@@ -120,7 +120,7 @@ export const SliceSubTab: React.FC<SliceSubTabProps> = (props) => {
               type="text"
               value={form.newNodeName}
               onChange={(event) => form.setNewNodeName(event.target.value)}
-              placeholder="Enter name for sliced data"
+              placeholder="Enter name for sliced data block"
               disabled={!hasSelection}
             />
           </div>

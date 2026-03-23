@@ -44,7 +44,7 @@ export function formatDataType(fullType: string): { display: string; full: strin
     if (className === 'DataFrame') {
       display = 'polars.DataFrame';
     } else if (className === 'LazyFrame') {
-      display = 'polars.LazyFrame';
+      display = 'Data Block';
     } else if (className === 'Series') {
       display = 'polars.Series';
     }

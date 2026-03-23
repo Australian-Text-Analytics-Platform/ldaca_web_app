@@ -110,11 +110,11 @@ export const PREVIEW_PAGE_SIZE_OPTIONS = [10, 20, 50];
 export const MAX_CONCAT_NODES = 6;
 
 export const JOIN_TYPE_OPTIONS: Array<{ value: JoinType; description: string }> = [
-  { value: 'inner', description: 'Only rows with matching keys in both nodes.' },
-  { value: 'left', description: 'All rows from the left node plus matching rows from the right.' },
-  { value: 'right', description: 'All rows from the right node plus matching rows from the left.' },
-  { value: 'full', description: 'All rows from both nodes; missing matches become nulls.' },
-  { value: 'semi', description: 'Rows from the left node that have at least one match in the right.' },
-  { value: 'anti', description: 'Rows from the left node that do not match anything in the right.' },
+  { value: 'inner', description: 'Only rows with matching keys in both data blocks.' },
+  { value: 'left', description: 'All rows from the left data block plus matching rows from the right.' },
+  { value: 'right', description: 'All rows from the right data block plus matching rows from the left.' },
+  { value: 'full', description: 'All rows from both data blocks; missing matches become nulls.' },
+  { value: 'semi', description: 'Rows from the left data block that have at least one match in the right.' },
+  { value: 'anti', description: 'Rows from the left data block that do not match anything in the right.' },
   { value: 'cross', description: 'Cartesian product of all rows; ignores column selections.' },
 ];

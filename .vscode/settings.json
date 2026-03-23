@@ -1,3 +1,9 @@
 {
-    "python-envs.pythonProjects": []
+    "python-envs.pythonProjects": [],
+    "eslint.workingDirectories": [
+        {
+            "directory": "frontend",
+            "changeProcessCWD": true
+        }
+    ]
 }

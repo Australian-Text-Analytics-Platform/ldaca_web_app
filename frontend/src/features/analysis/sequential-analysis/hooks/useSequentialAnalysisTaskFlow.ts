@@ -108,7 +108,7 @@ export function useSequentialAnalysisTaskFlow({
   const handleAnalyze = async () => {
     const nodeIdForAnalysis = activeNodeId;
     if (!nodeIdForAnalysis || !currentWorkspaceId) {
-      toast.error('Please select a node first');
+      toast.error('Please select a data block first');
       return;
     }
 

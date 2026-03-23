@@ -656,7 +656,7 @@ const AiAnnotatorFeature: React.FC = () => {
 
   const handleReview = async () => {
     if (!selectedNodeId || !reviewTextColumn || !reviewAnnotationColumn) {
-      setStatusMessage('Select a node, text column, and annotation column to review.');
+      setStatusMessage('Select a data block, text column, and annotation column to review.');
       return;
     }
     setIsReviewLoading(true);

@@ -146,11 +146,11 @@ export const TokenFrequencyResultsPanel = ({
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-4">
               <div className="flex items-center justify-between gap-2">
-                <Label htmlFor="stop-words">Stop words ({appliedStopCount})</Label>
+                <Label htmlFor="stop-words">Stop words filter ({appliedStopCount})</Label>
                 <HelpIcon
                   targetKey="analysis.token-frequency.stop-words"
                   label="Stop words"
-                  tooltip="Words entered here are removed from all displayed token frequencies."
+                  tooltip="Words entered here are removed from the displayed token tables and comparison views after a run completes."
                 />
               </div>
               <textarea
@@ -175,13 +175,19 @@ export const TokenFrequencyResultsPanel = ({
                 </Button>
                 <Button
                   type="button"
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
                   onClick={onFillDefaultStopWords}
                   disabled={isLoadingStopWords}
                 >
                   Fill Default
                 </Button>
+                <HelpIcon
+                  targetKey="analysis.token-frequency.stop-words"
+                  label="About default stop words"
+                  tooltip="Fill Default loads the bundled English stop-word list shipped with the app. You can edit that list before or after applying it. Click to open the tutorial."
+                  className="h-5 w-5 text-muted-foreground"
+                />
               </div>
             </div>
 
@@ -191,7 +197,7 @@ export const TokenFrequencyResultsPanel = ({
                 <HelpIcon
                   targetKey="analysis.token-frequency.token-limit"
                   label="Token display limit"
-                  tooltip="Limits the number of top tokens shown per table after filtering."
+                  tooltip="Limits how many top tokens are shown per table after the analysis has finished."
                 />
               </div>
               <div className="flex items-center gap-2">

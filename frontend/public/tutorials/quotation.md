@@ -29,6 +29,10 @@ Start with a modest length (e.g., 5–10 words on each side) and adjust based on
 
 Use the result panel to review extracted quotations and metadata.
 
+The pagination footer shows **Documents searched per page (N matches found)** so you can see how many source documents on the current page produced at least one quotation row.
+
+If a source document on that page has no extracted quotation, it does not appear as a row in the result table.
+
 <h3 id="help-quotation-clear-results">Clear results</h3>
 
 Quotation results are saved in the backend so the tab can reload and keep persistent pages. **Clear Results** clears the cached result in the backend and resets the tab.

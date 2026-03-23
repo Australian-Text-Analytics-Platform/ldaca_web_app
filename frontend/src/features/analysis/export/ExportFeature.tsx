@@ -103,7 +103,7 @@ const ExportFeature: React.FC = () => {
       }, 0);
     } catch (e) {
       console.error(e);
-      toast.error('Failed to export nodes');
+      toast.error('Failed to export data blocks');
     } finally {
       setExporting(false);
     }
@@ -137,7 +137,7 @@ const ExportFeature: React.FC = () => {
       }, 0);
     } catch (e) {
       console.error(e);
-      toast.error('Failed to download node');
+      toast.error('Failed to download data block');
     } finally {
       setDownloadingIds((s) => ({ ...s, [id]: 'idle' }));
     }
@@ -152,7 +152,7 @@ const ExportFeature: React.FC = () => {
             <HelpIcon
               targetKey="analysis.export.parameters"
               label="Export parameters"
-              tooltip="Select nodes, choose a format, and export results for download."
+              tooltip="Select data blocks, choose a format, and export them for download."
             />
           </CardTitle>
         </CardHeader>
@@ -174,7 +174,7 @@ const ExportFeature: React.FC = () => {
             <div className="border-border/60 bg-background max-h-104 space-y-2 overflow-y-auto rounded-lg border p-2 shadow-sm">
               {selectedNodes.length === 0 && (
                 <div className="border-border/40 bg-muted/30 text-muted-foreground flex items-center justify-center rounded-md border border-dashed py-10 text-sm">
-                  Choose nodes in the graph sidebar to enable exports.
+                  Choose data blocks in the graph sidebar to enable exports.
                 </div>
               )}
               {selectedNodes.map((n: GraphNode) => {

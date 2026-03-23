@@ -300,7 +300,7 @@ export const TokenFrequencyUnifiedTokenSection = ({
               <HelpIcon
                 targetKey="analysis.token-frequency.unified-word-cloud"
                 label="Unified word cloud"
-                tooltip="Shows a combined comparative word cloud for the selected node pair."
+                tooltip="Shows a combined comparative word cloud for the selected data block pair."
               />
             </div>
             <Button variant="outline" size="sm" onClick={() => onDownloadWordCloud('unified', 'Unified Word Cloud')}>
@@ -376,7 +376,7 @@ export const TokenFrequencyUnifiedTokenSection = ({
                 </div>
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">Unified cloud appears when two node results and comparative statistics are available.</p>
+              <p className="text-sm text-muted-foreground">Unified cloud appears when two data block results and comparative statistics are available.</p>
             )}
           </div>
         </CardContent>
@@ -390,7 +390,7 @@ export const TokenFrequencyUnifiedTokenSection = ({
               <HelpIcon
                 targetKey="analysis.token-frequency.statistical-measures"
                 label="Statistics"
-                tooltip="Displays comparative token-level statistical measures for the selected nodes."
+                tooltip="Displays comparative token-level statistical measures for the selected data blocks."
               />
             </div>
             <Button

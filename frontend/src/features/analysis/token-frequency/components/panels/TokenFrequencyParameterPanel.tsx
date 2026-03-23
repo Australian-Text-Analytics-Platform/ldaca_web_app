@@ -49,7 +49,7 @@ export const TokenFrequencyParameterPanel = ({
       help={{
         targetKey: 'analysis.token-frequency.parameters',
         label: 'Token frequency parameters',
-        tooltip: 'Choose nodes, text columns, token limits, and stop words before running the analysis.',
+        tooltip: 'Choose up to two data blocks and the text columns to analyze. After the run, use the results panel to adjust stop words and displayed token limits.',
       }}
       actions={{
         onRun: onAnalyze,

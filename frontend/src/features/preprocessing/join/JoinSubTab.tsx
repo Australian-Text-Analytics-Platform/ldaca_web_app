@@ -53,13 +53,13 @@ export const JoinSubTab: React.FC<JoinSubTabProps> = (props) => {
             <HelpIcon
               targetKey="preprocessing.join.tab"
               label="Join sub-tab overview"
-              tooltip="Combine up to two nodes using matching columns."
+              tooltip="Combine up to two data blocks using matching columns."
             />
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6 pt-0">
           <p className="text-sm text-muted-foreground">
-            Select up to two nodes in the workspace (Shift/⌘-click) to configure a join. Column pickers will appear below
+            Select up to two data blocks in the workspace (Shift/⌘-click) to configure a join. Column pickers will appear below
             for the current selection.
             <span className="ml-2 inline-flex items-center">
               <HelpIcon
@@ -124,7 +124,7 @@ export const JoinSubTab: React.FC<JoinSubTabProps> = (props) => {
             </div>
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <Label htmlFor="join-new-node-name">New node name</Label>
+                <Label htmlFor="join-new-node-name">New data block name</Label>
                 <HelpIcon targetKey="preprocessing.join.new-node-name" label="Join output name" />
               </div>
               <Input
@@ -170,7 +170,7 @@ export const JoinSubTab: React.FC<JoinSubTabProps> = (props) => {
               <HelpIcon targetKey="preprocessing.common.preview" label="Preview table" />
             </span>
           }
-          description="Inspect a sample of the joined rows before creating the node."
+          description="Inspect a sample of the joined rows before creating the data block."
           columns={preview.columns}
           data={preview.data}
           pagination={preview.pagination}

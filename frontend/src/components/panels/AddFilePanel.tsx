@@ -63,13 +63,13 @@ export const AddFilePanel: React.FC<AddFilePanelProps> = ({ filename, open, onCl
       <DialogContent className="w-full max-w-[min(80vw,960px)] border-none bg-transparent p-0 shadow-none">
         <DialogHeader className="sr-only">
           <DialogTitle>{filename ? `Add file: ${filename}` : 'Add file to workspace'}</DialogTitle>
-          <DialogDescription>Files are staged as LazyFrames automatically. Choose an optional sheet, inspect the preview, and confirm.</DialogDescription>
+          <DialogDescription>Files are added as data blocks automatically. Choose an optional sheet, inspect the preview, and confirm.</DialogDescription>
         </DialogHeader>
         <Card className="flex w-full max-h-[90vh] min-w-0 flex-col">
           <CardHeader className="border-b px-6 py-4">
             <CardTitle className="truncate text-lg font-semibold">Add File{filename ? `: ${filename}` : ''}</CardTitle>
             <CardDescription>
-              Files are added as LazyFrames automatically. Choose an optional sheet, inspect the preview, and confirm to stage the node lazily.
+              Files are added as data blocks automatically. Choose an optional sheet, inspect the preview, and confirm before adding it to the workspace.
             </CardDescription>
           </CardHeader>
 

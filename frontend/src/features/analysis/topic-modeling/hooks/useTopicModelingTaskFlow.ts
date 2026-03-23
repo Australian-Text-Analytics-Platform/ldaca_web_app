@@ -243,7 +243,7 @@ export function useTopicModelingTaskFlow({
       ]);
 
       setDetachDialogOpen(false);
-      toast.success('Detached topic node(s) created');
+      toast.success('Detached topic data block(s) created');
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : 'Topic detach failed');
     } finally {

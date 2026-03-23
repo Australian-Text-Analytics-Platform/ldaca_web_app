@@ -676,7 +676,7 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
           type="text"
           value={condition.operator === 'between' ? '' : String(condition.value ?? '')}
           disabled
-          placeholder={hasSelection ? 'Select a column' : 'Select a node to configure filters'}
+          placeholder={hasSelection ? 'Select a column' : 'Select a data block to configure filters'}
           className="flex-1 rounded-md border border-border/70 bg-muted px-2 py-1 text-sm text-muted-foreground"
         />
       );
@@ -872,7 +872,7 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
 
   const handleApplyFilter = async () => {
     if (!selectedNodeId) {
-      onAlert('Please select a node first');
+      onAlert('Please select a data block first');
       return;
     }
 
@@ -894,7 +894,7 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     }
   };
   const previewReadyMessage = !hasSelection
-    ? 'Select a node to preview filtered results.'
+    ? 'Select a data block to preview filtered results.'
     : 'Configure at least one complete condition to see a live preview of the filtered rows.';
 
   const summaryText = conditions.length === 0

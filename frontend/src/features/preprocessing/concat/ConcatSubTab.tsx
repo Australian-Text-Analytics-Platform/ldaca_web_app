@@ -36,7 +36,7 @@ export const ConcatSubTab: React.FC<ConcatSubTabProps> = (props) => {
                 <HelpIcon
                   targetKey="preprocessing.concat.tab"
                   label="Concat sub-tab overview"
-                  tooltip="Stack compatible nodes vertically into a single dataset."
+                  tooltip="Stack compatible data blocks vertically into a single data block."
                 />
               </CardTitle>
             </div>
@@ -50,7 +50,7 @@ export const ConcatSubTab: React.FC<ConcatSubTabProps> = (props) => {
         </CardHeader>
         <CardContent className="space-y-6 pt-0">
           <p className="text-sm text-muted-foreground">
-            Multi-select nodes in the workspace (Shift/⌘-click) to stack them vertically. We′ll align schemas and preserve column order.
+            Multi-select data blocks in the workspace (Shift/⌘-click) to stack them vertically. We′ll align schemas and preserve column order.
           </p>
 
           <NodeSelectionPanel
@@ -106,7 +106,7 @@ export const ConcatSubTab: React.FC<ConcatSubTabProps> = (props) => {
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <Label htmlFor="concat-new-node-name">New node name</Label>
+                <Label htmlFor="concat-new-node-name">New data block name</Label>
                 <HelpIcon targetKey="preprocessing.concat.new-node-name" label="Concat output name" />
               </div>
               <Input
@@ -153,7 +153,7 @@ export const ConcatSubTab: React.FC<ConcatSubTabProps> = (props) => {
             <HelpIcon targetKey="preprocessing.common.preview" label="Preview table" />
           </span>
         }
-        description="Inspect a sample of the stacked rows before creating the node."
+        description="Inspect a sample of the stacked rows before creating the data block."
         columns={preview.columns}
         data={preview.data}
         pagination={preview.pagination}

@@ -33,6 +33,10 @@ Regex mode lets you use patterns for advanced matching (e.g., word variants).
 
 Use the result panel to review keyword-in-context hits and compare separated versus combined views.
 
+The pagination footer shows **Documents searched per page (N matches found)** so you can tell how many source documents on the current page produced at least one concordance row.
+
+If a source document on that page does not contain the search term, it does not produce a row in the result table.
+
 <h3 id="help-concordance-clear-results">Clear results</h3>
 
 Concordance results are saved in the backend so the tab can reload and preserve your last results. **Clear Results** clears the cached result in the backend and resets the tab state.

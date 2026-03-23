@@ -25,7 +25,7 @@ Select one or more data blocks from the workspace graph. Each tab will show only
 
 <h3 id="help-preprocessing-common-apply-button">Apply action</h3>
 
-Use **Add to Workspace** or **Add to Node** to run the transformation. A new data block is created (or the selected data block is updated) without overwriting your source data.
+Use **Add to Workspace** or **Add to Data Block** to run the transformation. A new data block is created (or the selected data block is updated) without overwriting your source data.
 
 <h3 id="help-preprocessing-common-preview">Preview table</h3>
 
@@ -87,17 +87,17 @@ Practice exercise:
 
 ![Join screenshot](tutorials/assets/preprocessing_join.png)
 
-Join combines two datasets using matching columns. Use it when your text data lives in one data block and metadata lives in another, or when you need to enrich a dataset before analysis.
+Join combines two data blocks using matching columns. Use it when your text data lives in one data block and metadata lives in another, or when you need to enrich a data block before analysis.
 
 <h3 id="help-preprocessing-join-section">Join sub-tab overview</h3>
 
-The Join sub-tab guides you through selecting up to two datasets, choosing join columns, and producing a combined data block.
+The Join sub-tab guides you through selecting up to two data blocks, choosing join columns, and producing a combined data block.
 
 <h3 id="help-preprocessing-join-column-picker">Join column picker</h3>
 
 ![Join column picker screenshot](tutorials/assets/preprocessing_join_column_picker.png)
 
-Column pickers choose which column to match in each dataset.
+Column pickers choose which column to match in each data block.
 
 - Pick columns that represent the same identifier in both data blocks.
 - Clean, consistent IDs produce the best joins.
@@ -116,7 +116,7 @@ Join type controls how unmatched rows are handled:
 
 <h3 id="help-preprocessing-join-node-name">Join output name</h3>
 
-Give the new joined dataset a clear name so it is easy to find later. Leave it blank to use the suggested name.
+Give the new joined data block a clear name so it is easy to find later. Leave it blank to use the suggested name.
 
 <h3 id="help-preprocessing-join-apply">Apply join</h3>
 
@@ -132,7 +132,7 @@ Practice exercise:
 
 ![Stack screenshot](tutorials/assets/preprocessing_concat.png)
 
-Stack combines multiple datasets vertically. Use it when you want to merge similar tables into one larger dataset.
+Stack combines multiple data blocks vertically. Use it when you want to merge similar tables into one larger data block.
 
 <h3 id="help-preprocessing-concat-new-node-name">New data block name</h3>
 
@@ -185,7 +185,7 @@ Expression tips:
 
 Set a clear label for the computed column so it is easy to use downstream.
 
-Key controls include the data block selection panel, the Basic builder, the Advanced editor, the optional new column name, the **Add to Node** action, and the preview showing the computed column.
+Key controls include the data block selection panel, the Basic builder, the Advanced editor, the optional new column name, the **Add to Data Block** action, and the preview showing the computed column.
 
 Practice exercise:
 

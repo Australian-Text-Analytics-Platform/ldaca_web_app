@@ -71,6 +71,11 @@ const dedupeColumns = (cols: string[]): string[] => {
 const hasSuccessfulConcordanceResults = (result: ConcordanceAnalysisResponse | null): boolean =>
   Boolean(result && result.state === 'successful');
 
+const buildMatchCountLabel = (count: number | undefined): string => {
+  const safeCount = Number.isFinite(count) ? Math.max(0, Math.floor(count as number)) : 0;
+  return `Documents searched per page (${safeCount} match${safeCount === 1 ? '' : 'es'} found)`;
+};
+
 const highlightMatchInText = (
   textValue: string,
   startValue: unknown,
@@ -921,7 +926,7 @@ const ConcordanceFeature: React.FC = () => {
           <div className="flex items-center mb-4">
             <h3 className="text-lg font-semibold text-gray-800">Combined Results</h3>
             <div className="ml-auto flex items-center space-x-2">
-              <span className="text-xs text-gray-500">Rows colored by source node</span>
+              <span className="text-xs text-gray-500">Rows colored by source data block</span>
               <Button
                 onClick={() => {
                   const nodeIdsForDetach = selectedNodes.slice(0,2).map(n => n.id);
@@ -962,7 +967,7 @@ const ConcordanceFeature: React.FC = () => {
                   {rows.length === 0 ? (
                     <TableRow>
                       <TableCell className="h-24 text-center text-muted-foreground" colSpan={displayColumns.length || 1}>
-                        No results on this page for &quot;{searchWord}&quot;
+                        No matching rows on this page for &quot;{searchWord}&quot;. Source rows without matches are omitted.
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -1013,7 +1018,7 @@ const ConcordanceFeature: React.FC = () => {
               hasPrev={combinedHasPrev}
               totalPages={nodeData.pagination?.total_source_pages}
               onPageChange={(newPage) => setCombinedPage(newPage)}
-              pageSizeLabel="Documents searched per page"
+              pageSizeLabel={buildMatchCountLabel(nodeData.total_matches)}
               loading={combinedLoading}
             />
           </div>
@@ -1063,7 +1068,7 @@ const ConcordanceFeature: React.FC = () => {
                 {nodeData.data.length === 0 ? (
                   <TableRow>
                     <TableCell className="h-24 text-center text-muted-foreground" colSpan={tableColumns.length || 1}>
-                      No results on this page for &quot;{searchWord}&quot;
+                      No matching rows on this page for &quot;{searchWord}&quot;. Source rows without matches are omitted.
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -1124,7 +1129,7 @@ const ConcordanceFeature: React.FC = () => {
               }
             })();
           }}
-          pageSizeLabel="Documents searched per page"
+          pageSizeLabel={buildMatchCountLabel(nodeData.total_matches)}
           pageSizeOptions={[10, 20, 50, 100]}
           loading={nodeIsLoading}
         >
@@ -1140,7 +1145,7 @@ const ConcordanceFeature: React.FC = () => {
             disabled={nodeIsLoading || isDetaching || !searchWord.trim() || !canDetach || !detachNodeId}
             size="sm"
             className="bg-green-600 hover:bg-green-700"
-            title="Create a new node with concordance results joined to the original table"
+            title="Create a new data block with concordance results joined to the original table"
           >
             {isDetaching ? (
               <><Loader2 className="mr-2 h-3 w-3 animate-spin" />Detaching...</>
@@ -1164,7 +1169,7 @@ const ConcordanceFeature: React.FC = () => {
                 <HelpIcon
                   targetKey="analysis.concordance.parameters"
                   label="Concordance parameters"
-                  tooltip="Select nodes, choose the search term, and set context options before running."
+                  tooltip="Select data blocks, choose the search term, and set context options before running."
                 />
               </CardTitle>
             </div>

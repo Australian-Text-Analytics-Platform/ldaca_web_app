@@ -1,7 +1,7 @@
 import React from 'react';
 import { cn } from '../../lib/utils';
 
-export const ANALYSIS_LOCKED_MESSAGE = 'Analysis locked to the last request. Clear results to unlock and resync node choices.';
+export const ANALYSIS_LOCKED_MESSAGE = 'Analysis locked to the last request. Clear results to unlock and resync data block choices.';
 
 type AnalysisLockedNoticeProps = {
   message?: string;

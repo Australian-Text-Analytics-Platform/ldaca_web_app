@@ -171,13 +171,13 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
 
   const joinConfigIssues = (() => {
     if (!joinLeftNodeId || !joinRightNodeId) {
-      return 'Pick two nodes to configure a join.';
+      return 'Pick two data blocks to configure a join.';
     }
     if (joinLeftNodeId === joinRightNodeId) {
-      return 'Select two different nodes to join—joining a node to itself is not supported yet.';
+      return 'Select two different data blocks to join. Joining a data block to itself is not supported yet.';
     }
     if (needsColumns && (!joinLeftColumn || !joinRightColumn)) {
-      return 'Choose the columns that should match between the two nodes.';
+      return 'Choose the columns that should match between the two data blocks.';
     }
     if (needsColumns && sharedColumns.length === 0) {
       return 'No matching column names detected. Select compatible columns manually or rename them to match.';
@@ -330,7 +330,7 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
     setJoinPreviewPageSize(size);
   };
 
-  const readyMessage = joinConfigIssues || 'Select two nodes and configure the join to view a preview.';
+  const readyMessage = joinConfigIssues || 'Select two data blocks and configure the join to view a preview.';
 
   const handleJoinColumnChange = (nodeId: string, column: string) => {
     if (nodeId === joinLeftNodeId) {
@@ -344,7 +344,7 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
 
   const handleApplyJoin = async () => {
     if (!joinConfigReady) {
-      onAlert('Please select two different nodes and matching columns to join.');
+      onAlert('Please select two different data blocks and matching columns to join.');
       return;
     }
     const leftColumns = needsColumns ? [joinLeftColumn] : [];

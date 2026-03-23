@@ -631,7 +631,7 @@ export const DataLoaderFeature: React.FC = () => {
               <HelpIcon
                 targetKey="data-loader.active-workspace.section"
                 label="Active workspace overview"
-                tooltip="Choose or rename the workspace where new nodes will be added. Save regularly to persist your progress."
+                tooltip="Choose or rename the workspace where new data blocks will be added. Save regularly to persist your progress."
               />
             </CardTitle>
           </CardHeader>
@@ -640,7 +640,7 @@ export const DataLoaderFeature: React.FC = () => {
               <div className="rounded-md border border-border/60 bg-muted/30 px-4 py-3 text-sm">
                 <div className="flex flex-wrap items-center gap-2 text-base font-semibold text-foreground">
                   {currentWorkspace.name}
-                  <Badge>{nodeCount} nodes</Badge>
+                  <Badge>{nodeCount} data block{nodeCount === 1 ? '' : 's'}</Badge>
                 </div>
                 <div className="mt-1 text-xs text-muted-foreground">
                   Updated {formatTimestamp(currentWorkspace.modified_at || currentWorkspace.updated_at)} | Size {formatBytes(Number(currentWorkspace.workspace_size_Byte || 0))} | Created {formatTimestamp(currentWorkspace.created_at)}
@@ -792,7 +792,7 @@ export const DataLoaderFeature: React.FC = () => {
                       <div>
                         <div className="font-medium text-foreground">{workspace.name || workspaceId}</div>
                         <div className="text-xs text-muted-foreground">
-                          Updated {formatTimestamp(workspace.modified_at || workspace.updated_at)} | {workspace.total_nodes ?? workspace.dataframe_count ?? 0} nodes | Size {formatBytes(Number(workspace.workspace_size_Byte || 0))}
+                          Updated {formatTimestamp(workspace.modified_at || workspace.updated_at)} | {workspace.total_nodes ?? workspace.dataframe_count ?? 0} data block{(workspace.total_nodes ?? workspace.dataframe_count ?? 0) === 1 ? '' : 's'} | Size {formatBytes(Number(workspace.workspace_size_Byte || 0))}
                         </div>
                       </div>
                       <div className="flex flex-wrap gap-2">

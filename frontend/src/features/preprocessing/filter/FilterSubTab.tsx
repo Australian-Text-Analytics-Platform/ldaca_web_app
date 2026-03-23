@@ -37,7 +37,7 @@ export const FilterSubTab: React.FC<FilterSubTabProps> = (props) => {
                 <HelpIcon
                   targetKey="preprocessing.filter.tab"
                   label="Filter sub-tab overview"
-                  tooltip="Apply column-based filters to create a new node from the selected dataset."
+                  tooltip="Apply column-based filters to create a new data block from the selected data block."
                 />
               </CardTitle>
             </div>
@@ -83,7 +83,7 @@ export const FilterSubTab: React.FC<FilterSubTabProps> = (props) => {
 
           {hasSelection && !isSchemaLoading && !hasSchema && (
             <div className="rounded-md border border-dashed border-amber-400/60 bg-amber-100/70 p-4 text-sm text-amber-900">
-              No schema information is available for this node yet.
+              No schema information is available for this data block yet.
             </div>
           )}
 
@@ -94,7 +94,7 @@ export const FilterSubTab: React.FC<FilterSubTabProps> = (props) => {
                 <HelpIcon targetKey="preprocessing.filter.conditions" label="Filter conditions builder" />
               </span>
             }
-            description="Apply column-based filters to create a new node from the selected dataset."
+            description="Apply column-based filters to create a new data block from the selected data block."
             conditions={conditionBuilder.conditions}
             availableColumns={conditionBuilder.availableColumns}
             logic={conditionBuilder.logic}
@@ -105,9 +105,9 @@ export const FilterSubTab: React.FC<FilterSubTabProps> = (props) => {
             disabled={schemaState.isConfigDisabled}
             hasSelection={hasSelection}
             isSchemaLoading={hasSelection && isSchemaLoading}
-            noSelectionMessage="Configure conditions once a node is selected."
+            noSelectionMessage="Configure conditions once a data block is selected."
             schemaLoadingMessage="Retrieving column information…"
-            noSchemaMessage="No schema information is available for this node yet."
+            noSchemaMessage="No schema information is available for this data block yet."
             renderValueInput={conditionBuilder.renderValueInput}
             renderConditionMetadata={conditionBuilder.renderConditionMetadata}
             shouldHideOperatorSelect={conditionBuilder.shouldHideOperatorSelect}
@@ -117,7 +117,7 @@ export const FilterSubTab: React.FC<FilterSubTabProps> = (props) => {
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <label className="block text-sm font-medium text-muted-foreground" htmlFor="filter-new-node-name">
-                New node name
+                New data block name
               </label>
               <HelpIcon targetKey="preprocessing.filter.new-node-name" label="Filter output name" />
             </div>

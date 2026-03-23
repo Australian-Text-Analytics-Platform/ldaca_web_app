@@ -132,6 +132,8 @@ describe('ExportFeature', () => {
   it('passes the selected bulk export format through to the backend request', async () => {
     render(<ExportFeature />);
 
+    expect(screen.getByText('Selected Data Blocks')).toBeInTheDocument();
+
     fireEvent.change(screen.getByRole('combobox', { name: 'Format' }), {
       target: { value: 'parquet' },
     });

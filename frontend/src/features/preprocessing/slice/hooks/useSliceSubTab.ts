@@ -174,7 +174,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
 
   const rangeSummary = (() => {
     if (!hasSelection) {
-      return 'Select a node to configure slicing.';
+      return 'Select a data block to configure slicing.';
     }
     if (!offsetValid) {
       return 'Offset must be a non-negative integer (zero-based row index).';
@@ -194,7 +194,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
 
   const lastResultSummary = (() => {
     if (!lastResult) {
-      return 'Adjust parameters and add to workspace to create a sliced node.';
+      return 'Adjust parameters and add to workspace to create a sliced data block.';
     }
     if (lastResult.length === undefined) {
       return `Last slice “${lastResult.nodeName}” (offset ${lastResult.offset} → end).`;
@@ -278,7 +278,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
   };
 
   const previewReadyMessage = !hasSelection
-    ? 'Select a node to preview sliced rows.'
+    ? 'Select a data block to preview sliced rows.'
     : 'Enter a valid offset (and optional length) to see a preview.';
 
   const applyDisabled =
@@ -286,7 +286,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
 
   const applySlice = async () => {
     if (!selectedNodeId) {
-      setInlineError('Select a node to slice.');
+      setInlineError('Select a data block to slice.');
       return;
     }
     if (!offsetValid) {

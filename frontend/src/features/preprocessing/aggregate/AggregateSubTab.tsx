@@ -109,7 +109,7 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
             <HelpIcon
               targetKey="preprocessing.aggregate.tab"
               label="Aggregate sub-tab overview"
-              tooltip="Combine existing columns with Polars-style expressions. The result is added to the selected node using with_columns."
+              tooltip="Combine existing columns with Polars-style expressions. The result is added to the selected data block using with_columns."
             />
           </CardTitle>
         </CardHeader>
@@ -373,7 +373,7 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
                     Adding…
                   </>
                 ) : (
-                  'Add to Node'
+                  'Add to Data Block'
                 )}
               </Button>
               <HelpIcon targetKey="preprocessing.common.apply-button" label="Apply action" />

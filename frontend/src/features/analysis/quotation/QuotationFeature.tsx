@@ -93,6 +93,11 @@ const clampContextLength = (value: number): number => {
   return Math.max(0, Math.min(MAX_CONTEXT_LENGTH, Math.floor(value)));
 };
 
+const buildQuotationMatchCountLabel = (count: number | undefined): string => {
+  const safeCount = Number.isFinite(count) ? Math.max(0, Math.floor(count as number)) : 0;
+  return `Documents searched per page (${safeCount} match${safeCount === 1 ? '' : 'es'} found)`;
+};
+
 type HighlightSpan = { start: number; end: number; types: string[] };
 
 interface ContextClipResult {
@@ -1019,7 +1024,7 @@ const QuotationFeature: React.FC = () => {
                   <HelpIcon
                     targetKey="analysis.quotation.parameters"
                     label="Quotation parameters"
-                    tooltip="Select a node, choose a text column, and configure quotation settings."
+                    tooltip="Select a data block, choose a text column, and configure quotation settings."
                   />
                 </CardTitle>
               </div>
@@ -1277,7 +1282,7 @@ const QuotationFeature: React.FC = () => {
                               {rowsWithQuotes.length === 0 ? (
                                 <TableRow>
                                   <TableCell className="h-24 text-center text-muted-foreground" colSpan={cols.length || 1}>
-                                    No quotations
+                                    No quotations found on this page. Source rows without quotations are omitted.
                                   </TableCell>
                                 </TableRow>
                               ) : (
@@ -1324,7 +1329,7 @@ const QuotationFeature: React.FC = () => {
                       totalPages={resultState?.pagination?.total_source_pages}
                       onPageChange={(newPage) => handlePageChange(newPage)}
                       onPageSizeChange={(newSize) => handlePageSizeChange(newSize)}
-                      pageSizeLabel="Documents searched per page"
+                      pageSizeLabel={buildQuotationMatchCountLabel(resultState?.pagination?.result_count)}
                       pageSizeOptions={[50, 100, 200, 400]}
                     >
                       <Button
