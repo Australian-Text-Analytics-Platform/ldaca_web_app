@@ -2,14 +2,6 @@ import React, { memo, useEffect, useState } from 'react';
 import { useWorkspaceData } from '../../hooks/useWorkspaceData';
 import { useWorkspaceActions } from '../../hooks/useWorkspaceActions';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '../ui/dialog';
-import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogContent,
@@ -18,8 +10,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../ui/alert-dialog';
-import { Input } from '../ui/input';
-import { Button } from '../ui/button';
 import { getInvalidWorkspaceNameMessage } from '../../lib/workspaceName';
 
 /**
@@ -28,12 +18,10 @@ import { getInvalidWorkspaceNameMessage } from '../../lib/workspaceName';
  */
 export const WorkspaceControls: React.FC = memo(() => {
   const { currentWorkspace } = useWorkspaceData();
-  const { saveWorkspace, saveWorkspaceAs, renameWorkspace, setCurrentWorkspace } = useWorkspaceActions();
+  const { saveWorkspace, renameWorkspace, setCurrentWorkspace } = useWorkspaceActions();
 
   const [isEditing, setIsEditing] = useState(false);
   const [nameInput, setNameInput] = useState(currentWorkspace?.name || '');
-  const [saveAsOpen, setSaveAsOpen] = useState(false);
-  const [saveAsName, setSaveAsName] = useState('');
   const [nameAlertOpen, setNameAlertOpen] = useState(false);
   const [nameAlertMessage, setNameAlertMessage] = useState('');
 
@@ -57,13 +45,6 @@ export const WorkspaceControls: React.FC = memo(() => {
       }
     } finally {
       setIsEditing(false);
-    }
-  };
-
-  const handleSaveAs = async () => {
-    if (saveAsName) {
-      await saveWorkspaceAs(saveAsName);
-      setSaveAsOpen(false);
     }
   };
 
@@ -116,18 +97,6 @@ export const WorkspaceControls: React.FC = memo(() => {
             Save
           </button>
 
-          {/* Save As */}
-          <button
-            className="text-xs text-gray-600 hover:text-gray-800 px-2 py-1 border rounded"
-            onClick={() => {
-              setSaveAsName(currentWorkspace?.name || 'workspace.ldaca');
-              setSaveAsOpen(true);
-            }}
-            title="Save workspace as"
-          >
-            Save As
-          </button>
-
           {/* Unload */}
           <button
             className="text-xs text-gray-600 hover:text-gray-800 px-2 py-1 border rounded"
@@ -138,33 +107,6 @@ export const WorkspaceControls: React.FC = memo(() => {
           </button>
         </>
       )}
-
-      <Dialog open={saveAsOpen} onOpenChange={setSaveAsOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Save Workspace As</DialogTitle>
-            <DialogDescription>
-              Enter a new filename for the workspace copy.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <Input
-              value={saveAsName}
-              onChange={(e) => setSaveAsName(e.target.value)}
-              placeholder="Filename"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleSaveAs();
-              }}
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setSaveAsOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSaveAs}>Save As</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <AlertDialog open={nameAlertOpen} onOpenChange={setNameAlertOpen}>
         <AlertDialogContent>

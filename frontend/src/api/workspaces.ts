@@ -13,7 +13,6 @@ export const workspacesApi = {
   nodes: (headers: Record<string,string> = {}) => get<Record<string, unknown>>(`/workspaces/nodes`, headers).then(r => (r as Record<string, unknown>).nodes || r),
   graph: (headers: Record<string,string> = {}) => get<WorkspaceGraphResponse>(`/workspaces/graph`, headers),
   save: (headers: Record<string,string> = {}) => post<Record<string, unknown>>(`/workspaces/save`, {}, headers),
-  saveAs: (filename: string, headers: Record<string,string> = {}) => post<Record<string, unknown>>(`/workspaces/save-as`, {}, headers, { filename }),
   updateName: (newName: string, headers: Record<string,string> = {}) => httpRequest<Record<string, unknown>>(`/workspaces/name`, { method: 'PUT', headers, params: { new_name: newName } }),
   clearAnalysis: (task?: string, headers: Record<string,string> = {}) => httpRequest<Record<string, unknown>>(`/workspaces/analysis/clear`, { method: 'POST', headers, params: task ? { task } : {} }),
   listTasks: (headers: Record<string,string> = {}) => httpRequest<Record<string, unknown>>(`/tasks`, { method: 'GET', headers }),

@@ -35,11 +35,6 @@ const registry: Record<string, TutorialTarget> = {
     anchor: 'help-data-loader-rename-workspace-input',
     label: 'Rename workspace input',
   },
-  'data-loader.save-as.button': {
-    file: 'tutorials/data-loader.md',
-    anchor: 'help-data-loader-save-as-button',
-    label: 'Save workspace as',
-  },
   'data-loader.unload.button': {
     file: 'tutorials/data-loader.md',
     anchor: 'help-data-loader-unload-button',

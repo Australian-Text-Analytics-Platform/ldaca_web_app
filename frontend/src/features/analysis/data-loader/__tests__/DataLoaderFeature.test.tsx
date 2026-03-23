@@ -26,7 +26,6 @@ vi.mock('@/hooks/useWorkspaceActions', () => ({
     createWorkspace: vi.fn(),
     renameWorkspace: vi.fn(),
     saveWorkspace: vi.fn(),
-    saveWorkspaceAs: vi.fn(),
     deleteWorkspace: vi.fn(),
     setCurrentWorkspace: vi.fn(),
     createNodeFromFile: vi.fn(),
@@ -144,5 +143,6 @@ describe('DataLoaderFeature citation UI', () => {
     expect(screen.getByRole('button', { name: /upload workspace/i })).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: /download/i }).length).toBeGreaterThan(0);
     expect(screen.getAllByText('0 data blocks').length).toBeGreaterThan(0);
+    expect(screen.queryByRole('button', { name: /save as/i })).not.toBeInTheDocument();
   });
 });

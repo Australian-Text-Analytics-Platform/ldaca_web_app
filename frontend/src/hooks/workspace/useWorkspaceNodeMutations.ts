@@ -157,31 +157,6 @@ export const useWorkspaceNodeMutations = ({
     },
   });
 
-  const saveWorkspaceAsMutation = useMutation({
-    mutationFn: (filename: string) => {
-      ensureWorkspaceSelected();
-      return workspacesApi.saveAs(filename, authHeaders);
-    },
-    onMutate: () => startOperation('saveWorkspaceAs'),
-    onSuccess: (data: Record<string, unknown>) => {
-      const newWorkspace = data?.new_workspace;
-      if (newWorkspace) {
-        queryClient.setQueryData(queryKeys.workspaces, (old: Record<string, unknown>[] | undefined) => {
-          if (!old) return [newWorkspace];
-          const exists = old.some((workspace: Record<string, unknown>) => workspace.id === (newWorkspace as Record<string, unknown>).id);
-          return exists ? old : [...old, newWorkspace];
-        });
-      } else {
-        queryClient.invalidateQueries({ queryKey: queryKeys.workspaces });
-      }
-      endOperation('saveWorkspaceAs');
-    },
-    onError: (error: Error) => {
-      setOperationError('saveWorkspaceAs', error.message);
-      endOperation('saveWorkspaceAs');
-    },
-  });
-
   const updateWorkspaceNameMutation = useMutation({
     mutationFn: (newName: string) => {
       ensureWorkspaceSelected();
@@ -571,7 +546,6 @@ export const useWorkspaceNodeMutations = ({
     createWorkspace: (name: string, description?: string) => createWorkspaceMutation.mutateAsync({ name, description }),
     deleteWorkspace: (workspaceId: string) => deleteWorkspaceMutation.mutateAsync(workspaceId),
     saveWorkspace: () => saveWorkspaceMutation.mutateAsync(),
-    saveWorkspaceAs: (filename: string) => saveWorkspaceAsMutation.mutateAsync(filename),
     renameWorkspace: (newName: string) => updateWorkspaceNameMutation.mutateAsync(newName),
     renameNode: (nodeId: string, newName: string) =>
       renameNodeMutation.mutateAsync({ nodeId, newName }),

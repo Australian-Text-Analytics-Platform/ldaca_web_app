@@ -42,13 +42,6 @@ This button creates a new workspace using the name you entered.
 
 Use this field to rename the **current** workspace. Rename is helpful when the project scope changes or you want to tidy your list.
 
-<h2 id="help-data-loader-save-as-button">Save workspace as</h2>
-
-Save As creates a copy of the current workspace under a new name.
-
-- Use this to preserve a milestone.
-- Useful before running a risky transformation.
-
 <h2 id="help-data-loader-unload-button">Unload workspace</h2>
 
 Unload closes the active workspace without deleting it.

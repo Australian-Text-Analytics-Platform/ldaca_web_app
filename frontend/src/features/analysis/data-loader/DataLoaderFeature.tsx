@@ -180,8 +180,6 @@ export const DataLoaderFeature: React.FC = () => {
   const [workspaceAlertOpen, setWorkspaceAlertOpen] = useState(false);
   const [workspaceToDelete, setWorkspaceToDelete] = useState<{ id: string; name?: string | null } | null>(null);
   const [deletingWorkspace, setDeletingWorkspace] = useState(false);
-  const [saveAsOpen, setSaveAsOpen] = useState(false);
-  const [saveAsName, setSaveAsName] = useState('');
   const [workspaceNameAlert, setWorkspaceNameAlert] = useState<string | null>(null);
   const [ldacaImportOpen, setLdacaImportOpen] = useState(false);
   const [ldacaUrl, setLdacaUrl] = useState('');
@@ -289,23 +287,6 @@ export const DataLoaderFeature: React.FC = () => {
       notify('success', 'Workspace saved.');
     } catch (error) {
       notify('error', (error as Error).message || 'Failed to save workspace.');
-    }
-  };
-
-  const handleSaveWorkspaceAs = async () => {
-    if (!hasWorkspaceSelected) return;
-    setSaveAsOpen(true);
-  };
-
-  const confirmSaveAs = async () => {
-    if (!saveAsName.trim()) return;
-    try {
-      await workspaceActions.saveWorkspaceAs(saveAsName.trim());
-      notify('success', `Workspace saved as ${saveAsName}.`);
-      setSaveAsOpen(false);
-      setSaveAsName('');
-    } catch (error) {
-      notify('error', (error as Error).message || 'Failed to save workspace copy.');
     }
   };
 
@@ -678,12 +659,6 @@ export const DataLoaderFeature: React.FC = () => {
                 <RefreshCcw className="mr-2 h-4 w-4" /> Save
               </Button>
               <div className="flex items-center gap-1">
-                <Button variant="outline" onClick={handleSaveWorkspaceAs} disabled={!hasWorkspaceSelected}>
-                  <FolderPlus className="mr-2 h-4 w-4" /> Save as…
-                </Button>
-                <HelpIcon targetKey="data-loader.save-as.button" label="Save workspace as" />
-              </div>
-              <div className="flex items-center gap-1">
                 <Button
                   variant="outline"
                   onClick={() => workspaceActions.setCurrentWorkspace(null)}
@@ -970,33 +945,6 @@ export const DataLoaderFeature: React.FC = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog open={saveAsOpen} onOpenChange={setSaveAsOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Save Workspace As</DialogTitle>
-            <DialogDescription>
-              Enter a filename for the workspace export (e.g., my_workspace.json)
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <Input
-              value={saveAsName}
-              onChange={(e) => setSaveAsName(e.target.value)}
-              placeholder="filename.json"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') confirmSaveAs();
-              }}
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setSaveAsOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={confirmSaveAs}>Save</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      
       <Dialog open={ldacaImportOpen} onOpenChange={setLdacaImportOpen}>
         <DialogContent>
           <DialogHeader>
