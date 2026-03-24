@@ -131,7 +131,7 @@ export function ConditionBuilder<Condition extends ConditionBuilderItem>(props: 
                         onValueChange={(value) => onConditionChange(condition.id, 'column', value as Condition[keyof Condition])}
                         disabled={disabled}
                       >
-                        <SelectTrigger className="min-w-[10rem] flex-grow">
+                        <SelectTrigger className="min-w-40 grow">
                           <SelectValue placeholder="Select column" />
                         </SelectTrigger>
                         <SelectContent>
