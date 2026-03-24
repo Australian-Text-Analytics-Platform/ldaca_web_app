@@ -31,7 +31,7 @@ These were validated in this workspace and are the fastest reliable entry points
 - Frontend build: `npm run build -w frontend`, passes.
 - Frontend tests: `npm run test -w frontend -- --run`, passes (`27` files, `70` tests).
 - Backend run: existing backend responds on `http://127.0.0.1:8001/health`.
-- Backend tests: `cd ldaca_web_app_backend && uv run pytest -q`, currently fails with `1` existing failing test.
+- Backend tests: `cd ldaca_web_app_backend && uv run pytest -q`, passes (`269` tests).
 - `docworkspace` tests: `cd docworkspace && uv run pytest -q`, passes.
 - `polars-text` tests: `cd polars-text && uv run pytest -q`, passes.
 
@@ -40,7 +40,6 @@ These were validated in this workspace and are the fastest reliable entry points
 Do not assume the repo is green before your change:
 
 - `npm run lint -w frontend` currently fails with `5` existing ESLint errors.
-- `cd ldaca_web_app_backend && uv run pytest -q` currently fails at `tests/unit/test_package_backend_runtime.py::test_sync_runtime_environment_uses_frozen_non_editable_sync`.
 - `npm run prepare:backend-runtime -w frontend` currently fails after rebuilding `ldaca_web_app_backend/dist-tauri/` with `ModuleNotFoundError: No module named 'ldaca_web_app_backend'` during the runtime smoke import.
 - `cd polars-text && make test` is not reliable in this environment because it calls bare `pytest`; use `uv run pytest -q` instead.
 
