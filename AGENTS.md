@@ -57,6 +57,14 @@ Because `prepare:backend-runtime` uses `--clean`, it is side-effectful and rewri
 - Expect backend data under `~/Documents/ldaca` unless `DATA_ROOT` overrides it.
 - Some `polars-text` features download Hugging Face assets on first use; avoid treating that as an unexpected network regression.
 
+## Codebase-Specific AI Rules
+
+- Avoid eager `collect()` except at I/O boundaries, artifact writing, or final response serialization.
+- Keep backend routers thin. Validate request shapes in the router, then delegate business logic to `core/` or analysis helpers.
+- Use `Depends(get_current_user)` for backend route authentication; do not bypass it in new routes.
+- For worker tasks, follow the existing worker pattern: call `configure_worker_environment()` first, import heavy dependencies inside the worker function, and write large outputs to artifacts.
+- In frontend code, do not add `useMemo`, `useCallback`, or `React.memo` for routine optimization. The repo uses React Compiler.
+
 ## CI-Relevant Checks
 
 For typical frontend changes, run:
