@@ -51,6 +51,7 @@ Because `prepare:backend-runtime` uses `--clean`, it is side-effectful and rewri
 - Trust this file first, then check the nearest manifest, CI workflow, or build script before doing broad repo exploration.
 - Prefer `npm run ... -w frontend` from repo root for frontend commands.
 - Prefer `uv run ...` inside Python package directories.
+- Whenever you modify a Python project in this repo, run `uvx ty check` and `uv run pytest` from each affected Python package directory and make sure both commands pass before considering the work complete.
 - Do not run backend tests from repo root; run them from `ldaca_web_app_backend/`.
 - If you touch desktop packaging, inspect `ldaca_web_app_backend/scripts/package_backend_runtime.py` and `frontend/scripts/stage-backend-runtime.mjs` before changing anything.
 - Expect backend data under `~/Documents/ldaca` unless `DATA_ROOT` overrides it.
@@ -67,5 +68,10 @@ For typical frontend changes, run:
 For backend changes, run:
 
 - `cd ldaca_web_app_backend && uv run pytest -q`
+
+For changes in any Python project, also run from the affected package directory:
+
+- `uvx ty check`
+- `uv run pytest`
 
 For package-specific work, run only the impacted package tests instead of the full monorepo.
