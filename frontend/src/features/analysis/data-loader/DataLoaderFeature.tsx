@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Loader2, FolderPlus, Upload, Trash2, Eye, Download as DownloadIcon, Plus, RefreshCcw, LogOut, Quote, ChevronRightIcon, FileIcon, FolderIcon } from 'lucide-react';
+import { Loader2, FolderPlus, Upload, Trash2, Eye, Download as DownloadIcon, Plus, RefreshCcw, LogOut, Quote, ChevronRightIcon, FileIcon, FolderIcon, MoreHorizontal } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useQueryClient } from '@tanstack/react-query';
@@ -41,6 +41,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../../../components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from '../../../components/ui/dropdown-menu';
 import HelpIcon from '../../../components/help/HelpIcon';
 
 const formatBytes = (bytes?: number | null): string => {
@@ -174,6 +180,7 @@ export const DataLoaderFeature: React.FC = () => {
   const [newWorkspaceName, setNewWorkspaceName] = useState('');
   const [newWorkspaceDescription, setNewWorkspaceDescription] = useState('');
   const [renameValue, setRenameValue] = useState('');
+  const [descriptionValue, setDescriptionValue] = useState('');
   const [previewFile, setPreviewFile] = useState<string | null>(null);
   const [addFileName, setAddFileName] = useState<string | null>(null);
   const [importingSamples, setImportingSamples] = useState(false);
@@ -213,7 +220,10 @@ export const DataLoaderFeature: React.FC = () => {
     const active = workspaces.find((ws) => getWorkspaceId(ws) === currentWorkspaceId);
     if (active?.name) {
       setRenameValue(active.name);
+    } else {
+      setRenameValue('');
     }
+    setDescriptionValue(active?.description || '');
   }, [currentWorkspaceId, workspaces]);
 
   useEffect(() => {
@@ -241,6 +251,8 @@ export const DataLoaderFeature: React.FC = () => {
   const fileTree = buildFileTree(sortedFiles);
 
   const currentWorkspace = workspaces.find((ws) => getWorkspaceId(ws) === currentWorkspaceId) || null;
+  const normalizedCurrentDescription = (currentWorkspace?.description || '').trim();
+  const normalizedDescriptionValue = descriptionValue.trim();
 
   const nodeCount =
     workspaceGraph?.nodes?.length ??
@@ -287,6 +299,15 @@ export const DataLoaderFeature: React.FC = () => {
       notify('success', 'Workspace saved.');
     } catch (error) {
       notify('error', (error as Error).message || 'Failed to save workspace.');
+    }
+  };
+
+  const handleUpdateWorkspaceDescription = async () => {
+    try {
+      await workspaceActions.updateWorkspaceDescription(descriptionValue.trim());
+      notify('success', 'Workspace description updated.');
+    } catch (error) {
+      notify('error', (error as Error).message || 'Failed to update workspace description.');
     }
   };
 
@@ -618,59 +639,75 @@ export const DataLoaderFeature: React.FC = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             {currentWorkspace ? (
-              <div className="rounded-md border border-border/60 bg-muted/30 px-4 py-3 text-sm">
-                <div className="flex flex-wrap items-center gap-2 text-base font-semibold text-foreground">
-                  {currentWorkspace.name}
-                  <Badge>{nodeCount} data block{nodeCount === 1 ? '' : 's'}</Badge>
+              <>
+                <div className="rounded-md border border-border/60 bg-muted/30 px-4 py-3 text-sm">
+                  <div className="flex flex-wrap items-center gap-2 text-base font-semibold text-foreground">
+                    {currentWorkspace.name}
+                    <Badge>{nodeCount} data block{nodeCount === 1 ? '' : 's'}</Badge>
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    Updated {formatTimestamp(currentWorkspace.modified_at || currentWorkspace.updated_at)} | Size {formatBytes(Number(currentWorkspace.workspace_size_Byte || 0))} | Created {formatTimestamp(currentWorkspace.created_at)}
+                  </div>
                 </div>
-                <div className="mt-1 text-xs text-muted-foreground">
-                  Updated {formatTimestamp(currentWorkspace.modified_at || currentWorkspace.updated_at)} | Size {formatBytes(Number(currentWorkspace.workspace_size_Byte || 0))} | Created {formatTimestamp(currentWorkspace.created_at)}
-                </div>
-              </div>
-            ) : (
-              <div className="rounded-md border border-dashed border-muted-foreground/50 px-4 py-3 text-sm text-muted-foreground">
-                No workspace selected. Pick one below or create a new workspace.
-              </div>
-            )}
 
-            {hasWorkspaceSelected && (
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="rename-workspace">Rename workspace</Label>
-                  <HelpIcon targetKey="data-loader.rename-workspace.input" label="Rename workspace input" />
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="rename-workspace">Rename workspace</Label>
+                    <HelpIcon targetKey="data-loader.rename-workspace.input" label="Rename workspace input" />
+                  </div>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <Input
+                      id="rename-workspace"
+                      value={renameValue}
+                      onChange={(event) => setRenameValue(event.target.value)}
+                      placeholder="Enter new name"
+                      disabled={!hasWorkspaceSelected || workspaceBusy}
+                    />
+                    <Button onClick={handleRenameWorkspace} disabled={!hasWorkspaceSelected || !renameValue.trim()}>
+                      Rename
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  <Input
-                    id="rename-workspace"
-                    value={renameValue}
-                    onChange={(event) => setRenameValue(event.target.value)}
-                    placeholder="Enter new name"
-                    disabled={!hasWorkspaceSelected || workspaceBusy}
-                  />
-                  <Button onClick={handleRenameWorkspace} disabled={!hasWorkspaceSelected || !renameValue.trim()}>
-                    Rename
+
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="workspace-description">Workspace description</Label>
+                  </div>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <Input
+                      id="workspace-description"
+                      aria-label="Workspace description"
+                      value={descriptionValue}
+                      onChange={(event) => setDescriptionValue(event.target.value)}
+                      placeholder="Enter workspace description"
+                      disabled={!hasWorkspaceSelected || workspaceBusy}
+                    />
+                    <Button
+                      onClick={handleUpdateWorkspaceDescription}
+                      disabled={!hasWorkspaceSelected || workspaceBusy || normalizedDescriptionValue === normalizedCurrentDescription}
+                    >
+                      Update description
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button variant="outline" onClick={handleSaveWorkspace} disabled={!hasWorkspaceSelected}>
+                    <RefreshCcw className="mr-2 h-4 w-4" /> Save
                   </Button>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="outline"
+                      onClick={() => workspaceActions.setCurrentWorkspace(null)}
+                      disabled={!hasWorkspaceSelected || workspaceBusy}
+                    >
+                      <LogOut className="mr-2 h-4 w-4" /> Unload
+                    </Button>
+                    <HelpIcon targetKey="data-loader.unload.button" label="Unload workspace" />
+                  </div>
                 </div>
-              </div>
-            )}
-
-            <div className="flex flex-wrap items-center gap-2">
-              <Button variant="outline" onClick={handleSaveWorkspace} disabled={!hasWorkspaceSelected}>
-                <RefreshCcw className="mr-2 h-4 w-4" /> Save
-              </Button>
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="outline"
-                  onClick={() => workspaceActions.setCurrentWorkspace(null)}
-                  disabled={!hasWorkspaceSelected || workspaceBusy}
-                >
-                  <LogOut className="mr-2 h-4 w-4" /> Unload
-                </Button>
-                <HelpIcon targetKey="data-loader.unload.button" label="Unload workspace" />
-              </div>
-            </div>
-
-            {!hasWorkspaceSelected && (
+              </>
+            ) : (
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <Label htmlFor="new-workspace-name">Create workspace</Label>
@@ -761,11 +798,31 @@ export const DataLoaderFeature: React.FC = () => {
                     <div
                       key={workspaceId}
                       className={`flex flex-col gap-2 rounded-md border px-4 py-3 sm:flex-row sm:items-center sm:justify-between ${
-                        isActive ? 'border-primary bg-primary/5' : 'border-border/70 bg-background'
+                        isActive ? 'border-primary bg-primary/10 ring-1 ring-primary/20 shadow-sm' : 'border-border/70 bg-background'
                       }`}
                     >
                       <div>
-                        <div className="font-medium text-foreground">{workspace.name || workspaceId}</div>
+                        <div className="flex items-center gap-1 font-medium text-foreground">
+                          <span>{workspace.name || workspaceId}</span>
+                          <DropdownMenu modal={false}>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-6 w-6"
+                                aria-label="View workspace description"
+                              >
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start" className="max-w-xs">
+                              <DropdownMenuLabel>Description</DropdownMenuLabel>
+                              <div className="px-2 py-1.5 text-sm text-popover-foreground whitespace-pre-wrap">
+                                {workspace.description?.trim() || 'No description added yet.'}
+                              </div>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                         <div className="text-xs text-muted-foreground">
                           Updated {formatTimestamp(workspace.modified_at || workspace.updated_at)} | {workspace.total_nodes ?? workspace.dataframe_count ?? 0} data block{(workspace.total_nodes ?? workspace.dataframe_count ?? 0) === 1 ? '' : 's'} | Size {formatBytes(Number(workspace.workspace_size_Byte || 0))}
                         </div>
@@ -774,10 +831,9 @@ export const DataLoaderFeature: React.FC = () => {
                         <Button
                           size="sm"
                           variant={isActive ? 'outline' : 'secondary'}
-                          onClick={() => workspaceActions.setCurrentWorkspace(workspaceId)}
-                          disabled={isActive}
+                          onClick={() => workspaceActions.setCurrentWorkspace(isActive ? null : workspaceId)}
                         >
-                          {isActive ? 'Loaded' : 'Load'}
+                          {isActive ? 'Unload' : 'Load'}
                         </Button>
                         <Button
                           size="sm"

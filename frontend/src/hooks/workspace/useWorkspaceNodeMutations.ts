@@ -174,6 +174,23 @@ export const useWorkspaceNodeMutations = ({
     },
   });
 
+  const updateWorkspaceDescriptionMutation = useMutation({
+    mutationFn: (description: string) => {
+      ensureWorkspaceSelected();
+      return workspacesApi.updateDescription(description, authHeaders);
+    },
+    onMutate: () => startOperation('updateWorkspaceDescription'),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.workspaces });
+      queryClient.invalidateQueries({ queryKey: queryKeys.currentWorkspace });
+      endOperation('updateWorkspaceDescription');
+    },
+    onError: (error: Error) => {
+      setOperationError('updateWorkspaceDescription', error.message);
+      endOperation('updateWorkspaceDescription');
+    },
+  });
+
   const renameNodeMutation = useMutation({
     mutationFn: ({ nodeId, newName }: { nodeId: string; newName: string }) =>
       nodesApi.rename(nodeId, newName, authHeaders),
@@ -547,6 +564,7 @@ export const useWorkspaceNodeMutations = ({
     deleteWorkspace: (workspaceId: string) => deleteWorkspaceMutation.mutateAsync(workspaceId),
     saveWorkspace: () => saveWorkspaceMutation.mutateAsync(),
     renameWorkspace: (newName: string) => updateWorkspaceNameMutation.mutateAsync(newName),
+    updateWorkspaceDescription: (description: string) => updateWorkspaceDescriptionMutation.mutateAsync(description),
     renameNode: (nodeId: string, newName: string) =>
       renameNodeMutation.mutateAsync({ nodeId, newName }),
     undoNode: (nodeId: string) =>

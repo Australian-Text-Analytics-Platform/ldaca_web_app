@@ -14,6 +14,8 @@ export const workspacesApi = {
   graph: (headers: Record<string,string> = {}) => get<WorkspaceGraphResponse>(`/workspaces/graph`, headers),
   save: (headers: Record<string,string> = {}) => post<Record<string, unknown>>(`/workspaces/save`, {}, headers),
   updateName: (newName: string, headers: Record<string,string> = {}) => httpRequest<Record<string, unknown>>(`/workspaces/name`, { method: 'PUT', headers, params: { new_name: newName } }),
+  updateDescription: (description: string, headers: Record<string,string> = {}) =>
+    httpRequest<Record<string, unknown>>(`/workspaces/description`, { method: 'PUT', headers, params: { description } }),
   clearAnalysis: (task?: string, headers: Record<string,string> = {}) => httpRequest<Record<string, unknown>>(`/workspaces/analysis/clear`, { method: 'POST', headers, params: task ? { task } : {} }),
   listTasks: (headers: Record<string,string> = {}) => httpRequest<Record<string, unknown>>(`/tasks`, { method: 'GET', headers }),
   clearTokenFrequencies: (headers: Record<string, string> = {}) =>
