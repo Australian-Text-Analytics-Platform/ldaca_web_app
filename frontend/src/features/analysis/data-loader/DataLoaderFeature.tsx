@@ -629,12 +629,20 @@ export const DataLoaderFeature: React.FC = () => {
         <Card ref={activeCardRef}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              Active workspace
-              <HelpIcon
-                targetKey="data-loader.active-workspace.section"
-                label="Active workspace overview"
-                tooltip="Choose or rename the workspace where new data blocks will be added. Save regularly to persist your progress."
-              />
+              {currentWorkspace ? 'Active workspace' : 'Create workspace'}
+              {currentWorkspace ? (
+                <HelpIcon
+                  targetKey="data-loader.active-workspace.section"
+                  label="Active workspace overview"
+                  tooltip="Choose or rename the workspace where new data blocks will be added. Save regularly to persist your progress."
+                />
+              ) : (
+                <HelpIcon
+                  targetKey="data-loader.create-workspace.name"
+                  label="Create workspace overview"
+                  tooltip="Create a new workspace before uploading files or adding data blocks. Add an optional description if you want to capture its purpose."
+                />
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -709,10 +717,6 @@ export const DataLoaderFeature: React.FC = () => {
               </>
             ) : (
               <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="new-workspace-name">Create workspace</Label>
-                  <HelpIcon targetKey="data-loader.create-workspace.name" label="Workspace name input" />
-                </div>
                 <Input
                   id="new-workspace-name"
                   value={newWorkspaceName}

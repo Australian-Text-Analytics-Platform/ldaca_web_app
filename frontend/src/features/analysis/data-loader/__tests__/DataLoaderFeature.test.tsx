@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import DataLoaderFeature from '../DataLoaderFeature';
@@ -165,12 +165,13 @@ describe('DataLoaderFeature citation UI', () => {
     const user = userEvent.setup();
     renderWithProviders(<DataLoaderFeature />);
 
+    const renameInput = screen.getByLabelText('Rename workspace');
+    const activeWorkspaceCard = renameInput.closest('div.rounded-xl.border.bg-card');
+    expect(activeWorkspaceCard).not.toBeNull();
+    expect(within(activeWorkspaceCard!).getByText('Active workspace')).toBeInTheDocument();
+    expect(within(activeWorkspaceCard!).queryByText('Create workspace')).not.toBeInTheDocument();
     expect(screen.queryByPlaceholderText('Workspace name')).not.toBeInTheDocument();
     expect(screen.queryByPlaceholderText('Optional description')).not.toBeInTheDocument();
-
-    const activeWorkspaceHeading = screen.getAllByText('Active workspace')[0];
-    const activeWorkspaceCard = activeWorkspaceHeading.closest('div.rounded-xl.border.bg-card');
-    expect(activeWorkspaceCard).not.toBeNull();
 
     const workspaceCardName = screen.getAllByText('Main Workspace')[1];
     const workspaceManagerCard = workspaceCardName.closest('div.rounded-md.border');
@@ -217,9 +218,14 @@ describe('DataLoaderFeature citation UI', () => {
 
     renderWithProviders(<DataLoaderFeature />);
 
+    const createWorkspaceButton = screen.getByRole('button', { name: /create workspace/i });
+    const createWorkspaceCard = createWorkspaceButton.closest('div.rounded-xl.border.bg-card');
+    expect(createWorkspaceCard).not.toBeNull();
+    expect(within(createWorkspaceCard!).queryByText('Active workspace')).not.toBeInTheDocument();
+    expect(within(createWorkspaceCard!).getAllByText('Create workspace')).toHaveLength(2);
     expect(screen.getByPlaceholderText('Workspace name')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Optional description')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /create workspace/i })).toBeInTheDocument();
+    expect(createWorkspaceButton).toBeInTheDocument();
     expect(screen.queryByPlaceholderText('Enter new name')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Workspace description')).not.toBeInTheDocument();
   });
