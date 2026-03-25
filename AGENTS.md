@@ -35,16 +35,6 @@ These were validated in this workspace and are the fastest reliable entry points
 - `docworkspace` tests: `cd docworkspace && uv run pytest -q`, passes.
 - `polars-text` tests: `cd polars-text && uv run pytest -q`, passes.
 
-## Current Known Failures
-
-Do not assume the repo is green before your change:
-
-- `npm run lint -w frontend` currently fails with `5` existing ESLint errors.
-- `npm run prepare:backend-runtime -w frontend` currently fails after rebuilding `ldaca_web_app_backend/dist-tauri/` with `ModuleNotFoundError: No module named 'ldaca_web_app_backend'` during the runtime smoke import.
-- `cd polars-text && make test` is not reliable in this environment because it calls bare `pytest`; use `uv run pytest -q` instead.
-
-Because `prepare:backend-runtime` uses `--clean`, it is side-effectful and rewrites `ldaca_web_app_backend/dist-tauri/`.
-
 ## Practical Rules For Agents
 
 - Trust this file first, then check the nearest manifest, CI workflow, or build script before doing broad repo exploration.
@@ -70,7 +60,9 @@ For typical frontend changes, run:
 
 - `npm run build -w frontend`
 - `npm run test -w frontend -- --run`
-- `npm run lint -w frontend` only if your change could affect or fix the existing lint baseline
+- `npm run lint -w frontend`
+
+Frontend changes are not complete until both `npm run test -w frontend -- --run` and `npm run lint -w frontend` have been run after the edit.
 
 For backend changes, run:
 

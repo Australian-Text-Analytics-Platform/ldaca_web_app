@@ -25,7 +25,14 @@ const toArchiveNameSegment = (label: string, maxLength = 20) => {
   const raw = (label || 'analysis').toString().trim() || 'analysis';
   const tail = raw.split('/').pop()?.trim() || raw;
   const safe = tail
-    .replace(/[<>:"\\|?*\u0000-\u001F]+/g, '_')
+    .split('')
+    .map((char) => {
+      if (char.charCodeAt(0) < 32) {
+        return '_';
+      }
+      return /[<>:"\\|?*]/.test(char) ? '_' : char;
+    })
+    .join('')
     .replace(/\s+/g, ' ')
     .trim() || 'analysis';
   const truncated = safe.slice(0, maxLength).replace(/[_\-. ]+$/g, '').trim();

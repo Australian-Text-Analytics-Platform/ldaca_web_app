@@ -56,6 +56,14 @@ export interface ExpressionTransformRequest {
   preview_limit?: number;
 }
 
+export interface ReplaceRequest {
+  source_column: string;
+  pattern: string;
+  replacement: string;
+  output_column_name?: string | null;
+  preview_limit?: number;
+}
+
 export interface ExpressionPreviewResponse {
   columns: string[];
   dtypes: Record<string, string>;
@@ -67,6 +75,20 @@ export interface ExpressionApplyResponse {
   node_id: string;
   column_name: string;
   expression: string;
+  dtype?: string | null;
+  message: string;
+}
+
+export interface ReplacePreviewResponse {
+  columns: string[];
+  dtypes: Record<string, string>;
+  data: Record<string, unknown>[];
+}
+
+export interface ReplaceApplyResponse {
+  state: 'successful';
+  node_id: string;
+  column_name: string;
   dtype?: string | null;
   message: string;
 }
@@ -178,6 +200,22 @@ export const nodesApi = {
     headers: Record<string, string> = {}
   ) => httpRequest<ExpressionApplyResponse>(
     `/workspaces/nodes/${node}/compute-column`,
+    { method: 'POST', headers, body: req }
+  ),
+  replaceTextPreview: (
+    node: string,
+    req: ReplaceRequest,
+    headers: Record<string, string> = {}
+  ) => httpRequest<ReplacePreviewResponse>(
+    `/workspaces/nodes/${node}/replace/preview`,
+    { method: 'POST', headers, body: req }
+  ),
+  replaceText: (
+    node: string,
+    req: ReplaceRequest,
+    headers: Record<string, string> = {}
+  ) => httpRequest<ReplaceApplyResponse>(
+    `/workspaces/nodes/${node}/replace`,
     { method: 'POST', headers, body: req }
   ),
 };

@@ -347,7 +347,7 @@ const TopicModelingFeature: React.FC = () => {
 
   const handleRunOrUpdate = async () => {
     await executeAnalysisRunOrUpdate({
-      hasLockedParameterChanges: hasLockedParameterChanges,
+      hasLockedParameterChanges,
       clearResults,
       runFreshAnalysis: handleRun,
     });

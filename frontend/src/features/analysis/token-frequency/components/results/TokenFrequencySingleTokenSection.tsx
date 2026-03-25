@@ -35,7 +35,7 @@ export const TokenFrequencySingleTokenSection = ({
     : 'grid grid-cols-1 gap-6 xl:grid-cols-2';
 
   return (
-    <div className={singleNodeLayoutClassName}>
+    <div className={singleNodeLayoutClassName} data-testid="token-frequency-single-layout">
       {nodeDisplayResults.map((result, index) => {
         const nodeKey = result.nodeId || result.displayName || `node-${index}`;
         const color = getColorForNode(result.nodeId || result.displayName, index);
@@ -55,7 +55,7 @@ export const TokenFrequencySingleTokenSection = ({
                 <CardTitle className="min-w-0 flex-1 break-words whitespace-normal text-base font-semibold [overflow-wrap:anywhere]">
                   {result.displayName}
                 </CardTitle>
-                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                <div className="flex flex-wrap items-center gap-2 sm:justify-end" data-testid={`token-frequency-actions-${nodeKey}`}>
                   <Button variant="outline" size="sm" onClick={() => onDownloadWordCloud(nodeKey, result.displayName)}>
                     <Download className="mr-2 h-4 w-4" />
                     Word Cloud

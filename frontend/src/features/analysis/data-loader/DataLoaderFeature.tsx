@@ -626,7 +626,7 @@ export const DataLoaderFeature: React.FC = () => {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card ref={activeCardRef}>
+        <Card ref={activeCardRef} data-testid={currentWorkspace ? 'active-workspace-card' : 'create-workspace-card'}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               {currentWorkspace ? 'Active workspace' : 'Create workspace'}
@@ -801,6 +801,7 @@ export const DataLoaderFeature: React.FC = () => {
                   return (
                     <div
                       key={workspaceId}
+                      data-testid={`workspace-manager-item-${workspaceId}`}
                       className={`flex flex-col gap-2 rounded-md border px-4 py-3 sm:flex-row sm:items-center sm:justify-between ${
                         isActive ? 'border-primary bg-primary/10 ring-1 ring-primary/20 shadow-sm' : 'border-border/70 bg-background'
                       }`}

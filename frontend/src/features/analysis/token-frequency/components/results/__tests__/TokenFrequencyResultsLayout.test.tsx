@@ -98,22 +98,22 @@ const baseUnifiedSectionProps = {
 describe('Token frequency result layouts', () => {
   it('lets long node names wrap and keeps a single node card at full width', () => {
     const longName = 'sample_data/ADO/qldelection2020_candidate_tweets_with_an_extremely_long_name_that_should_wrap';
-    const { container } = render(
+    render(
       <TokenFrequencySingleTokenSection
         {...baseSingleSectionProps}
         nodeDisplayResults={[buildNodeResult({ displayName: longName })]}
       />
     );
 
-    const grid = container.firstElementChild;
+    const grid = screen.getByTestId('token-frequency-single-layout');
     expect(grid).toHaveClass('grid-cols-1');
     expect(grid).not.toHaveClass('xl:grid-cols-2');
 
     const title = screen.getByText(longName);
     expect(title).toHaveClass('min-w-0', 'break-words', 'whitespace-normal');
 
-    const wordCloudButton = screen.getByRole('button', { name: 'Word Cloud' });
-    expect(wordCloudButton.parentElement).toHaveClass('flex-wrap');
+    const actionRow = screen.getByTestId('token-frequency-actions-node-1');
+    expect(actionRow).toHaveClass('flex-wrap');
   });
 
   it('shows the unified card only when two node results are available', () => {

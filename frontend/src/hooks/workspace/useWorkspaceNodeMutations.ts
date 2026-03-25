@@ -6,6 +6,7 @@ import {
   type FilterRequest,
   type SliceRequest,
   type ExpressionTransformRequest,
+  type ReplaceRequest,
 } from '../../api/nodes';
 import { queryKeys } from '../../lib/queryKeys';
 import { type NodeSchemaResponse } from '../../types';
@@ -475,6 +476,28 @@ export const useWorkspaceNodeMutations = ({
     },
   });
 
+  const replaceTextMutation = useMutation({
+    mutationFn: ({ nodeId, request }: { nodeId: string; request: ReplaceRequest }) =>
+      nodesApi.replaceText(nodeId, request, authHeaders),
+    onMutate: () => {
+      startOperation('replaceText');
+    },
+    onSuccess: (_response, variables) => {
+      if (currentWorkspaceId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
+        if (variables?.nodeId) {
+          queryClient.invalidateQueries({ queryKey: queryKeys.nodeData(currentWorkspaceId, variables.nodeId) });
+          queryClient.invalidateQueries({ queryKey: queryKeys.nodeSchema(currentWorkspaceId, variables.nodeId) });
+        }
+      }
+      endOperation('replaceText');
+    },
+    onError: (error: Error) => {
+      setOperationError('replaceText', error.message);
+      endOperation('replaceText');
+    },
+  });
+
   const sliceNodeMutation = useMutation({
     mutationFn: ({ nodeId, request }: { nodeId: string; request: SliceRequest }) =>
       nodesApi.slice(nodeId, request, authHeaders),
@@ -612,6 +635,10 @@ export const useWorkspaceNodeMutations = ({
       computeColumnMutation.mutateAsync({ nodeId, request }),
     computeColumnPreview: (nodeId: string, request: ExpressionTransformRequest) =>
       nodesApi.computeColumnPreview(nodeId, request, authHeaders),
+    replaceText: (nodeId: string, request: ReplaceRequest) =>
+      replaceTextMutation.mutateAsync({ nodeId, request }),
+    replaceTextPreview: (nodeId: string, request: ReplaceRequest) =>
+      nodesApi.replaceTextPreview(nodeId, request, authHeaders),
     castColumn: (nodeId: string, column: string, targetType: string, format?: string) =>
       castNodeMutation.mutateAsync({ nodeId, column, targetType, format }),
     renameColumn: (nodeId: string, column: string, newName: string) =>
