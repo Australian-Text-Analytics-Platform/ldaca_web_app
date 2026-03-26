@@ -109,8 +109,8 @@ jobs:
         run: |
           Set-StrictMode -Version Latest
           [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-          Write-Host "Building Tauri application with NSIS..."
-          npx tauri build --bundles nsis
+          Write-Host "Building Tauri application with MSI packaging..."
+          npx tauri build
 
       - name: Validate bundled backend runtime
         shell: pwsh
@@ -157,30 +157,20 @@ jobs:
           Write-Host "Available bundle directories:"
           Get-ChildItem -Path $bundleRoot -Directory | ForEach-Object { Write-Host "  $($_.Name)" }
 
-          # Find installer files
-          $archives = @(Get-ChildItem -Path $bundleRoot -Recurse -Include *.exe,*.msi -ErrorAction SilentlyContinue)
+          # Find MSI installer files
+          $archives = @(Get-ChildItem -Path $bundleRoot -Recurse -Include *.msi -ErrorAction SilentlyContinue)
           if ($archives.Count -eq 0) {
-            Write-Error "No Windows installer artifacts found"
+            Write-Error "No Windows MSI artifacts found"
             exit 1
           }
 
-          Write-Host "`nFound installers:"
+          Write-Host "`nFound MSI installers:"
           $archives | ForEach-Object { Write-Host "  $($_.FullName)" }
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: ldaca-desktop-windows
-          path: |
-            target/release/bundle/nsis/*.exe
-            target/release/bundle/msi/*.msi
-          if-no-files-found: ignore
-          retention-days: 14
-
-      - name: Upload NSIS installer (primary)
-        uses: actions/upload-artifact@v7
-        with:
-          name: ldaca-desktop-windows-nsis
-          path: target/release/bundle/nsis/*.exe
+          name: ldaca-desktop-windows-msi
+          path: target/release/bundle/msi/*.msi
           if-no-files-found: error
           retention-days: 14

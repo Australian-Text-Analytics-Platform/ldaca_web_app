@@ -18,7 +18,7 @@
 
 **Question:** _How do I produce the installer?_
 
-**Answer:** Run the desktop build script from the web app workspace root.
+**Answer:** Run the desktop build script from the web app workspace root. On Windows, this produces the MSI installer.
 
 ## Recap
 
