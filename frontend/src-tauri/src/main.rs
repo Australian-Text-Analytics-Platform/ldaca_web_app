@@ -80,7 +80,7 @@ impl BackendProcessHandle {
 
 const DEV_BACKEND_RUNTIME: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../../ldaca_web_app_backend/dist-tauri/backend-runtime"
+    "/../../dist-tauri/backend-runtime"
 );
 
 const BACKEND_HOST: &str = "127.0.0.1";
@@ -90,9 +90,9 @@ const BUNDLE_RUNTIME_CANDIDATES: &[&str] = &[
     "backend-runtime",
     "_up_/backend-runtime",
     "_up_/_up_/backend-runtime",
-    "ldaca_web_app_backend/dist-tauri/backend-runtime",
-    "_up_/ldaca_web_app_backend/dist-tauri/backend-runtime",
-    "_up_/_up_/ldaca_web_app_backend/dist-tauri/backend-runtime",
+    "dist-tauri/backend-runtime",
+    "_up_/dist-tauri/backend-runtime",
+    "_up_/_up_/dist-tauri/backend-runtime",
 ];
 
 fn make_error(message: impl Into<String>) -> Box<dyn std::error::Error> {

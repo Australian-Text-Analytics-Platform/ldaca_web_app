@@ -51,9 +51,9 @@
         {
             "label": "Prepare backend (MacOS)",
             "type": "shell",
-            "command": "uv run python scripts/package_backend_runtime.py --clean",
+            "command": "uv run --no-project python scripts/package_backend_runtime.py --clean",
             "options": {
-                "cwd": "${workspaceFolder}/ldaca_web_app_backend"
+                "cwd": "${workspaceFolder}"
             },
             "problemMatcher": [],
             "presentation": {

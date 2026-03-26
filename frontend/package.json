@@ -86,7 +86,7 @@
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css,json}\"",
     "tauri": "tauri",
     "clean": "cd src-tauri && cargo clean",
-    "package:backend-runtime": "cd ../ldaca_web_app_backend && uv run --python 3.14 python scripts/package_backend_runtime.py --clean --python-version 3.14",
+    "package:backend-runtime": "cd .. && uv run --no-project --python 3.14 python scripts/package_backend_runtime.py --clean --python-version 3.14",
     "stage:backend-runtime": "node scripts/stage-backend-runtime.mjs",
     "prepare:backend-runtime": "npm run package:backend-runtime && npm run stage:backend-runtime",
     "desktop:dev": "npm run prepare:backend-runtime && tauri dev",

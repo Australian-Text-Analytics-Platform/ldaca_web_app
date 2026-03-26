@@ -19,12 +19,12 @@ jobs:
 
     steps:
       - name: Checkout repository with submodules
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           submodules: recursive
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 24
 
@@ -43,7 +43,7 @@ jobs:
           mkdir -p ~/.local/share/uv
 
       - name: Cache Cargo registry
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cargo/registry
@@ -53,7 +53,7 @@ jobs:
             ${{ runner.os }}-cargo-
 
       - name: Cache rustup toolchains
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.rustup
           key: ${{ runner.os }}-rustup-${{ hashFiles('Cargo.toml', 'frontend/src-tauri/Cargo.lock', 'polars-text/Cargo.toml', 'polars-text/Cargo.lock') }}
@@ -61,13 +61,10 @@ jobs:
             ${{ runner.os }}-rustup-
 
       - name: Install uv CLI
-        shell: bash
-        run: |
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+        uses: astral-sh/setup-uv@v6
 
       - name: Cache uv workspace
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cache/uv
@@ -82,8 +79,7 @@ jobs:
 
       - name: Package backend runtime
         shell: bash
-        working-directory: ldaca_web_app_backend
-        run: uv run --python 3.14 python scripts/package_backend_runtime.py --clean --python-version 3.14
+        run: uv run --no-project --python 3.14 python scripts/package_backend_runtime.py --clean --python-version 3.14
 
       - name: Stage backend runtime for Tauri
         shell: bash
@@ -138,7 +134,7 @@ jobs:
           echo "Labeled DMG: $labeled_dmg"
 
       - name: Upload macOS Apple Silicon DMG artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ldaca-desktop-macos-apple-silicon
           path: ${{ steps.label-dmg.outputs.path }}

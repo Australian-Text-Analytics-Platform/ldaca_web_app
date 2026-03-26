@@ -7,7 +7,7 @@ const __dirname = path.dirname(__filename);
 
 const frontendRoot = path.resolve(__dirname, '..');
 const repoRoot = path.resolve(frontendRoot, '..');
-const sourceRuntime = path.join(repoRoot, 'ldaca_web_app_backend', 'dist-tauri', 'backend-runtime');
+const sourceRuntime = path.join(repoRoot, 'dist-tauri', 'backend-runtime');
 const targetRuntime = path.join(
   frontendRoot,
   'src-tauri',

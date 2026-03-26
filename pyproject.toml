@@ -7,3 +7,6 @@ dependencies = ["ldaca-web-app-backend>=0.3.0", "ldaca-loader"]
 
 [tool.uv.sources]
 ldaca-loader = { git = "https://github.com/Australian-Text-Analytics-Platform/ldaca-tabulator", branch = "ldaca_web_app_integration" }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
