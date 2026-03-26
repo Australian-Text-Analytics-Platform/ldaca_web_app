@@ -18,7 +18,7 @@ import { getInvalidWorkspaceNameMessage } from '../../lib/workspaceName';
  */
 export const WorkspaceControls: React.FC = memo(() => {
   const { currentWorkspace } = useWorkspaceData();
-  const { saveWorkspace, renameWorkspace, setCurrentWorkspace } = useWorkspaceActions();
+  const { saveWorkspace, renameWorkspace } = useWorkspaceActions();
 
   const [isEditing, setIsEditing] = useState(false);
   const [nameInput, setNameInput] = useState(currentWorkspace?.name || '');
@@ -95,15 +95,6 @@ export const WorkspaceControls: React.FC = memo(() => {
             title="Save workspace"
           >
             Save
-          </button>
-
-          {/* Unload */}
-          <button
-            className="text-xs text-gray-600 hover:text-gray-800 px-2 py-1 border rounded"
-            onClick={() => setCurrentWorkspace(null)}
-            title="Unload workspace (remove from memory)"
-          >
-            Unload
           </button>
         </>
       )}
