@@ -85,15 +85,7 @@ const DEV_BACKEND_RUNTIME: &str = concat!(
 
 const BACKEND_HOST: &str = "127.0.0.1";
 const RUNTIME_MANIFEST: &str = "runtime-manifest.json";
-
-const BUNDLE_RUNTIME_CANDIDATES: &[&str] = &[
-    "backend-runtime",
-    "_up_/backend-runtime",
-    "_up_/_up_/backend-runtime",
-    "dist-tauri/backend-runtime",
-    "_up_/dist-tauri/backend-runtime",
-    "_up_/_up_/dist-tauri/backend-runtime",
-];
+const BUNDLE_RUNTIME_DIR: &str = "backend-runtime";
 
 fn make_error(message: impl Into<String>) -> Box<dyn std::error::Error> {
     Box::new(io::Error::new(io::ErrorKind::Other, message.into()))
@@ -176,16 +168,14 @@ fn scan_for_manifest(start_dir: &Path, max_depth: usize) -> Option<PathBuf> {
 
 fn detect_runtime_dir(app: &AppHandle) -> Option<PathBuf> {
     let resolver = app.path();
-    for resource in BUNDLE_RUNTIME_CANDIDATES {
-        if let Ok(candidate) = resolver.resolve(resource, BaseDirectory::Resource) {
-            if candidate.exists() && runtime_dir_has_manifest(&candidate) {
-                println!(
-                    "Resolved backend runtime via bundle candidate '{}': {}",
-                    resource,
-                    candidate.display()
-                );
-                return Some(candidate);
-            }
+    if let Ok(candidate) = resolver.resolve(BUNDLE_RUNTIME_DIR, BaseDirectory::Resource) {
+        if candidate.exists() && runtime_dir_has_manifest(&candidate) {
+            println!(
+                "Resolved backend runtime via bundle resource '{}': {}",
+                BUNDLE_RUNTIME_DIR,
+                candidate.display()
+            );
+            return Some(candidate);
         }
     }
 
@@ -204,16 +194,14 @@ fn detect_runtime_dir(app: &AppHandle) -> Option<PathBuf> {
         // On Windows, both MSI-installed apps and bare build outputs place
         // backend-runtime adjacent to the executable.
         if let Some(exe_dir) = exe_path.parent() {
-            for rel in BUNDLE_RUNTIME_CANDIDATES {
-                let candidate = exe_dir.join(rel);
-                if candidate.exists() && runtime_dir_has_manifest(&candidate) {
-                    println!(
-                        "Resolved backend runtime via exe-adjacent candidate '{}': {}",
-                        rel,
-                        candidate.display()
-                    );
-                    return Some(candidate);
-                }
+            let candidate = exe_dir.join(BUNDLE_RUNTIME_DIR);
+            if candidate.exists() && runtime_dir_has_manifest(&candidate) {
+                println!(
+                    "Resolved backend runtime via exe-adjacent path '{}': {}",
+                    BUNDLE_RUNTIME_DIR,
+                    candidate.display()
+                );
+                return Some(candidate);
             }
         }
 
@@ -223,16 +211,14 @@ fn detect_runtime_dir(app: &AppHandle) -> Option<PathBuf> {
             .and_then(|p| p.parent())
             .map(|p| p.join("Resources"))
         {
-            for rel in BUNDLE_RUNTIME_CANDIDATES {
-                let candidate = resources_dir.join(rel);
-                if candidate.exists() && runtime_dir_has_manifest(&candidate) {
-                    println!(
-                        "Resolved backend runtime via executable-relative candidate '{}': {}",
-                        rel,
-                        candidate.display()
-                    );
-                    return Some(candidate);
-                }
+            let candidate = resources_dir.join(BUNDLE_RUNTIME_DIR);
+            if candidate.exists() && runtime_dir_has_manifest(&candidate) {
+                println!(
+                    "Resolved backend runtime via executable-relative path '{}': {}",
+                    BUNDLE_RUNTIME_DIR,
+                    candidate.display()
+                );
+                return Some(candidate);
             }
 
             if let Some(runtime_dir) = scan_for_manifest(&resources_dir, 5) {
@@ -319,9 +305,6 @@ fn locate_python_binary(runtime_dir: &Path) -> Option<PathBuf> {
             .join("Scripts")
             .join("python.exe"),
         runtime_dir.join("python").join("python.exe"),
-        runtime_dir.join("python").join("python3.exe"),
-        runtime_dir.join("venv").join("bin").join("python"),
-        runtime_dir.join("venv").join("Scripts").join("python.exe"),
     ];
 
     for candidate in candidates {
@@ -559,12 +542,14 @@ fn spawn_backend_process(
         // Prepend managed-python dir to PATH so C extension modules (greenlet,
         // numpy, etc.) can find vcruntime140.dll and other DLLs that ship with
         // the managed CPython installation.
-        let mut new_path = std::ffi::OsString::from(home);
+        #[cfg(target_os = "windows")]
         if let Some(existing_path) = std::env::var_os("PATH") {
-            new_path.push(";");
-            new_path.push(existing_path);
+            if let Ok(paths) = std::env::join_paths([home.as_os_str(), existing_path.as_os_str()]) {
+                command.env("PATH", paths);
+            }
+        } else {
+            command.env("PATH", home.as_os_str());
         }
-        command.env("PATH", new_path);
     } else {
         eprintln!(
             "WARNING: managed-python not found under {}; pyvenv.cfg home path may be stale on this machine",
@@ -723,7 +708,7 @@ fn main() {
 
     // Use 127.0.0.1 instead of localhost to avoid mixed content issues on Windows
     // where Tauri serves from https://tauri.localhost
-    let backend_url = format!("http://127.0.0.1:{}", backend_port);
+    let backend_url = format!("http://{}:{}", BACKEND_HOST, backend_port);
     println!("Backend will run on: {}", backend_url);
 
     let backend_state = BackendState {
