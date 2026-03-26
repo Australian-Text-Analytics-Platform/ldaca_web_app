@@ -43,14 +43,6 @@ jobs:
           toolchain: stable
           targets: x86_64-pc-windows-msvc
 
-      - name: Prepare cache directories
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.cargo\registry" | Out-Null
-          New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.cargo\git" | Out-Null
-          New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.rustup" | Out-Null
-          New-Item -ItemType Directory -Force -Path "$env:LOCALAPPDATA\uv" | Out-Null
-
       - name: Cache Cargo registry
         uses: actions/cache@v5
         with:
@@ -61,16 +53,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
-      - name: Cache rustup toolchains
-        uses: actions/cache@v5
-        with:
-          path: ~/.rustup
-          key: ${{ runner.os }}-rustup-${{ hashFiles('Cargo.toml', 'frontend/src-tauri/Cargo.lock', 'polars-text/Cargo.toml', 'polars-text/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-rustup-
-
       - name: Install uv CLI
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v7
 
       - name: Cache uv workspace
         uses: actions/cache@v5
@@ -92,8 +76,6 @@ jobs:
         run: |
           Set-StrictMode -Version Latest
           [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-          $env:PYTHONUTF8 = "1"
-          $env:PYTHONIOENCODING = "utf-8"
           uv run --no-project --python 3.14 python scripts/package_backend_runtime.py --clean --python-version 3.14
 
       - name: Stage backend runtime for Tauri
@@ -109,7 +91,6 @@ jobs:
         run: |
           Set-StrictMode -Version Latest
           [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-          Write-Host "Building Tauri application with MSI packaging..."
           npx tauri build
 
       - name: Validate bundled backend runtime
@@ -117,55 +98,14 @@ jobs:
         run: |
           Set-StrictMode -Version Latest
           $runtimeDir = "target\release\backend-runtime"
-          $managedPython = @(Get-ChildItem -Path (Join-Path $runtimeDir "managed-python") -Directory -Filter "cpython-*" -ErrorAction SilentlyContinue | Select-Object -First 1)
-          if ($managedPython.Count -gt 0) {
-            $pythonExe = Join-Path $managedPython[0].FullName "python.exe"
-          } else {
-            $pythonExe = Join-Path $runtimeDir "python\Scripts\python.exe"
-          }
-
-          if (-not (Test-Path $runtimeDir)) {
-            Write-Error "Bundled backend runtime not found at $runtimeDir"
-            exit 1
-          }
+          $pythonExe = Join-Path $runtimeDir "python\Scripts\python.exe"
 
           if (-not (Test-Path (Join-Path $runtimeDir "runtime-manifest.json"))) {
             Write-Error "runtime-manifest.json missing from bundled runtime"
             exit 1
           }
 
-          if (-not (Test-Path $pythonExe)) {
-            Write-Error "Bundled Python interpreter not found at $pythonExe"
-            exit 1
-          }
-
           & $pythonExe -c "import encodings, ldaca_web_app_backend, polars_text, sys; print(sys.version)"
-          Write-Host "Bundled runtime validation succeeded: $runtimeDir"
-
-      - name: Gather Windows bundles
-        id: gather-bundles
-        shell: pwsh
-        run: |
-          Set-StrictMode -Version Latest
-          $bundleRoot = "target/release/bundle"
-          if (-not (Test-Path $bundleRoot)) {
-            Write-Error "Bundle output not found at $bundleRoot"
-            exit 1
-          }
-
-          # List all available bundles
-          Write-Host "Available bundle directories:"
-          Get-ChildItem -Path $bundleRoot -Directory | ForEach-Object { Write-Host "  $($_.Name)" }
-
-          # Find MSI installer files
-          $archives = @(Get-ChildItem -Path $bundleRoot -Recurse -Include *.msi -ErrorAction SilentlyContinue)
-          if ($archives.Count -eq 0) {
-            Write-Error "No Windows MSI artifacts found"
-            exit 1
-          }
-
-          Write-Host "`nFound MSI installers:"
-          $archives | ForEach-Object { Write-Host "  $($_.FullName)" }
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v7

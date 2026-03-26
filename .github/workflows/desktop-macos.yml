@@ -34,14 +34,6 @@ jobs:
           toolchain: stable
           targets: aarch64-apple-darwin
 
-      - name: Prepare cache directories
-        run: |
-          mkdir -p ~/.cargo/registry
-          mkdir -p ~/.cargo/git
-          mkdir -p ~/.rustup
-          mkdir -p ~/.cache/uv
-          mkdir -p ~/.local/share/uv
-
       - name: Cache Cargo registry
         uses: actions/cache@v5
         with:
@@ -52,16 +44,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
-      - name: Cache rustup toolchains
-        uses: actions/cache@v5
-        with:
-          path: ~/.rustup
-          key: ${{ runner.os }}-rustup-${{ hashFiles('Cargo.toml', 'frontend/src-tauri/Cargo.lock', 'polars-text/Cargo.toml', 'polars-text/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-rustup-
-
       - name: Install uv CLI
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v7
 
       - name: Cache uv workspace
         uses: actions/cache@v5
