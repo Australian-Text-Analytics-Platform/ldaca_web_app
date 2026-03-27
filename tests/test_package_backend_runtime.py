@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -57,3 +58,12 @@ def test_sync_runtime_environment_uses_frozen_non_editable_sync(
             },
         )
     ]
+
+
+def test_root_workspace_uses_local_backend_source() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    pyproject = tomllib.loads((repo_root / "pyproject.toml").read_text("utf-8"))
+
+    backend_source = pyproject["tool"]["uv"]["sources"]["ldaca-web-app-backend"]
+
+    assert backend_source == {"path": "./ldaca_web_app_backend"}

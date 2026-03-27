@@ -309,10 +309,21 @@ describe('ConcordanceFeature', () => {
         'node-1': {
           data: [],
           columns: [],
+          metadata: {
+            metadata_columns: [],
+            concordance_columns: [],
+            all_columns: [],
+          },
           pagination: {
+            page: 1,
+            page_size: 20,
+            total_source_rows: 0,
+            total_source_pages: 1,
+            result_count: 0,
             has_prev: false,
             has_next: false,
           },
+          sorting: { descending: false },
         },
       },
     };
@@ -364,6 +375,9 @@ describe('ConcordanceFeature', () => {
           pagination: {
             page: 1,
             page_size: 20,
+            total_source_rows: 1,
+            total_source_pages: 1,
+            result_count: 1,
             has_prev: false,
             has_next: false,
           },
@@ -418,6 +432,9 @@ describe('ConcordanceFeature', () => {
           pagination: {
             page: 1,
             page_size: 20,
+            total_source_rows: 1,
+            total_source_pages: 1,
+            result_count: 1,
             has_prev: false,
             has_next: false,
           },
@@ -479,6 +496,9 @@ describe('ConcordanceFeature', () => {
           pagination: {
             page: 1,
             page_size: 20,
+            total_source_rows: 1,
+            total_source_pages: 1,
+            result_count: 1,
             has_prev: false,
             has_next: false,
           },
@@ -530,10 +550,12 @@ describe('ConcordanceFeature', () => {
             concordance_columns: ['CONC_LEFT_CONTEXT', 'CONC_MATCHED_TEXT', 'CONC_RIGHT_CONTEXT'],
             all_columns: ['text', 'CONC_LEFT_CONTEXT', 'CONC_MATCHED_TEXT', 'CONC_RIGHT_CONTEXT'],
           },
-          total_matches: 0,
           pagination: {
             page: 1,
             page_size: 20,
+            total_source_rows: 1,
+            total_source_pages: 1,
+            result_count: 1,
             has_prev: false,
             has_next: false,
           },
@@ -555,12 +577,21 @@ describe('ConcordanceFeature', () => {
         'node-1': {
           data: [],
           columns: [],
+          metadata: {
+            metadata_columns: [],
+            concordance_columns: [],
+            all_columns: [],
+          },
           pagination: {
             page: 1,
             page_size: 20,
+            total_source_rows: 0,
+            total_source_pages: 1,
+            result_count: 0,
             has_prev: false,
             has_next: false,
           },
+          sorting: { descending: false },
         },
       },
     };

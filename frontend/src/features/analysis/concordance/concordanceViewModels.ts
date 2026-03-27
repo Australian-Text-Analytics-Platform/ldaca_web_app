@@ -27,7 +27,7 @@ export function flattenConcordanceGroups(groups: ConcordanceGroupedRow[]): Conco
 
 export function buildDispersionRows(groups: ConcordanceGroupedRow[]): ConcordanceDispersionRow[] {
   return groups.flatMap((group) => {
-    if (!Array.isArray(group) || group.length === 0) {
+    if (group.length === 0) {
       return [];
     }
 
@@ -43,11 +43,7 @@ export function buildDispersionRows(groups: ConcordanceGroupedRow[]): Concordanc
 }
 
 export function getDispersionHits(row: Record<string, unknown>): ConcordanceGroupedRow {
-  const value = row[CONCORDANCE_COLUMN_KEYS.dispersion];
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  return value.filter((hit): hit is ConcordanceHitRow => typeof hit === 'object' && hit !== null);
+  return row[CONCORDANCE_COLUMN_KEYS.dispersion] as ConcordanceGroupedRow;
 }
 
 export function getDispersionTextLength(row: Record<string, unknown>, textColumn: string): number {

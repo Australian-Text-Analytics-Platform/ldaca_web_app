@@ -90,16 +90,7 @@ const buildMatchCountLabel = (count: number | undefined): string => {
 };
 
 const getConcordancePageMatchCount = (nodeData: ConcordanceResultEntry): number => {
-  const groupedRows = Array.isArray(nodeData.data) ? nodeData.data : [];
-  const pageMatchCount = groupedRows.reduce((total, group) => {
-    return total + (Array.isArray(group) ? group.length : 0);
-  }, 0);
-
-  if (pageMatchCount > 0) {
-    return pageMatchCount;
-  }
-
-  return Number.isFinite(nodeData.total_matches) ? Math.max(0, Math.floor(nodeData.total_matches as number)) : 0;
+  return nodeData.data.reduce((total, group) => total + group.length, 0);
 };
 
 const getDispersionColumnStyle = (
@@ -313,16 +304,10 @@ const ConcordanceFeature: React.FC = () => {
   const availableMetadataColumns = (() => {
     const metadataColumnSet = new Set<string>();
     const resultEntries = results?.data ?? {};
-    const coreColumnSet = new Set<string>(CORE_COLS);
 
     Object.values(resultEntries).forEach((entry) => {
       const nodeEntry = entry as ConcordanceResultEntry;
-      const columns = Array.isArray(nodeEntry.columns) ? nodeEntry.columns : [];
-      const metadataColumns = Array.isArray(nodeEntry.metadata?.metadata_columns)
-        ? (nodeEntry.metadata?.metadata_columns as string[])
-        : columns.filter((column) => !coreColumnSet.has(column) && column !== '__source_node');
-
-      metadataColumns.forEach((column) => {
+      nodeEntry.metadata.metadata_columns.forEach((column) => {
         if (column && column !== '__source_node') {
           metadataColumnSet.add(column);
         }
@@ -1070,19 +1055,17 @@ const ConcordanceFeature: React.FC = () => {
     const detachNodeId = actualNodeId || (labelToNodeId?.[nodeKey] ?? requestNodeId);
     const canDetach = Boolean(detachNodeId) && detachNodeId !== '__COMBINED__';
     if (nodeKey === '__COMBINED__') {
-      const groupedRows = nodeData.data || [];
+      const groupedRows = nodeData.data;
       const rows = showDispersion
         ? buildDispersionRows(groupedRows)
         : flattenConcordanceGroups(groupedRows);
       const longestTextLength = showDispersion && proportionalDispersionBars
         ? rows.reduce((max, row) => Math.max(max, getDispersionTextLength(row, column)), 0)
         : 0;
-      const columns: string[] = nodeData.columns || [];
+      const columns = nodeData.columns;
       const combinedHasPrev = Boolean(nodeData.pagination?.has_prev);
       const combinedHasNext = Boolean(nodeData.pagination?.has_next);
-      // Derive display columns: core first, then metadata (columns minus core and internal)
-      const coreSet = new Set<string>(CORE_COLS);
-      const metaCols = columns.filter(c => !coreSet.has(c) && c !== '__source_node');
+      const metaCols = nodeData.metadata.metadata_columns;
       const visibleMetaCols = (selectedMetadataColumns ?? []).filter((columnName) => metaCols.includes(columnName));
       const rawDisplayColumns = showDispersion
         ? (showMetadata ? [CONCORDANCE_DISPERSION_COLUMN, ...visibleMetaCols] : [CONCORDANCE_DISPERSION_COLUMN])
@@ -1227,15 +1210,15 @@ const ConcordanceFeature: React.FC = () => {
       );
     }
     // Build per-node display columns using metadata
-    const groupedRows = nodeData.data || [];
+    const groupedRows = nodeData.data;
     const rows = showDispersion
       ? buildDispersionRows(groupedRows)
       : flattenConcordanceGroups(groupedRows);
     const longestTextLength = showDispersion && proportionalDispersionBars
       ? rows.reduce((max, row) => Math.max(max, getDispersionTextLength(row, column)), 0)
       : 0;
-    const allCols: string[] = (nodeData.columns || (rows.length ? Object.keys(rows[0]) : [])) as string[];
-    const metaCols: string[] = (nodeData.metadata?.metadata_columns as string[] | undefined) ?? allCols.filter(c => !new Set<string>(CORE_COLS).has(c));
+    const allCols = nodeData.columns;
+    const metaCols = nodeData.metadata.metadata_columns;
     const visibleMetaCols = (selectedMetadataColumns ?? []).filter((columnName) => metaCols.includes(columnName));
     const rawDisplayColumns = showDispersion
       ? (showMetadata ? [CONCORDANCE_DISPERSION_COLUMN, ...visibleMetaCols.filter(c => allCols.includes(c))] : [CONCORDANCE_DISPERSION_COLUMN])

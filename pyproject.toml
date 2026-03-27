@@ -3,9 +3,10 @@ name = "ldaca-web-app-workspace"
 version = "0.2.0"
 description = "LDaCA Web App Workspace"
 requires-python = ">=3.14"
-dependencies = ["ldaca-web-app-backend>=0.3.3", "ldaca-loader"]
+dependencies = ["ldaca-web-app-backend", "ldaca-loader"]
 
 [tool.uv.sources]
+ldaca-web-app-backend = { path = "./ldaca_web_app_backend" }
 ldaca-loader = { git = "https://github.com/Australian-Text-Analytics-Platform/ldaca-tabulator", branch = "ldaca_web_app_integration" }
 
 [tool.pytest.ini_options]

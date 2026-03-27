@@ -28,12 +28,20 @@ export interface ConcordanceDetachOptionsResponse {
 }
 export interface ConcordanceAnalysisRequest { node_ids: string[]; node_columns: Record<string,string>; search_word: string; num_left_tokens?: number; num_right_tokens?: number; regex?: boolean; case_sensitive?: boolean; sort_by?: string; combined?: boolean; }
 export interface ConcordanceResultQuery { node_id?: string; combined?: boolean; page?: number; page_number?: number; page_size?: number; sort_by?: string; descending?: boolean; show_metadata?: boolean; update_only?: boolean; }
+export interface ConcordancePagination {
+  page: number;
+  page_size: number;
+  total_source_rows: number;
+  total_source_pages: number;
+  result_count: number;
+  has_next: boolean;
+  has_prev: boolean;
+}
 export interface ConcordanceResultEntry {
   data: ConcordanceGroupedRow[];
   columns: string[];
-  metadata?: ConcordanceMetadata;
-  total_matches?: number;
-  pagination: { page: number; page_size: number; total_pages?: number; total_source_pages?: number; has_next: boolean; has_prev: boolean; };
+  metadata: ConcordanceMetadata;
+  pagination: ConcordancePagination;
   sorting: { sort_by?: string; descending: boolean; };
 }
 export interface ConcordanceAnalysisResponse {

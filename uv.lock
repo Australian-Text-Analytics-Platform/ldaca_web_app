@@ -873,8 +873,8 @@ dependencies = [
 
 [[package]]
 name = "ldaca-web-app-backend"
-version = "0.3.2"
-source = { registry = "https://pypi.org/simple" }
+version = "0.3.3"
+source = { directory = "ldaca_web_app_backend" }
 dependencies = [
     { name = "aiosqlite" },
     { name = "bertopic" },
@@ -892,9 +892,33 @@ dependencies = [
     { name = "pydantic-settings" },
     { name = "tbb", marker = "sys_platform != 'darwin'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ea/a9/3f885a0336ec02e030c88b343dde5481f4917d782dcd02e47d345e9d648b/ldaca_web_app_backend-0.3.2.tar.gz", hash = "sha256:2111b3f35873182e4c88b316e00fa907fd81ebd24936840611eaf20c95c10acf", size = 4098321, upload-time = "2026-03-27T03:38:21.387Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/96/e8/6a7e7d3b31c2e5b43758b2521dd0dfa77bc07a108257e4128c908e527b7e/ldaca_web_app_backend-0.3.2-py3-none-any.whl", hash = "sha256:422d7d98bb33ae11a61b95bc35897b81f618c8e9cdc1b30b773b3d898fa10257", size = 4162191, upload-time = "2026-03-27T03:38:19.614Z" },
+
+[package.metadata]
+requires-dist = [
+    { name = "aiosqlite", specifier = ">=0.21.0" },
+    { name = "bertopic", specifier = ">=0.17.3" },
+    { name = "docworkspace", specifier = ">=0.2.1" },
+    { name = "fastapi", extras = ["standard"], specifier = ">=0.135.0" },
+    { name = "fastapi-users", extras = ["sqlalchemy"], specifier = ">=14.0.1" },
+    { name = "fastexcel", specifier = ">=0.18.0" },
+    { name = "google-auth-oauthlib", specifier = ">=1.2.2" },
+    { name = "httpx", specifier = ">=0.27.0" },
+    { name = "ipython", marker = "extra == 'deploy'", specifier = ">=9.5.0" },
+    { name = "jupyter-server-proxy", marker = "extra == 'deploy'", specifier = ">=4.4.0" },
+    { name = "ldaca-loader", git = "https://github.com/Australian-Text-Analytics-Platform/ldaca-tabulator?branch=ldaca_web_app_integration" },
+    { name = "openai", specifier = ">=2.26.0" },
+    { name = "psutil", specifier = ">=6.1.0" },
+    { name = "pyairtable", specifier = ">=3.3.0" },
+    { name = "pyarrow", specifier = ">=16.0.0" },
+    { name = "pydantic-settings", specifier = ">=2.0.0" },
+    { name = "tbb", marker = "sys_platform != 'darwin'", specifier = ">=2022.3.1" },
+]
+provides-extras = ["deploy"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest-asyncio", specifier = ">=0.23.0" },
+    { name = "twine", specifier = ">=6.2.0" },
 ]
 
 [[package]]
@@ -909,7 +933,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "ldaca-loader", git = "https://github.com/Australian-Text-Analytics-Platform/ldaca-tabulator?branch=ldaca_web_app_integration" },
-    { name = "ldaca-web-app-backend", specifier = ">=0.3.2" },
+    { name = "ldaca-web-app-backend", directory = "ldaca_web_app_backend" },
 ]
 
 [[package]]
@@ -2183,14 +2207,14 @@ wheels = [
 
 [[package]]
 name = "types-requests"
-version = "2.32.4.20260324"
+version = "2.33.0.20260327"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "urllib3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/6c/b1/66bafdc85965e5aa3db42e1b9128bf8abe252edd7556d00a07ef437a3e0e/types_requests-2.32.4.20260324.tar.gz", hash = "sha256:33a2a9ccb1de7d4e4da36e347622c35418f6761269014cc32857acabd5df739e", size = 23765, upload-time = "2026-03-24T04:06:35.106Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/02/5f/2e3dbae6e21be6ae026563bad96cbf76602d73aa85ea09f13419ddbdabb4/types_requests-2.33.0.20260327.tar.gz", hash = "sha256:f4f74f0b44f059e3db420ff17bd1966e3587cdd34062fe38a23cda97868f8dd8", size = 23804, upload-time = "2026-03-27T04:23:38.737Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5b/5a/ce5999f9bd72c7fac681d26cd0a5782b379053bfc2214e2a3fbe30852c9e/types_requests-2.32.4.20260324-py3-none-any.whl", hash = "sha256:f83ef2deb284fe99a249b8b0b0a3e4b9809e01ff456063c4df0aac7670c07ab9", size = 20735, upload-time = "2026-03-24T04:06:33.9Z" },
+    { url = "https://files.pythonhosted.org/packages/8c/55/951e733616c92cb96b57554746d2f65f4464d080cc2cc093605f897aba89/types_requests-2.33.0.20260327-py3-none-any.whl", hash = "sha256:fde0712be6d7c9a4d490042d6323115baf872d9a71a22900809d0432de15776e", size = 20737, upload-time = "2026-03-27T04:23:37.813Z" },
 ]
 
 [[package]]
