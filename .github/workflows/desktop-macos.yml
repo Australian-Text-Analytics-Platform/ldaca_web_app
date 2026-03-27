@@ -73,12 +73,7 @@ jobs:
       - name: Build Tauri desktop application
         shell: bash
         working-directory: frontend
-        run: npx tauri build
-
-      - name: Create DMG
-        shell: bash
-        working-directory: frontend
-        run: npx create-dmg "../target/release/bundle/macos/LDaCA Text Analytics.app" "../target/release/bundle/macos/" --overwrite --no-code-sign
+        run: npx tauri build --bundles app,dmg
 
       - name: Validate bundled backend runtime
         shell: bash

@@ -90,7 +90,7 @@
     "stage:backend-runtime": "node scripts/stage-backend-runtime.mjs",
     "prepare:backend-runtime": "npm run package:backend-runtime && npm run stage:backend-runtime",
     "desktop:dev": "npm run prepare:backend-runtime && tauri dev",
-    "desktop:build:mac": "npm run prepare:backend-runtime && tauri build && npx create-dmg \"../target/release/bundle/macos/LDaCA Text Analytics.app\" \"../target/release/bundle/macos/\" --overwrite --no-code-sign",
+    "desktop:build:mac": "npm run prepare:backend-runtime && tauri build --bundles app,dmg",
     "desktop:build:windows": "npm run prepare:backend-runtime && tauri build"
   },
   "devDependencies": {
