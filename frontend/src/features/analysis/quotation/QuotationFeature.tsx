@@ -311,7 +311,7 @@ const QuotationFeature: React.FC = () => {
   const setEngineDialogOpen = useQuotationEngineDialogStore((state) => state.setOpen);
   const openEngineDialog = useQuotationEngineDialogStore((state) => state.open);
   const closeEngineDialog = useQuotationEngineDialogStore((state) => state.close);
-  const [showMetadata, setShowMetadata] = useState(true);
+  const [showMetadata, setShowMetadata] = useState(false);
   const [selectedMetadataColumns, setSelectedMetadataColumns] = useState<string[] | null>(null);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [isLoadingQuotations, setIsLoadingQuotations] = useState(false);
@@ -450,7 +450,7 @@ const QuotationFeature: React.FC = () => {
         setEngineConfigStore({ type: 'local' });
       }
       setNodeColumnSelections([{ nodeId, column }], { replace: true });
-      setShowMetadata(true);
+      setShowMetadata(false);
       try {
         await restoreAnalysisLockFromRequest({
           workspaceId: currentWorkspaceId,
@@ -955,14 +955,12 @@ const QuotationFeature: React.FC = () => {
       return [] as string[];
     }
 
-    const selection = activeSelections.find((item) => item.nodeId === nodeId);
-    const textCol = selection?.column || '';
     const resultState = resultsByNode[nodeId];
     const rowsForColumns = resultState?.rows ?? [];
     const allCols = Array.isArray(resultState?.columns) && resultState.columns.length
       ? resultState.columns.filter((column) => !column.startsWith('__'))
       : (rowsForColumns[0] ? Object.keys(rowsForColumns[0]).filter((column) => !column.startsWith('__')) : []);
-    const baseColumns = (originalColumnsByNode[nodeId] || []).filter((column) => column !== textCol && !column.startsWith('__'));
+    const baseColumns = (originalColumnsByNode[nodeId] || []).filter((column) => !column.startsWith('__'));
     const generatedMetadataColumns = [
       QUOTATION_COLUMN_KEYS.speaker,
       QUOTATION_COLUMN_KEYS.speakerStartIdx,
@@ -980,24 +978,20 @@ const QuotationFeature: React.FC = () => {
 
     return Array.from(new Set([...baseColumns, ...generatedMetadataColumns]));
   })();
-  const quotationMetadataColumnsKey = quotationMetadataColumns.join('|');
+  const preferredMetadataColumns = (() => {
+    const nodeId = displayedNodes[0] ? getNodeIdentifier(displayedNodes[0], 0) : '';
+    if (!nodeId) {
+      return [] as string[];
+    }
 
-  useEffect(() => {
-    setSelectedMetadataColumns((previousSelection) => {
-      const nextSelection = reconcileMetadataColumnSelection(
-        quotationMetadataColumns,
-        previousSelection,
-      );
-      const normalizedPreviousSelection = previousSelection ?? [];
-      if (
-        normalizedPreviousSelection.length === nextSelection.length &&
-        normalizedPreviousSelection.every((column, index) => column === nextSelection[index])
-      ) {
-        return previousSelection;
-      }
-      return nextSelection;
-    });
-  }, [quotationMetadataColumns, quotationMetadataColumnsKey]);
+    const selection = activeSelections.find((item) => item.nodeId === nodeId);
+    return selection?.column ? [selection.column] : [];
+  })();
+  const resolvedMetadataColumns = reconcileMetadataColumnSelection(
+    quotationMetadataColumns,
+    selectedMetadataColumns,
+    preferredMetadataColumns,
+  );
 
   return (
     <>
@@ -1200,7 +1194,7 @@ const QuotationFeature: React.FC = () => {
                     showMetadata={showMetadata}
                     onShowMetadataChange={setShowMetadata}
                     availableColumns={quotationMetadataColumns}
-                    selectedColumns={selectedMetadataColumns ?? []}
+                    selectedColumns={resolvedMetadataColumns}
                     onSelectedColumnsChange={setSelectedMetadataColumns}
                   />
                   <div className="flex flex-wrap items-center gap-2">
@@ -1281,9 +1275,9 @@ const QuotationFeature: React.FC = () => {
                 })();
 
                 const mainColumn = textCol || (allCols.includes(QUOTATION_COLUMN_KEYS.quote) ? QUOTATION_COLUMN_KEYS.quote : allCols[0] || QUOTATION_COLUMN_KEYS.quote);
-                const baseColumns = (originalColumnsByNode[nodeId] || []).filter((c) => c !== textCol && !c.startsWith('__'));
+                const baseColumns = (originalColumnsByNode[nodeId] || []).filter((c) => !c.startsWith('__'));
                 const presentMeta = metaColumns.filter((c) => allCols.includes(c));
-                const visibleMetadataColumns = (selectedMetadataColumns ?? []).filter(
+                const visibleMetadataColumns = resolvedMetadataColumns.filter(
                   (columnName) => baseColumns.includes(columnName) || presentMeta.includes(columnName),
                 );
 

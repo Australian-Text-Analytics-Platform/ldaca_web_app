@@ -1,5 +1,12 @@
 const DEFAULT_METADATA_COLUMN = 'document';
 
+const normalizePreferredColumns = (
+  preferredColumns: string | string[] = DEFAULT_METADATA_COLUMN,
+): string[] => {
+  const rawColumns = Array.isArray(preferredColumns) ? preferredColumns : [preferredColumns];
+  return dedupeColumns([...rawColumns, DEFAULT_METADATA_COLUMN]);
+};
+
 const dedupeColumns = (columns: string[]): string[] => {
   const seen = new Set<string>();
   const normalized: string[] = [];
@@ -18,15 +25,18 @@ const dedupeColumns = (columns: string[]): string[] => {
 
 export const getDefaultMetadataColumnSelection = (
   availableColumns: string[],
-  preferredColumn: string = DEFAULT_METADATA_COLUMN,
+  preferredColumn: string | string[] = DEFAULT_METADATA_COLUMN,
 ): string[] => {
   const normalizedColumns = dedupeColumns(availableColumns);
   if (normalizedColumns.length === 0) {
     return [];
   }
 
-  if (normalizedColumns.includes(preferredColumn)) {
-    return [preferredColumn];
+  const resolvedPreferredColumn = normalizePreferredColumns(preferredColumn).find((column) =>
+    normalizedColumns.includes(column),
+  );
+  if (resolvedPreferredColumn) {
+    return [resolvedPreferredColumn];
   }
 
   return [normalizedColumns[0]];
@@ -35,7 +45,7 @@ export const getDefaultMetadataColumnSelection = (
 export const reconcileMetadataColumnSelection = (
   availableColumns: string[],
   selectedColumns: string[] | null,
-  preferredColumn: string = DEFAULT_METADATA_COLUMN,
+  preferredColumn: string | string[] = DEFAULT_METADATA_COLUMN,
 ): string[] => {
   const normalizedColumns = dedupeColumns(availableColumns);
   if (selectedColumns === null) {

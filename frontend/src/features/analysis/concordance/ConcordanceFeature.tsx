@@ -89,6 +89,19 @@ const buildMatchCountLabel = (count: number | undefined): string => {
   return `Documents searched per page (${safeCount} match${safeCount === 1 ? '' : 'es'} found)`;
 };
 
+const getConcordancePageMatchCount = (nodeData: ConcordanceResultEntry): number => {
+  const groupedRows = Array.isArray(nodeData.data) ? nodeData.data : [];
+  const pageMatchCount = groupedRows.reduce((total, group) => {
+    return total + (Array.isArray(group) ? group.length : 0);
+  }, 0);
+
+  if (pageMatchCount > 0) {
+    return pageMatchCount;
+  }
+
+  return Number.isFinite(nodeData.total_matches) ? Math.max(0, Math.floor(nodeData.total_matches as number)) : 0;
+};
+
 const getDispersionColumnStyle = (
   isDispersionVisible: boolean,
   isMetadataVisible: boolean,
@@ -320,23 +333,6 @@ const ConcordanceFeature: React.FC = () => {
   })();
   const availableMetadataColumnsKey = availableMetadataColumns.join('|');
 
-  useEffect(() => {
-    setSelectedMetadataColumns((previousSelection) => {
-      const nextSelection = reconcileMetadataColumnSelection(
-        availableMetadataColumns,
-        previousSelection,
-      );
-      const normalizedPreviousSelection = previousSelection ?? [];
-      if (
-        normalizedPreviousSelection.length === nextSelection.length &&
-        normalizedPreviousSelection.every((column, index) => column === nextSelection[index])
-      ) {
-        return previousSelection;
-      }
-      return nextSelection;
-    });
-  }, [availableMetadataColumns, availableMetadataColumnsKey]);
-
   // Map any node's id/name variants to its assigned color (used in combined table)
   const sourceColorMap = (() => {
     const map: Record<string, string> = {};
@@ -474,6 +470,27 @@ const ConcordanceFeature: React.FC = () => {
   });
 
   const effectiveNodeColumnSelections = isLocked ? activeNodeColumnSelections : nodeColumnSelections;
+  const preferredMetadataColumns = dedupeColumns(
+    effectiveNodeColumnSelections.map((selection) => selection.column).filter(Boolean),
+  );
+
+  useEffect(() => {
+    setSelectedMetadataColumns((previousSelection) => {
+      const nextSelection = reconcileMetadataColumnSelection(
+        availableMetadataColumns,
+        previousSelection,
+        preferredMetadataColumns,
+      );
+      const normalizedPreviousSelection = previousSelection ?? [];
+      if (
+        normalizedPreviousSelection.length === nextSelection.length &&
+        normalizedPreviousSelection.every((column, index) => column === nextSelection[index])
+      ) {
+        return previousSelection;
+      }
+      return nextSelection;
+    });
+  }, [availableMetadataColumns, availableMetadataColumnsKey, preferredMetadataColumns]);
 
   const {
     handleSearch,
@@ -1202,7 +1219,7 @@ const ConcordanceFeature: React.FC = () => {
               hasPrev={combinedHasPrev}
               totalPages={nodeData.pagination?.total_source_pages}
               onPageChange={(newPage) => setCombinedPage(newPage)}
-              pageSizeLabel={buildMatchCountLabel(nodeData.total_matches)}
+              pageSizeLabel={buildMatchCountLabel(getConcordancePageMatchCount(nodeData))}
               loading={combinedLoading}
             />
           </div>
@@ -1340,7 +1357,7 @@ const ConcordanceFeature: React.FC = () => {
               }
             })();
           }}
-          pageSizeLabel={buildMatchCountLabel(nodeData.total_matches)}
+          pageSizeLabel={buildMatchCountLabel(getConcordancePageMatchCount(nodeData))}
           pageSizeOptions={[10, 20, 50, 100]}
           loading={nodeIsLoading}
         >

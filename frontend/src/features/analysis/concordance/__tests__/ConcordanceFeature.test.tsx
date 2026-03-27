@@ -451,6 +451,102 @@ describe('ConcordanceFeature', () => {
     clientWidthSpy.mockRestore();
   });
 
+  it('prefers the selected text column over the first metadata column by default', async () => {
+    mockInitialResult = {
+      state: 'successful',
+      message: 'ok',
+      data: {
+        'node-1': {
+          data: [
+            [
+              {
+                speaker: 'A',
+                text: 'alpha beta alpha',
+                CONC_LEFT_CONTEXT: '',
+                CONC_MATCHED_TEXT: 'alpha',
+                CONC_RIGHT_CONTEXT: 'beta alpha',
+                CONC_START_IDX: 0,
+                CONC_END_IDX: 5,
+              },
+            ],
+          ],
+          columns: ['speaker', 'text', 'CONC_LEFT_CONTEXT', 'CONC_MATCHED_TEXT', 'CONC_RIGHT_CONTEXT'],
+          metadata: {
+            metadata_columns: ['speaker', 'text'],
+            concordance_columns: ['CONC_LEFT_CONTEXT', 'CONC_MATCHED_TEXT', 'CONC_RIGHT_CONTEXT'],
+            all_columns: ['speaker', 'text', 'CONC_LEFT_CONTEXT', 'CONC_MATCHED_TEXT', 'CONC_RIGHT_CONTEXT'],
+          },
+          pagination: {
+            page: 1,
+            page_size: 20,
+            has_prev: false,
+            has_next: false,
+          },
+          sorting: { descending: false },
+        },
+      },
+    };
+
+    render(<ConcordanceFeature />);
+
+    fireEvent.click(screen.getByRole('checkbox', { name: /show metadata/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('columnheader', { name: /text/i })).toBeInTheDocument();
+    });
+
+    expect(screen.queryByRole('columnheader', { name: /speaker/i })).not.toBeInTheDocument();
+  });
+
+  it('shows the current page concordance occurrence count in the pagination label', async () => {
+    mockInitialResult = {
+      state: 'successful',
+      message: 'ok',
+      data: {
+        'node-1': {
+          data: [
+            [
+              {
+                text: 'alpha beta alpha',
+                CONC_LEFT_CONTEXT: '',
+                CONC_MATCHED_TEXT: 'alpha',
+                CONC_RIGHT_CONTEXT: 'beta alpha',
+                CONC_START_IDX: 0,
+                CONC_END_IDX: 5,
+              },
+              {
+                text: 'alpha beta alpha',
+                CONC_LEFT_CONTEXT: 'alpha beta',
+                CONC_MATCHED_TEXT: 'alpha',
+                CONC_RIGHT_CONTEXT: '',
+                CONC_START_IDX: 11,
+                CONC_END_IDX: 16,
+              },
+            ],
+          ],
+          columns: ['text', 'CONC_LEFT_CONTEXT', 'CONC_MATCHED_TEXT', 'CONC_RIGHT_CONTEXT'],
+          metadata: {
+            metadata_columns: ['text'],
+            concordance_columns: ['CONC_LEFT_CONTEXT', 'CONC_MATCHED_TEXT', 'CONC_RIGHT_CONTEXT'],
+            all_columns: ['text', 'CONC_LEFT_CONTEXT', 'CONC_MATCHED_TEXT', 'CONC_RIGHT_CONTEXT'],
+          },
+          total_matches: 0,
+          pagination: {
+            page: 1,
+            page_size: 20,
+            has_prev: false,
+            has_next: false,
+          },
+          sorting: { descending: false },
+        },
+      },
+    };
+
+    render(<ConcordanceFeature />);
+
+    expect(screen.getByText('Documents searched per page (2 matches found)')).toBeInTheDocument();
+  });
+
   it('hides the proportional-width control until Dispersion View is enabled', () => {
     mockInitialResult = {
       state: 'successful',
