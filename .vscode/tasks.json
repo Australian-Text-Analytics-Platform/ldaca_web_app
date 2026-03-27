@@ -98,6 +98,23 @@
                 "showReuseMessage": true,
                 "clear": false
             }
+        },
+        {
+            "label": "Test All",
+            "type": "shell",
+            "command": "(cd docworkspace && uv run pytest && uvx ty check) && (cd ldaca_web_app_backend && uv run pytest && uvx ty check) && (cd polars-text && uv run pytest && uvx ty check) && (cd frontend && npm run test -- --run && npm run lint && npm run build)",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": [],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            }
         }
     ]
 }
