@@ -141,6 +141,7 @@ vi.mock('../generatedColumns', () => ({
     endIdx: 'CONC_END_IDX',
     leftToken: 'L1',
     rightToken: 'R1',
+    dispersion: 'CONC_dispersion',
   },
   CONCORDANCE_CORE_COLUMNS: ['CONC_LEFT_CONTEXT', 'CONC_MATCHED_TEXT', 'CONC_RIGHT_CONTEXT'],
 }));
@@ -331,6 +332,146 @@ describe('ConcordanceFeature', () => {
     await waitFor(() => {
       expect(screen.getAllByPlaceholderText('Enter word or phrase to search for')[0]).toHaveValue('replacement');
     });
+
+    unmount();
+  });
+
+  it('replaces concordance columns with a dispersion column when Dispersion View is enabled', async () => {
+    mockInitialResult = {
+      state: 'successful',
+      message: 'ok',
+      data: {
+        'node-1': {
+          data: [
+            [
+              {
+                text: 'alpha beta alpha',
+                speaker: 'A',
+                CONC_LEFT_CONTEXT: '',
+                CONC_MATCHED_TEXT: 'alpha',
+                CONC_RIGHT_CONTEXT: 'beta alpha',
+                CONC_START_IDX: 0,
+                CONC_END_IDX: 5,
+              },
+            ],
+          ],
+          columns: ['text', 'speaker', 'CONC_LEFT_CONTEXT', 'CONC_MATCHED_TEXT', 'CONC_RIGHT_CONTEXT'],
+          metadata: {
+            metadata_columns: ['text', 'speaker'],
+            concordance_columns: ['CONC_LEFT_CONTEXT', 'CONC_MATCHED_TEXT', 'CONC_RIGHT_CONTEXT'],
+            all_columns: ['text', 'speaker', 'CONC_LEFT_CONTEXT', 'CONC_MATCHED_TEXT', 'CONC_RIGHT_CONTEXT'],
+          },
+          pagination: {
+            page: 1,
+            page_size: 20,
+            has_prev: false,
+            has_next: false,
+          },
+          sorting: { descending: false },
+        },
+      },
+    };
+
+    const { unmount } = render(<ConcordanceFeature />);
+
+    fireEvent.click(screen.getByRole('checkbox', { name: /dispersion view/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('CONC_dispersion')).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole('checkbox', { name: /bar length proportional to text length/i })).toBeInTheDocument();
+
+    expect(screen.queryByText('CONC_LEFT_CONTEXT')).not.toBeInTheDocument();
+    expect(screen.queryByText('CONC_MATCHED_TEXT')).not.toBeInTheDocument();
+    expect(screen.queryByText('CONC_RIGHT_CONTEXT')).not.toBeInTheDocument();
+
+    unmount();
+  });
+
+  it('keeps the dispersion column at half the table width when metadata is shown', async () => {
+    const clientWidthSpy = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800);
+    mockInitialResult = {
+      state: 'successful',
+      message: 'ok',
+      data: {
+        'node-1': {
+          data: [
+            [
+              {
+                document: 'Doc 1',
+                speaker: 'A',
+                CONC_LEFT_CONTEXT: '',
+                CONC_MATCHED_TEXT: 'alpha',
+                CONC_RIGHT_CONTEXT: 'beta alpha',
+                CONC_START_IDX: 0,
+                CONC_END_IDX: 5,
+              },
+            ],
+          ],
+          columns: ['document', 'speaker', 'CONC_LEFT_CONTEXT', 'CONC_MATCHED_TEXT', 'CONC_RIGHT_CONTEXT'],
+          metadata: {
+            metadata_columns: ['document', 'speaker'],
+            concordance_columns: ['CONC_LEFT_CONTEXT', 'CONC_MATCHED_TEXT', 'CONC_RIGHT_CONTEXT'],
+            all_columns: ['document', 'speaker', 'CONC_LEFT_CONTEXT', 'CONC_MATCHED_TEXT', 'CONC_RIGHT_CONTEXT'],
+          },
+          pagination: {
+            page: 1,
+            page_size: 20,
+            has_prev: false,
+            has_next: false,
+          },
+          sorting: { descending: false },
+        },
+      },
+    };
+
+    const { unmount } = render(<ConcordanceFeature />);
+
+    fireEvent.click(screen.getByRole('checkbox', { name: /dispersion view/i }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /show metadata/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('CONC_dispersion')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText('document')).toBeInTheDocument();
+    expect(screen.queryByText('speaker')).not.toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'CONC_dispersion' })).toHaveStyle({ width: '400px' });
+
+    fireEvent.pointerDown(screen.getByRole('button', { name: /metadata columns/i }), { button: 0 });
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /speaker/i }));
+    fireEvent.keyDown(screen.getByRole('menu', { name: /metadata columns/i }), { key: 'Escape' });
+
+    await waitFor(() => {
+      expect(screen.getByRole('columnheader', { name: /speaker/i })).toBeInTheDocument();
+    });
+
+    unmount();
+    clientWidthSpy.mockRestore();
+  });
+
+  it('hides the proportional-width control until Dispersion View is enabled', () => {
+    mockInitialResult = {
+      state: 'successful',
+      message: 'ok',
+      data: {
+        'node-1': {
+          data: [],
+          columns: [],
+          pagination: {
+            page: 1,
+            page_size: 20,
+            has_prev: false,
+            has_next: false,
+          },
+        },
+      },
+    };
+
+    const { unmount } = render(<ConcordanceFeature />);
+
+    expect(screen.queryByRole('checkbox', { name: /bar length proportional to text length/i })).not.toBeInTheDocument();
 
     unmount();
   });

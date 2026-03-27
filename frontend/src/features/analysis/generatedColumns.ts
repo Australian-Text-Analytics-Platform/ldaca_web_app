@@ -8,6 +8,8 @@ export const CONCORDANCE_CORE_COLUMNS = [
   'CONC_r1',
 ] as const;
 
+export const CONCORDANCE_DISPERSION_COLUMN = 'CONC_dispersion' as const;
+
 export const CONCORDANCE_COLUMN_KEYS = {
   leftContext: 'CONC_left_context',
   matchedText: 'CONC_matched_text',
@@ -16,6 +18,7 @@ export const CONCORDANCE_COLUMN_KEYS = {
   endIdx: 'CONC_end_idx',
   leftToken: 'CONC_l1',
   rightToken: 'CONC_r1',
+  dispersion: CONCORDANCE_DISPERSION_COLUMN,
 } as const;
 
 export const QUOTATION_COLUMN_KEYS = {

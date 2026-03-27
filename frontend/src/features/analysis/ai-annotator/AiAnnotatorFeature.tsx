@@ -30,6 +30,10 @@ import {
   AlertDialogTitle,
 } from '../../../components/ui/alert-dialog';
 import { normalizeTypeName } from '../../../utils/columnTypes';
+import {
+  MetadataColumnSelector,
+} from '../common/components/MetadataColumnSelector';
+import { reconcileMetadataColumnSelection } from '../common/components/metadataColumnSelection';
 
 type EndpointPreset = 'openai' | 'lmstudio' | 'custom';
 const LMSTUDIO_BASE_URL = 'http://127.0.0.1:1234/v1';
@@ -155,6 +159,7 @@ const AiAnnotatorFeature: React.FC = () => {
   const [resultNode, setResultNode] = useState<AiAnnotationNodeResult | null>(null);
   const [isPaging, setIsPaging] = useState(false);
   const [showMetadata, setShowMetadata] = useState(false);
+  const [selectedMetadataColumns, setSelectedMetadataColumns] = useState<string[] | null>(null);
   const [panelTab, setPanelTab] = useState<'ai-annotation' | 'review'>('ai-annotation');
   const [isDetaching, setIsDetaching] = useState(false);
   const [reviewEdits, setReviewEdits] = useState<Record<string, string>>({});
@@ -512,16 +517,37 @@ const AiAnnotatorFeature: React.FC = () => {
   const inferredTextColumn =
     (selectedColumn && resultColumns.includes(selectedColumn) ? selectedColumn : null) ??
     (resultColumns.find((col) => !annotationColumns.includes(col)) ?? null);
-  const visibleColumns = (() => {
-    if (showMetadata) {
-      return resultColumns;
-    }
+  const availableMetadataColumns = resultColumns.filter(
+    (column) => !annotationColumns.includes(column) && column !== inferredTextColumn,
+  );
+  const availableMetadataColumnsKey = availableMetadataColumns.join('|');
 
+  useEffect(() => {
+    setSelectedMetadataColumns((previousSelection) => {
+      const nextSelection = reconcileMetadataColumnSelection(
+        availableMetadataColumns,
+        previousSelection,
+      );
+      const normalizedPreviousSelection = previousSelection ?? [];
+      if (
+        normalizedPreviousSelection.length === nextSelection.length &&
+        normalizedPreviousSelection.every((column, index) => column === nextSelection[index])
+      ) {
+        return previousSelection;
+      }
+      return nextSelection;
+    });
+  }, [availableMetadataColumns, availableMetadataColumnsKey]);
+
+  const visibleColumns = (() => {
     const prioritized = [
       ...annotationColumns,
       ...(inferredTextColumn ? [inferredTextColumn] : []),
     ];
-    const unique = Array.from(new Set(prioritized.filter(Boolean)));
+    const visibleMetadataColumns = showMetadata
+      ? (selectedMetadataColumns ?? []).filter((column) => availableMetadataColumns.includes(column))
+      : [];
+    const unique = Array.from(new Set([...prioritized.filter(Boolean), ...visibleMetadataColumns]));
     return unique.length > 0 ? unique : resultColumns;
   })();
   const pagination = resultNode?.pagination;
@@ -1208,15 +1234,13 @@ const AiAnnotatorFeature: React.FC = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex flex-wrap items-center gap-4">
-              <label className="flex items-center gap-2 text-sm text-foreground">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4"
-                  checked={showMetadata}
-                  onChange={(event) => setShowMetadata(event.target.checked)}
-                />
-                <span>Show metadata</span>
-              </label>
+              <MetadataColumnSelector
+                showMetadata={showMetadata}
+                onShowMetadataChange={setShowMetadata}
+                availableColumns={availableMetadataColumns}
+                selectedColumns={selectedMetadataColumns ?? []}
+                onSelectedColumnsChange={setSelectedMetadataColumns}
+              />
             </div>
 
             <div className="rounded-lg border border-border bg-card">

@@ -9,7 +9,7 @@ import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
 import { useWorkspaceActions } from '../../../hooks/useWorkspaceActions';
 import { useAuth } from '../../../hooks/useAuth';
 import useNodeColumnInfos from '../../../hooks/useNodeColumnInfos';
-import { type ConcordanceAnalysisResponse, type ConcordanceResultEntry, textApi } from '../../../api/text';
+import { type ConcordanceAnalysisResponse, type ConcordanceGroupedRow, type ConcordanceResultEntry, textApi } from '../../../api/text';
 import { useAnalysisStore } from '../../../stores/analysisStore';
 import { useUIStore } from '../../../stores';
 import { Button } from '../../../components/ui/button';
@@ -49,10 +49,23 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { AnalysisPagination } from '../../../components/AnalysisPagination';
 import { AnalysisTableScrollArea } from '../../../components/AnalysisTableScrollArea';
 import { ConcordanceDetachDialog, type DetachNodeOption } from './components/ConcordanceDetachDialog';
+import { ConcordanceDispersionCell } from './components/ConcordanceDispersionCell';
+import {
+  buildDispersionRows,
+  flattenConcordanceGroups,
+  getDispersionBarWidthPercent,
+  getDispersionHits,
+  getDispersionTextLength,
+} from './concordanceViewModels';
 import {
   CONCORDANCE_COLUMN_KEYS,
   CONCORDANCE_CORE_COLUMNS,
+  CONCORDANCE_DISPERSION_COLUMN,
 } from '../generatedColumns';
+import {
+  MetadataColumnSelector,
+} from '../common/components/MetadataColumnSelector';
+import { reconcileMetadataColumnSelection } from '../common/components/metadataColumnSelection';
 
 
 const CORE_COLS = [...CONCORDANCE_CORE_COLUMNS];
@@ -76,12 +89,32 @@ const buildMatchCountLabel = (count: number | undefined): string => {
   return `Documents searched per page (${safeCount} match${safeCount === 1 ? '' : 'es'} found)`;
 };
 
+const getDispersionColumnStyle = (
+  isDispersionVisible: boolean,
+  isMetadataVisible: boolean,
+  visibleWidth: number,
+): React.CSSProperties | undefined => {
+  if (!isDispersionVisible || !isMetadataVisible) {
+    return undefined;
+  }
+
+  if (visibleWidth <= 0) {
+    return undefined;
+  }
+
+  const columnWidth = `${Math.floor(visibleWidth / 2)}px`;
+  return {
+    width: columnWidth,
+    minWidth: columnWidth,
+    maxWidth: columnWidth,
+  };
+};
+
 const highlightMatchInText = (
   textValue: string,
-  startValue: unknown,
-  endValue: unknown,
+  ranges: Array<{ start: unknown; end: unknown }>,
   fallbackMatch?: string,
-  fallbackCaseSensitive?: boolean
+  fallbackCaseSensitive?: boolean,
 ): React.ReactNode => {
   if (typeof textValue !== 'string' || textValue.length === 0) {
     return textValue;
@@ -98,39 +131,66 @@ const highlightMatchInText = (
     return null;
   };
 
-  let startIdx = parseIndex(startValue);
-  let endIdx = parseIndex(endValue);
-
-  if (startIdx === null || endIdx === null || endIdx <= startIdx) {
-    if (fallbackMatch && fallbackMatch.length > 0) {
-      const source = fallbackCaseSensitive ? textValue : textValue.toLowerCase();
-      const needle = fallbackCaseSensitive ? fallbackMatch : fallbackMatch.toLowerCase();
-      const fallbackIdx = source.indexOf(needle);
-      if (fallbackIdx !== -1) {
-        startIdx = fallbackIdx;
-        endIdx = fallbackIdx + needle.length;
+  const normalizedRanges = ranges
+    .map(({ start, end }) => {
+      const startIdx = parseIndex(start);
+      const endIdx = parseIndex(end);
+      if (startIdx === null || endIdx === null || endIdx <= startIdx) {
+        return null;
       }
+      const safeStart = Math.max(0, Math.min(startIdx, textValue.length));
+      const safeEnd = Math.max(safeStart, Math.min(endIdx, textValue.length));
+      if (safeEnd <= safeStart) {
+        return null;
+      }
+      return { start: safeStart, end: safeEnd };
+    })
+    .filter((range): range is { start: number; end: number } => Boolean(range))
+    .sort((left, right) => left.start - right.start);
+
+  if (normalizedRanges.length === 0 && fallbackMatch && fallbackMatch.length > 0) {
+    const source = fallbackCaseSensitive ? textValue : textValue.toLowerCase();
+    const needle = fallbackCaseSensitive ? fallbackMatch : fallbackMatch.toLowerCase();
+    const fallbackIdx = source.indexOf(needle);
+    if (fallbackIdx !== -1) {
+      normalizedRanges.push({ start: fallbackIdx, end: fallbackIdx + needle.length });
     }
   }
 
-  if (startIdx === null || endIdx === null || endIdx <= startIdx) {
+  if (normalizedRanges.length === 0) {
     return textValue;
   }
 
-  const safeStart = Math.max(0, Math.min(startIdx, textValue.length));
-  const safeEnd = Math.max(safeStart, Math.min(endIdx, textValue.length));
+  const mergedRanges: Array<{ start: number; end: number }> = [];
+  normalizedRanges.forEach((range) => {
+    const previous = mergedRanges[mergedRanges.length - 1];
+    if (!previous || range.start > previous.end) {
+      mergedRanges.push({ ...range });
+      return;
+    }
+    previous.end = Math.max(previous.end, range.end);
+  });
 
-  if (safeEnd <= safeStart) {
-    return textValue;
+  const children: React.ReactNode[] = [];
+  let cursor = 0;
+  mergedRanges.forEach((range, index) => {
+    if (cursor < range.start) {
+      children.push(<React.Fragment key={`plain-${index}`}>{textValue.slice(cursor, range.start)}</React.Fragment>);
+    }
+    children.push(
+      <mark key={`mark-${range.start}-${range.end}`} className="bg-yellow-200 text-gray-900 rounded px-1">
+        {textValue.slice(range.start, range.end)}
+      </mark>
+    );
+    cursor = range.end;
+  });
+  if (cursor < textValue.length) {
+    children.push(<React.Fragment key="plain-tail">{textValue.slice(cursor)}</React.Fragment>);
   }
 
   return (
     <>
-      {textValue.slice(0, safeStart)}
-      <mark className="bg-yellow-200 text-gray-900 rounded px-1">
-        {textValue.slice(safeStart, safeEnd)}
-      </mark>
-      {textValue.slice(safeEnd)}
+      {children}
     </>
   );
 };
@@ -180,7 +240,12 @@ const ConcordanceFeature: React.FC = () => {
   const [regex, setRegex] = useState(false);
   const [caseSensitive, setCaseSensitive] = useState(false);
   const [showMetadata, setShowMetadata] = useState(false);
+  const [selectedMetadataColumns, setSelectedMetadataColumns] = useState<string[] | null>(null);
+  const [showDispersion, setShowDispersion] = useState(false);
+  const [proportionalDispersionBars, setProportionalDispersionBars] = useState(false);
+  const [resultsViewportWidth, setResultsViewportWidth] = useState(0);
   const [results, concordanceResultsRef, _setResultSafely, setResults] = useSafeResult<ConcordanceAnalysisResponse>();
+  const resultsViewportRef = useRef<HTMLDivElement | null>(null);
   const labelToNodeId = (() => {
     const params = results?.analysis_params;
     const mapping = params?.label_to_node_map;
@@ -205,6 +270,72 @@ const ConcordanceFeature: React.FC = () => {
   const [combinedPage, setCombinedPage] = useState(1);
   const [combinedPageSize] = useState(20);
   const [combinedLoading, setCombinedLoading] = useState(false);
+
+  useEffect(() => {
+    const element = resultsViewportRef.current;
+    if (!element) {
+      return;
+    }
+
+    const updateWidth = () => {
+      setResultsViewportWidth(element.clientWidth);
+    };
+
+    updateWidth();
+
+    if (typeof ResizeObserver === 'undefined') {
+      return;
+    }
+
+    const observer = new ResizeObserver(() => {
+      updateWidth();
+    });
+    observer.observe(element);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [results]);
+
+  const availableMetadataColumns = (() => {
+    const metadataColumnSet = new Set<string>();
+    const resultEntries = results?.data ?? {};
+    const coreColumnSet = new Set<string>(CORE_COLS);
+
+    Object.values(resultEntries).forEach((entry) => {
+      const nodeEntry = entry as ConcordanceResultEntry;
+      const columns = Array.isArray(nodeEntry.columns) ? nodeEntry.columns : [];
+      const metadataColumns = Array.isArray(nodeEntry.metadata?.metadata_columns)
+        ? (nodeEntry.metadata?.metadata_columns as string[])
+        : columns.filter((column) => !coreColumnSet.has(column) && column !== '__source_node');
+
+      metadataColumns.forEach((column) => {
+        if (column && column !== '__source_node') {
+          metadataColumnSet.add(column);
+        }
+      });
+    });
+
+    return Array.from(metadataColumnSet);
+  })();
+  const availableMetadataColumnsKey = availableMetadataColumns.join('|');
+
+  useEffect(() => {
+    setSelectedMetadataColumns((previousSelection) => {
+      const nextSelection = reconcileMetadataColumnSelection(
+        availableMetadataColumns,
+        previousSelection,
+      );
+      const normalizedPreviousSelection = previousSelection ?? [];
+      if (
+        normalizedPreviousSelection.length === nextSelection.length &&
+        normalizedPreviousSelection.every((column, index) => column === nextSelection[index])
+      ) {
+        return previousSelection;
+      }
+      return nextSelection;
+    });
+  }, [availableMetadataColumns, availableMetadataColumnsKey]);
 
   // Map any node's id/name variants to its assigned color (used in combined table)
   const sourceColorMap = (() => {
@@ -758,10 +889,17 @@ const ConcordanceFeature: React.FC = () => {
   }, [viewMode, results, combinedPage, combinedPageSize, updateStoredResult]);
 
 
-  const handleRowClick = (row: Record<string, unknown>, nodeId: string, column: string) => {
+  const handleRowClick = (
+    row: Record<string, unknown>,
+    nodeId: string,
+    column: string,
+    groupedHits?: ConcordanceGroupedRow,
+  ) => {
     if (!currentWorkspaceId) return;
 
-    const record = { ...row };
+    const concordanceHits = groupedHits && groupedHits.length > 0 ? groupedHits : [row];
+    const primaryRecord = concordanceHits[0] ?? row;
+    const record = { ...primaryRecord };
     const availableColumns = Object.keys(record);
     const rawFullText = record[column];
     const fullText = rawFullText === null || rawFullText === undefined ? undefined : String(rawFullText);
@@ -772,6 +910,7 @@ const ConcordanceFeature: React.FC = () => {
       column,
       full_text: fullText,
       record,
+      concordance_hits: concordanceHits,
       available_columns: availableColumns,
       case_sensitive: row.case_sensitive ?? caseSensitive,
     };
@@ -796,11 +935,16 @@ const ConcordanceFeature: React.FC = () => {
       return { text: null as string | null, highlighted: null as React.ReactNode };
     }
 
+    const concordanceHits = Array.isArray(selectedDetail.concordance_hits)
+      ? selectedDetail.concordance_hits as Array<Record<string, unknown>>
+      : [selectedDetail];
     const matchedTextValue = selectedDetail[CONCORDANCE_COLUMN_KEYS.matchedText];
     const highlighted = highlightMatchInText(
       textCandidate,
-      selectedDetail[CONCORDANCE_COLUMN_KEYS.startIdx],
-      selectedDetail[CONCORDANCE_COLUMN_KEYS.endIdx],
+      concordanceHits.map((hit) => ({
+        start: hit[CONCORDANCE_COLUMN_KEYS.startIdx],
+        end: hit[CONCORDANCE_COLUMN_KEYS.endIdx],
+      })),
       (typeof matchedTextValue === 'string' && matchedTextValue.length > 0)
         ? matchedTextValue
         : searchWord,
@@ -909,17 +1053,27 @@ const ConcordanceFeature: React.FC = () => {
     const detachNodeId = actualNodeId || (labelToNodeId?.[nodeKey] ?? requestNodeId);
     const canDetach = Boolean(detachNodeId) && detachNodeId !== '__COMBINED__';
     if (nodeKey === '__COMBINED__') {
-      const rows = nodeData.data || [];
+      const groupedRows = nodeData.data || [];
+      const rows = showDispersion
+        ? buildDispersionRows(groupedRows)
+        : flattenConcordanceGroups(groupedRows);
+      const longestTextLength = showDispersion && proportionalDispersionBars
+        ? rows.reduce((max, row) => Math.max(max, getDispersionTextLength(row, column)), 0)
+        : 0;
       const columns: string[] = nodeData.columns || [];
       const combinedHasPrev = Boolean(nodeData.pagination?.has_prev);
       const combinedHasNext = Boolean(nodeData.pagination?.has_next);
       // Derive display columns: core first, then metadata (columns minus core and internal)
       const coreSet = new Set<string>(CORE_COLS);
       const metaCols = columns.filter(c => !coreSet.has(c) && c !== '__source_node');
-      const rawDisplayColumns = showMetadata
-        ? [...CORE_COLS.filter(c => columns.includes(c)), ...metaCols]
-        : CORE_COLS.filter(c => columns.includes(c));
+      const visibleMetaCols = (selectedMetadataColumns ?? []).filter((columnName) => metaCols.includes(columnName));
+      const rawDisplayColumns = showDispersion
+        ? (showMetadata ? [CONCORDANCE_DISPERSION_COLUMN, ...visibleMetaCols] : [CONCORDANCE_DISPERSION_COLUMN])
+        : (showMetadata
+          ? [...CORE_COLS.filter(c => columns.includes(c)), ...visibleMetaCols]
+          : CORE_COLS.filter(c => columns.includes(c)));
       const displayColumns = dedupeColumns(rawDisplayColumns);
+      const dispersionColumnStyle = getDispersionColumnStyle(showDispersion, showMetadata, resultsViewportWidth);
 
       return (
         <div key="__COMBINED__" className="mb-6">
@@ -950,13 +1104,14 @@ const ConcordanceFeature: React.FC = () => {
           </div>
           <div className="rounded-lg border border-border bg-card">
             <AnalysisTableScrollArea maxHeightClass="max-h-100">
-                <Table className="min-w-180" disableContainer>
+                <Table className={showDispersion ? 'w-full' : 'min-w-180'} disableContainer>
                 <TableHeader className="bg-gray-50 sticky top-0 z-10">
                   <TableRow>
                     {displayColumns.map((c: string) => (
                       <TableHead
                         key={c}
                         className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+                        style={c === CONCORDANCE_DISPERSION_COLUMN ? dispersionColumnStyle : undefined}
                       >
                         {c}
                       </TableHead>
@@ -993,6 +1148,23 @@ const ConcordanceFeature: React.FC = () => {
                       const bg = `${color}20`; // light tint
                       return (
                         <TableRow key={idx} className="cursor-pointer" style={{ backgroundColor: bg }} onClick={() => {
+                          if (showDispersion) {
+                            const hits = getDispersionHits(row);
+                            const sourceHit = hits[0];
+                            const sourceLabel = sourceHit?.__source_node ?? rawSrc;
+                            if (sourceLabel) {
+                              const nodesForDetail = panelSelectedNodes;
+                              const nodeObj = nodesForDetail.find((n: WorkspaceNodeLike) => {
+                                const candidates = [n.id, n.name, n.name, (n as Record<string, unknown>).data && typeof (n as Record<string, unknown>).data === 'object' ? ((n as Record<string, unknown>).data as Record<string, unknown>)?.name : undefined, n.label, (n as Record<string, unknown>).data && typeof (n as Record<string, unknown>).data === 'object' ? ((n as Record<string, unknown>).data as Record<string, unknown>)?.label : undefined].filter(Boolean).map(v=>String(v).toLowerCase());
+                                return candidates.includes(String(sourceLabel).toLowerCase());
+                              });
+                              const sel = nodeObj && effectiveNodeColumnSelections.find(s => s.nodeId === nodeObj.id);
+                              if (nodeObj && sel?.column) {
+                                handleRowClick(row, String(nodeObj.id ?? ''), sel.column, hits);
+                              }
+                            }
+                            return;
+                          }
                           if (rawSrc) {
                     const nodesForDetail = panelSelectedNodes;
                       const nodeObj = nodesForDetail.find((n: WorkspaceNodeLike) => {
@@ -1003,7 +1175,19 @@ const ConcordanceFeature: React.FC = () => {
                             if (nodeObj && sel?.column) handleRowClick(row, String(nodeObj.id ?? ''), sel.column);
                           }
                         }}>
-                          {displayColumns.map((c: string, i: number) => <TableCell key={i}>{row[c] !== undefined && row[c] !== null ? String(row[c]) : ''}</TableCell>)}
+                          {displayColumns.map((c: string, i: number) => (
+                            <TableCell key={i} style={c === CONCORDANCE_DISPERSION_COLUMN ? dispersionColumnStyle : undefined}>
+                              {c === CONCORDANCE_DISPERSION_COLUMN ? (
+                                <ConcordanceDispersionCell
+                                  hits={getDispersionHits(row)}
+                                  textLength={getDispersionTextLength(row, column)}
+                                  barWidthPercent={proportionalDispersionBars
+                                    ? getDispersionBarWidthPercent(row, column, longestTextLength)
+                                    : 100}
+                                />
+                              ) : row[c] !== undefined && row[c] !== null ? String(row[c]) : ''}
+                            </TableCell>
+                          ))}
                         </TableRow>
                       );
                     })
@@ -1026,15 +1210,25 @@ const ConcordanceFeature: React.FC = () => {
       );
     }
     // Build per-node display columns using metadata
-    const rows = nodeData.data || [];
+    const groupedRows = nodeData.data || [];
+    const rows = showDispersion
+      ? buildDispersionRows(groupedRows)
+      : flattenConcordanceGroups(groupedRows);
+    const longestTextLength = showDispersion && proportionalDispersionBars
+      ? rows.reduce((max, row) => Math.max(max, getDispersionTextLength(row, column)), 0)
+      : 0;
     const allCols: string[] = (nodeData.columns || (rows.length ? Object.keys(rows[0]) : [])) as string[];
     const metaCols: string[] = (nodeData.metadata?.metadata_columns as string[] | undefined) ?? allCols.filter(c => !new Set<string>(CORE_COLS).has(c));
-    const rawDisplayColumns = showMetadata
-      ? [...CORE_COLS.filter(c => allCols.includes(c)), ...metaCols.filter(c => allCols.includes(c))]
-      : CORE_COLS.filter(c => allCols.includes(c));
+    const visibleMetaCols = (selectedMetadataColumns ?? []).filter((columnName) => metaCols.includes(columnName));
+    const rawDisplayColumns = showDispersion
+      ? (showMetadata ? [CONCORDANCE_DISPERSION_COLUMN, ...visibleMetaCols.filter(c => allCols.includes(c))] : [CONCORDANCE_DISPERSION_COLUMN])
+      : (showMetadata
+        ? [...CORE_COLS.filter(c => allCols.includes(c)), ...visibleMetaCols.filter(c => allCols.includes(c))]
+        : CORE_COLS.filter(c => allCols.includes(c)));
     const displayColumns = dedupeColumns(rawDisplayColumns);
     const tableColumns = displayColumns.length > 0 ? displayColumns : allCols;
     const sortableColumns = new Set(metaCols);
+    const dispersionColumnStyle = getDispersionColumnStyle(showDispersion, showMetadata, resultsViewportWidth);
 
     const currentNodePagination = nodePagination[paginationKey];
     const currentPage = currentNodePagination?.currentPage ?? 1;
@@ -1049,7 +1243,7 @@ const ConcordanceFeature: React.FC = () => {
       <div key={nodeKey} className="mb-6">
         <div className="rounded-lg border border-border bg-card">
           <AnalysisTableScrollArea maxHeightClass="max-h-100">
-              <Table className="min-w-180" disableContainer>
+              <Table className={showDispersion ? 'w-full' : 'min-w-180'} disableContainer>
               <TableHeader className="bg-gray-50 sticky top-0 z-10">
                 <TableRow>
                   {tableColumns.map(key => {
@@ -1057,7 +1251,11 @@ const ConcordanceFeature: React.FC = () => {
                     return isSortable ? (
                       <SortableHeader key={key} columnKey={key} label={key} paginationKey={paginationKey} requestNodeId={requestNodeId} />
                     ) : (
-                      <TableHead key={key} className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                      <TableHead
+                        key={key}
+                        className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+                        style={key === CONCORDANCE_DISPERSION_COLUMN ? dispersionColumnStyle : undefined}
+                      >
                         {key}
                       </TableHead>
                     );
@@ -1065,24 +1263,37 @@ const ConcordanceFeature: React.FC = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {nodeData.data.length === 0 ? (
+                {rows.length === 0 ? (
                   <TableRow>
                     <TableCell className="h-24 text-center text-muted-foreground" colSpan={tableColumns.length || 1}>
                       No matching rows on this page for &quot;{searchWord}&quot;. Source rows without matches are omitted.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  nodeData.data.map((row: Record<string, unknown>, index: number) => (
+                  rows.map((row: Record<string, unknown>, index: number) => (
                     <TableRow 
                       key={index} 
                       className={`cursor-pointer ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
                       onClick={() => {
-                        handleRowClick(row, effectiveNodeId, column);
+                        handleRowClick(
+                          row,
+                          effectiveNodeId,
+                          column,
+                          showDispersion ? getDispersionHits(row) : undefined,
+                        );
                       }}
                     >
                       {tableColumns.map((colKey: string, cellIndex) => (
-                        <TableCell key={cellIndex}>
-                          {row[colKey] !== null && row[colKey] !== undefined ? String(row[colKey]) : ''}
+                        <TableCell key={cellIndex} style={colKey === CONCORDANCE_DISPERSION_COLUMN ? dispersionColumnStyle : undefined}>
+                          {colKey === CONCORDANCE_DISPERSION_COLUMN ? (
+                            <ConcordanceDispersionCell
+                              hits={getDispersionHits(row)}
+                              textLength={getDispersionTextLength(row, column)}
+                              barWidthPercent={proportionalDispersionBars
+                                ? getDispersionBarWidthPercent(row, column, longestTextLength)
+                                : 100}
+                            />
+                          ) : row[colKey] !== null && row[colKey] !== undefined ? String(row[colKey]) : ''}
                         </TableCell>
                       ))}
                     </TableRow>
@@ -1349,13 +1560,26 @@ const ConcordanceFeature: React.FC = () => {
                     </Tabs>
                   )}
                 </div>
-                <div className="flex flex-wrap items-center gap-4">
-                  <label className="flex items-center gap-2 text-sm text-foreground">
-                    <input
-                      type="checkbox"
-                      checked={showMetadata}
-                      onChange={(e) => {
-                        const nextValue = e.target.checked;
+                <div className="flex flex-col gap-3">
+                  <div className="flex flex-wrap items-center gap-4">
+                    <label className="flex items-center gap-2 text-sm text-foreground">
+                      <input
+                        type="checkbox"
+                        checked={showDispersion}
+                        onChange={(e) => {
+                          const isChecked = e.target.checked;
+                          setShowDispersion(isChecked);
+                          if (!isChecked) {
+                            setProportionalDispersionBars(false);
+                          }
+                        }}
+                        className="h-4 w-4"
+                      />
+                      <span>Dispersion View</span>
+                    </label>
+                    <MetadataColumnSelector
+                      showMetadata={showMetadata}
+                      onShowMetadataChange={(nextValue) => {
                         const previousValue = showMetadata;
                         setShowMetadata(nextValue);
                         void (async () => {
@@ -1367,13 +1591,28 @@ const ConcordanceFeature: React.FC = () => {
                           }
                         })();
                       }}
-                      className="h-4 w-4"
+                      availableColumns={availableMetadataColumns}
+                      selectedColumns={selectedMetadataColumns ?? []}
+                      onSelectedColumnsChange={setSelectedMetadataColumns}
                     />
-                    <span>Show metadata</span>
-                  </label>
+                  </div>
+                  {showDispersion ? (
+                    <div className="flex flex-wrap items-center gap-4">
+                      <label className="flex items-center gap-2 text-sm text-foreground">
+                        <input
+                          type="checkbox"
+                          checked={proportionalDispersionBars}
+                          onChange={(e) => setProportionalDispersionBars(e.target.checked)}
+                          className="h-4 w-4"
+                        />
+                        <span>Bar length proportional to text length</span>
+                      </label>
+                    </div>
+                  ) : null}
                 </div>
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent>
+                <div ref={resultsViewportRef} className="space-y-6">
                 {results.data && Object.keys(results.data).length > 0 ? (
                   <div className={`grid gap-6 ${viewMode==='combined' ? 'grid-cols-1' : 'grid-cols-1'}`}>
                     {Object.entries(results.data).filter(([k]) => viewMode==='combined' ? k==='__COMBINED__' : k !== '__COMBINED__').map(([nodeName, nodeData]) => {
@@ -1412,6 +1651,7 @@ const ConcordanceFeature: React.FC = () => {
                 ) : (
                   <div className="rounded-md border border-muted bg-muted/50 px-4 py-3 text-sm text-muted-foreground">No data available</div>
                 )}
+                </div>
               </CardContent>
           </>
         </Card>
@@ -1441,6 +1681,10 @@ const ConcordanceFeature: React.FC = () => {
                 <div>
                   <span className="font-medium text-gray-700">Search Word:</span>
                   <span className="ml-2 font-mono bg-yellow-100 px-1 rounded">{searchWord}</span>
+                </div>
+                <div>
+                  <span className="font-medium text-gray-700">Matches:</span>
+                  <span className="ml-2">{Array.isArray(selectedDetail.concordance_hits) ? selectedDetail.concordance_hits.length : 1}</span>
                 </div>
                 <div>
                   <span className="font-medium text-gray-700">L1 Word:</span>

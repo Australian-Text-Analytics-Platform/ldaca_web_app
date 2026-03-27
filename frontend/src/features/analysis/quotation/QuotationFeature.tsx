@@ -58,6 +58,10 @@ import {
   QuotationDetachDialog,
   type QuotationDetachNodeOption,
 } from './components/QuotationDetachDialog';
+import {
+  MetadataColumnSelector,
+} from '../common/components/MetadataColumnSelector';
+import { reconcileMetadataColumnSelection } from '../common/components/metadataColumnSelection';
 
 interface QuotationResultState {
   rows: Record<string, unknown>[];
@@ -298,7 +302,6 @@ const QuotationFeature: React.FC = () => {
     docTypeOnly: true,
   });
 
-  // Show metadata by default so the table mirrors original columns
   const engineConfig = useQuotationEngineConfigStore((state) => state.config);
   const lastRemoteUrl = useQuotationEngineConfigStore((state) => state.lastRemoteUrl);
   const setEngineConfigStore = useQuotationEngineConfigStore((state) => state.setConfig);
@@ -309,6 +312,7 @@ const QuotationFeature: React.FC = () => {
   const openEngineDialog = useQuotationEngineDialogStore((state) => state.open);
   const closeEngineDialog = useQuotationEngineDialogStore((state) => state.close);
   const [showMetadata, setShowMetadata] = useState(true);
+  const [selectedMetadataColumns, setSelectedMetadataColumns] = useState<string[] | null>(null);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [isLoadingQuotations, setIsLoadingQuotations] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
@@ -945,6 +949,56 @@ const QuotationFeature: React.FC = () => {
     });
   };
 
+  const quotationMetadataColumns = (() => {
+    const nodeId = displayedNodes[0] ? getNodeIdentifier(displayedNodes[0], 0) : '';
+    if (!nodeId) {
+      return [] as string[];
+    }
+
+    const selection = activeSelections.find((item) => item.nodeId === nodeId);
+    const textCol = selection?.column || '';
+    const resultState = resultsByNode[nodeId];
+    const rowsForColumns = resultState?.rows ?? [];
+    const allCols = Array.isArray(resultState?.columns) && resultState.columns.length
+      ? resultState.columns.filter((column) => !column.startsWith('__'))
+      : (rowsForColumns[0] ? Object.keys(rowsForColumns[0]).filter((column) => !column.startsWith('__')) : []);
+    const baseColumns = (originalColumnsByNode[nodeId] || []).filter((column) => column !== textCol && !column.startsWith('__'));
+    const generatedMetadataColumns = [
+      QUOTATION_COLUMN_KEYS.speaker,
+      QUOTATION_COLUMN_KEYS.speakerStartIdx,
+      QUOTATION_COLUMN_KEYS.speakerEndIdx,
+      QUOTATION_COLUMN_KEYS.quoteStartIdx,
+      QUOTATION_COLUMN_KEYS.quoteEndIdx,
+      QUOTATION_COLUMN_KEYS.verb,
+      QUOTATION_COLUMN_KEYS.verbStartIdx,
+      QUOTATION_COLUMN_KEYS.verbEndIdx,
+      QUOTATION_COLUMN_KEYS.quoteType,
+      QUOTATION_COLUMN_KEYS.quoteTokenCount,
+      QUOTATION_COLUMN_KEYS.isFloatingQuote,
+      QUOTATION_COLUMN_KEYS.quoteRowIdx,
+    ].filter((column) => allCols.includes(column));
+
+    return Array.from(new Set([...baseColumns, ...generatedMetadataColumns]));
+  })();
+  const quotationMetadataColumnsKey = quotationMetadataColumns.join('|');
+
+  useEffect(() => {
+    setSelectedMetadataColumns((previousSelection) => {
+      const nextSelection = reconcileMetadataColumnSelection(
+        quotationMetadataColumns,
+        previousSelection,
+      );
+      const normalizedPreviousSelection = previousSelection ?? [];
+      if (
+        normalizedPreviousSelection.length === nextSelection.length &&
+        normalizedPreviousSelection.every((column, index) => column === nextSelection[index])
+      ) {
+        return previousSelection;
+      }
+      return nextSelection;
+    });
+  }, [quotationMetadataColumns, quotationMetadataColumnsKey]);
+
   return (
     <>
       <Dialog open={engineDialogOpen} onOpenChange={setEngineDialogOpen}>
@@ -1142,15 +1196,13 @@ const QuotationFeature: React.FC = () => {
               </div>
               <div className="space-y-2 text-sm">
                 <div className="flex flex-wrap items-center gap-4">
-                  <label className="flex items-center gap-2 text-sm text-foreground">
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4"
-                      checked={showMetadata}
-                      onChange={(event) => setShowMetadata(event.target.checked)}
-                    />
-                    <span>Show metadata</span>
-                  </label>
+                  <MetadataColumnSelector
+                    showMetadata={showMetadata}
+                    onShowMetadataChange={setShowMetadata}
+                    availableColumns={quotationMetadataColumns}
+                    selectedColumns={selectedMetadataColumns ?? []}
+                    onSelectedColumnsChange={setSelectedMetadataColumns}
+                  />
                   <div className="flex flex-wrap items-center gap-2">
                     <div className="flex items-center gap-2">
                       <label
@@ -1203,7 +1255,7 @@ const QuotationFeature: React.FC = () => {
                 const rowsForRender = resultState?.rows?.length ? resultState.rows : fallbackRows;
                 const rowsWithQuotes = rowsForRender.filter((row) => row?.[QUOTATION_COLUMN_KEYS.quote]);
 
-                const metaColumns = [
+                const metaColumns: string[] = [
                   QUOTATION_COLUMN_KEYS.speaker,
                   QUOTATION_COLUMN_KEYS.speakerStartIdx,
                   QUOTATION_COLUMN_KEYS.speakerEndIdx,
@@ -1231,13 +1283,15 @@ const QuotationFeature: React.FC = () => {
                 const mainColumn = textCol || (allCols.includes(QUOTATION_COLUMN_KEYS.quote) ? QUOTATION_COLUMN_KEYS.quote : allCols[0] || QUOTATION_COLUMN_KEYS.quote);
                 const baseColumns = (originalColumnsByNode[nodeId] || []).filter((c) => c !== textCol && !c.startsWith('__'));
                 const presentMeta = metaColumns.filter((c) => allCols.includes(c));
+                const visibleMetadataColumns = (selectedMetadataColumns ?? []).filter(
+                  (columnName) => baseColumns.includes(columnName) || presentMeta.includes(columnName),
+                );
 
                 const cols = (() => {
                   const ordered: string[] = [];
                   if (mainColumn) ordered.push(mainColumn);
                   if (showMetadata) {
-                    ordered.push(...baseColumns);
-                    ordered.push(...presentMeta);
+                    ordered.push(...visibleMetadataColumns);
                   }
                   return ordered.length ? Array.from(new Set(ordered)) : [mainColumn];
                 })();
