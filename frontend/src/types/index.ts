@@ -11,28 +11,21 @@ export interface User {
 
 // Remove GoogleUser - we only need one User interface
 
-export interface FileInfo {
-  filename: string;
-  display_name?: string;
+export interface FileTreeFile {
+  name: string;
+  path: string;
+  type: 'file';
   size: number;
-  created_at: number;
-  file_type: string;
-  folder?: string;
-  readme?: string | null;
-  // New metadata for distinguishing sample vs user files and full path display
-  full_path?: string;
-  is_sample?: boolean;
-  path_type?: 'sample' | 'user';
-  // Keep old field names for backward compatibility
-  modified?: string;
-  type?: string;
 }
 
-export interface FileListResponse {
-  files: FileInfo[];
-  total: number;
-  user_folder: string;
+export interface FileTreeDirectory {
+  name: string;
+  path: string;
+  type: 'directory';
+  children: FileTreeNode[];
 }
+
+export type FileTreeNode = FileTreeFile | FileTreeDirectory;
 
 export interface FileData {
   files: string[];

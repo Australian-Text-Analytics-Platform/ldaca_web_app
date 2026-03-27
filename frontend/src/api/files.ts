@@ -1,21 +1,29 @@
 import { get, post, del, httpRequest } from './http';
 
-export interface FileInfo {
-  filename: string;
-  display_name: string;
-  folder: string;
+export interface FileTreeFile {
+  name: string;
+  path: string;
+  type: 'file';
   size: number;
-  created_at: number;
-  file_type: string;
-  readme?: string | null;
-  modified?: string;
-  type?: string;
 }
 
-export interface FileListResponse {
-  files: FileInfo[];
-  total: number;
-  user_folder: string;
+export interface FileTreeDirectory {
+  name: string;
+  path: string;
+  type: 'directory';
+  children: FileTreeNode[];
+}
+
+export type FileTreeNode = FileTreeFile | FileTreeDirectory;
+
+export interface CreateFolderResponse {
+  message: string;
+  path: string;
+}
+
+export interface MoveFileResponse {
+  message: string;
+  path: string;
 }
 
 export interface UnifiedFilePreviewRequest {
@@ -62,7 +70,12 @@ export interface LdacaImportStartResponse {
 }
 
 export const filesApi = {
-  list: (headers: Record<string,string> = {}) => get<FileListResponse>('/files/', headers),
+  list: (headers: Record<string,string> = {}) => get<FileTreeNode[]>('/files/', headers),
+  raw: (path: string, headers: Record<string,string> = {}) => get<string>('/files/raw', headers, { path }),
+  createFolder: (parentPath: string, name: string, headers: Record<string, string> = {}) =>
+    post<CreateFolderResponse>('/files/folders', { parent_path: parentPath, name }, headers),
+  moveFile: (sourcePath: string, targetDirectoryPath: string, headers: Record<string, string> = {}) =>
+    post<MoveFileResponse>('/files/move', { source_path: sourcePath, target_directory_path: targetDirectoryPath }, headers),
   upload: (file: File, headers: Record<string,string> = {}) => {
     const formData = new FormData();
     formData.append('file', file);

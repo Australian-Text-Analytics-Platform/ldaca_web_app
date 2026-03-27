@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { filesApi } from '../api/files';
-import { type FileInfo, type FileListResponse } from '../types';
+import { type FileTreeNode } from '../types';
 import { queryKeys } from '../lib/queryKeys';
 
 interface UseFilesProps {
@@ -13,7 +13,7 @@ export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {
   const queryClient = useQueryClient();
   const normalizedHeaders = authHeaders ?? {};
   const headerSignature = JSON.stringify(normalizedHeaders);
-  const filesQuery = useQuery<FileListResponse>({
+  const filesQuery = useQuery<FileTreeNode[]>({
     queryKey: [...queryKeys.files, headerSignature],
     queryFn: () => filesApi.list(normalizedHeaders),
     enabled,
@@ -37,8 +37,7 @@ export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {
     },
   });
 
-  const files = (filesQuery.data?.files || []) as FileInfo[];
-  const fileListResponse = filesQuery.data ?? null;
+  const fileTree = filesQuery.data ?? [];
   const refetchFiles = async () => {
     const result = await filesQuery.refetch();
     return result.data ?? null;
@@ -106,8 +105,7 @@ export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {
   };
 
   return {
-    files,
-    fileListResponse,
+    fileTree,
     selectedFile,
     setSelectedFile,
   loadingFiles: filesQuery.isLoading || filesQuery.isFetching,

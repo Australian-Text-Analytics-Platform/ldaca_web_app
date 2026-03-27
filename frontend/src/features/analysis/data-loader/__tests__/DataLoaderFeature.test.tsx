@@ -5,9 +5,21 @@ import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import DataLoaderFeature from '../DataLoaderFeature';
 
-const mockSetCurrentWorkspace = vi.fn();
-const mockUpdateWorkspaceDescription = vi.fn();
-const mockHandleUploadFile = vi.fn();
+const {
+  mockSetCurrentWorkspace,
+  mockUpdateWorkspaceDescription,
+  mockHandleUploadFile,
+  mockRawFile,
+  mockCreateFolder,
+  mockMoveFile,
+} = vi.hoisted(() => ({
+  mockSetCurrentWorkspace: vi.fn(),
+  mockUpdateWorkspaceDescription: vi.fn(),
+  mockHandleUploadFile: vi.fn(),
+  mockRawFile: vi.fn(),
+  mockCreateFolder: vi.fn(),
+  mockMoveFile: vi.fn(),
+}));
 
 type MockWorkspaceState = {
   workspaces: Array<{
@@ -65,40 +77,61 @@ vi.mock('@/hooks/useAuth', () => ({
   }),
 }));
 
-const mockFiles = [
+const mockFileTree = [
   {
-    filename: 'sample_data/ADO/docs.csv',
-    display_name: 'docs.csv',
-    folder: 'sample_data/ADO',
-    size: 100,
-    created_at: Date.now(),
-    file_type: 'csv',
-    readme: '# ADO Citation\n\nReference text.',
-  },
-  {
-    filename: 'sample_data/ADO/README.md',
-    display_name: 'README.md',
-    folder: 'sample_data/ADO',
-    size: 50,
-    created_at: Date.now(),
-    file_type: 'text',
-    readme: null,
-  },
-  {
-    filename: 'sample_data/Other/no-readme.csv',
-    display_name: 'no-readme.csv',
-    folder: 'sample_data/Other',
-    size: 75,
-    created_at: Date.now(),
-    file_type: 'csv',
-    readme: null,
+    name: 'sample_data',
+    path: 'sample_data',
+    type: 'directory' as const,
+    children: [
+      {
+        name: 'ADO',
+        path: 'sample_data/ADO',
+        type: 'directory' as const,
+        children: [
+          {
+            name: 'README.md',
+            path: 'sample_data/ADO/README.md',
+            type: 'file' as const,
+            size: 48,
+          },
+          {
+            name: 'docs.csv',
+            path: 'sample_data/ADO/docs.csv',
+            type: 'file' as const,
+            size: 100,
+          },
+        ],
+      },
+      {
+        name: 'Other',
+        path: 'sample_data/Other',
+        type: 'directory' as const,
+        children: [
+          {
+            name: 'no-readme.csv',
+            path: 'sample_data/Other/no-readme.csv',
+            type: 'file' as const,
+            size: 75,
+          },
+        ],
+      },
+    ],
   },
 ];
 
+vi.mock('@/api/files', () => ({
+  filesApi: {
+    raw: mockRawFile,
+    createFolder: mockCreateFolder,
+    moveFile: mockMoveFile,
+    importSampleData: vi.fn(),
+    importLdaca: vi.fn(),
+  },
+}));
+
 vi.mock('@/hooks/useFiles', () => ({
   useFiles: () => ({
-    files: mockFiles,
-    fileListResponse: { files: mockFiles, total: mockFiles.length, user_folder: '/tmp/user_data' },
+    fileTree: mockFileTree,
     selectedFile: null,
     setSelectedFile: vi.fn(),
     loadingFiles: false,
@@ -146,6 +179,9 @@ describe('DataLoaderFeature citation UI', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockHandleUploadFile.mockResolvedValue(true);
+    mockRawFile.mockResolvedValue('# ADO Citation\n\nReference text.');
+    mockCreateFolder.mockResolvedValue({ message: 'Folder created', path: 'new-folder' });
+    mockMoveFile.mockResolvedValue({ message: 'File moved', path: 'sample_data/Other/docs.csv' });
     mockWorkspaceState = {
       workspaces: [{ id: 'ws-1', name: 'Main Workspace', description: 'Initial workspace description', created_at: '2024-01-01', updated_at: '2024-01-02', dataframe_count: 0 }],
       currentWorkspaceId: 'ws-1',
@@ -153,24 +189,114 @@ describe('DataLoaderFeature citation UI', () => {
     };
   });
 
-  it('shows inline citation icon only for files with readme and opens citation dialog', async () => {
+  it('shows folder citation icons only for directories with readme and opens citation dialog', async () => {
     const user = userEvent.setup();
     renderWithProviders(<DataLoaderFeature />);
 
     const citationButtons = screen.getAllByLabelText(/view citation/i);
     expect(citationButtons).toHaveLength(1);
+    expect(screen.queryByText('README.md')).not.toBeInTheDocument();
 
     await user.click(citationButtons[0]);
 
+    await waitFor(() => {
+      expect(mockRawFile).toHaveBeenCalledWith('sample_data/ADO/README.md', {});
+    });
     expect(screen.getByRole('heading', { name: 'Citation' })).toBeInTheDocument();
     expect(screen.getByText('ADO Citation')).toBeInTheDocument();
     expect(screen.getByText('Reference text.')).toBeInTheDocument();
   });
 
+  it('creates a root folder from the top-level add folder button', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DataLoaderFeature />);
+
+    fireEvent.click(getVisibleMatch(screen.getAllByRole('button', { name: /add root folder/i })));
+    await user.type(screen.getByLabelText(/folder name/i), 'Research Notes');
+    fireEvent.click(screen.getByRole('button', { name: /^create folder$/i }));
+
+    await waitFor(() => {
+      expect(mockCreateFolder).toHaveBeenCalledWith('', 'Research Notes', {});
+    });
+  });
+
+  it('creates a subfolder from a directory row action', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DataLoaderFeature />);
+
+    fireEvent.click(getVisibleMatch(screen.getAllByRole('button', { name: /add folder inside ado/i })));
+    await user.type(screen.getByLabelText(/folder name/i), 'Transcripts');
+    fireEvent.click(screen.getByRole('button', { name: /^create folder$/i }));
+
+    await waitFor(() => {
+      expect(mockCreateFolder).toHaveBeenCalledWith('sample_data/ADO', 'Transcripts', {});
+    });
+  });
+
+  it('moves a dragged file when dropped on a folder row', async () => {
+    renderWithProviders(<DataLoaderFeature />);
+
+    const draggedFileRow = getVisibleMatch(screen.getAllByTestId('file-row-sample_data/ADO/docs.csv'));
+    const targetFolderRow = getVisibleMatch(screen.getAllByTestId('folder-row-sample_data/Other'));
+    let currentDragPath = 'sample_data/ADO/docs.csv';
+
+    const dataTransfer = {
+      effectAllowed: 'move',
+      dropEffect: 'move',
+      setData: vi.fn(),
+      getData: vi.fn((type: string) => type === 'application/x-ldaca-file-path' ? currentDragPath : ''),
+      types: ['application/x-ldaca-file-path', 'text/plain'],
+    };
+
+    fireEvent.dragStart(draggedFileRow, { dataTransfer });
+    currentDragPath = '';
+    fireEvent.dragOver(targetFolderRow, { dataTransfer });
+
+    await waitFor(() => {
+      expect(targetFolderRow.className).toContain('bg-primary/10');
+    });
+
+    fireEvent.drop(targetFolderRow, { dataTransfer });
+
+    await waitFor(() => {
+      expect(mockMoveFile).toHaveBeenCalledWith('sample_data/ADO/docs.csv', 'sample_data/Other', {});
+    });
+  });
+
+  it('moves a dragged file when dropped on a file row inside a folder', async () => {
+    renderWithProviders(<DataLoaderFeature />);
+
+    const draggedFileRow = getVisibleMatch(screen.getAllByTestId('file-row-sample_data/ADO/docs.csv'));
+    const targetFileRow = getVisibleMatch(screen.getAllByTestId('file-row-sample_data/Other/no-readme.csv'));
+    let currentDragPath = 'sample_data/ADO/docs.csv';
+
+    const dataTransfer = {
+      effectAllowed: 'move',
+      dropEffect: 'move',
+      setData: vi.fn(),
+      getData: vi.fn((type: string) => type === 'application/x-ldaca-file-path' ? currentDragPath : ''),
+      types: ['application/x-ldaca-file-path', 'text/plain'],
+    };
+
+    fireEvent.dragStart(draggedFileRow, { dataTransfer });
+    currentDragPath = '';
+    fireEvent.dragOver(targetFileRow, { dataTransfer });
+
+    await waitFor(() => {
+      expect(targetFileRow.className).toContain('bg-primary/10');
+    });
+
+    fireEvent.drop(targetFileRow, { dataTransfer });
+
+    await waitFor(() => {
+      expect(mockMoveFile).toHaveBeenCalledWith('sample_data/ADO/docs.csv', 'sample_data/Other', {});
+    });
+  });
+
   it('renders workspace upload and download controls', () => {
     renderWithProviders(<DataLoaderFeature />);
 
-    expect(screen.getByRole('button', { name: /upload workspace/i })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /upload workspace/i }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole('button', { name: /download/i }).length).toBeGreaterThan(0);
     expect(screen.getAllByText('0 data blocks').length).toBeGreaterThan(0);
     expect(screen.queryByRole('button', { name: /save as/i })).not.toBeInTheDocument();

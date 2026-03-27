@@ -12,7 +12,7 @@ import { queryKeys } from '../../../lib/queryKeys';
 import { filesApi } from '../../../api/files';
 import { workspacesApi } from '../../../api/workspaces';
 import { useAnalysisStore, type TaskItem } from '../../../stores/analysisStore';
-import { type FileInfo } from '../../../types';
+import { type FileTreeDirectory, type FileTreeFile, type FileTreeNode } from '../../../types';
 import { AddFilePanel, FilePreviewPanel } from '../../../components/panels';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Button } from '../../../components/ui/button';
@@ -49,6 +49,14 @@ import {
 } from '../../../components/ui/dropdown-menu';
 import HelpIcon from '../../../components/help/HelpIcon';
 
+const README_FILENAME = 'README.md';
+const FILE_DRAG_MIME_TYPE = 'application/x-ldaca-file-path';
+
+type FileMoveTarget = {
+  key: string;
+  directoryPath: string;
+};
+
 const formatBytes = (bytes?: number | null): string => {
   if (!bytes || Number.isNaN(bytes)) return '—';
   const units = ['B', 'KB', 'MB', 'GB', 'TB'];
@@ -79,78 +87,25 @@ const getWorkspaceId = (workspace: { id?: string; unique_id?: string }): string 
   return null;
 };
 
-type FileTreeFolder = { name: string; path: string; children: FileTreeNode[] };
-type FileTreeFile = { file: FileInfo };
-type FileTreeNode = FileTreeFolder | FileTreeFile;
-
-function buildFileTree(files: FileInfo[]): FileTreeNode[] {
-  const folderMap = new Map<string, FileInfo[]>();
-  const rootFiles: FileInfo[] = [];
-
-  for (const file of files) {
-    const folder = file.folder?.trim();
-    if (folder) {
-      const existing = folderMap.get(folder);
-      if (existing) {
-        existing.push(file);
-      } else {
-        folderMap.set(folder, [file]);
-      }
-    } else {
-      rootFiles.push(file);
-    }
-  }
-
-  // Build nested folder structure from paths like "sample_data/ADO"
-  const root: FileTreeNode[] = [];
-  const folderNodes = new Map<string, FileTreeFolder>();
-
-  const getOrCreateFolder = (path: string): FileTreeFolder => {
-    const existing = folderNodes.get(path);
-    if (existing) return existing;
-
-    const parts = path.split('/');
-    const name = parts[parts.length - 1];
-    const node: FileTreeFolder = { name, path, children: [] };
-    folderNodes.set(path, node);
-
-    if (parts.length > 1) {
-      const parentPath = parts.slice(0, -1).join('/');
-      const parent = getOrCreateFolder(parentPath);
-      parent.children.push(node);
-    } else {
-      root.push(node);
-    }
-    return node;
-  };
-
-  for (const [folderPath, folderFiles] of folderMap) {
-    const folder = getOrCreateFolder(folderPath);
-    for (const f of folderFiles.sort((a, b) => (a.display_name || a.filename).localeCompare(b.display_name || b.filename))) {
-      folder.children.push({ file: f });
-    }
-  }
-
-  for (const f of rootFiles.sort((a, b) => (a.display_name || a.filename).localeCompare(b.display_name || b.filename))) {
-    root.push({ file: f });
-  }
-
-  // Sort root: folders first, then files
-  root.sort((a, b) => {
-    const aIsFolder = 'children' in a ? 0 : 1;
-    const bIsFolder = 'children' in b ? 0 : 1;
-    if (aIsFolder !== bIsFolder) return aIsFolder - bIsFolder;
-    const aName = 'children' in a ? a.name : (a.file.display_name || a.file.filename);
-    const bName = 'children' in b ? b.name : (b.file.display_name || b.file.filename);
-    return aName.localeCompare(bName);
-  });
-
-  return root;
+function countFilesInNode(node: FileTreeNode): number {
+  if (node.type === 'file') return node.name.toLowerCase() === README_FILENAME.toLowerCase() ? 0 : 1;
+  return node.children.reduce((sum, child) => sum + countFilesInNode(child), 0);
 }
 
-function countFilesInNode(node: FileTreeNode): number {
-  if ('file' in node) return 1;
-  return node.children.reduce((sum, child) => sum + countFilesInNode(child), 0);
+function getCitationFile(directory: FileTreeDirectory): FileTreeFile | null {
+  const child = directory.children.find(
+    (candidate): candidate is FileTreeFile => candidate.type === 'file' && candidate.name.toLowerCase() === README_FILENAME.toLowerCase(),
+  );
+  return child ?? null;
+}
+
+function getVisibleDirectoryChildren(directory: FileTreeDirectory): FileTreeNode[] {
+  return directory.children.filter((child) => child.type !== 'file' || child.name.toLowerCase() !== README_FILENAME.toLowerCase());
+}
+
+function getParentDirectoryPath(filePath: string): string {
+  const lastSlashIndex = filePath.lastIndexOf('/');
+  return lastSlashIndex === -1 ? '' : filePath.slice(0, lastSlashIndex);
 }
 
 const MAX_FILE_TREE_HEIGHT_REM = 40;
@@ -164,8 +119,7 @@ export const DataLoaderFeature: React.FC = () => {
   const authHeaders = getAuthHeaders();
 
   const {
-    files,
-    fileListResponse,
+    fileTree,
     selectedFile,
     setSelectedFile,
     loadingFiles,
@@ -191,7 +145,18 @@ export const DataLoaderFeature: React.FC = () => {
   const [ldacaImportOpen, setLdacaImportOpen] = useState(false);
   const [ldacaUrl, setLdacaUrl] = useState('');
   const [ldacaImporting, setLdacaImporting] = useState(false);
-  const [citationFile, setCitationFile] = useState<FileInfo | null>(null);
+  const [citationDirectory, setCitationDirectory] = useState<FileTreeDirectory | null>(null);
+  const [citationPath, setCitationPath] = useState<string | null>(null);
+  const [citationContent, setCitationContent] = useState<string | null>(null);
+  const [citationLoading, setCitationLoading] = useState(false);
+  const [createFolderOpen, setCreateFolderOpen] = useState(false);
+  const [createFolderParentPath, setCreateFolderParentPath] = useState('');
+  const [createFolderParentLabel, setCreateFolderParentLabel] = useState('root');
+  const [newFolderName, setNewFolderName] = useState('');
+  const [creatingFolder, setCreatingFolder] = useState(false);
+  const [folderNameAlert, setFolderNameAlert] = useState<string | null>(null);
+  const [draggingFilePath, setDraggingFilePath] = useState<string | null>(null);
+  const [fileMoveTarget, setFileMoveTarget] = useState<FileMoveTarget | null>(null);
   const [refreshingWorkspaces, setRefreshingWorkspaces] = useState(false);
   const [refreshingFiles, setRefreshingFiles] = useState(false);
   const [uploadingFiles, setUploadingFiles] = useState(false);
@@ -249,8 +214,7 @@ export const DataLoaderFeature: React.FC = () => {
     return (bTime || 0) - (aTime || 0);
   });
 
-  const sortedFiles = [...files].sort((a: FileInfo, b: FileInfo) => a.filename.localeCompare(b.filename));
-  const fileTree = buildFileTree(sortedFiles);
+  const totalFileCount = fileTree.reduce((sum, node) => sum + countFilesInNode(node), 0);
 
   const currentWorkspace = workspaces.find((ws) => getWorkspaceId(ws) === currentWorkspaceId) || null;
   const normalizedCurrentDescription = (currentWorkspace?.description || '').trim();
@@ -474,6 +438,147 @@ export const DataLoaderFeature: React.FC = () => {
     }
   };
 
+  const openCreateFolderDialog = (parentPath: string, parentLabel: string) => {
+    setCreateFolderParentPath(parentPath);
+    setCreateFolderParentLabel(parentLabel);
+    setNewFolderName('');
+    setFolderNameAlert(null);
+    setCreateFolderOpen(true);
+  };
+
+  const handleCreateFolder = async () => {
+    const trimmedName = newFolderName.trim();
+    if (!trimmedName) {
+      return;
+    }
+
+    setCreatingFolder(true);
+    try {
+      await filesApi.createFolder(createFolderParentPath, trimmedName, authHeaders);
+      await refetchFiles();
+      notify('success', `Folder "${trimmedName}" created.`);
+      setCreateFolderOpen(false);
+      setNewFolderName('');
+    } catch (error) {
+      const message = (error as { message?: string })?.message || 'Failed to create folder.';
+      if (message.toLowerCase().includes('invalid folder name')) {
+        setFolderNameAlert(message);
+        return;
+      }
+      notify('error', message);
+    } finally {
+      setCreatingFolder(false);
+    }
+  };
+
+  const getDraggedFilePath = (event: React.DragEvent<HTMLElement>): string | null => {
+    const customPath = event.dataTransfer.getData(FILE_DRAG_MIME_TYPE);
+    if (customPath) {
+      return customPath;
+    }
+
+    const plainTextPath = event.dataTransfer.getData('text/plain');
+    return plainTextPath || draggingFilePath;
+  };
+
+  const canDropFileIntoDirectory = (sourcePath: string | null, targetDirectoryPath: string): boolean => {
+    if (!sourcePath) {
+      return false;
+    }
+
+    return getParentDirectoryPath(sourcePath) !== targetDirectoryPath;
+  };
+
+  const handleTreeFileDragStart = (event: React.DragEvent<HTMLDivElement>, filePath: string) => {
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData(FILE_DRAG_MIME_TYPE, filePath);
+    event.dataTransfer.setData('text/plain', filePath);
+    setDraggingFilePath(filePath);
+    setFileMoveTarget(null);
+  };
+
+  const handleTreeFileDragEnd = () => {
+    setDraggingFilePath(null);
+    setFileMoveTarget(null);
+  };
+
+  const isFileMoveTargetActive = (targetKey: string, targetDirectoryPath: string): boolean => {
+    return (
+      fileMoveTarget?.key === targetKey &&
+      fileMoveTarget.directoryPath === targetDirectoryPath &&
+      canDropFileIntoDirectory(draggingFilePath, targetDirectoryPath)
+    );
+  };
+
+  const handleDirectoryDragOver = (
+    targetKey: string,
+    targetDirectoryPath: string,
+    event: React.DragEvent<HTMLElement>,
+  ) => {
+    const sourcePath = getDraggedFilePath(event);
+    if (!canDropFileIntoDirectory(sourcePath, targetDirectoryPath)) {
+      return;
+    }
+
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    setFileMoveTarget({ key: targetKey, directoryPath: targetDirectoryPath });
+  };
+
+  const handleDirectoryDragLeave = (targetKey: string, event: React.DragEvent<HTMLElement>) => {
+    const relatedTarget = event.relatedTarget;
+    if (relatedTarget instanceof Node && event.currentTarget.contains(relatedTarget)) {
+      return;
+    }
+
+    setFileMoveTarget((currentTarget) => currentTarget?.key === targetKey ? null : currentTarget);
+  };
+
+  const handleDirectoryDrop = async (targetDirectoryPath: string, event: React.DragEvent<HTMLElement>) => {
+    const sourcePath = getDraggedFilePath(event);
+    if (!canDropFileIntoDirectory(sourcePath, targetDirectoryPath)) {
+      return;
+    }
+
+    if (!sourcePath) {
+      return;
+    }
+
+    event.preventDefault();
+  setFileMoveTarget(null);
+    setDraggingFilePath(null);
+
+    try {
+      await filesApi.moveFile(sourcePath, targetDirectoryPath, authHeaders);
+      await refetchFiles();
+      notify('success', `Moved ${sourcePath.split('/').at(-1)}.`);
+    } catch (error) {
+      notify('error', (error as Error).message || 'Failed to move file.');
+    }
+  };
+
+  const openCitation = async (directory: FileTreeDirectory, readmePath: string | null) => {
+    if (!readmePath) {
+      setCitationDirectory(directory);
+      setCitationPath(null);
+      setCitationContent(null);
+      return;
+    }
+
+    setCitationDirectory(directory);
+    setCitationPath(readmePath);
+    setCitationContent(null);
+    setCitationLoading(true);
+    try {
+      const rawContent = await filesApi.raw(readmePath, authHeaders);
+      setCitationContent(rawContent);
+    } catch (error) {
+      notify('error', (error as Error).message || 'Failed to load citation.');
+    } finally {
+      setCitationLoading(false);
+    }
+  };
+
   const openFilePicker = () => {
     fileInputRef.current?.click();
   };
@@ -581,14 +686,27 @@ export const DataLoaderFeature: React.FC = () => {
     }
   };
 
-  const workspaceFolder = fileListResponse?.user_folder || dataFolder || 'data/';
+  const workspaceFolder = dataFolder || 'data/';
   const workspaceBusy = isLoading.workspaces || isLoading.currentWorkspace;
 
-  const renderFileItem = (file: FileInfo) => (
+  const renderFileItem = (file: FileTreeFile, parentDirectoryPath: string) => (
     <div
-      key={file.filename}
+      key={file.path}
+      draggable
+      data-file-path={file.path}
+      data-testid={`file-row-${file.path}`}
+      onDragStart={(event) => handleTreeFileDragStart(event, file.path)}
+      onDragEnd={handleTreeFileDragEnd}
+      onDragEnter={(event) => handleDirectoryDragOver(`file:${file.path}`, parentDirectoryPath, event)}
+      onDragOver={(event) => handleDirectoryDragOver(`file:${file.path}`, parentDirectoryPath, event)}
+      onDragLeave={(event) => handleDirectoryDragLeave(`file:${file.path}`, event)}
+      onDrop={(event) => void handleDirectoryDrop(parentDirectoryPath, event)}
       className={`group flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-accent/50 ${
-        selectedFile === file.filename ? 'bg-muted/50' : ''
+        selectedFile === file.path ? 'bg-muted/50' : ''
+      } ${
+        isFileMoveTargetActive(`file:${file.path}`, parentDirectoryPath)
+          ? 'bg-primary/10 ring-1 ring-primary/30'
+          : ''
       }`}
     >
       <FileIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -596,29 +714,15 @@ export const DataLoaderFeature: React.FC = () => {
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             <span className="truncate text-sm font-medium text-foreground">
-              {file.display_name || file.filename}
+              {file.name}
             </span>
-            {Boolean(file.readme?.trim()) && (file.display_name || '').toLowerCase() !== 'readme.md' && (
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-5 w-5 shrink-0 text-muted-foreground hover:text-foreground"
-                aria-label={`View citation for ${file.display_name || file.filename}`}
-                title="View citation"
-                onClick={() => setCitationFile(file)}
-              >
-                <Quote className="h-3 w-3" />
-              </Button>
-            )}
           </div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <span>{formatBytes(file.size)}</span>
-            <span className="hidden sm:inline">·</span>
-            <span className="hidden sm:inline">{formatTimestamp(file.modified)}</span>
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setPreviewFile(file.filename)}>
+          <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setPreviewFile(file.path)}>
             <Eye className="h-3.5 w-3.5" />
             <span className="hidden lg:inline">Preview</span>
           </Button>
@@ -632,14 +736,14 @@ export const DataLoaderFeature: React.FC = () => {
                 setWorkspaceAlertOpen(true);
                 return;
               }
-              setAddFileName(file.filename);
-              setSelectedFile(file.filename);
+              setAddFileName(file.path);
+              setSelectedFile(file.path);
             }}
           >
             <Plus className="h-3.5 w-3.5" />
             <span className="hidden lg:inline">Add</span>
           </Button>
-          <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => handleDownloadFile(file.filename)}>
+          <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => handleDownloadFile(file.path)}>
             <DownloadIcon className="h-3.5 w-3.5" />
             <span className="hidden xl:inline">Download</span>
           </Button>
@@ -647,7 +751,7 @@ export const DataLoaderFeature: React.FC = () => {
             size="sm"
             variant="ghost"
             className="h-7 px-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
-            onClick={() => handleDeleteFile(file.filename)}
+            onClick={() => handleDeleteFile(file.path)}
             disabled={fileActionInFlight}
           >
             <Trash2 className="h-3.5 w-3.5" />
@@ -658,30 +762,72 @@ export const DataLoaderFeature: React.FC = () => {
   );
 
   const renderFileTreeNode = (node: FileTreeNode): React.ReactNode => {
-    if ('file' in node) {
-      return renderFileItem(node.file);
+    if (node.type === 'file') {
+      return renderFileItem(node, getParentDirectoryPath(node.path));
     }
 
     const fileCount = countFilesInNode(node);
+    const citationFile = getCitationFile(node);
+    const visibleChildren = getVisibleDirectoryChildren(node);
     return (
       <Collapsible key={node.path} defaultOpen>
-        <CollapsibleTrigger asChild>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="group/folder w-full justify-start gap-1 transition-none hover:bg-accent hover:text-accent-foreground"
+        <div
+          className={`flex items-center gap-1 rounded-md pr-1 hover:bg-accent/50 ${
+            isFileMoveTargetActive(`folder:${node.path}`, node.path)
+              ? 'bg-primary/10 ring-1 ring-primary/30'
+              : ''
+          }`}
+          data-folder-path={node.path}
+          data-testid={`folder-row-${node.path}`}
+          onDragEnter={(event) => handleDirectoryDragOver(`folder:${node.path}`, node.path, event)}
+          onDragOver={(event) => handleDirectoryDragOver(`folder:${node.path}`, node.path, event)}
+          onDragLeave={(event) => handleDirectoryDragLeave(`folder:${node.path}`, event)}
+          onDrop={(event) => void handleDirectoryDrop(node.path, event)}
+        >
+          <div
+            className="flex min-w-0 flex-1 items-center gap-1 rounded-md"
           >
-            <ChevronRightIcon className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]/folder:rotate-90" />
-            <FolderIcon className="h-4 w-4 shrink-0" />
-            <span className="truncate">{node.name}</span>
-            <Badge variant="secondary" className="ml-auto text-[10px]">
-              {fileCount}
-            </Badge>
+            <CollapsibleTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="group h-8 min-w-0 justify-start gap-1 px-2 transition-none hover:bg-transparent hover:text-accent-foreground"
+              >
+                <ChevronRightIcon className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-90" />
+                <FolderIcon className="h-4 w-4 shrink-0" />
+                <span className="truncate">{node.name}</span>
+              </Button>
+            </CollapsibleTrigger>
+            {citationFile ? (
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
+                aria-label={`View citation for ${node.name}`}
+                title="View citation"
+                onClick={() => void openCitation(node, citationFile.path)}
+              >
+                <Quote className="h-3.5 w-3.5" />
+              </Button>
+            ) : null}
+          </div>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
+            aria-label={`Add folder inside ${node.name}`}
+            title={`Add folder inside ${node.name}`}
+            onClick={() => openCreateFolderDialog(node.path, node.name)}
+          >
+            <FolderPlus className="h-3.5 w-3.5" />
           </Button>
-        </CollapsibleTrigger>
+          <Badge variant="secondary" className="text-[10px]">
+            {fileCount}
+          </Badge>
+        </div>
         <CollapsibleContent className="ml-5">
           <div className="flex flex-col gap-0.5 border-l border-border/40 pl-2">
-            {node.children.map((child) => renderFileTreeNode(child))}
+            {visibleChildren.map((child) => renderFileTreeNode(child))}
           </div>
         </CollapsibleContent>
       </Collapsible>
@@ -1015,12 +1161,40 @@ export const DataLoaderFeature: React.FC = () => {
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" /> Loading files…
               </div>
-            ) : sortedFiles.length === 0 ? (
-              <div className={`rounded-md border px-4 py-3 text-sm ${isFileDropActive ? 'border-primary text-foreground' : 'border-dashed border-muted-foreground/60 text-muted-foreground'}`}>
-                {isFileDropActive ? 'Drop files here to upload them.' : 'No files found. Upload a dataset to begin.'}
+            ) : totalFileCount === 0 ? (
+              <div className={`overflow-hidden rounded-md border ${isFileDropActive ? 'border-primary text-foreground' : 'border-dashed border-muted-foreground/60 text-muted-foreground'}`}>
+                <div className="flex items-center justify-start border-b border-border/60 px-2 py-1.5">
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
+                    onClick={() => openCreateFolderDialog('', 'root')}
+                    disabled={creatingFolder}
+                    aria-label="Add root folder"
+                    title="Add root folder"
+                  >
+                    <FolderPlus className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+                <div className="px-4 py-3 text-sm">
+                  {isFileDropActive ? 'Drop files here to upload them.' : 'No files found. Upload a dataset to begin.'}
+                </div>
               </div>
             ) : (
               <div className={`overflow-hidden rounded-md border ${isFileDropActive ? 'border-primary' : ''}`}>
+                <div className="flex items-center justify-start border-b border-border/60 px-2 py-1.5">
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
+                    onClick={() => openCreateFolderDialog('', 'root')}
+                    disabled={creatingFolder}
+                    aria-label="Add root folder"
+                    title="Add root folder"
+                  >
+                    <FolderPlus className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
                 <ScrollArea
                   className="w-full"
                   style={{ maxHeight: `${MAX_FILE_TREE_HEIGHT_REM}rem` }}
@@ -1034,7 +1208,7 @@ export const DataLoaderFeature: React.FC = () => {
           </div>
         </CardContent>
         <div className="flex flex-wrap items-center justify-between gap-3 px-6 pb-4 text-xs text-muted-foreground">
-          <div>Total files: {sortedFiles.length}</div>
+          <div>Total files: {totalFileCount}</div>
         </div>
       </Card>
 
@@ -1128,23 +1302,90 @@ export const DataLoaderFeature: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={Boolean(citationFile)} onOpenChange={(open) => !open && setCitationFile(null)}>
+      <Dialog
+        open={createFolderOpen}
+        onOpenChange={(open) => {
+          setCreateFolderOpen(open);
+          if (!open) {
+            setNewFolderName('');
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create folder</DialogTitle>
+            <DialogDescription>
+              {createFolderParentPath ? `Create a subfolder inside ${createFolderParentLabel}.` : 'Create a folder under the root files directory.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="new-folder-name">Folder name</Label>
+              <Input
+                id="new-folder-name"
+                value={newFolderName}
+                onChange={(event) => setNewFolderName(event.target.value)}
+                placeholder="Enter folder name"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateFolderOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreateFolder} disabled={creatingFolder || !newFolderName.trim()}>
+              {creatingFolder ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Create folder
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(citationDirectory)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCitationDirectory(null);
+            setCitationPath(null);
+            setCitationContent(null);
+            setCitationLoading(false);
+          }
+        }}
+      >
         <DialogContent className="max-h-[80vh] max-w-3xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Citation</DialogTitle>
             <DialogDescription>
-              {citationFile ? `Source: ${citationFile.folder || '(root)'} / README.md` : 'Citation metadata'}
+              {citationPath ? `Source: ${citationPath}` : 'Citation metadata'}
             </DialogDescription>
           </DialogHeader>
-          {citationFile?.readme ? (
+          {citationLoading ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading citation…
+            </div>
+          ) : citationContent ? (
             <div className="prose prose-sm max-w-none dark:prose-invert">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{citationFile.readme}</ReactMarkdown>
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{citationContent}</ReactMarkdown>
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">No citation available for this file.</p>
+            <p className="text-sm text-muted-foreground">No citation available for this folder.</p>
           )}
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={Boolean(folderNameAlert)} onOpenChange={(open: boolean) => !open && setFolderNameAlert(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Invalid folder name</AlertDialogTitle>
+            <AlertDialogDescription>
+              {folderNameAlert || 'Folder names cannot include path separators or traversal sequences.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setFolderNameAlert(null)}>Got it</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
