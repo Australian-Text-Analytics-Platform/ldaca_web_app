@@ -2,11 +2,11 @@
 
 [← Back to tutorial index](./index.md)
 
-<h1>Data Structuring tutorial</h1>
+<h1>Data Preprocessing tutorial</h1>
 
 ![Preprocessing screenshot](tutorials/assets/preprocessing.png)
 
-Data Structuring turns raw text data into analysis-ready datasets. Each sub-tab helps you shape data in a focused way, and every action creates a **new data block** so you can compare results without overwriting the original.
+Data Preprocessing turns raw text data into analysis-ready datasets. Each sub-tab helps you shape data in a focused way, and every action creates a **new data block** so you can compare results without overwriting the original.
 
 Use this workflow in any tab:
 

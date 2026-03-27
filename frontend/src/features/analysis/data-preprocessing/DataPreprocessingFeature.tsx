@@ -46,7 +46,7 @@ const DataPreprocessingFeature: React.FC = () => {
     <div className="space-y-6">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Data Structuring</h1>
+          <h1 className="text-2xl font-semibold text-foreground">Data Preprocessing</h1>
           <p className="text-sm text-muted-foreground">
             Prepare your dataset with filtering, slicing, join, stack, replace, and create tools.
           </p>
@@ -58,7 +58,7 @@ const DataPreprocessingFeature: React.FC = () => {
         onValueChange={(value) => setActiveSubtab(value as DataPrepSubtab)}
         className="space-y-6"
       >
-        <TabsList aria-label="Data structuring sub-views" className="flex flex-wrap gap-2">
+        <TabsList aria-label="Data preprocessing sub-views" className="flex flex-wrap gap-2">
           <TabsTrigger value="filter">Filter</TabsTrigger>
           <TabsTrigger value="slice">Slice</TabsTrigger>
           <TabsTrigger value="join">Join</TabsTrigger>

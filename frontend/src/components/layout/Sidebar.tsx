@@ -78,7 +78,7 @@ const MIN_SECTION_HEIGHT = 120;
 
 const NAV_ITEMS: NavItem[] = [
   { id: 'data-loader', label: 'Data Loader', icon: FolderOpen },
-  { id: 'filter', label: 'Data Structuring', icon: Filter },
+  { id: 'filter', label: 'Data Preprocessing', icon: Filter },
   { id: 'token-frequency', label: 'Token Frequency', icon: TrendingUp },
   { id: 'concordance', label: 'Concordance', icon: FileText },
   { id: 'analysis', label: 'Sequential Analysis', icon: BarChart3 },
