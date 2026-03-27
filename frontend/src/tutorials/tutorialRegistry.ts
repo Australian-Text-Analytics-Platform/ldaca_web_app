@@ -48,7 +48,7 @@ const registry: Record<string, TutorialTarget> = {
   'data-loader.upload.button': {
     file: 'tutorials/data-loader.md',
     anchor: 'help-data-loader-upload-button',
-    label: 'Upload file',
+    label: 'Upload files',
   },
   'data-loader.import-sample.button': {
     file: 'tutorials/data-loader.md',

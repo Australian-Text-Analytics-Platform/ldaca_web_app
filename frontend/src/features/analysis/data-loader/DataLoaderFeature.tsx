@@ -194,6 +194,8 @@ export const DataLoaderFeature: React.FC = () => {
   const [citationFile, setCitationFile] = useState<FileInfo | null>(null);
   const [refreshingWorkspaces, setRefreshingWorkspaces] = useState(false);
   const [refreshingFiles, setRefreshingFiles] = useState(false);
+  const [uploadingFiles, setUploadingFiles] = useState(false);
+  const [isFileDropActive, setIsFileDropActive] = useState(false);
   const [uploadingWorkspaceZip, setUploadingWorkspaceZip] = useState(false);
   const [downloadingWorkspaceId, setDownloadingWorkspaceId] = useState<string | null>(null);
   const [pendingDownloads, setPendingDownloads] = useState<Record<string, { taskId: string; workspaceName: string }>>({});
@@ -476,16 +478,90 @@ export const DataLoaderFeature: React.FC = () => {
     fileInputRef.current?.click();
   };
 
-  const handleFileInputChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const uploadSelectedFiles = async (filesToUpload: FileList | File[] | null | undefined) => {
+    const selectedFiles = Array.from(filesToUpload ?? []);
+    if (selectedFiles.length === 0) {
+      return;
+    }
+
+    setUploadingFiles(true);
+    let uploadedCount = 0;
+    const failedFiles: string[] = [];
+
     try {
-      const success = await handleUploadFile(file);
-      if (success) {
-        notify('success', `Uploaded ${file.name}.`);
-      } else {
-        notify('error', 'Upload failed.');
+      for (const file of selectedFiles) {
+        try {
+          const success = await handleUploadFile(file);
+          if (success) {
+            uploadedCount += 1;
+          } else {
+            failedFiles.push(file.name);
+          }
+        } catch {
+          failedFiles.push(file.name);
+        }
       }
+
+      if (failedFiles.length === 0) {
+        if (uploadedCount === 1) {
+          notify('success', `Uploaded ${selectedFiles[0]?.name}.`);
+        } else {
+          notify('success', `Uploaded ${uploadedCount} files.`);
+        }
+        return;
+      }
+
+      if (uploadedCount === 0) {
+        notify('error', `Failed to upload ${failedFiles.length === 1 ? failedFiles[0] : `${failedFiles.length} files`}.`);
+        return;
+      }
+
+      notify('error', `Uploaded ${uploadedCount} of ${selectedFiles.length} files. Failed: ${failedFiles.join(', ')}.`);
+    } finally {
+      setUploadingFiles(false);
+    }
+  };
+
+  const isFileDrag = (event: React.DragEvent<HTMLElement>) => {
+    return Array.from(event.dataTransfer?.types ?? []).includes('Files');
+  };
+
+  const handleFileAreaDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    if (!isFileDrag(event)) {
+      return;
+    }
+
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+    setIsFileDropActive(true);
+  };
+
+  const handleFileAreaDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
+    if (!isFileDrag(event)) {
+      return;
+    }
+
+    const relatedTarget = event.relatedTarget;
+    if (relatedTarget instanceof Node && event.currentTarget.contains(relatedTarget)) {
+      return;
+    }
+
+    setIsFileDropActive(false);
+  };
+
+  const handleFileAreaDrop = async (event: React.DragEvent<HTMLDivElement>) => {
+    if (!isFileDrag(event)) {
+      return;
+    }
+
+    event.preventDefault();
+    setIsFileDropActive(false);
+    await uploadSelectedFiles(event.dataTransfer.files);
+  };
+
+  const handleFileInputChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      await uploadSelectedFiles(event.target.files);
     } catch (error) {
       notify('error', (error as Error).message || 'Upload failed.');
     } finally {
@@ -892,10 +968,10 @@ export const DataLoaderFeature: React.FC = () => {
         <CardContent className="space-y-4">
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-1">
-              <Button onClick={openFilePicker} disabled={uploading}>
-                <Upload className="mr-2 h-4 w-4" /> {uploading ? 'Uploading…' : 'Upload file'}
+              <Button onClick={openFilePicker} disabled={uploading || uploadingFiles}>
+                <Upload className="mr-2 h-4 w-4" /> {uploading || uploadingFiles ? 'Uploading…' : 'Upload files'}
               </Button>
-              <HelpIcon targetKey="data-loader.upload.button" label="Upload file" />
+              <HelpIcon targetKey="data-loader.upload.button" label="Upload files" />
             </div>
             <div className="flex items-center gap-1">
               <Button variant="outline" onClick={handleImportSampleData} disabled={importingSamples}>
@@ -912,7 +988,9 @@ export const DataLoaderFeature: React.FC = () => {
             <input
               ref={fileInputRef}
               type="file"
+              aria-label="Upload files"
               className="hidden"
+              multiple
               onChange={handleFileInputChange}
             />
             <div className="text-xs text-muted-foreground">
@@ -920,26 +998,40 @@ export const DataLoaderFeature: React.FC = () => {
             </div>
           </div>
 
-          {loadingFiles ? (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" /> Loading files…
-            </div>
-          ) : sortedFiles.length === 0 ? (
-            <div className="rounded-md border border-dashed border-muted-foreground/60 px-4 py-3 text-sm text-muted-foreground">
-              No files found. Upload a dataset to begin.
-            </div>
-          ) : (
-            <div className="overflow-hidden rounded-md border">
-              <ScrollArea
-                className="w-full"
-                style={{ maxHeight: `${MAX_FILE_TREE_HEIGHT_REM}rem` }}
-              >
-                <div className="flex flex-col gap-0.5 p-2">
-                  {fileTree.map((node) => renderFileTreeNode(node))}
-                </div>
-              </ScrollArea>
-            </div>
-          )}
+          <div className="text-xs text-muted-foreground">
+            Drag multiple files into the file list to upload them, or use Upload files to select several at once.
+          </div>
+
+          <div
+            role="region"
+            aria-label="Files upload area"
+            onDragEnter={handleFileAreaDragOver}
+            onDragOver={handleFileAreaDragOver}
+            onDragLeave={handleFileAreaDragLeave}
+            onDrop={handleFileAreaDrop}
+            className={`rounded-md transition-colors ${isFileDropActive ? 'border border-primary bg-primary/5 ring-2 ring-primary/20' : ''}`}
+          >
+            {loadingFiles ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" /> Loading files…
+              </div>
+            ) : sortedFiles.length === 0 ? (
+              <div className={`rounded-md border px-4 py-3 text-sm ${isFileDropActive ? 'border-primary text-foreground' : 'border-dashed border-muted-foreground/60 text-muted-foreground'}`}>
+                {isFileDropActive ? 'Drop files here to upload them.' : 'No files found. Upload a dataset to begin.'}
+              </div>
+            ) : (
+              <div className={`overflow-hidden rounded-md border ${isFileDropActive ? 'border-primary' : ''}`}>
+                <ScrollArea
+                  className="w-full"
+                  style={{ maxHeight: `${MAX_FILE_TREE_HEIGHT_REM}rem` }}
+                >
+                  <div className="flex flex-col gap-0.5 p-2">
+                    {fileTree.map((node) => renderFileTreeNode(node))}
+                  </div>
+                </ScrollArea>
+              </div>
+            )}
+          </div>
         </CardContent>
         <div className="flex flex-wrap items-center justify-between gap-3 px-6 pb-4 text-xs text-muted-foreground">
           <div>Total files: {sortedFiles.length}</div>

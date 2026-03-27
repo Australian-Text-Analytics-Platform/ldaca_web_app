@@ -1,12 +1,13 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import DataLoaderFeature from '../DataLoaderFeature';
 
 const mockSetCurrentWorkspace = vi.fn();
 const mockUpdateWorkspaceDescription = vi.fn();
+const mockHandleUploadFile = vi.fn();
 
 type MockWorkspaceState = {
   workspaces: Array<{
@@ -103,7 +104,7 @@ vi.mock('@/hooks/useFiles', () => ({
     loadingFiles: false,
     loading: false,
     uploading: false,
-    handleUploadFile: vi.fn(),
+    handleUploadFile: mockHandleUploadFile,
     handleDeleteFile: vi.fn(),
     handleDownloadFile: vi.fn(),
     refetchFiles: vi.fn(),
@@ -144,6 +145,7 @@ describe('DataLoaderFeature citation UI', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockHandleUploadFile.mockResolvedValue(true);
     mockWorkspaceState = {
       workspaces: [{ id: 'ws-1', name: 'Main Workspace', description: 'Initial workspace description', created_at: '2024-01-01', updated_at: '2024-01-02', dataframe_count: 0 }],
       currentWorkspaceId: 'ws-1',
@@ -228,5 +230,50 @@ describe('DataLoaderFeature citation UI', () => {
     expect(createWorkspaceButton).toBeInTheDocument();
     expect(within(createWorkspaceCard).queryByPlaceholderText('Enter new name')).not.toBeInTheDocument();
     expect(within(createWorkspaceCard).queryByLabelText('Workspace description')).not.toBeInTheDocument();
+  });
+
+  it('allows selecting multiple files from the upload picker', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DataLoaderFeature />);
+
+    const uploadInput = screen.getAllByLabelText(/upload files/i, { selector: 'input' }).at(-1);
+    expect(uploadInput).toBeDefined();
+    expect(uploadInput).toHaveAttribute('multiple');
+
+    const firstFile = new File(['alpha'], 'first.csv', { type: 'text/csv' });
+    const secondFile = new File(['beta'], 'second.csv', { type: 'text/csv' });
+
+    await user.upload(uploadInput!, [firstFile, secondFile]);
+
+    await waitFor(() => expect(mockHandleUploadFile).toHaveBeenCalledTimes(2));
+    expect(mockHandleUploadFile).toHaveBeenNthCalledWith(1, firstFile);
+    expect(mockHandleUploadFile).toHaveBeenNthCalledWith(2, secondFile);
+  });
+
+  it('uploads multiple dropped files from the files area', async () => {
+    renderWithProviders(<DataLoaderFeature />);
+
+    const uploadArea = screen.getAllByRole('region', { name: /files upload area/i }).at(-1);
+    expect(uploadArea).toBeDefined();
+    const firstFile = new File(['alpha'], 'dragged-a.csv', { type: 'text/csv' });
+    const secondFile = new File(['beta'], 'dragged-b.csv', { type: 'text/csv' });
+
+    fireEvent.dragOver(uploadArea!, {
+      dataTransfer: {
+        files: [firstFile, secondFile],
+        types: ['Files'],
+      },
+    });
+
+    fireEvent.drop(uploadArea!, {
+      dataTransfer: {
+        files: [firstFile, secondFile],
+        types: ['Files'],
+      },
+    });
+
+    await waitFor(() => expect(mockHandleUploadFile).toHaveBeenCalledTimes(2));
+    expect(mockHandleUploadFile).toHaveBeenNthCalledWith(1, firstFile);
+    expect(mockHandleUploadFile).toHaveBeenNthCalledWith(2, secondFile);
   });
 });
