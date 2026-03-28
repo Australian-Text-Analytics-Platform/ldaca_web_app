@@ -57,7 +57,7 @@ const EmptyState = () => (
 );
 
 export function WorkspaceDataTableFeature(_props: WorkspaceDataTableFeatureProps) {
-  const { selectedNode, header, tabs, table, loading } = useWorkspaceDataTable();
+  const { selectedNode, header, tabs, table, loading, nodeActions } = useWorkspaceDataTable();
 
   if (loading.nodeData) {
     return <LoadingState />;
@@ -71,7 +71,15 @@ export function WorkspaceDataTableFeature(_props: WorkspaceDataTableFeatureProps
     <div className="flex h-full flex-col">
       <WorkspaceSelectionTabs {...tabs} />
       <div className="flex h-full flex-col">
-        <WorkspaceDataHeader info={header} showTabMeta={tabs.shouldShowTabs} />
+        <WorkspaceDataHeader
+          info={header}
+          showTabMeta={tabs.shouldShowTabs}
+          onUndo={nodeActions.onUndo}
+          onRedo={nodeActions.onRedo}
+          onDelete={nodeActions.onDelete}
+          canUndo={nodeActions.canUndo}
+          canRedo={nodeActions.canRedo}
+        />
         <div className="flex-1 min-h-0">
           <WorkspaceTable {...table} />
         </div>

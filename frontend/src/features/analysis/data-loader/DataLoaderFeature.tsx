@@ -123,7 +123,6 @@ export const DataLoaderFeature: React.FC = () => {
     selectedFile,
     setSelectedFile,
     loadingFiles,
-    loading: fileActionInFlight,
     uploading,
     handleUploadFile,
     handleDeleteFile,
@@ -752,7 +751,7 @@ export const DataLoaderFeature: React.FC = () => {
             variant="ghost"
             className="h-7 px-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
             onClick={() => handleDeleteFile(file.path)}
-            disabled={fileActionInFlight}
+            disabled={loadingFiles}
           >
             <Trash2 className="h-3.5 w-3.5" />
           </Button>

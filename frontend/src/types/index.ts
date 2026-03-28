@@ -110,24 +110,6 @@ export interface NodeSchemaResponse {
   document_column?: string;
 }
 
-export interface CastResponse {
-  node_id: string;
-  name: string;
-  shape: NodeShape;
-  columns: string[];
-  preview: Record<string, unknown>[];
-  is_text_data: boolean;
-  data_type: string;
-  operation: string;
-  cast_info: {
-    column: string;
-    original_type: string;
-    new_type: string;
-    target_type: string;
-    format_used?: string;
-  };
-}
-
 export interface NodeDataResponse {
   data: Record<string, unknown>[];
   total_rows: number;

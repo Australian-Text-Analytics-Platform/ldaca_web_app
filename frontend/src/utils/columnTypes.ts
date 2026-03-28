@@ -175,17 +175,4 @@ export const filterColumnsByType = (columns: ColumnInfo[], allowedTypes: string[
   return columns.filter((column) => allowed.has(column.dataType.toLowerCase()));
 };
 
-export const getColumnNamesByType = (
-  node: unknown,
-  allowedTypes: string[],
-  options: { fallbackToAll?: boolean } = {}
-): string[] => {
-  const infos = getColumnsWithTypesFromNode(node);
-  const filtered = filterColumnsByType(infos, allowedTypes);
-  if (filtered.length === 0 && options.fallbackToAll) {
-    return infos.map((column) => column.name);
-  }
-  return filtered.map((column) => column.name);
-};
-
 export const mapColumnsToInfo = (node: unknown): ColumnInfo[] => getColumnsWithTypesFromNode(node);

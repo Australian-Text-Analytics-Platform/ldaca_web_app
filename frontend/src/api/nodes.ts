@@ -116,8 +116,6 @@ export const nodesApi = {
   delete: (node: string, headers: Record<string,string> = {}) => del<Record<string, unknown>>(`/workspaces/nodes/${node}`, headers),
   rename: (node: string, newName: string, headers: Record<string,string> = {}) => httpRequest<Record<string, unknown>>(`/workspaces/nodes/${node}/name`, { method: 'PUT', headers, params: { new_name: newName } }),
   clone: (node: string, headers: Record<string,string> = {}) => httpRequest<Record<string, unknown>>(`/workspaces/nodes/${node}/clone`, { method: 'POST', headers }),
-  // Backward-compatible alias for older call sites.
-  copy: (node: string, headers: Record<string,string> = {}) => httpRequest<Record<string, unknown>>(`/workspaces/nodes/${node}/clone`, { method: 'POST', headers }),
   undo: (node: string, headers: Record<string, string> = {}) =>
     httpRequest<NodeInfoResponse>(`/workspaces/nodes/${node}/undo`, { method: 'POST', headers }),
   redo: (node: string, headers: Record<string, string> = {}) =>

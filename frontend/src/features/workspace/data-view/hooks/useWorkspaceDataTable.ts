@@ -7,11 +7,17 @@ import type { WorkspaceTableProps } from '../components/WorkspaceTable';
 
 export interface WorkspaceDataTableHeaderInfo {
   nodeLabel: string;
-  shapeLabel: string;
-  rowsLoaded: number;
   tabPosition: number;
   totalTabs: number;
   isEmptyTable: boolean;
+}
+
+export interface WorkspaceDataTableNodeActions {
+  onUndo?: () => void;
+  onRedo?: () => void;
+  onDelete?: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
 }
 
 export interface WorkspaceSelectionTab {
@@ -32,6 +38,7 @@ export interface WorkspaceSelectionTabsState {
 export interface WorkspaceDataTableViewModel {
   selectedNode: ReturnType<typeof useWorkspaceSelection>['selectedNode'];
   header: WorkspaceDataTableHeaderInfo;
+  nodeActions: WorkspaceDataTableNodeActions;
   tabs: WorkspaceSelectionTabsState;
   table: WorkspaceTableProps;
   loading: {
@@ -75,6 +82,9 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
     renameColumn,
     deleteColumn,
     refreshNodeSchema,
+    deleteNode,
+    undoNode,
+    redoNode,
     selectNodes,
     toggleNodeSelection,
   } = useWorkspaceActions();
@@ -134,25 +144,27 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
       toggleNodeSelection(nodeId);
     };
 
-  const displayShape = (() => {
-    if (Array.isArray(selectedNode?.shape)) {
-      const [rows, cols] = selectedNode.shape;
-      const formatPart = (value: number | null | undefined) =>
-        typeof value === 'number' && Number.isFinite(value) ? value.toLocaleString() : '?';
-      return [formatPart(rows), formatPart(cols)] as [string, string];
-    }
-    return ['?', '?'] as [string, string];
-  })();
-
-  const rowsLoaded = (Array.isArray(nodeData.data) ? nodeData.data.length : 0);
+  const selectedNodeCapabilities = selectedNode as {
+    id?: string;
+    can_undo?: boolean;
+    can_redo?: boolean;
+  } | null;
+  const canUndo = Boolean(selectedNodeCapabilities?.can_undo);
+  const canRedo = Boolean(selectedNodeCapabilities?.can_redo);
 
   const header: WorkspaceDataTableHeaderInfo = {
     nodeLabel: resolveNodeDisplayLabel(selectedNode) || 'Unknown node',
-    shapeLabel: `${displayShape[0]} × ${displayShape[1]}`,
-    rowsLoaded,
     tabPosition,
     totalTabs: multiSelectedNodes.length,
     isEmptyTable: Array.isArray(nodeData.data) && nodeData.data.length === 0,
+  };
+
+  const nodeActions: WorkspaceDataTableNodeActions = {
+    onUndo: selectedNode?.id && undoNode ? () => void undoNode(selectedNode.id) : undefined,
+    onRedo: selectedNode?.id && redoNode ? () => void redoNode(selectedNode.id) : undefined,
+    onDelete: selectedNode?.id && deleteNode ? () => void deleteNode(selectedNode.id) : undefined,
+    canUndo,
+    canRedo,
   };
 
   const tabs: WorkspaceSelectionTabsState = {
@@ -199,6 +211,7 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
   return {
     selectedNode,
     header,
+    nodeActions,
     tabs,
     table,
     loading: {
