@@ -1,5 +1,6 @@
 import type { Dispatch, SetStateAction } from 'react';
 import type {
+  QuotationAnalysisResponse,
   QuotationRequest,
   QuotationResultQuery,
   QuotationEngineConfig,
@@ -68,8 +69,8 @@ interface QuotationActions {
   showErrorDialog: (message: string) => void;
   baseHandlePageChange: (page: number) => void;
   baseHandlePageSizeChange: (pageSize: number) => void;
-  updateResultState: (nodeId: string, column: string, result: Record<string, unknown>) => void;
-  applyContextLengthPreferenceFromResult: (payload: Record<string, unknown>) => void;
+  updateResultState: (nodeId: string, column: string, result: QuotationAnalysisResponse) => void;
+  applyContextLengthPreferenceFromResult: (payload: QuotationAnalysisResponse) => void;
   setLocalTaskId: (id: string | null) => void;
 }
 
@@ -82,7 +83,7 @@ interface QuotationLock {
   quotationSearch: (
     nodeId: string,
     request: QuotationRequest,
-  ) => Promise<Record<string, unknown>>;
+  ) => Promise<QuotationAnalysisResponse>;
   detachQuotation: (nodeId: string, request: QuotationDetachRequest) => Promise<void>;
   openEngineDialog: () => void;
 }

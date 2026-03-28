@@ -235,7 +235,9 @@ export interface AnalysisPaginationProps {
   /** Called when the user changes the page size. Pass `undefined` to hide the selector. */
   onPageSizeChange?: (pageSize: number) => void;
   /** Context-specific label for the page-size selector. */
-  pageSizeLabel?: string;
+  pageSizeLabel?: React.ReactNode;
+  /** Optional summary rendered after the page-size selector. */
+  pageSizeSummary?: React.ReactNode;
   /** Options shown in the page-size dropdown. */
   pageSizeOptions?: number[];
   /** Show a loading indicator. */
@@ -255,6 +257,7 @@ export const AnalysisPagination = ({
   onPageChange,
   onPageSizeChange,
   pageSizeLabel = 'Rows per page',
+  pageSizeSummary,
   pageSizeOptions = DEFAULT_PAGE_SIZE_OPTIONS,
   loading = false,
   children,
@@ -299,6 +302,9 @@ export const AnalysisPagination = ({
                 </SelectGroup>
               </SelectContent>
             </Select>
+            {pageSizeSummary ? (
+              <span className="text-sm text-muted-foreground whitespace-nowrap">{pageSizeSummary}</span>
+            ) : null}
           </>
         )}
       </div>

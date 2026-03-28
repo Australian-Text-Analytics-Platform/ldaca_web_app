@@ -22,6 +22,7 @@ export const CONCORDANCE_COLUMN_KEYS = {
 } as const;
 
 export const QUOTATION_COLUMN_KEYS = {
+  document: 'QUOTE_DOCUMENT',
   speaker: 'QUOTE_speaker',
   speakerStartIdx: 'QUOTE_speaker_start_idx',
   speakerEndIdx: 'QUOTE_speaker_end_idx',
@@ -36,6 +37,8 @@ export const QUOTATION_COLUMN_KEYS = {
   isFloatingQuote: 'QUOTE_is_floating_quote',
   quoteRowIdx: 'QUOTE_quote_row_idx',
 } as const;
+
+export const QUOTATION_DOCUMENT_COLUMN = QUOTATION_COLUMN_KEYS.document;
 
 export const TOPIC_COLUMN_KEYS = {
   topic: 'TOPIC_topic',

@@ -26,6 +26,7 @@ interface ConcordanceState {
   numLeftTokens: number;
   numRightTokens: number;
   regex: boolean;
+  wholeWord: boolean;
   caseSensitive: boolean;
 }
 
@@ -68,6 +69,7 @@ export function useConcordanceTaskFlow({
     numLeftTokens,
     numRightTokens,
     regex,
+    wholeWord,
     caseSensitive,
   },
   actions: {
@@ -192,6 +194,7 @@ export function useConcordanceTaskFlow({
         num_left_tokens: numLeftTokens,
         num_right_tokens: numRightTokens,
         regex,
+        whole_word: wholeWord,
         case_sensitive: caseSensitive,
       };
       if (isCombinedQuery) {
@@ -360,6 +363,7 @@ export function useConcordanceTaskFlow({
         num_left_tokens: numLeftTokens,
         num_right_tokens: numRightTokens,
         regex,
+        whole_word: wholeWord,
         case_sensitive: caseSensitive,
         new_node_name: buildDetachNodeName(resolvedNodeLabel, '_conc'),
         ...(selectedColumns && selectedColumns.length > 0 ? { selected_columns: selectedColumns } : {}),

@@ -11,8 +11,8 @@ export interface ConcordanceMetadata {
 export type ConcordanceHitRow = Record<string, unknown>;
 export type ConcordanceGroupedRow = ConcordanceHitRow[];
 
-export interface ConcordanceRequest { column: string; search_word: string; num_left_tokens?: number; num_right_tokens?: number; regex?: boolean; case_sensitive?: boolean; sort_by?: string; }
-export interface ConcordanceDetachRequest { node_id: string; column: string; search_word: string; num_left_tokens?: number; num_right_tokens?: number; regex?: boolean; case_sensitive?: boolean; new_node_name?: string; selected_columns?: string[]; }
+export interface ConcordanceRequest { column: string; search_word: string; num_left_tokens?: number; num_right_tokens?: number; regex?: boolean; whole_word?: boolean; case_sensitive?: boolean; sort_by?: string; }
+export interface ConcordanceDetachRequest { node_id: string; column: string; search_word: string; num_left_tokens?: number; num_right_tokens?: number; regex?: boolean; whole_word?: boolean; case_sensitive?: boolean; new_node_name?: string; selected_columns?: string[]; }
 export interface ConcordanceDetachNodeOption {
   node_id: string;
   node_name: string;
@@ -26,7 +26,7 @@ export interface ConcordanceDetachOptionsResponse {
   data?: { nodes: ConcordanceDetachNodeOption[] };
   metadata?: { task_id?: string; [key: string]: unknown };
 }
-export interface ConcordanceAnalysisRequest { node_ids: string[]; node_columns: Record<string,string>; search_word: string; num_left_tokens?: number; num_right_tokens?: number; regex?: boolean; case_sensitive?: boolean; sort_by?: string; combined?: boolean; }
+export interface ConcordanceAnalysisRequest { node_ids: string[]; node_columns: Record<string,string>; search_word: string; num_left_tokens?: number; num_right_tokens?: number; regex?: boolean; whole_word?: boolean; case_sensitive?: boolean; sort_by?: string; combined?: boolean; }
 export interface ConcordanceResultQuery { node_id?: string; combined?: boolean; page?: number; page_number?: number; page_size?: number; sort_by?: string; descending?: boolean; show_metadata?: boolean; update_only?: boolean; }
 export interface ConcordancePagination {
   page: number;
@@ -55,6 +55,31 @@ export interface ConcordanceAnalysisResponse {
 }
 export type QuotationEngineType = 'local' | 'remote';
 export interface QuotationEngineConfig { type: QuotationEngineType; url?: string | null; }
+export interface QuotationMetadata {
+  quotation_columns: string[];
+  metadata_columns: string[];
+  all_columns: string[];
+}
+export type QuotationHitRow = Record<string, unknown>;
+export type QuotationGroupedRow = QuotationHitRow[];
+export interface QuotationPagination {
+  page: number;
+  page_size: number;
+  total_source_rows: number;
+  total_source_pages: number;
+  result_count: number;
+  has_next: boolean;
+  has_prev: boolean;
+}
+export interface QuotationAnalysisResponse {
+  data: QuotationGroupedRow[];
+  columns: string[];
+  metadata: QuotationMetadata;
+  pagination: QuotationPagination;
+  sorting: { sort_by?: string | null; descending: boolean; };
+  preferences?: { context_length?: number; [key: string]: unknown };
+  task_id?: string;
+}
 export interface QuotationRequest { column: string; page?: number; page_size?: number; sort_by?: string | null; descending?: boolean; engine?: QuotationEngineConfig; }
 export interface QuotationDetachRequest { node_id: string; column: string; new_node_name?: string; engine?: QuotationEngineConfig; selected_columns?: string[]; }
 export interface QuotationDetachNodeOption {
@@ -308,13 +333,13 @@ export const textApi = {
   postConcordanceTaskResult: (taskId: string, body: ConcordanceResultQuery, headers: Record<string,string> = {}) => post<ConcordanceAnalysisResponse>(`/workspaces/concordance/tasks/${taskId}/result`, body, headers),
 
   // Quotation
-  quotation: (node: string, req: QuotationRequest, headers: Record<string,string> = {}) => post<Record<string, unknown>>(`/workspaces/nodes/${node}/quotation`, req, headers),
+  quotation: (node: string, req: QuotationRequest, headers: Record<string,string> = {}) => post<QuotationAnalysisResponse>(`/workspaces/nodes/${node}/quotation`, req, headers),
   getQuotationDetachOptions: (node: string, column: string, headers: Record<string,string> = {}) =>
     httpRequest<QuotationDetachOptionsResponse>(`/workspaces/nodes/${node}/quotation/detach-options`, { method: 'GET', headers, params: { column } }),
   quotationDetach: async (node: string, req: QuotationDetachRequest, headers: Record<string,string> = {}): Promise<void> => { await post(`/workspaces/nodes/${node}/quotation/detach`, req, headers); },
   getQuotationTaskRequest: (taskId: string, headers: Record<string,string> = {}) => httpRequest<Record<string, unknown>>(`/workspaces/quotation/tasks/${taskId}/request`, { method: 'GET', headers }),
-  getQuotationTaskResult: (taskId: string, headers: Record<string,string> = {}, params?: QuotationResultQuery) => httpRequest<Record<string, unknown>>(`/workspaces/quotation/tasks/${taskId}/result`, { method: 'GET', headers, params: params as Record<string, unknown> }),
-  postQuotationTaskResult: (taskId: string, body: QuotationResultQuery, headers: Record<string,string> = {}) => post<Record<string, unknown>>(`/workspaces/quotation/tasks/${taskId}/result`, body, headers),
+  getQuotationTaskResult: (taskId: string, headers: Record<string,string> = {}, params?: QuotationResultQuery) => httpRequest<QuotationAnalysisResponse>(`/workspaces/quotation/tasks/${taskId}/result`, { method: 'GET', headers, params: params as Record<string, unknown> }),
+  postQuotationTaskResult: (taskId: string, body: QuotationResultQuery, headers: Record<string,string> = {}) => post<QuotationAnalysisResponse>(`/workspaces/quotation/tasks/${taskId}/result`, body, headers),
 
   // Sequential analysis
   sequentialAnalysis: (node: string, req: SequentialAnalysisRequest, headers: Record<string,string> = {}) => post<Record<string, unknown>>(`/workspaces/nodes/${node}/sequential-analysis`, req, headers),

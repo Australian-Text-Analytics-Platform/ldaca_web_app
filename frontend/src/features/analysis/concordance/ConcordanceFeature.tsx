@@ -65,6 +65,7 @@ import {
 import {
   MetadataColumnSelector,
 } from '../common/components/MetadataColumnSelector';
+import { GroupedResultsPageSizeSummary } from '../common/components/GroupedResultsPageSizeSummary';
 import { reconcileMetadataColumnSelection } from '../common/components/metadataColumnSelection';
 
 
@@ -83,15 +84,6 @@ const dedupeColumns = (cols: string[]): string[] => {
 
 const hasSuccessfulConcordanceResults = (result: ConcordanceAnalysisResponse | null): boolean =>
   Boolean(result && result.state === 'successful');
-
-const buildMatchCountLabel = (count: number | undefined): string => {
-  const safeCount = Number.isFinite(count) ? Math.max(0, Math.floor(count as number)) : 0;
-  return `Documents searched per page (${safeCount} match${safeCount === 1 ? '' : 'es'} found)`;
-};
-
-const getConcordancePageMatchCount = (nodeData: ConcordanceResultEntry): number => {
-  return nodeData.data.reduce((total, group) => total + group.length, 0);
-};
 
 const getDispersionColumnStyle = (
   isDispersionVisible: boolean,
@@ -242,6 +234,7 @@ const ConcordanceFeature: React.FC = () => {
   const [numLeftTokens, setNumLeftTokens] = useState(10);
   const [numRightTokens, setNumRightTokens] = useState(10);
   const [regex, setRegex] = useState(false);
+  const [wholeWord, setWholeWord] = useState(true);
   const [caseSensitive, setCaseSensitive] = useState(false);
   const [showMetadata, setShowMetadata] = useState(false);
   const [selectedMetadataColumns, setSelectedMetadataColumns] = useState<string[] | null>(null);
@@ -422,7 +415,9 @@ const ConcordanceFeature: React.FC = () => {
       setSearchWord(String(reqObj.search_word || ''));
       setNumLeftTokens(Number(reqObj.num_left_tokens ?? 10));
       setNumRightTokens(Number(reqObj.num_right_tokens ?? 10));
-      setRegex(!!reqObj.regex);
+      const hydratedRegex = !!reqObj.regex;
+      setRegex(hydratedRegex);
+      setWholeWord(hydratedRegex ? false : typeof reqObj.whole_word === 'boolean' ? reqObj.whole_word : true);
       setCaseSensitive(!!reqObj.case_sensitive);
       const hydratedMode: 'separated' | 'combined' = reqObj.combined && reqObj.combinable !== false ? 'combined' : 'separated';
       setViewMode(hydratedMode);
@@ -499,6 +494,7 @@ const ConcordanceFeature: React.FC = () => {
       numLeftTokens,
       numRightTokens,
       regex,
+      wholeWord,
       caseSensitive,
     },
     actions: {
@@ -527,6 +523,7 @@ const ConcordanceFeature: React.FC = () => {
       num_left_tokens: numLeftTokens,
       num_right_tokens: numRightTokens,
       regex,
+      whole_word: wholeWord,
       case_sensitive: caseSensitive,
     },
     getServerParams: (request) => ({
@@ -544,6 +541,12 @@ const ConcordanceFeature: React.FC = () => {
             ? request.num_tokens_right
             : 5,
       regex: typeof request.regex === 'boolean' ? request.regex : false,
+      whole_word:
+        typeof request.regex === 'boolean' && request.regex
+          ? false
+          : typeof request.whole_word === 'boolean'
+            ? request.whole_word
+            : true,
       case_sensitive: typeof request.case_sensitive === 'boolean' ? request.case_sensitive : false,
     }),
   });
@@ -1202,7 +1205,8 @@ const ConcordanceFeature: React.FC = () => {
               hasPrev={combinedHasPrev}
               totalPages={nodeData.pagination?.total_source_pages}
               onPageChange={(newPage) => setCombinedPage(newPage)}
-              pageSizeLabel={buildMatchCountLabel(getConcordancePageMatchCount(nodeData))}
+              pageSizeLabel="Documents per page"
+              pageSizeSummary={<GroupedResultsPageSizeSummary groups={nodeData.data} />}
               loading={combinedLoading}
             />
           </div>
@@ -1340,7 +1344,8 @@ const ConcordanceFeature: React.FC = () => {
               }
             })();
           }}
-          pageSizeLabel={buildMatchCountLabel(getConcordancePageMatchCount(nodeData))}
+          pageSizeLabel="Documents per page"
+          pageSizeSummary={<GroupedResultsPageSizeSummary groups={nodeData.data} />}
           pageSizeOptions={[10, 20, 50, 100]}
           loading={nodeIsLoading}
         >
@@ -1452,8 +1457,26 @@ const ConcordanceFeature: React.FC = () => {
                 <label className="flex items-center gap-2">
                   <input
                     type="checkbox"
+                    checked={wholeWord}
+                    onChange={(e) => setWholeWord(e.target.checked)}
+                    disabled={regex}
+                    className="h-4 w-4"
+                  />
+                  <span className="text-sm text-foreground">Whole word</span>
+                </label>
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
                     checked={regex}
-                    onChange={(e) => setRegex(e.target.checked)}
+                    onChange={(e) => {
+                      const nextRegex = e.target.checked;
+                      setRegex(nextRegex);
+                      if (nextRegex) {
+                        setWholeWord(false);
+                      }
+                    }}
                     className="h-4 w-4"
                   />
                   <span className="text-sm text-foreground">Use regular expression</span>
