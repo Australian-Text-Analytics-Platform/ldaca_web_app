@@ -25,6 +25,18 @@ This setting controls the smallest number of documents that can form a topic.
 
 Start with a moderate value and adjust until the topics feel meaningful for your dataset size.
 
+<h3 id="help-topic-modeling-random-seed">Random seed</h3>
+
+The random seed controls the reproducibility of topic modeling results. Setting a fixed seed ensures that running the same analysis on the same data produces identical topics each time.
+
+- Use any non-negative integer (e.g. 0, 42, 12345).
+- Change the seed to explore alternative topic groupings from the same data.
+- Keep the same seed when you want consistent, reproducible results.
+
+**Q: Does the seed affect topic quality?**
+
+No — different seeds may produce slightly different topic assignments, but the overall quality depends on your data and the minimum topic size setting.
+
 <h2 id="help-topic-modeling-results">Result panel</h2>
 
 Use the result panel to explore the topic map, labels, and summary counts.
