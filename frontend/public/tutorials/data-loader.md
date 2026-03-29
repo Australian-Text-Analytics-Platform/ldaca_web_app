@@ -10,7 +10,7 @@ This is the landing page of the whole webApp before any analysis can be done. Th
 
 <h2 id="help-data-loader-active-workspace">Active workspace overview</h2>
 
-![Active workspace screenshot](tutorials/assets/data_loader_active_workspace.png)
+![Active workspace screenshot](tutorials/assets/data_loader/active_workspace.png)
 
 The active workspace shows the current project and data blocks under analysis. The user can rename or unload the current workspace. If there is no active workspace loaded, the user can also initiate a new empty workspace from here.
 
@@ -19,7 +19,7 @@ The active workspace shows the current project and data blocks under analysis. T
 
 <h2 id="help-data-loader-create-workspace-name">Workspace name input</h2>
 
-![Create workspace screenshot](tutorials/assets/data_loader_create_workspace.png)
+![Create workspace screenshot](tutorials/assets/data_loader/create_workspace.png)
 
 This pane only appears when there isn't an active workspace loaded. Use this pane  to initialise the name of a **new** empty workspace. Pick something descriptive (e.g., the project or dataset name) and add optional description to this workspace.
 - Caveat: the description can not be changed within the webApp after creation.
@@ -30,10 +30,10 @@ Please don't! This will confuse yourself and potentially lead to mistakes in the
 
 <h2 id="help-data-loader-create-workspace-button">Create workspace button</h2>
 
-This button creates a new workspace using the name you entered.
+This button creates a new workspace using the name you entered, with optional description for the workspace.
 
 - After creating, the workspace becomes active.
-- An active workspace is needed before loading any files.
+- An active workspace is needed before any files can be loaded and analysed.
 
 <h2 id="help-data-loader-rename-workspace-input">Rename workspace input</h2>
 
@@ -48,7 +48,7 @@ Unload closes the active workspace without deleting it.
 
 <h2 id="help-data-loader-workspace-manager">Workspace manager overview</h2>
 
-![Workspace manager screenshot](tutorials/assets/data_loader_workspace_manager.png)
+![Workspace manager screenshot](tutorials/assets/data_loader/workspace_manager.png)
 
 The workspace manager lists every saved workspace so you can switch projects and keep your workspace list tidy.
 
@@ -58,9 +58,10 @@ The workspace manager lists every saved workspace so you can switch projects and
 
 <h2 id="help-data-loader-files-section">Files and uploads section</h2>
 
-![Files section screenshot](tutorials/assets/data_loader_files_section.png)
+![Files section screenshot](tutorials/assets/data_loader/files_section.png)
 
-This panel is where you bring new data into your workspace. It includes upload, sample import, and add-to-workspace actions.
+This pane is where you bring new data into your workspace. It includes upload, sample import, and add-to-workspace actions.
+The user can also create new folder structure, drag and move files and delete unwanted files from this pane.
 
 **Q: What file types are supported?**
 
@@ -92,14 +93,17 @@ Click this to import a dataset directly from the Language Data Commons of Austra
 
 - Paste the full URL to an LDaCA Zip download (e.g., from an LDaCA repository page).
 - The import runs in the background.
-- Files will appear in your files list once the download and extraction are complete.
+- Files will appear in your files list under the folder **LDaCA** once the download and extraction are complete. If the new file is not shown, click the refresh button on the top right corner the pane.
+- For now, this loader only supports three fully public collections to be loaded, which are [COOEE](https://data.ldaca.edu.au/collection?id=arcp%3A%2F%2Fname%2Chdl10.26180~23961609&_crateId=arcp%3A%2F%2Fname%2Chdl10.26180~23961609), [ICE-AUS](https://data.ldaca.edu.au/collection?id=arcp%3A%2F%2Fname%2Chdl10.25949~24769173.v1&_crateId=arcp%3A%2F%2Fname%2Chdl10.25949~24769173.v1) and  [La Trobe Australian Spoken English](https://data.ldaca.edu.au/collection?id=arcp%3A%2F%2Fname%2Chdl10.26181~23089559&_crateId=arcp%3A%2F%2Fname%2Chdl10.26181~23089559).
 
-<h2 id="help-data-loader-add-button">Add file to workspace</h2>
-
-This action adds the selected file into the workspace graph as a data block.
-
-- After adding, you can run analyses on it.
-- Use descriptive data block names for clarity.
+<h2 id="help-data-loader-file-operations">File operations</h2>
+![Files operations](tutorials/assets/data_loader/file_operations.png)
+Several actions can be performed once new text/metadata files are uploaded/imported/downloaded to the files section.
+- Preview the data file contents;
+- Add the selected file into the active workspace as a data block;
+- Download the original file to local disk (generally in your Download folder);
+- Remove the file from the remote/app end;
+- Add a new subfolder, drag to move a file among folders.
 
 ## Practice exercise
 
