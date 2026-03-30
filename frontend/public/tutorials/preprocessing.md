@@ -143,9 +143,9 @@ Practice exercise:
 
 <h2 id="help-preprocessing-concat-section">Stack</h2>
 
-![Stack screenshot](tutorials/assets/preprocessing_concat.png)
+![Stack screenshot](tutorials/assets/preprocessing/concat.png)
 
-Stack combines multiple data blocks vertically. Use it when you want to merge similar tables into one larger data block.
+The Stack tab combines multiple data blocks vertically. Use it when you want to merge multiple data blocks with identical headers into one longer data block.
 
 <h3 id="help-preprocessing-concat-new-node-name">New data block name</h3>
 
@@ -153,7 +153,7 @@ Provide a label for the stacked output. Leave it blank to use the suggested name
 
 <h3 id="help-preprocessing-concat-schema-status">Schema status</h3>
 
-![Schema status screenshot](tutorials/assets/preprocessing_concat_schema_status.png)
+![Schema status screenshot](tutorials/assets/preprocessing/concat_schema_status.png)
 
 The schema status summary tells you whether all selected data blocks share the same column structure and highlights mismatches.
 
@@ -167,9 +167,9 @@ Practice exercise:
 
 <h2 id="help-preprocessing-aggregate-section">Create</h2>
 
-![Create screenshot](tutorials/assets/preprocessing_create.png)
+![Create screenshot](tutorials/assets/preprocessing/create.png)
 
-Create builds computed columns on top of a selected data block. Use it to create derived fields before analysis.
+The create tab allows user to builds new columns in a selected data block by merging contents from multiple columns as texts. This is useful when different columns are to be analysed as a whole, e.g. combining title, abstract and body text as the full article content.
 
 <h3 id="help-preprocessing-aggregate-builder">Expression builder</h3>
 
@@ -184,7 +184,7 @@ How it works:
 
 <h3 id="help-preprocessing-aggregate-expression">Advanced expression</h3>
 
-![Advanced expression screenshot](tutorials/assets/preprocessing_create_expression.png)
+![Advanced expression screenshot](tutorials/assets/preprocessing/create_expression.png)
 
 Write the expression directly when you need full control, helper functions, or complex logic.
 
