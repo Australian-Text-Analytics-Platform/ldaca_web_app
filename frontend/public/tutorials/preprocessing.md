@@ -6,14 +6,20 @@
 
 ![Preprocessing screenshot](tutorials/assets/preprocessing.png)
 
-Data Preprocessing turns raw text data into analysis-ready datasets. Each sub-tab helps you shape data in a focused way, and every action creates a **new data block** so you can compare results without overwriting the original.
+The Data Preprocessing tools transform and prepare raw text data blocks into analysis-ready datasets. Each sub-tab helps you shape data in a certain way, and every action creates a **new data block** so the original data blocks are not overwritten and all operations are recoverable. There are currently six tool tabs in this section:
+1. Filter - Create a subset of the selected data block based on one or a series of data-driven logic operations;
+2. Slice - Create a subset of the selected data block by sampling the data with a defined interval.
+3. Join - Create a new data block by linking two selected data blocks on certain columns with common values.
+4. Stack - Create a new data block by connecting/stacking two selected data blocks, which share identical column headers.
+5. Match - Use regular expression (RegEx) to match certain text pattern from the selected text column, then either remove, replace or extract the matched texts to the selected, or a different, column in the data block.
+6. Create - Combine the contents from two or more columns and save the outcomes as a new column in the data block.
 
-Use this workflow in any tab:
+In order to process relevant data block(s) in any tab, the user needs to:
 
-1. Select one or more data blocks from the workspace.
-2. Configure the transformation.
-3. Review the preview table.
-4. Add the result back to the workspace.
+1. Select one or more data blocks from the workspace - depending on the need.
+2. Configure the transformation to be done with the selected tool.
+3. Review the preview table and make sure it shows expected outcomes.
+4. Add the result back to the workspace as a new child data block of the original selected data block(s).
 
 <h2 id="help-preprocessing-common-section">Common controls</h2>
 
@@ -21,33 +27,37 @@ These controls appear in multiple preprocessing tabs and behave the same way acr
 
 <h3 id="help-preprocessing-common-node-selection">Data block selection panel</h3>
 
-Select one or more data blocks from the workspace graph. Each tab will show only the number of data blocks it supports.
+Select one or more data blocks from the workspace graph or the data block list. Each tool will only work when designated number of data blocks are selected.
 
 <h3 id="help-preprocessing-common-apply-button">Apply action</h3>
 
-Use **Add to Workspace** or **Add to Data Block** to run the transformation. A new data block is created (or the selected data block is updated) without overwriting your source data.
+Use **Add to Workspace** or **Add to Data Block** to run the transformation. A new data block is created (or the selected data block is updated) without overwriting your source data block.
 
 <h3 id="help-preprocessing-common-preview">Preview table</h3>
 
-The preview shows a paginated sample of what the output will look like. It is a quick way to confirm your configuration before applying it.
+The preview pane displays the outcomes in a paginated format with an estimated size. The user can quickly check the results of different configurations before applying the pre-processing and producing a new data block to the workspace.
 
 <h2 id="help-preprocessing-filter-section">Filter</h2>
 
-![Filter screenshot](tutorials/assets/preprocessing_filter.png)
+![Filter screenshot](tutorials/assets/preprocessing/filter.png)
 
-Filter keeps only the rows that match your conditions. Use it to remove noise, focus on a subset, or create a clean working dataset before analysis.
+The filter tool keeps only the rows that match defined conditions. Use it to remove noise, focus on a subset, or create a clean working dataset before analysis. This tool accepts only one selected data block at a time.
 
 <h3 id="help-preprocessing-filter-conditions">Filter conditions</h3>
 
-![Filter conditions screenshot](tutorials/assets/preprocessing_filter_conditions.png)
+![Filter conditions screenshot](tutorials/assets/preprocessing/filter_conditions.png)
 
-Define one or more column-based rules, then choose AND/OR logic to combine them.
+Define one or more column-based logic conditions, where each condition can be defined differently based on the data type of selected column. All conditional outcomes can be combined by either AND or OR logic operation for the final filtered outcomes.
+1. Use the "Add Condition" button to add more conditions to be applied.
+2. Select the desired combining logic operation for all conditions. The webApp does not support chain of various logic operations.
+3. All individual conditions can be negated by checking the "negate" checkbox.
+4. The preview pane displays the number of rows to be filtered based on the current condition set. It is possible to return an empty data block if there isn't any eligible row from the selected data block, or the conditions are conflicting.
 
 <h3 id="help-preprocessing-filter-new-node-name">New data block name</h3>
 
-![Filter new data block name screenshot](tutorials/assets/preprocessing_filter_new_node_name.png)
+![Filter new data block name screenshot](tutorials/assets/preprocessing/filter_new_node_name.png)
 
-Name the filtered output so it is easy to spot in the workspace.
+The user can name the filtered output data block so it is easy to spot in the workspace. The new data block is a child data block of the original selected data block.
 
 Key controls include the data block selection panel, the filter conditions builder (with AND/OR logic), the new data block name input, the status summary, the **Add to Workspace** action, and the preview table that shows matched rows.
 
@@ -59,17 +69,17 @@ Practice exercise:
 
 <h2 id="help-preprocessing-slice-section">Slice</h2>
 
-![Slice screenshot](tutorials/assets/preprocessing_slice.png)
+![Slice screenshot](tutorials/assets/preprocessing/slice.png)
 
 Slice extracts a contiguous range of rows. It is useful for sampling, debugging, or grabbing a fixed subset of text data.
 
 <h3 id="help-preprocessing-slice-offset">Offset</h3>
 
-The zero-based index of the first row to include.
+The zero-based index of the first row to include. If the user want the slicing to include the first row of the data block, set this to 0. If the slicing should start from the Nth row, set this value to N-1.
 
 <h3 id="help-preprocessing-slice-length">Length</h3>
 
-The number of rows to include. Leave it blank to slice until the end.
+The number of rows to include. Leave it blank to slice until the end. 
 
 <h3 id="help-preprocessing-slice-new-node-name">New data block name</h3>
 
@@ -85,22 +95,25 @@ Practice exercise:
 
 <h2>Join</h2>
 
-![Join screenshot](tutorials/assets/preprocessing_join.png)
+![Join screenshot](tutorials/assets/preprocessing/join.png)
 
 Join combines two data blocks using matching columns. Use it when your text data lives in one data block and metadata lives in another, or when you need to enrich a data block before analysis.
 
 <h3 id="help-preprocessing-join-section">Join sub-tab overview</h3>
 
-The Join sub-tab guides you through selecting up to two data blocks, choosing join columns, and producing a combined data block.
+The Join sub-tab guides you through selecting two data blocks, choosing the columns from each data block that consist of common values, then "stitch" both data blocks side-by-side together based on the joining columns.
+
+Depending on the type of the joining method and common values between two data blocks, the outcome data block can be longer or shorter than the selected source data blocks, but it will include all columns from both data blocks hence wider than the source data blocks.
 
 <h3 id="help-preprocessing-join-column-picker">Join column picker</h3>
 
-![Join column picker screenshot](tutorials/assets/preprocessing_join_column_picker.png)
+![Join column picker screenshot](tutorials/assets/preprocessing/join_column_picker.png)
 
 Column pickers choose which column to match in each data block.
 
 - Pick columns that represent the same identifier in both data blocks.
 - Clean, consistent IDs produce the best joins.
+- The webApp will *guess* and pre-populate the columns that are more likely to share common values from both data blocks, but the user is responsible to select the correct joining columns and type of joining method.
 
 <h3 id="help-preprocessing-join-type">Join type selector</h3>
 
