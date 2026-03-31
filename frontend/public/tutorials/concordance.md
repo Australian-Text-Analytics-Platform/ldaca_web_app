@@ -25,9 +25,9 @@ Regex mode lets you use patterns for advanced matching (e.g., word variants).
 - Use it when you need flexible matching.
 - Turn it off for exact, literal searches.
 
-**Q: Can I search for multiple words at one time?**
+**Q: Can I search multiple words at one time?**
 
-The concordance tool accepts only one input search term. However, if you choose to use regular expression (RegEx) as your search term, it's possible to compile a pattern that matches multiple words. The user is responsible to design their RegEx search pattern, and the follows are a few simple examples. Alternatively, the user can excute several concordance searches with different terms, detach the results and use the pre-processing Stack tool to connect the results.
+The concordance tool accepts only one input search term. However, if you choose to use regular expression ([RegEx](https://en.wikipedia.org/wiki/Regular_expression)) as your search term, it's possible to compile a pattern that matches multiple words. The user is responsible to [design the RegEx](https://regexr.com/) search pattern, and the follows are a few simple examples. Alternatively, the user can excute several concordance searches with different terms, detach the results and use the pre-processing Stack tool to connect the results.
 
 **Example RegEx patterns**
 
