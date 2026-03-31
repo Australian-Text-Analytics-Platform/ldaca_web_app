@@ -69,8 +69,8 @@ export const useReplaceSubTab = (props: ReplaceSubTabProps) => {
 
   const [selectedColumn, setSelectedColumn] = useState('');
   const [mode, setMode] = useState<'replace' | 'extract'>('replace');
-  const [count, setCount] = useState<'all' | 'first'>('all');
   const [n, setN] = useState<number | null>(null);
+  const count = n !== null ? 'first' : 'all';
   const [pattern, setPattern] = useState('');
   const [replacement, setReplacement] = useState('');
   const [connector, setConnector] = useState('');
@@ -221,7 +221,6 @@ export const useReplaceSubTab = (props: ReplaceSubTabProps) => {
     mode,
     setMode,
     count,
-    setCount,
     n,
     setN,
     pattern,

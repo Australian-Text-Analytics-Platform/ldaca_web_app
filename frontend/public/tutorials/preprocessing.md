@@ -57,31 +57,33 @@ Practice exercise:
 2. Add a condition that keeps only one category.
 3. Add the filtered result as a new data block.
 
-<h2 id="help-preprocessing-slice-section">Slice</h2>
+<h2 id="help-preprocessing-slice-section">Sample</h2>
 
 ![Slice screenshot](tutorials/assets/preprocessing_slice.png)
 
-Slice extracts a contiguous range of rows. It is useful for sampling, debugging, or grabbing a fixed subset of text data.
+Sample lets you either extract a contiguous range of rows with <strong>Slice</strong> or draw a <strong>Random Sample</strong> using a fraction and optional seed. It is useful for debugging, quick inspection, and creating repeatable subsets of larger text data.
+
+Use the sampling method dropdown at the top of the card to switch between Slice and Random Sample.
 
 <h3 id="help-preprocessing-slice-offset">Offset</h3>
 
-The zero-based index of the first row to include.
+When Slice is selected, Offset is the zero-based index of the first row to include.
 
 <h3 id="help-preprocessing-slice-length">Length</h3>
 
-The number of rows to include. Leave it blank to slice until the end.
+When Slice is selected, Length is the number of rows to include.
 
 <h3 id="help-preprocessing-slice-new-node-name">New data block name</h3>
 
-Label the slice output so it is easy to find later.
+Label the sampled output so it is easy to find later.
 
-Key controls include the data block selection panel, offset and length inputs, the new data block name field, the range summary, the **Add to Workspace** action, and the preview table for the slice output.
+Key controls include the data block selection panel, the sampling method dropdown, mode-specific parameter inputs, the new data block name field, the status summary, the **Add to Workspace** action, and the preview table for the output rows.
 
 Practice exercise:
 
 1. Pick a dataset with at least 200 rows.
-2. Set offset to 50 and length to 25.
-3. Add the slice as a new data block and compare the row count.
+2. Try Slice with offset 50 and length 25, then try Random Sample with fraction 0.2 and a fixed seed.
+3. Add each result as a new data block and compare the row count.
 
 <h2>Join</h2>
 

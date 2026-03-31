@@ -48,7 +48,7 @@ const DataPreprocessingFeature: React.FC = () => {
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Data Preprocessing</h1>
           <p className="text-sm text-muted-foreground">
-            Prepare your dataset with filtering, slicing, join, stack, find, and create tools.
+            Prepare your dataset with filtering, sampling, join, stack, find, and create tools.
           </p>
         </div>
       </div>
@@ -60,7 +60,7 @@ const DataPreprocessingFeature: React.FC = () => {
       >
         <TabsList aria-label="Data preprocessing sub-views" className="flex flex-wrap gap-2">
           <TabsTrigger value="filter">Filter</TabsTrigger>
-          <TabsTrigger value="slice">Slice</TabsTrigger>
+          <TabsTrigger value="slice">Sample</TabsTrigger>
           <TabsTrigger value="join">Join</TabsTrigger>
           <TabsTrigger value="concat">Stack</TabsTrigger>
           <TabsTrigger value="find">Find</TabsTrigger>

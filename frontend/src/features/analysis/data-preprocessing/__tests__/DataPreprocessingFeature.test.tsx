@@ -1,10 +1,14 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import DataPreprocessingFeature from '../DataPreprocessingFeature';
 
+window.HTMLElement.prototype.scrollIntoView = vi.fn();
+
+const mockSliceNode = vi.fn();
+const mockSlicePreview = vi.fn();
 const mockComputeColumnPreview = vi.fn();
 const mockComputeColumn = vi.fn();
 const mockReplacePreview = vi.fn();
@@ -52,8 +56,8 @@ vi.mock('@/hooks/useWorkspaceActions', () => ({
     joinNodes: vi.fn(),
     concatNodes: vi.fn(),
     concatPreview: vi.fn(),
-    sliceNode: vi.fn(),
-    slicePreview: vi.fn(),
+    sliceNode: mockSliceNode,
+    slicePreview: mockSlicePreview,
     computeColumn: mockComputeColumn,
     computeColumnPreview: mockComputeColumnPreview,
     replaceText: mockReplaceText,
@@ -79,6 +83,26 @@ vi.mock('@/components/help/HelpIcon', () => ({
 describe('DataPreprocessingFeature replace tab', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockSlicePreview.mockResolvedValue({
+      columns: ['Body', 'Count'],
+      dtypes: {
+        Body: 'Utf8',
+        Count: 'Int64',
+      },
+      data: [{ Body: 'Invoice 1', Count: 1 }],
+      pagination: {
+        page: 1,
+        page_size: 10,
+        total_rows: 1,
+        total_pages: 1,
+      },
+    });
+    mockSliceNode.mockResolvedValue({
+      node_id: 'sample-node-1',
+      data: {
+        node_name: 'Corpus_sampled',
+      },
+    });
     mockReplacePreview.mockResolvedValue({
       columns: ['Body', 'Count'],
       dtypes: {
@@ -135,6 +159,48 @@ describe('DataPreprocessingFeature replace tab', () => {
         pattern: regexPattern,
         replacement: '#',
         output_column_name: 'Body',
+      });
+    });
+  });
+
+  it('shows the Sample tab and submits a random sample request', async () => {
+    // pointerEventsCheck disabled: jsdom does not compute CSS from Tailwind
+    // classes, so Radix portal leftovers from prior tests can produce false
+    // positives for `pointer-events: none`.
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+
+    render(<DataPreprocessingFeature />);
+
+    screen.getByRole('tab', { name: 'Filter' }).focus();
+    await user.keyboard('{ArrowRight}');
+
+    await waitFor(() => {
+      expect(screen.getByRole('tab', { name: 'Sample' })).toHaveAttribute('aria-selected', 'true');
+    });
+
+    expect(screen.getByText('Sample rows')).toBeInTheDocument();
+    expect(screen.getByLabelText('Offset')).toBeInTheDocument();
+
+    screen.getByRole('combobox', { name: 'Sampling method' }).focus();
+    await user.keyboard('{ArrowDown}{ArrowDown}{Enter}');
+
+    expect(screen.queryByLabelText('Offset')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Fraction')).toBeInTheDocument();
+    expect(screen.getByLabelText('Random seed')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Fraction'), { target: { value: '0.4' } });
+    fireEvent.change(screen.getByLabelText('Random seed'), { target: { value: '7' } });
+
+    await user.click(screen.getByRole('button', { name: 'Add to Workspace' }));
+
+    await waitFor(() => {
+      const [nodeId, payload] = mockSliceNode.mock.calls[0] ?? [];
+      expect(nodeId).toBe('node-1');
+      expect(payload).toMatchObject({
+        mode: 'random_sample',
+        fraction: 0.4,
+        random_seed: 7,
+        new_node_name: 'Corpus_sampled',
       });
     });
   });

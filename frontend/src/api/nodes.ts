@@ -29,7 +29,14 @@ export interface FilterCondition {
   regex?: boolean;
 }
 export interface FilterRequest { conditions: FilterCondition[]; logic?: string; new_node_name?: string; }
-export interface SliceRequest { offset: number; length?: number; new_node_name?: string; }
+export interface SliceRequest {
+  mode?: 'slice' | 'random_sample';
+  offset?: number;
+  length?: number;
+  fraction?: number;
+  random_seed?: number;
+  new_node_name?: string;
+}
 export interface JoinNodesRequest { left_node_id: string; right_node_id: string; left_on: string; right_on: string; how?: string; new_node_name?: string; }
 export interface JoinPreviewParams { left_node_id: string; right_node_id: string; left_on?: string; right_on?: string; how?: string; }
 export interface CastNodeRequest { column: string; target_type: string; format?: string; }

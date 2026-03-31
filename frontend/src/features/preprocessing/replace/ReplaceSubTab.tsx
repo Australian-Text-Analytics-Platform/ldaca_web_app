@@ -24,7 +24,6 @@ export const ReplaceSubTab: React.FC<ReplaceSubTabProps> = (props) => {
     mode,
     setMode,
     count,
-    setCount,
     n,
     setN,
     pattern,
@@ -108,33 +107,16 @@ export const ReplaceSubTab: React.FC<ReplaceSubTabProps> = (props) => {
               </Select>
             </div>
 
-            <div className="w-24 space-y-2">
-              <Label htmlFor="find-count">Count</Label>
-              <Select value={count} onValueChange={(value: 'all' | 'first') => {
-                setCount(value);
-                if (value === 'all') setN(null);
-                else if (n === null) setN(1);
-              }} disabled={controlsDisabled || !selectedColumn}>
-                <SelectTrigger id="find-count">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="first">First</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="w-20 space-y-2">
-              <Label htmlFor="find-n">n</Label>
+            <div className="w-44 space-y-2">
+              <Label htmlFor="find-n">Match count</Label>
               <Input
                 id="find-n"
                 type="number"
                 min={1}
-                value={count === 'all' ? '' : (n ?? '')}
+                value={n ?? ''}
                 onChange={(event) => setN(event.target.value ? Number(event.target.value) : null)}
-                placeholder={count === 'first' ? '1' : ''}
-                disabled={controlsDisabled || !selectedColumn || count === 'all'}
+                placeholder="All if left blank"
+                disabled={controlsDisabled || !selectedColumn}
               />
             </div>
 
