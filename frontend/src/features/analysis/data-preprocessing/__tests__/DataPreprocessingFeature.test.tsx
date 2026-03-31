@@ -164,10 +164,7 @@ describe('DataPreprocessingFeature replace tab', () => {
   });
 
   it('shows the Sample tab and submits a random sample request', async () => {
-    // pointerEventsCheck disabled: jsdom does not compute CSS from Tailwind
-    // classes, so Radix portal leftovers from prior tests can produce false
-    // positives for `pointer-events: none`.
-    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    const user = userEvent.setup();
 
     render(<DataPreprocessingFeature />);
 
@@ -185,20 +182,20 @@ describe('DataPreprocessingFeature replace tab', () => {
     await user.keyboard('{ArrowDown}{ArrowDown}{Enter}');
 
     expect(screen.queryByLabelText('Offset')).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Fraction')).toBeInTheDocument();
+    expect(screen.getByLabelText('Fraction / Count')).toBeInTheDocument();
     expect(screen.getByLabelText('Random seed')).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText('Fraction'), { target: { value: '0.4' } });
+    fireEvent.change(screen.getByLabelText('Fraction / Count'), { target: { value: '0.4' } });
     fireEvent.change(screen.getByLabelText('Random seed'), { target: { value: '7' } });
 
-    await user.click(screen.getByRole('button', { name: 'Add to Workspace' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add to Workspace' }));
 
     await waitFor(() => {
       const [nodeId, payload] = mockSliceNode.mock.calls[0] ?? [];
       expect(nodeId).toBe('node-1');
       expect(payload).toMatchObject({
         mode: 'random_sample',
-        fraction: 0.4,
+        sample_size: 0.4,
         random_seed: 7,
         new_node_name: 'Corpus_sampled',
       });

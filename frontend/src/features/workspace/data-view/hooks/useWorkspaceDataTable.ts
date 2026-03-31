@@ -16,6 +16,7 @@ export interface WorkspaceDataTableNodeActions {
   onUndo?: () => void;
   onRedo?: () => void;
   onDelete?: () => void;
+  onRename?: (newName: string) => void;
   canUndo: boolean;
   canRedo: boolean;
 }
@@ -83,6 +84,7 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
     deleteColumn,
     refreshNodeSchema,
     deleteNode,
+    renameNode,
     undoNode,
     redoNode,
     selectNodes,
@@ -163,6 +165,7 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
     onUndo: selectedNode?.id && undoNode ? () => void undoNode(selectedNode.id) : undefined,
     onRedo: selectedNode?.id && redoNode ? () => void redoNode(selectedNode.id) : undefined,
     onDelete: selectedNode?.id && deleteNode ? () => void deleteNode(selectedNode.id) : undefined,
+    onRename: selectedNode?.id && renameNode ? (newName: string) => void renameNode(selectedNode.id, newName) : undefined,
     canUndo,
     canRedo,
   };

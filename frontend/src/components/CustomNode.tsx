@@ -1,6 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
 import { type NodeProps, Handle, Position, useStore, type Node as ReactFlowNode } from '@xyflow/react';
-import { Settings2, Trash2, Copy, Check } from 'lucide-react';
+import { Settings2, Copy, Check } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from './ui/alert-dialog';
 import { type WorkspaceNode } from '../types';
 
 type DebugWindow = Window & { __LDACA_DEBUG_GRAPH?: boolean };
@@ -21,6 +31,7 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
   const [isRenaming, setIsRenaming] = useState(false);
   const [newName, setNewName] = useState('');
   const [copied, setCopied] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
 
@@ -59,9 +70,15 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
 
   const handleDeleteClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+    setShowMenu(false);
+    setShowDeleteConfirm(true);
+  };
+
+  const handleDeleteConfirm = () => {
     if (node?.node_id) {
       onDelete(node.node_id);
     }
+    setShowDeleteConfirm(false);
   };
 
   const handleRenameClick = (e: React.MouseEvent) => {
@@ -146,7 +163,6 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
     : null;
 
   const menuButtonClassName = 'flex h-7 w-7 items-center justify-center rounded-md bg-white/80 text-gray-600 transition-colors hover:bg-white hover:text-gray-800';
-  const deleteButtonClassName = 'flex h-7 w-7 items-center justify-center rounded-md bg-white/80 text-red-500 transition-colors hover:bg-white hover:text-red-700';
 
   const nodeActionControls = (
     <div className="flex items-center space-x-1 shrink-0">
@@ -194,18 +210,16 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
             >
               Redo
             </button>
+
+            <button
+              onClick={handleDeleteClick}
+              className="w-full border-t border-border/60 px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50"
+            >
+              Delete
+            </button>
           </div>
         )}
       </div>
-
-      <button
-        onClick={handleDeleteClick}
-        className={deleteButtonClassName}
-        title="Delete node"
-        aria-label="Delete node"
-      >
-        <Trash2 className="h-3.5 w-3.5" />
-      </button>
     </div>
   );
 
@@ -247,6 +261,23 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
         </div>
         <Handle type="target" position={Position.Left} className="w-2! h-2! bg-gray-400! opacity-0 pointer-events-none" />
         <Handle type="source" position={Position.Right} className="w-2! h-2! bg-gray-400! opacity-0 pointer-events-none" />
+
+        <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete &ldquo;{nodeName}&rdquo;?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently delete this node and its data. This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive text-white hover:bg-destructive/90">
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     );
   }
@@ -325,6 +356,22 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
       <Handle type="target" position={Position.Left} className="w-2! h-2! bg-gray-400! opacity-0 pointer-events-none" />
       <Handle type="source" position={Position.Right} className="w-2! h-2! bg-gray-400! opacity-0 pointer-events-none" />
 
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete &ldquo;{nodeName}&rdquo;?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this node and its data. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive text-white hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

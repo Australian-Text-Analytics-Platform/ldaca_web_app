@@ -42,7 +42,7 @@ interface SliceHistory {
   mode: SamplingMode;
   offset?: number;
   length?: number;
-  fraction?: number;
+  sampleSize?: number;
   randomSeed?: number;
 }
 
@@ -64,8 +64,9 @@ interface SliceFormControllers {
   setOffsetInput: (value: string) => void;
   lengthInput: string;
   setLengthInput: (value: string) => void;
-  fractionInput: string;
-  setFractionInput: (value: string) => void;
+  sampleSizeInput: string;
+  setSampleSizeInput: (value: string) => void;
+  sampleSizeHint: string | null;
   randomSeedInput: string;
   setRandomSeedInput: (value: string) => void;
   newNodeName: string;
@@ -110,19 +111,19 @@ const buildSlicePayload = ({
   mode,
   offset,
   lengthValue,
-  fractionValue,
+  sampleSizeValue,
   randomSeedValue,
 }: {
   mode: SamplingMode;
   offset: number;
   lengthValue?: number;
-  fractionValue?: number;
+  sampleSizeValue?: number;
   randomSeedValue?: number;
 }): SliceRequestPayload => {
   const payload: SliceRequestPayload = { mode };
   if (mode === 'random_sample') {
-    if (typeof fractionValue === 'number') {
-      payload.fraction = fractionValue;
+    if (typeof sampleSizeValue === 'number') {
+      payload.sample_size = sampleSizeValue;
     }
     if (typeof randomSeedValue === 'number') {
       payload.random_seed = randomSeedValue;
@@ -151,7 +152,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
   const [mode, setMode] = useState<SamplingMode>('slice');
   const [offsetInput, setOffsetInput] = useState('0');
   const [lengthInput, setLengthInput] = useState('');
-  const [fractionInput, setFractionInput] = useState('');
+  const [sampleSizeInput, setSampleSizeInput] = useState('');
   const [randomSeedInput, setRandomSeedInput] = useState('');
   const [newNodeName, setNewNodeName] = useState('');
   const [inlineError, setInlineError] = useState<string | null>(null);
@@ -173,14 +174,14 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
 
   useEffect(() => {
     setInlineError(null);
-  }, [mode, offsetInput, lengthInput, fractionInput, randomSeedInput, selectedNodeId]);
+  }, [mode, offsetInput, lengthInput, sampleSizeInput, randomSeedInput, selectedNodeId]);
 
   useEffect(() => {
     if (!selectedNodeId) {
       setMode('slice');
       setOffsetInput('0');
       setLengthInput('');
-      setFractionInput('');
+      setSampleSizeInput('');
       setRandomSeedInput('');
       setNewNodeName('');
       setLastResult(null);
@@ -190,7 +191,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
     setMode('slice');
     setOffsetInput('0');
     setLengthInput('');
-    setFractionInput('');
+    setSampleSizeInput('');
     setRandomSeedInput('');
     setNewNodeName(`${baseName}_sliced`);
     setLastResult(null);
@@ -225,11 +226,22 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
     lengthNumber !== null && Number.isInteger(lengthNumber) && lengthNumber >= 0;
   const lengthValue = lengthNumber === null ? undefined : lengthNumber;
 
-  const trimmedFraction = fractionInput.trim();
-  const fractionNumber = trimmedFraction.length > 0 ? Number(trimmedFraction) : null;
-  const fractionValid =
-    fractionNumber !== null && Number.isFinite(fractionNumber) && fractionNumber > 0 && fractionNumber <= 1;
-  const fractionValue = fractionValid ? fractionNumber ?? undefined : undefined;
+  const trimmedSampleSize = sampleSizeInput.trim();
+  const sampleSizeNumber = trimmedSampleSize.length > 0 ? Number(trimmedSampleSize) : null;
+  const sampleSizeValid =
+    sampleSizeNumber !== null &&
+    Number.isFinite(sampleSizeNumber) &&
+    sampleSizeNumber > 0 &&
+    (sampleSizeNumber < 1 || Number.isInteger(sampleSizeNumber));
+  const sampleSizeValue = sampleSizeValid ? sampleSizeNumber ?? undefined : undefined;
+
+  const sampleSizeHint: string | null = (() => {
+    if (trimmedSampleSize.length === 0 || sampleSizeValid) return null;
+    if (sampleSizeNumber !== null && sampleSizeNumber >= 1 && !Number.isInteger(sampleSizeNumber)) {
+      return 'Values ≥ 1 must be whole numbers (e.g. 25, not 25.5).';
+    }
+    return 'Enter a fraction (0–1) or an integer row count (≥ 1).';
+  })();
 
   const trimmedRandomSeed = randomSeedInput.trim();
   const randomSeedNumber = trimmedRandomSeed.length > 0 ? Number(trimmedRandomSeed) : null;
@@ -238,7 +250,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
     (randomSeedNumber !== null && Number.isInteger(randomSeedNumber) && randomSeedNumber >= 0);
   const randomSeedValue = trimmedRandomSeed.length === 0 ? undefined : randomSeedValid ? randomSeedNumber ?? undefined : undefined;
 
-  const hasOperation = mode === 'slice' ? offsetValid && lengthValid : fractionValid && randomSeedValid;
+  const hasOperation = mode === 'slice' ? offsetValid && lengthValid : sampleSizeValid && randomSeedValid;
 
   const rangeSummary = (() => {
     if (!hasSelection) {
@@ -258,16 +270,22 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
       return `Rows ${offsetNumber}–${endRow} inclusive (${lengthValue} total).`;
     }
 
-    if (!fractionValid) {
-      return 'Fraction is required – enter a value greater than 0 and at most 1.';
+    if (!sampleSizeValid) {
+      return 'Enter a fraction (0–1) or an integer row count (≥ 1).';
     }
     if (!randomSeedValid) {
       return 'Random seed must be a non-negative integer.';
     }
-    if (randomSeedValue === undefined) {
-      return `Random sample using fraction ${fractionValue}.`;
+    if (sampleSizeValue !== undefined && sampleSizeValue < 1) {
+      if (randomSeedValue === undefined) {
+        return `Random sample using fraction ${sampleSizeValue}.`;
+      }
+      return `Random sample using fraction ${sampleSizeValue} with seed ${randomSeedValue}.`;
     }
-    return `Random sample using fraction ${fractionValue} with seed ${randomSeedValue}.`;
+    if (randomSeedValue === undefined) {
+      return `Random sample of ${sampleSizeValue} rows.`;
+    }
+    return `Random sample of ${sampleSizeValue} rows with seed ${randomSeedValue}.`;
   })();
 
   const lastResultSummary = (() => {
@@ -275,10 +293,13 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
       return 'Adjust parameters and add to workspace to create a sampled data block.';
     }
     if (lastResult.mode === 'random_sample') {
+      const sizeLabel = lastResult.sampleSize !== undefined && lastResult.sampleSize < 1
+        ? `fraction ${lastResult.sampleSize}`
+        : `n=${lastResult.sampleSize}`;
       if (lastResult.randomSeed === undefined) {
-        return `Last random sample “${lastResult.nodeName}” (fraction ${lastResult.fraction}).`;
+        return `Last random sample "${lastResult.nodeName}" (${sizeLabel}).`;
       }
-      return `Last random sample “${lastResult.nodeName}” (fraction ${lastResult.fraction}, seed ${lastResult.randomSeed}).`;
+      return `Last random sample "${lastResult.nodeName}" (${sizeLabel}, seed ${lastResult.randomSeed}).`;
     }
     const lastOffset = lastResult.offset ?? 0;
     if (lastResult.length === undefined) {
@@ -309,7 +330,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
       mode,
       offset: offsetNumber,
       lengthValue,
-      fractionValue,
+      sampleSizeValue,
       randomSeedValue,
     });
     return {
@@ -384,7 +405,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
     ? 'Select a data block to preview output rows.'
     : mode === 'slice'
       ? 'Showing original data. Enter offset and length to preview sliced rows.'
-      : 'Showing original data. Enter fraction and optional seed to preview sampled rows.';
+      : 'Showing original data. Enter a fraction or row count and optional seed to preview sampled rows.';
 
   const applyDisabled =
     !hasSelection || !hasOperation || isSlicing || isLoading.operations;
@@ -404,8 +425,8 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
         return;
       }
     } else {
-      if (!fractionValid) {
-        setInlineError('Fraction is required – enter a value greater than 0 and at most 1.');
+      if (!sampleSizeValid) {
+        setInlineError('Enter a fraction (0–1) or an integer row count (≥ 1).');
         return;
       }
       if (!randomSeedValid) {
@@ -418,7 +439,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
       mode,
       offset: offsetNumber,
       lengthValue,
-      fractionValue,
+      sampleSizeValue,
       randomSeedValue,
     });
     const trimmedName = newNodeName.trim();
@@ -449,7 +470,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
         mode,
         offset: mode === 'slice' ? offsetNumber : undefined,
         length: mode === 'slice' ? lengthValue : undefined,
-        fraction: mode === 'random_sample' ? fractionValue : undefined,
+        sampleSize: mode === 'random_sample' ? sampleSizeValue : undefined,
         randomSeed: mode === 'random_sample' ? randomSeedValue : undefined,
       });
       onAlert(`${operationLabel} created: ${responseName}${resultNodeId ? ` (${resultNodeId})` : ''}.`);
@@ -481,8 +502,9 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
       setOffsetInput,
       lengthInput,
       setLengthInput,
-      fractionInput,
-      setFractionInput,
+      sampleSizeInput,
+      setSampleSizeInput,
+      sampleSizeHint,
       randomSeedInput,
       setRandomSeedInput,
       newNodeName,

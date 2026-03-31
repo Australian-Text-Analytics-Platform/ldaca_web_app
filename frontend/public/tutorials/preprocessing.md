@@ -61,7 +61,7 @@ Practice exercise:
 
 ![Slice screenshot](tutorials/assets/preprocessing_slice.png)
 
-Sample lets you either extract a contiguous range of rows with <strong>Slice</strong> or draw a <strong>Random Sample</strong> using a fraction and optional seed. It is useful for debugging, quick inspection, and creating repeatable subsets of larger text data.
+Sample lets you either extract a contiguous range of rows with <strong>Slice</strong> or draw a <strong>Random Sample</strong> using a fraction (0–1) or absolute row count (≥ 1) and an optional seed. It is useful for debugging, quick inspection, and creating repeatable subsets of larger text data.
 
 Use the sampling method dropdown at the top of the card to switch between Slice and Random Sample.
 
@@ -82,7 +82,7 @@ Key controls include the data block selection panel, the sampling method dropdow
 Practice exercise:
 
 1. Pick a dataset with at least 200 rows.
-2. Try Slice with offset 50 and length 25, then try Random Sample with fraction 0.2 and a fixed seed.
+2. Try Slice with offset 50 and length 25, then try Random Sample with fraction 0.2, or count 100, and a fixed seed.
 3. Add each result as a new data block and compare the row count.
 
 <h2>Join</h2>

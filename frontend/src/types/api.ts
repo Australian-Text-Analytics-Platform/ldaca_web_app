@@ -131,7 +131,7 @@ export interface SliceRequest {
   mode?: 'slice' | 'random_sample';
   offset?: number;
   length?: number;
-  fraction?: number;
+  sample_size?: number;
   random_seed?: number;
   description?: string;
 }

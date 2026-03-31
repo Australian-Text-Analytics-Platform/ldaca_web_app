@@ -73,10 +73,9 @@ export function WorkspaceDataTableFeature(_props: WorkspaceDataTableFeatureProps
       <div className="flex h-full flex-col">
         <WorkspaceDataHeader
           info={header}
-          showTabMeta={tabs.shouldShowTabs}
           onUndo={nodeActions.onUndo}
           onRedo={nodeActions.onRedo}
-          onDelete={nodeActions.onDelete}
+          onRename={nodeActions.onRename}
           canUndo={nodeActions.canUndo}
           canRedo={nodeActions.canRedo}
         />

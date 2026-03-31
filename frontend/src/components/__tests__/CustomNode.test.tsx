@@ -18,11 +18,6 @@ const getLatestNodeSettingsButton = () => {
   return buttons[buttons.length - 1] as HTMLButtonElement;
 };
 
-const getLatestDeleteButton = () => {
-  const buttons = screen.getAllByRole('button', { name: /delete node/i });
-  return buttons[buttons.length - 1] as HTMLButtonElement;
-};
-
 describe('CustomNode', () => {
   it('removes the save action from the node menu', async () => {
     mockZoom = 1;
@@ -153,12 +148,11 @@ describe('CustomNode', () => {
     );
 
     expect(getLatestNodeSettingsButton()).toBeInTheDocument();
-    expect(getLatestDeleteButton()).toBeInTheDocument();
 
     await user.click(getLatestNodeSettingsButton());
     expect(screen.getByRole('button', { name: 'Rename' })).toBeInTheDocument();
 
-    await user.click(getLatestDeleteButton());
-    expect(onDelete).toHaveBeenCalledWith('node-zoomed-out');
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+    expect(screen.getByText(/This action cannot be undone/)).toBeInTheDocument();
   });
 });

@@ -127,19 +127,21 @@ export const SliceSubTab: React.FC<SliceSubTabProps> = (props) => {
           ) : (
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="sample-fraction">Fraction</Label>
+                <Label htmlFor="sample-fraction">Fraction / Count</Label>
                 <Input
                   id="sample-fraction"
                   type="number"
                   min={0}
-                  max={1}
-                  step="0.01"
-                  value={form.fractionInput}
-                  onChange={(event) => form.setFractionInput(event.target.value)}
+                  step="any"
+                  value={form.sampleSizeInput}
+                  onChange={(event) => form.setSampleSizeInput(event.target.value)}
                   disabled={!hasSelection}
-                  placeholder="Share of rows to sample"
+                  placeholder="e.g. 0.4 for 40% or 100 for 100 rows"
                 />
-                <p className="text-xs text-muted-foreground">Enter a value greater than 0 and up to 1.</p>
+                <p className="text-xs text-muted-foreground">Fraction (0–1) for proportional sampling, or an integer ≥ 1 for an absolute row count.</p>
+                {form.sampleSizeHint && (
+                  <p className="text-xs text-destructive">{form.sampleSizeHint}</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="sample-random-seed">Random seed</Label>

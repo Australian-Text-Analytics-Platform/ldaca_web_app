@@ -5,11 +5,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { WorkspaceDataHeader } from '../WorkspaceDataHeader';
 
 describe('WorkspaceDataHeader', () => {
-  it('shows undo redo delete controls and omits extra metadata labels', async () => {
+  it('shows undo redo controls and omits extra metadata labels', async () => {
     const user = userEvent.setup();
     const onUndo = vi.fn();
     const onRedo = vi.fn();
-    const onDelete = vi.fn();
 
     render(
       <WorkspaceDataHeader
@@ -19,10 +18,8 @@ describe('WorkspaceDataHeader', () => {
           totalTabs: 1,
           isEmptyTable: false,
         }}
-        showTabMeta={false}
         onUndo={onUndo}
         onRedo={onRedo}
-        onDelete={onDelete}
         canUndo
         canRedo={false}
       />
@@ -36,7 +33,6 @@ describe('WorkspaceDataHeader', () => {
 
     expect(screen.getByRole('button', { name: 'Redo' })).toBeDisabled();
 
-    await user.click(screen.getByRole('button', { name: 'Delete' }));
-    expect(onDelete).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
   });
 });
