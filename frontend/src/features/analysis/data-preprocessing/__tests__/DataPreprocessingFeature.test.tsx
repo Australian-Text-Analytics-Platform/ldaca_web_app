@@ -86,6 +86,12 @@ describe('DataPreprocessingFeature replace tab', () => {
         Count: 'Int64',
       },
       data: [{ Body: 'Invoice #', Count: 1 }],
+      pagination: {
+        page: 1,
+        page_size: 10,
+        total_rows: 1,
+        total_pages: 1,
+      },
     });
     mockReplaceText.mockResolvedValue({
       state: 'successful',
@@ -95,13 +101,13 @@ describe('DataPreprocessingFeature replace tab', () => {
     });
   });
 
-  it('builds a regex replace expression from the Replace tab', async () => {
+  it('builds a regex replace expression from the Find tab', async () => {
     const user = userEvent.setup();
     const regexPattern = String.raw`\d+`;
 
     render(<DataPreprocessingFeature />);
 
-    await user.click(screen.getByRole('tab', { name: 'Replace' }));
+    await user.click(screen.getByRole('tab', { name: 'Find' }));
 
     await user.type(screen.getByLabelText('Regex pattern'), regexPattern);
     await user.type(screen.getByLabelText('Replacement'), '#');
@@ -114,7 +120,6 @@ describe('DataPreprocessingFeature replace tab', () => {
         pattern: regexPattern,
         replacement: '#',
         output_column_name: 'Body',
-        preview_limit: 25,
       });
     });
 

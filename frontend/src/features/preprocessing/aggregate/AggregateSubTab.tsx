@@ -6,10 +6,10 @@ import HelpIcon from '../../../components/help/HelpIcon';
 import { Button } from '../../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Input } from '../../../components/ui/input';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../../components/ui/table';
 import { Separator } from '../../../components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../components/ui/tabs';
 import { cn } from '../../../lib/utils';
+import { PreviewTable } from '../components/PreviewTable';
 import { useAggregateSubTab, type AggregateSubTabProps } from './hooks/useAggregateSubTab';
 
 export type { AggregateSubTabProps } from './hooks/useAggregateSubTab';
@@ -25,79 +25,6 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
     manualExpressionActive,
     dropZoneRef,
   } = useAggregateSubTab(props);
-
-  const renderPreview = () => {
-    if (preview.loading) {
-      return (
-        <div className="flex h-32 items-center justify-center text-muted-foreground">
-          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-          Calculating preview…
-        </div>
-      );
-    }
-
-    if (preview.error) {
-      return (
-        <div className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
-          {preview.error}
-        </div>
-      );
-    }
-
-    if (!preview.data) {
-      return (
-        <div className="rounded-md border border-dashed border-muted-foreground/40 bg-muted/30 p-4 text-sm text-muted-foreground">
-          Configure an expression and exit the field to see the computed column preview inline before applying.
-        </div>
-      );
-    }
-
-    const columns = preview.data.columns;
-    const rows = preview.data.data;
-
-    return (
-      <div className="overflow-hidden rounded-lg border border-border">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader className="bg-muted/40">
-              <TableRow>
-                {columns.map((col) => (
-                  <TableHead
-                    key={col}
-                    className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground"
-                  >
-                    {col}
-                  </TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={columns.length}
-                    className="px-3 py-6 text-center text-sm text-muted-foreground"
-                  >
-                    No rows produced by this expression.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                rows.map((row, idx) => (
-                  <TableRow key={idx}>
-                    {columns.map((col) => (
-                      <TableCell key={`${idx}-${col}`} className="px-3 py-2 font-mono text-xs text-foreground">
-                        {String(row?.[col] ?? '')}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </div>
-    );
-  };
 
   return (
     <div className="space-y-6">
@@ -387,16 +314,6 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
                 Preview updates after you finish editing tokens or exit the fields.
               </span>
             )}
-            {preview.stale &&
-              !preview.loading &&
-              !expression.focused.expression &&
-              !expression.focused.columnName &&
-              basicBuilder.editingTokenId === null &&
-              !basicBuilder.dragActive && (
-                <span className="text-sm text-muted-foreground">
-                  Preview is out of date; it will refresh automatically.
-                </span>
-              )}
             {apply.currentMatchesApplied && !preview.loading && !preview.error && (
               <span className="text-sm text-muted-foreground">Latest expression already applied.</span>
             )}
@@ -404,19 +321,22 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            Preview
-            <HelpIcon
-              targetKey="preprocessing.common.preview"
-              label="Preview table"
-              tooltip={`Shows up to ${preview.limit} rows with the computed column appended. Preview refreshes after each apply.`}
-            />
-          </CardTitle>
-        </CardHeader>
-        <CardContent>{renderPreview()}</CardContent>
-      </Card>
+      <PreviewTable
+        title="Preview"
+        description="Shows the computed column appended. Preview refreshes after each apply."
+        columns={preview.columns}
+        data={preview.data}
+        pagination={preview.pagination}
+        loading={preview.loading}
+        error={preview.error}
+        ready={preview.ready}
+        readyMessage={preview.readyMessage}
+        page={preview.page}
+        pageSize={preview.pageSize}
+        onPageSizeChange={preview.setPageSize}
+        onPreviousPage={preview.onPreviousPage}
+        onNextPage={preview.onNextPage}
+      />
     </div>
   );
 };

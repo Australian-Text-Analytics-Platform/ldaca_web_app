@@ -633,12 +633,12 @@ export const useWorkspaceNodeMutations = ({
       nodesApi.slicePreview(nodeId, request, page, pageSize, authHeaders),
     computeColumn: (nodeId: string, request: ExpressionTransformRequest) =>
       computeColumnMutation.mutateAsync({ nodeId, request }),
-    computeColumnPreview: (nodeId: string, request: ExpressionTransformRequest) =>
-      nodesApi.computeColumnPreview(nodeId, request, authHeaders),
+    computeColumnPreview: (nodeId: string, request: ExpressionTransformRequest, page = 1, pageSize = 10) =>
+      nodesApi.computeColumnPreview(nodeId, request, page, pageSize, authHeaders),
     replaceText: (nodeId: string, request: ReplaceRequest) =>
       replaceTextMutation.mutateAsync({ nodeId, request }),
-    replaceTextPreview: (nodeId: string, request: ReplaceRequest) =>
-      nodesApi.replaceTextPreview(nodeId, request, authHeaders),
+    replaceTextPreview: (nodeId: string, request: ReplaceRequest, page = 1, pageSize = 10) =>
+      nodesApi.replaceTextPreview(nodeId, request, page, pageSize, authHeaders),
     castColumn: (nodeId: string, column: string, targetType: string, format?: string) =>
       castNodeMutation.mutateAsync({ nodeId, column, targetType, format }),
     renameColumn: (nodeId: string, column: string, newName: string) =>

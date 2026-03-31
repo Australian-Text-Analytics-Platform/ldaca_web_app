@@ -356,21 +356,25 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     return buildFilterRequestPayload(conditions, logic);
   })();
 
+  const conditionsComplete = conditions.length > 0 && conditions.every(isConditionComplete);
+
   const previewRequestSignature = (() => {
-    if (!previewRequest) return '';
-    const baseSignature = JSON.stringify(previewRequest);
-    return selectedNodeId ? `${selectedNodeId}::${baseSignature}` : baseSignature;
+    if (!selectedNodeId || !hasSelection) return '';
+    if (conditionsComplete && previewRequest) {
+      return `${selectedNodeId}::filter::${JSON.stringify(previewRequest)}`;
+    }
+    return `${selectedNodeId}::raw`;
   })();
 
-  const previewReady = hasSelection && conditions.length > 0 && conditions.every(isConditionComplete);
+  const previewReady = hasSelection;
 
-  const filterPreviewRequest = (() => {
-    if (!previewReady || !selectedNodeId || !previewRequest) {
+  const filterPreviewRequest: { nodeId: string; payload: FilterRequest | null } | null = (() => {
+    if (!hasSelection || !selectedNodeId) {
       return null;
     }
     return {
       nodeId: selectedNodeId,
-      payload: previewRequest,
+      payload: conditionsComplete && previewRequest ? previewRequest : null,
     };
   })();
 
@@ -380,12 +384,20 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     pageSize,
     signal: _signal,
   }: {
-    request: { nodeId: string; payload: FilterRequest };
+    request: { nodeId: string; payload: FilterRequest | null };
     page: number;
     pageSize: number;
     signal: AbortSignal;
   }) => {
-    const response = await filterPreview(request.nodeId, request.payload, page, pageSize);
+    if (request.payload) {
+      const response = await filterPreview(request.nodeId, request.payload, page, pageSize);
+      return {
+        data: Array.isArray(response?.data) ? (response.data as PreviewRow[]) : [],
+        columns: Array.isArray(response?.columns) ? response.columns : [],
+        pagination: response?.pagination ?? null,
+      };
+    }
+    const response = await nodesApi.data(request.nodeId, page, pageSize);
     return {
       data: Array.isArray(response?.data) ? (response.data as PreviewRow[]) : [],
       columns: Array.isArray(response?.columns) ? response.columns : [],
@@ -895,7 +907,7 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
   };
   const previewReadyMessage = !hasSelection
     ? 'Select a data block to preview filtered results.'
-    : 'Configure at least one complete condition to see a live preview of the filtered rows.';
+    : 'Showing original data. Configure conditions to preview filtered rows.';
 
   const summaryText = conditions.length === 0
     ? 'Define at least one condition to enable preview and filtering.'

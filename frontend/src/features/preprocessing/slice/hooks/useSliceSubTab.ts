@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { SliceRequest as SliceRequestPayload, FilterPreviewResponse } from '../../../../api/nodes';
+import { nodesApi, type SliceRequest as SliceRequestPayload, type FilterPreviewResponse } from '../../../../api/nodes';
 import type { NodeColumnSelection, WorkspaceNodeLike } from '../../../../components/NodeSelectionPanel';
 import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
 import type { PreviewPagination, PreviewRow } from '../../types';
@@ -169,8 +169,10 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
   const trimmedLength = lengthInput.trim();
   const lengthNumber = trimmedLength.length > 0 ? Number(trimmedLength) : null;
   const lengthValid =
-    lengthNumber === null || (Number.isInteger(lengthNumber) && lengthNumber >= 0);
+    lengthNumber !== null && Number.isInteger(lengthNumber) && lengthNumber >= 0;
   const lengthValue = lengthNumber === null ? undefined : lengthNumber;
+
+  const hasOperation = offsetValid && lengthValid;
 
   const rangeSummary = (() => {
     if (!hasSelection) {
@@ -180,15 +182,12 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
       return 'Offset must be a non-negative integer (zero-based row index).';
     }
     if (!lengthValid) {
-      return 'Length must be a non-negative integer when provided.';
-    }
-    if (lengthValue === undefined) {
-      return `Rows ${offsetNumber} → end of dataset.`;
+      return 'Length is required – enter the number of rows to include in the slice.';
     }
     if (lengthValue === 0) {
       return `Slice starting at row ${offsetNumber} returning zero rows (length = 0).`;
     }
-    const endRow = offsetNumber + lengthValue - 1;
+    const endRow = offsetNumber + (lengthValue ?? 0) - 1;
     return `Rows ${offsetNumber}–${endRow} inclusive (${lengthValue} total).`;
   })();
 
@@ -206,16 +205,19 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
     return `Last slice “${lastResult.nodeName}” (rows ${lastResult.offset}–${endRow}).`;
   })();
 
-  const previewReady = hasSelection && offsetValid && lengthValid;
+  const previewReady = hasSelection && offsetValid;
 
   interface SlicePreviewRequest {
     nodeId: string;
-    payload: SliceRequestPayload;
+    payload: SliceRequestPayload | null;
   }
 
   const slicePreviewRequest: SlicePreviewRequest | null = (() => {
     if (!previewReady || !selectedNodeId) {
       return null;
+    }
+    if (!hasOperation) {
+      return { nodeId: selectedNodeId, payload: null };
     }
     const payload = buildSlicePayload(offsetNumber, lengthValue);
     return {
@@ -226,6 +228,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
 
   const previewSignature = (() => {
     if (!slicePreviewRequest) return 'slice-preview-disabled';
+    if (!slicePreviewRequest.payload) return `${slicePreviewRequest.nodeId}::raw`;
     return `${slicePreviewRequest.nodeId}::${JSON.stringify(slicePreviewRequest.payload)}`;
   })();
 
@@ -238,7 +241,15 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
     page: number;
     pageSize: number;
   }) => {
-    const response = await slicePreview(request.nodeId, request.payload, page, pageSize);
+    if (request.payload) {
+      const response = await slicePreview(request.nodeId, request.payload, page, pageSize);
+      return {
+        data: Array.isArray(response?.data) ? (response.data as PreviewRow[]) : [],
+        columns: Array.isArray(response?.columns) ? response.columns : [],
+        pagination: (response?.pagination as PreviewPagination) ?? null,
+      };
+    }
+    const response = await nodesApi.data(request.nodeId, page, pageSize);
     return {
       data: Array.isArray(response?.data) ? (response.data as PreviewRow[]) : [],
       columns: Array.isArray(response?.columns) ? response.columns : [],
@@ -279,7 +290,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
 
   const previewReadyMessage = !hasSelection
     ? 'Select a data block to preview sliced rows.'
-    : 'Enter a valid offset (and optional length) to see a preview.';
+    : 'Showing original data. Enter offset and length to preview sliced rows.';
 
   const applyDisabled =
     !hasSelection || !offsetValid || !lengthValid || isSlicing || isLoading.operations;
@@ -294,7 +305,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
       return;
     }
     if (!lengthValid) {
-      setInlineError('Length must be a non-negative integer when provided.');
+      setInlineError('Length is required – enter a non-negative integer.');
       return;
     }
 

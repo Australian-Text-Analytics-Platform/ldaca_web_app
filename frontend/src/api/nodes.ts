@@ -62,12 +62,10 @@ export interface ReplaceRequest {
   replacement: string;
   output_column_name?: string | null;
   preview_limit?: number;
-}
-
-export interface ExpressionPreviewResponse {
-  columns: string[];
-  dtypes: Record<string, string>;
-  data: Record<string, unknown>[];
+  mode?: 'replace' | 'extract';
+  count?: 'all' | 'first';
+  n?: number | null;
+  connector?: string;
 }
 
 export interface ExpressionApplyResponse {
@@ -77,12 +75,6 @@ export interface ExpressionApplyResponse {
   expression: string;
   dtype?: string | null;
   message: string;
-}
-
-export interface ReplacePreviewResponse {
-  columns: string[];
-  dtypes: Record<string, string>;
-  data: Record<string, unknown>[];
 }
 
 export interface ReplaceApplyResponse {
@@ -187,10 +179,12 @@ export const nodesApi = {
   computeColumnPreview: (
     node: string,
     req: ExpressionTransformRequest,
+    page = 1,
+    pageSize = 10,
     headers: Record<string, string> = {}
-  ) => httpRequest<ExpressionPreviewResponse>(
+  ) => httpRequest<FilterPreviewResponse>(
     `/workspaces/nodes/${node}/compute-column/preview`,
-    { method: 'POST', headers, body: req }
+    { method: 'POST', headers, params: { page, page_size: pageSize }, body: req }
   ),
   computeColumn: (
     node: string,
@@ -203,10 +197,12 @@ export const nodesApi = {
   replaceTextPreview: (
     node: string,
     req: ReplaceRequest,
+    page = 1,
+    pageSize = 10,
     headers: Record<string, string> = {}
-  ) => httpRequest<ReplacePreviewResponse>(
+  ) => httpRequest<FilterPreviewResponse>(
     `/workspaces/nodes/${node}/replace/preview`,
-    { method: 'POST', headers, body: req }
+    { method: 'POST', headers, params: { page, page_size: pageSize }, body: req }
   ),
   replaceText: (
     node: string,

@@ -12,7 +12,7 @@ import { SliceSubTab } from '../../preprocessing/slice/SliceSubTab';
 import { AggregateSubTab } from '../../preprocessing/aggregate/AggregateSubTab';
 import { ReplaceSubTab } from '../../preprocessing/replace/ReplaceSubTab';
 
-type DataPrepSubtab = 'filter' | 'slice' | 'join' | 'concat' | 'replace' | 'aggregate';
+type DataPrepSubtab = 'filter' | 'slice' | 'join' | 'concat' | 'find' | 'aggregate';
 
 const DataPreprocessingFeature: React.FC = () => {
   const { selectedNodeId, selectedNode, selectedNodes, selectedNodeIds } = useWorkspaceSelection();
@@ -48,7 +48,7 @@ const DataPreprocessingFeature: React.FC = () => {
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Data Preprocessing</h1>
           <p className="text-sm text-muted-foreground">
-            Prepare your dataset with filtering, slicing, join, stack, replace, and create tools.
+            Prepare your dataset with filtering, slicing, join, stack, find, and create tools.
           </p>
         </div>
       </div>
@@ -63,7 +63,7 @@ const DataPreprocessingFeature: React.FC = () => {
           <TabsTrigger value="slice">Slice</TabsTrigger>
           <TabsTrigger value="join">Join</TabsTrigger>
           <TabsTrigger value="concat">Stack</TabsTrigger>
-          <TabsTrigger value="replace">Replace</TabsTrigger>
+          <TabsTrigger value="find">Find</TabsTrigger>
           <TabsTrigger value="aggregate">Create</TabsTrigger>
         </TabsList>
 
@@ -118,7 +118,7 @@ const DataPreprocessingFeature: React.FC = () => {
           />
         </TabsContent>
 
-        <TabsContent value="replace" className="space-y-6">
+        <TabsContent value="find" className="space-y-6">
           <ReplaceSubTab
             selectedNodeId={selectedNodeId}
             selectedNodes={selectedNodes}

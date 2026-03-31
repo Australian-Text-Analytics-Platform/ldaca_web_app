@@ -94,7 +94,7 @@ export const SliceSubTab: React.FC<SliceSubTabProps> = (props) => {
             </div>
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <Label htmlFor="slice-length">Length (optional)</Label>
+                <Label htmlFor="slice-length">Length</Label>
                 <HelpIcon targetKey="preprocessing.slice.length" label="Slice length" />
               </div>
               <Input
@@ -104,9 +104,9 @@ export const SliceSubTab: React.FC<SliceSubTabProps> = (props) => {
                 value={form.lengthInput}
                 onChange={(event) => form.setLengthInput(event.target.value)}
                 disabled={!hasSelection}
-                placeholder="Leave blank to slice until the end"
+                placeholder="Number of rows to include"
               />
-              <p className="text-xs text-muted-foreground">Number of rows to include. Leave blank to read through the end.</p>
+              <p className="text-xs text-muted-foreground">Number of rows to include from the offset.</p>
             </div>
           </div>
 
