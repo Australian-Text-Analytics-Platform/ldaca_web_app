@@ -66,6 +66,8 @@ describe('TokenFrequencyResultsPanel', () => {
         onStatsPageChange={vi.fn()}
         onStatsRowsPerPageChange={vi.fn()}
         onDownloadFrequencyCsv={vi.fn()}
+        statsTokenFilter=""
+        onStatsTokenFilterChange={vi.fn()}
       />
     );
 

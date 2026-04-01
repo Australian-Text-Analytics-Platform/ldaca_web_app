@@ -2,7 +2,7 @@ import type { NodeResultView, NormalizedNodeResult, TokenFrequencyStatisticsEntr
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Download, SortAsc, SortDesc } from 'lucide-react';
+import { Download, Search, SortAsc, SortDesc } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import HelpIcon from '@/components/help/HelpIcon';
 import { Wordcloud } from '@visx/wordcloud';
@@ -34,6 +34,8 @@ type TokenFrequencyUnifiedTokenSectionProps = {
   statsRowsPerPage: number;
   onStatsRowsPerPageChange: (rows: number) => void;
   onDownloadFrequencyCsv: (label: string, rows: unknown[]) => void;
+  statsTokenFilter: string;
+  onStatsTokenFilterChange: (value: string) => void;
 };
 
 type StatisticsColumn = {
@@ -186,6 +188,8 @@ export const TokenFrequencyUnifiedTokenSection = ({
   statsRowsPerPage,
   onStatsRowsPerPageChange,
   onDownloadFrequencyCsv,
+  statsTokenFilter,
+  onStatsTokenFilterChange,
 }: TokenFrequencyUnifiedTokenSectionProps) => {
   const hasMultipleNodes = normalizedNodeResults.length >= 2 || nodeDisplayResults.length >= 2 || lastCompareNodeIds.length >= 2;
 
@@ -382,7 +386,7 @@ export const TokenFrequencyUnifiedTokenSection = ({
         </CardContent>
       </Card>
 
-      {sortedStatistics.length > 0 && (
+      {(Array.isArray(statistics) && statistics.length > 0) && (
         <div className="space-y-3 rounded-lg border p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -403,8 +407,25 @@ export const TokenFrequencyUnifiedTokenSection = ({
             </Button>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-300 border-collapse text-sm">
+          <div className="flex items-center gap-2">
+            <Search className="h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Filter tokens (use * as wildcard, e.g. pre* or *ing)"
+              value={statsTokenFilter}
+              onChange={(event) => onStatsTokenFilterChange(event.target.value)}
+              className="h-8 max-w-sm"
+            />
+            {statsTokenFilter && (
+              <span className="text-xs text-muted-foreground">
+                {sortedStatistics.length} match{sortedStatistics.length !== 1 ? 'es' : ''}
+              </span>
+            )}
+          </div>
+
+          {sortedStatistics.length > 0 ? (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-300 border-collapse text-sm">
               <thead>
                 <tr className="border-b text-left">
                   {STATISTICS_COLUMNS.map((column) => {
@@ -479,6 +500,10 @@ export const TokenFrequencyUnifiedTokenSection = ({
               </Button>
             </div>
           </div>
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground">No tokens match the current filter.</p>
+          )}
         </div>
       )}
     </div>

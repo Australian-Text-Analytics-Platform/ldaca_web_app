@@ -93,6 +93,8 @@ const baseUnifiedSectionProps = {
   statsRowsPerPage: 25,
   onStatsRowsPerPageChange: vi.fn(),
   onDownloadFrequencyCsv: vi.fn(),
+  statsTokenFilter: '',
+  onStatsTokenFilterChange: vi.fn(),
 };
 
 describe('Token frequency result layouts', () => {
