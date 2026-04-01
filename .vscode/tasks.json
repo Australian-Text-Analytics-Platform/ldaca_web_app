@@ -6,11 +6,11 @@
         {
             "label": "Start Backend",
             "type": "shell",
-            "command": "uv run uvicorn ldaca_web_app_backend.main:app --reload --port 8001",
+            "command": "uv run uvicorn ldaca_web_app.main:app --reload --port 8001",
             "options": {
-                "cwd": "${workspaceFolder}/ldaca_web_app_backend",
+                "cwd": "${workspaceFolder}/backend",
                 "env": {
-                    "PYTHONPATH": "${workspaceFolder}/ldaca_web_app_backend/src"
+                    "PYTHONPATH": "${workspaceFolder}/backend/src"
                 }
             },
             "problemMatcher": [],
@@ -102,7 +102,7 @@
         {
             "label": "Test All",
             "type": "shell",
-            "command": "(cd docworkspace && uv run pytest && uvx ty check) && (cd ldaca_web_app_backend && uv run pytest && uvx ty check) && (cd polars-text && uv run pytest && uvx ty check) && (cd frontend && npm run test -- --run && npm run lint && npm run build)",
+            "command": "(cd docworkspace && uv run pytest && uvx ty check) && (cd backend && uv run pytest && uvx ty check) && (cd polars-text && uv run pytest && uvx ty check) && (cd frontend && npm run test -- --run && npm run lint && npm run build)",
             "options": {
                 "cwd": "${workspaceFolder}"
             },

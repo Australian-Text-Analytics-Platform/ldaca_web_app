@@ -61,7 +61,7 @@ jobs:
         with:
           path: |
             ~/AppData/Local/uv
-          key: ${{ runner.os }}-uv-${{ hashFiles('ldaca_web_app_backend/uv.lock', 'ldaca_web_app_backend/pyproject.toml') }}
+          key: ${{ runner.os }}-uv-${{ hashFiles('backend/uv.lock', 'backend/pyproject.toml') }}
           restore-keys: |
             ${{ runner.os }}-uv-
 
@@ -105,7 +105,7 @@ jobs:
             exit 1
           }
 
-          & $pythonExe -c "import encodings, ldaca_web_app_backend, polars_text, sys; print(sys.version)"
+          & $pythonExe -c "import encodings, ldaca_web_app, polars_text, sys; print(sys.version)"
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v7

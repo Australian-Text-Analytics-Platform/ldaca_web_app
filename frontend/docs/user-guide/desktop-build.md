@@ -24,4 +24,4 @@
 
 **Question:** _Where are the detailed backend packaging steps?_
 
-**Answer:** See the backend packaging reference in `ldaca_web_app/ldaca_web_app_backend/docs/reference/packaging.md`.
+**Answer:** See the backend packaging reference in `ldaca_web_app/backend/docs/reference/packaging.md`.
