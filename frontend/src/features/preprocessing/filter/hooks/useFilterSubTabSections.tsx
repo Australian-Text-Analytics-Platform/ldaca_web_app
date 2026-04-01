@@ -6,6 +6,7 @@ import type { NodeColumnSelection, WorkspaceNodeLike } from '../../../../compone
 import { DateTimePickerField } from '../../utils/dateTimeUtils';
 import { normalizeTypeName, getOperatorsForType, formatPreviewValue } from '../../utils/typeUtils';
 import { ISO_PLACEHOLDER } from '../../utils/dateTimeHelpers';
+import { buildFilterAutoNodeName } from '../../utils/autoNodeNames';
 import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
 import { buildFilterRequestPayload, isConditionComplete } from '../utils/serializers';
 import { FilterValueChecklist } from '../components/FilterValueChecklist';
@@ -101,6 +102,7 @@ export interface UseFilterSubTabSectionsResult {
   newNodeInput: {
     value: string;
     setValue: (value: string) => void;
+    placeholder: string;
     disabled: boolean;
   };
   summaryText: string;
@@ -344,12 +346,14 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
   }, [conditions, currentWorkspaceId, selectedNodeId, getCategoricalKey, ensureCategoricalOptions]);
 
   useEffect(() => {
-    if (selectedNode?.name) {
-      setNewNodeName(`${selectedNode.name}_filtered`);
-    } else if (!selectedNodeId) {
-      setNewNodeName('');
-    }
-  }, [selectedNode, selectedNodeId]);
+    setNewNodeName('');
+  }, [selectedNodeId]);
+
+  const autoNodeName = buildFilterAutoNodeName({
+    baseName: selectedNode?.name || selectedNodeId,
+    conditions,
+    logic,
+  });
 
   const previewRequest = (() => {
     if (!conditions.length) return null;
@@ -893,7 +897,8 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
       return;
     }
 
-    const request: FilterRequest = buildFilterRequestPayload(conditions, logic, newNodeName);
+    const requestName = newNodeName.trim() || autoNodeName;
+    const request: FilterRequest = buildFilterRequestPayload(conditions, logic, requestName);
 
     try {
       setIsFiltering(true);
@@ -947,6 +952,7 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     newNodeInput: {
       value: newNodeName,
       setValue: setNewNodeName,
+      placeholder: autoNodeName,
       disabled: !hasSelection,
     },
     summaryText,

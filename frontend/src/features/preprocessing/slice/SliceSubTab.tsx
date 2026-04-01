@@ -170,7 +170,7 @@ export const SliceSubTab: React.FC<SliceSubTabProps> = (props) => {
               type="text"
               value={form.newNodeName}
               onChange={(event) => form.setNewNodeName(event.target.value)}
-              placeholder={form.mode === 'slice' ? 'Enter name for sliced data block' : 'Enter name for sampled data block'}
+              placeholder={form.newNodeNamePlaceholder}
               disabled={!hasSelection}
             />
           </div>

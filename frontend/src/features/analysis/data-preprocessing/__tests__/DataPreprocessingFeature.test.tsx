@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import DataPreprocessingFeature from '../DataPreprocessingFeature';
@@ -9,6 +9,8 @@ window.HTMLElement.prototype.scrollIntoView = vi.fn();
 
 const mockSliceNode = vi.fn();
 const mockSlicePreview = vi.fn();
+const mockFilterNode = vi.fn();
+const mockFilterPreview = vi.fn();
 const mockComputeColumnPreview = vi.fn();
 const mockComputeColumn = vi.fn();
 const mockReplacePreview = vi.fn();
@@ -51,8 +53,8 @@ vi.mock('@/hooks/useWorkspaceData', () => ({
 
 vi.mock('@/hooks/useWorkspaceActions', () => ({
   useWorkspaceActions: () => ({
-    filterNode: vi.fn(),
-    filterPreview: vi.fn(),
+    filterNode: mockFilterNode,
+    filterPreview: mockFilterPreview,
     joinNodes: vi.fn(),
     concatNodes: vi.fn(),
     concatPreview: vi.fn(),
@@ -83,6 +85,21 @@ vi.mock('@/components/help/HelpIcon', () => ({
 describe('DataPreprocessingFeature replace tab', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockFilterPreview.mockResolvedValue({
+      columns: ['Body', 'Count'],
+      dtypes: {
+        Body: 'Utf8',
+        Count: 'Int64',
+      },
+      data: [{ Body: 'candidate tweet', Count: 1 }],
+      pagination: {
+        page: 1,
+        page_size: 10,
+        total_rows: 1,
+        total_pages: 1,
+      },
+    });
+    mockFilterNode.mockResolvedValue(undefined);
     mockSlicePreview.mockResolvedValue({
       columns: ['Body', 'Count'],
       dtypes: {
@@ -188,6 +205,10 @@ describe('DataPreprocessingFeature replace tab', () => {
     fireEvent.change(screen.getByLabelText('Fraction / Count'), { target: { value: '0.4' } });
     fireEvent.change(screen.getByLabelText('Random seed'), { target: { value: '7' } });
 
+    const sampleNameInput = screen.getByLabelText('New data block name');
+    expect(sampleNameInput).toHaveValue('');
+    expect(sampleNameInput).toHaveAttribute('placeholder', 'Corpus_sampled_fr_0_4_rs_7');
+
     fireEvent.click(screen.getByRole('button', { name: 'Add to Workspace' }));
 
     await waitFor(() => {
@@ -197,8 +218,49 @@ describe('DataPreprocessingFeature replace tab', () => {
         mode: 'random_sample',
         sample_size: 0.4,
         random_seed: 7,
-        new_node_name: 'Corpus_sampled',
+        new_node_name: 'Corpus_sampled_fr_0_4_rs_7',
       });
+    });
+  });
+
+  it('uses a smart filter placeholder name and preserves typed overrides', async () => {
+    const user = userEvent.setup();
+
+    render(<DataPreprocessingFeature />);
+
+    const filterPanel = screen.getByRole('tabpanel', { name: 'Filter' });
+    const [columnSelect] = within(filterPanel).getAllByRole('combobox');
+    columnSelect.focus();
+    await user.keyboard('{ArrowDown}{Enter}');
+
+    const valueInput = await screen.findByPlaceholderText('Enter value');
+    fireEvent.change(valueInput, { target: { value: 'candidate' } });
+
+    const nameInput = within(filterPanel).getByLabelText('New data block name');
+    expect(nameInput).toHaveValue('');
+    expect(nameInput).toHaveAttribute('placeholder', 'Corpus_filtered_by_Body_eq_candidate');
+
+    fireEvent.change(nameInput, { target: { value: 'custom_filter_name' } });
+    fireEvent.change(valueInput, { target: { value: 'election' } });
+
+    expect(nameInput).toHaveValue('custom_filter_name');
+
+    fireEvent.click(within(filterPanel).getByRole('button', { name: 'Add to Workspace' }));
+
+    await waitFor(() => {
+      const [nodeId, payload] = mockFilterNode.mock.calls[0] ?? [];
+      expect(nodeId).toBe('node-1');
+      expect(payload).toMatchObject({
+        logic: 'and',
+        new_node_name: 'custom_filter_name',
+      });
+      expect(payload.conditions).toMatchObject([
+        {
+          column: 'Body',
+          operator: 'eq',
+          value: 'election',
+        },
+      ]);
     });
   });
 });

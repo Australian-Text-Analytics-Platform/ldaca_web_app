@@ -3,6 +3,7 @@ import { nodesApi, type SliceRequest as SliceRequestPayload, type FilterPreviewR
 import type { NodeColumnSelection, WorkspaceNodeLike } from '../../../../components/NodeSelectionPanel';
 import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
 import type { PreviewPagination, PreviewRow } from '../../types';
+import { buildSamplingAutoNodeName } from '../../utils/autoNodeNames';
 import { buildWorkspaceNodeMap, deriveNodeLabel } from '../../utils/nodeMetadata';
 
 export interface SliceOperationResult {
@@ -71,6 +72,7 @@ interface SliceFormControllers {
   setRandomSeedInput: (value: string) => void;
   newNodeName: string;
   setNewNodeName: (value: string) => void;
+  newNodeNamePlaceholder: string;
 }
 
 interface SlicePreviewConfig {
@@ -187,13 +189,12 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
       setLastResult(null);
       return;
     }
-    const baseName = selectedNodeLabel || selectedNodeId;
     setMode('slice');
     setOffsetInput('0');
     setLengthInput('');
     setSampleSizeInput('');
     setRandomSeedInput('');
-    setNewNodeName(`${baseName}_sliced`);
+    setNewNodeName('');
     setLastResult(null);
     setInlineError(null);
   }, [selectedNodeId, selectedNodeLabel]);
@@ -202,8 +203,6 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
     if (!selectedNodeId) {
       return;
     }
-    const baseName = selectedNodeLabel || selectedNodeId;
-    setNewNodeName(mode === 'slice' ? `${baseName}_sliced` : `${baseName}_sampled`);
     setLastResult(null);
     setInlineError(null);
   }, [mode, selectedNodeId, selectedNodeLabel]);
@@ -251,6 +250,15 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
   const randomSeedValue = trimmedRandomSeed.length === 0 ? undefined : randomSeedValid ? randomSeedNumber ?? undefined : undefined;
 
   const hasOperation = mode === 'slice' ? offsetValid && lengthValid : sampleSizeValid && randomSeedValid;
+
+  const autoNodeName = buildSamplingAutoNodeName({
+    baseName: selectedNodeLabel || selectedNodeId,
+    mode,
+    offset: offsetValid ? offsetNumber : undefined,
+    length: lengthValid ? lengthValue : undefined,
+    sampleSize: sampleSizeValid ? sampleSizeValue : undefined,
+    randomSeed: randomSeedValid ? randomSeedValue : undefined,
+  });
 
   const rangeSummary = (() => {
     if (!hasSelection) {
@@ -442,9 +450,9 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
       sampleSizeValue,
       randomSeedValue,
     });
-    const trimmedName = newNodeName.trim();
-    if (trimmedName.length > 0) {
-      payload.new_node_name = trimmedName;
+    const requestedName = newNodeName.trim() || autoNodeName;
+    if (requestedName) {
+      payload.new_node_name = requestedName;
     }
 
     setInlineError(null);
@@ -461,7 +469,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
       const responseName =
         response?.node_name?.trim?.() ||
         response?.data?.node_name?.trim?.() ||
-        payload.new_node_name ||
+        requestedName ||
         `${selectedNodeLabel || selectedNodeId}_${mode === 'slice' ? 'sliced' : 'sampled'}`;
       const resultNodeId = response?.node_id;
       setLastResult({
@@ -509,6 +517,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
       setRandomSeedInput,
       newNodeName,
       setNewNodeName,
+      newNodeNamePlaceholder: autoNodeName,
     },
     summaries: {
       range: rangeSummary,
