@@ -8,10 +8,10 @@
 
 The Data Preprocessing tools transform and prepare raw text data blocks into analysis-ready datasets. Each sub-tab helps you shape data in a certain way, and every action creates a **new data block** so the original data blocks are not overwritten and all operations are recoverable. There are currently six tool tabs in this section:
 1. Filter - Create a subset of the selected data block based on one or a series of data-driven logic operations;
-2. Slice - Create a subset of the selected data block by sampling the data with a defined interval.
+2. Sample - Create a subset of the selected data block by either sampling a certain fraction/number of rows randomly, or slice a chunk of data from the data block.
 3. Join - Create a new data block by linking two selected data blocks on certain columns with common values.
 4. Stack - Create a new data block by connecting/stacking two selected data blocks, which share identical column headers.
-5. Match - Use regular expression (RegEx) to match certain text pattern from the selected text column, then either remove, replace or extract the matched texts to the selected, or a different, column in the data block.
+5. Find - Use regular expression (RegEx) to match certain text pattern from the selected text column, then either remove, replace or extract the matched texts to the selected, or a different, column in the data block.
 6. Create - Combine the contents from two or more columns and save the outcomes as a new column in the data block.
 
 In order to process relevant data block(s) in any tab, the user needs to:
