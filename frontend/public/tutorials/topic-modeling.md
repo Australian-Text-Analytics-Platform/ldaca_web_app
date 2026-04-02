@@ -6,7 +6,9 @@
 
 ![Topic modeling screenshot](tutorials/assets/topic_modeling.png)
 
-Topic modeling helps you discover themes in a large collection of documents. The app uses BERTopic under the hood.
+Topic modeling helps you discover themes in a large collection of documents. The app uses [BERTopic](https://maartengr.github.io/BERTopic/index.html) under the hood. There are several other popular Topic Modelling methods and they all work differently for a similar purpose (uncovering sematic topics). 
+
+BERTopic is a relatively new topic modelling method based on contextual sentence embeddings,
 
 > **Placeholder (image):** Screenshot of topic modeling setup panel and results.
 
