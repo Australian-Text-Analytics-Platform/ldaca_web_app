@@ -10,6 +10,7 @@ import { Label } from '../../../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
 import { Tag } from '../../../components/ui/tag';
 import { PreviewTable } from '../components/PreviewTable';
+import { acceptPlaceholderOnTab } from '../utils/placeholderTabFill';
 import { JOIN_TYPE_OPTIONS, type JoinType } from '../types';
 import { useJoinSubTab, type JoinSubTabProps } from './hooks/useJoinSubTab';
 
@@ -132,6 +133,7 @@ export const JoinSubTab: React.FC<JoinSubTabProps> = (props) => {
                 value={joinNewNodeName}
                 placeholder={joinNamePlaceholder}
                 onChange={(event) => setJoinNewNodeName(event.target.value)}
+                onKeyDown={(event) => acceptPlaceholderOnTab({ event, value: joinNewNodeName, setValue: setJoinNewNodeName })}
                 autoComplete="off"
               />
               <p className="text-xs text-muted-foreground">Leave blank to use the suggested name shown in gray.</p>

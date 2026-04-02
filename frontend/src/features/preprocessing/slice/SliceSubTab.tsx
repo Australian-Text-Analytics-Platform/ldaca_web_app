@@ -10,6 +10,7 @@ import { Label } from '../../../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
 import { Tag } from '../../../components/ui/tag';
 import { PreviewTable } from '../components/PreviewTable';
+import { acceptPlaceholderOnTab } from '../utils/placeholderTabFill';
 import { useSliceSubTab, type SliceSubTabProps } from './hooks/useSliceSubTab';
 
 export type { SliceSubTabProps } from './hooks/useSliceSubTab';
@@ -170,6 +171,7 @@ export const SliceSubTab: React.FC<SliceSubTabProps> = (props) => {
               type="text"
               value={form.newNodeName}
               onChange={(event) => form.setNewNodeName(event.target.value)}
+              onKeyDown={(event) => acceptPlaceholderOnTab({ event, value: form.newNodeName, setValue: form.setNewNodeName })}
               placeholder={form.newNodeNamePlaceholder}
               disabled={!hasSelection}
             />

@@ -223,6 +223,37 @@ describe('DataPreprocessingFeature replace tab', () => {
     });
   });
 
+  it('fills the suggested sample name when tab is pressed on an empty name field', async () => {
+    const user = userEvent.setup();
+
+    render(<DataPreprocessingFeature />);
+
+    const [filterTab] = screen.getAllByRole('tab', { name: 'Filter' });
+    filterTab.focus();
+    await user.keyboard('{ArrowRight}');
+
+    await waitFor(() => {
+      expect(screen.getByRole('tab', { name: 'Sample' })).toHaveAttribute('aria-selected', 'true');
+    });
+
+    const samplePanel = screen.getByRole('tabpanel', { name: 'Sample' });
+
+    const [samplingMethodSelect] = within(samplePanel).getAllByRole('combobox');
+    samplingMethodSelect.focus();
+    await user.keyboard('{ArrowDown}{ArrowDown}{Enter}');
+
+    fireEvent.change(within(samplePanel).getByPlaceholderText('e.g. 0.4 for 40% or 100 for 100 rows'), { target: { value: '0.4' } });
+    fireEvent.change(within(samplePanel).getByPlaceholderText('Optional seed for repeatable samples'), { target: { value: '7' } });
+
+    const sampleNameInput = within(samplePanel).getByPlaceholderText('Corpus_sampled_fr_0_4_rs_7');
+    expect(sampleNameInput).toHaveValue('');
+    expect(sampleNameInput).toHaveAttribute('placeholder', 'Corpus_sampled_fr_0_4_rs_7');
+
+    fireEvent.keyDown(sampleNameInput, { key: 'Tab', code: 'Tab' });
+
+    expect(sampleNameInput).toHaveValue('Corpus_sampled_fr_0_4_rs_7');
+  });
+
   it('uses a smart filter placeholder name and preserves typed overrides', async () => {
     const user = userEvent.setup();
 

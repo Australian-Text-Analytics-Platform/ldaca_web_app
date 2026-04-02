@@ -9,6 +9,7 @@ import { Input } from '../../../components/ui/input';
 import { Label } from '../../../components/ui/label';
 import { Tag } from '../../../components/ui/tag';
 import { PreviewTable } from '../components/PreviewTable';
+import { acceptPlaceholderOnTab } from '../utils/placeholderTabFill';
 import { useConcatSubTab, type ConcatSubTabProps } from './hooks/useConcatSubTab';
 
 export type { ConcatSubTabProps } from './hooks/useConcatSubTab';
@@ -114,6 +115,7 @@ export const ConcatSubTab: React.FC<ConcatSubTabProps> = (props) => {
                 value={form.value}
                 placeholder={form.placeholder}
                 onChange={(event) => form.setValue(event.target.value)}
+                onKeyDown={(event) => acceptPlaceholderOnTab({ event, value: form.value, setValue: form.setValue })}
               />
               <p className="text-xs text-muted-foreground">Leave blank to use the suggested name shown in gray.</p>
             </div>
