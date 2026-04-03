@@ -6,13 +6,13 @@
 
 ![Preprocessing screenshot](tutorials/assets/preprocessing.png)
 
-The Data Preprocessing tools transform and prepare raw text data blocks into analysis-ready datasets. Each sub-tab helps you shape data in a certain way, and every action creates a **new data block** so the original data blocks are not overwritten and all operations are recoverable. There are currently six tool tabs in this section:
-1. Filter - Create a subset of the selected data block based on one or a series of data-driven logic operations;
-2. Sample - Create a subset of the selected data block by either sampling a certain fraction/number of rows randomly, or slice a chunk of data from the data block.
-3. Join - Create a new data block by linking two selected data blocks on certain columns with common values.
-4. Stack - Create a new data block by connecting/stacking two selected data blocks, which share identical column headers.
-5. Find - Use regular expression (RegEx) to match certain text pattern from the selected text column, then either remove, replace or extract the matched texts to the selected, or a different, column in the data block.
-6. Create - Combine the contents from two or more columns and save the outcomes as a new column in the data block.
+The Data Preprocessing tools transform and prepare raw text data blocks into analysis-ready datasets. Each tab lets you transform data in a specific way, and every action creates a **new data block** so the original data blocks are not overwritten and all operations are recoverable. There are currently six tool tabs in this section:
+1. Filter - Create a subset of the selected data block based on one or more filter conditions.
+2. Sample - Create a subset of the selected data block by either randomly sampling a certain fraction or number of rows, or by slicing a contiguous chunk of rows from the data block.
+3. Join - Create a new data block by linking two selected data blocks on columns with common values.
+4. Stack - Create a new data block by vertically stacking two selected data blocks that share identical column headers.
+5. Find - Use Regular Expressions (RegEx) to match text patterns in the selected text column, then remove, replace, or extract the matched text into the same column or a new column in the data block.
+6. Create - Combine the contents of two or more columns and save the result as a new column in the data block.
 
 In order to process relevant data block(s) in any tab, the user needs to:
 
@@ -27,7 +27,7 @@ These controls appear in multiple preprocessing tabs and behave the same way acr
 
 <h3 id="help-preprocessing-common-node-selection">Data block selection panel</h3>
 
-Select one or more data blocks from the workspace graph or the data block list. Each tool will only work when designated number of data blocks are selected.
+Select one or more data blocks from the workspace graph or the data block list. Each tool will only work when the required number of data blocks are selected.
 
 <h3 id="help-preprocessing-common-apply-button">Apply action</h3>
 
@@ -47,11 +47,11 @@ The filter tool keeps only the rows that match defined conditions. Use it to rem
 
 ![Filter conditions screenshot](tutorials/assets/preprocessing/filter_conditions.png)
 
-Define one or more column-based logic conditions, where each condition can be defined differently based on the data type of selected column. All conditional outcomes can be combined by either AND or OR logic operation for the final filtered outcomes.
-1. Use the "Add Condition" button to add more conditions to be applied.
-2. Select the desired combining logic operation for all conditions. The webApp does not support chain of various logic operations.
-3. All individual conditions can be negated by checking the "negate" checkbox.
-4. The preview pane displays the number of rows to be filtered based on the current condition set. It is possible to return an empty data block if there isn't any eligible row from the selected data block, or the conditions are conflicting.
+Define one or more column-based filter conditions. Each condition can be configured differently depending on the data type of the selected column. All conditions can be combined using either AND or OR logic.
+1. Use the "Add Condition" button to add additional conditions.
+2. Select the combining logic for all conditions. The app does not support mixed logic chains (e.g. a mix of AND and OR).
+3. Any individual condition can be negated by checking its "Negate" checkbox.
+4. The preview pane displays the number of rows that match the current condition set. It is possible to produce an empty data block if no rows satisfy the conditions or if the conditions conflict with one another.
 
 <h3 id="help-preprocessing-filter-new-node-name">New data block name</h3>
 
@@ -71,25 +71,25 @@ Practice exercise:
 
 ![Sample screenshot](tutorials/assets/preprocessing/sample.png)
 
-Sample tool extracts either a contiguous range or a randomised set of rows from the selected data block. Extracting a small and representive subset of the data makes exploring and debugging quicker than working with the full size data.
+The Sample tool extracts either a contiguous range or a randomly selected set of rows from the selected data block. Extracting a small, representative subset of the data makes exploring and debugging quicker than working with the full-size dataset.
 
 <h3 id="help-preprocessing-slice-offset">Slice</h3>
 
 ![Slice screenshot](tutorials/assets/preprocessing/sample_slice.png)
 
-The slice option extract a continous chunk of data from the data block. The offset parameters set the start row of the chunk (first row as 0). 
+The slice option extracts a continuous chunk of rows from the data block. The offset parameter sets the starting row of the chunk (where the first row is 0).
 
 <h3 id="help-preprocessing-slice-length">Length</h3>
 
-The number of rows to include in the extraction. Leave it blank to slice until the end of the data block. If you want the sub-block to include the row 101-200, set offset = 100 and length = 100.
+The number of rows to include in the extraction. Leave it blank to slice until the end of the data block. To include rows 101–200, set offset = 100 and length = 100.
 
 <h3 id="help-preprocessing-sample-fraction">Fraction/Count</h3>
 
 ![Random screenshot](tutorials/assets/preprocessing/sample_random.png)
 
-The random sample option extracts a set of randomised rows from the data block. You can define to sample either a proportion (e.g. 30%) or a certain number of rows (e.g. 500) from the selected data block. 
+The random sample option extracts a randomly selected set of rows from the data block. You can specify either a proportion (e.g. 30%) or a fixed number of rows (e.g. 500) from the selected data block.
 
-For proportional sampling, enter a decimal number between 0 and 1 for this parameter. For example, 0.3 to extract 30% of the selected data block. Or a whole number for number of rows, e.g. 100 to extract 100 rows. If the whole number is greater than the size of the data block, all rows will be extracted in a shuffled order.
+For proportional sampling, enter a decimal number between 0 and 1. For example, enter 0.3 to extract 30% of the data block. For a fixed row count, enter a whole number, e.g. 100 to extract 100 rows. If the number entered exceeds the size of the data block, all rows will be extracted in a shuffled order.
 
 <h3 id="help-preprocessing-sample-seed">Random Seed</h3>
 
@@ -100,7 +100,7 @@ The random seed controls the reproducibility of the random sampling process. Set
 
 <h3 id="help-preprocessing-slice-new-node-name">New data block name</h3>
 
-Label the slice output so it is easy to find later. The pre-populated name include the parameters of the selected operation.
+Label the sample output so it is easy to find later. The pre-populated name includes the parameters of the selected operation.
 
 Key controls include the data block selection panel, offset and length inputs, the new data block name field, the range summary, the **Add to Workspace** action, and the preview table for the slice output.
 
@@ -118,19 +118,19 @@ Join combines two data blocks using matching columns. Use it when your text data
 
 <h3 id="help-preprocessing-join-section">Join sub-tab overview</h3>
 
-The Join sub-tab guides you through selecting two data blocks, choosing the columns from each data block that consist of common values, then "stitch" both data blocks side-by-side together based on the joining columns.
+The Join tab guides you through selecting two data blocks, choosing the columns from each data block that share common values, and then joining both data blocks side by side based on those columns.
 
-Depending on the type of the joining method and common values between two data blocks, the outcome data block can be longer or shorter than the selected source data blocks, but it will include all columns from both data blocks hence wider than the source data blocks.
+Depending on the join type and the common values between the two data blocks, the resulting data block can have more or fewer rows than either source, but it will include all columns from both data blocks, making it wider than either source.
 
 <h3 id="help-preprocessing-join-column-picker">Join column picker</h3>
 
 ![Join column picker screenshot](tutorials/assets/preprocessing/join_column_picker.png)
 
-Column pickers choose which column to match in each data block.
+The column pickers let you choose which column to match in each data block.
 
 - Pick columns that represent the same identifier in both data blocks.
 - Clean, consistent IDs produce the best joins.
-- The webApp will *guess* and pre-populate the columns that are more likely to share common values from both data blocks, but the user is responsible to select the correct joining columns and type of joining method.
+- The app will *guess* and pre-populate the columns most likely to share common values between the two data blocks, but you are responsible for selecting the correct joining columns and join type.
 
 <h3 id="help-preprocessing-join-type">Join type selector</h3>
 
@@ -185,7 +185,7 @@ Practice exercise:
 <h2 id="help-preprocessing-find-replace">Find</h2>
 
 ![Find screenshot](tutorials/assets/preprocessing/find.png)
-The Find pre-processing tool can do a lot of versitle text column manipulation, including cleaning, extracting, replacing and creating, powered by the famous Regular Expression (RegEx). You need to know how to write RegEx patterns for matching desired words and phrases for certain purposes.
+The Find tool supports versatile text column manipulation, including cleaning, extracting, replacing, and creating content, powered by Regular Expressions (RegEx). You need to know how to write RegEx patterns to match the words and phrases you need.
 
 The **Find** tool supports two operations on the matched text contents, Replace or Extract. The outcomes can overwrite the same column of text or add to the data block as a new column, if the column name is defined.
 
@@ -201,7 +201,7 @@ The **Find** tool supports two operations on the matched text contents, Replace 
 
 ![Create screenshot](tutorials/assets/preprocessing/create.png)
 
-The **create** tab allows user to builds new columns in a selected data block by merging contents from multiple columns as texts. This is useful when different columns are to be analysed as a whole, e.g. combining title, abstract and body text as the full article content.
+The **Create** tab allows users to build new columns in a selected data block by merging the contents of multiple columns as text. This is useful when different columns need to be analysed as a whole, e.g. combining a title, abstract, and body text as the full article content.
 
 <h3 id="help-preprocessing-aggregate-builder">Expression builder</h3>
 
