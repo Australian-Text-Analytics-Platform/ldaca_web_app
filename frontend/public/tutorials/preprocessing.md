@@ -75,7 +75,7 @@ Sample tool extracts either a contiguous range or a randomised set of rows from 
 
 <h3 id="help-preprocessing-slice-offset">Slice</h3>
 
-![Slice screenshot](tutorials/assets/preprocessing/slice.png)
+![Slice screenshot](tutorials/assets/preprocessing/sample_slice.png)
 
 The slice option extract a continous chunk of data from the data block. The offset parameters set the start row of the chunk (first row as 0). 
 
@@ -85,9 +85,9 @@ The number of rows to include in the extraction. Leave it blank to slice until t
 
 <h3 id="help-preprocessing-sample-fraction">Fraction/Count</h3>
 
-![Sample screenshot](tutorials/assets/preprocessing/sample.png)
+![Random screenshot](tutorials/assets/preprocessing/sample_random.png)
 
-The sample option extract a set of randomised rows from the data block. You can define to sample either a proportion (e.g. 30%) or a certain number of rows (e.g. 500) from the selected data block. 
+The random sample option extracts a set of randomised rows from the data block. You can define to sample either a proportion (e.g. 30%) or a certain number of rows (e.g. 500) from the selected data block. 
 
 For proportional sampling, enter a decimal number between 0 and 1 for this parameter. For example, 0.3 to extract 30% of the selected data block. Or a whole number for number of rows, e.g. 100 to extract 100 rows. If the whole number is greater than the size of the data block, all rows will be extracted in a shuffled order.
 
@@ -182,11 +182,26 @@ Practice exercise:
 2. Leave the new data block name blank.
 3. Add the stacked result and confirm the column list matches.
 
+<h2 id="help-preprocessing-find-replace">Find</h2>
+
+![Find screenshot](tutorials/assets/preprocessing/find.png)
+The Find pre-processing tool can do a lot of versitle text column manipulation, including cleaning, extracting, replacing and creating, powered by the famous Regular Expression (RegEx). You need to know how to write RegEx patterns for matching desired words and phrases for certain purposes.
+
+The **Find** tool supports two operations on the matched text contents, Replace or Extract. The outcomes can overwrite the same column of text or add to the data block as a new column, if the column name is defined.
+
+![Replace screenshot](tutorials/assets/preprocessing/find_replace.png)
+
+**Replace**: The above figure shows an example of replacing all urls in the post by empty string, hence deleting the urls and create a new column named url_removed.
+
+![Extract screenshot](tutorials/assets/preprocessing/find_extract.png)
+
+**Extract**: This is the example to match and extract all twitter mentions (@username) from the tweet messages, connect with space and create a new column named mentioned to include all mentioned usernames.
+
 <h2 id="help-preprocessing-aggregate-section">Create</h2>
 
 ![Create screenshot](tutorials/assets/preprocessing/create.png)
 
-The create tab allows user to builds new columns in a selected data block by merging contents from multiple columns as texts. This is useful when different columns are to be analysed as a whole, e.g. combining title, abstract and body text as the full article content.
+The **create** tab allows user to builds new columns in a selected data block by merging contents from multiple columns as texts. This is useful when different columns are to be analysed as a whole, e.g. combining title, abstract and body text as the full article content.
 
 <h3 id="help-preprocessing-aggregate-builder">Expression builder</h3>
 
