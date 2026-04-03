@@ -75,7 +75,7 @@ export function TopicModelingParameterPanel({
 
   return (
     <AnalysisCardLayout
-      title="Topic Modeling Parameters"
+      title="Topic Modeling"
       actions={{
         onRun,
         onClear,
