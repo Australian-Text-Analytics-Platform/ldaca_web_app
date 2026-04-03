@@ -67,23 +67,40 @@ Practice exercise:
 2. Add a condition that keeps only one category.
 3. Add the filtered result as a new data block.
 
-<h2 id="help-preprocessing-slice-section">Slice</h2>
+<h2 id="help-preprocessing-slice-section">Sample Tool</h2>
+
+![Sample screenshot](tutorials/assets/preprocessing/sample.png)
+
+Sample tool extracts either a contiguous range or a randomised set of rows from the selected data block. Extracting a small and representive subset of the data makes exploring and debugging quicker than working with the full size data.
+
+<h3 id="help-preprocessing-slice-offset">Slice</h3>
 
 ![Slice screenshot](tutorials/assets/preprocessing/slice.png)
 
-Slice extracts a contiguous range of rows. It is useful for sampling, debugging, or grabbing a fixed subset of text data.
-
-<h3 id="help-preprocessing-slice-offset">Offset</h3>
-
-The zero-based index of the first row to include. If the user want the slicing to include the first row of the data block, set this to 0. If the slicing should start from the Nth row, set this value to N-1.
+The slice option extract a continous chunk of data from the data block. The offset parameters set the start row of the chunk (first row as 0). 
 
 <h3 id="help-preprocessing-slice-length">Length</h3>
 
-The number of rows to include. Leave it blank to slice until the end. 
+The number of rows to include in the extraction. Leave it blank to slice until the end of the data block. If you want the sub-block to include the row 101-200, set offset = 100 and length = 100.
+
+<h3 id="help-preprocessing-sample-fraction">Fraction/Count</h3>
+
+![Sample screenshot](tutorials/assets/preprocessing/sample.png)
+
+The sample option extract a set of randomised rows from the data block. You can define to sample either a proportion (e.g. 30%) or a certain number of rows (e.g. 500) from the selected data block. 
+
+For proportional sampling, enter a decimal number between 0 and 1 for this parameter. For example, 0.3 to extract 30% of the selected data block. Or a whole number for number of rows, e.g. 100 to extract 100 rows. If the whole number is greater than the size of the data block, all rows will be extracted in a shuffled order.
+
+<h3 id="help-preprocessing-sample-seed">Random Seed</h3>
+
+The random seed controls the reproducibility of the random sampling process. Setting a fixed seed ensures the same rows/order are extracted each time from the **same data**.
+
+- Use any non-negative integer (e.g. 0, 42, 12345).
+- Remember the seed value when you want consistent, reproducible results.
 
 <h3 id="help-preprocessing-slice-new-node-name">New data block name</h3>
 
-Label the slice output so it is easy to find later.
+Label the slice output so it is easy to find later. The pre-populated name include the parameters of the selected operation.
 
 Key controls include the data block selection panel, offset and length inputs, the new data block name field, the range summary, the **Add to Workspace** action, and the preview table for the slice output.
 
