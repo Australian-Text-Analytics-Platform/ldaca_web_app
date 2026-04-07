@@ -281,15 +281,3 @@ export function useSchemaManagement(config: SchemaManagementConfig) {
     clearLockedSchema,
   };
 }
-
-/**
- * Custom hook that provides a ref that always contains the latest value.
- * Useful for accessing state inside async callbacks without adding to deps.
- */
-export function useLatestRef<T>(value: T) {
-  const ref = useRef(value);
-  useEffect(() => {
-    ref.current = value;
-  }, [value]);
-  return ref;
-}

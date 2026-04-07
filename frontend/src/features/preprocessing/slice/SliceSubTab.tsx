@@ -7,8 +7,10 @@ import { Button } from '../../../components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Input } from '../../../components/ui/input';
 import { Label } from '../../../components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
 import { Tag } from '../../../components/ui/tag';
 import { PreviewTable } from '../components/PreviewTable';
+import { acceptPlaceholderOnTab } from '../utils/placeholderTabFill';
 import { useSliceSubTab, type SliceSubTabProps } from './hooks/useSliceSubTab';
 
 export type { SliceSubTabProps } from './hooks/useSliceSubTab';
@@ -34,11 +36,11 @@ export const SliceSubTab: React.FC<SliceSubTabProps> = (props) => {
           <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
-                Slice rows
+                Sample rows
                 <HelpIcon
                   targetKey="preprocessing.slice.tab"
-                  label="Slice sub-tab overview"
-                  tooltip="Extract a contiguous range of rows from the selected data block."
+                  label="Sample sub-tab overview"
+                  tooltip="Create either a contiguous slice or a random sample from the selected data block."
                 />
               </CardTitle>
               
@@ -76,51 +78,101 @@ export const SliceSubTab: React.FC<SliceSubTabProps> = (props) => {
             }
           />
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Label htmlFor="slice-offset">Offset</Label>
-                <HelpIcon targetKey="preprocessing.slice.offset" label="Slice offset" />
-              </div>
-              <Input
-                id="slice-offset"
-                type="number"
-                min={0}
-                value={form.offsetInput}
-                onChange={(event) => form.setOffsetInput(event.target.value)}
-                disabled={!hasSelection}
-              />
-              <p className="text-xs text-muted-foreground">Zero-based index of the first row to include.</p>
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Label htmlFor="slice-length">Length (optional)</Label>
-                <HelpIcon targetKey="preprocessing.slice.length" label="Slice length" />
-              </div>
-              <Input
-                id="slice-length"
-                type="number"
-                min={0}
-                value={form.lengthInput}
-                onChange={(event) => form.setLengthInput(event.target.value)}
-                disabled={!hasSelection}
-                placeholder="Leave blank to slice until the end"
-              />
-              <p className="text-xs text-muted-foreground">Number of rows to include. Leave blank to read through the end.</p>
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="sampling-mode">Sampling method</Label>
+            <Select value={form.mode} onValueChange={(value) => form.setMode(value as 'slice' | 'random_sample')}>
+              <SelectTrigger id="sampling-mode" disabled={!hasSelection} className="sm:max-w-xs">
+                <SelectValue placeholder="Select sampling method" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="slice">Slice</SelectItem>
+                <SelectItem value="random_sample">Random Sample</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
+
+          {form.mode === 'slice' ? (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="slice-offset">Offset</Label>
+                  <HelpIcon targetKey="preprocessing.slice.offset" label="Slice offset" />
+                </div>
+                <Input
+                  id="slice-offset"
+                  type="number"
+                  min={0}
+                  value={form.offsetInput}
+                  onChange={(event) => form.setOffsetInput(event.target.value)}
+                  disabled={!hasSelection}
+                />
+                <p className="text-xs text-muted-foreground">Zero-based index of the first row to include.</p>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="slice-length">Length</Label>
+                  <HelpIcon targetKey="preprocessing.slice.length" label="Slice length" />
+                </div>
+                <Input
+                  id="slice-length"
+                  type="number"
+                  min={0}
+                  value={form.lengthInput}
+                  onChange={(event) => form.setLengthInput(event.target.value)}
+                  disabled={!hasSelection}
+                  placeholder="Number of rows to include"
+                />
+                <p className="text-xs text-muted-foreground">Number of rows to include from the offset.</p>
+              </div>
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="sample-fraction">Fraction / Count</Label>
+                <Input
+                  id="sample-fraction"
+                  type="number"
+                  min={0}
+                  step="any"
+                  value={form.sampleSizeInput}
+                  onChange={(event) => form.setSampleSizeInput(event.target.value)}
+                  disabled={!hasSelection}
+                  placeholder="e.g. 0.4 for 40% or 100 for 100 rows"
+                />
+                <p className="text-xs text-muted-foreground">Fraction (0–1) for proportional sampling, or an integer ≥ 1 for an absolute row count.</p>
+                {form.sampleSizeHint && (
+                  <p className="text-xs text-destructive">{form.sampleSizeHint}</p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="sample-random-seed">Random seed</Label>
+                <Input
+                  id="sample-random-seed"
+                  type="number"
+                  min={0}
+                  step="1"
+                  value={form.randomSeedInput}
+                  onChange={(event) => form.setRandomSeedInput(event.target.value)}
+                  disabled={!hasSelection}
+                  placeholder="Optional seed for repeatable samples"
+                />
+                <p className="text-xs text-muted-foreground">Use a seed to reproduce the same sampled rows.</p>
+              </div>
+            </div>
+          )}
 
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <Label htmlFor="slice-new-node-name">New data block name</Label>
-              <HelpIcon targetKey="preprocessing.slice.new-node-name" label="Slice output name" />
+              <HelpIcon targetKey="preprocessing.slice.new-node-name" label="Sample output name" />
             </div>
             <Input
               id="slice-new-node-name"
               type="text"
               value={form.newNodeName}
               onChange={(event) => form.setNewNodeName(event.target.value)}
-              placeholder="Enter name for sliced data block"
+              onKeyDown={(event) => acceptPlaceholderOnTab({ event, value: form.newNodeName, setValue: form.setNewNodeName })}
+              placeholder={form.newNodeNamePlaceholder}
               disabled={!hasSelection}
             />
           </div>
@@ -150,11 +202,11 @@ export const SliceSubTab: React.FC<SliceSubTabProps> = (props) => {
       <PreviewTable
         title={
           <span className="flex items-center gap-2">
-            Preview sliced rows
+            Preview output rows
             <HelpIcon targetKey="preprocessing.common.preview" label="Preview table" />
           </span>
         }
-        description="Review rows returned by the current slice configuration before adding to the workspace."
+        description="Review rows returned by the current slice or random sample configuration before adding to the workspace."
         columns={preview.columns}
         data={preview.data}
         pagination={preview.pagination}

@@ -128,6 +128,8 @@ export function WorkspaceGraphFeature({ fallback }: WorkspaceGraphFeatureProps) 
         className="bg-gray-50"
         style={{ width: '100%', height: '100%' }}
         defaultViewport={{ x: 0, y: 0, zoom: 1 }}
+        minZoom={0.05}
+        maxZoom={4}
         connectOnClick={false}
         nodesDraggable
         nodesConnectable={false}

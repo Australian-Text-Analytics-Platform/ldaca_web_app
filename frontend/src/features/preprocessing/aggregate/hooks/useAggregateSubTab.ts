@@ -1,24 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 
 import type { WorkspaceNodeLike } from '../../../../components/NodeSelectionPanel';
-import type {
-  ExpressionApplyResponse,
-  ExpressionPreviewResponse,
-  ExpressionTransformRequest,
+import {
+  nodesApi,
+  type ExpressionApplyResponse,
+  type FilterPreviewResponse,
+  type ExpressionTransformRequest,
 } from '../../../../api/nodes';
-import { ApiError } from '../../../../api/http';
 import { mapColumnsToInfo } from '../../../../utils/columnTypes';
+import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
+import type { PreviewPagination, PreviewRow } from '../../types';
 
-const DEFAULT_PREVIEW_LIMIT = 25;
 const DEFAULT_PALETTE = ['#2563eb'];
-
-const getErrorMessage = (error: unknown): string => {
-  if (!error) return 'Unknown error';
-  if (error instanceof ApiError) return error.message || 'Request failed';
-  if (error instanceof Error) return error.message;
-  if (typeof error === 'string') return error;
-  return 'Request failed';
-};
 
 const SMART_CHAR_MAP: Record<string, string> = {
   '\u201C': '"', // "
@@ -55,7 +48,7 @@ export interface AggregateSubTabProps {
     operations: boolean;
   };
   onAlert: (message: string) => void;
-  computeColumnPreview: (nodeId: string, request: ExpressionTransformRequest) => Promise<ExpressionPreviewResponse>;
+  computeColumnPreview: (nodeId: string, request: ExpressionTransformRequest, page?: number, pageSize?: number) => Promise<FilterPreviewResponse>;
   computeColumn: (nodeId: string, request: ExpressionTransformRequest) => Promise<ExpressionApplyResponse>;
   refreshNodeSchema: (nodeId: string) => Promise<unknown>;
 }
@@ -122,12 +115,18 @@ export interface BasicBuilderConfig {
 }
 
 export interface PreviewConfig {
-  data: ExpressionPreviewResponse | null;
+  data: PreviewRow[];
+  columns: string[];
+  pagination: PreviewPagination | null;
   loading: boolean;
   error: string | null;
-  stale: boolean;
-  limit: number;
-  requestPreview: () => void;
+  ready: boolean;
+  readyMessage: string;
+  page: number;
+  pageSize: number;
+  setPageSize: (size: number) => void;
+  onPreviousPage: () => void;
+  onNextPage: () => void;
 }
 
 export interface ApplyConfig {
@@ -200,38 +199,34 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
 
   const [expression, setExpression] = useState('');
   const [columnName, setColumnName] = useState('');
-  const [previewData, setPreviewData] = useState<ExpressionPreviewResponse | null>(null);
-  const [previewLoading, setPreviewLoading] = useState(false);
-  const [previewError, setPreviewError] = useState<string | null>(null);
   const [applyLoading, setApplyLoading] = useState(false);
   const [lastAppliedExpression, setLastAppliedExpression] = useState<string | null>(null);
   const [expressionFocused, setExpressionFocused] = useState(false);
   const [columnNameFocused, setColumnNameFocused] = useState(false);
-  const [previewStale, setPreviewStale] = useState(false);
   const [expressionMode, setExpressionMode] = useState<'basic' | 'advanced'>('basic');
   const [basicTokens, setBasicTokens] = useState<BasicToken[]>([]);
   const [dropIndicator, setDropIndicator] = useState<DropIndicator | null>(null);
   const [basicDragActive, setBasicDragActive] = useState(false);
   const [editingTokenId, setEditingTokenId] = useState<string | null>(null);
   const [customDraft, setCustomDraft] = useState('');
+  const [committedExpression, setCommittedExpression] = useState('');
+  const [committedColumnName, setCommittedColumnName] = useState('');
 
   const customOriginalRef = useRef<string>('');
   const dropZoneRef = useRef<HTMLDivElement | null>(null);
-  const previewTimeoutRef = useRef<number | null>(null);
   const latestExpressionRef = useRef('');
   const latestColumnNameRef = useRef('');
   const lastDragPayloadRef = useRef<DragPayload | null>(null);
 
   useEffect(() => {
-    setPreviewData(null);
-    setPreviewError(null);
     setLastAppliedExpression(null);
-    setPreviewStale(false);
     setBasicTokens([]);
     setEditingTokenId(null);
     setDropIndicator(null);
     setBasicDragActive(false);
     setCustomDraft('');
+    setCommittedExpression('');
+    setCommittedColumnName('');
   }, [limitedNodeId, selectedNodeId]);
 
   useEffect(() => {
@@ -241,15 +236,6 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
   useEffect(() => {
     latestColumnNameRef.current = columnName;
   }, [columnName]);
-
-  useEffect(
-    () => () => {
-      if (previewTimeoutRef.current && typeof window !== 'undefined') {
-        window.clearTimeout(previewTimeoutRef.current);
-      }
-    },
-    [],
-  );
 
   useEffect(() => {
     if (expressionMode === 'advanced') {
@@ -330,14 +316,6 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     const normalizedExpression = normalizeSmartCharacters(nextExpression);
     latestExpressionRef.current = normalizedExpression;
     setExpression(normalizedExpression);
-    const nextTrimmed = normalizedExpression.trim();
-    if (nextTrimmed.length === 0) {
-      setPreviewData(null);
-      setPreviewError(null);
-      setPreviewStale(false);
-    } else {
-      setPreviewStale(true);
-    }
   };
 
   const applyBasicTokenUpdate = (updater: (prev: BasicToken[]) => BasicToken[]) => {
@@ -362,54 +340,109 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     return payload;
   };
 
-  const handlePreview = async () => {
-    const currentExpression = latestExpressionRef.current.trim();
-    if (!activeNodeId || currentExpression.length === 0) {
-      setPreviewData(null);
-      setPreviewError(null);
-      setPreviewStale(false);
-      return;
-    }
-    setPreviewLoading(true);
-    setPreviewError(null);
-    try {
-      const payload: ExpressionTransformRequest = {
-        ...buildRequest(),
-        preview_limit: DEFAULT_PREVIEW_LIMIT,
-      };
-      const response = await computeColumnPreview(activeNodeId, payload);
-      setPreviewData(response);
-      setPreviewStale(false);
-    } catch (error) {
-      setPreviewError(getErrorMessage(error));
-      setPreviewData(null);
-      setPreviewStale(false);
-    } finally {
-      setPreviewLoading(false);
-    }
+  const commitExpression = () => {
+    setCommittedExpression(latestExpressionRef.current.trim());
+    setCommittedColumnName(latestColumnNameRef.current.trim());
   };
 
-  const requestPreview = () => {
-    if (!hasSelection) return;
-    if (latestExpressionRef.current.trim().length === 0) {
-      setPreviewData(null);
-      setPreviewError(null);
-      setPreviewStale(false);
-      return;
-    }
-    void handlePreview();
-  };
+  const commitTimeoutRef = useRef<number | null>(null);
 
-  const schedulePreview = () => {
+  useEffect(
+    () => () => {
+      if (commitTimeoutRef.current && typeof window !== 'undefined') {
+        window.clearTimeout(commitTimeoutRef.current);
+      }
+    },
+    [],
+  );
+
+  const scheduleCommit = () => {
     if (!hasSelection) return;
     if (typeof window === 'undefined') return;
-    if (previewTimeoutRef.current) {
-      window.clearTimeout(previewTimeoutRef.current);
+    if (commitTimeoutRef.current) {
+      window.clearTimeout(commitTimeoutRef.current);
     }
-    previewTimeoutRef.current = window.setTimeout(() => {
-      previewTimeoutRef.current = null;
-      requestPreview();
+    commitTimeoutRef.current = window.setTimeout(() => {
+      commitTimeoutRef.current = null;
+      commitExpression();
     }, 250);
+  };
+
+  interface AggregatePreviewRequest {
+    nodeId: string;
+    payload: ExpressionTransformRequest | null;
+  }
+
+  const aggregatePreviewRequest: AggregatePreviewRequest | null = (() => {
+    if (!hasSelection || !activeNodeId) return null;
+    if (committedExpression.length === 0) return { nodeId: activeNodeId, payload: null };
+    const payload: ExpressionTransformRequest = { expression: committedExpression };
+    if (committedColumnName.length > 0) payload.new_column_name = committedColumnName;
+    return { nodeId: activeNodeId, payload };
+  })();
+
+  const previewSignature = (() => {
+    if (!aggregatePreviewRequest) return 'aggregate-preview-disabled';
+    if (!aggregatePreviewRequest.payload) return `${aggregatePreviewRequest.nodeId}::raw`;
+    return `${aggregatePreviewRequest.nodeId}::${JSON.stringify(aggregatePreviewRequest.payload)}`;
+  })();
+
+  const previewFetcher = async ({
+    request,
+    page,
+    pageSize,
+  }: {
+    request: AggregatePreviewRequest;
+    page: number;
+    pageSize: number;
+    signal: AbortSignal;
+  }) => {
+    if (request.payload) {
+      const response = await computeColumnPreview(request.nodeId, request.payload, page, pageSize);
+      return {
+        data: Array.isArray(response?.data) ? (response.data as PreviewRow[]) : [],
+        columns: Array.isArray(response?.columns) ? response.columns : [],
+        pagination: (response?.pagination as PreviewPagination) ?? null,
+      };
+    }
+    const response = await nodesApi.data(request.nodeId, page, pageSize);
+    return {
+      data: Array.isArray(response?.data) ? (response.data as PreviewRow[]) : [],
+      columns: Array.isArray(response?.columns) ? response.columns : [],
+      pagination: (response?.pagination as PreviewPagination) ?? null,
+    };
+  };
+
+  const {
+    data: previewData,
+    columns: previewColumns,
+    pagination: previewPagination,
+    loading: previewLoading,
+    error: previewError,
+    page: previewPage,
+    pageSize: previewPageSize,
+    setPage: setPreviewPage,
+    setPageSize: setPreviewPageSize,
+    refresh: refreshPreview,
+  } = usePreprocessingPreview({
+    request: aggregatePreviewRequest,
+    signature: previewSignature,
+    fetcher: previewFetcher,
+    debounceMs: 100,
+  });
+
+  const currentPreviewPage = previewPagination?.page ?? previewPage;
+
+  const handlePreviewPrev = () => {
+    if (previewPagination?.has_prev && !previewLoading) {
+      setPreviewPage(Math.max(1, currentPreviewPage - 1));
+    }
+  };
+
+  const handlePreviewNext = () => {
+    if (previewPagination?.has_next && !previewLoading) {
+      setPreviewPage(currentPreviewPage + 1);
+    }
   };
 
   const clampIndex = (value: number, max: number) => {
@@ -427,7 +460,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
         next.splice(insertIndex, 0, { id: createTokenId(), kind: 'column', column });
         return next;
       });
-      schedulePreview();
+      scheduleCommit();
     };
 
   const addCustomToken = (index?: number) => {
@@ -453,7 +486,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
         next.splice(idx, 1);
         return next;
       });
-      schedulePreview();
+      scheduleCommit();
     };
 
   const moveBasicToken = (tokenId: string, index: number) => {
@@ -473,7 +506,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
         next.splice(targetIndex, 0, item);
         return next;
       });
-      schedulePreview();
+      scheduleCommit();
     };
 
   const startEditingCustomToken = (tokenId: string) => {
@@ -506,7 +539,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
             return token;
           }),
         );
-        schedulePreview();
+        scheduleCommit();
       } else {
         setCustomDraft(customOriginalRef.current);
       }
@@ -518,11 +551,11 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     if (basicDisabled) return;
     if (basicTokens.length === 0) {
       setExpressionAndMarkDirty('');
-      schedulePreview();
+      scheduleCommit();
       return;
     }
     applyBasicTokenUpdate(() => []);
-    schedulePreview();
+    scheduleCommit();
   };
 
   const parseDragPayload = (event: React.DragEvent): DragPayload | null => {
@@ -692,16 +725,16 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     const currentExpression = latestExpressionRef.current.trim();
     if (!activeNodeId || currentExpression.length === 0) return;
     setApplyLoading(true);
-    setPreviewError(null);
     try {
       const payload = buildRequest();
       const response = await computeColumn(activeNodeId, payload);
       setLastAppliedExpression(response.expression);
       onAlert(response.message || `Added column ${response.column_name}`);
       void refreshNodeSchema(activeNodeId);
-      await handlePreview();
-    } catch (error) {
-      setPreviewError(getErrorMessage(error));
+      commitExpression();
+      refreshPreview();
+    } catch {
+      // Error shown via preview
     } finally {
       setApplyLoading(false);
     }
@@ -721,21 +754,16 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       const next = normalizeSmartCharacters(event.target.value);
       latestColumnNameRef.current = next;
       setColumnName(next);
-      if (trimmedExpression.length === 0) {
-        setPreviewStale(false);
-        return;
-      }
-      setPreviewStale(true);
     };
 
   const handleExpressionBlur = () => {
     setExpressionFocused(false);
-    requestPreview();
+    commitExpression();
   };
 
   const handleColumnBlur = () => {
     setColumnNameFocused(false);
-    requestPreview();
+    commitExpression();
   };
 
   const handleExpressionFocus = () => {
@@ -831,11 +859,19 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     },
     preview: {
       data: previewData,
+      columns: previewColumns,
+      pagination: previewPagination,
       loading: previewLoading,
       error: previewError,
-      stale: previewStale,
-      limit: DEFAULT_PREVIEW_LIMIT,
-      requestPreview,
+      ready: hasSelection,
+      readyMessage: !hasSelection
+        ? 'Select a data block to configure an expression.'
+        : 'Showing original data. Configure an expression and exit the field to preview results.',
+      page: previewPage,
+      pageSize: previewPageSize,
+      setPageSize: setPreviewPageSize,
+      onPreviousPage: handlePreviewPrev,
+      onNextPage: handlePreviewNext,
     },
     apply: {
       loading: applyLoading,

@@ -22,8 +22,6 @@ export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {
   });
 
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [loadedFile, setLoadedFile] = useState<string | null>(null);
   const uploadMutation = useMutation({
     mutationFn: (file: File) => filesApi.upload(file, normalizedHeaders),
     onSuccess: () => {
@@ -43,21 +41,6 @@ export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {
     return result.data ?? null;
   };
 
-  const handleLoadFile = async (filename: string) => {
-    setLoading(true);
-    try {
-  // Loading a file into a workspace context isn't part of filesApi; retaining placeholder if backend adds it.
-  // For now just set loadedFile for UI consistency.
-      setLoadedFile(filename);
-      return true;
-    } catch (error) {
-      console.error('Failed to load file:', error);
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleUploadFile = async (file: File) => {
     try {
       await uploadMutation.mutateAsync(file);
@@ -75,9 +58,6 @@ export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {
       await refetchFiles();
       if (selectedFile === filename) {
         setSelectedFile(null);
-      }
-      if (loadedFile === filename) {
-        setLoadedFile(null);
       }
       return true;
     } catch (error) {
@@ -109,10 +89,7 @@ export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {
     selectedFile,
     setSelectedFile,
   loadingFiles: filesQuery.isLoading || filesQuery.isFetching,
-    loading,
     uploading: uploadMutation.isPending,
-    loadedFile,
-    handleLoadFile,
     handleUploadFile,
     handleDeleteFile,
     handleDownloadFile,

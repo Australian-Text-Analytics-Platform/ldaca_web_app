@@ -245,6 +245,27 @@ export const filterStatisticsByStopWords = (statistics: unknown, appliedStopSet:
     .filter((stat) => Number(stat.log_likelihood_llv) > 0);
 };
 
+export const wildcardToRegExp = (pattern: string): RegExp | null => {
+  const trimmed = pattern.trim();
+  if (!trimmed) return null;
+  // Escape regex special chars except * and ?
+  const escaped = trimmed
+    .toLowerCase()
+    .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+    .replace(/\*/g, '.*')
+    .replace(/\?/g, '.');
+  return new RegExp(`^${escaped}$`, 'i');
+};
+
+export const filterStatisticsByTokenPattern = (
+  statistics: TokenFrequencyStatisticsEntry[],
+  pattern: string,
+): TokenFrequencyStatisticsEntry[] => {
+  const regex = wildcardToRegExp(pattern);
+  if (!regex) return statistics;
+  return statistics.filter((stat) => regex.test(String(stat.token || '')));
+};
+
 export const sortStatistics = (
   filteredStatistics: TokenFrequencyStatisticsEntry[],
   statsSortColumn: string,

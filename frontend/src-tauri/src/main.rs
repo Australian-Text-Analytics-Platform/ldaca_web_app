@@ -507,7 +507,7 @@ fn spawn_backend_process(
     let mut command = Command::new(&runtime.python);
     command
         .arg("-m")
-        .arg("ldaca_web_app_backend.cli")
+        .arg("ldaca_web_app.cli")
         .current_dir(&runtime.root)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());

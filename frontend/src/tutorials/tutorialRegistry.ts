@@ -118,7 +118,7 @@ const registry: Record<string, TutorialTarget> = {
   'preprocessing.slice.tab': {
     file: 'tutorials/preprocessing.md',
     anchor: 'help-preprocessing-slice-section',
-    label: 'Slice sub-tab overview',
+    label: 'Sample sub-tab overview',
   },
   'preprocessing.slice.offset': {
     file: 'tutorials/preprocessing.md',
@@ -133,7 +133,7 @@ const registry: Record<string, TutorialTarget> = {
   'preprocessing.slice.new-node-name': {
     file: 'tutorials/preprocessing.md',
     anchor: 'help-preprocessing-slice-new-node-name',
-    label: 'Slice output name',
+    label: 'Sample output name',
   },
   'preprocessing.concat.tab': {
     file: 'tutorials/preprocessing.md',

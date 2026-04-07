@@ -5,7 +5,7 @@ This repository contains the LDaCA web app and desktop app, plus the shared Pyth
 ## Repository Overview
 
 - `frontend/`: React 19 + Vite frontend, shared UI, and Tauri desktop shell in `src-tauri/`
-- `ldaca_web_app_backend/`: FastAPI backend and workspace/task APIs
+- `backend/`: FastAPI backend (PyPI: `ldaca-web-app`, import: `ldaca_web_app`) and workspace/task APIs
 - `docworkspace/`: lazy workspace graph library built around `Workspace` and `Node`
 - `polars-text/`: Rust/PyO3 Polars plugin package for concordance, quotation, tokenization, and related text analysis
 - `ldaca-tabulator/`: RO-Crate and tabular import/export utilities
@@ -14,7 +14,7 @@ This repository contains the LDaCA web app and desktop app, plus the shared Pyth
 
 ### Backend
 
-The backend lives under `ldaca_web_app_backend/src/ldaca_web_app_backend/` and is organized around:
+The backend lives under `backend/src/ldaca_web_app/` and is organized around:
 
 - `api/`: FastAPI routers, mounted under `/api`
 - `analysis/`: in-memory task storage and request schemas
@@ -41,7 +41,7 @@ Heavy analyses such as topic modeling and `polars-text`-backed tasks run out of 
 
 `API Router -> Task Manager -> ProcessPoolExecutor -> worker task -> Parquet artifacts -> API result retrieval`
 
-Worker functions are registered in `ldaca_web_app_backend/src/ldaca_web_app_backend/core/worker.py`.
+Worker functions are registered in `backend/src/ldaca_web_app/core/worker.py`.
 
 ### Frontend Commands
 
@@ -94,9 +94,9 @@ npm run test -w frontend -- --run
 ### Backend Commands
 
 ```sh
-cd ldaca_web_app_backend && uv run uvicorn ldaca_web_app_backend.main:app --reload --port 8001
-cd ldaca_web_app_backend && uv run pytest -q
-cd ldaca_web_app_backend && uvx ty check
+cd backend && uv run uvicorn ldaca_web_app.main:app --reload --port 8001
+cd backend && uv run pytest -q
+cd backend && uvx ty check
 ```
 
 ### Shared Python Packages
@@ -138,6 +138,6 @@ npm run test -w frontend -- --run
 
 ## Documentation
 
-- Backend docs: `ldaca_web_app_backend/docs/index.md`
+- Backend docs: `backend/docs/index.md`
 - Frontend docs: `frontend/docs/index.md`
 - Agent workflow and repo-specific coding guidance: `AGENTS.md`

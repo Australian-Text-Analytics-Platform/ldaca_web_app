@@ -18,6 +18,7 @@ import {
   computeAnalysisNodeIds,
   deriveNodeDisplayResults,
   filterStatisticsByStopWords,
+  filterStatisticsByTokenPattern,
   normalizeNodeResults,
   sortStatistics,
 } from './tokenFrequencyAdapters';
@@ -89,6 +90,7 @@ const TokenFrequencyFeature = () => {
   const [statsSortDirection, setStatsSortDirection] = useState<'asc' | 'desc'>('desc');
   const [statsPage, setStatsPage] = useState<number>(1);
   const [statsRowsPerPage, setStatsRowsPerPage] = useState<number>(50);
+  const [statsTokenFilter, setStatsTokenFilter] = useState<string>('');
 
   const panelNodeIds = panelSelectedNodes
     .slice(0, 2)
@@ -283,7 +285,10 @@ const TokenFrequencyFeature = () => {
 
   const normalizedNodeResults = normalizeNodeResults(results?.data, analysisNodeIds, computeDisplayName);
   const nodeDisplayResults = deriveNodeDisplayResults(normalizedNodeResults, appliedStopSet, effectiveTokenLimit);
-  const filteredStatistics = filterStatisticsByStopWords(results?.statistics, appliedStopSet);
+  const filteredStatistics = filterStatisticsByTokenPattern(
+    filterStatisticsByStopWords(results?.statistics, appliedStopSet),
+    statsTokenFilter,
+  );
   const sortedStatistics = sortStatistics(filteredStatistics, statsSortColumn, statsSortDirection);
 
   const registerWordCloudRef = (nodeKey: string, element: SVGSVGElement | null) => {
@@ -394,6 +399,11 @@ const TokenFrequencyFeature = () => {
     setStatsPage(1);
   };
 
+  const handleStatsTokenFilterChange = (value: string) => {
+    setStatsTokenFilter(value);
+    setStatsPage(1);
+  };
+
   const hasIncompleteSelections = effectiveNodeColumnSelections.some((selection) => !selection.column);
   const displayNodeCount = panelSelectedNodes.length;
 
@@ -479,6 +489,8 @@ const TokenFrequencyFeature = () => {
         onStatsPageChange={setStatsPage}
         statsRowsPerPage={statsRowsPerPage}
         onStatsRowsPerPageChange={setStatsRowsPerPage}
+        statsTokenFilter={statsTokenFilter}
+        onStatsTokenFilterChange={handleStatsTokenFilterChange}
       />
 
       <TokenFrequencyDownloadDialog

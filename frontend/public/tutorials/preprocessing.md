@@ -102,13 +102,13 @@ The random seed controls the reproducibility of the random sampling process. Set
 
 Label the sample output so it is easy to find later. The pre-populated name includes the parameters of the selected operation.
 
-Key controls include the data block selection panel, offset and length inputs, the new data block name field, the range summary, the **Add to Workspace** action, and the preview table for the slice output.
+Key controls include the data block selection panel, the sampling method dropdown, mode-specific parameter inputs, the new data block name field, the status summary, the **Add to Workspace** action, and the preview table for the output rows.
 
 Practice exercise:
 
 1. Pick a dataset with at least 200 rows.
-2. Set offset to 50 and length to 25.
-3. Add the slice as a new data block and compare the row count.
+2. Try Slice with offset 50 and length 25, then try Random Sample with fraction 0.2, or count 100, and a fixed seed.
+3. Add each result as a new data block and compare the row count.
 
 <h2>Join</h2>
 

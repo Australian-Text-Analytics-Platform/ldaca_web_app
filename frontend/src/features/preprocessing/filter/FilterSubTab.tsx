@@ -7,6 +7,7 @@ import { Button } from '../../../components/ui/button';
 import HelpIcon from '../../../components/help/HelpIcon';
 import { ConditionBuilder } from '../components/condition-builder';
 import { PreviewTable } from '../components/PreviewTable';
+import { acceptPlaceholderOnTab } from '../utils/placeholderTabFill';
 import { useFilterSubTabSections, type FilterSubTabProps } from './hooks/useFilterSubTabSections';
 import type { FilterConditionWithId } from '../types';
 
@@ -126,7 +127,8 @@ export const FilterSubTab: React.FC<FilterSubTabProps> = (props) => {
               type="text"
               value={newNodeInput.value}
               onChange={(event) => newNodeInput.setValue(event.target.value)}
-              placeholder="Enter name for filtered data"
+              onKeyDown={(event) => acceptPlaceholderOnTab({ event, value: newNodeInput.value, setValue: newNodeInput.setValue })}
+              placeholder={newNodeInput.placeholder}
               disabled={newNodeInput.disabled}
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
             />

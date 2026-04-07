@@ -6,7 +6,7 @@
 
 **Question:** _How is the web app organized?_
 
-**Answer:** The root `ldaca_web_app/` folder is the workspace, with `frontend/` as a workspace member and `ldaca_web_app_backend/` as a sibling project.
+**Answer:** The root `ldaca_web_app/` folder is the workspace, with `frontend/` as a workspace member and `backend/` as a sibling project.
 
 ## 2) Installing dependencies
 

@@ -24,10 +24,12 @@ describe('AnalysisPagination', () => {
     render(
       <AnalysisPagination
         {...baseProps}
-        pageSizeLabel="Documents searched per page"
+        pageSizeLabel="Documents per page"
+        pageSizeSummary="(Found 3 instances in 2 documents)."
       />,
     );
 
-    expect(screen.getByText('Documents searched per page')).toBeInTheDocument();
+    expect(screen.getByText('Documents per page')).toBeInTheDocument();
+    expect(screen.getByText('(Found 3 instances in 2 documents).')).toBeInTheDocument();
   });
 });

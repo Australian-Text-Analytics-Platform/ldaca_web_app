@@ -49,22 +49,28 @@ export function TopicModelingBubbleChartSection({
 }: Props) {
   return (
     <>
-      <div className="relative w-full overflow-hidden rounded-lg border border-muted-foreground/30 bg-background" ref={chartRef}>
-        <button
-          type="button"
-          className="absolute top-2 right-2 z-20 flex items-center gap-1.5 rounded-md border border-border bg-white/95 px-2.5 py-1.5 text-xs font-medium text-foreground shadow-sm transition-colors hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed"
-          onClick={handleResetZoom}
-          disabled={isAtGlobalZoom}
-          title="Reset zoom to global view (or double-click chart)"
-          aria-label="Reset zoom to global view"
+      <div className="relative w-full" ref={chartRef}>
+        <div
+          className="overflow-hidden rounded-lg border border-muted-foreground/30 bg-background"
+          data-testid="topic-bubble-chart-shell"
         >
-          <Scan className="h-3.5 w-3.5" />
-          Reset view
-        </button>
-        {bubbleElements}
+          <button
+            type="button"
+            className="absolute top-2 right-2 z-20 flex items-center gap-1.5 rounded-md border border-border bg-white/95 px-2.5 py-1.5 text-xs font-medium text-foreground shadow-sm transition-colors hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed"
+            onClick={handleResetZoom}
+            disabled={isAtGlobalZoom}
+            title="Reset zoom to global view (or double-click chart)"
+            aria-label="Reset zoom to global view"
+          >
+            <Scan className="h-3.5 w-3.5" />
+            Reset view
+          </button>
+          {bubbleElements}
+        </div>
         {tooltip.topic && (
           <div
-            className="pointer-events-none absolute z-10 max-w-xs rounded-md border border-border bg-card p-3 text-xs shadow-lg"
+            className="pointer-events-none absolute z-30 max-w-xs rounded-md border border-border bg-card p-3 text-xs shadow-lg"
+            data-testid="topic-bubble-chart-tooltip"
             style={{ left: tooltip.x, top: tooltip.y }}
           >
             <div className="text-sm font-semibold">Topic {tooltip.topic.id}</div>

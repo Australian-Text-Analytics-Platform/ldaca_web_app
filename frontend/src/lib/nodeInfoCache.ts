@@ -86,11 +86,6 @@ export async function getNodeInfo(options: NodeInfoRequestOptions): Promise<Node
   return request;
 }
 
-export function primeNodeInfo(workspaceId: string, nodeId: string, info: NodeInfo): void {
-  const key = cacheKeyFor(workspaceId, nodeId);
-  cache.set(key, info);
-}
-
 export function invalidateNodeInfo(workspaceId: string, nodeId?: string): void {
   if (nodeId) {
     const key = cacheKeyFor(workspaceId, nodeId);
@@ -111,6 +106,4 @@ export function invalidateNodeInfo(workspaceId: string, nodeId?: string): void {
   }
 }
 
-export function getCachedNodeInfo(workspaceId: string, nodeId: string): NodeInfo | undefined {
-  return cache.get(cacheKeyFor(workspaceId, nodeId));
-}
+

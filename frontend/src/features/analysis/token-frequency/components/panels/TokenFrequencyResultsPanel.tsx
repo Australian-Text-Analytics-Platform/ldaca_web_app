@@ -65,6 +65,8 @@ type TokenFrequencyResultsPanelProps = {
   statsPage: number;
   onStatsPageChange: (page: number) => void;
   onStatsRowsPerPageChange: (rows: number) => void;
+  statsTokenFilter: string;
+  onStatsTokenFilterChange: (value: string) => void;
 
   onDownloadFrequencyCsv: (label: string, rows: unknown[]) => void;
 };
@@ -107,6 +109,8 @@ export const TokenFrequencyResultsPanel = ({
   statsPage,
   onStatsPageChange,
   onStatsRowsPerPageChange,
+  statsTokenFilter,
+  onStatsTokenFilterChange,
   onDownloadFrequencyCsv,
 }: TokenFrequencyResultsPanelProps) => {
   const isRunningState = isRunning;
@@ -260,6 +264,8 @@ export const TokenFrequencyResultsPanel = ({
             statsPage={statsPage}
             onStatsPageChange={onStatsPageChange}
             onDownloadFrequencyCsv={onDownloadFrequencyCsv}
+            statsTokenFilter={statsTokenFilter}
+            onStatsTokenFilterChange={onStatsTokenFilterChange}
           />
         </div>
       ) : null}

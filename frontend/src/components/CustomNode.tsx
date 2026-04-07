@@ -1,6 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
 import { type NodeProps, Handle, Position, useStore, type Node as ReactFlowNode } from '@xyflow/react';
-import { Settings2, Trash2, Copy, Check } from 'lucide-react';
+import { Settings2, Copy, Check } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from './ui/alert-dialog';
 import { type WorkspaceNode } from '../types';
 
 type DebugWindow = Window & { __LDACA_DEBUG_GRAPH?: boolean };
@@ -21,6 +31,7 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
   const [isRenaming, setIsRenaming] = useState(false);
   const [newName, setNewName] = useState('');
   const [copied, setCopied] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
 
@@ -59,16 +70,15 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
 
   const handleDeleteClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+    setShowMenu(false);
+    setShowDeleteConfirm(true);
+  };
+
+  const handleDeleteConfirm = () => {
     if (node?.node_id) {
       onDelete(node.node_id);
     }
-  };
-
-  const handleSaveClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setShowMenu(false);
-    // TODO: Implement save functionality
-    console.debug('Save node data:', node.node_id);
+    setShowDeleteConfirm(false);
   };
 
   const handleRenameClick = (e: React.MouseEvent) => {
@@ -152,6 +162,67 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
     ? `${formatShapePart(nodeShape[0])} × ${formatShapePart(nodeShape[1])}`
     : null;
 
+  const menuButtonClassName = 'flex h-7 w-7 items-center justify-center rounded-md bg-white/80 text-gray-600 transition-colors hover:bg-white hover:text-gray-800';
+
+  const nodeActionControls = (
+    <div className="flex items-center space-x-1 shrink-0">
+      <div className="relative" ref={menuRef}>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowMenu(!showMenu);
+          }}
+          className={menuButtonClassName}
+          title="More options"
+          aria-label="Node settings"
+        >
+          <Settings2 className="h-3.5 w-3.5" />
+        </button>
+
+        {showMenu && (
+          <div className="absolute right-0 top-8 z-10 min-w-36 rounded-md border border-border bg-white shadow-lg">
+            <button
+              onClick={handleRenameClick}
+              className="w-full rounded-md px-3 py-2 text-left text-xs hover:bg-muted/60"
+            >
+              Rename
+            </button>
+
+            <button
+              onClick={handleCopyNode}
+              className="w-full border-t border-border/60 px-3 py-2 text-left text-xs hover:bg-muted/60"
+            >
+              Clone
+            </button>
+
+            <button
+              onClick={handleUndoNode}
+              disabled={!node?.can_undo}
+              className="w-full border-t border-border/60 px-3 py-2 text-left text-xs disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent hover:bg-muted/60"
+            >
+              Undo
+            </button>
+
+            <button
+              onClick={handleRedoNode}
+              disabled={!node?.can_redo}
+              className="w-full border-t border-border/60 px-3 py-2 text-left text-xs disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent hover:bg-muted/60"
+            >
+              Redo
+            </button>
+
+            <button
+              onClick={handleDeleteClick}
+              className="w-full border-t border-border/60 px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50"
+            >
+              Delete
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   dlog('CustomNode rendering:', {
     nodeId: node?.node_id,
     nodeName,
@@ -163,7 +234,7 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
   });
 
   if (isZoomedOut) {
-    // Compact view: name only, single uniform box
+    // Compact view keeps critical controls visible while preserving the compact footprint.
     const compactClasses = `
       flex items-start rounded-lg border-2 p-4 transition-all duration-150 ease-in-out
       ${isHighlighted
@@ -175,11 +246,14 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
         className={compactClasses}
         style={{ minWidth: '180px', maxWidth: '300px', position: 'relative' }}
       >
+        <div className="absolute right-2 top-2 z-10">
+          {nodeActionControls}
+        </div>
         {isHighlighted && (
           <div className="w-3 h-3 bg-green-500 rounded-full mr-2.5 mt-2 shrink-0" />
         )}
         <div
-          className="font-bold text-3xl leading-snug whitespace-normal"
+          className="pr-16 font-bold text-3xl leading-snug whitespace-normal"
           style={{ wordBreak: 'break-word', overflowWrap: 'anywhere', hyphens: 'auto' }}
           title={nodeName}
         >
@@ -187,6 +261,23 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
         </div>
         <Handle type="target" position={Position.Left} className="w-2! h-2! bg-gray-400! opacity-0 pointer-events-none" />
         <Handle type="source" position={Position.Right} className="w-2! h-2! bg-gray-400! opacity-0 pointer-events-none" />
+
+        <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete &ldquo;{nodeName}&rdquo;?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently delete this node and its data. This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive text-white hover:bg-destructive/90">
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     );
   }
@@ -237,76 +328,7 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
             </div>
           )}
         </div>
-        
-        <div className="flex items-center space-x-1 shrink-0">
-          {/* More menu button */}
-          <div className="relative" ref={menuRef}>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowMenu(!showMenu);
-              }}
-              className="w-5 h-5 flex items-center justify-center text-gray-500 hover:text-gray-700 rounded transition-colors"
-              title="More options"
-              aria-label="Node settings"
-            >
-              <Settings2 className="h-3.5 w-3.5" />
-            </button>
-            
-            {/* Dropdown menu */}
-            {showMenu && (
-              <div className="absolute right-0 top-6 bg-white border border-border rounded-md shadow-lg z-10 min-w-36">
-                <button
-                  onClick={handleSaveClick}
-                  className="w-full text-left px-3 py-2 text-xs hover:bg-muted/60 rounded-md"
-                >
-                  Save
-                </button>
-                
-                <button
-                  onClick={handleRenameClick}
-                  className="w-full text-left px-3 py-2 text-xs hover:bg-muted/60 border-t border-border/60"
-                >
-                  Rename
-                </button>
-
-                <button
-                  onClick={handleCopyNode}
-                  className="w-full text-left px-3 py-2 text-xs hover:bg-muted/60 border-t border-border/60"
-                >
-                  Clone
-                </button>
-
-                <button
-                  onClick={handleUndoNode}
-                  disabled={!node?.can_undo}
-                  className="w-full text-left px-3 py-2 text-xs border-t border-border/60 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-muted/60 disabled:hover:bg-transparent"
-                >
-                  Undo
-                </button>
-
-                <button
-                  onClick={handleRedoNode}
-                  disabled={!node?.can_redo}
-                  className="w-full text-left px-3 py-2 text-xs border-t border-border/60 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-muted/60 disabled:hover:bg-transparent"
-                >
-                  Redo
-                </button>
-                
-              </div>
-            )}
-          </div>
-          
-          {/* Delete button */}
-          <button
-            onClick={handleDeleteClick}
-            className="w-5 h-5 flex items-center justify-center text-red-500 hover:text-red-700 rounded transition-colors"
-            title="Delete node"
-            aria-label="Delete node"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
-        </div>
+        {nodeActionControls}
       </div>
 
       {/* Node Body */}
@@ -334,6 +356,22 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
       <Handle type="target" position={Position.Left} className="w-2! h-2! bg-gray-400! opacity-0 pointer-events-none" />
       <Handle type="source" position={Position.Right} className="w-2! h-2! bg-gray-400! opacity-0 pointer-events-none" />
 
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete &ldquo;{nodeName}&rdquo;?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this node and its data. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive text-white hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

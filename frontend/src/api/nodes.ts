@@ -29,7 +29,14 @@ export interface FilterCondition {
   regex?: boolean;
 }
 export interface FilterRequest { conditions: FilterCondition[]; logic?: string; new_node_name?: string; }
-export interface SliceRequest { offset: number; length?: number; new_node_name?: string; }
+export interface SliceRequest {
+  mode?: 'slice' | 'random_sample';
+  offset?: number;
+  length?: number;
+  sample_size?: number;
+  random_seed?: number;
+  new_node_name?: string;
+}
 export interface JoinNodesRequest { left_node_id: string; right_node_id: string; left_on: string; right_on: string; how?: string; new_node_name?: string; }
 export interface JoinPreviewParams { left_node_id: string; right_node_id: string; left_on?: string; right_on?: string; how?: string; }
 export interface CastNodeRequest { column: string; target_type: string; format?: string; }
@@ -62,12 +69,10 @@ export interface ReplaceRequest {
   replacement: string;
   output_column_name?: string | null;
   preview_limit?: number;
-}
-
-export interface ExpressionPreviewResponse {
-  columns: string[];
-  dtypes: Record<string, string>;
-  data: Record<string, unknown>[];
+  mode?: 'replace' | 'extract';
+  count?: 'all' | 'first';
+  n?: number | null;
+  connector?: string;
 }
 
 export interface ExpressionApplyResponse {
@@ -77,12 +82,6 @@ export interface ExpressionApplyResponse {
   expression: string;
   dtype?: string | null;
   message: string;
-}
-
-export interface ReplacePreviewResponse {
-  columns: string[];
-  dtypes: Record<string, string>;
-  data: Record<string, unknown>[];
 }
 
 export interface ReplaceApplyResponse {
@@ -116,8 +115,6 @@ export const nodesApi = {
   delete: (node: string, headers: Record<string,string> = {}) => del<Record<string, unknown>>(`/workspaces/nodes/${node}`, headers),
   rename: (node: string, newName: string, headers: Record<string,string> = {}) => httpRequest<Record<string, unknown>>(`/workspaces/nodes/${node}/name`, { method: 'PUT', headers, params: { new_name: newName } }),
   clone: (node: string, headers: Record<string,string> = {}) => httpRequest<Record<string, unknown>>(`/workspaces/nodes/${node}/clone`, { method: 'POST', headers }),
-  // Backward-compatible alias for older call sites.
-  copy: (node: string, headers: Record<string,string> = {}) => httpRequest<Record<string, unknown>>(`/workspaces/nodes/${node}/clone`, { method: 'POST', headers }),
   undo: (node: string, headers: Record<string, string> = {}) =>
     httpRequest<NodeInfoResponse>(`/workspaces/nodes/${node}/undo`, { method: 'POST', headers }),
   redo: (node: string, headers: Record<string, string> = {}) =>
@@ -189,10 +186,12 @@ export const nodesApi = {
   computeColumnPreview: (
     node: string,
     req: ExpressionTransformRequest,
+    page = 1,
+    pageSize = 10,
     headers: Record<string, string> = {}
-  ) => httpRequest<ExpressionPreviewResponse>(
+  ) => httpRequest<FilterPreviewResponse>(
     `/workspaces/nodes/${node}/compute-column/preview`,
-    { method: 'POST', headers, body: req }
+    { method: 'POST', headers, params: { page, page_size: pageSize }, body: req }
   ),
   computeColumn: (
     node: string,
@@ -205,10 +204,12 @@ export const nodesApi = {
   replaceTextPreview: (
     node: string,
     req: ReplaceRequest,
+    page = 1,
+    pageSize = 10,
     headers: Record<string, string> = {}
-  ) => httpRequest<ReplacePreviewResponse>(
+  ) => httpRequest<FilterPreviewResponse>(
     `/workspaces/nodes/${node}/replace/preview`,
-    { method: 'POST', headers, body: req }
+    { method: 'POST', headers, params: { page, page_size: pageSize }, body: req }
   ),
   replaceText: (
     node: string,

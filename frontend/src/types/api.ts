@@ -128,8 +128,11 @@ export interface CastRequest {
 }
 
 export interface SliceRequest {
-  offset: number;
+  mode?: 'slice' | 'random_sample';
+  offset?: number;
   length?: number;
+  sample_size?: number;
+  random_seed?: number;
   description?: string;
 }
 

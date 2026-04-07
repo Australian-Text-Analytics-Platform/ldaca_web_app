@@ -9,7 +9,14 @@ import { useAuth } from '../../../hooks/useAuth';
 import { useUIStore } from '../../../stores/uiStore';
 import AnalysisTaskBanner from '../../../components/tabs/AnalysisTaskBanner';
 import { textApi } from '../../../api/text';
-import type { QuotationEngineConfig, QuotationEngineType } from '../../../api/text';
+import type {
+  QuotationAnalysisResponse,
+  QuotationEngineConfig,
+  QuotationEngineType,
+  QuotationGroupedRow,
+  QuotationHitRow,
+  QuotationMetadata,
+} from '../../../api/text';
 import useNodeColumnInfos from '../../../hooks/useNodeColumnInfos';
 import { useQuotationEngineDialogStore, useQuotationEngineConfigStore } from '../../../stores/quotationEngineStore';
 import { Button } from '../../../components/ui/button';
@@ -53,7 +60,8 @@ import {
 
 import { AnalysisPagination } from '../../../components/AnalysisPagination';
 import { useQuotationTaskFlow } from './hooks/useQuotationTaskFlow';
-import { QUOTATION_COLUMN_KEYS } from '../generatedColumns';
+import { QUOTATION_COLUMN_KEYS, QUOTATION_DOCUMENT_COLUMN } from '../generatedColumns';
+import { flattenQuotationGroups } from './quotationViewModels';
 import {
   QuotationDetachDialog,
   type QuotationDetachNodeOption,
@@ -61,17 +69,20 @@ import {
 import {
   MetadataColumnSelector,
 } from '../common/components/MetadataColumnSelector';
+import { GroupedResultsPageSizeSummary } from '../common/components/GroupedResultsPageSizeSummary';
 import { reconcileMetadataColumnSelection } from '../common/components/metadataColumnSelection';
 
 interface QuotationResultState {
-  rows: Record<string, unknown>[];
+  groupedRows: QuotationGroupedRow[];
+  rows: QuotationHitRow[];
   columns: string[];
+  metadata: QuotationMetadata;
   pagination: {
     page: number;
     page_size: number;
-    total_source_rows?: number;
-    total_source_pages?: number;
-    result_count?: number;
+    total_source_rows: number;
+    total_source_pages: number;
+    result_count: number;
     has_next: boolean;
     has_prev: boolean;
   };
@@ -97,11 +108,6 @@ const clampContextLength = (value: number): number => {
   return Math.max(0, Math.min(MAX_CONTEXT_LENGTH, Math.floor(value)));
 };
 
-const buildQuotationMatchCountLabel = (count: number | undefined): string => {
-  const safeCount = Number.isFinite(count) ? Math.max(0, Math.floor(count as number)) : 0;
-  return `Documents searched per page (${safeCount} match${safeCount === 1 ? '' : 'es'} found)`;
-};
-
 type HighlightSpan = { start: number; end: number; types: string[] };
 
 interface ContextClipResult {
@@ -112,6 +118,10 @@ interface ContextClipResult {
   sliceStart: number;
   sliceEnd: number;
 }
+
+type QuotationDisplayRow = QuotationHitRow & {
+  __spans: { start: number; end: number; type: string }[];
+};
 
 const clipTextAroundSpans = (text: string, spans: HighlightSpan[], surroundingWords: number): ContextClipResult => {
   const normalizedWords = Number.isFinite(surroundingWords)
@@ -275,7 +285,7 @@ const normalizeRemoteUrl = (value: string): NormalizedRemoteUrl => {
 
 const QuotationFeature: React.FC = () => {
   const { selectedNodes, handlePageChange: baseHandlePageChange, handlePageSizeChange: baseHandlePageSizeChange } = useWorkspaceSelection();
-  const { currentWorkspaceId, nodeData } = useWorkspaceData();
+  const { currentWorkspaceId } = useWorkspaceData();
   const { quotationSearch, detachQuotation } = useWorkspaceActions();
   const { getAuthHeaders } = useAuth();
   const currentView = useUIStore((state) => state.currentView);
@@ -388,7 +398,7 @@ const QuotationFeature: React.FC = () => {
     setEngineError(null);
   }, [engineConfig.type, engineConfig.url]);
 
-  const quotationResultRef = useRef<Record<string, unknown> | null>(null);
+  const quotationResultRef = useRef<QuotationAnalysisResponse | null>(null);
 
   const {
     resolveTaskId,
@@ -396,7 +406,7 @@ const QuotationFeature: React.FC = () => {
     banner: quotationWaitingBanner,
     hasActiveTask,
     clearResults,
-  } = useAnalysisFeature<Record<string, unknown>>({
+  } = useAnalysisFeature<QuotationAnalysisResponse>({
     analysisType: 'quotation_analysis',
     taskType: 'quotation',
     workspaceId: currentWorkspaceId,
@@ -475,7 +485,7 @@ const QuotationFeature: React.FC = () => {
     },
   });
 
-  const applyContextLengthPreferenceFromResult = (payload: Record<string, unknown>) => {
+  const applyContextLengthPreferenceFromResult = (payload: QuotationAnalysisResponse | Record<string, unknown>) => {
     const prefs = payload?.preferences as Record<string, unknown> | undefined;
     const prefValue = Number(prefs?.context_length ?? prefs?.contextLength);
     if (!Number.isFinite(prefValue)) {
@@ -750,14 +760,9 @@ const QuotationFeature: React.FC = () => {
     }
   };
 
-  const normalizeQuotationResult = (result: Record<string, unknown>, column: string): QuotationResultState => {
-    const toNumber = (value: unknown, fallback: number) => {
-      const num = Number(value);
-      return Number.isFinite(num) ? num : fallback;
-    };
-
-    const rawRows: Record<string, unknown>[] = Array.isArray(result?.data) ? result.data as Record<string, unknown>[] : [];
-    const rows = rawRows.map((row) => {
+  const buildQuotationResultState = (result: QuotationAnalysisResponse, column: string): QuotationResultState => {
+    const groupedRows = result.data;
+    const rows = flattenQuotationGroups(groupedRows).map((row) => {
       const spans: { start: number; end: number; type: string }[] = [];
       const addSpan = (start?: unknown, end?: unknown, type?: string) => {
         if (!type) return;
@@ -771,45 +776,26 @@ const QuotationFeature: React.FC = () => {
       addSpan(row?.[QUOTATION_COLUMN_KEYS.quoteStartIdx], row?.[QUOTATION_COLUMN_KEYS.quoteEndIdx], 'quote');
       addSpan(row?.[QUOTATION_COLUMN_KEYS.verbStartIdx], row?.[QUOTATION_COLUMN_KEYS.verbEndIdx], 'verb');
       return { ...row, __spans: spans };
-    });
+    }) as QuotationDisplayRow[];
 
-    let columns: string[] = Array.isArray(result?.columns) && result.columns.length
-      ? result.columns.slice()
-      : (rows[0] ? Object.keys(rows[0]).filter((key) => !key.startsWith('__')) : []);
-    if (column && !columns.includes(column)) {
-      columns = [...columns, column];
-    }
-
-    const rawPagination = (result?.pagination || {}) as Record<string, unknown>;
-    const pageSize = Math.max(1, toNumber(rawPagination.page_size, rows.length || DEFAULT_PAGE_SIZE));
-    const pagination = {
-      page: Math.max(1, toNumber(rawPagination.page, 1)),
-      page_size: pageSize,
-      total_source_rows: rawPagination.total_source_rows != null ? toNumber(rawPagination.total_source_rows, 0) : undefined,
-      total_source_pages: rawPagination.total_source_pages != null ? toNumber(rawPagination.total_source_pages, 1) : undefined,
-      result_count: rawPagination.result_count != null ? toNumber(rawPagination.result_count, 0) : undefined,
-      has_next: Boolean(rawPagination.has_next ?? false),
-      has_prev: Boolean(rawPagination.has_prev ?? false),
-    };
-
-    const rawSorting = (result?.sorting || {}) as Record<string, unknown>;
-    const descending = typeof rawSorting.descending === 'boolean' ? rawSorting.descending : false;
-    const sorting = {
-      sort_by: (rawSorting.sort_by ?? null) as string | null | undefined,
-      descending,
-    };
+    const metadata = result.metadata;
+    const columns = metadata.all_columns.slice();
+    const pagination = result.pagination;
+    const sorting = result.sorting;
 
     return {
+      groupedRows,
       rows,
       columns,
+      metadata,
       pagination,
       sorting,
       column,
     };
   };
 
-  const updateResultState = (nodeId: string, column: string, result: Record<string, unknown>): QuotationResultState => {
-    const normalized = normalizeQuotationResult(result, column);
+  const updateResultState = (nodeId: string, column: string, result: QuotationAnalysisResponse): QuotationResultState => {
+    const normalized = buildQuotationResultState(result, column);
     setResultsByNode((prev) => ({ ...prev, [nodeId]: normalized }));
     setNodeState((prev) => ({
       ...prev,
@@ -956,12 +942,13 @@ const QuotationFeature: React.FC = () => {
     }
 
     const resultState = resultsByNode[nodeId];
-    const rowsForColumns = resultState?.rows ?? [];
-    const allCols = Array.isArray(resultState?.columns) && resultState.columns.length
-      ? resultState.columns.filter((column) => !column.startsWith('__'))
-      : (rowsForColumns[0] ? Object.keys(rowsForColumns[0]).filter((column) => !column.startsWith('__')) : []);
-    const baseColumns = (originalColumnsByNode[nodeId] || []).filter((column) => !column.startsWith('__'));
+    if (!resultState) {
+      return [] as string[];
+    }
+
+    const baseColumns = resultState.metadata.metadata_columns.filter((column) => !column.startsWith('__'));
     const generatedMetadataColumns = [
+      QUOTATION_COLUMN_KEYS.quote,
       QUOTATION_COLUMN_KEYS.speaker,
       QUOTATION_COLUMN_KEYS.speakerStartIdx,
       QUOTATION_COLUMN_KEYS.speakerEndIdx,
@@ -974,7 +961,7 @@ const QuotationFeature: React.FC = () => {
       QUOTATION_COLUMN_KEYS.quoteTokenCount,
       QUOTATION_COLUMN_KEYS.isFloatingQuote,
       QUOTATION_COLUMN_KEYS.quoteRowIdx,
-    ].filter((column) => allCols.includes(column));
+    ].filter((column) => resultState.metadata.quotation_columns.includes(column));
 
     return Array.from(new Set([...baseColumns, ...generatedMetadataColumns]));
   })();
@@ -1245,49 +1232,15 @@ const QuotationFeature: React.FC = () => {
                 const textCol = selection?.column || '';
 
                 const resultState = resultsByNode[nodeId];
-                const fallbackRows: Record<string, unknown>[] = Array.isArray(nodeData?.data) ? nodeData.data as Record<string, unknown>[] : [];
-                const rowsForRender = resultState?.rows?.length ? resultState.rows : fallbackRows;
-                const rowsWithQuotes = rowsForRender.filter((row) => row?.[QUOTATION_COLUMN_KEYS.quote]);
-
-                const metaColumns: string[] = [
-                  QUOTATION_COLUMN_KEYS.speaker,
-                  QUOTATION_COLUMN_KEYS.speakerStartIdx,
-                  QUOTATION_COLUMN_KEYS.speakerEndIdx,
-                  QUOTATION_COLUMN_KEYS.quoteStartIdx,
-                  QUOTATION_COLUMN_KEYS.quoteEndIdx,
-                  QUOTATION_COLUMN_KEYS.verb,
-                  QUOTATION_COLUMN_KEYS.verbStartIdx,
-                  QUOTATION_COLUMN_KEYS.verbEndIdx,
-                  QUOTATION_COLUMN_KEYS.quoteType,
-                  QUOTATION_COLUMN_KEYS.quoteTokenCount,
-                  QUOTATION_COLUMN_KEYS.isFloatingQuote,
-                  QUOTATION_COLUMN_KEYS.quoteRowIdx,
-                ];
-
-                const allCols = (() => {
-                  if (Array.isArray(resultState?.columns) && resultState.columns.length) {
-                    return resultState.columns.filter((c: string) => !c.startsWith('__'));
-                  }
-                  if (rowsWithQuotes.length) {
-                    return Object.keys(rowsWithQuotes[0]).filter((c) => !c.startsWith('__'));
-                  }
-                  return [] as string[];
-                })();
-
-                const mainColumn = textCol || (allCols.includes(QUOTATION_COLUMN_KEYS.quote) ? QUOTATION_COLUMN_KEYS.quote : allCols[0] || QUOTATION_COLUMN_KEYS.quote);
-                const baseColumns = (originalColumnsByNode[nodeId] || []).filter((c) => !c.startsWith('__'));
-                const presentMeta = metaColumns.filter((c) => allCols.includes(c));
-                const visibleMetadataColumns = resolvedMetadataColumns.filter(
-                  (columnName) => baseColumns.includes(columnName) || presentMeta.includes(columnName),
-                );
+                const rowsWithQuotes = (resultState?.rows ?? []).filter((row) => row?.[QUOTATION_COLUMN_KEYS.quote]);
+                const visibleMetadataColumns = showMetadata ? resolvedMetadataColumns : [];
 
                 const cols = (() => {
-                  const ordered: string[] = [];
-                  if (mainColumn) ordered.push(mainColumn);
+                  const ordered: string[] = [QUOTATION_DOCUMENT_COLUMN];
                   if (showMetadata) {
                     ordered.push(...visibleMetadataColumns);
                   }
-                  return ordered.length ? Array.from(new Set(ordered)) : [mainColumn];
+                  return Array.from(new Set(ordered));
                 })();
 
                 return (
@@ -1307,7 +1260,7 @@ const QuotationFeature: React.FC = () => {
                             <TableHeader className="bg-muted sticky top-0 z-10">
                               <TableRow className="border-b border-border/60">
                                 {cols.map((c: string) => {
-                                  const sortable = (originalColumnsByNode[nodeId] || []).includes(c);
+                                  const sortable = Boolean(resultState?.metadata.metadata_columns.includes(c));
                                   const active = resultState?.sorting?.sort_by === c;
                                   return (
                                     <TableHead
@@ -1340,9 +1293,9 @@ const QuotationFeature: React.FC = () => {
                                     className="border-b border-border/60 last:border-b-0 hover:bg-muted/40"
                                   >
                                     {cols.map((c: string, cellIdx: number) => {
-                                      const val = row?.[c];
+                                      const val = c === QUOTATION_DOCUMENT_COLUMN ? row?.[textCol] : row?.[c];
                                       const cellKey = `${nodeId}:${rowIdx}:${cellIdx}`;
-                                      const shouldHighlight = textCol ? c === textCol : c === QUOTATION_COLUMN_KEYS.quote;
+                                      const shouldHighlight = Boolean(textCol) && c === QUOTATION_DOCUMENT_COLUMN;
                                       const content = shouldHighlight
                                         ? renderHighlightedText(
                                             typeof val === 'string' ? val : String(val ?? ''),
@@ -1377,7 +1330,8 @@ const QuotationFeature: React.FC = () => {
                       totalPages={resultState?.pagination?.total_source_pages}
                       onPageChange={(newPage) => handlePageChange(newPage)}
                       onPageSizeChange={(newSize) => handlePageSizeChange(newSize)}
-                      pageSizeLabel={buildQuotationMatchCountLabel(resultState?.pagination?.result_count)}
+                      pageSizeLabel="Documents per page"
+                      pageSizeSummary={<GroupedResultsPageSizeSummary groups={resultState?.groupedRows ?? []} />}
                       pageSizeOptions={[50, 100, 200, 400]}
                     >
                       <Button

@@ -1,11 +1,11 @@
 # AGENTS.md
 
-Start here before exploring. This monorepo contains the LDaCA web app and desktop app: a React 19 + Vite + Tauri frontend in `frontend/`, a FastAPI backend in `ldaca_web_app_backend/`, and supporting Python/Rust packages in `docworkspace/` and `polars-text/`. Treat package manifests, CI workflows, and build scripts as the source of truth when docs disagree.
+Start here before exploring. This monorepo contains the LDaCA web app and desktop app: a React 19 + Vite + Tauri frontend in `frontend/`, a FastAPI backend in `backend/`, and supporting Python/Rust packages in `docworkspace/` and `polars-text/`. Treat package manifests, CI workflows, and build scripts as the source of truth when docs disagree.
 
 ## Repo Map
 
 - `frontend/`: React 19, Vite 8, TypeScript, Vitest, ESLint, Tauri desktop shell in `src-tauri/`
-- `ldaca_web_app_backend/`: FastAPI backend, uv-managed, Python `>=3.14`
+- `backend/`: FastAPI backend (PyPI: `ldaca-web-app`, import: `ldaca_web_app`), uv-managed, Python `>=3.14`
 - `docworkspace/`: Python package for lazy Polars workspace/node graphs
 - `polars-text/`: Rust/PyO3 + Python package for text-analysis primitives
 - Root `package.json`: npm workspace wrapper for `frontend`
@@ -31,7 +31,7 @@ These were validated in this workspace and are the fastest reliable entry points
 - Frontend build: `npm run build -w frontend`, passes.
 - Frontend tests: `npm run test -w frontend -- --run`, passes (`27` files, `70` tests).
 - Backend run: existing backend responds on `http://127.0.0.1:8001/health`.
-- Backend tests: `cd ldaca_web_app_backend && uv run pytest -q`, passes (`269` tests).
+- Backend tests: `cd backend && uv run pytest -q`, passes (`269` tests).
 - `docworkspace` tests: `cd docworkspace && uv run pytest -q`, passes.
 - `polars-text` tests: `cd polars-text && uv run pytest -q`, passes.
 
@@ -41,8 +41,8 @@ These were validated in this workspace and are the fastest reliable entry points
 - Prefer `npm run ... -w frontend` from repo root for frontend commands.
 - Prefer `uv run ...` inside Python package directories.
 - Whenever you modify a Python project in this repo, run `uvx ty check` and `uv run pytest` from each affected Python package directory and make sure both commands pass before considering the work complete.
-- Do not run backend tests from repo root; run them from `ldaca_web_app_backend/`.
-- If you touch desktop packaging, inspect `ldaca_web_app_backend/scripts/package_backend_runtime.py` and `frontend/scripts/stage-backend-runtime.mjs` before changing anything.
+- Do not run backend tests from repo root; run them from `backend/`.
+- If you touch desktop packaging, inspect `scripts/package_backend_runtime.py` and `frontend/scripts/stage-backend-runtime.mjs` before changing anything.
 - Expect backend data under `~/Documents/ldaca` unless `DATA_ROOT` overrides it.
 - Some `polars-text` features download Hugging Face assets on first use; avoid treating that as an unexpected network regression.
 
@@ -66,7 +66,7 @@ Frontend changes are not complete until both `npm run test -w frontend -- --run`
 
 For backend changes, run:
 
-- `cd ldaca_web_app_backend && uv run pytest -q`
+- `cd backend && uv run pytest -q`
 
 For changes in any Python project, also run from the affected package directory:
 

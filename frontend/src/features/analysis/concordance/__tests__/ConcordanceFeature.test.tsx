@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const handleSearchMock = vi.fn();
 const clearResultsMock = vi.fn(async () => {});
+let latestTaskFlowParams: { state?: Record<string, unknown> } | null = null;
 let mockPendingConcordance: Record<string, unknown> | null = null;
 let mockHydrationState = { status: 'idle' as const, lastHydratedAt: 1 };
 let mockInitialResult: Record<string, unknown> | null = null;
@@ -147,14 +148,17 @@ vi.mock('../generatedColumns', () => ({
 }));
 
 vi.mock('../hooks/useConcordanceTaskFlow', () => ({
-  useConcordanceTaskFlow: () => ({
+  useConcordanceTaskFlow: (params: { state?: Record<string, unknown> }) => {
+    latestTaskFlowParams = params;
+    return {
     handleSearch: handleSearchMock,
     updateStoredResult: vi.fn(),
     handleSort: vi.fn(),
     handlePageChange: vi.fn(),
     persistResultPreferences: vi.fn(),
     handleDetach: vi.fn(),
-  }),
+  };
+  },
 }));
 
 vi.mock('../../common', async () => {
@@ -239,6 +243,7 @@ describe('ConcordanceFeature', () => {
   beforeEach(() => {
     handleSearchMock.mockClear();
     clearResultsMock.mockClear();
+    latestTaskFlowParams = null;
     mockPendingConcordance = null;
     mockHydrationState = { status: 'idle', lastHydratedAt: 1 };
     mockInitialResult = null;
@@ -275,6 +280,26 @@ describe('ConcordanceFeature', () => {
     return waitFor(() => {
       expect(handleSearchMock).toHaveBeenCalledWith(true, undefined, undefined, undefined, undefined, true);
     }).finally(unmount);
+  });
+
+  it('defaults whole-word on and disables it when regex is enabled', () => {
+    const { unmount } = render(<ConcordanceFeature />);
+
+    const wholeWordCheckbox = screen.getByRole('checkbox', { name: /whole word/i });
+    const regexCheckbox = screen.getByRole('checkbox', { name: /use regular expression/i });
+
+    expect(wholeWordCheckbox).toBeChecked();
+    expect(wholeWordCheckbox).toBeEnabled();
+    expect(latestTaskFlowParams?.state?.wholeWord).toBe(true);
+
+    fireEvent.click(regexCheckbox);
+
+    expect(regexCheckbox).toBeChecked();
+    expect(wholeWordCheckbox).not.toBeChecked();
+    expect(wholeWordCheckbox).toBeDisabled();
+    expect(latestTaskFlowParams?.state?.wholeWord).toBe(false);
+
+    unmount();
   });
 
   it('fills the concordance search box from a pending token handoff when no results exist', async () => {
@@ -566,7 +591,8 @@ describe('ConcordanceFeature', () => {
 
     render(<ConcordanceFeature />);
 
-    expect(screen.getByText('Documents searched per page (2 matches found)')).toBeInTheDocument();
+    expect(screen.getAllByText('Documents per page').length).toBeGreaterThan(0);
+    expect(screen.getByText('(Found 2 instances in 1 document).')).toBeInTheDocument();
   });
 
   it('hides the proportional-width control until Dispersion View is enabled', () => {

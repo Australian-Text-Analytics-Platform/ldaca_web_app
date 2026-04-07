@@ -1,19 +1,23 @@
 import { useEffect, useState } from 'react';
-import type { SliceRequest as SliceRequestPayload, FilterPreviewResponse } from '../../../../api/nodes';
+import { nodesApi, type SliceRequest as SliceRequestPayload, type FilterPreviewResponse } from '../../../../api/nodes';
 import type { NodeColumnSelection, WorkspaceNodeLike } from '../../../../components/NodeSelectionPanel';
 import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
 import type { PreviewPagination, PreviewRow } from '../../types';
+import { buildSamplingAutoNodeName } from '../../utils/autoNodeNames';
 import { buildWorkspaceNodeMap, deriveNodeLabel } from '../../utils/nodeMetadata';
 
 export interface SliceOperationResult {
   success?: boolean;
   message?: string;
   node_id?: string;
+  node_name?: string;
   data?: {
     node_name?: string;
     data_type?: string;
   };
 }
+
+export type SamplingMode = 'slice' | 'random_sample';
 
 export interface SliceSubTabProps {
   selectedNodeId: string | null;
@@ -36,8 +40,11 @@ export interface SliceSubTabProps {
 interface SliceHistory {
   nodeId?: string;
   nodeName: string;
-  offset: number;
+  mode: SamplingMode;
+  offset?: number;
   length?: number;
+  sampleSize?: number;
+  randomSeed?: number;
 }
 
 interface SliceSelectionPanelConfig {
@@ -52,12 +59,20 @@ interface SliceSelectionPanelConfig {
 }
 
 interface SliceFormControllers {
+  mode: SamplingMode;
+  setMode: (value: SamplingMode) => void;
   offsetInput: string;
   setOffsetInput: (value: string) => void;
   lengthInput: string;
   setLengthInput: (value: string) => void;
+  sampleSizeInput: string;
+  setSampleSizeInput: (value: string) => void;
+  sampleSizeHint: string | null;
+  randomSeedInput: string;
+  setRandomSeedInput: (value: string) => void;
   newNodeName: string;
   setNewNodeName: (value: string) => void;
+  newNodeNamePlaceholder: string;
 }
 
 interface SlicePreviewConfig {
@@ -94,8 +109,30 @@ export interface UseSliceSubTabResult {
 const DEFAULT_PALETTE = ['#2563eb'];
 const PREVIEW_DEBOUNCE_MS = 400;
 
-const buildSlicePayload = (offset: number, lengthValue?: number): SliceRequestPayload => {
-  const payload: SliceRequestPayload = { offset };
+const buildSlicePayload = ({
+  mode,
+  offset,
+  lengthValue,
+  sampleSizeValue,
+  randomSeedValue,
+}: {
+  mode: SamplingMode;
+  offset: number;
+  lengthValue?: number;
+  sampleSizeValue?: number;
+  randomSeedValue?: number;
+}): SliceRequestPayload => {
+  const payload: SliceRequestPayload = { mode };
+  if (mode === 'random_sample') {
+    if (typeof sampleSizeValue === 'number') {
+      payload.sample_size = sampleSizeValue;
+    }
+    if (typeof randomSeedValue === 'number') {
+      payload.random_seed = randomSeedValue;
+    }
+    return payload;
+  }
+  payload.offset = offset;
   if (typeof lengthValue === 'number') {
     payload.length = lengthValue;
   }
@@ -114,8 +151,11 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
     onAlert,
   } = props;
 
+  const [mode, setMode] = useState<SamplingMode>('slice');
   const [offsetInput, setOffsetInput] = useState('0');
   const [lengthInput, setLengthInput] = useState('');
+  const [sampleSizeInput, setSampleSizeInput] = useState('');
+  const [randomSeedInput, setRandomSeedInput] = useState('');
   const [newNodeName, setNewNodeName] = useState('');
   const [inlineError, setInlineError] = useState<string | null>(null);
   const [isSlicing, setIsSlicing] = useState(false);
@@ -136,23 +176,36 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
 
   useEffect(() => {
     setInlineError(null);
-  }, [offsetInput, lengthInput, selectedNodeId]);
+  }, [mode, offsetInput, lengthInput, sampleSizeInput, randomSeedInput, selectedNodeId]);
 
   useEffect(() => {
     if (!selectedNodeId) {
+      setMode('slice');
       setOffsetInput('0');
       setLengthInput('');
+      setSampleSizeInput('');
+      setRandomSeedInput('');
       setNewNodeName('');
       setLastResult(null);
       return;
     }
-    const baseName = selectedNodeLabel || selectedNodeId;
+    setMode('slice');
     setOffsetInput('0');
     setLengthInput('');
-    setNewNodeName(`${baseName}_sliced`);
+    setSampleSizeInput('');
+    setRandomSeedInput('');
+    setNewNodeName('');
     setLastResult(null);
     setInlineError(null);
   }, [selectedNodeId, selectedNodeLabel]);
+
+  useEffect(() => {
+    if (!selectedNodeId) {
+      return;
+    }
+    setLastResult(null);
+    setInlineError(null);
+  }, [mode, selectedNodeId, selectedNodeLabel]);
 
   const sliceSelectedNodesForPanel = activeNode ? [activeNode] : [];
 
@@ -169,55 +222,125 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
   const trimmedLength = lengthInput.trim();
   const lengthNumber = trimmedLength.length > 0 ? Number(trimmedLength) : null;
   const lengthValid =
-    lengthNumber === null || (Number.isInteger(lengthNumber) && lengthNumber >= 0);
+    lengthNumber !== null && Number.isInteger(lengthNumber) && lengthNumber >= 0;
   const lengthValue = lengthNumber === null ? undefined : lengthNumber;
+
+  const trimmedSampleSize = sampleSizeInput.trim();
+  const sampleSizeNumber = trimmedSampleSize.length > 0 ? Number(trimmedSampleSize) : null;
+  const sampleSizeValid =
+    sampleSizeNumber !== null &&
+    Number.isFinite(sampleSizeNumber) &&
+    sampleSizeNumber > 0 &&
+    (sampleSizeNumber < 1 || Number.isInteger(sampleSizeNumber));
+  const sampleSizeValue = sampleSizeValid ? sampleSizeNumber ?? undefined : undefined;
+
+  const sampleSizeHint: string | null = (() => {
+    if (trimmedSampleSize.length === 0 || sampleSizeValid) return null;
+    if (sampleSizeNumber !== null && sampleSizeNumber >= 1 && !Number.isInteger(sampleSizeNumber)) {
+      return 'Values ≥ 1 must be whole numbers (e.g. 25, not 25.5).';
+    }
+    return 'Enter a fraction (0–1) or an integer row count (≥ 1).';
+  })();
+
+  const trimmedRandomSeed = randomSeedInput.trim();
+  const randomSeedNumber = trimmedRandomSeed.length > 0 ? Number(trimmedRandomSeed) : null;
+  const randomSeedValid =
+    trimmedRandomSeed.length === 0 ||
+    (randomSeedNumber !== null && Number.isInteger(randomSeedNumber) && randomSeedNumber >= 0);
+  const randomSeedValue = trimmedRandomSeed.length === 0 ? undefined : randomSeedValid ? randomSeedNumber ?? undefined : undefined;
+
+  const hasOperation = mode === 'slice' ? offsetValid && lengthValid : sampleSizeValid && randomSeedValid;
+
+  const autoNodeName = buildSamplingAutoNodeName({
+    baseName: selectedNodeLabel || selectedNodeId,
+    mode,
+    offset: offsetValid ? offsetNumber : undefined,
+    length: lengthValid ? lengthValue : undefined,
+    sampleSize: sampleSizeValid ? sampleSizeValue : undefined,
+    randomSeed: randomSeedValid ? randomSeedValue : undefined,
+  });
 
   const rangeSummary = (() => {
     if (!hasSelection) {
-      return 'Select a data block to configure slicing.';
+      return 'Select a data block to configure sampling.';
     }
-    if (!offsetValid) {
-      return 'Offset must be a non-negative integer (zero-based row index).';
+    if (mode === 'slice') {
+      if (!offsetValid) {
+        return 'Offset must be a non-negative integer (zero-based row index).';
+      }
+      if (!lengthValid) {
+        return 'Length is required – enter the number of rows to include in the slice.';
+      }
+      if (lengthValue === 0) {
+        return `Slice starting at row ${offsetNumber} returning zero rows (length = 0).`;
+      }
+      const endRow = offsetNumber + (lengthValue ?? 0) - 1;
+      return `Rows ${offsetNumber}–${endRow} inclusive (${lengthValue} total).`;
     }
-    if (!lengthValid) {
-      return 'Length must be a non-negative integer when provided.';
+
+    if (!sampleSizeValid) {
+      return 'Enter a fraction (0–1) or an integer row count (≥ 1).';
     }
-    if (lengthValue === undefined) {
-      return `Rows ${offsetNumber} → end of dataset.`;
+    if (!randomSeedValid) {
+      return 'Random seed must be a non-negative integer.';
     }
-    if (lengthValue === 0) {
-      return `Slice starting at row ${offsetNumber} returning zero rows (length = 0).`;
+    if (sampleSizeValue !== undefined && sampleSizeValue < 1) {
+      if (randomSeedValue === undefined) {
+        return `Random sample using fraction ${sampleSizeValue}.`;
+      }
+      return `Random sample using fraction ${sampleSizeValue} with seed ${randomSeedValue}.`;
     }
-    const endRow = offsetNumber + lengthValue - 1;
-    return `Rows ${offsetNumber}–${endRow} inclusive (${lengthValue} total).`;
+    if (randomSeedValue === undefined) {
+      return `Random sample of ${sampleSizeValue} rows.`;
+    }
+    return `Random sample of ${sampleSizeValue} rows with seed ${randomSeedValue}.`;
   })();
 
   const lastResultSummary = (() => {
     if (!lastResult) {
-      return 'Adjust parameters and add to workspace to create a sliced data block.';
+      return 'Adjust parameters and add to workspace to create a sampled data block.';
     }
+    if (lastResult.mode === 'random_sample') {
+      const sizeLabel = lastResult.sampleSize !== undefined && lastResult.sampleSize < 1
+        ? `fraction ${lastResult.sampleSize}`
+        : `n=${lastResult.sampleSize}`;
+      if (lastResult.randomSeed === undefined) {
+        return `Last random sample "${lastResult.nodeName}" (${sizeLabel}).`;
+      }
+      return `Last random sample "${lastResult.nodeName}" (${sizeLabel}, seed ${lastResult.randomSeed}).`;
+    }
+    const lastOffset = lastResult.offset ?? 0;
     if (lastResult.length === undefined) {
-      return `Last slice “${lastResult.nodeName}” (offset ${lastResult.offset} → end).`;
+      return `Last slice “${lastResult.nodeName}” (offset ${lastOffset} → end).`;
     }
     if (lastResult.length === 0) {
-      return `Last slice “${lastResult.nodeName}” (offset ${lastResult.offset}, zero rows).`;
+      return `Last slice “${lastResult.nodeName}” (offset ${lastOffset}, zero rows).`;
     }
-    const endRow = lastResult.offset + lastResult.length - 1;
-    return `Last slice “${lastResult.nodeName}” (rows ${lastResult.offset}–${endRow}).`;
+    const endRow = lastOffset + lastResult.length - 1;
+    return `Last slice “${lastResult.nodeName}” (rows ${lastOffset}–${endRow}).`;
   })();
 
-  const previewReady = hasSelection && offsetValid && lengthValid;
+  const previewReady = hasSelection && (mode === 'slice' ? offsetValid : true);
 
   interface SlicePreviewRequest {
     nodeId: string;
-    payload: SliceRequestPayload;
+    payload: SliceRequestPayload | null;
   }
 
   const slicePreviewRequest: SlicePreviewRequest | null = (() => {
     if (!previewReady || !selectedNodeId) {
       return null;
     }
-    const payload = buildSlicePayload(offsetNumber, lengthValue);
+    if (!hasOperation) {
+      return { nodeId: selectedNodeId, payload: null };
+    }
+    const payload = buildSlicePayload({
+      mode,
+      offset: offsetNumber,
+      lengthValue,
+      sampleSizeValue,
+      randomSeedValue,
+    });
     return {
       nodeId: selectedNodeId,
       payload,
@@ -226,6 +349,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
 
   const previewSignature = (() => {
     if (!slicePreviewRequest) return 'slice-preview-disabled';
+    if (!slicePreviewRequest.payload) return `${slicePreviewRequest.nodeId}::raw`;
     return `${slicePreviewRequest.nodeId}::${JSON.stringify(slicePreviewRequest.payload)}`;
   })();
 
@@ -238,7 +362,15 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
     page: number;
     pageSize: number;
   }) => {
-    const response = await slicePreview(request.nodeId, request.payload, page, pageSize);
+    if (request.payload) {
+      const response = await slicePreview(request.nodeId, request.payload, page, pageSize);
+      return {
+        data: Array.isArray(response?.data) ? (response.data as PreviewRow[]) : [],
+        columns: Array.isArray(response?.columns) ? response.columns : [],
+        pagination: (response?.pagination as PreviewPagination) ?? null,
+      };
+    }
+    const response = await nodesApi.data(request.nodeId, page, pageSize);
     return {
       data: Array.isArray(response?.data) ? (response.data as PreviewRow[]) : [],
       columns: Array.isArray(response?.columns) ? response.columns : [],
@@ -278,58 +410,83 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
   };
 
   const previewReadyMessage = !hasSelection
-    ? 'Select a data block to preview sliced rows.'
-    : 'Enter a valid offset (and optional length) to see a preview.';
+    ? 'Select a data block to preview output rows.'
+    : mode === 'slice'
+      ? 'Showing original data. Enter offset and length to preview sliced rows.'
+      : 'Showing original data. Enter a fraction or row count and optional seed to preview sampled rows.';
 
   const applyDisabled =
-    !hasSelection || !offsetValid || !lengthValid || isSlicing || isLoading.operations;
+    !hasSelection || !hasOperation || isSlicing || isLoading.operations;
 
   const applySlice = async () => {
     if (!selectedNodeId) {
-      setInlineError('Select a data block to slice.');
+      setInlineError('Select a data block to sample.');
       return;
     }
-    if (!offsetValid) {
-      setInlineError('Offset must be a non-negative integer.');
-      return;
-    }
-    if (!lengthValid) {
-      setInlineError('Length must be a non-negative integer when provided.');
-      return;
+    if (mode === 'slice') {
+      if (!offsetValid) {
+        setInlineError('Offset must be a non-negative integer.');
+        return;
+      }
+      if (!lengthValid) {
+        setInlineError('Length is required – enter a non-negative integer.');
+        return;
+      }
+    } else {
+      if (!sampleSizeValid) {
+        setInlineError('Enter a fraction (0–1) or an integer row count (≥ 1).');
+        return;
+      }
+      if (!randomSeedValid) {
+        setInlineError('Random seed must be a non-negative integer.');
+        return;
+      }
     }
 
-    const payload = buildSlicePayload(offsetNumber, lengthValue);
-    const trimmedName = newNodeName.trim();
-    if (trimmedName.length > 0) {
-      payload.new_node_name = trimmedName;
+    const payload = buildSlicePayload({
+      mode,
+      offset: offsetNumber,
+      lengthValue,
+      sampleSizeValue,
+      randomSeedValue,
+    });
+    const requestedName = newNodeName.trim() || autoNodeName;
+    if (requestedName) {
+      payload.new_node_name = requestedName;
     }
 
     setInlineError(null);
     setIsSlicing(true);
     try {
       const response = await sliceNode(selectedNodeId, payload);
+      const operationLabel = mode === 'slice' ? 'Slice' : 'Random sample';
       if (response?.success === false) {
-        const message = response.message || 'Slice operation failed';
+        const message = response.message || `${operationLabel} operation failed`;
         setInlineError(message);
-        onAlert(`Slice failed: ${message}`);
+        onAlert(`${operationLabel} failed: ${message}`);
         return;
       }
       const responseName =
+        response?.node_name?.trim?.() ||
         response?.data?.node_name?.trim?.() ||
-        payload.new_node_name ||
-        `${selectedNodeLabel || selectedNodeId}_sliced`;
+        requestedName ||
+        `${selectedNodeLabel || selectedNodeId}_${mode === 'slice' ? 'sliced' : 'sampled'}`;
       const resultNodeId = response?.node_id;
       setLastResult({
         nodeId: resultNodeId ?? undefined,
         nodeName: responseName,
-        offset: offsetNumber,
-        length: lengthValue,
+        mode,
+        offset: mode === 'slice' ? offsetNumber : undefined,
+        length: mode === 'slice' ? lengthValue : undefined,
+        sampleSize: mode === 'random_sample' ? sampleSizeValue : undefined,
+        randomSeed: mode === 'random_sample' ? randomSeedValue : undefined,
       });
-      onAlert(`Slice created: ${responseName}${resultNodeId ? ` (${resultNodeId})` : ''}.`);
+      onAlert(`${operationLabel} created: ${responseName}${resultNodeId ? ` (${resultNodeId})` : ''}.`);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Slice operation failed';
+      const operationLabel = mode === 'slice' ? 'Slice' : 'Random sample';
+      const message = error instanceof Error ? error.message : `${operationLabel} operation failed`;
       setInlineError(message);
-      onAlert(`Slice failed: ${message}`);
+      onAlert(`${operationLabel} failed: ${message}`);
     } finally {
       setIsSlicing(false);
     }
@@ -347,12 +504,20 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
       onColorChange: () => undefined,
     },
     form: {
+      mode,
+      setMode,
       offsetInput,
       setOffsetInput,
       lengthInput,
       setLengthInput,
+      sampleSizeInput,
+      setSampleSizeInput,
+      sampleSizeHint,
+      randomSeedInput,
+      setRandomSeedInput,
       newNodeName,
       setNewNodeName,
+      newNodeNamePlaceholder: autoNodeName,
     },
     summaries: {
       range: rangeSummary,
