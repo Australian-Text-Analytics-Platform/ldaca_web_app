@@ -201,6 +201,7 @@ describe('DataPreprocessingFeature replace tab', () => {
     expect(screen.queryByLabelText('Offset')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Fraction / Count')).toBeInTheDocument();
     expect(screen.getByLabelText('Random seed')).toBeInTheDocument();
+    expect(screen.getByLabelText('Random seed')).toHaveValue(42);
 
     fireEvent.change(screen.getByLabelText('Fraction / Count'), { target: { value: '0.4' } });
     fireEvent.change(screen.getByLabelText('Random seed'), { target: { value: '7' } });

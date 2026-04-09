@@ -110,6 +110,7 @@ export interface UseSliceSubTabResult {
 
 const DEFAULT_PALETTE = ['#2563eb'];
 const PREVIEW_DEBOUNCE_MS = 400;
+const DEFAULT_RANDOM_SEED = '42';
 
 const buildSlicePayload = ({
   mode,
@@ -157,7 +158,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
   const [offsetInput, setOffsetInput] = useState('0');
   const [lengthInput, setLengthInput] = useState('');
   const [sampleSizeInput, setSampleSizeInput] = useState('');
-  const [randomSeedInput, setRandomSeedInput] = useState('0');
+  const [randomSeedInput, setRandomSeedInput] = useState(DEFAULT_RANDOM_SEED);
   const [noRandomSeed, setNoRandomSeed] = useState(false);
   const [newNodeName, setNewNodeName] = useState('');
   const [inlineError, setInlineError] = useState<string | null>(null);
@@ -187,7 +188,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
       setOffsetInput('0');
       setLengthInput('');
       setSampleSizeInput('');
-      setRandomSeedInput('0');
+      setRandomSeedInput(DEFAULT_RANDOM_SEED);
       setNoRandomSeed(false);
       setNewNodeName('');
       setLastResult(null);
@@ -197,7 +198,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
     setOffsetInput('0');
     setLengthInput('');
     setSampleSizeInput('');
-    setRandomSeedInput('0');
+    setRandomSeedInput(DEFAULT_RANDOM_SEED);
     setNoRandomSeed(false);
     setNewNodeName('');
     setLastResult(null);
