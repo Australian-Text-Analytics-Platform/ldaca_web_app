@@ -23,6 +23,9 @@ The LDaCA WebApp offers an interface that prioritizes ease of use and efficient 
 7.	Working Directory: Set the local directory where the data are saved.
 8.	Help and Feedback: When you encounter problems.
 
+For detailed explanation of how each of the above sections work, please refer to [User Interface Overview](./ui.md).
+
+
 ## Concept: How the Tools Interoperate
 The LDaCA suite of tools is designed to work together seamlessly, allowing you to conduct comprehensive text analyses. Here’s how the components interact:
 - **Data block**: Tabular data consists of at least one column of analysable textual contents. Each row represents a unit of text (document, post, comment, speech etc.) and its associated metadata in columns. A data block can be viewed as a collection of texts with various types of metadata.
@@ -56,6 +59,7 @@ Most operations (filtering, sampling, joining, stacking, detaching etc.) on a da
 
 ## Tutorial sections
 
+- [User Interface Overview](./ui.md) — learn what each section of the main screen does.
 - [Data loader](./data-loader.md) — create workspaces and upload data.
 - [Data Preprocessing](./preprocessing.md) — filter, slice, join, stack, and create columns.
 - [Token frequency](./token-frequency.md) — count and explore common terms.
