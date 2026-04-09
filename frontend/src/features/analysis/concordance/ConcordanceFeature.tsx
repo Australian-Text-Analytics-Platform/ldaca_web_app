@@ -48,6 +48,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../../compo
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { AnalysisPagination } from '../../../components/AnalysisPagination';
 import { AnalysisTableScrollArea } from '../../../components/AnalysisTableScrollArea';
+import { takeMostRecent } from '../../../utils/selectionUtils';
 import { ConcordanceDetachDialog, type DetachNodeOption } from './components/ConcordanceDetachDialog';
 import { ConcordanceDispersionCell } from './components/ConcordanceDispersionCell';
 import {
@@ -676,16 +677,16 @@ const ConcordanceFeature: React.FC = () => {
     if (Array.isArray(queuedPendingConcordance.selectedNodes) && queuedPendingConcordance.selectedNodes.length > 0) {
       const targetIds = queuedPendingConcordance.selectedNodes
         .map((node) => (typeof node?.id === 'string' ? node.id : ''))
-        .filter((id): id is string => id.trim().length > 0)
-        .slice(0, 2);
-      if (targetIds.length > 0) {
+        .filter((id): id is string => id.trim().length > 0);
+      const effectiveTargetIds = takeMostRecent(targetIds, 2);
+      if (effectiveTargetIds.length > 0) {
         const currentIds = selectedNodes.map((node) => node.id);
         const needsSync =
-          targetIds.length !== currentIds.length ||
-          targetIds.some((id, index) => id !== currentIds[index]);
+          effectiveTargetIds.length !== currentIds.length ||
+          effectiveTargetIds.some((id, index) => id !== currentIds[index]);
         if (needsSync) {
           try {
-            selectNodes(targetIds);
+            selectNodes(effectiveTargetIds);
           } catch (error) {
             console.warn('Failed to sync workspace selection from pending concordance:', error);
           }
@@ -1086,7 +1087,7 @@ const ConcordanceFeature: React.FC = () => {
               <span className="text-xs text-gray-500">Rows colored by source data block</span>
               <Button
                 onClick={() => {
-                  const nodeIdsForDetach = selectedNodes.slice(0,2).map(n => n.id);
+                  const nodeIdsForDetach = takeMostRecent(selectedNodes, 2).map(n => n.id);
                   if (nodeIdsForDetach.length === 0 || !searchWord.trim()) return;
                   const nodes = nodeIdsForDetach.map(nid => {
                     const col = effectiveNodeColumnSelections.find(s => s.nodeId === nid)?.column || '';

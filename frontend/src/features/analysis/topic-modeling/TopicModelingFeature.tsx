@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '../../../hooks/useWorkspaceSelection';
 import { useAuth } from '../../../hooks/useAuth';
+import { takeMostRecent } from '../../../utils/selectionUtils';
 // Updated to use modular API object pattern
 import { textApi, type TopicModelingResponse, type TopicModelingTopic } from '../../../api/text';
 import { useAnalysisStore, type TaskItem } from '../../../stores/analysisStore';
@@ -176,8 +177,7 @@ const TopicModelingFeature: React.FC = () => {
   };
 
   const topicRunningTask = taskStatus.runningTask;
-  const panelNodeIds = panelSelectedNodes
-    .slice(0, 2)
+  const panelNodeIds = takeMostRecent(panelSelectedNodes, 2)
     .map((node, idx) => getNodeIdentifier(node, idx) || activeNodeIds[idx])
     .filter((id): id is string => Boolean(id));
   const panelNodeIdsKey = panelNodeIds.join('|');
@@ -200,7 +200,7 @@ const TopicModelingFeature: React.FC = () => {
   const defaultPalette = DEFAULT_PALETTE;
 
   const { nodeColors, handleColorChange, defaultPalette: _dp } = useNodeColorManagement({
-    activeNodeIds: panelNodeIds.slice(0, 2),
+    activeNodeIds: takeMostRecent(panelNodeIds, 2),
   });
 
   const effectiveNodeColumnSelections = isLocked ? activeNodeColumnSelections : nodeColumnSelections;
@@ -317,7 +317,7 @@ const TopicModelingFeature: React.FC = () => {
     setTooltip,
   });
 
-  const colorNodeIds = isLocked ? activeNodeIds.slice(0, 2) : panelNodeIds;
+  const colorNodeIds = isLocked ? takeMostRecent(activeNodeIds, 2) : panelNodeIds;
 
   const { bubbleElements, renderSizeComposition } = useTopicModelingBubbleChart({
     topics,

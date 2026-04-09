@@ -9,6 +9,7 @@ import {
 } from '../../../../api/text';
 import { queryKeys } from '../../../../lib/queryKeys';
 import { restoreAnalysisLockFromRequest, extractAndSetTaskId } from '../../common';
+import { takeMostRecent } from '../../../../utils/selectionUtils';
 
 type NodeColumnSelection = {
   nodeId: string;
@@ -95,7 +96,7 @@ export function useTopicModelingTaskFlow({
       return;
     }
 
-    const requestNodeIds = panelNodeIds.slice(0, 2);
+    const requestNodeIds = takeMostRecent(panelNodeIds, 2);
     lastFetchedRef.current = { taskId: null, state: null };
     setIsRunning(true);
     runningRef.current = true;

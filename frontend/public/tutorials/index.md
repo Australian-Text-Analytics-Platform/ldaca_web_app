@@ -1,9 +1,9 @@
 <!-- markdownlint-disable MD033 -->
 
-<h1 id="help-tutorial-index">LDaCA tutorial index</h1>
+<h1 id="help-tutorial-index">LDaCA Text Analytic webApp Tutorial</h1>
 
 <p align="center">
-  <img src="/logo.png" alt="LDaCA" width="360" />
+  <img src="/LDaCA_logo_Dark.png" alt="LDaCA" width="360" />
 </p>
 
 Welcome to the LDaCA WebApp, your innovative solution for text analysis in research projects. This guide is designed to support new users as they begin their journey with the LDaCA text analytic tools, providing clear instructions, practical examples, and inspiration for leveraging the app’s powerful tools. Whether you are new to text analysis or an experienced researcher, this document will help you understand the installation process, the user interface, the core concepts behind the LDaCA’s interoperable tools, and how to achieve meaningful outcomes from your analysis.

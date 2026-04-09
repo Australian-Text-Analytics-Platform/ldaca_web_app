@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import type { WorkspaceNodeLike } from '../nodeSelectionTypes';
@@ -50,12 +50,24 @@ export const NodeSelectionList: React.FC<NodeSelectionListProps> = ({
       ? nodeIds
       : nodes.map((node, index) => getNodeIdentifier(node, index));
 
+  // Auto-scroll to the right end when the selection changes so the
+  // most recently selected data blocks are always visible.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const nodeIdsKey = derivedNodeIds.join('|');
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) {
+      el.scrollLeft = el.scrollWidth;
+    }
+  }, [nodeIdsKey]);
+
   if (!nodes.length) {
     return emptyState ? <>{emptyState}</> : null;
   }
 
   return (
     <div
+      ref={scrollRef}
       className={cn(
         'flex gap-2.5 px-3 pb-2 pt-0',
         nodes.length > maxCompare ? 'overflow-x-auto' : 'overflow-x-hidden',

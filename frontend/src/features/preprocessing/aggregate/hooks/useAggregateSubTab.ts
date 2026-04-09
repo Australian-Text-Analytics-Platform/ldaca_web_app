@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import type { WorkspaceNodeLike } from '../../../../components/NodeSelectionPanel';
+import { takeMostRecent } from '../../../../utils/selectionUtils';
 import {
   nodesApi,
   type ExpressionApplyResponse,
@@ -170,7 +171,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
 
   const effectiveNodes = (() => {
     if (selectedNodes?.length) {
-      return selectedNodes.slice(0, 1);
+      return takeMostRecent(selectedNodes, 1);
     }
     if (selectedNodeId) {
       const fallback = workspaceNodes.find((node, idx) => {

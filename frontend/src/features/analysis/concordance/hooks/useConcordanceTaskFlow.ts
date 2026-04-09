@@ -9,6 +9,7 @@ import {
 } from '../../../../api/text';
 import { restoreAnalysisLockFromRequest, extractAndSetTaskId } from '../../common';
 import type { NodeColumnSelection, NodePaginationState } from '../../common';
+import { takeMostRecent } from '../../../../utils/selectionUtils';
 
 export type PaginationState = Record<string, NodePaginationState>;
 
@@ -130,7 +131,7 @@ export function useConcordanceTaskFlow({
     }
 
     const requestNodeIds = (() => {
-      const baseIds = activeNodeIds.slice(0, 2);
+      const baseIds = takeMostRecent(activeNodeIds, 2);
       if (targetNodeId && !baseIds.includes(targetNodeId)) {
         return [...baseIds, targetNodeId];
       }

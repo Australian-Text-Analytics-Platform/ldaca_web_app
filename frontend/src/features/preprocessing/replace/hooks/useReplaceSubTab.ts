@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import type { WorkspaceNodeLike } from '../../../../components/NodeSelectionPanel';
+import { takeMostRecent } from '../../../../utils/selectionUtils';
 import {
   nodesApi,
   type FilterPreviewResponse,
@@ -51,7 +52,7 @@ export const useReplaceSubTab = (props: ReplaceSubTabProps) => {
   } = props;
 
   const effectiveNodes = (() => {
-    if (selectedNodes.length > 0) return selectedNodes.slice(0, 1);
+    if (selectedNodes.length > 0) return takeMostRecent(selectedNodes, 1);
     if (!selectedNodeId) return [];
     const fallback = workspaceNodes.find((node, index) => getNodeId(node, index) === selectedNodeId);
     return fallback ? [fallback] : [];

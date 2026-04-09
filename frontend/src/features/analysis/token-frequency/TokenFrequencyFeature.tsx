@@ -4,6 +4,7 @@ import { useAuth } from '../../../hooks/useAuth';
 import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '../../../hooks/useWorkspaceSelection';
 import { useWorkspaceActions } from '../../../hooks/useWorkspaceActions';
+import { takeMostRecent } from '../../../utils/selectionUtils';
 
 import { useNodeColumnInfos } from '../../../hooks/useNodeColumnInfos';
 import {
@@ -92,13 +93,12 @@ const TokenFrequencyFeature = () => {
   const [statsRowsPerPage, setStatsRowsPerPage] = useState<number>(50);
   const [statsTokenFilter, setStatsTokenFilter] = useState<string>('');
 
-  const panelNodeIds = panelSelectedNodes
-    .slice(0, 2)
+  const panelNodeIds = takeMostRecent(panelSelectedNodes, 2)
     .map((node, idx) => getNodeIdentifier(node, idx) || activeNodeIds[idx])
     .filter((id): id is string => Boolean(id));
 
   const { nodeColors, handleColorChange, defaultPalette } = useNodeColorManagement({
-    activeNodeIds: panelNodeIds.slice(0, 2),
+    activeNodeIds: takeMostRecent(panelNodeIds, 2),
     palette: TOKEN_FREQUENCY_PALETTE,
   });
 

@@ -79,6 +79,7 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
   const getColumnLabel = (node: WorkspaceNodeLike, idx: number) => (columnLabelFn ? columnLabelFn(node, idx) : 'Text Column:');
   // Compute stable list of selected node ids to avoid retriggering on object identity changes
   const selectedNodeIds = selectedNodes.map((node, idx) => getNodeIdentifier(node, idx));
+
   const columnSelectionsByNode = (() => {
     const map = new Map<string, NodeColumnSelection>();
     nodeColumnSelections.forEach((selection) => {
@@ -210,7 +211,7 @@ const NodeSelectionPanel: React.FC<NodeSelectionPanelProps> = ({
       {(originalCount ?? selectedNodes.length) > maxCompare && (
         <div className="mt-1 flex items-center gap-1 text-sm text-amber-600">
           <AlertTriangle className="h-4 w-4 shrink-0" />
-          Maximum {maxCompare} data block allowed here. Currently {(originalCount ?? selectedNodes.length)} selected in workspace; only the first {maxCompare} is used.
+          Maximum {maxCompare} data block{maxCompare === 1 ? '' : 's'} allowed here. Currently {(originalCount ?? selectedNodes.length)} selected in workspace; only the most recent {maxCompare} {maxCompare === 1 ? 'is' : 'are'} used.
         </div>
       )}
     </div>

@@ -5,6 +5,7 @@ import { resolveTokenFrequencyNodeContext, type TokenFrequencyAnalysisParams } f
 import { restoreAnalysisLockFromRequest, extractAndSetTaskId, type WorkspaceNodeLike } from '../../common';
 import type { PendingConcordance } from '@/stores/analysisStore';
 import type { ViewType } from '@/stores/uiStore';
+import { takeMostRecent } from '@/utils/selectionUtils';
 
 interface AnalysisState {
   currentWorkspaceId: string | null;
@@ -116,7 +117,7 @@ export const useTokenFrequencyTaskFlow = ({
       });
 
       const request: TokenFrequencyRequest = {
-        node_ids: panelNodeIds.slice(0, 2),
+        node_ids: takeMostRecent(panelNodeIds, 2),
         node_columns: nodeColumns,
         stop_words: stopWordsArray,
       };
@@ -183,7 +184,6 @@ export const useTokenFrequencyTaskFlow = ({
       resolvedContext.nodeIds.length > 0
         ? resolvedContext.nodeIds
         : panelNodeIds
-            .slice(0, 2)
             .filter((id): id is string => typeof id === 'string' && id.trim().length > 0);
 
     const fallbackSelections: NodeColumnSelection[] =
@@ -192,8 +192,7 @@ export const useTokenFrequencyTaskFlow = ({
         : effectiveNodeColumnSelections.filter((selection) => fallbackNodeIds.includes(selection.nodeId) && selection.column);
 
     const uniqueNodeIds: string[] = fallbackNodeIds
-      .filter((id, index, all) => all.indexOf(id) === index)
-      .slice(0, 2);
+      .filter((id, index, all) => all.indexOf(id) === index);
 
     const effectiveSelections = fallbackSelections.filter((selection) => uniqueNodeIds.includes(selection.nodeId));
 

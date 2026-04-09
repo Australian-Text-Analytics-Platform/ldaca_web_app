@@ -11,6 +11,7 @@ import type {
 } from '../../types';
 import { MAX_CONCAT_NODES } from '../../types';
 import { buildWorkspaceNodeMap, deriveNodeLabel, extractNodeColumns, extractNodeDtypes, getNodeKey } from '../../utils/nodeMetadata';
+import { takeMostRecent } from '../../../../utils/selectionUtils';
 
 const DEFAULT_CONCAT_PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#f97316', '#d946ef', '#0ea5e9', '#f59e0b', '#14b8a6'];
 
@@ -224,7 +225,7 @@ export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult
   const workspaceNodeMap = buildWorkspaceNodeMap(workspaceNodes);
 
   const uniqueNodeIds = dedupeNodeIds(selectedNodeIds);
-  const concatNodeIds = uniqueNodeIds.slice(0, MAX_CONCAT_NODES);
+  const concatNodeIds = takeMostRecent(uniqueNodeIds, MAX_CONCAT_NODES);
   const concatOriginalCount = uniqueNodeIds.length;
 
   const concatSelectedNodes: WorkspaceNodeLike[] = (() => {
@@ -375,7 +376,7 @@ export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult
   };
 
   const extraSelectionMessage = concatOriginalCount > MAX_CONCAT_NODES
-    ? `Using the first ${MAX_CONCAT_NODES} of ${concatOriginalCount} selected data blocks. Deselect extras to include them.`
+    ? `Using the most recent ${MAX_CONCAT_NODES} of ${concatOriginalCount} selected data blocks. Deselect extras to choose which ones to include.`
     : null;
 
   return {

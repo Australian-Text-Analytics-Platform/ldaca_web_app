@@ -6,6 +6,7 @@ import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
 import type { JoinPreviewRequestPayload, JoinType, PreviewPagination, PreviewRow } from '../../types';
 import { JOIN_TYPE_OPTIONS } from '../../types';
 import { buildWorkspaceNodeMap, deriveNodeLabel, extractNodeColumns, getNodeKey } from '../../utils/nodeMetadata';
+import { takeMostRecent } from '../../../../utils/selectionUtils';
 
 const DEFAULT_JOIN_PALETTE = ['#2563eb', '#dc2626'];
 const MAX_JOIN_NODES = 2;
@@ -113,7 +114,7 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
   const workspaceNodeMap = buildWorkspaceNodeMap(workspaceNodes);
 
   const uniqueSelectedNodeIds = dedupeNodeIds(selectedNodeIds);
-  const joinNodeIds = uniqueSelectedNodeIds.slice(0, MAX_JOIN_NODES);
+  const joinNodeIds = takeMostRecent(uniqueSelectedNodeIds, MAX_JOIN_NODES);
   const joinOriginalCount = uniqueSelectedNodeIds.length;
 
   const joinSelectedNodes = (() => {

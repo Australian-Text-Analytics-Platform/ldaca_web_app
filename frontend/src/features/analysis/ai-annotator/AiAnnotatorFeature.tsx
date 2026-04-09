@@ -13,6 +13,7 @@ import { AnalysisCardLayout } from '../common/components/AnalysisCardLayout';
 import AnalysisTaskBanner from '../../../components/tabs/AnalysisTaskBanner';
 import { useUIStore } from '../../../stores/uiStore';
 import { getNodeIdentifier, useAnalysisFeature, useAnalysisLockMachine, extractAndSetTaskId, restoreAnalysisLockFromRequest, resetAnalysisSelectionAfterClear } from '../common';
+import { takeMostRecent } from '../../../utils/selectionUtils';
 import { ChevronDown, ChevronUp, Loader2, Plus, RotateCcw, Sparkles, Wrench } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../components/ui/card';
 import { ScrollArea } from '../../../components/ui/scroll-area';
@@ -208,14 +209,13 @@ const AiAnnotatorFeature: React.FC = () => {
     docTypeOnly: true,
   });
 
-  const displayedNodes = panelSelectedNodes.slice(0, 1);
+  const displayedNodes = takeMostRecent(panelSelectedNodes, 1);
   const displayedNodeIds = displayedNodes
     .map((node, idx) => getNodeIdentifier(node, idx))
     .filter((id): id is string => Boolean(id));
 
   const effectiveSelections = (isLocked ? activeNodeColumnSelections : nodeColumnSelections)
-    .filter((selection) => displayedNodeIds.includes(selection.nodeId))
-    .slice(0, 1);
+    .filter((selection) => displayedNodeIds.includes(selection.nodeId));
 
   const { getColumnInfos } = useNodeColumnInfos({
     workspaceId: currentWorkspaceId,

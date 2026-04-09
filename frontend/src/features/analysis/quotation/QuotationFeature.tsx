@@ -45,6 +45,7 @@ import {
 } from '../../../components/ui/table';
 import { AnalysisTableScrollArea } from '../../../components/AnalysisTableScrollArea';
 import { ArrowUpDown, Loader2, Play, Trash2, Unlink } from 'lucide-react';
+import { takeMostRecent } from '../../../utils/selectionUtils';
 import {
   getNodeIdentifier,
   getServerEngineConfig,
@@ -340,7 +341,7 @@ const QuotationFeature: React.FC = () => {
 
   const activeSelections = isLocked ? activeNodeColumnSelections : nodeColumnSelections;
 
-  const displayedNodes = panelSelectedNodes.slice(0, 1);
+  const displayedNodes = takeMostRecent(panelSelectedNodes, 1);
 
   const originalColumnsByNode = (() => {
     const map: Record<string, string[]> = {};
