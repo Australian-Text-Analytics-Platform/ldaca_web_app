@@ -24,7 +24,7 @@ The edit icon next to the heading allows you to customise which tools appear and
 
 <h2 id="help-ui-data-selection">2. Data Selection</h2>
 
-Below the tool list, the **Data Blocks** panel shows every data block in the active workspace. Select one or more data blocks here to make them available to the current tool. This section is a shortcut for (de)selecting the available data blocks, which is equivalent to making selections in the Workspace Graph View (section 4).
+Below the tool list, the **Data Blocks** panel shows every data block in the active workspace. Select one or more data blocks here to make them available to the current tool. This section is a convenient shortcut for (de)selecting available data blocks, which is equivalent to making selections in the Workspace Graph View (section 4), especially when the right column is hidden.
 
 - The total count and the number of currently selected data blocks are displayed at the top.
 - Click a data block to select it. Hold **Shift** (or **⌘** on macOS) and click to select multiple data blocks when a tool requires more than one (e.g. Join or Stack).
@@ -41,9 +41,9 @@ The **Tasks** panel sits below data selection and tracks time-consuming backgrou
 - Click **Clear** to dismiss completed task notifications.
 - **Live updates** keeps the panel refreshed automatically so you can continue working while tasks run in the background.
 
-<h2 id="help-ui-workspace-manager">4. Workspace Manager</h2>
+<h2 id="help-ui-workspace-graph-view">4. Workspace Graph View</h2>
 
-**Note**: The whole right column (*Workspace Manager and Data Viewer*) can be collapsed to save screen space when they are not in use.
+**Note**: The whole right column (*Workspace Graph View and Data Viewer*) can be collapsed to save screen space when they are not in use, click the top-right arrow button to hide/show the whole right pane.
 
 The **Workspace Graph View** occupies the top-right area and visualises how data blocks relate to each other. Every data block is a node and every derivation (filter, join, sample, etc.) draws an edge from parent to child.
 

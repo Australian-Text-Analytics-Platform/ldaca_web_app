@@ -17,7 +17,7 @@ The LDaCA WebApp offers an interface that prioritizes ease of use and efficient 
 1.	Tool Choice: Choose and customise which tool module to use.
 2.	Data Selection: Select the data block to be analysed.
 3.	Task Centre: Show progress of time-consuming tasks.
-4.	Workspace Manager: Manage all processible and produced data blocks.
+4.	Workspace Graph View: Manage all processible and produced data blocks.
 5.	Data Viewer: View selected data block(s) as table.
 6.	Tool Interface: The main interface of the selected analytic tool.
 7.	Working Directory: Set the local directory where the data are saved.
