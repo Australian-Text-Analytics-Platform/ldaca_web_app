@@ -70,6 +70,8 @@ interface SliceFormControllers {
   sampleSizeHint: string | null;
   randomSeedInput: string;
   setRandomSeedInput: (value: string) => void;
+  noRandomSeed: boolean;
+  setNoRandomSeed: (value: boolean) => void;
   newNodeName: string;
   setNewNodeName: (value: string) => void;
   newNodeNamePlaceholder: string;
@@ -155,7 +157,8 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
   const [offsetInput, setOffsetInput] = useState('0');
   const [lengthInput, setLengthInput] = useState('');
   const [sampleSizeInput, setSampleSizeInput] = useState('');
-  const [randomSeedInput, setRandomSeedInput] = useState('');
+  const [randomSeedInput, setRandomSeedInput] = useState('0');
+  const [noRandomSeed, setNoRandomSeed] = useState(false);
   const [newNodeName, setNewNodeName] = useState('');
   const [inlineError, setInlineError] = useState<string | null>(null);
   const [isSlicing, setIsSlicing] = useState(false);
@@ -176,7 +179,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
 
   useEffect(() => {
     setInlineError(null);
-  }, [mode, offsetInput, lengthInput, sampleSizeInput, randomSeedInput, selectedNodeId]);
+  }, [mode, offsetInput, lengthInput, sampleSizeInput, randomSeedInput, noRandomSeed, selectedNodeId]);
 
   useEffect(() => {
     if (!selectedNodeId) {
@@ -184,7 +187,8 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
       setOffsetInput('0');
       setLengthInput('');
       setSampleSizeInput('');
-      setRandomSeedInput('');
+      setRandomSeedInput('0');
+      setNoRandomSeed(false);
       setNewNodeName('');
       setLastResult(null);
       return;
@@ -193,7 +197,8 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
     setOffsetInput('0');
     setLengthInput('');
     setSampleSizeInput('');
-    setRandomSeedInput('');
+    setRandomSeedInput('0');
+    setNoRandomSeed(false);
     setNewNodeName('');
     setLastResult(null);
     setInlineError(null);
@@ -244,10 +249,11 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
 
   const trimmedRandomSeed = randomSeedInput.trim();
   const randomSeedNumber = trimmedRandomSeed.length > 0 ? Number(trimmedRandomSeed) : null;
-  const randomSeedValid =
-    trimmedRandomSeed.length === 0 ||
-    (randomSeedNumber !== null && Number.isInteger(randomSeedNumber) && randomSeedNumber >= 0);
-  const randomSeedValue = trimmedRandomSeed.length === 0 ? undefined : randomSeedValid ? randomSeedNumber ?? undefined : undefined;
+  const randomSeedValid = noRandomSeed
+    ? true
+    : trimmedRandomSeed.length > 0 &&
+      randomSeedNumber !== null && Number.isInteger(randomSeedNumber) && randomSeedNumber >= 0;
+  const randomSeedValue = noRandomSeed ? undefined : (randomSeedValid ? randomSeedNumber ?? undefined : undefined);
 
   const hasOperation = mode === 'slice' ? offsetValid && lengthValid : sampleSizeValid && randomSeedValid;
 
@@ -258,6 +264,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
     length: lengthValid ? lengthValue : undefined,
     sampleSize: sampleSizeValid ? sampleSizeValue : undefined,
     randomSeed: randomSeedValid ? randomSeedValue : undefined,
+    noRandomSeed,
   });
 
   const rangeSummary = (() => {
@@ -515,6 +522,8 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
       sampleSizeHint,
       randomSeedInput,
       setRandomSeedInput,
+      noRandomSeed,
+      setNoRandomSeed,
       newNodeName,
       setNewNodeName,
       newNodeNamePlaceholder: autoNodeName,

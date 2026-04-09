@@ -5,6 +5,7 @@ import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
 import HelpIcon from '../../../components/help/HelpIcon';
 import { Button } from '../../../components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
+import { Checkbox } from '../../../components/ui/checkbox';
 import { Input } from '../../../components/ui/input';
 import { Label } from '../../../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
@@ -146,16 +147,28 @@ export const SliceSubTab: React.FC<SliceSubTabProps> = (props) => {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="sample-random-seed">Random seed</Label>
-                <Input
-                  id="sample-random-seed"
-                  type="number"
-                  min={0}
-                  step="1"
-                  value={form.randomSeedInput}
-                  onChange={(event) => form.setRandomSeedInput(event.target.value)}
-                  disabled={!hasSelection}
-                  placeholder="Optional seed for repeatable samples"
-                />
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="sample-random-seed"
+                    type="number"
+                    min={0}
+                    step="1"
+                    value={form.randomSeedInput}
+                    onChange={(event) => form.setRandomSeedInput(event.target.value)}
+                    disabled={!hasSelection || form.noRandomSeed}
+                    placeholder={form.noRandomSeed ? 'No seed' : 'Seed'}
+                    className="w-28"
+                  />
+                  <Checkbox
+                    id="no-random-seed"
+                    checked={form.noRandomSeed}
+                    onCheckedChange={(checked) => form.setNoRandomSeed(checked === true)}
+                    disabled={!hasSelection}
+                  />
+                  <Label htmlFor="no-random-seed" className="text-sm font-normal text-muted-foreground whitespace-nowrap">
+                    No Random Seed
+                  </Label>
+                </div>
                 <p className="text-xs text-muted-foreground">Use a seed to reproduce the same sampled rows.</p>
               </div>
             </div>
