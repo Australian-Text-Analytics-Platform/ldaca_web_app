@@ -97,6 +97,8 @@ The random seed controls the reproducibility of the random sampling process. Set
 
 - Use any non-negative integer (e.g. 0, 42, 12345).
 - Remember the seed value when you want consistent, reproducible results.
+- If you would like to have a **True Random** subset of selected data block, check the *No Random See* box after the seed control. 
+  - **Warning**: This will not only generate a random sample with unknown seed (*unreproducible*) at the time of creation, but also randomly redraw the sample everytime it is accessed or analysed again. *This randomness will be passed to all derived child data blocks if you elect to sample without a seed, and the results are subject to change at each analysis.* Please only use this option for exploring the dataset.
 
 <h3 id="help-preprocessing-slice-new-node-name">New data block name</h3>
 

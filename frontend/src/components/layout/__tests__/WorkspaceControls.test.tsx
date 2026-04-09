@@ -1,6 +1,7 @@
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { TooltipProvider } from '@/components/ui/tooltip';
 
 import { WorkspaceControls } from '../WorkspaceControls';
 
@@ -20,7 +21,7 @@ vi.mock('@/hooks/useWorkspaceActions', () => ({
 
 describe('WorkspaceControls', () => {
   it('renders save without rendering unload or a Save As action', () => {
-    render(<WorkspaceControls />);
+    render(<TooltipProvider><WorkspaceControls /></TooltipProvider>);
 
     expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Unload' })).not.toBeInTheDocument();

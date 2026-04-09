@@ -11,6 +11,7 @@ import {
   AlertDialogTitle,
 } from '../ui/alert-dialog';
 import { getInvalidWorkspaceNameMessage } from '../../lib/workspaceName';
+import HelpIcon from '@/components/help/HelpIcon';
 
 /**
  * Separated controls component focused only on workspace controls
@@ -51,6 +52,7 @@ export const WorkspaceControls: React.FC = memo(() => {
   return (
     <div className="flex items-center gap-3 flex-wrap">
       <h3 className="text-sm font-medium text-gray-700">Workspace Graph View</h3>
+      <HelpIcon targetKey="ui.workspace-graph-view" label="Workspace Graph View" className="h-5 w-5 text-muted-foreground" />
       <span className="text-gray-300">|</span>
       
       {isEditing ? (

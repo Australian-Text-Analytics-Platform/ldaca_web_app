@@ -35,6 +35,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { DataFolderDialog } from '@/components/dialogs/DataFolderDialog';
 import SidebarNodesSection from '@/components/layout/sidebar/SidebarNodesSection';
 import SidebarTasksSection from '@/components/layout/sidebar/SidebarTasksSection';
+import HelpIcon from '@/components/help/HelpIcon';
 import type {
   SidebarTaskRecord,
   SidebarWorkspaceNode,
@@ -73,6 +74,11 @@ const SECTION_TITLES: Record<SectionKey, string> = {
   views: 'Views',
   nodes: 'Data Blocks',
   tasks: 'Tasks',
+};
+const SECTION_HELP_KEYS: Record<SectionKey, string> = {
+  views: 'ui.tool-choice',
+  nodes: 'ui.data-selection',
+  tasks: 'ui.task-centre',
 };
 const MIN_SECTION_HEIGHT = 120;
 
@@ -398,7 +404,14 @@ const Sidebar: React.FC = () => {
                     onClick={() => toggleSection(key)}
                     aria-expanded={!isCollapsed}
                   >
-                    <span>{title}</span>
+                    <span className="flex items-center gap-1">
+                      {title}
+                      <HelpIcon
+                        targetKey={SECTION_HELP_KEYS[key]}
+                        label={title}
+                        className="h-5 w-5 text-muted-foreground"
+                      />
+                    </span>
                     <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
                       {key === 'nodes' && (
                         <span className="font-medium text-foreground/80">{nodeCount}</span>
@@ -516,7 +529,10 @@ const Sidebar: React.FC = () => {
         >
           <div className="flex items-start gap-3">
             <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-foreground">Working directory</p>
+              <p className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-foreground">
+                Working directory
+                <HelpIcon targetKey="ui.working-directory" label="Working Directory" className="h-4 w-4 text-muted-foreground" />
+              </p>
               <p className="mt-0.5 text-[11px] leading-tight text-muted-foreground break-all">
                 {dataFolder || 'Not configured'}
               </p>
@@ -537,23 +553,26 @@ const Sidebar: React.FC = () => {
             </Tooltip>
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button
-            variant="ghost"
-            className="flex-1 justify-center"
-            onClick={() => openTutorialTarget(tutorialIndexTarget)}
-          >
-            <BookOpen className="h-4 w-4" />
-            <span>Tutorial</span>
-          </Button>
-          <Button
-            variant="ghost"
-            className="flex-1 justify-center"
-            onClick={openFeedbackModal}
-          >
-            <MessageSquare className="h-4 w-4" />
-            <span>Feedback</span>
-          </Button>
+        <div className="flex items-center gap-2">
+          <div className="flex flex-1 gap-2">
+            <Button
+              variant="ghost"
+              className="flex-1 justify-center"
+              onClick={() => openTutorialTarget(tutorialIndexTarget)}
+            >
+              <BookOpen className="h-4 w-4" />
+              <span>Tutorial</span>
+            </Button>
+            <Button
+              variant="ghost"
+              className="flex-1 justify-center"
+              onClick={openFeedbackModal}
+            >
+              <MessageSquare className="h-4 w-4" />
+              <span>Feedback</span>
+            </Button>
+          </div>
+          <HelpIcon targetKey="ui.help-feedback" label="Help and Feedback" className="h-5 w-5 text-muted-foreground" />
         </div>
       </SidebarFooter>
 

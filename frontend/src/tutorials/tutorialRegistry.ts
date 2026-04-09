@@ -5,6 +5,41 @@ export type TutorialTarget = {
 };
 
 const registry: Record<string, TutorialTarget> = {
+  'ui.tool-choice': {
+    file: 'tutorials/ui.md',
+    anchor: 'help-ui-tool-choice',
+    label: 'Tool Choice',
+  },
+  'ui.data-selection': {
+    file: 'tutorials/ui.md',
+    anchor: 'help-ui-data-selection',
+    label: 'Data Selection',
+  },
+  'ui.task-centre': {
+    file: 'tutorials/ui.md',
+    anchor: 'help-ui-task-centre',
+    label: 'Task Centre',
+  },
+  'ui.workspace-graph-view': {
+    file: 'tutorials/ui.md',
+    anchor: 'help-ui-workspace-graph-view',
+    label: 'Workspace Graph View',
+  },
+  'ui.data-viewer': {
+    file: 'tutorials/ui.md',
+    anchor: 'help-ui-data-viewer',
+    label: 'Data Viewer',
+  },
+  'ui.working-directory': {
+    file: 'tutorials/ui.md',
+    anchor: 'help-ui-working-directory',
+    label: 'Working Directory',
+  },
+  'ui.help-feedback': {
+    file: 'tutorials/ui.md',
+    anchor: 'help-ui-help-feedback',
+    label: 'Help and Feedback',
+  },
   'data-loader.active-workspace.section': {
     file: 'tutorials/data-loader.md',
     anchor: 'help-data-loader-active-workspace',

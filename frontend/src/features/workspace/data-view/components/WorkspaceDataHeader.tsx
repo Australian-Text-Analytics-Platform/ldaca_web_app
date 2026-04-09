@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
+import HelpIcon from '@/components/help/HelpIcon';
 
 import type { WorkspaceDataTableHeaderInfo } from '../hooks/useWorkspaceDataTable';
 
@@ -52,6 +53,7 @@ export const WorkspaceDataHeader = ({
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
           <h3 className="text-sm font-medium text-gray-700">Data View</h3>
+          <HelpIcon targetKey="ui.data-viewer" label="Data Viewer" className="h-5 w-5 text-muted-foreground" />
           <span className="text-gray-300">|</span>
           {isRenaming ? (
             <input

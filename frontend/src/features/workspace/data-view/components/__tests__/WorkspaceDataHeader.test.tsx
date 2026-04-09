@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { TooltipProvider } from '@/components/ui/tooltip';
 
 import { WorkspaceDataHeader } from '../WorkspaceDataHeader';
 
@@ -11,18 +12,20 @@ describe('WorkspaceDataHeader', () => {
     const onRedo = vi.fn();
 
     render(
-      <WorkspaceDataHeader
-        info={{
-          nodeLabel: 'sample_data/ADO/qldelection2020_candidate_tweets_conc',
-          tabPosition: 1,
-          totalTabs: 1,
-          isEmptyTable: false,
-        }}
-        onUndo={onUndo}
-        onRedo={onRedo}
-        canUndo
-        canRedo={false}
-      />
+      <TooltipProvider>
+        <WorkspaceDataHeader
+          info={{
+            nodeLabel: 'sample_data/ADO/qldelection2020_candidate_tweets_conc',
+            tabPosition: 1,
+            totalTabs: 1,
+            isEmptyTable: false,
+          }}
+          onUndo={onUndo}
+          onRedo={onRedo}
+          canUndo
+          canRedo={false}
+        />
+      </TooltipProvider>
     );
 
     expect(screen.queryByText(/rows loaded/i)).not.toBeInTheDocument();
