@@ -201,6 +201,7 @@ describe('DataPreprocessingFeature replace tab', () => {
     expect(screen.queryByLabelText('Offset')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Fraction / Count')).toBeInTheDocument();
     expect(screen.getByLabelText('Random seed')).toBeInTheDocument();
+    expect(screen.getByLabelText('Random seed')).toHaveValue(42);
 
     fireEvent.change(screen.getByLabelText('Fraction / Count'), { target: { value: '0.4' } });
     fireEvent.change(screen.getByLabelText('Random seed'), { target: { value: '7' } });
@@ -243,9 +244,12 @@ describe('DataPreprocessingFeature replace tab', () => {
     await user.keyboard('{ArrowDown}{ArrowDown}{Enter}');
 
     fireEvent.change(within(samplePanel).getByPlaceholderText('e.g. 0.4 for 40% or 100 for 100 rows'), { target: { value: '0.4' } });
-    fireEvent.change(within(samplePanel).getByPlaceholderText('Optional seed for repeatable samples'), { target: { value: '7' } });
+    fireEvent.change(screen.getByLabelText('Random seed'), { target: { value: '7' } });
 
-    const sampleNameInput = within(samplePanel).getByPlaceholderText('Corpus_sampled_fr_0_4_rs_7');
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText('Corpus_sampled_fr_0_4_rs_7')).toBeInTheDocument();
+    });
+    const sampleNameInput = screen.getByPlaceholderText('Corpus_sampled_fr_0_4_rs_7');
     expect(sampleNameInput).toHaveValue('');
     expect(sampleNameInput).toHaveAttribute('placeholder', 'Corpus_sampled_fr_0_4_rs_7');
 
