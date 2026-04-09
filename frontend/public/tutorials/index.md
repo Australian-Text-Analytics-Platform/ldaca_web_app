@@ -6,19 +6,37 @@
   <img src="/logo.png" alt="LDaCA" width="360" />
 </p>
 
-Welcome! This tutorial set walks you through the LDaCA text analysis platform from first upload to exporting results. Each section is focused and hands-on, so you can jump to what you need.
+Welcome to the LDaCA WebApp, your innovative solution for text analysis in research projects. This guide is designed to support new users as they begin their journey with the LDaCA text analytic tools, providing clear instructions, practical examples, and inspiration for leveraging the app’s powerful tools. Whether you are new to text analysis or an experienced researcher, this document will help you understand the installation process, the user interface, the core concepts behind the LDaCA’s interoperable tools, and how to achieve meaningful outcomes from your analysis.
 
 ## Overview
 
-The LDaCA web app is a general text analytics workspace for exploring text data, managing projects, and producing shareable results. Use it to bring in datasets, clean and join them, run analyses, and export insights in a repeatable workflow.
+The LDaCA WebApp offers an interface that prioritizes ease of use and efficient navigation. The main user interface includes the following main sections, systematically presented in three primary columns.
 
-Key capabilities include:
+![LDaCA main webApp](tutorials/assets/ldaca_main.png)
 
-- **Workspaces** to organize projects, versions, and saved analyses.
-- **File ingestion** with upload, preview, and sample data helpers.
-- **Preprocessing** tools for cleaning, joining, and preparing data.
-- **Analyses** like token frequency, concordance, topic modeling, sequential analysis, and quotation extraction.
-- **Export** options for tables, summaries, and downstream reporting.
+1.	Tool Choice: Choose and customise which tool module to use.
+2.	Data Selection: Select the data block to be analysed.
+3.	Task Centre: Show progress of time-consuming tasks.
+4.	Workspace Manager: Manage all processible and produced data blocks.
+5.	Data Viewer: View selected data block(s) as table.
+6.	Tool Interface: The main interface of the selected analytic tool.
+7.	Working Directory: Set the local directory where the data are saved.
+8.	Help and Feedback: When you encounter problems.
+
+## Concept: How the Tools Interoperate
+The LDaCA suite of tools is designed to work together seamlessly, allowing you to conduct comprehensive text analyses. Here’s how the components interact:
+- **Data block**: Tabular data consists of at least one column of analysable textual contents. Each row represents a unit of text (document, post, comment, speech etc.) and its associated metadata in columns. A data block can be viewed as a collection of texts with various types of metadata.
+- **Workspace**: A set of data blocks that can be processed, analysed and derived from each other. The workspace is a virtual space where the user uploads, processes and manipulates all relevant data blocks to a project or task. The workspace is visualised as a graph of interconnecting data blocks, where the links indicates how new data blocks are derived from their parent data blocks through various operations. The user can select, rename, delete or clone the data blocks from the workspace manager.
+
+The data block is the fundamental analytic unit for all LDaCA tools, serves as both input and output so that the result of one tool can be processed by any other tool seamlessly. 
+The text corpus and metadata can be uploaded to the webApp then loaded as a data block to an active workspace.
+Most operations (filtering, sampling, joining, stacking, detaching etc.) on a data block derives a new data block in the workspace, and 
+
+- Data Loader: Upload your text files and load  the text corpus (e.g., interview transcripts, articles) into a project workspace.
+- Preprocessing: Use built-in cleaning tools to prepare your text, including removal of stopwords, stemming, and normalization.
+- Analysis Modules: Select from available tools — such as frequency analysis, quotation extractor, topic modeling or concordance analysis — to process your data.
+-	Results Integration: Combine the findings from different modules to gain holistic insights, e.g., linking topics to historical trends.
+- Export & Share: Export your results in various formats (CSV, image or a whole zip archived workspace) and share with your collaborators.
 
 ## How to use the help icons
 

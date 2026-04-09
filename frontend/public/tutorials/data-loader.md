@@ -91,10 +91,16 @@ Use this option to load curated sample datasets for exploration and testing.
 
 Use this option to import a dataset directly from the Language Data Commons of Australia (LDaCA).
 
-- Paste the full URL of an LDaCA ZIP download (e.g., as obtained from an LDaCA repository page).
-- The import process runs in the background.
-- Imported files will appear in the files list under the **LDaCA** folder once the download and extraction are complete. If the files do not appear, click the refresh button in the top-right corner of the panel.
+![Copy download link](tutorials/assets/data_loader/ldaca_loader_link.png)
+
+- Paste the full URL of an LDaCA ZIP download (e.g., as obtained from an LDaCA repository page by tight clicking the download icon, then paste the link to the url input of the pop up window).
+
+![Paste download link](tutorials/assets/data_loader/ldaca_loader_input.png)
+
+- The import process runs in the background, depending on the size of the collection and your network speed, this may take from 30 seconds to a few minutes to finish.
+- Imported collection will appear in the files list under the **LDaCA** folder as a *parquet* file after the extraction completes. If the files do not appear, click the refresh button in the top-right corner of the panel.
 - Currently, this importer supports the following fully public collections: [COOEE](https://data.ldaca.edu.au/collection?id=arcp%3A%2F%2Fname%2Chdl10.26180~23961609&_crateId=arcp%3A%2F%2Fname%2Chdl10.26180~23961609), [ICE-AUS](https://data.ldaca.edu.au/collection?id=arcp%3A%2F%2Fname%2Chdl10.25949~24769173.v1&_crateId=arcp%3A%2F%2Fname%2Chdl10.25949~24769173.v1), and [La Trobe Australian Spoken English](https://data.ldaca.edu.au/collection?id=arcp%3A%2F%2Fname%2Chdl10.26181~23089559&_crateId=arcp%3A%2F%2Fname%2Chdl10.26181~23089559).
+
 
 <h2 id="help-data-loader-file-operations">File operations</h2>
 
