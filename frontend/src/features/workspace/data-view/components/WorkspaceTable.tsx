@@ -31,6 +31,8 @@ import {
 import { toast } from 'sonner';
 import { DatetimeFormatPanel } from '../../../../components/panels/DatetimeFormatPanel';
 import { ConfirmDialog } from '../../../../components/ui/confirm-dialog';
+import { RowDetailPanel } from '../../../analysis/common/components/RowDetailPanel';
+import { useRowDetailDialog } from '../../../analysis/common/components/useRowDetailDialog';
 import { TablePaginationControls } from './TablePaginationControls';
 import type { DataRow, PaginationInfo } from '../types';
 import type { NodeSchemaResponse } from '../../../../types';
@@ -112,6 +114,7 @@ export interface WorkspaceTableProps {
   loading?: boolean;
   workspaceId?: string;
   nodeId?: string;
+  documentColumn?: string;
   onCast?: (column: string, targetType: string, format?: string) => Promise<void>;
   onRenameColumn?: (column: string, nextName: string) => Promise<void>;
   onDeleteColumn?: (column: string) => Promise<void>;
@@ -126,6 +129,7 @@ export function WorkspaceTable({
   loading = false,
   workspaceId,
   nodeId,
+  documentColumn,
   onCast,
   onRenameColumn,
   onDeleteColumn,
@@ -151,6 +155,7 @@ export function WorkspaceTable({
   const [expandedColumns, setExpandedColumns] = useState<Record<string, boolean>>({});
   const [deleteColumnDialogOpen, setDeleteColumnDialogOpen] = useState(false);
   const [columnToDelete, setColumnToDelete] = useState<string | null>(null);
+  const { detailPayload, detailOpen, setDetailOpen, openDetail: openRowDetail } = useRowDetailDialog();
 
   const debugEnabled = (() => {
     if (typeof window === 'undefined') {
@@ -717,7 +722,22 @@ export function WorkspaceTable({
             </TableHeader>
             <TableBody className="divide-y divide-border/60 bg-white">
               {tableRows.map((row) => (
-                <TableRow key={row.id} className="transition-colors duration-150 hover:bg-muted/40">
+                <TableRow
+                  key={row.id}
+                  className="cursor-pointer transition-colors duration-150 hover:bg-muted/40"
+                  onClick={() => {
+                    const detailTextColumn =
+                      documentColumn
+                      && Object.prototype.hasOwnProperty.call(row.original, documentColumn)
+                        ? documentColumn
+                        : undefined;
+
+                    openRowDetail({
+                      record: { ...row.original },
+                      textColumn: detailTextColumn,
+                    });
+                  }}
+                >
                   {row.getVisibleCells().map((cell) => {
                     const meta = cell.column.columnDef.meta;
                     return (
@@ -793,6 +813,12 @@ export function WorkspaceTable({
         cancelText="Cancel"
         variant="destructive"
         onConfirm={confirmDeleteColumn}
+      />
+
+      <RowDetailPanel
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        payload={detailPayload}
       />
     </>
   );
