@@ -72,6 +72,9 @@ import {
 } from '../common/components/MetadataColumnSelector';
 import { GroupedResultsPageSizeSummary } from '../common/components/GroupedResultsPageSizeSummary';
 import { reconcileMetadataColumnSelection } from '../common/components/metadataColumnSelection';
+import { RowDetailPanel } from '../common/components/RowDetailPanel';
+import { useRowDetailDialog } from '../common/components/useRowDetailDialog';
+import { renderQuotationDetailText } from './components/quotationDetailText';
 
 interface QuotationResultState {
   groupedRows: QuotationGroupedRow[];
@@ -333,6 +336,7 @@ const QuotationFeature: React.FC = () => {
   const [isSavingContextLength, setIsSavingContextLength] = useState(false);
   const [errorDialogOpen, setErrorDialogOpen] = useState(false);
   const [errorDialogMessage, setErrorDialogMessage] = useState<string>('');
+  const { detailPayload, detailOpen, setDetailOpen, openDetail: openRowDetail } = useRowDetailDialog();
 
   const { getColumnInfos } = useNodeColumnInfos({
     workspaceId: currentWorkspaceId,
@@ -1291,7 +1295,19 @@ const QuotationFeature: React.FC = () => {
                                 rowsWithQuotes.map((row, rowIdx: number) => (
                                   <TableRow
                                     key={rowIdx}
-                                    className="border-b border-border/60 last:border-b-0 hover:bg-muted/40"
+                                    className="border-b border-border/60 last:border-b-0 hover:bg-muted/40 cursor-pointer"
+                                    onClick={() => {
+                                      const record = { ...row };
+                                      const rawFullText = record[textCol];
+                                      const fullText = rawFullText == null ? undefined : String(rawFullText);
+                                      const quotationGeneratedCols = Object.values(QUOTATION_COLUMN_KEYS);
+                                      openRowDetail({
+                                        record,
+                                        textColumn: textCol,
+                                        fullText,
+                                        excludeMetadataColumns: [...quotationGeneratedCols, '__spans'],
+                                      });
+                                    }}
                                   >
                                     {cols.map((c: string, cellIdx: number) => {
                                       const val = c === QUOTATION_DOCUMENT_COLUMN ? row?.[textCol] : row?.[c];
@@ -1387,6 +1403,34 @@ const QuotationFeature: React.FC = () => {
         selectAllDetachColumns={selectAllDetachColumns}
         deselectAllDetachColumns={deselectAllDetachColumns}
         handleDetachConfirm={handleDetachConfirm}
+      />
+
+      <RowDetailPanel
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        payload={detailPayload}
+        customization={detailPayload ? {
+          label: 'Quotation',
+          summaryFields: [
+            {
+              label: 'Quote Type',
+              value: String(detailPayload.record[QUOTATION_COLUMN_KEYS.quoteType] ?? ''),
+            },
+            {
+              label: 'Speaker',
+              value: String(detailPayload.record[QUOTATION_COLUMN_KEYS.speaker] ?? ''),
+            },
+            {
+              label: 'Verb',
+              value: String(detailPayload.record[QUOTATION_COLUMN_KEYS.verb] ?? ''),
+            },
+            {
+              label: 'Quote',
+              value: String(detailPayload.record[QUOTATION_COLUMN_KEYS.quote] ?? ''),
+            },
+          ],
+          renderDocumentText: (text, record) => renderQuotationDetailText(text, record),
+        } : undefined}
       />
     </>
   );

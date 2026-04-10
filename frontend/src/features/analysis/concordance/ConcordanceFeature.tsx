@@ -44,7 +44,9 @@ import {
   pruneTasksById,
 } from '../../../hooks/analysisTaskUtils';
 import { useConcordanceTaskFlow, type PaginationState } from './hooks/useConcordanceTaskFlow';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../../components/ui/dialog';
+import { RowDetailPanel } from '../common/components/RowDetailPanel';
+import { useRowDetailDialog } from '../common/components/useRowDetailDialog';
+import { highlightMatchInText } from '../common/components/highlightText';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { AnalysisPagination } from '../../../components/AnalysisPagination';
 import { AnalysisTableScrollArea } from '../../../components/AnalysisTableScrollArea';
@@ -107,90 +109,7 @@ const getDispersionColumnStyle = (
   };
 };
 
-const highlightMatchInText = (
-  textValue: string,
-  ranges: Array<{ start: unknown; end: unknown }>,
-  fallbackMatch?: string,
-  fallbackCaseSensitive?: boolean,
-): React.ReactNode => {
-  if (typeof textValue !== 'string' || textValue.length === 0) {
-    return textValue;
-  }
 
-  const parseIndex = (value: unknown): number | null => {
-    if (typeof value === 'number' && Number.isFinite(value)) {
-      return Math.floor(value);
-    }
-    if (typeof value === 'string' && value.trim() !== '') {
-      const parsed = Number.parseInt(value, 10);
-      return Number.isNaN(parsed) ? null : parsed;
-    }
-    return null;
-  };
-
-  const normalizedRanges = ranges
-    .map(({ start, end }) => {
-      const startIdx = parseIndex(start);
-      const endIdx = parseIndex(end);
-      if (startIdx === null || endIdx === null || endIdx <= startIdx) {
-        return null;
-      }
-      const safeStart = Math.max(0, Math.min(startIdx, textValue.length));
-      const safeEnd = Math.max(safeStart, Math.min(endIdx, textValue.length));
-      if (safeEnd <= safeStart) {
-        return null;
-      }
-      return { start: safeStart, end: safeEnd };
-    })
-    .filter((range): range is { start: number; end: number } => Boolean(range))
-    .sort((left, right) => left.start - right.start);
-
-  if (normalizedRanges.length === 0 && fallbackMatch && fallbackMatch.length > 0) {
-    const source = fallbackCaseSensitive ? textValue : textValue.toLowerCase();
-    const needle = fallbackCaseSensitive ? fallbackMatch : fallbackMatch.toLowerCase();
-    const fallbackIdx = source.indexOf(needle);
-    if (fallbackIdx !== -1) {
-      normalizedRanges.push({ start: fallbackIdx, end: fallbackIdx + needle.length });
-    }
-  }
-
-  if (normalizedRanges.length === 0) {
-    return textValue;
-  }
-
-  const mergedRanges: Array<{ start: number; end: number }> = [];
-  normalizedRanges.forEach((range) => {
-    const previous = mergedRanges[mergedRanges.length - 1];
-    if (!previous || range.start > previous.end) {
-      mergedRanges.push({ ...range });
-      return;
-    }
-    previous.end = Math.max(previous.end, range.end);
-  });
-
-  const children: React.ReactNode[] = [];
-  let cursor = 0;
-  mergedRanges.forEach((range, index) => {
-    if (cursor < range.start) {
-      children.push(<React.Fragment key={`plain-${index}`}>{textValue.slice(cursor, range.start)}</React.Fragment>);
-    }
-    children.push(
-      <mark key={`mark-${range.start}-${range.end}`} className="bg-yellow-200 text-gray-900 rounded px-1">
-        {textValue.slice(range.start, range.end)}
-      </mark>
-    );
-    cursor = range.end;
-  });
-  if (cursor < textValue.length) {
-    children.push(<React.Fragment key="plain-tail">{textValue.slice(cursor)}</React.Fragment>);
-  }
-
-  return (
-    <>
-      {children}
-    </>
-  );
-};
 
 const ConcordanceFeature: React.FC = () => {
   // Anchor ref for results container to stabilize scroll on view mode toggle
@@ -362,8 +281,11 @@ const ConcordanceFeature: React.FC = () => {
   const [globalPageSize, setGlobalPageSize] = useState(20);
   
   // Detail view state
-  const [selectedDetail, setSelectedDetail] = useState<Record<string, unknown> | null>(null);
-  const [showDetailModal, setShowDetailModal] = useState(false);
+  const { detailPayload, detailOpen, setDetailOpen, openDetail: openRowDetail } = useRowDetailDialog();
+  const [concordanceDetailExtra, setConcordanceDetailExtra] = useState<{
+    concordanceHits: Array<Record<string, unknown>>;
+    caseSensitive: boolean;
+  } | null>(null);
   
   // State for auto-triggering search from TokenFrequencyTab
   const [shouldAutoSearch, setShouldAutoSearch] = useState(false);
@@ -906,58 +828,63 @@ const ConcordanceFeature: React.FC = () => {
     const concordanceHits = groupedHits && groupedHits.length > 0 ? groupedHits : [row];
     const primaryRecord = concordanceHits[0] ?? row;
     const record = { ...primaryRecord };
-    const availableColumns = Object.keys(record);
     const rawFullText = record[column];
     const fullText = rawFullText === null || rawFullText === undefined ? undefined : String(rawFullText);
 
-    const detailPayload = {
-      ...row,
-      nodeId,
-      column,
-      full_text: fullText,
-      record,
-      concordance_hits: concordanceHits,
-      available_columns: availableColumns,
-      case_sensitive: row.case_sensitive ?? caseSensitive,
-    };
+    setConcordanceDetailExtra({
+      concordanceHits,
+      caseSensitive: (typeof row.case_sensitive === 'boolean' ? row.case_sensitive : caseSensitive),
+    });
 
-    setSelectedDetail(detailPayload);
-    setShowDetailModal(true);
+    openRowDetail({
+      record,
+      textColumn: column,
+      fullText,
+      excludeMetadataColumns: [...CORE_COLS, CONCORDANCE_COLUMN_KEYS.dispersion],
+    });
   };
 
-  const detailFullTextInfo = (() => {
-    if (!selectedDetail) {
-      return { text: null as string | null, highlighted: null as React.ReactNode };
-    }
+  const concordanceCustomization = (() => {
+    if (!detailPayload || !concordanceDetailExtra) return undefined;
+    const { record } = detailPayload;
+    const { concordanceHits, caseSensitive: detailCaseSensitive } = concordanceDetailExtra;
 
-    const textCandidate =
-      typeof selectedDetail.full_text === 'string'
-        ? selectedDetail.full_text
-        : typeof selectedDetail.text === 'string'
-        ? selectedDetail.text
-        : null;
+    const matchedTextValue = record[CONCORDANCE_COLUMN_KEYS.matchedText];
 
-    if (!textCandidate) {
-      return { text: null as string | null, highlighted: null as React.ReactNode };
-    }
-
-    const concordanceHits = Array.isArray(selectedDetail.concordance_hits)
-      ? selectedDetail.concordance_hits as Array<Record<string, unknown>>
-      : [selectedDetail];
-    const matchedTextValue = selectedDetail[CONCORDANCE_COLUMN_KEYS.matchedText];
-    const highlighted = highlightMatchInText(
-      textCandidate,
-      concordanceHits.map((hit) => ({
-        start: hit[CONCORDANCE_COLUMN_KEYS.startIdx],
-        end: hit[CONCORDANCE_COLUMN_KEYS.endIdx],
-      })),
-      (typeof matchedTextValue === 'string' && matchedTextValue.length > 0)
-        ? matchedTextValue
-        : searchWord,
-      typeof selectedDetail.case_sensitive === 'boolean' ? selectedDetail.case_sensitive : caseSensitive
-    );
-
-    return { text: textCandidate, highlighted };
+    return {
+      label: 'Concordance',
+      summaryFields: [
+        {
+          label: 'Search Word',
+          value: searchWord,
+          highlight: true,
+        },
+        {
+          label: 'Matches',
+          value: String(concordanceHits.length),
+        },
+        {
+          label: 'L1 Word',
+          value: String(record[CONCORDANCE_COLUMN_KEYS.leftToken] ?? ''),
+        },
+        {
+          label: 'R1 Word',
+          value: String(record[CONCORDANCE_COLUMN_KEYS.rightToken] ?? ''),
+        },
+      ],
+      renderDocumentText: (text: string) =>
+        highlightMatchInText(
+          text,
+          concordanceHits.map((hit) => ({
+            start: hit[CONCORDANCE_COLUMN_KEYS.startIdx],
+            end: hit[CONCORDANCE_COLUMN_KEYS.endIdx],
+          })),
+          (typeof matchedTextValue === 'string' && matchedTextValue.length > 0)
+            ? matchedTextValue
+            : searchWord,
+          detailCaseSensitive,
+        ),
+    };
   })();
 
   // --- Detach dialog helpers ---
@@ -1692,97 +1619,12 @@ const ConcordanceFeature: React.FC = () => {
       )}
 
       {/* Detail Modal */}
-      {selectedDetail && (
-        <Dialog open={showDetailModal} onOpenChange={setShowDetailModal}>
-          <DialogContent className="max-w-4xl w-full max-h-[80vh] overflow-hidden">
-            <DialogHeader>
-              <DialogTitle>Concordance Detail</DialogTitle>
-            </DialogHeader>
-
-            <div className="overflow-y-auto max-h-[calc(80vh-120px)] pr-1">
-              {/* Metadata */}
-              <div className="mb-6 grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="font-medium text-gray-700">Search Word:</span>
-                  <span className="ml-2 font-mono bg-yellow-100 px-1 rounded">{searchWord}</span>
-                </div>
-                <div>
-                  <span className="font-medium text-gray-700">Matches:</span>
-                  <span className="ml-2">{Array.isArray(selectedDetail.concordance_hits) ? selectedDetail.concordance_hits.length : 1}</span>
-                </div>
-                <div>
-                  <span className="font-medium text-gray-700">L1 Word:</span>
-                  <span className="ml-2">{String(selectedDetail[CONCORDANCE_COLUMN_KEYS.leftToken] ?? '')}</span>
-                </div>
-                <div>
-                  <span className="font-medium text-gray-700">R1 Word:</span>
-                  <span className="ml-2">{String(selectedDetail[CONCORDANCE_COLUMN_KEYS.rightToken] ?? '')}</span>
-                </div>
-              </div>
-
-              {/* Full Text */}
-              <div className="mb-6">
-                <h4 className="font-medium text-gray-700 mb-2">Full Text from Column: {String(selectedDetail.column ?? '')}</h4>
-                <div className="bg-gray-50 p-4 rounded-lg border">
-                  <div className="font-mono text-sm whitespace-pre-wrap max-h-96 overflow-y-auto">
-                    {detailFullTextInfo.text
-                      ? detailFullTextInfo.highlighted ?? detailFullTextInfo.text
-                      : 'Text not available'}
-                  </div>
-                </div>
-              </div>
-
-              {/* Document Metadata Table */}
-              <div>
-                <h4 className="font-medium text-gray-700 mb-2">Document Metadata</h4>
-                <div className="bg-white border border-border rounded-lg overflow-hidden">
-                  <Table>
-                    <TableHeader className="bg-gray-50">
-                      <TableRow>
-                        <TableHead className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Field</TableHead>
-                        <TableHead className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Value</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {(selectedDetail.record && typeof selectedDetail.record === 'object') ? Object.entries(selectedDetail.record as Record<string, unknown>).map(([key, value]) => {
-                        if (key === selectedDetail.column) {
-                          return null;
-                        }
-
-                        let displayValue: string;
-                        if (value === null || value === undefined) {
-                          displayValue = 'null';
-                        } else if (typeof value === 'object') {
-                          displayValue = JSON.stringify(value, null, 2);
-                        } else {
-                          displayValue = String(value);
-                        }
-
-                        return (
-                          <TableRow key={key}>
-                            <TableCell className="font-medium">{key}</TableCell>
-                            <TableCell>
-                              <div className="max-w-md wrap-break-word">
-                                {typeof value === 'object' && value !== null ? (
-                                  <pre className="text-xs bg-gray-100 p-2 rounded overflow-x-auto">
-                                    {displayValue}
-                                  </pre>
-                                ) : (
-                                  displayValue
-                                )}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      }) : null}
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
+      <RowDetailPanel
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        payload={detailPayload}
+        customization={concordanceCustomization}
+      />
 
       {/* Loading State */}
       {isLoading.graph && (

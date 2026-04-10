@@ -4,6 +4,7 @@ import { useWorkspaceData } from '../../../../hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '../../../../hooks/useWorkspaceSelection';
 import { useWorkspaceStatus } from '../../../../hooks/useWorkspaceStatus';
 import type { WorkspaceTableProps } from '../components/WorkspaceTable';
+import { getNodeDocumentColumn } from '../utils/documentColumn';
 
 export interface WorkspaceDataTableHeaderInfo {
   nodeLabel: string;
@@ -186,6 +187,7 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
     loading: isLoading.nodeData,
     workspaceId: currentWorkspaceId || undefined,
     nodeId: selectedNode?.id,
+    documentColumn: getNodeDocumentColumn(selectedNode),
     onCast: selectedNode
       ? async (column: string, targetType: string, format?: string) => {
           await castColumn(selectedNode.id, column, targetType, format);

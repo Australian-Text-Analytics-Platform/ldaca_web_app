@@ -10,6 +10,7 @@ import { Separator } from '../../../components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../components/ui/tabs';
 import { cn } from '../../../lib/utils';
 import { PreviewTable } from '../components/PreviewTable';
+import { getNodeDocumentColumn } from '../utils/nodeMetadata';
 import { useAggregateSubTab, type AggregateSubTabProps } from './hooks/useAggregateSubTab';
 
 export type { AggregateSubTabProps } from './hooks/useAggregateSubTab';
@@ -333,6 +334,7 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
         readyMessage={preview.readyMessage}
         page={preview.page}
         pageSize={preview.pageSize}
+        documentColumn={getNodeDocumentColumn(nodeSelection.effectiveNodes[0])}
         onPageSizeChange={preview.setPageSize}
         onPreviousPage={preview.onPreviousPage}
         onNextPage={preview.onNextPage}

@@ -5,6 +5,8 @@ import { ScrollArea } from '../../../components/ui/scroll-area';
 import { Button } from '../../../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
+import { RowDetailPanel } from '../../analysis/common/components/RowDetailPanel';
+import { useRowDetailDialog } from '../../analysis/common/components/useRowDetailDialog';
 import { formatPreviewValue } from '../utils/typeUtils';
 import { type PreviewRow, type PreviewPagination, PREVIEW_PAGE_SIZE_OPTIONS } from '../types';
 
@@ -24,6 +26,7 @@ interface PreviewTableProps {
   onPreviousPage: () => void;
   onNextPage: () => void;
   loadingBadge?: React.ReactNode;
+  documentColumn?: string;
 }
 
 /**
@@ -45,7 +48,9 @@ export const PreviewTable: React.FC<PreviewTableProps> = ({
   onPreviousPage,
   onNextPage,
   loadingBadge,
+  documentColumn,
 }) => {
+  const { detailPayload, detailOpen, setDetailOpen, openDetail: openRowDetail } = useRowDetailDialog();
   const columnsToRender =
     columns.length > 0
       ? columns
@@ -138,7 +143,21 @@ export const PreviewTable: React.FC<PreviewTableProps> = ({
                     </TableRow>
                   ) : (
                     data.map((row, rowIndex) => (
-                      <TableRow key={rowIndex}>
+                      <TableRow
+                        key={rowIndex}
+                        className="cursor-pointer transition-colors duration-150 hover:bg-muted/40"
+                        onClick={() => {
+                          const detailTextColumn =
+                            documentColumn && Object.prototype.hasOwnProperty.call(row, documentColumn)
+                              ? documentColumn
+                              : undefined;
+
+                          openRowDetail({
+                            record: { ...row },
+                            textColumn: detailTextColumn,
+                          });
+                        }}
+                      >
                         {columnsToRender.map((col) => {
                           const cellValue = formatPreviewValue(row[col]);
                           return (
@@ -189,6 +208,12 @@ export const PreviewTable: React.FC<PreviewTableProps> = ({
           </div>
         </CardFooter>
       )}
+
+      <RowDetailPanel
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        payload={detailPayload}
+      />
     </Card>
   );
 };
