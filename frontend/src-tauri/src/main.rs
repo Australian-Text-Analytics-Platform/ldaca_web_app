@@ -508,6 +508,7 @@ fn spawn_backend_process(
     command
         .arg("-m")
         .arg("ldaca_web_app.cli")
+        .arg("--backend")
         .current_dir(&runtime.root)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
@@ -659,43 +660,6 @@ fn wait_for_child_exit(child: &mut std::process::Child, timeout: Duration) -> bo
     }
 }
 
-fn wait_for_backend_health(backend_url: &str) -> io::Result<()> {
-    let health_url = format!("{}/health", backend_url.trim_end_matches('/'));
-    let poll_interval = Duration::from_millis(500);
-    let mut attempt = 0;
-    let agent = ureq::Agent::new_with_defaults();
-
-    loop {
-        attempt += 1;
-        match agent.get(&health_url).call() {
-            Ok(response) => {
-                if response.status() == 200 {
-                    println!(
-                        "Backend health check succeeded after {} attempt(s) (status {})",
-                        attempt,
-                        response.status()
-                    );
-                    return Ok(());
-                }
-
-                println!(
-                    "Backend health endpoint returned status {} on attempt {} – retrying...",
-                    response.status(),
-                    attempt
-                );
-            }
-            Err(err) => {
-                println!(
-                    "Backend health check attempt {} failed: {}. Retrying...",
-                    attempt, err
-                );
-            }
-        }
-
-        std::thread::sleep(poll_interval);
-    }
-}
-
 fn main() {
     // Find an available port for the backend (try 8001-8010)
     let backend_port = match find_available_port(8001, 8010) {
@@ -752,16 +716,13 @@ fn main() {
             *state.process.lock().unwrap() = Some(process);
 
             println!(
-                "Backend launched at: {} (pid {}) – waiting for /health",
+                "Backend launched at: {} (pid {}) – health polling delegated to frontend",
                 backend_url, backend_pid
             );
 
-            if let Err(err) = wait_for_backend_health(&backend_url) {
-                eprintln!("Backend health check failed: {}", err);
-                return Err(Box::new(err));
-            }
-
-            println!("Backend ready at: {} (pid {})", backend_url, backend_pid);
+            // Don't block setup waiting for /health — the frontend already
+            // polls the backend and shows a loading screen via useBackendHealth.
+            // This lets the window appear immediately.
 
             Ok(())
         })
