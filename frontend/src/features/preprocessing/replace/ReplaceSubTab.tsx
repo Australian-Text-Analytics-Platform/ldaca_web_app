@@ -9,6 +9,7 @@ import { Label } from '../../../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
 import { Tag } from '../../../components/ui/tag';
 import { PreviewTable } from '../components/PreviewTable';
+import { getNodeDocumentColumn } from '../utils/nodeMetadata';
 import { useReplaceSubTab, type ReplaceSubTabProps } from './hooks/useReplaceSubTab';
 
 export type { ReplaceSubTabProps } from './hooks/useReplaceSubTab';
@@ -215,6 +216,7 @@ export const ReplaceSubTab: React.FC<ReplaceSubTabProps> = (props) => {
         readyMessage={preview.readyMessage}
         page={preview.page}
         pageSize={preview.pageSize}
+        documentColumn={getNodeDocumentColumn(effectiveNodes[0])}
         onPageSizeChange={preview.setPageSize}
         onPreviousPage={preview.onPreviousPage}
         onNextPage={preview.onNextPage}

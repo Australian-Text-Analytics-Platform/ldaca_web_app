@@ -7,6 +7,7 @@ import { Button } from '../../../components/ui/button';
 import HelpIcon from '../../../components/help/HelpIcon';
 import { ConditionBuilder } from '../components/condition-builder';
 import { PreviewTable } from '../components/PreviewTable';
+import { getNodeDocumentColumn } from '../utils/nodeMetadata';
 import { acceptPlaceholderOnTab } from '../utils/placeholderTabFill';
 import { useFilterSubTabSections, type FilterSubTabProps } from './hooks/useFilterSubTabSections';
 import type { FilterConditionWithId } from '../types';
@@ -163,6 +164,7 @@ export const FilterSubTab: React.FC<FilterSubTabProps> = (props) => {
         readyMessage={preview.readyMessage}
         page={preview.page}
         pageSize={preview.pageSize}
+        documentColumn={getNodeDocumentColumn(props.selectedNode)}
         onPageSizeChange={preview.onPageSizeChange}
         onPreviousPage={preview.onPreviousPage}
         onNextPage={preview.onNextPage}

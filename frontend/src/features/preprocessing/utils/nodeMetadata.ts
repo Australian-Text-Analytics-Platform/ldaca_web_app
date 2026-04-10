@@ -52,3 +52,29 @@ export const extractNodeDtypes = (node: WorkspaceNodeLike | null | undefined): R
   }
   return {};
 };
+
+export const getNodeDocumentColumn = (node: WorkspaceNodeLike | null | undefined): string | undefined => {
+  const base = toRecord(node);
+  const data = toRecord(base.data);
+  const dataNode = toRecord(data.node);
+
+  const candidates = [
+    base.documentColumn,
+    base.document_column,
+    base.document,
+    data.documentColumn,
+    data.document_column,
+    data.document,
+    dataNode.documentColumn,
+    dataNode.document_column,
+    dataNode.document,
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string' && candidate.trim().length > 0) {
+      return candidate;
+    }
+  }
+
+  return undefined;
+};

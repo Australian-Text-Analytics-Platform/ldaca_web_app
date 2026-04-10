@@ -11,6 +11,7 @@ import { Label } from '../../../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
 import { Tag } from '../../../components/ui/tag';
 import { PreviewTable } from '../components/PreviewTable';
+import { getNodeDocumentColumn } from '../utils/nodeMetadata';
 import { acceptPlaceholderOnTab } from '../utils/placeholderTabFill';
 import { useSliceSubTab, type SliceSubTabProps } from './hooks/useSliceSubTab';
 
@@ -229,6 +230,7 @@ export const SliceSubTab: React.FC<SliceSubTabProps> = (props) => {
         readyMessage={preview.readyMessage}
         page={preview.page}
         pageSize={preview.pageSize}
+        documentColumn={getNodeDocumentColumn(props.selectedNode)}
         onPageSizeChange={preview.onPageSizeChange}
         onPreviousPage={preview.onPreviousPage}
         onNextPage={preview.onNextPage}
