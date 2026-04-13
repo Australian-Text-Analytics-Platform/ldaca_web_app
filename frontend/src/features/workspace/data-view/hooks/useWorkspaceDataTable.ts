@@ -3,6 +3,8 @@ import { useWorkspaceActions } from '../../../../hooks/useWorkspaceActions';
 import { useWorkspaceData } from '../../../../hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '../../../../hooks/useWorkspaceSelection';
 import { useWorkspaceStatus } from '../../../../hooks/useWorkspaceStatus';
+import { nodesApi } from '../../../../api/nodes';
+import { useAuth } from '../../../../hooks/useAuth';
 import type { WorkspaceTableProps } from '../components/WorkspaceTable';
 import { getNodeDocumentColumn } from '../utils/documentColumn';
 
@@ -18,6 +20,7 @@ export interface WorkspaceDataTableNodeActions {
   onRedo?: () => void;
   onDelete?: () => void;
   onRename?: (newName: string) => void;
+  onQueryPlan?: () => Promise<string | null>;
   canUndo: boolean;
   canRedo: boolean;
 }
@@ -79,6 +82,7 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
     handlePageChange,
     handlePageSizeChange,
   } = useWorkspaceSelection();
+  const { getAuthHeaders } = useAuth();
   const {
     castColumn,
     renameColumn,
@@ -167,6 +171,12 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
     onRedo: selectedNode?.id && redoNode ? () => void redoNode(selectedNode.id) : undefined,
     onDelete: selectedNode?.id && deleteNode ? () => void deleteNode(selectedNode.id) : undefined,
     onRename: selectedNode?.id && renameNode ? (newName: string) => void renameNode(selectedNode.id, newName) : undefined,
+    onQueryPlan: selectedNode?.id
+      ? async () => {
+          const resp = await nodesApi.queryPlan(selectedNode.id, getAuthHeaders());
+          return resp.plan ?? null;
+        }
+      : undefined,
     canUndo,
     canRedo,
   };

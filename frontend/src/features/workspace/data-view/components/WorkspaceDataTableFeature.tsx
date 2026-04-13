@@ -76,6 +76,7 @@ export function WorkspaceDataTableFeature(_props: WorkspaceDataTableFeatureProps
           onUndo={nodeActions.onUndo}
           onRedo={nodeActions.onRedo}
           onRename={nodeActions.onRename}
+          onQueryPlan={nodeActions.onQueryPlan}
           canUndo={nodeActions.canUndo}
           canRedo={nodeActions.canRedo}
         />

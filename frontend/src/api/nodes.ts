@@ -21,6 +21,10 @@ export interface ColumnDescribeResponse {
   max?: string | number | null;
 }
 
+export interface QueryPlanResponse {
+  plan: string;
+}
+
 export interface FilterCondition {
   column: string;
   operator: 'eq' | 'gte' | 'lte' | 'contains' | 'startswith' | 'endswith' | 'is_null' | 'between' | 'in';
@@ -119,6 +123,8 @@ export const nodesApi = {
     httpRequest<NodeInfoResponse>(`/workspaces/nodes/${node}/undo`, { method: 'POST', headers }),
   redo: (node: string, headers: Record<string, string> = {}) =>
     httpRequest<NodeInfoResponse>(`/workspaces/nodes/${node}/redo`, { method: 'POST', headers }),
+  queryPlan: (node: string, headers: Record<string, string> = {}) =>
+    get<QueryPlanResponse>(`/workspaces/nodes/${node}/query-plan`, headers),
   renameColumn: (node: string, column: string, newName: string, headers: Record<string,string> = {}) =>
     httpRequest<Record<string, unknown>>(`/workspaces/nodes/${node}/columns/${encodeURIComponent(column)}`, {
       method: 'PUT',

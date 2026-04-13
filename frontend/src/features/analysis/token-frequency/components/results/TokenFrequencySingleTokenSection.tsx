@@ -15,7 +15,6 @@ type TokenFrequencySingleTokenSectionProps = {
   registerWordCloudRef: (nodeKey: string, element: SVGSVGElement | null) => void;
 };
 
-const MAX_ROWS = 30;
 const VISIBLE_BAR_ROWS = 10;
 const BAR_ROW_HEIGHT_REM = 2;
 const BAR_ROW_GAP_REM = 0.5;
@@ -39,14 +38,20 @@ export const TokenFrequencySingleTokenSection = ({
       {nodeDisplayResults.map((result, index) => {
         const nodeKey = result.nodeId || result.displayName || `node-${index}`;
         const color = getColorForNode(result.nodeId || result.displayName, index);
-        const displayRows = Array.isArray(result.displayRows) ? result.displayRows.slice(0, MAX_ROWS) : [];
+        const displayRows = Array.isArray(result.displayRows) ? result.displayRows : [];
         const maxFrequency = Math.max(1, ...displayRows.map((row) => Number(row.frequency) || 0));
         const words = displayRows.map((item) => ({
           text: String(item?.token ?? ''),
           value: Number(item?.frequency) || 0,
         }));
+
+        const wordCount = words.length;
+        const cloudWidth = wordCount > 60 ? 600 : wordCount > 30 ? 500 : 400;
+        const cloudHeight = wordCount > 60 ? 400 : wordCount > 30 ? 300 : 200;
+        const maxFontSize = wordCount > 60 ? 32 : wordCount > 30 ? 40 : 48;
+        const minFontSize = wordCount > 60 ? 8 : wordCount > 30 ? 10 : 12;
         const fontSizeSetter = (datum: { value: number }) =>
-          Math.max(12, Math.min(48, (datum.value / maxFrequency) * 36 + 12));
+          Math.max(minFontSize, Math.min(maxFontSize, (datum.value / maxFrequency) * (maxFontSize - minFontSize) + minFontSize));
 
         return (
           <Card key={`${result.nodeId || result.displayName}-${index}`} className="h-full">
@@ -76,19 +81,19 @@ export const TokenFrequencySingleTokenSection = ({
               <div className="mb-4 flex w-full justify-center overflow-visible">
                 <svg
                   ref={(element) => registerWordCloudRef(nodeKey, element)}
-                  width={400}
-                  height={200}
+                  width={cloudWidth}
+                  height={cloudHeight}
                   className="overflow-visible"
                   style={{ overflow: 'visible' }}
                   xmlns="http://www.w3.org/2000/svg"
                 >
                   <Wordcloud
                     words={words}
-                    width={400}
-                    height={200}
+                    width={cloudWidth}
+                    height={cloudHeight}
                     fontSize={fontSizeSetter}
                     font="Segoe UI, Roboto, sans-serif"
-                    padding={2}
+                    padding={wordCount > 60 ? 1 : 2}
                     spiral="archimedean"
                     rotate={0}
                     random={() => 0.5}

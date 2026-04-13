@@ -8,6 +8,7 @@ import { takeMostRecent } from '../../../utils/selectionUtils';
 
 import { useNodeColumnInfos } from '../../../hooks/useNodeColumnInfos';
 import {
+  DEFAULT_TOKEN_LIMIT,
   parseAnalysisNodeRequest,
   getNodeIdentifier,
   resetAnalysisSelectionAfterClear,
@@ -51,7 +52,6 @@ import { TokenFrequencyResultsPanel } from './components/panels/TokenFrequencyRe
 import { useAnalysisStore } from '../../../stores/analysisStore';
 import { useUIStore } from '../../../stores/uiStore';
 
-const DEFAULT_TOKEN_LIMIT = 100;
 const MAX_TOKEN_LIMIT_INPUT = 100;
 const UNIFIED_WORDCLOUD_WIDTH = 640;
 const UNIFIED_WORDCLOUD_HEIGHT = 340;

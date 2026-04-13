@@ -73,8 +73,8 @@ const baseUnifiedSectionProps = {
   lastCompareNodeIds: [] as string[],
   statistics: [] as TokenFrequencyStatisticsEntry[],
   appliedStopSet: new Set<string>(),
-  effectiveTokenLimit: 100,
-  defaultTokenLimit: 100,
+  effectiveTokenLimit: 25,
+  defaultTokenLimit: 25,
   computeDisplayName: (nodeId: string) => nodeId,
   getColorForNode: () => '#3b82f6',
   onDownloadWordCloud: vi.fn(),
@@ -116,6 +116,29 @@ describe('Token frequency result layouts', () => {
 
     const actionRow = screen.getByTestId('token-frequency-actions-node-1');
     expect(actionRow).toHaveClass('flex-wrap');
+  });
+
+  it('renders all configured tokens instead of truncating after thirty', () => {
+    const displayRows = Array.from({ length: 50 }, (_, index) => ({
+      token: `token-${index + 1}`,
+      frequency: 50 - index,
+    }));
+
+    render(
+      <TokenFrequencySingleTokenSection
+        {...baseSingleSectionProps}
+        nodeDisplayResults={[
+          buildNodeResult({
+            displayRows,
+            filteredRows: displayRows,
+            rows: displayRows,
+          }),
+        ]}
+      />
+    );
+
+    expect(screen.getAllByText('token-1').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('token-50').length).toBeGreaterThan(0);
   });
 
   it('shows the unified card only when two node results are available', () => {

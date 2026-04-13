@@ -1,6 +1,6 @@
 import { applySelectedColumnsToSnapshots, createNodeSnapshots } from '../../../hooks/useSchemaManagement';
 
-export const DEFAULT_TOKEN_LIMIT = 10;
+export const DEFAULT_TOKEN_LIMIT = 25;
 
 type ClampResult = {
   limit: number;

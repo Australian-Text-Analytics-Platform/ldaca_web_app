@@ -36,7 +36,7 @@ describe('TokenFrequencyResultsPanel', () => {
         onStopWordsApply={vi.fn()}
         isLoadingStopWords={false}
         onFillDefaultStopWords={vi.fn()}
-        tokenLimitInput="10"
+        tokenLimitInput="25"
         onTokenLimitInputChange={vi.fn()}
         onTokenLimitBlur={vi.fn()}
         tokenLimitError={null}
@@ -46,8 +46,8 @@ describe('TokenFrequencyResultsPanel', () => {
         nodeDisplayResults={[]}
         lastCompareNodeIds={[]}
         appliedStopSet={new Set()}
-        effectiveTokenLimit={10}
-        defaultTokenLimit={10}
+        effectiveTokenLimit={25}
+        defaultTokenLimit={25}
         computeDisplayName={vi.fn()}
         getColorForNode={vi.fn()}
         onDownloadWordCloud={vi.fn()}
@@ -74,6 +74,7 @@ describe('TokenFrequencyResultsPanel', () => {
     expect(screen.getByRole('button', { name: 'Apply Stop Words' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Fill Default' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'About default stop words' })).toBeInTheDocument();
+    expect(screen.getByText('Currently displaying top 25 tokens per table (default: 25).')).toBeInTheDocument();
     expect(screen.queryByText('Bundled default stop words')).not.toBeInTheDocument();
     expect(
       screen.queryByText(/Fill Default loads the bundled English stop-word list shipped with the app/i)

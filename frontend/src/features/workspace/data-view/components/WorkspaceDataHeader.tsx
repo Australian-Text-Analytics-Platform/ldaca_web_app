@@ -1,5 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 import HelpIcon from '@/components/help/HelpIcon';
 
 import type { WorkspaceDataTableHeaderInfo } from '../hooks/useWorkspaceDataTable';
@@ -9,6 +16,7 @@ interface WorkspaceDataHeaderProps {
   onUndo?: () => void;
   onRedo?: () => void;
   onRename?: (newName: string) => void;
+  onQueryPlan?: () => Promise<string | null>;
   canUndo?: boolean;
   canRedo?: boolean;
 }
@@ -18,18 +26,21 @@ export const WorkspaceDataHeader = ({
   onUndo,
   onRedo,
   onRename,
+  onQueryPlan,
   canUndo = false,
   canRedo = false,
 }: WorkspaceDataHeaderProps) => {
   const [isRenaming, setIsRenaming] = useState(false);
   const [nameInput, setNameInput] = useState(info.nodeLabel);
+  const [queryPlanOpen, setQueryPlanOpen] = useState(false);
+  const [queryPlan, setQueryPlan] = useState<string | null>(null);
+  const [queryPlanLoading, setQueryPlanLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  /* eslint-disable react-hooks/set-state-in-effect -- Syncing input with prop when node changes */
+  /* Syncing input with prop when node changes */
   useEffect(() => {
     setNameInput(info.nodeLabel);
   }, [info.nodeLabel]);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleRenameCommit = () => {
     const trimmed = nameInput.trim();
@@ -48,8 +59,20 @@ export const WorkspaceDataHeader = ({
     }, 10);
   };
 
+  const handleOpenQueryPlan = async () => {
+    setQueryPlanOpen(true);
+    setQueryPlan(null);
+    setQueryPlanLoading(true);
+    try {
+      const plan = onQueryPlan ? await onQueryPlan() : null;
+      setQueryPlan(plan);
+    } finally {
+      setQueryPlanLoading(false);
+    }
+  };
+
   return (
-    <div className="flex-shrink-0 border-b border-border bg-muted p-2">
+    <div className="shrink-0 border-b border-border bg-muted p-2">
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
           <h3 className="text-sm font-medium text-gray-700">Data View</h3>
@@ -93,6 +116,9 @@ export const WorkspaceDataHeader = ({
         </div>
 
         <div className="ml-auto flex items-center gap-2">
+          <Button type="button" variant="outline" size="sm" onClick={handleOpenQueryPlan} disabled={!onQueryPlan}>
+            Info
+          </Button>
           <Button type="button" variant="outline" size="sm" onClick={onUndo} disabled={!canUndo}>
             Undo
           </Button>
@@ -101,6 +127,31 @@ export const WorkspaceDataHeader = ({
           </Button>
         </div>
       </div>
+
+      <Dialog open={queryPlanOpen} onOpenChange={setQueryPlanOpen}>
+        <DialogContent className="flex h-[88vh] w-[96vw] max-w-[96vw] flex-col overflow-hidden p-0 sm:max-w-[96vw]">
+          <DialogHeader className="shrink-0 px-6 pt-6 pb-4">
+            <DialogTitle>Query Plan</DialogTitle>
+            <DialogDescription>
+              Polars LazyFrame execution plan for <strong>{info.nodeLabel}</strong>
+            </DialogDescription>
+          </DialogHeader>
+          {queryPlanLoading ? (
+            <div className="flex flex-1 items-center gap-2 px-6 pb-6 text-sm text-muted-foreground">
+              <div className="size-4 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
+              Loading query plan…
+            </div>
+          ) : (
+            <div className="min-h-0 flex-1 px-6 pb-6">
+              <div className="h-full overflow-x-scroll overflow-y-auto rounded-md bg-muted p-4">
+                <pre className="min-w-max whitespace-pre text-xs font-mono leading-relaxed">
+                  {queryPlan ?? 'No plan available.'}
+                </pre>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
