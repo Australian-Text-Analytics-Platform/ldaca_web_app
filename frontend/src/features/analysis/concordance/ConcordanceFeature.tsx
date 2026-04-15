@@ -14,7 +14,7 @@ import { useAnalysisStore } from '../../../stores/analysisStore';
 import { useUIStore } from '../../../stores';
 import { Button } from '../../../components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
-import { Play, Loader2, Trash2, Link as LinkIcon } from 'lucide-react';
+import { Play, Loader2, Trash2, Plus } from 'lucide-react';
 import HelpIcon from '../../../components/help/HelpIcon';
 import {
   Table,
@@ -1028,8 +1028,8 @@ const ConcordanceFeature: React.FC = () => {
                 size="sm"
                 className="bg-green-600 hover:bg-green-700"
               >
-                <LinkIcon className="mr-2 h-4 w-4" />
-                Detach Both
+                <Plus className="mr-2 h-4 w-4" />
+                Add Both to Workspace
               </Button>
             </div>
           </div>
@@ -1288,13 +1288,13 @@ const ConcordanceFeature: React.FC = () => {
             }}
             disabled={nodeIsLoading || isDetaching || !searchWord.trim() || !canDetach || !detachNodeId}
             size="sm"
-            className="bg-green-600 hover:bg-green-700"
+            className="h-auto max-w-full whitespace-normal wrap-break-word bg-green-600 py-1.5 text-left hover:bg-green-700"
             title="Create a new data block with concordance results joined to the original table"
           >
             {isDetaching ? (
-              <><Loader2 className="mr-2 h-3 w-3 animate-spin" />Detaching...</>
+              <><Loader2 className="mr-2 h-3 w-3 animate-spin" />Adding to Workspace...</>
             ) : (
-              <><LinkIcon className="mr-2 h-3 w-3" />Detach</>
+              <><Plus className="mr-2 h-3 w-3" />Add to Workspace</>
             )}
           </Button>
         </AnalysisPagination>

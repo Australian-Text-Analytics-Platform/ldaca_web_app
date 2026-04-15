@@ -34,6 +34,7 @@ describe('ConcordanceDetachDialog', () => {
     expect(screen.getByRole('checkbox', { name: /CONC_matched_text/i })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: /CONC_right_context/i })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: /speaker/i })).not.toBeChecked();
+    expect(screen.getByRole('button', { name: /^add to workspace$/i })).toBeInTheDocument();
   });
 
   it('renders a select all button and triggers the callback', async () => {

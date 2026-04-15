@@ -33,6 +33,7 @@ describe('QuotationDetachDialog', () => {
     expect(screen.getByRole('checkbox', { name: /QUOTE_quote/i })).toBeDisabled();
     expect(screen.getByRole('checkbox', { name: /QUOTE_speaker/i })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: /speaker_role/i })).not.toBeChecked();
+    expect(screen.getByRole('button', { name: /^add to workspace$/i })).toBeInTheDocument();
   });
 
   it('renders a select all button and triggers the callback', async () => {

@@ -1224,10 +1224,13 @@ const AiAnnotatorFeature: React.FC = () => {
                 {isDetaching ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Detaching...
+                    Adding to Workspace...
                   </>
                 ) : (
-                  'Detach'
+                  <>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add to Workspace
+                  </>
                 )}
               </Button>
             </div>

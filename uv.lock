@@ -496,15 +496,14 @@ wheels = [
 
 [[package]]
 name = "docworkspace"
-version = "0.2.1"
+version = "0.2.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "polars" },
     { name = "polars-text" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/68/01/79745dbb1f9229fcddb68833d9ddbc046f5b2ea5a1d00c14ded6450afb09/docworkspace-0.2.1.tar.gz", hash = "sha256:f3cc39d73bfcc8f58a10ae7caf09e8a2289be067e118f7583df8d97275529c55", size = 24849, upload-time = "2026-03-25T23:19:22.029Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d4/55/66c09285801ebe44b759438b9655c15cd4a24e470c2642be517cb3e51a8e/docworkspace-0.2.2.tar.gz", hash = "sha256:7a446507f8e75bb375f1739047e175a2471869914495a9515e25a4edf7ddac4d", size = 28949, upload-time = "2026-04-07T23:49:29.915Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/82/ac/13edbcb9b3ea74fc998ffe2f3a5d0cb19c172ed8e3dee5b638d033b66329/docworkspace-0.2.1-py3-none-any.whl", hash = "sha256:99425cbb18dab473d8b0b602dc95ef03cfd3b49fdf335930a1c9c85a29b54937", size = 16247, upload-time = "2026-03-25T23:19:20.629Z" },
+    { url = "https://files.pythonhosted.org/packages/37/06/d7233c1f39f4a8a67caf04e7245561a3970d54f366dcec0ada0e632714ca/docworkspace-0.2.2-py3-none-any.whl", hash = "sha256:e989d369ceb81461b5c53c1fc91e4f31bf6eb523b647287f4db661d8faff09c2", size = 16201, upload-time = "2026-04-07T23:49:28.742Z" },
 ]
 
 [[package]]
@@ -867,15 +866,6 @@ wheels = [
 ]
 
 [[package]]
-name = "inflection"
-version = "0.5.1"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/e1/7e/691d061b7329bc8d54edbf0ec22fbfb2afe61facb681f9aaa9bff7a27d04/inflection-0.5.1.tar.gz", hash = "sha256:1a29730d366e996aaacffb2f1f1cb9593dc38e2ddd30c91250c6dde09ea9b417", size = 15091, upload-time = "2020-08-22T08:16:29.139Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/59/91/aa6bde563e0085a02a435aa99b49ef75b0a4b062635e606dab23ce18d720/inflection-0.5.1-py2.py3-none-any.whl", hash = "sha256:f38b2b640938a4f35ade69ac3d053042959b62a0f1076a5bbaa1b9526605a8a2", size = 9454, upload-time = "2020-08-22T08:16:27.816Z" },
-]
-
-[[package]]
 name = "jinja2"
 version = "3.1.6"
 source = { registry = "https://pypi.org/simple" }
@@ -942,7 +932,7 @@ dependencies = [
 
 [[package]]
 name = "ldaca-web-app"
-version = "0.1.3"
+version = "0.1.11"
 source = { directory = "backend" }
 dependencies = [
     { name = "aiosqlite" },
@@ -953,10 +943,8 @@ dependencies = [
     { name = "fastexcel" },
     { name = "google-auth-oauthlib" },
     { name = "httpx" },
-    { name = "nltk" },
     { name = "openai" },
     { name = "psutil" },
-    { name = "pyairtable" },
     { name = "pyarrow" },
     { name = "pydantic-settings" },
     { name = "spacy" },
@@ -967,7 +955,7 @@ dependencies = [
 requires-dist = [
     { name = "aiosqlite", specifier = ">=0.21.0" },
     { name = "bertopic", specifier = ">=0.17.3" },
-    { name = "docworkspace", specifier = ">=0.2.1" },
+    { name = "docworkspace", specifier = ">=0.2.2" },
     { name = "fastapi", extras = ["standard"], specifier = ">=0.135.0" },
     { name = "fastapi-users", extras = ["sqlalchemy"], specifier = ">=14.0.1" },
     { name = "fastexcel", specifier = ">=0.18.0" },
@@ -976,10 +964,8 @@ requires-dist = [
     { name = "ipython", marker = "extra == 'deploy'", specifier = ">=9.5.0" },
     { name = "jupyter-server-proxy", marker = "extra == 'deploy'", specifier = ">=4.4.0" },
     { name = "ldaca-loader", marker = "extra == 'ldaca'", git = "https://github.com/Australian-Text-Analytics-Platform/ldaca-tabulator?branch=ldaca_web_app_integration" },
-    { name = "nltk", specifier = ">=3.8.0" },
     { name = "openai", specifier = ">=2.26.0" },
     { name = "psutil", specifier = ">=6.1.0" },
-    { name = "pyairtable", specifier = ">=3.3.0" },
     { name = "pyarrow", specifier = ">=16.0.0" },
     { name = "pydantic-settings", specifier = ">=2.0.0" },
     { name = "spacy", specifier = ">=3.7.0" },
@@ -1129,21 +1115,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/6a/51/63fe664f3908c97be9d2e4f1158eb633317598cfa6e1fc14af5383f17512/networkx-3.6.1.tar.gz", hash = "sha256:26b7c357accc0c8cde558ad486283728b65b6a95d85ee1cd66bafab4c8168509", size = 2517025, upload-time = "2025-12-08T17:02:39.908Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/9e/c9/b2622292ea83fbb4ec318f5b9ab867d0a28ab43c5717bb85b0a5f6b3b0a4/networkx-3.6.1-py3-none-any.whl", hash = "sha256:d47fbf302e7d9cbbb9e2555a0d267983d2aa476bac30e90dfbe5669bd57f3762", size = 2068504, upload-time = "2025-12-08T17:02:38.159Z" },
-]
-
-[[package]]
-name = "nltk"
-version = "3.9.4"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "click" },
-    { name = "joblib" },
-    { name = "regex" },
-    { name = "tqdm" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/74/a1/b3b4adf15585a5bc4c357adde150c01ebeeb642173ded4d871e89468767c/nltk-3.9.4.tar.gz", hash = "sha256:ed03bc098a40481310320808b2db712d95d13ca65b27372f8a403949c8b523d0", size = 2946864, upload-time = "2026-03-24T06:13:40.641Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/9d/91/04e965f8e717ba0ab4bdca5c112deeab11c9e750d94c4d4602f050295d39/nltk-3.9.4-py3-none-any.whl", hash = "sha256:f2fa301c3a12718ce4a0e9305c5675299da5ad9e26068218b69d692fda84828f", size = 1552087, upload-time = "2026-03-24T06:13:38.47Z" },
 ]
 
 [[package]]
@@ -1467,16 +1438,16 @@ wheels = [
 
 [[package]]
 name = "polars-text"
-version = "0.1.1"
+version = "0.1.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "polars" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/81/8b/1081595db4e4e38c73a8876127624a0f1ca28cd6b1f76c9dfa3247c59aef/polars_text-0.1.1.tar.gz", hash = "sha256:9f00c66065fce4722af02fb9798eecda529168637182592bb381087528515035", size = 59484, upload-time = "2026-03-25T23:17:09.301Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/42/b9/1653c8ac742e3b84ebe328d213b5eb09ee96ce6241c27364911a2e29e2aa/polars_text-0.1.2.tar.gz", hash = "sha256:2a080c8e7e0ecef10b3b431fb14dbb90de6faf552e24ffa30f52f0876c5fe5e8", size = 53365, upload-time = "2026-04-07T23:41:59.225Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5c/3b/4ebf46a7802e2dfb6d2873aef6efceecd617a4d802ed27487ec155e69344/polars_text-0.1.1-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:2f74897bb965546c3eb1915dd37d180fff2aa3af03b5827d9f24e083cd515c46", size = 7663770, upload-time = "2026-03-25T23:17:00.69Z" },
-    { url = "https://files.pythonhosted.org/packages/38/03/666a2fc6c8749bae2912e51ddf335dc8466cad8552d9b7762e40c8e58ee2/polars_text-0.1.1-cp314-cp314-manylinux_2_28_x86_64.whl", hash = "sha256:081c911bbc148cf96af2dd60d19850e6523bea3e96e937a5eeb78da2b627d0eb", size = 11235028, upload-time = "2026-03-25T23:17:03.128Z" },
-    { url = "https://files.pythonhosted.org/packages/39/e4/eff93a53fc7c00e3d85d595c302bc99201431b6e62a5f6b30a0af978d25e/polars_text-0.1.1-cp314-cp314-win_amd64.whl", hash = "sha256:5f75ddef203520bc448b4318a3a5b87dd2055b6f47198a3ddcd26c67c4463f55", size = 7812149, upload-time = "2026-03-25T23:17:07.636Z" },
+    { url = "https://files.pythonhosted.org/packages/b4/60/829e2048d45aa63ec9c2634f63bf750b9569aded969920db3240737ea9e9/polars_text-0.1.2-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:f7dbd56bc3c90d87defc9e682e816ff7cdf264f19ee458df190322ba92c10c20", size = 7659172, upload-time = "2026-04-07T23:41:53.444Z" },
+    { url = "https://files.pythonhosted.org/packages/a5/60/6417a5e73915e0dbc4c1f0643b41c715428a5350f4b2a97903655b526342/polars_text-0.1.2-cp314-cp314-manylinux_2_28_x86_64.whl", hash = "sha256:0283306eb5c185cac89db3abf1ecf877b47c4e18a2afc4ad8892a5ab12116b8f", size = 10981911, upload-time = "2026-04-07T23:41:55.388Z" },
+    { url = "https://files.pythonhosted.org/packages/da/a6/ff1dd58b29c7ac03e7344311e2b82f211d043321d8f9705a9e8e664db900/polars_text-0.1.2-cp314-cp314-win_amd64.whl", hash = "sha256:5b80da5e9902ecaefc4db227a38d20fc6c328ee4254678319329b38248c2ea4e", size = 7771979, upload-time = "2026-04-07T23:41:57.646Z" },
 ]
 
 [[package]]
@@ -1544,22 +1515,6 @@ argon2 = [
 ]
 bcrypt = [
     { name = "bcrypt" },
-]
-
-[[package]]
-name = "pyairtable"
-version = "3.3.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "inflection" },
-    { name = "pydantic" },
-    { name = "requests" },
-    { name = "typing-extensions" },
-    { name = "urllib3" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/2c/1d/8a572580e02297cef7ae01053a8b550b7759ea80326cd3231df87b00555b/pyairtable-3.3.0.tar.gz", hash = "sha256:d6d3b77f6feb7a02a84779c2235d37a46605f36030cf20ed99b08bab73108a8c", size = 150168, upload-time = "2025-11-05T20:11:41.435Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/13/7b/bebb0ebb86353b63740869ed10ac1fef1636ccc6042beb1d8d3956cad02d/pyairtable-3.3.0-py2.py3-none-any.whl", hash = "sha256:38af09c18659918b96539ac4d9730c9656f6ce2088cdff692dd311fa16802acf", size = 101513, upload-time = "2025-11-05T20:11:40.137Z" },
 ]
 
 [[package]]

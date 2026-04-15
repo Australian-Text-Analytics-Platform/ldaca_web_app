@@ -36,6 +36,7 @@ describe('TopicModelingDetachDialog', () => {
     expect(topicCheckbox).toBeDisabled();
     expect(documentCheckbox).not.toBeChecked();
     expect(speakerCheckbox).not.toBeChecked();
+    expect(screen.getByRole('button', { name: /^add to workspace$/i })).toBeInTheDocument();
   });
 
   it('renders a select all button and triggers the callback', async () => {

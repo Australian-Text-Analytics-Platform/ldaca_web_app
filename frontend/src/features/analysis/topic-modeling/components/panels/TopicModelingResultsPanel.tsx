@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button } from '../../../../../components/ui/button';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Plus } from 'lucide-react';
 import { TopicModelingBubbleChartSection } from '../results/TopicModelingBubbleChartSection';
 import { TopicModelingDetachDialog } from '../results/TopicModelingDetachDialog';
 import { AnalysisCardLayout } from '../../../common/components/AnalysisCardLayout';
@@ -132,12 +132,18 @@ export function TopicModelingResultsPanel({
                 {isDetachLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Loading Detach…
+                    Preparing Add to Workspace…
                   </>
                 ) : selectedTopicIds.size > 0 ? (
-                  `Detach (${selectedTopicIds.size} topics)`
+                  <>
+                    <Plus className="mr-2 h-4 w-4" />
+                    {`Add to Workspace (${selectedTopicIds.size} topics)`}
+                  </>
                 ) : (
-                  'Detach (all)'
+                  <>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add to Workspace (all)
+                  </>
                 )}
               </Button>
             </div>

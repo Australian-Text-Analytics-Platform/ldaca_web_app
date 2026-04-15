@@ -44,7 +44,7 @@ import {
   TableRow,
 } from '../../../components/ui/table';
 import { AnalysisTableScrollArea } from '../../../components/AnalysisTableScrollArea';
-import { ArrowUpDown, Loader2, Play, Trash2, Unlink } from 'lucide-react';
+import { ArrowUpDown, Loader2, Play, Plus, Trash2 } from 'lucide-react';
 import { takeMostRecent } from '../../../utils/selectionUtils';
 import {
   getNodeIdentifier,
@@ -1356,17 +1356,17 @@ const QuotationFeature: React.FC = () => {
                         size="sm"
                         onClick={() => void openDetachDialog(nodeId)}
                         disabled={Boolean(nodeDetaching[nodeId])}
-                        className="bg-green-600 text-white hover:bg-green-700"
+                        className="h-auto max-w-full whitespace-normal wrap-break-word bg-green-600 py-1.5 text-left text-white hover:bg-green-700"
                       >
                         {nodeDetaching[nodeId] ? (
                           <>
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Detaching…
+                            Adding to Workspace…
                           </>
                         ) : (
                           <>
-                            <Unlink className="mr-2 h-4 w-4" />
-                            Detach
+                            <Plus className="mr-2 h-4 w-4" />
+                            Add to Workspace
                           </>
                         )}
                       </Button>
