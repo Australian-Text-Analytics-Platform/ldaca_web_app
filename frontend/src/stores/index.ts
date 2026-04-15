@@ -7,3 +7,4 @@ export { useUIStore } from './uiStore';
 export type { ViewType } from './uiStore';
 export { useSelectionStore } from './selectionStore';
 export { useQuotationEngineDialogStore, useQuotationEngineConfigStore } from './quotationEngineStore';
+export { usePreferencesStore } from './preferencesStore';

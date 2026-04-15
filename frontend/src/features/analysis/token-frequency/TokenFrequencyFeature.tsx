@@ -202,6 +202,7 @@ const TokenFrequencyFeature = () => {
     effectiveTokenLimit,
     applyTokenLimitState,
     applyStopSetFromText,
+    sortStopWords,
     handleTokenLimitInputChange,
     handleTokenLimitBlur,
     handleFillDefaultStopWords,
@@ -459,6 +460,7 @@ const TokenFrequencyFeature = () => {
         onStopWordsApply={handleApplyStopWords}
         isLoadingStopWords={isLoadingStopWords}
         onFillDefaultStopWords={handleFillDefaultStopWords}
+        onSortStopWords={sortStopWords}
         tokenLimitInput={tokenLimitInput}
         onTokenLimitInputChange={handleTokenLimitInputChange}
         onTokenLimitBlur={handleTokenLimitBlur}

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, Suspense, lazy, type ReactNode } from 'react';
 import { useAuth, type AuthPhase, REFRESH_FAILURE_THRESHOLD } from './hooks/useAuth';
 import { useBackendHealth } from './hooks/useBackendHealth';
+import { usePreferencesInit } from './hooks/usePreferences';
 import { QueryProvider } from './providers/QueryProvider';
 import { WorkspaceProvider } from './providers/WorkspaceProvider';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -8,6 +9,7 @@ import GoogleLogin from './components/GoogleLogin';
 import Sidebar from './components/layout/Sidebar';
 import BlockingScreen from './components/startup/BlockingScreen';
 import { useUIStore } from './stores';
+import { usePreferencesStore } from './stores/preferencesStore';
 import { useShallow } from 'zustand/react/shallow';
 import { SidebarInset, SidebarProvider, SidebarTrigger } from './components/ui/sidebar';
 import { Toaster } from './components/ui/sonner';
@@ -60,6 +62,14 @@ const WorkspaceShell: React.FC = () => {
     error: authError,
     refreshAuth,
   } = useAuth({ autoStart: true, debugLabel: 'WorkspaceShell' });
+
+  // Initialize preferences from backend and sync visible views into uiStore
+  usePreferencesInit();
+  const prefsHydrated = usePreferencesStore((s) => s.hydrated);
+  const syncVisibleViews = useUIStore((s) => s.syncVisibleViewsFromPreferences);
+  useEffect(() => {
+    if (prefsHydrated) syncVisibleViews();
+  }, [prefsHydrated, syncVisibleViews]);
   if (import.meta.env.DEV) {
     console.debug('[WorkspaceShell] auth phase', phase.status, {
       isAuthenticated,

@@ -36,6 +36,7 @@ describe('TokenFrequencyResultsPanel', () => {
         onStopWordsApply={vi.fn()}
         isLoadingStopWords={false}
         onFillDefaultStopWords={vi.fn()}
+        onSortStopWords={vi.fn()}
         tokenLimitInput="25"
         onTokenLimitInputChange={vi.fn()}
         onTokenLimitBlur={vi.fn()}
@@ -73,6 +74,7 @@ describe('TokenFrequencyResultsPanel', () => {
 
     expect(screen.getByRole('button', { name: 'Apply Stop Words' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Fill Default' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sort' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'About default stop words' })).toBeInTheDocument();
     expect(screen.getByText('Currently displaying top 25 tokens per table (default: 25).')).toBeInTheDocument();
     expect(screen.queryByText('Bundled default stop words')).not.toBeInTheDocument();

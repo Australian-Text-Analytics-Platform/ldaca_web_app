@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import { enableMapSet } from 'immer';
+import { usePreferencesStore } from './preferencesStore';
 
 enableMapSet();
 
@@ -73,6 +74,7 @@ interface UIActions {
   // View management
   setCurrentView: (view: ViewType) => void;
   setViewVisibility: (view: ViewType, visible: boolean) => void;
+  syncVisibleViewsFromPreferences: () => void;
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   
@@ -150,16 +152,26 @@ export const useUIStore = create<UIStore>()(
           state.visibleViews = ALL_VIEWS.filter(
             (candidate) => candidate === view || state.visibleViews.includes(candidate)
           );
-          return;
+        } else {
+          if (state.visibleViews.length <= 1) {
+            return;
+          }
+
+          state.visibleViews = state.visibleViews.filter((candidate) => candidate !== view);
+
+          if (state.currentView === view) {
+            state.currentView = state.visibleViews[0] ?? 'data-loader';
+          }
         }
 
-        if (state.visibleViews.length <= 1) {
-          return;
-        }
+        // Sync hidden state to the preferences store
+        usePreferencesStore.getState().setViewHidden(view, !visible);
+      }),
 
-        state.visibleViews = state.visibleViews.filter((candidate) => candidate !== view);
-
-        if (state.currentView === view) {
+      syncVisibleViewsFromPreferences: () => set((state) => {
+        const hiddenViews = usePreferencesStore.getState().hiddenViews;
+        state.visibleViews = ALL_VIEWS.filter((v) => !hiddenViews.includes(v));
+        if (!state.visibleViews.includes(state.currentView)) {
           state.currentView = state.visibleViews[0] ?? 'data-loader';
         }
       }),
