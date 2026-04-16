@@ -40,7 +40,17 @@ describe('AnalysisPagination', () => {
       </AnalysisPagination>,
     );
 
-    const wrapper = screen.getByText('Add to Workspace').parentElement!;
+    const wrapper = screen.getByText((_, element) => {
+      if (!(element instanceof HTMLDivElement)) {
+        return false;
+      }
+
+      return (
+        element.textContent === 'Add to Workspace'
+        && element.classList.contains('flex')
+        && element.classList.contains('items-center')
+      );
+    });
     expect(wrapper).toHaveClass('flex');
     expect(wrapper).toHaveClass('items-center');
   });

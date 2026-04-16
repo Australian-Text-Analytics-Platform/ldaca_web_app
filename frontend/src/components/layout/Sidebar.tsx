@@ -398,46 +398,47 @@ const Sidebar: React.FC = () => {
                       onMouseDown={(event) => handleResizeStart(previousKey, key, event)}
                     />
                   ) : null}
-                  <button
-                    type="button"
-                    className="flex w-full items-center justify-between border-b border-border/40 bg-muted/40 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
-                    onClick={() => toggleSection(key)}
-                    aria-expanded={!isCollapsed}
-                  >
-                    <span className="flex items-center gap-1">
-                      {title}
-                      <HelpIcon
-                        targetKey={SECTION_HELP_KEYS[key]}
-                        label={title}
-                        className="h-5 w-5 text-muted-foreground"
-                      />
-                    </span>
-                    <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                      {key === 'nodes' && (
-                        <span className="font-medium text-foreground/80">{nodeCount}</span>
-                      )}
-                      {key === 'tasks' && (
-                        <Circle
-                          data-testid="tasks-connection-indicator"
-                          className={cn('h-3 w-3', {
-                            'text-green-500 fill-green-500': isConnected,
-                            'text-amber-500 fill-amber-500 animate-pulse': isConnecting,
-                            'text-muted-foreground fill-muted-foreground':
-                              !isConnected && !isConnecting && !connectionError,
-                            'text-red-500 fill-red-500': !!connectionError,
-                          })}
-                        />
-                      )}
-                      <ChevronDown
-                        className={cn(
-                          'h-3 w-3 transition-transform',
-                          isCollapsed ? '-rotate-90' : 'rotate-0'
+                  <div className="flex items-center border-b border-border/40 bg-muted/40">
+                    <button
+                      type="button"
+                      className="flex min-w-0 flex-1 items-center justify-between px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                      onClick={() => toggleSection(key)}
+                      aria-expanded={!isCollapsed}
+                    >
+                      <span className="flex items-center gap-1">
+                        {title}
+                      </span>
+                      <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                        {key === 'nodes' && (
+                          <span className="font-medium text-foreground/80">{nodeCount}</span>
                         )}
-                      />
-                    </div>
-                  </button>
-                  {key === 'views' && (
-                    <div className="absolute right-7 top-1/2 -translate-y-1/2">
+                        {key === 'tasks' && (
+                          <Circle
+                            data-testid="tasks-connection-indicator"
+                            className={cn('h-3 w-3', {
+                              'text-green-500 fill-green-500': isConnected,
+                              'text-amber-500 fill-amber-500 animate-pulse': isConnecting,
+                              'text-muted-foreground fill-muted-foreground':
+                                !isConnected && !isConnecting && !connectionError,
+                              'text-red-500 fill-red-500': !!connectionError,
+                            })}
+                          />
+                        )}
+                        <ChevronDown
+                          className={cn(
+                            'h-3 w-3 transition-transform',
+                            isCollapsed ? '-rotate-90' : 'rotate-0'
+                          )}
+                        />
+                      </div>
+                    </button>
+                    <HelpIcon
+                      targetKey={SECTION_HELP_KEYS[key]}
+                      label={title}
+                      className="h-5 w-5 shrink-0 text-muted-foreground"
+                    />
+                    {key === 'views' && (
+                      <div className="pr-1.5">
                       <DropdownMenu>
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -448,10 +449,6 @@ const Sidebar: React.FC = () => {
                                 size="icon"
                                 className="h-6 w-6 text-muted-foreground"
                                 aria-label="Edit visible views"
-                                onClick={(event) => {
-                                  event.preventDefault();
-                                  event.stopPropagation();
-                                }}
                               >
                                 <Pencil className="h-3.5 w-3.5" />
                               </Button>
@@ -479,8 +476,9 @@ const Sidebar: React.FC = () => {
                           })}
                         </DropdownMenuContent>
                       </DropdownMenu>
-                    </div>
-                  )}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div
                   className={cn(
@@ -572,7 +570,6 @@ const Sidebar: React.FC = () => {
               <span>Feedback</span>
             </Button>
           </div>
-          <HelpIcon targetKey="ui.help-feedback" label="Help and Feedback" className="h-5 w-5 text-muted-foreground" />
         </div>
       </SidebarFooter>
 
