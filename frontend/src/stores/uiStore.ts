@@ -60,9 +60,23 @@ interface UIState {
     deleteConfirmModal: boolean;
     feedbackModal: boolean;
     tutorialModal: boolean;
+    warningModal: boolean;
+    infoModal: boolean;
   };
 
   tutorialTarget?: {
+    file: string;
+    anchor: string;
+    label?: string;
+  } | null;
+
+  warningTarget?: {
+    file: string;
+    anchor: string;
+    label?: string;
+  } | null;
+
+  infoTarget?: {
     file: string;
     anchor: string;
     label?: string;
@@ -104,6 +118,12 @@ interface UIActions {
   openTutorialModal: () => void;
   closeTutorialModal: () => void;
   openTutorialTarget: (target: { file: string; anchor: string; label?: string }) => void;
+  openWarningModal: () => void;
+  closeWarningModal: () => void;
+  openWarningTarget: (target: { file: string; anchor: string; label?: string }) => void;
+  openInfoModal: () => void;
+  closeInfoModal: () => void;
+  openInfoTarget: (target: { file: string; anchor: string; label?: string }) => void;
   closeAllModals: () => void;
 }
 
@@ -129,8 +149,12 @@ export const useUIStore = create<UIStore>()(
         deleteConfirmModal: false,
         feedbackModal: false,
         tutorialModal: false,
+        warningModal: false,
+        infoModal: false,
       },
       tutorialTarget: null,
+      warningTarget: null,
+      infoTarget: null,
 
       // View management
       setCurrentView: (view) => set((state) => {
@@ -270,6 +294,34 @@ export const useUIStore = create<UIStore>()(
       closeTutorialModal: () => set((state) => {
         state.modals.tutorialModal = false;
         state.tutorialTarget = null;
+      }),
+
+      openWarningModal: () => set((state) => {
+        state.modals.warningModal = true;
+      }),
+
+      openWarningTarget: (target) => set((state) => {
+        state.warningTarget = target;
+        state.modals.warningModal = true;
+      }),
+
+      closeWarningModal: () => set((state) => {
+        state.modals.warningModal = false;
+        state.warningTarget = null;
+      }),
+
+      openInfoModal: () => set((state) => {
+        state.modals.infoModal = true;
+      }),
+
+      openInfoTarget: (target) => set((state) => {
+        state.infoTarget = target;
+        state.modals.infoModal = true;
+      }),
+
+      closeInfoModal: () => set((state) => {
+        state.modals.infoModal = false;
+        state.infoTarget = null;
       }),
       
       closeAllModals: () => set((state) => {
