@@ -223,17 +223,12 @@ export function useQuotationTaskFlow({
     const column = overrides?.columnOverride || selection?.column;
     if (!column) return null;
 
-    const st = nodeState[nodeId] || {
-      currentPage: 1,
-      pageSize: DEFAULT_PAGE_SIZE,
-      sortBy: undefined,
-      descending: false,
-    };
-    const page = overrides?.page ?? st.currentPage ?? 1;
-    const pageSize = overrides?.pageSize ?? st.pageSize ?? DEFAULT_PAGE_SIZE;
-    const sortBy = overrides?.sortBy ?? st.sortBy;
+    const st = nodeState[nodeId];
+    const page = overrides?.page ?? st?.currentPage ?? 1;
+    const pageSize = overrides?.pageSize ?? st?.pageSize;
+    const sortBy = overrides?.sortBy ?? st?.sortBy;
     const descending: boolean =
-      overrides?.descending ?? st.descending ?? false;
+      overrides?.descending ?? st?.descending ?? false;
 
     const enginePayload = buildEngineRequest();
     if (!enginePayload) {
@@ -249,11 +244,13 @@ export function useQuotationTaskFlow({
     const requestPayload: QuotationRequest = {
       column,
       page,
-      page_size: pageSize,
       sort_by: sortBy ?? undefined,
       descending,
       engine: engineConfigForRequest,
     };
+    if (pageSize !== undefined) {
+      requestPayload.page_size = pageSize;
+    }
 
     try {
       const result = await quotationSearch(nodeId, requestPayload);

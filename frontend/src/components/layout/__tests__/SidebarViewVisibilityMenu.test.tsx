@@ -1,6 +1,6 @@
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import Sidebar from '../Sidebar';
 import { SidebarProvider } from '../../ui/sidebar';
@@ -68,8 +68,6 @@ const renderSidebar = () =>
 
 describe('Sidebar view visibility menu', () => {
   beforeEach(() => {
-    cleanup();
-
     authState.isMultiUserMode = false;
     authState.dataFolder = '/tmp/workdir';
     authState.logout = vi.fn();
