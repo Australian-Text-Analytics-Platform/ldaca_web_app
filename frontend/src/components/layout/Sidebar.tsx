@@ -517,36 +517,38 @@ const Sidebar: React.FC = () => {
       </SidebarContent>
 
       <SidebarFooter className="space-y-2 px-3 py-2">
-        <div
-          className="rounded-md border border-border/60 bg-muted/30 px-3 py-2"
-          data-testid="sidebar-data-directory"
-        >
-          <div className="flex items-start gap-3">
-            <div className="min-w-0 flex-1">
-              <p className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-foreground">
-                Working directory
-                <HelpIcon targetKey="ui.working-directory" label="Working Directory" className="h-4 w-4 text-muted-foreground" />
-              </p>
-              <p className="mt-0.5 text-[11px] leading-tight text-muted-foreground break-all">
-                {dataFolder || 'Not configured'}
-              </p>
+        {!isMultiUserMode && (
+          <div
+            className="rounded-md border border-border/60 bg-muted/30 px-3 py-2"
+            data-testid="sidebar-data-directory"
+          >
+            <div className="flex items-start gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-foreground">
+                  Working directory
+                  <HelpIcon targetKey="ui.working-directory" label="Working Directory" className="h-4 w-4 text-muted-foreground" />
+                </p>
+                <p className="mt-0.5 text-[11px] leading-tight text-muted-foreground break-all">
+                  {dataFolder || 'Not configured'}
+                </p>
+              </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 shrink-0 text-muted-foreground"
+                    aria-label="Change working directory"
+                    onClick={handleEditDataFolder}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Change working directory</TooltipContent>
+              </Tooltip>
             </div>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 shrink-0 text-muted-foreground"
-                  aria-label="Change working directory"
-                  onClick={handleEditDataFolder}
-                >
-                  <Pencil className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="top">Change working directory</TooltipContent>
-            </Tooltip>
           </div>
-        </div>
+        )}
         <div className="flex items-center gap-2">
           <div className="flex flex-1 gap-2">
             <Button
@@ -570,10 +572,12 @@ const Sidebar: React.FC = () => {
       </SidebarFooter>
 
       <SidebarRail />
-      <DataFolderDialog
-        open={isDataFolderDialogOpen}
-        onOpenChange={setIsDataFolderDialogOpen}
-      />
+      {!isMultiUserMode && (
+        <DataFolderDialog
+          open={isDataFolderDialogOpen}
+          onOpenChange={setIsDataFolderDialogOpen}
+        />
+      )}
     </SidebarRoot>
   );
 };
