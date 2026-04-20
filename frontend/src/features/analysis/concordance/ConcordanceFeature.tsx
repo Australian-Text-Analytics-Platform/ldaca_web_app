@@ -43,6 +43,7 @@ import type { WorkspaceNodeLike } from '../common/nodeSelectionTypes';
 import {
   pruneTasksById,
 } from '../../../hooks/analysisTaskUtils';
+import { useAnalysisTaskStatus } from '../../../hooks/useAnalysisTaskStatus';
 import { useConcordanceTaskFlow, type PaginationState } from './hooks/useConcordanceTaskFlow';
 import { RowDetailPanel } from '../common/components/RowDetailPanel';
 import { useRowDetailDialog } from '../common/components/useRowDetailDialog';
@@ -117,7 +118,7 @@ const ConcordanceFeature: React.FC = () => {
   const { selectedNodes } = useWorkspaceSelection();
   const { isLoading } = useWorkspaceStatus();
   const { currentWorkspaceId } = useWorkspaceData();
-  const { detachConcordance, selectNodes } = useWorkspaceActions();
+  const { detachConcordance, materializeConcordance, selectNodes } = useWorkspaceActions();
   const currentView = useUIStore((state) => state.currentView);
   const isActiveTab = currentView === 'concordance';
   const { getColumnInfos } = useNodeColumnInfos({
@@ -270,6 +271,11 @@ const ConcordanceFeature: React.FC = () => {
   
   // Individual node detaching states
   const [nodeDetaching, setNodeDetaching] = useState<Record<string, boolean>>({});
+
+  // Individual node materializing states and tracked task ids
+  const [nodeMaterializing, setNodeMaterializing] = useState<Record<string, boolean>>({});
+  const [materializeTaskIds, setMaterializeTaskIds] = useState<Record<string, string>>({});
+  const [materializedPaths, setMaterializedPaths] = useState<Record<string, string>>({});
   
   // Detach dialog state
   const [detachDialogOpen, setDetachDialogOpen] = useState(false);
@@ -344,6 +350,10 @@ const ConcordanceFeature: React.FC = () => {
       setCaseSensitive(!!reqObj.case_sensitive);
       const hydratedMode: 'separated' | 'combined' = reqObj.combined && reqObj.combinable !== false ? 'combined' : 'separated';
       setViewMode(hydratedMode);
+      const paths = reqObj.materialized_paths as Record<string, string> | undefined;
+      if (paths && typeof paths === 'object') {
+        setMaterializedPaths(prev => ({ ...prev, ...paths }));
+      }
       try {
         await restoreAnalysisLockFromRequest({
           workspaceId: currentWorkspaceId,
@@ -402,6 +412,7 @@ const ConcordanceFeature: React.FC = () => {
     handlePageChange,
     persistResultPreferences,
     handleDetach,
+    handleMaterialize,
   } = useConcordanceTaskFlow({
     state: {
       currentWorkspaceId,
@@ -429,12 +440,15 @@ const ConcordanceFeature: React.FC = () => {
       setLocalTaskId: setLocalConcordanceTaskId,
       setNodeLoading,
       setNodeDetaching,
+      setNodeMaterializing,
+      setMaterializeTaskIds,
     },
     lock: {
       getAuthHeaders,
       lockWithSnapshots,
       resolveTaskId,
       detachConcordance,
+      materializeConcordance,
     },
   });
 
@@ -500,7 +514,14 @@ const ConcordanceFeature: React.FC = () => {
     const analysisParams = results?.analysis_params ?? {};
     const preferenceSource = results?.preferences ?? (analysisParams as Record<string, unknown>)?.preferences as Record<string, unknown> | undefined ?? {};
 
-    const nextPageSize = preferenceSource?.page_size ?? analysisParams?.page_size;
+    // Fall back to the first node's resolved pagination.page_size (which reflects
+    // server-side estimation) when the analysis params don't carry it.
+    const firstNodeEntry = results?.data
+      ? Object.values(results.data)[0]
+      : undefined;
+    const firstNodePageSize = firstNodeEntry?.pagination?.page_size;
+
+    const nextPageSize = preferenceSource?.page_size ?? analysisParams?.page_size ?? firstNodePageSize;
     if (typeof nextPageSize === 'number' && Number.isFinite(nextPageSize) && nextPageSize > 0 && nextPageSize !== globalPageSize) {
       // Defer to avoid synchronous setState in effect body (react-hooks/set-state-in-effect)
       const id = requestAnimationFrame(() => {
@@ -525,6 +546,91 @@ const ConcordanceFeature: React.FC = () => {
       return () => cancelAnimationFrame(id);
     }
   }, [results, globalPageSize, showMetadata, setNodePagination]);
+
+  // Watch materialize task status: when a tracked concordance_materialize task
+  // reaches a terminal state, clear its loading flag, refresh the task request
+  // to pick up new materialized_paths, and (on success) reset page_size to the
+  // default 20 before refetching the current page with the new semantics.
+  const materializeStatus = useAnalysisTaskStatus(['concordance_materialize']);
+  const processedMaterializeTaskIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const trackedEntries = Object.entries(materializeTaskIds);
+    if (trackedEntries.length === 0) return;
+
+    for (const task of materializeStatus.tasks) {
+      const taskId = task?.task_id;
+      if (!taskId) continue;
+      if (processedMaterializeTaskIdsRef.current.has(taskId)) continue;
+      const state = task?.state;
+      if (state !== 'successful' && state !== 'failed' && state !== 'cancelled') continue;
+
+      const nodeEntry = trackedEntries.find(([, trackedId]) => trackedId === taskId);
+      if (!nodeEntry) continue;
+      const [nodeId] = nodeEntry;
+
+      processedMaterializeTaskIdsRef.current.add(taskId);
+      setNodeMaterializing(prev => {
+        if (!prev[nodeId]) return prev;
+        const { [nodeId]: _removed, ...next } = prev;
+        void _removed;
+        return next;
+      });
+      setMaterializeTaskIds(prev => {
+        if (!(nodeId in prev)) return prev;
+        const { [nodeId]: _removed, ...next } = prev;
+        void _removed;
+        return next;
+      });
+
+      if (state !== 'successful') {
+        toast.error(`Materialize ${state}`);
+        continue;
+      }
+
+      toast.success('Materialize complete.');
+
+      // Refetch parent concordance task request to learn the newly-persisted
+      // materialized_paths map; then reset page_size to 20 and refetch results
+      // so the table re-renders with occurrence-row semantics.
+      void (async () => {
+        try {
+          const headers = getAuthHeaders();
+          const parentTaskId = await resolveTaskId();
+          if (parentTaskId) {
+            const req = await textApi.getConcordanceTaskRequest(parentTaskId, headers);
+            const reqObj = (req as Record<string, unknown>) ?? {};
+            const paths = (reqObj.materialized_paths as Record<string, string> | undefined) ?? undefined;
+            if (paths && typeof paths === 'object') {
+              setMaterializedPaths(prev => ({ ...prev, ...paths }));
+            }
+          }
+        } catch (error) {
+          console.warn('Failed to refresh concordance task request after materialize', error);
+        }
+
+        setGlobalPageSize(20);
+        setNodePagination(prev => {
+          const updated = { ...prev };
+          Object.keys(updated).forEach((key) => {
+            updated[key] = { ...updated[key], pageSize: 20, currentPage: 1 };
+          });
+          return updated;
+        });
+
+        try {
+          await persistResultPreferences({ pageSize: 20 });
+        } catch (error) {
+          console.warn('Failed to refetch concordance after materialize', error);
+        }
+      })();
+    }
+  }, [
+    materializeStatus.tasks,
+    materializeTaskIds,
+    getAuthHeaders,
+    resolveTaskId,
+    persistResultPreferences,
+  ]);
 
   // Preserve results across transient graph refetches: only clear when the actual set of selected IDs changes
   const selectedNodeIds = selectedNodes.map((node) => node.id).sort();
@@ -946,7 +1052,7 @@ const ConcordanceFeature: React.FC = () => {
   const handleDetachConfirm = async () => {
     for (const n of pendingDetachNodes) {
       const cols = selectedDetachColumns[n.nodeId] || [];
-      await handleDetach(n.nodeId, n.column, n.nodeLabel, cols);
+      await handleDetach(n.nodeId, n.column, n.nodeLabel, cols, materializedPaths[n.nodeId] ?? null);
     }
     setDetachDialogOpen(false);
     setPendingDetachNodes([]);
@@ -1133,8 +1239,8 @@ const ConcordanceFeature: React.FC = () => {
               hasPrev={combinedHasPrev}
               totalPages={nodeData.pagination?.total_source_pages}
               onPageChange={(newPage) => setCombinedPage(newPage)}
-              pageSizeLabel="Documents per page"
-              pageSizeSummary={<GroupedResultsPageSizeSummary groups={nodeData.data} />}
+              pageSizeLabel={nodeData.materialized ? 'Occurrences per page' : 'Documents per page'}
+              pageSizeSummary={nodeData.materialized ? undefined : <GroupedResultsPageSizeSummary groups={nodeData.data} />}
               loading={combinedLoading}
             />
           </div>
@@ -1170,6 +1276,8 @@ const ConcordanceFeature: React.FC = () => {
 
     const detachingKey = detachNodeId ?? "";
     const isDetaching = detachingKey ? Boolean(nodeDetaching[detachingKey]) : false;
+    const isMaterializing = detachingKey ? Boolean(nodeMaterializing[detachingKey]) : false;
+    const hasMaterializedPath = detachingKey ? Boolean(materializedPaths[detachingKey]) : false;
 
     return (
       <div key={nodeKey} className="mb-6">
@@ -1272,11 +1380,39 @@ const ConcordanceFeature: React.FC = () => {
               }
             })();
           }}
-          pageSizeLabel="Documents per page"
-          pageSizeSummary={<GroupedResultsPageSizeSummary groups={nodeData.data} />}
-          pageSizeOptions={[10, 20, 50, 100]}
+          pageSizeLabel={nodeData.materialized ? 'Occurrences per page' : 'Documents per page'}
+          pageSizeSummary={nodeData.materialized ? undefined : <GroupedResultsPageSizeSummary groups={nodeData.data} />}
+          pageSizeOptions={[10, 20, 50, 100, 200, 400, 800]}
           loading={nodeIsLoading}
         >
+          {/* Materialize button */}
+          <Button
+            onClick={() => {
+              if (detachNodeId) {
+                void handleMaterialize(detachNodeId, column);
+              }
+            }}
+            disabled={
+              nodeIsLoading
+              || isMaterializing
+              || hasMaterializedPath
+              || !searchWord.trim()
+              || !canDetach
+              || !detachNodeId
+            }
+            size="sm"
+            variant="outline"
+            className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
+            title="Cache all occurrence rows to disk so subsequent pagination and Add-to-Workspace reuse them"
+          >
+            {isMaterializing ? (
+              <><Loader2 className="mr-2 h-3 w-3 animate-spin" />Materializing...</>
+            ) : hasMaterializedPath ? (
+              <>Materialized</>
+            ) : (
+              <>Materialize</>
+            )}
+          </Button>
           {/* Detach button */}
           <Button
             onClick={() => {

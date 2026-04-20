@@ -5,6 +5,7 @@ import type {
   QuotationResultQuery,
   QuotationEngineConfig,
   QuotationDetachRequest,
+  QuotationMaterializeRequest,
 } from '../../../../api/text';
 import { textApi } from '../../../../api/text';
 import { getNodeIdentifier, restoreAnalysisLockFromRequest, extractAndSetTaskId } from '../../common';
@@ -66,6 +67,8 @@ interface QuotationActions {
   setIsLoadingQuotations: (value: boolean) => void;
   setHasLoaded: (value: boolean) => void;
   setNodeDetaching: Dispatch<SetStateAction<Record<string, boolean>>>;
+  setNodeMaterializing?: Dispatch<SetStateAction<Record<string, boolean>>>;
+  setMaterializeTaskIds?: Dispatch<SetStateAction<Record<string, string>>>;
   showErrorDialog: (message: string) => void;
   baseHandlePageChange: (page: number) => void;
   baseHandlePageSizeChange: (pageSize: number) => void;
@@ -85,6 +88,10 @@ interface QuotationLock {
     request: QuotationRequest,
   ) => Promise<QuotationAnalysisResponse>;
   detachQuotation: (nodeId: string, request: QuotationDetachRequest) => Promise<void>;
+  materializeQuotation?: (
+    nodeId: string,
+    request: QuotationMaterializeRequest,
+  ) => Promise<{ metadata?: { task_id?: string } } | undefined>;
   openEngineDialog: () => void;
 }
 
@@ -113,6 +120,8 @@ export function useQuotationTaskFlow({
     setIsLoadingQuotations,
     setHasLoaded,
     setNodeDetaching,
+    setNodeMaterializing,
+    setMaterializeTaskIds,
     showErrorDialog,
     baseHandlePageChange,
     baseHandlePageSizeChange,
@@ -126,6 +135,7 @@ export function useQuotationTaskFlow({
     resolveTaskId,
     quotationSearch,
     detachQuotation,
+    materializeQuotation,
     openEngineDialog,
   },
 }: Params) {
@@ -416,7 +426,7 @@ export function useQuotationTaskFlow({
     });
   };
 
-  const handleDetach = async (nodeId: string, selectedColumns?: string[]) => {
+  const handleDetach = async (nodeId: string, selectedColumns?: string[], materializedPath?: string | null) => {
     const selection = activeSelections.find((s) => s.nodeId === nodeId);
     if (!selection?.column) return;
     setNodeDetaching((prev) => ({ ...prev, [nodeId]: true }));
@@ -435,11 +445,59 @@ export function useQuotationTaskFlow({
             ? { type: 'remote', url: enginePayload.url }
             : { type: 'local' },
         ...(selectedColumns && selectedColumns.length > 0 ? { selected_columns: selectedColumns } : {}),
+        ...(materializedPath ? { materialized_path: materializedPath } : {}),
       });
     } catch (e: unknown) {
       showErrorDialog(getErrorMessage(e));
     } finally {
       setNodeDetaching((prev) => ({ ...prev, [nodeId]: false }));
+    }
+  };
+
+  const handleMaterialize = async (nodeId: string) => {
+    const selection = activeSelections.find((s) => s.nodeId === nodeId);
+    if (!selection?.column) return;
+    if (!materializeQuotation) return;
+
+    const parentTaskId = await resolveTaskId();
+    if (!parentTaskId) {
+      showErrorDialog('No quotation task to materialize.');
+      return;
+    }
+
+    setNodeMaterializing?.((prev) => ({ ...prev, [nodeId]: true }));
+    try {
+      const enginePayload = buildEngineRequest();
+      if (!enginePayload) {
+        openEngineDialog();
+        setNodeMaterializing?.((prev) => {
+          if (!prev[nodeId]) return prev;
+          const { [nodeId]: _removed, ...next } = prev;
+          void _removed;
+          return next;
+        });
+        return;
+      }
+      const resp = await materializeQuotation(nodeId, {
+        parent_task_id: parentTaskId,
+        column: selection.column,
+        engine:
+          enginePayload.type === 'remote'
+            ? { type: 'remote', url: enginePayload.url }
+            : { type: 'local' },
+      });
+      const taskId = (resp as { metadata?: { task_id?: string } } | undefined)?.metadata?.task_id;
+      if (taskId && setMaterializeTaskIds) {
+        setMaterializeTaskIds((prev) => ({ ...prev, [nodeId]: taskId }));
+      }
+    } catch (e: unknown) {
+      showErrorDialog(getErrorMessage(e));
+      setNodeMaterializing?.((prev) => {
+        if (!prev[nodeId]) return prev;
+        const { [nodeId]: _removed, ...next } = prev;
+        void _removed;
+        return next;
+      });
     }
   };
 
@@ -454,5 +512,6 @@ export function useQuotationTaskFlow({
     handlePageSizeChange,
     handleSort,
     handleDetach,
+    handleMaterialize,
   };
 }

@@ -4,6 +4,7 @@ import {
   type ConcordanceAnalysisRequest,
   type ConcordanceAnalysisResponse,
   type ConcordanceDetachRequest,
+  type ConcordanceMaterializeRequest,
   type ConcordanceResultQuery,
   textApi,
 } from '../../../../api/text';
@@ -40,6 +41,8 @@ interface ConcordanceActions {
   setLocalTaskId: (id: string | null) => void;
   setNodeLoading: Dispatch<SetStateAction<Record<string, boolean>>>;
   setNodeDetaching: Dispatch<SetStateAction<Record<string, boolean>>>;
+  setNodeMaterializing?: Dispatch<SetStateAction<Record<string, boolean>>>;
+  setMaterializeTaskIds?: Dispatch<SetStateAction<Record<string, string>>>;
 }
 
 interface ConcordanceLock {
@@ -47,6 +50,10 @@ interface ConcordanceLock {
   lockWithSnapshots: (snapshots: Array<{ id: string; name?: string; columns?: string[] }>) => void;
   resolveTaskId: () => Promise<string | null>;
   detachConcordance: (nodeId: string, request: ConcordanceDetachRequest) => Promise<void>;
+  materializeConcordance?: (
+    nodeId: string,
+    request: ConcordanceMaterializeRequest
+  ) => Promise<{ metadata?: { task_id?: string } } | undefined>;
 }
 
 type Params = {
@@ -82,12 +89,15 @@ export function useConcordanceTaskFlow({
     setLocalTaskId,
     setNodeLoading,
     setNodeDetaching,
+    setNodeMaterializing,
+    setMaterializeTaskIds,
   },
   lock: {
     getAuthHeaders,
     lockWithSnapshots,
     resolveTaskId,
     detachConcordance,
+    materializeConcordance,
   },
 }: Params) {
 
@@ -349,7 +359,7 @@ export function useConcordanceTaskFlow({
     }
   };
 
-  const handleDetach = async (nodeId: string, column: string, nodeLabel?: string, selectedColumns?: string[]) => {
+  const handleDetach = async (nodeId: string, column: string, nodeLabel?: string, selectedColumns?: string[], materializedPath?: string | null) => {
     if (!currentWorkspaceId || !searchWord.trim()) return;
 
     setNodeDetaching(prev => ({ ...prev, [nodeId]: true }));
@@ -357,7 +367,7 @@ export function useConcordanceTaskFlow({
       const resolvedNodeLabel = (nodeLabel && nodeLabel.trim().length > 0)
         ? nodeLabel
         : nodeId;
-      const request = {
+      const request: ConcordanceDetachRequest = {
         node_id: nodeId,
         column,
         search_word: searchWord.trim(),
@@ -368,6 +378,7 @@ export function useConcordanceTaskFlow({
         case_sensitive: caseSensitive,
         new_node_name: buildDetachNodeName(resolvedNodeLabel, '_conc'),
         ...(selectedColumns && selectedColumns.length > 0 ? { selected_columns: selectedColumns } : {}),
+        ...(materializedPath ? { materialized_path: materializedPath } : {}),
       };
       await detachConcordance(nodeId, request);
     } catch (error) {
@@ -378,6 +389,45 @@ export function useConcordanceTaskFlow({
     }
   };
 
+  const handleMaterialize = async (nodeId: string, column: string) => {
+    if (!currentWorkspaceId || !searchWord.trim()) {
+      toast.error('Run a concordance search first.');
+      return;
+    }
+    if (!materializeConcordance) return;
+
+    const parentTaskId = await resolveTaskId();
+    if (!parentTaskId) {
+      toast.error('No concordance task to materialize.');
+      return;
+    }
+
+    setNodeMaterializing?.(prev => ({ ...prev, [nodeId]: true }));
+    try {
+      const request: ConcordanceMaterializeRequest = {
+        parent_task_id: parentTaskId,
+        column,
+        search_word: searchWord.trim(),
+        num_left_tokens: numLeftTokens,
+        num_right_tokens: numRightTokens,
+        regex,
+        whole_word: wholeWord,
+        case_sensitive: caseSensitive,
+      };
+      const resp = await materializeConcordance(nodeId, request);
+      const taskId = (resp as { metadata?: { task_id?: string } } | undefined)?.metadata?.task_id;
+      if (taskId && setMaterializeTaskIds) {
+        setMaterializeTaskIds(prev => ({ ...prev, [nodeId]: taskId }));
+      }
+      toast.success('Materialize started.');
+    } catch (error) {
+      console.error('Error materializing concordance:', error);
+      const msg = error instanceof Error ? error.message : String(error);
+      toast.error(`Error materializing concordance: ${msg}`);
+      setNodeMaterializing?.(prev => ({ ...prev, [nodeId]: false }));
+    }
+  };
+
   return {
     handleSearch,
     updateStoredResult,
@@ -385,5 +435,6 @@ export function useConcordanceTaskFlow({
     handlePageChange,
     persistResultPreferences,
     handleDetach,
+    handleMaterialize,
   };
 }

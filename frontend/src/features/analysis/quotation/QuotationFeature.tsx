@@ -60,6 +60,7 @@ import {
 } from '../common';
 
 import { AnalysisPagination } from '../../../components/AnalysisPagination';
+import { useAnalysisTaskStatus } from '../../../hooks/useAnalysisTaskStatus';
 import { useQuotationTaskFlow } from './hooks/useQuotationTaskFlow';
 import { QUOTATION_COLUMN_KEYS, QUOTATION_DOCUMENT_COLUMN } from '../generatedColumns';
 import { flattenQuotationGroups } from './quotationViewModels';
@@ -290,7 +291,7 @@ const normalizeRemoteUrl = (value: string): NormalizedRemoteUrl => {
 const QuotationFeature: React.FC = () => {
   const { selectedNodes, handlePageChange: baseHandlePageChange, handlePageSizeChange: baseHandlePageSizeChange } = useWorkspaceSelection();
   const { currentWorkspaceId } = useWorkspaceData();
-  const { quotationSearch, detachQuotation } = useWorkspaceActions();
+  const { quotationSearch, detachQuotation, materializeQuotation } = useWorkspaceActions();
   const { getAuthHeaders } = useAuth();
   const currentView = useUIStore((state) => state.currentView);
   const isActiveTab = currentView === 'quotation';
@@ -466,6 +467,10 @@ const QuotationFeature: React.FC = () => {
       }
       setNodeColumnSelections([{ nodeId, column }], { replace: true });
       setShowMetadata(false);
+      const matPath = requestData.materialized_path;
+      if (typeof matPath === 'string' && matPath) {
+        setMaterializedPaths(prev => ({ ...prev, [nodeId]: matPath }));
+      }
       try {
         await restoreAnalysisLockFromRequest({
           workspaceId: currentWorkspaceId,
@@ -561,6 +566,9 @@ const QuotationFeature: React.FC = () => {
   }>>({});
   // Deprecated per-node loading indicator; rely on DataView-like UX
   const [nodeDetaching, setNodeDetaching] = useState<Record<string, boolean>>({});
+  const [nodeMaterializing, setNodeMaterializing] = useState<Record<string, boolean>>({});
+  const [materializeTaskIds, setMaterializeTaskIds] = useState<Record<string, string>>({});
+  const [materializedPaths, setMaterializedPaths] = useState<Record<string, string>>({});
   const [detachDialogOpen, setDetachDialogOpen] = useState(false);
   const [pendingDetachNodeId, setPendingDetachNodeId] = useState<string | null>(null);
   const [detachNodeOptions, setDetachNodeOptions] = useState<QuotationDetachNodeOption[]>([]);
@@ -822,6 +830,7 @@ const QuotationFeature: React.FC = () => {
     handlePageSizeChange,
     handleSort,
     handleDetach,
+    handleMaterialize,
   } = useQuotationTaskFlow({
     state: {
       currentWorkspaceId,
@@ -841,6 +850,8 @@ const QuotationFeature: React.FC = () => {
       setIsLoadingQuotations,
       setHasLoaded,
       setNodeDetaching,
+      setNodeMaterializing,
+      setMaterializeTaskIds,
       showErrorDialog,
       baseHandlePageChange,
       baseHandlePageSizeChange,
@@ -854,9 +865,80 @@ const QuotationFeature: React.FC = () => {
       resolveTaskId,
       quotationSearch,
       detachQuotation,
+      materializeQuotation,
       openEngineDialog,
     },
   });
+
+  // Watch quotation_materialize task status: clear flag on terminal state; on
+  // success, refresh request to learn materialized_path, reset page_size to
+  // the default 20, and refetch the current page (which will now slice from
+  // the cached parquet with occurrence-row semantics).
+  const quotationMaterializeStatus = useAnalysisTaskStatus(['quotation_materialize']);
+  const processedQuotationMaterializeTaskIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const trackedEntries = Object.entries(materializeTaskIds);
+    if (trackedEntries.length === 0) return;
+
+    for (const task of quotationMaterializeStatus.tasks) {
+      const taskId = task?.task_id;
+      if (!taskId) continue;
+      if (processedQuotationMaterializeTaskIdsRef.current.has(taskId)) continue;
+      const state = task?.state;
+      if (state !== 'successful' && state !== 'failed' && state !== 'cancelled') continue;
+
+      const nodeEntry = trackedEntries.find(([, trackedId]) => trackedId === taskId);
+      if (!nodeEntry) continue;
+      const [nodeId] = nodeEntry;
+
+      processedQuotationMaterializeTaskIdsRef.current.add(taskId);
+      setNodeMaterializing((prev) => {
+        if (!prev[nodeId]) return prev;
+        const { [nodeId]: _removed, ...next } = prev;
+        void _removed;
+        return next;
+      });
+      setMaterializeTaskIds((prev) => {
+        if (!(nodeId in prev)) return prev;
+        const { [nodeId]: _removed, ...next } = prev;
+        void _removed;
+        return next;
+      });
+
+      if (state !== 'successful') continue;
+
+      void (async () => {
+        try {
+          const headers = getAuthHeaders();
+          const parentTaskId = await resolveTaskId();
+          if (parentTaskId) {
+            const req = await textApi.getQuotationTaskRequest(parentTaskId, headers);
+            const reqObj = (req as Record<string, unknown>) ?? {};
+            const path = typeof reqObj.materialized_path === 'string'
+              ? (reqObj.materialized_path as string)
+              : null;
+            if (path) {
+              setMaterializedPaths((prev) => ({ ...prev, [nodeId]: path }));
+            }
+          }
+        } catch (error) {
+          console.warn('Failed to refresh quotation task request after materialize', error);
+        }
+
+        try {
+          handlePageSizeChange(20);
+        } catch (error) {
+          console.warn('Failed to reset quotation page size after materialize', error);
+        }
+      })();
+    }
+  }, [
+    quotationMaterializeStatus.tasks,
+    materializeTaskIds,
+    getAuthHeaders,
+    resolveTaskId,
+    handlePageSizeChange,
+  ]);
 
   const handleEngineDialogSave = () => {
     const payload = buildEngineRequest();
@@ -925,7 +1007,7 @@ const QuotationFeature: React.FC = () => {
   const handleDetachConfirm = async () => {
     if (!pendingDetachNodeId) return;
     const selectedColumns = selectedDetachColumns[pendingDetachNodeId] || [];
-    await handleDetach(pendingDetachNodeId, selectedColumns);
+    await handleDetach(pendingDetachNodeId, selectedColumns, materializedPaths[pendingDetachNodeId] ?? null);
     setDetachDialogOpen(false);
     setPendingDetachNodeId(null);
     setDetachNodeOptions([]);
@@ -1349,8 +1431,32 @@ const QuotationFeature: React.FC = () => {
                       onPageSizeChange={(newSize) => handlePageSizeChange(newSize)}
                       pageSizeLabel="Documents per page"
                       pageSizeSummary={<GroupedResultsPageSizeSummary groups={resultState?.groupedRows ?? []} />}
-                      pageSizeOptions={[50, 100, 200, 400]}
+                      pageSizeOptions={[10, 20, 50, 100, 200, 400, 800]}
                     >
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => void handleMaterialize(nodeId)}
+                        disabled={
+                          Boolean(nodeMaterializing[nodeId])
+                          || Boolean(materializedPaths[nodeId])
+                          || Boolean(nodeDetaching[nodeId])
+                        }
+                        className="h-auto max-w-full whitespace-normal wrap-break-word py-1.5 text-left"
+                        title="Cache all occurrence rows to disk so subsequent pagination and Add-to-Workspace reuse them"
+                      >
+                        {nodeMaterializing[nodeId] ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Materializing…
+                          </>
+                        ) : materializedPaths[nodeId] ? (
+                          <>Materialized</>
+                        ) : (
+                          <>Materialize</>
+                        )}
+                      </Button>
                       <Button
                         type="button"
                         size="sm"
