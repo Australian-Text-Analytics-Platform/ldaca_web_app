@@ -1,4 +1,5 @@
-import { GoogleLogin as OAuthGoogleLogin, type CredentialResponse } from '@react-oauth/google';
+import { GoogleLogin as OAuthGoogleLogin } from '@react-oauth/google';
+import { getApiBase } from '@/api/env';
 
 interface GoogleLoginProps {
   onLogin: (idToken: string) => Promise<void>;
@@ -7,20 +8,8 @@ interface GoogleLoginProps {
   error?: string | null;
 }
 
-function GoogleLogin({ onLogin, onLogout: _onLogout, isLoading, error }: GoogleLoginProps) {
-  const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
-    try {
-      if (credentialResponse.credential) {
-        await onLogin(credentialResponse.credential);
-      }
-    } catch (error) {
-      console.error('Google login failed:', error);
-    }
-  };
-
-  const handleGoogleError = () => {
-    console.error('Google Login Failed');
-  };
+function GoogleLogin({ onLogin: _onLogin, onLogout: _onLogout, isLoading, error }: GoogleLoginProps) {
+  const loginUri = `${getApiBase()}/auth/google/callback`;
 
   return (
     <div className="space-y-4">
@@ -31,8 +20,9 @@ function GoogleLogin({ onLogin, onLogout: _onLogout, isLoading, error }: GoogleL
       )}
       
       <OAuthGoogleLogin
-        onSuccess={handleGoogleSuccess}
-        onError={handleGoogleError}
+        onSuccess={() => {/* redirect mode — handled server-side */}}
+        ux_mode="redirect"
+        login_uri={loginUri}
         size="large"
         text="signin_with"
         shape="rectangular"

@@ -350,30 +350,26 @@ const Sidebar: React.FC = () => {
   return (
     <SidebarRoot>
       <SidebarHeader className="border-b border-border/40 px-3 py-2">
-        <div className="flex items-start gap-2">
-          <div className="flex min-w-0 flex-1 flex-col items-start gap-2 w-full">
-            <div className="flex items-center gap-2 w-full">
-              <SidebarTrigger className="md:hidden" />
-              <img src={logo} alt="LDaCA Logo" className="w-full h-auto object-contain" />
-            </div>
-            <div className="flex min-w-0 flex-col leading-tight w-full">
-              <p className="text-xl font-semibold w-full">Text Analytics</p>
-              {isMultiUserMode && (
-                <p className="text-[11px] text-muted-foreground truncate" title={user?.name ?? 'Guest'}>
-                  Welcome, {user?.name ?? 'Guest'}
-                </p>
-              )}
-            </div>
+        <div className="flex min-w-0 flex-col gap-2 w-full">
+          <div className="flex items-center gap-2 w-full">
+            <SidebarTrigger className="md:hidden" />
+            <img src={logo} alt="LDaCA Logo" className="w-full h-auto object-contain" />
           </div>
+          <p className="text-xl font-semibold w-full">Text Analytics</p>
           {isMultiUserMode && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-xs text-red-600 hover:text-red-700 shrink-0"
-              onClick={logout}
-            >
-              Logout
-            </Button>
+            <div className="flex items-center justify-between w-full">
+              <p className="text-[11px] text-muted-foreground truncate" title={user?.name ?? 'Guest'}>
+                Welcome, {user?.name ?? 'Guest'}
+              </p>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs text-red-600 hover:text-red-700 shrink-0 h-auto py-0 px-1"
+                onClick={logout}
+              >
+                Logout
+              </Button>
+            </div>
           )}
         </div>
       </SidebarHeader>

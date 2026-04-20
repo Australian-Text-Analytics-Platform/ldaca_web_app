@@ -50,8 +50,11 @@ export function getApiBase(options: ApiEnvOptions = {}): string {
 
   if (typeof window === 'undefined') return '/api';
 
-  // 4. Server-injected base path (handles any reverse proxy generically)
-  if (window.__BASE_PATH__) {
+  // 4. Server-injected base path (handles any reverse proxy generically).
+  //    The backend always injects `window.__BASE_PATH__` as a string (even "")
+  //    when it serves the frontend, so its *presence* (not truthiness) means
+  //    "same-origin" — no port redirect needed.
+  if (typeof window.__BASE_PATH__ === 'string') {
     return `${window.location.origin}${window.__BASE_PATH__}/api`;
   }
 

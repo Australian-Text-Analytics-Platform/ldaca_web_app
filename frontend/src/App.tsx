@@ -8,6 +8,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import GoogleLogin from './components/GoogleLogin';
 import Sidebar from './components/layout/Sidebar';
 import BlockingScreen from './components/startup/BlockingScreen';
+import logo from './logo.png';
 import { useUIStore } from './stores';
 import { usePreferencesStore } from './stores/preferencesStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -196,24 +197,17 @@ const WorkspaceShell: React.FC = () => {
     );
   }
 
-  // Show login screen if not authenticated and in multi-user mode
+  // Show login screen if not authenticated and in multi-user mode.
+  // Reuses the same full-screen layout as BlockingScreen, but swaps the
+  // spinner card for a Google sign-in card.
   if (shouldShowLoginCard) {
     return (
-      <div className="min-h-screen bg-linear-to-br from-slate-50 to-blue-50 flex items-center justify-center">
-        <ErrorBoundary>
-          <div className="bg-white p-8 rounded-xl shadow-lg max-w-md w-full mx-4">
-            <h1 className="text-2xl font-bold text-gray-800 mb-6 text-center">
-              LDaCA Corpus Analysis Platform
-            </h1>
-            <GoogleLogin 
-              onLogin={loginWithGoogle} 
-              onLogout={logout}
-              isLoading={authLoading}
-              error={authError}
-            />
-          </div>
-        </ErrorBoundary>
-      </div>
+      <LoginScreen
+        onLogin={loginWithGoogle}
+        onLogout={logout}
+        isLoading={authLoading}
+        error={authError}
+      />
     );
   }
 
@@ -443,6 +437,45 @@ const getBlockingCopy = (phase: AuthPhase, showLaggingHint: boolean): BlockingCo
   }
 
   return null;
+};
+
+type LoginScreenProps = {
+  onLogin: (idToken: string) => Promise<void>;
+  onLogout: () => void;
+  isLoading?: boolean;
+  error?: string | null;
+};
+
+const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onLogout, isLoading, error }) => {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-blue-50 flex items-center justify-center px-4 py-10">
+      <div className="w-full max-w-xl text-center space-y-6 bg-white/80 backdrop-blur rounded-2xl shadow-2xl border border-white/60 px-10 py-12">
+        <div className="flex justify-center">
+          <img
+            src={logo}
+            alt="LDaCA Logo"
+            className="h-16 w-auto object-contain drop-shadow"
+          />
+        </div>
+        <div className="space-y-2">
+          <h1 className="text-3xl font-semibold text-gray-900">Sign in to continue</h1>
+          <p className="text-base text-gray-600">
+            LDaCA Text Analytics requires you to sign in with a Google account.
+          </p>
+        </div>
+        <ErrorBoundary>
+          <div className="flex justify-center pt-2">
+            <GoogleLogin
+              onLogin={onLogin}
+              onLogout={onLogout}
+              isLoading={isLoading}
+              error={error}
+            />
+          </div>
+        </ErrorBoundary>
+      </div>
+    </div>
+  );
 };
 
 export default App;

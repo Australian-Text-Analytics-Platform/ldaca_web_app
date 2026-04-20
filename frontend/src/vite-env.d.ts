@@ -8,3 +8,10 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+interface Window {
+  __BASE_PATH__?: string;
+  __BACKEND_URL__?: string;
+  __GOOGLE_CLIENT_ID__?: string;
+  __MULTI_USER__?: boolean;
+}
