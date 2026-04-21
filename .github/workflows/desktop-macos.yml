@@ -48,7 +48,9 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.toml', 'frontend/src-tauri/Cargo.lock', 'polars-text/Cargo.toml', 'polars-text/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-${{ hashFiles('frontend/src-tauri/Cargo.toml',
+            'frontend/src-tauri/Cargo.lock', 'polars-text/Cargo.toml',
+            'polars-text/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
 
@@ -56,7 +58,9 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ~/.rustup
-          key: ${{ runner.os }}-rustup-${{ hashFiles('Cargo.toml', 'frontend/src-tauri/Cargo.lock', 'polars-text/Cargo.toml', 'polars-text/Cargo.lock') }}
+          key: ${{ runner.os }}-rustup-${{ hashFiles('frontend/src-tauri/Cargo.toml',
+            'frontend/src-tauri/Cargo.lock', 'polars-text/Cargo.toml',
+            'polars-text/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-rustup-
 
@@ -69,7 +73,8 @@ jobs:
           path: |
             ~/.cache/uv
             ~/.local/share/uv
-          key: ${{ runner.os }}-uv-${{ hashFiles('backend/uv.lock', 'backend/pyproject.toml') }}
+          key: ${{ runner.os }}-uv-${{ hashFiles('backend/uv.lock',
+            'backend/pyproject.toml') }}
           restore-keys: |
             ${{ runner.os }}-uv-
 
@@ -79,7 +84,8 @@ jobs:
 
       - name: Package backend runtime
         shell: bash
-        run: uv run --no-project --python 3.14 python scripts/package_backend_runtime.py --clean --python-version 3.14
+        run: uv run --no-project --python 3.14 python scripts/package_backend_runtime.py
+          --clean --python-version 3.14
 
       - name: Stage backend runtime for Tauri
         shell: bash
@@ -97,7 +103,7 @@ jobs:
         run: |
           set -Eeuo pipefail
           repo_root="$(cd .. && pwd -P)"
-          app_path="$repo_root/target/release/bundle/macos/LDaCA Text Analytics.app"
+          app_path="$repo_root/frontend/src-tauri/target/release/bundle/macos/LDaCA Text Analytics.app"
           runtime_path="$app_path/Contents/Resources/backend-runtime"
 
           test -d "$runtime_path"
@@ -117,13 +123,13 @@ jobs:
           set -Eeuo pipefail
           shopt -s nullglob
           repo_root="$(cd .. && pwd -P)"
-          dmg_files=("$repo_root"/target/release/bundle/dmg/*.dmg)
+          dmg_files=("$repo_root"/frontend/src-tauri/target/release/bundle/dmg/*.dmg)
           if [ ${#dmg_files[@]} -eq 0 ]; then
             echo "No DMG output found" >&2
             exit 1
           fi
           primary_dmg="${dmg_files[0]}"
-          labeled_dmg="$repo_root/target/release/bundle/dmg/ldaca-desktop-apple-silicon.dmg"
+          labeled_dmg="$repo_root/frontend/src-tauri/target/release/bundle/dmg/ldaca-desktop-apple-silicon.dmg"
           cp "$primary_dmg" "$labeled_dmg"
           echo "path=$labeled_dmg" >> "$GITHUB_OUTPUT"
           echo "Primary DMG: $primary_dmg"
