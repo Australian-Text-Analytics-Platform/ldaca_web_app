@@ -92,20 +92,33 @@ const WorkspaceShell: React.FC = () => {
     setIsResizingSidebar(true);
     const startX = e.clientX;
     const startWidth = sidebarWidth;
+    const gapEl = document.querySelector<HTMLElement>('[data-slot="sidebar-gap"]');
+    const containerEl = document.querySelector<HTMLElement>('[data-slot="sidebar-container"]');
+    // Disable primitive's width transition so the sidebar tracks the cursor exactly (same pattern as other separators)
+    if (gapEl) gapEl.style.transition = 'none';
+    if (containerEl) containerEl.style.transition = 'none';
     let rafId: number | null = null;
     let liveWidth = startWidth;
     const onMove = (ev: MouseEvent) => {
       if (rafId !== null) cancelAnimationFrame(rafId);
       rafId = requestAnimationFrame(() => {
         liveWidth = Math.min(400, Math.max(160, startWidth + (ev.clientX - startX)));
-        document.documentElement.style.setProperty('--sidebar-width', `${liveWidth}px`);
+        if (gapEl) gapEl.style.width = `${liveWidth}px`;
+        if (containerEl) containerEl.style.width = `${liveWidth}px`;
       });
     };
     const onUp = () => {
       if (rafId !== null) cancelAnimationFrame(rafId);
       setSidebarWidth(liveWidth);
       setIsResizingSidebar(false);
-      document.documentElement.style.removeProperty('--sidebar-width');
+      if (gapEl) {
+        gapEl.style.transition = '';
+        gapEl.style.width = '';
+      }
+      if (containerEl) {
+        containerEl.style.transition = '';
+        containerEl.style.width = '';
+      }
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
     };
@@ -278,7 +291,7 @@ const WorkspaceShell: React.FC = () => {
               </ErrorBoundary>
 
               <div
-                className={`hidden md:flex shrink-0 cursor-col-resize group relative w-3 items-center justify-center ${isResizingSidebar ? 'z-20' : ''}`}
+                className={`hidden md:flex shrink-0 cursor-col-resize group relative w-2 items-center justify-center ${isResizingSidebar ? 'z-20' : ''}`}
                 onMouseDown={onStartSidebarResize}
                 role="separator"
                 aria-orientation="vertical"
@@ -307,7 +320,9 @@ const WorkspaceShell: React.FC = () => {
                     <InsetCard
                       ref={mainRef}
                       role="main"
-                      className={`relative h-full ${isResizing ? 'transition-none' : 'transition-all duration-300 ease-in-out'}`}
+                      className={`relative h-full p-2 pl-1 ${
+                        isRightCollapsed ? 'pr-2' : 'pr-1'
+                      } ${isResizing ? 'transition-none' : 'transition-all duration-300 ease-in-out'}`}
                       style={{ width: isRightCollapsed ? '100%' : `${100 - rightWidth}%`, minWidth: 280 }}
                       innerClassName="overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden p-4"
                     >
@@ -337,7 +352,7 @@ const WorkspaceShell: React.FC = () => {
 
                     {!isRightCollapsed && (
                       <div
-                        className="w-3 shrink-0 cursor-col-resize group relative flex items-center justify-center"
+                        className="w-2 shrink-0 cursor-col-resize group relative flex items-center justify-center"
                         onMouseDown={onStartResize}
                         role="separator"
                         aria-orientation="vertical"

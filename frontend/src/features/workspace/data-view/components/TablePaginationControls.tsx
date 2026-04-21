@@ -130,7 +130,7 @@ const PaginationJump = ({ totalPages, onPageChange }: PaginationJumpProps) => {
         aria-expanded={open}
         aria-haspopup="dialog"
         onClick={() => setOpen((previous) => !previous)}
-        className="size-9 text-muted-foreground hover:text-foreground"
+        className="size-8 text-muted-foreground hover:text-foreground"
       >
         <MoreHorizontal className="h-4 w-4" />
         <span className="sr-only">Jump to page</span>
@@ -138,9 +138,6 @@ const PaginationJump = ({ totalPages, onPageChange }: PaginationJumpProps) => {
       {open ? (
         <div className="absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2 rounded-md border border-border bg-popover px-3 py-2 text-popover-foreground shadow-lg">
           <form className="flex items-center gap-2" onSubmit={handleSubmit} noValidate>
-            <label className="text-xs font-medium text-muted-foreground" htmlFor={inputId}>
-              Page:
-            </label>
             <Input
               id={inputId}
               ref={inputRef}
@@ -203,13 +200,13 @@ export const TablePaginationControls = ({
     const nextDisabled = !has_next;
 
     return (
-      <div className="flex flex-col gap-3 border-t border-border bg-muted/40 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+      <div className="flex flex-col gap-1.5 border-t border-border bg-muted/40 px-3 py-1.5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <span>Rows per page</span>
           <select
             value={page_size}
             onChange={(event) => onPageSizeChange(Number(event.target.value))}
-            className="h-9 rounded-md border border-input bg-background px-2 py-1 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            className="h-7 rounded-md border border-input bg-background px-2 py-0.5 text-xs text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           >
             {normalizedOptions.map((size) => (
               <option key={size} value={size}>

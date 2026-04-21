@@ -51,8 +51,8 @@ const WorkspaceView: React.FC = () => {
     <div className="flex flex-col h-full bg-transparent" ref={containerRef}>
       <InsetCard
         ref={topRef}
-        className="min-h-30"
-        style={{ height: `calc(${split}% - 0.375rem)` }}
+        className="min-h-30 p-2 pb-1"
+        style={{ height: `calc(${split}% - 0.25rem)` }}
       >
         <div className="p-2 bg-muted border-b border-border shrink-0">
           <WorkspaceControls />
@@ -63,7 +63,7 @@ const WorkspaceView: React.FC = () => {
       </InsetCard>
 
       <div
-        className="h-3 shrink-0 cursor-row-resize relative group flex items-center justify-center"
+        className="h-2 shrink-0 cursor-row-resize relative group flex items-center justify-center"
         onMouseDown={onStartDrag}
         role="separator"
         aria-orientation="horizontal"
@@ -78,8 +78,8 @@ const WorkspaceView: React.FC = () => {
 
       <InsetCard
         ref={bottomRef}
-        className="min-h-30"
-        style={{ height: `calc(${100 - split}% - 0.375rem)` }}
+        className="min-h-30 p-2 pt-1"
+        style={{ height: `calc(${100 - split}% - 0.25rem)` }}
       >
         <div className="flex-1 min-h-0">
           <WorkspaceDataView />

@@ -349,7 +349,7 @@ const Sidebar: React.FC = () => {
 
   return (
     <SidebarRoot
-      className="md:p-2! md:pr-0! **:data-[sidebar=sidebar]:rounded-xl **:data-[sidebar=sidebar]:border **:data-[sidebar=sidebar]:border-border/60 **:data-[sidebar=sidebar]:shadow-sm **:data-[sidebar=sidebar]:overflow-hidden"
+      className="md:p-2! md:pr-1! **:data-[sidebar=sidebar]:rounded-xl **:data-[sidebar=sidebar]:border **:data-[sidebar=sidebar]:border-border/60 **:data-[sidebar=sidebar]:shadow-sm **:data-[sidebar=sidebar]:overflow-hidden"
     >
       <SidebarHeader className="border-b border-border/40 px-3 py-2">
         <div className="flex min-w-0 flex-col gap-2 w-full">

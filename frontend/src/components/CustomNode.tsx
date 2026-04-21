@@ -23,6 +23,8 @@ interface CustomNodeData extends Record<string, unknown> {
   onRedo?: (nodeId: string) => void;
 }
 
+const COMPACT_NODE_ZOOM_THRESHOLD = 0.5;
+
 /** React Flow node renderer for a workspace node. Shows a compact card when zoomed
  *  out, and a full card with metadata + action menu when zoomed in. */
 function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>) {
@@ -36,7 +38,7 @@ function CustomNode({ data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>
   const renameInputRef = useRef<HTMLInputElement>(null);
 
   const zoom = useStore((s) => s.transform[2]);
-  const isZoomedOut = zoom < 0.7;
+  const isZoomedOut = zoom < COMPACT_NODE_ZOOM_THRESHOLD;
 
   const nodeName = node?.name || 'Loading...';
   const nodeShape = node?.shape;
