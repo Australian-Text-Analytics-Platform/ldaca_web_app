@@ -398,19 +398,31 @@ const Sidebar: React.FC = () => {
                       onMouseDown={(event) => handleResizeStart(previousKey, key, event)}
                     />
                   ) : null}
-                  <button
-                    type="button"
+                  <div
+                    role="button"
+                    tabIndex={0}
                     className="flex w-full items-center justify-between border-b border-border/40 bg-muted/40 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
                     onClick={() => toggleSection(key)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        toggleSection(key);
+                      }
+                    }}
                     aria-expanded={!isCollapsed}
                   >
                     <span className="flex items-center gap-1">
                       {title}
-                      <HelpIcon
-                        targetKey={SECTION_HELP_KEYS[key]}
-                        label={title}
-                        className="h-5 w-5 text-muted-foreground"
-                      />
+                      <span
+                        onClick={(event) => event.stopPropagation()}
+                        onKeyDown={(event) => event.stopPropagation()}
+                      >
+                        <HelpIcon
+                          targetKey={SECTION_HELP_KEYS[key]}
+                          label={title}
+                          className="h-5 w-5 text-muted-foreground"
+                        />
+                      </span>
                     </span>
                     <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
                       {key === 'nodes' && (
@@ -435,7 +447,7 @@ const Sidebar: React.FC = () => {
                         )}
                       />
                     </div>
-                  </button>
+                  </div>
                   {key === 'views' && (
                     <div className="absolute right-7 top-1/2 -translate-y-1/2">
                       <DropdownMenu>
