@@ -43,10 +43,10 @@ const DataPreprocessingFeature: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Data Preprocessing</h1>
+          <h1 className="text-xl font-semibold text-foreground">Data Preprocessing</h1>
           <p className="text-sm text-muted-foreground">
             Prepare your dataset with filtering, sampling, join, stack, find, and create tools.
           </p>
@@ -56,7 +56,7 @@ const DataPreprocessingFeature: React.FC = () => {
       <Tabs
         value={activeSubtab}
         onValueChange={(value) => setActiveSubtab(value as DataPrepSubtab)}
-        className="space-y-6"
+        className="space-y-4"
       >
         <TabsList aria-label="Data preprocessing sub-views" className="flex flex-wrap gap-2">
           <TabsTrigger value="filter">Filter</TabsTrigger>
@@ -67,7 +67,7 @@ const DataPreprocessingFeature: React.FC = () => {
           <TabsTrigger value="aggregate">Create</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="filter" className="space-y-6">
+        <TabsContent value="filter" className="space-y-4">
           <FilterSubTab
             selectedNodeId={selectedNodeId}
             selectedNode={selectedNode}
@@ -82,7 +82,7 @@ const DataPreprocessingFeature: React.FC = () => {
           />
         </TabsContent>
 
-        <TabsContent value="slice" className="space-y-6">
+        <TabsContent value="slice" className="space-y-4">
           <SliceSubTab
             selectedNodeId={selectedNodeId}
             selectedNode={selectedNode}
@@ -95,7 +95,7 @@ const DataPreprocessingFeature: React.FC = () => {
           />
         </TabsContent>
 
-        <TabsContent value="join" className="space-y-6">
+        <TabsContent value="join" className="space-y-4">
           <JoinSubTab
             selectedNodeIds={selectedNodeIds}
             currentWorkspaceId={currentWorkspaceId}
@@ -106,7 +106,7 @@ const DataPreprocessingFeature: React.FC = () => {
           />
         </TabsContent>
 
-        <TabsContent value="concat" className="space-y-6">
+        <TabsContent value="concat" className="space-y-4">
           <ConcatSubTab
             selectedNodeIds={selectedNodeIds}
             currentWorkspaceId={currentWorkspaceId}
@@ -118,7 +118,7 @@ const DataPreprocessingFeature: React.FC = () => {
           />
         </TabsContent>
 
-        <TabsContent value="find" className="space-y-6">
+        <TabsContent value="find" className="space-y-4">
           <ReplaceSubTab
             selectedNodeId={selectedNodeId}
             selectedNodes={selectedNodes}
@@ -131,7 +131,7 @@ const DataPreprocessingFeature: React.FC = () => {
           />
         </TabsContent>
 
-        <TabsContent value="aggregate" className="space-y-6">
+        <TabsContent value="aggregate" className="space-y-4">
           <AggregateSubTab
             selectedNodeId={selectedNodeId}
             selectedNodes={selectedNodes}

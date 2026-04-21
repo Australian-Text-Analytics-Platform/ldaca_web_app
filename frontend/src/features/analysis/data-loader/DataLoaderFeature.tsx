@@ -842,10 +842,10 @@ export const DataLoaderFeature: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-semibold text-foreground">Data Loader</h1>
+          <h1 className="text-xl font-semibold text-foreground">Data Loader</h1>
           <HelpIcon
             targetKey="data-loader.tab"
             label="Data loader overview"
@@ -854,7 +854,7 @@ export const DataLoaderFeature: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2">
         <Card ref={activeCardRef} data-testid={currentWorkspace ? 'active-workspace-card' : 'create-workspace-card'}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">

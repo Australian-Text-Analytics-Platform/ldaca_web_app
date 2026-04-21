@@ -1439,7 +1439,7 @@ const ConcordanceFeature: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <Card>
         <CardHeader className="space-y-0 pb-4">
           <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
@@ -1455,7 +1455,7 @@ const ConcordanceFeature: React.FC = () => {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-6 pt-0">
+        <CardContent className="space-y-4 pt-0">
           <NodeSelectionPanel
             selectedNodes={panelSelectedNodes}
             nodeColumnSelections={effectiveNodeColumnSelections}
@@ -1475,7 +1475,7 @@ const ConcordanceFeature: React.FC = () => {
             lockedMessage={ANALYSIS_LOCKED_MESSAGE}
           />
 
-          <div className="space-y-6">
+          <div className="space-y-4">
             <div className="grid gap-4 lg:grid-cols-2">
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
@@ -1699,9 +1699,9 @@ const ConcordanceFeature: React.FC = () => {
                 </div>
               </CardHeader>
               <CardContent>
-                <div ref={resultsViewportRef} className="space-y-6">
+                <div ref={resultsViewportRef} className="space-y-4">
                 {results.data && Object.keys(results.data).length > 0 ? (
-                  <div className={`grid gap-6 ${viewMode==='combined' ? 'grid-cols-1' : 'grid-cols-1'}`}>
+                  <div className={`grid gap-4 ${viewMode==='combined' ? 'grid-cols-1' : 'grid-cols-1'}`}>
                     {Object.entries(results.data).filter(([k]) => viewMode==='combined' ? k==='__COMBINED__' : k !== '__COMBINED__').map(([nodeName, nodeData]) => {
                       const nodesForDetail = panelSelectedNodes;
                       const keyedOrder = Object.keys(results.data);

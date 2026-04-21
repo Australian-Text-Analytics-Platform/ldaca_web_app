@@ -69,7 +69,7 @@ export const AddFilePanel: React.FC<AddFilePanelProps> = ({ filename, open, onCl
             </CardDescription>
           </CardHeader>
 
-          <CardContent className="flex-1 min-w-0 space-y-6 overflow-auto px-6 py-6">
+          <CardContent className="flex-1 min-w-0 space-y-4 overflow-auto px-6 py-6">
             {fileType === 'excel' && sheetNames && sheetNames.length > 0 && (
               <div>
                 <label className="mb-2 block text-sm font-medium text-foreground">Sheet</label>

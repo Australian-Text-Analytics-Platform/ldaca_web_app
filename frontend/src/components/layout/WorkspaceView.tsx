@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { WorkspaceGraphView } from './WorkspaceGraphView';
 import { WorkspaceDataView } from './WorkspaceDataView';
 import { WorkspaceControls } from './WorkspaceControls';
+import { InsetCard } from './InsetCard';
 
 /**
  * Stacked workspace view: graph on top, data table on bottom, with a
@@ -14,10 +15,12 @@ const WorkspaceView: React.FC = () => {
   const topRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const [split, setSplit] = useState<number>(50); // percentage for top panel
+  const [isDragging, setIsDragging] = useState(false);
 
   const onStartDrag = (e: React.MouseEvent) => {
     e.preventDefault();
     if (!containerRef.current) return;
+    setIsDragging(true);
     const startY = e.clientY;
     const startPct = split;
     const containerHeight = containerRef.current.getBoundingClientRect().height;
@@ -36,6 +39,7 @@ const WorkspaceView: React.FC = () => {
     const onUp = () => {
       if (rafId !== null) cancelAnimationFrame(rafId);
       setSplit(livePct);
+      setIsDragging(false);
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
     };
@@ -44,33 +48,43 @@ const WorkspaceView: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-white" ref={containerRef}>
-      <div ref={topRef} className="border-b border-border flex flex-col min-h-[120px]" style={{ height: `${split}%` }}>
-        <div className="p-2 bg-muted border-b border-border flex-shrink-0">
+    <div className="flex flex-col h-full bg-transparent" ref={containerRef}>
+      <InsetCard
+        ref={topRef}
+        className="min-h-30"
+        style={{ height: `calc(${split}% - 0.375rem)` }}
+      >
+        <div className="p-2 bg-muted border-b border-border shrink-0">
           <WorkspaceControls />
         </div>
         <div className="flex-1 min-h-0">
           <WorkspaceGraphView />
         </div>
-      </div>
+      </InsetCard>
 
       <div
-        className="h-2 bg-gray-100 hover:bg-gray-200 cursor-row-resize relative group"
+        className="h-3 shrink-0 cursor-row-resize relative group flex items-center justify-center"
         onMouseDown={onStartDrag}
         role="separator"
         aria-orientation="horizontal"
         aria-label="Resize graph and data panels"
       >
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="h-0.5 w-16 bg-gray-300 rounded group-hover:bg-gray-400" />
-        </div>
+        <div
+          className={`pointer-events-none h-1 w-10 rounded-full transition-colors ${
+            isDragging ? 'bg-gray-500' : 'bg-gray-300 group-hover:bg-gray-500'
+          }`}
+        />
       </div>
 
-      <div ref={bottomRef} className="flex flex-col min-h-[120px]" style={{ height: `${100 - split}%` }}>
+      <InsetCard
+        ref={bottomRef}
+        className="min-h-30"
+        style={{ height: `calc(${100 - split}% - 0.375rem)` }}
+      >
         <div className="flex-1 min-h-0">
           <WorkspaceDataView />
         </div>
-      </div>
+      </InsetCard>
     </div>
   );
 };

@@ -144,7 +144,7 @@ const ExportFeature: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <Card>
         <CardHeader className="space-y-1">
           <CardTitle className="flex items-center gap-2">
@@ -156,7 +156,7 @@ const ExportFeature: React.FC = () => {
             />
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-4">
           <div className="border-border/50 bg-muted/40 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed px-4 py-3">
             <div className="text-muted-foreground text-sm">
               Workspace ID:{' '}

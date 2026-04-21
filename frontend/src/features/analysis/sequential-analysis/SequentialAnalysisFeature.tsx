@@ -445,7 +445,7 @@ const SequentialAnalysisFeature = () => {
     : 'Aggregated frequency over time';
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <Card>
         <CardHeader className="space-y-0 pb-4">
           <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
@@ -461,7 +461,7 @@ const SequentialAnalysisFeature = () => {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-6 pt-0">
+        <CardContent className="space-y-4 pt-0">
           <NodeSelectionPanel
             selectedNodes={panelSelectedNodes}
             nodeColumnSelections={nodeColumnSelections}
@@ -687,7 +687,7 @@ const SequentialAnalysisFeature = () => {
               </Select>
             </div>
           </CardHeader>
-          <CardContent className="space-y-6">
+          <CardContent className="space-y-4">
             <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
               <div className="rounded-md border border-border/60 p-3">
                 <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">

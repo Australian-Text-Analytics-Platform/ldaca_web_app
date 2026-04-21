@@ -430,7 +430,7 @@ const TokenFrequencyFeature = () => {
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <TokenFrequencyParameterPanel
         panelSelectedNodes={panelSelectedNodes}
         effectiveNodeColumnSelections={effectiveNodeColumnSelections}

@@ -356,7 +356,7 @@ const TopicModelingFeature: React.FC = () => {
   const shouldShowResultsPanel = Boolean(topicWaitingBanner || result || error);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <TopicModelingParameterPanel
         selectedNodes={panelSelectedNodes}
         nodeColumnSelections={effectiveNodeColumnSelections}

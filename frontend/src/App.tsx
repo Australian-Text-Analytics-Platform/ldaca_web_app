@@ -7,6 +7,7 @@ import { WorkspaceProvider } from './providers/WorkspaceProvider';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import GoogleLogin from './components/GoogleLogin';
 import Sidebar from './components/layout/Sidebar';
+import { InsetCard } from './components/layout/InsetCard';
 import BlockingScreen from './components/startup/BlockingScreen';
 import logo from './logo.png';
 import { useUIStore } from './stores';
@@ -79,10 +80,38 @@ const WorkspaceShell: React.FC = () => {
   const [lastRightWidth, setLastRightWidth] = useState<number>(40); // remember last width when collapsing
   const [isRightCollapsed, setIsRightCollapsed] = useState<boolean>(false);
   const [isResizing, setIsResizing] = useState(false);
+  const [isResizingSidebar, setIsResizingSidebar] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState<number>(208); // px, matches default SIDEBAR_WIDTH (16rem at 13px base)
   const layoutRef = useRef<HTMLDivElement>(null);
-  const mainRef = useRef<HTMLElement>(null);
+  const mainRef = useRef<HTMLDivElement>(null);
   const asideRef = useRef<HTMLElement>(null);
   const rightWidthLiveRef = useRef<number>(rightWidth);
+
+  const onStartSidebarResize = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizingSidebar(true);
+    const startX = e.clientX;
+    const startWidth = sidebarWidth;
+    let rafId: number | null = null;
+    let liveWidth = startWidth;
+    const onMove = (ev: MouseEvent) => {
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        liveWidth = Math.min(400, Math.max(160, startWidth + (ev.clientX - startX)));
+        document.documentElement.style.setProperty('--sidebar-width', `${liveWidth}px`);
+      });
+    };
+    const onUp = () => {
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      setSidebarWidth(liveWidth);
+      setIsResizingSidebar(false);
+      document.documentElement.style.removeProperty('--sidebar-width');
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }, [sidebarWidth]);
 
   useEffect(() => {
     if (phase.status !== 'bootstrapping') return;
@@ -200,7 +229,10 @@ const WorkspaceShell: React.FC = () => {
     <QueryProvider>
       <WorkspaceProvider>
         <ErrorBoundary>
-          <SidebarProvider className="bg-linear-to-br from-slate-50 to-blue-50">
+          <SidebarProvider
+            className="bg-linear-to-br from-slate-50 to-blue-50"
+            style={{ ['--sidebar-width' as string]: `${sidebarWidth}px` } as React.CSSProperties}
+          >
             {/* Tutorial Modal */}
             <Dialog open={tutorialModal} onOpenChange={(open) => !open && closeTutorialModal()}>
               <DialogContent className="max-w-5xl h-[85vh] flex flex-col p-0 gap-0 overflow-hidden">
@@ -245,7 +277,21 @@ const WorkspaceShell: React.FC = () => {
                 <Sidebar />
               </ErrorBoundary>
 
-              <SidebarInset className="flex h-screen flex-1 flex-col overflow-hidden bg-transparent">
+              <div
+                className={`hidden md:flex shrink-0 cursor-col-resize group relative w-3 items-center justify-center ${isResizingSidebar ? 'z-20' : ''}`}
+                onMouseDown={onStartSidebarResize}
+                role="separator"
+                aria-orientation="vertical"
+                aria-label="Resize sidebar"
+              >
+                <div
+                  className={`pointer-events-none w-1 h-10 rounded-full transition-colors ${
+                    isResizingSidebar ? 'bg-gray-500' : 'bg-gray-300 group-hover:bg-gray-500'
+                  }`}
+                />
+              </div>
+
+              <SidebarInset className="flex h-full flex-1 flex-col overflow-hidden bg-transparent md:m-0! md:ml-0! md:rounded-none! md:shadow-none!">
                 <Suspense fallback={null}>
                   <FeedbackPanel open={feedbackOpen} onClose={closeFeedbackModal} />
                 </Suspense>
@@ -258,10 +304,12 @@ const WorkspaceShell: React.FC = () => {
 
                 <div className="flex flex-1 flex-col overflow-hidden">
                   <div className="relative flex flex-1 overflow-hidden" ref={layoutRef}>
-                    <main
+                    <InsetCard
                       ref={mainRef}
-                      className={`relative h-full flex-1 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden p-6 ${isResizing ? 'transition-none' : 'transition-all duration-300 ease-in-out'}`}
+                      role="main"
+                      className={`relative h-full ${isResizing ? 'transition-none' : 'transition-all duration-300 ease-in-out'}`}
                       style={{ width: isRightCollapsed ? '100%' : `${100 - rightWidth}%`, minWidth: 280 }}
+                      innerClassName="overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden p-4"
                     >
                       <div className="w-full max-w-none mx-0">
                         <ErrorBoundary>
@@ -285,21 +333,27 @@ const WorkspaceShell: React.FC = () => {
                           </Suspense>
                         </ErrorBoundary>
                       </div>
-                    </main>
+                    </InsetCard>
 
                     {!isRightCollapsed && (
                       <div
-                        className={`w-1 ${isResizing ? 'bg-gray-300' : 'bg-gray-200 hover:bg-gray-300'} cursor-col-resize`}
+                        className="w-3 shrink-0 cursor-col-resize group relative flex items-center justify-center"
                         onMouseDown={onStartResize}
                         role="separator"
                         aria-orientation="vertical"
                         aria-label="Resize right panel"
-                      />
+                      >
+                        <div
+                          className={`pointer-events-none w-1 h-10 rounded-full transition-colors ${
+                            isResizing ? 'bg-gray-500' : 'bg-gray-300 group-hover:bg-gray-500'
+                          }`}
+                        />
+                      </div>
                     )}
 
                     <aside
                       ref={asideRef}
-                      className={`relative flex h-full flex-col overflow-hidden bg-white border-l border-gray-200 ${isResizing ? 'transition-none' : 'transition-all duration-300 ease-in-out'} ${
+                      className={`relative flex h-full flex-col overflow-hidden bg-transparent ${isResizing ? 'transition-none' : 'transition-all duration-300 ease-in-out'} ${
                         isRightCollapsed ? 'min-w-0' : 'min-w-[320px]'
                       }`}
                       style={{ width: isRightCollapsed ? 0 : `${rightWidth}%` }}
@@ -431,8 +485,8 @@ type LoginScreenProps = {
 
 const LoginScreen: React.FC<LoginScreenProps> = ({ isLoading, error }) => {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-blue-50 flex items-center justify-center px-4 py-10">
-      <div className="w-full max-w-xl text-center space-y-6 bg-white/80 backdrop-blur rounded-2xl shadow-2xl border border-white/60 px-10 py-12">
+    <div className="min-h-screen bg-linear-to-br from-slate-50 via-slate-100 to-blue-50 flex items-center justify-center px-4 py-10">
+      <div className="w-full max-w-xl text-center space-y-4 bg-white/80 backdrop-blur rounded-2xl shadow-2xl border border-white/60 px-10 py-12">
         <div className="flex justify-center">
           <img
             src={logo}
@@ -441,7 +495,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ isLoading, error }) => {
           />
         </div>
         <div className="space-y-2">
-          <h1 className="text-3xl font-semibold text-gray-900">Sign in to continue</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">Sign in to continue</h1>
           <p className="text-base text-gray-600">
             LDaCA Text Analytics requires you to sign in with a Google account.
           </p>

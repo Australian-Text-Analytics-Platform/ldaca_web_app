@@ -30,8 +30,8 @@ export const TokenFrequencySingleTokenSection = ({
   registerWordCloudRef,
 }: TokenFrequencySingleTokenSectionProps) => {
   const singleNodeLayoutClassName = nodeDisplayResults.length <= 1
-    ? 'grid grid-cols-1 gap-6'
-    : 'grid grid-cols-1 gap-6 xl:grid-cols-2';
+    ? 'grid grid-cols-1 gap-4'
+    : 'grid grid-cols-1 gap-4 xl:grid-cols-2';
 
   return (
     <div className={singleNodeLayoutClassName} data-testid="token-frequency-single-layout">

@@ -861,7 +861,7 @@ const AiAnnotatorFeature: React.FC = () => {
 
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {aiAnnotationWaitingBanner ? (
         <AnalysisTaskBanner
           analysisName="AI Annotation"
@@ -927,7 +927,7 @@ const AiAnnotatorFeature: React.FC = () => {
           </TabsList>
 
           <TabsContent value="ai-annotation" className="mt-0">
-            <div className="space-y-6">
+            <div className="space-y-4">
               <section className="space-y-4">
                 <div>
                   <h3 className="text-sm font-semibold text-foreground">Commonly Used Parameters</h3>

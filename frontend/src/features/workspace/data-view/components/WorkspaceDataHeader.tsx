@@ -72,7 +72,7 @@ export const WorkspaceDataHeader = ({
   };
 
   return (
-    <div className="shrink-0 border-b border-border bg-muted p-2">
+    <div className="shrink-0 border-b border-border p-2">
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
           <h3 className="text-sm font-medium text-gray-700">Data View</h3>
