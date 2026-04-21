@@ -1,4 +1,4 @@
-import React, { memo, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useWorkspaceData } from '../../hooks/useWorkspaceData';
 import { useWorkspaceActions } from '../../hooks/useWorkspaceActions';
 import {
@@ -17,7 +17,7 @@ import HelpIcon from '@/components/help/HelpIcon';
  * Separated controls component focused only on workspace controls
  * Removed view mode toggle since both views are now shown vertically
  */
-export const WorkspaceControls: React.FC = memo(() => {
+export const WorkspaceControls: React.FC = () => {
   const { currentWorkspace } = useWorkspaceData();
   const { saveWorkspace, renameWorkspace } = useWorkspaceActions();
 
@@ -116,6 +116,4 @@ export const WorkspaceControls: React.FC = memo(() => {
       </AlertDialog>
     </div>
   );
-});
-
-WorkspaceControls.displayName = 'WorkspaceControls';
+};

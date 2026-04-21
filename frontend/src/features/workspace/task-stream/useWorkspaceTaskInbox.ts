@@ -186,20 +186,13 @@ export const useWorkspaceTaskInbox = (
       switch (payload.type) {
         case 'workspace_updated': {
           if (workspaceId) {
-            
-            // Invalidate graph
+            // invalidateQueries with the default refetchType:'active' already
+            // refetches any observed query, so we do not also call refetchQueries.
             queryClient.invalidateQueries({
               queryKey: queryKeys.workspaceGraph(workspaceId),
             });
-            
-            // Invalidate node lists
             queryClient.invalidateQueries({
               queryKey: queryKeys.workspaceNodes(workspaceId),
-            });
-
-            // Force refetch nodes data if needed
-            queryClient.refetchQueries({
-              queryKey: queryKeys.workspaceGraph(workspaceId),
             });
           }
           break;
@@ -243,9 +236,6 @@ export const useWorkspaceTaskInbox = (
 
             if (workspaceId && shouldRefreshGraphFallback(payload.task as TaskItem)) {
               queryClient.invalidateQueries({
-                queryKey: queryKeys.workspaceGraph(workspaceId),
-              });
-              queryClient.refetchQueries({
                 queryKey: queryKeys.workspaceGraph(workspaceId),
               });
             }

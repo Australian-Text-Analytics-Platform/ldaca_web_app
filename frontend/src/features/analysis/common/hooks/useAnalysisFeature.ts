@@ -371,8 +371,6 @@ export function useAnalysisFeature<TResult = unknown>(
       ? (result: TResult | null | undefined) =>
           configRef.current.onHydratedResult?.(result ?? null)
       : undefined,
-    autoHydrateOnFocus: false,
-    autoHydrateOnVisibility: false,
   });
 
   // Gate: hydrate exactly once per workspace per tab activation

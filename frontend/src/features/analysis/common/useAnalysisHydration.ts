@@ -25,8 +25,6 @@ export interface UseAnalysisHydrationConfig<TRequest, TResult, TPreferences> {
   applyRequest?: (request: Nullable<TRequest>) => MaybePromise<void>;
   applyResult?: (result: Nullable<TResult>) => MaybePromise<void>;
   persistPreferences?: (partial: TPreferences) => MaybePromise<void>;
-  autoHydrateOnFocus?: boolean;
-  autoHydrateOnVisibility?: boolean;
   onHydrationError?: (error: unknown) => void;
 }
 
@@ -35,8 +33,6 @@ export interface UseAnalysisHydrationReturn<TPreferences> {
   hydrationState: HydrationState;
   persistPreferences: (partial: TPreferences) => Promise<void>;
 }
-
-const isBrowser = typeof window !== 'undefined';
 
 const normalizePreferencePayload = <TPreferences extends Record<string, unknown>>(
   partial: TPreferences
@@ -73,8 +69,6 @@ export function useAnalysisHydration<TRequest = unknown, TResult = unknown, TPre
     applyRequest,
     applyResult,
     persistPreferences,
-    autoHydrateOnFocus = true,
-    autoHydrateOnVisibility = true,
     onHydrationError,
   } = config;
 
@@ -150,38 +144,6 @@ export function useAnalysisHydration<TRequest = unknown, TResult = unknown, TPre
     inflightRef.current = inflight;
     await inflight;
   }, [workspaceId, resolveTaskId, analysisKey, getAuthHeaders, onTaskIdResolved, fetchRequest, fetchResult, applyRequest, applyResult, onHydrationError]);
-
-  useEffect(() => {
-    if (!isBrowser || !workspaceId) return;
-
-    const handleFocus = () => {
-      if (!autoHydrateOnFocus) return;
-      void hydrateFromServer();
-    };
-
-    const handleVisibility = () => {
-      if (!autoHydrateOnVisibility) return;
-      if (document.visibilityState === 'visible') {
-        void hydrateFromServer();
-      }
-    };
-
-    if (autoHydrateOnFocus) {
-      window.addEventListener('focus', handleFocus);
-    }
-    if (autoHydrateOnVisibility) {
-      document.addEventListener('visibilitychange', handleVisibility);
-    }
-
-    return () => {
-      if (autoHydrateOnFocus) {
-        window.removeEventListener('focus', handleFocus);
-      }
-      if (autoHydrateOnVisibility) {
-        document.removeEventListener('visibilitychange', handleVisibility);
-      }
-    };
-  }, [workspaceId, autoHydrateOnFocus, autoHydrateOnVisibility, hydrateFromServer]);
 
   const persistPreferencesSafe = async (partial: TPreferences) => {
       if (!persistPreferences || !workspaceId || !partial) return;
