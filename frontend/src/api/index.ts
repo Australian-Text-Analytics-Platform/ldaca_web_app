@@ -6,4 +6,6 @@ export { workspacesApi } from './workspaces';
 export { nodesApi } from './nodes';
 export { textApi } from './text';
 export { configApi } from './config';
+export { preferencesApi } from './preferences';
+export type { UserPreferences, UserPreferencesUpdate, QuotationPreferences } from './preferences';
 

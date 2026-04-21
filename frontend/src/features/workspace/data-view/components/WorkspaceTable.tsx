@@ -157,27 +157,12 @@ export function WorkspaceTable({
   const [columnToDelete, setColumnToDelete] = useState<string | null>(null);
   const { detailPayload, detailOpen, setDetailOpen, openDetail: openRowDetail } = useRowDetailDialog();
 
-  const debugEnabled = (() => {
-    if (typeof window === 'undefined') {
-      return false;
-    }
-    try {
-      return window.localStorage.getItem('debugDataTable') === '1';
-    } catch (error) {
-      console.debug('WorkspaceTable: unable to read debug flag', error);
-      return false;
-    }
-  })();
-
   // Identity stability: used in useEffect dependency array
   const applySchema = useCallback((schema: unknown) => {
-      const mapping = extractColumnTypes(schema as NodeSchemaResponse | null);
-      if (debugEnabled) {
-        console.debug('WorkspaceTable: loaded column types', mapping);
-      }
-      setColumnTypes(mapping);
-      return mapping;
-    }, [debugEnabled]);
+    const mapping = extractColumnTypes(schema as NodeSchemaResponse | null);
+    setColumnTypes(mapping);
+    return mapping;
+  }, []);
 
   useEffect(() => {
     if (!workspaceId || !nodeId || !onRefreshSchema) {
@@ -202,14 +187,7 @@ export function WorkspaceTable({
     };
   }, [workspaceId, nodeId, onRefreshSchema, applySchema]);
 
-  useEffect(() => {
-    if (!debugEnabled) {
-      return;
-    }
-    console.debug('WorkspaceTable: data received', { rowCount: data.length, loading });
-  }, [data, loading, debugEnabled]);
-
-  const sanitizedData = (Array.isArray(data) ? data : []);
+  const sanitizedData = Array.isArray(data) ? data : [];
 
   const columns = (() => {
     const firstRow = sanitizedData.find((row) => row && typeof row === 'object');
@@ -649,7 +627,7 @@ export function WorkspaceTable({
     data: sanitizedData,
     columns: columnDefs,
     getCoreRowModel: getCoreRowModel(),
-    debugTable: debugEnabled,
+    debugTable: false,
     state: {
       columnPinning,
     },

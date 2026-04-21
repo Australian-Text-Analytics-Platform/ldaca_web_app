@@ -74,7 +74,7 @@ function DefaultErrorFallback({
       </button>
     </div>
     
-    {process.env.NODE_ENV === 'development' && error?.stack && (
+    {import.meta.env.DEV && error?.stack && (
       <details className="mt-6 w-full max-w-2xl">
         <summary className="cursor-pointer text-sm text-gray-600 hover:text-gray-800">
           Show Error Details

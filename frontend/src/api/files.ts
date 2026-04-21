@@ -43,24 +43,6 @@ export interface FilePreviewResponse {
   selected_sheet: string | null;
 }
 
-export interface FilesTaskItem {
-  task_id: string;
-  state: string;
-  task_type?: string;
-  name?: string;
-  user_id?: string;
-  workspace_id?: string;
-  progress?: number;
-  progress_message?: string;
-  message?: string;
-}
-
-export interface FilesTaskListResponse {
-  state: string;
-  data: FilesTaskItem[];
-  message: string;
-}
-
 export interface LdacaImportStartResponse {
   state: 'running';
   message: string;
@@ -70,25 +52,54 @@ export interface LdacaImportStartResponse {
 }
 
 export const filesApi = {
-  list: (headers: Record<string,string> = {}) => get<FileTreeNode[]>('/files/', headers),
-  raw: (path: string, headers: Record<string,string> = {}) => get<string>('/files/raw', headers, { path }),
+  list: (headers: Record<string, string> = {}) =>
+    get<FileTreeNode[]>('/files/', headers),
+
+  raw: (path: string, headers: Record<string, string> = {}) =>
+    get<string>('/files/raw', headers, { path }),
+
   createFolder: (parentPath: string, name: string, headers: Record<string, string> = {}) =>
     post<CreateFolderResponse>('/files/folders', { parent_path: parentPath, name }, headers),
+
   moveFile: (sourcePath: string, targetDirectoryPath: string, headers: Record<string, string> = {}) =>
-    post<MoveFileResponse>('/files/move', { source_path: sourcePath, target_directory_path: targetDirectoryPath }, headers),
-  upload: (file: File, headers: Record<string,string> = {}) => {
+    post<MoveFileResponse>(
+      '/files/move',
+      { source_path: sourcePath, target_directory_path: targetDirectoryPath },
+      headers,
+    ),
+
+  upload: (file: File, headers: Record<string, string> = {}) => {
     const formData = new FormData();
     formData.append('file', file);
-    return httpRequest<Record<string, unknown>>('/files/upload', { method: 'POST', formData, headers });
+    return httpRequest<Record<string, unknown>>('/files/upload', {
+      method: 'POST',
+      formData,
+      headers,
+    });
   },
-  download: (fileName: string, headers: Record<string,string> = {}) => httpRequest<Blob>(`/files/${encodeURIComponent(fileName)}`, { method: 'GET', headers, expectBlob: true }),
-  preview: (body: UnifiedFilePreviewRequest, headers: Record<string,string> = {}) => post<FilePreviewResponse>('/files/preview', body, headers),
-  info: (fileName: string, headers: Record<string,string> = {}) => get<Record<string, unknown>>(`/files/${encodeURIComponent(fileName)}/info`, headers),
-  delete: (fileName: string, headers: Record<string,string> = {}) => del<Record<string, unknown>>(`/files/${encodeURIComponent(fileName)}`, headers),
-  importSampleData: (headers: Record<string,string> = {}) => post<Record<string, unknown>>('/files/import-sample-data', {}, headers),
-  importLdaca: (url: string, headers: Record<string,string> = {}) =>
+
+  download: (fileName: string, headers: Record<string, string> = {}) =>
+    httpRequest<Blob>(`/files/${encodeURIComponent(fileName)}`, {
+      method: 'GET',
+      headers,
+      expectBlob: true,
+    }),
+
+  preview: (body: UnifiedFilePreviewRequest, headers: Record<string, string> = {}) =>
+    post<FilePreviewResponse>('/files/preview', body, headers),
+
+  delete: (fileName: string, headers: Record<string, string> = {}) =>
+    del<Record<string, unknown>>(`/files/${encodeURIComponent(fileName)}`, headers),
+
+  importSampleData: (headers: Record<string, string> = {}) =>
+    post<Record<string, unknown>>('/files/import-sample-data', {}, headers),
+
+  importLdaca: (url: string, headers: Record<string, string> = {}) =>
     post<LdacaImportStartResponse>('/files/import-ldaca', { url }, headers),
-  listTasks: (headers: Record<string,string> = {}) => get<FilesTaskListResponse>('/files/tasks', headers),
-  clearTasks: (payload: { task_type?: string; task_id?: string } = {}, headers: Record<string,string> = {}) =>
-    post<Record<string, unknown>>('/files/tasks/clear', payload, headers),
+
+  /** Clear a single background task tracked under /files/tasks. */
+  clearTasks: (
+    payload: { task_type?: string; task_id?: string } = {},
+    headers: Record<string, string> = {},
+  ) => post<Record<string, unknown>>('/files/tasks/clear', payload, headers),
 };

@@ -1,3 +1,15 @@
+/**
+ * Process-wide cache for node metadata (`GET /workspaces/:ws/nodes/:node`).
+ *
+ * Backend node info can be expensive (column schema, statistics). Multiple
+ * hooks ask for the same `(workspaceId, nodeId)` on a single render pass, so
+ * we deduplicate:
+ *   - `cache`    — resolved infos, returned synchronously on hit.
+ *   - `inflight` — in-progress fetches, so concurrent callers share one request.
+ *
+ * Consumers call `invalidateNodeInfo` (optionally node-scoped) after any
+ * mutation that changes a node's shape/schema.
+ */
 import { nodesApi } from '../api/nodes';
 
 export interface NodeInfo {
@@ -14,6 +26,7 @@ export interface NodeInfo {
 interface BaseOptions {
   workspaceId: string;
   nodeId: string;
+  /** Bypass the cached value and refetch. Inflight requests are still shared. */
   force?: boolean;
 }
 
@@ -34,26 +47,8 @@ const inflight = new Map<string, Promise<NodeInfo>>();
 
 const cacheKeyFor = (workspaceId: string, nodeId: string) => `${workspaceId}::${nodeId}`;
 
-const resolveHeaders = (options: NodeInfoRequestOptions): Record<string, string> => {
-  if ('headers' in options && options.headers) {
-    return options.headers;
-  }
-  if ('getAuthHeaders' in options && options.getAuthHeaders) {
-    return options.getAuthHeaders();
-  }
-  throw new Error('Either headers or getAuthHeaders must be provided to fetch node info.');
-};
-
-const finalize = (key: string, info: NodeInfo) => {
-  cache.set(key, info);
-  inflight.delete(key);
-  return info;
-};
-
-const handleFailure = (key: string, error: unknown) => {
-  inflight.delete(key);
-  throw error;
-};
+const resolveHeaders = (options: NodeInfoRequestOptions): Record<string, string> =>
+  'headers' in options && options.headers ? options.headers : options.getAuthHeaders();
 
 export async function getNodeInfo(options: NodeInfoRequestOptions): Promise<NodeInfo> {
   const { workspaceId, nodeId, force = false } = options;
@@ -61,31 +56,35 @@ export async function getNodeInfo(options: NodeInfoRequestOptions): Promise<Node
 
   if (!force) {
     const cached = cache.get(key);
-    if (cached) {
-      return cached;
-    }
-    const pending = inflight.get(key);
-    if (pending) {
-      return pending;
-    }
+    if (cached) return cached;
   } else {
     cache.delete(key);
-    const pending = inflight.get(key);
-    if (pending) {
-      return pending;
-    }
   }
 
-  const headers = resolveHeaders(options);
+  // Share an in-flight request even across force=true callers to avoid stampedes.
+  const pending = inflight.get(key);
+  if (pending) return pending;
+
   const request = nodesApi
-    .info(nodeId, headers)
-    .then((info) => finalize(key, info as unknown as NodeInfo))
-    .catch((error) => handleFailure(key, error));
+    .info(nodeId, resolveHeaders(options))
+    .then((info) => {
+      const typed = info as unknown as NodeInfo;
+      cache.set(key, typed);
+      return typed;
+    })
+    .finally(() => {
+      inflight.delete(key);
+    });
 
   inflight.set(key, request);
   return request;
 }
 
+/**
+ * Drop cached entries for a workspace (all nodes) or a specific node. Any
+ * concurrent inflight request is also cancelled from the cache's perspective,
+ * so the next call re-fetches.
+ */
 export function invalidateNodeInfo(workspaceId: string, nodeId?: string): void {
   if (nodeId) {
     const key = cacheKeyFor(workspaceId, nodeId);
@@ -95,14 +94,10 @@ export function invalidateNodeInfo(workspaceId: string, nodeId?: string): void {
   }
   const prefix = `${workspaceId}::`;
   for (const key of cache.keys()) {
-    if (key.startsWith(prefix)) {
-      cache.delete(key);
-    }
+    if (key.startsWith(prefix)) cache.delete(key);
   }
   for (const key of inflight.keys()) {
-    if (key.startsWith(prefix)) {
-      inflight.delete(key);
-    }
+    if (key.startsWith(prefix)) inflight.delete(key);
   }
 }
 

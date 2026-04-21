@@ -5,7 +5,6 @@ import type { UserPreferences, UserPreferencesUpdate } from '@/api/preferences';
 import { preferencesApi } from '@/api/preferences';
 import type { QuotationEngineConfig } from '@/api/text';
 import type { ViewType } from '@/stores/uiStore';
-import { ALL_VIEWS } from '@/stores/uiStore';
 
 const DEFAULT_HIDDEN_VIEWS: string[] = ['ai-annotator'];
 
@@ -30,8 +29,6 @@ interface PreferencesActions {
   loadFromBackend: (headers?: Record<string, string>) => Promise<void>;
   /** Push current state to backend */
   syncToBackend: (headers?: Record<string, string>) => Promise<void>;
-  /** Compute visible views from ALL_VIEWS minus hiddenViews */
-  getVisibleViews: () => ViewType[];
 }
 
 type PreferencesStore = PreferencesState & PreferencesActions;
@@ -137,10 +134,6 @@ export const usePreferencesStore = create<PreferencesStore>()(
           }
         },
 
-        getVisibleViews: () => {
-          const { hiddenViews } = get();
-          return ALL_VIEWS.filter((v) => !hiddenViews.includes(v));
-        },
       })),
       {
         name: 'ldaca-preferences',

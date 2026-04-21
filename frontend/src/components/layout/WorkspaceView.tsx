@@ -4,46 +4,37 @@ import { WorkspaceDataView } from './WorkspaceDataView';
 import { WorkspaceControls } from './WorkspaceControls';
 
 /**
- * Improved WorkspaceView with vertical layout showing both graph and data views
- * This replaces the tab-based layout with stacked views
+ * Stacked workspace view: graph on top, data table on bottom, with a
+ * drag-to-resize separator. Split ratio is committed to state only on
+ * mouseup — during the drag we mutate DOM heights directly via refs and
+ * rAF to avoid React re-renders.
  */
 const WorkspaceView: React.FC = () => {
-  // Collapsing is managed by App.tsx (entire right panel). This view is always expanded.
-  // Resizable split between Graph (top) and Data (bottom)
   const containerRef = useRef<HTMLDivElement>(null);
   const topRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const [split, setSplit] = useState<number>(50); // percentage for top panel height
-  const isDraggingRef = useRef(false);
+  const [split, setSplit] = useState<number>(50); // percentage for top panel
+
   const onStartDrag = (e: React.MouseEvent) => {
     e.preventDefault();
-    isDraggingRef.current = true;
-    // Add listeners on window to capture outside the bar
+    if (!containerRef.current) return;
+    const startY = e.clientY;
+    const startPct = split;
+    const containerHeight = containerRef.current.getBoundingClientRect().height;
     let rafId: number | null = null;
-  let livePct = split;
-  const startY = e.clientY;
-  const startPct = split;
+    let livePct = startPct;
+
     const onMove = (ev: MouseEvent) => {
-      if (!isDraggingRef.current || !containerRef.current) return;
       if (rafId !== null) cancelAnimationFrame(rafId);
       rafId = requestAnimationFrame(() => {
-        if (!containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    // Compute delta from initial Y to avoid jump on first move
-    const dy = ev.clientY - startY;
-    const deltaPct = (dy / rect.height) * 100; // moving down increases top height
-    const pct = Math.min(80, Math.max(20, startPct + deltaPct));
-        livePct = pct;
-        // Apply heights directly to DOM to avoid rerenders during drag
-        if (topRef.current) topRef.current.style.height = `${pct}%`;
-        if (bottomRef.current) bottomRef.current.style.height = `${100 - pct}%`;
+        const deltaPct = ((ev.clientY - startY) / containerHeight) * 100;
+        livePct = Math.min(80, Math.max(20, startPct + deltaPct));
+        if (topRef.current) topRef.current.style.height = `${livePct}%`;
+        if (bottomRef.current) bottomRef.current.style.height = `${100 - livePct}%`;
       });
     };
     const onUp = () => {
-      isDraggingRef.current = false;
-      // flush any pending frame
       if (rafId !== null) cancelAnimationFrame(rafId);
-      // Commit final split once after drag ends
       setSplit(livePct);
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
@@ -52,42 +43,34 @@ const WorkspaceView: React.FC = () => {
     window.addEventListener('mouseup', onUp);
   };
 
-  const topStyle = { height: `${split}%` };
-  const bottomStyle = { height: `${100 - split}%` };
-
   return (
     <div className="flex flex-col h-full bg-white" ref={containerRef}>
-      <>
-          {/* Graph View - Top resizable section */}
-          <div ref={topRef} className="border-b border-border flex flex-col min-h-[120px]" style={topStyle}>
-            <div className="p-2 bg-muted border-b border-border flex-shrink-0">
-              <WorkspaceControls />
-            </div>
-            <div className="flex-1 min-h-0">
-              <WorkspaceGraphView />
-            </div>
-          </div>
+      <div ref={topRef} className="border-b border-border flex flex-col min-h-[120px]" style={{ height: `${split}%` }}>
+        <div className="p-2 bg-muted border-b border-border flex-shrink-0">
+          <WorkspaceControls />
+        </div>
+        <div className="flex-1 min-h-0">
+          <WorkspaceGraphView />
+        </div>
+      </div>
 
-          {/* Drag handle */}
-          <div
-            className="h-2 bg-gray-100 hover:bg-gray-200 cursor-row-resize relative group"
-            onMouseDown={onStartDrag}
-            role="separator"
-            aria-orientation="horizontal"
-            aria-label="Resize graph and data panels"
-          >
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="h-0.5 w-16 bg-gray-300 rounded group-hover:bg-gray-400" />
-            </div>
-          </div>
+      <div
+        className="h-2 bg-gray-100 hover:bg-gray-200 cursor-row-resize relative group"
+        onMouseDown={onStartDrag}
+        role="separator"
+        aria-orientation="horizontal"
+        aria-label="Resize graph and data panels"
+      >
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="h-0.5 w-16 bg-gray-300 rounded group-hover:bg-gray-400" />
+        </div>
+      </div>
 
-          {/* Data View - Bottom resizable section */}
-          <div ref={bottomRef} className="flex flex-col min-h-[120px]" style={bottomStyle}>
-            <div className="flex-1 min-h-0">
-              <WorkspaceDataView />
-            </div>
-          </div>
-      </>
+      <div ref={bottomRef} className="flex flex-col min-h-[120px]" style={{ height: `${100 - split}%` }}>
+        <div className="flex-1 min-h-0">
+          <WorkspaceDataView />
+        </div>
+      </div>
     </div>
   );
 };

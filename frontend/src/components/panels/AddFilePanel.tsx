@@ -25,16 +25,12 @@ export const AddFilePanel: React.FC<AddFilePanelProps> = ({ filename, open, onCl
   } = useFilePreview(filename, open);
 
   const [submitting, setSubmitting] = useState(false);
-  const columnNames = columns as ReadonlyArray<string>;
-  const rows = previewData as ReadonlyArray<Record<string, unknown>>;
-  const availableSheets = sheetNames as ReadonlyArray<string> | null | undefined;
 
   useEffect(() => {
     if (!open) {
       setSubmitting(false);
     }
   }, [open]);
-
 
   const handleClose = () => {
     onClose();
@@ -74,7 +70,7 @@ export const AddFilePanel: React.FC<AddFilePanelProps> = ({ filename, open, onCl
           </CardHeader>
 
           <CardContent className="flex-1 min-w-0 space-y-6 overflow-auto px-6 py-6">
-            {fileType === 'excel' && availableSheets && availableSheets.length > 0 && (
+            {fileType === 'excel' && sheetNames && sheetNames.length > 0 && (
               <div>
                 <label className="mb-2 block text-sm font-medium text-foreground">Sheet</label>
                 <Select
@@ -88,7 +84,7 @@ export const AddFilePanel: React.FC<AddFilePanelProps> = ({ filename, open, onCl
                     <SelectValue placeholder="Select a sheet" />
                   </SelectTrigger>
                   <SelectContent>
-                    {availableSheets.map((name) => (
+                    {sheetNames.map((name) => (
                       <SelectItem key={name} value={name}>
                         {name}
                       </SelectItem>
@@ -105,13 +101,13 @@ export const AddFilePanel: React.FC<AddFilePanelProps> = ({ filename, open, onCl
                   <div className="p-4 text-sm text-muted-foreground">Loading…</div>
                 ) : error ? (
                   <div className="p-4 text-sm text-destructive">{error}</div>
-                ) : rows.length === 0 ? (
+                ) : previewData.length === 0 ? (
                   <div className="p-4 text-sm text-muted-foreground">No preview</div>
                 ) : (
                   <table className="min-w-max text-xs">
                     <thead>
                       <tr className="bg-muted">
-                        {columnNames.map((column) => (
+                        {columns.map((column) => (
                           <th key={column} className="px-2 py-1 text-left font-medium">
                             {column}
                           </th>
@@ -119,9 +115,9 @@ export const AddFilePanel: React.FC<AddFilePanelProps> = ({ filename, open, onCl
                       </tr>
                     </thead>
                     <tbody>
-                      {rows.slice(0, 10).map((row, rowIndex) => (
+                      {previewData.slice(0, 10).map((row, rowIndex) => (
                         <tr key={rowIndex} className={rowIndex % 2 ? 'bg-muted/50' : 'bg-background'}>
-                          {columnNames.map((column) => (
+                          {columns.map((column) => (
                             <td
                               key={column}
                               className="max-w-48 truncate px-2 py-1"

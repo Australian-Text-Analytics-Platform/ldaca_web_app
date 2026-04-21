@@ -1,103 +1,69 @@
 /**
- * Represents column metadata including name and data type
+ * Normalization helpers for column metadata returned by the backend.
+ *
+ * The backend reports dtypes in several wire formats (Polars `Utf8`,
+ * pandas `float64`, nested `List[Struct[...]]`, etc.). Hooks and feature
+ * components work with a small, closed set of canonical type names so UI
+ * controls (filter builder, concordance column picker) don't have to know
+ * the raw dialect. This module is that translation layer.
  */
+
 export interface ColumnInfo {
   name: string;
+  /** Canonical type. See `normalizeTypeName` for the full set. */
   dataType: string;
 }
 
 /**
- * Normalizes various data type representations into standardized type names.
- * Handles Polars, Pandas, and generic type strings.
- * 
- * @param type - Raw type string from backend (e.g., 'Utf8', 'Int64', 'Datetime')
- * @returns Normalized type name ('string', 'integer', 'float', 'datetime', 'boolean', 'categorical', 'list_string', 'annotation', 'unknown', 'struct')
- * 
- * @example
- * ```ts
- * normalizeTypeName('Utf8') // 'string'
- * normalizeTypeName('Int64') // 'integer'
- * normalizeTypeName('Float64') // 'float'
- * normalizeTypeName('Datetime') // 'datetime'
- * ```
+ * Ordered list of `(matcher → canonical type)` rules. First match wins, so
+ * keep the most specific patterns on top.
+ *
+ * Canonical types: `annotation`, `list_string`, `string`, `datetime`,
+ * `boolean`, `integer`, `float`, `categorical`, `struct`, `unknown`.
+ */
+const TYPE_RULES: Array<[(s: string) => boolean, string]> = [
+  [(s) =>
+      s === 'annotation' ||
+      (s.includes('list') && s.includes('struct') && s.includes('provider') && s.includes('annotation')),
+    'annotation'],
+  [(s) =>
+      s === 'list_string' ||
+      s.includes('list(string') ||
+      s.includes('list[utf8') ||
+      s.includes('list[str'),
+    'list_string'],
+  [(s) => s.includes('utf8') || s.includes('string') || s.includes('str'), 'string'],
+  [(s) => s.includes('datetime') || s.includes('timestamp'), 'datetime'],
+  [(s) => s.includes('date') && !s.includes('update'), 'datetime'],
+  [(s) => s.includes('time') && !s.includes('interval'), 'datetime'],
+  [(s) => s.includes('categorical') || s.includes('category'), 'categorical'],
+  [(s) => s.includes('list') || s.includes('array'), 'unknown'],
+  [(s) => s.includes('bool'), 'boolean'],
+  [(s) => s.includes('int') && !s.includes('interval'), 'integer'],
+  [(s) => s.includes('float') || s.includes('double'), 'float'],
+  [(s) => s.includes('decimal') || s.includes('numeric'), 'float'],
+  [(s) => s.includes('json') || s.includes('struct') || s.includes('map'), 'struct'],
+  [(s) => s.includes('unknown'), 'unknown'],
+];
+
+/**
+ * Map a raw backend dtype string to a canonical UI type. Falls back to
+ * `'string'` for unknown/missing input — most components render strings
+ * safely, so this is the least-surprising default.
  */
 export const normalizeTypeName = (type?: string | null): string => {
-  if (!type || typeof type !== 'string') {
-    return 'string';
+  if (!type || typeof type !== 'string') return 'string';
+  const s = type.toLowerCase();
+  for (const [match, label] of TYPE_RULES) {
+    if (match(s)) return label;
   }
-
-  const lowercaseType = type.toLowerCase();
-
-  if (
-    lowercaseType === 'annotation' ||
-    (lowercaseType.includes('list') &&
-      lowercaseType.includes('struct') &&
-      lowercaseType.includes('provider') &&
-      lowercaseType.includes('annotation'))
-  ) {
-    return 'annotation';
-  }
-
-  if (
-    lowercaseType === 'list_string' ||
-    lowercaseType.includes('list(string') ||
-    lowercaseType.includes('list[utf8') ||
-    lowercaseType.includes('list[str')
-  ) {
-    return 'list_string';
-  }
-
-  if (lowercaseType.includes('utf8') || lowercaseType.includes('string') || lowercaseType.includes('str')) {
-    return 'string';
-  }
-  if (lowercaseType.includes('datetime') || lowercaseType.includes('timestamp')) {
-    return 'datetime';
-  }
-  if (lowercaseType.includes('date') && !lowercaseType.includes('update')) {
-    return 'datetime';
-  }
-  if (lowercaseType.includes('time') && !lowercaseType.includes('interval')) {
-    return 'datetime';
-  }
-  if (lowercaseType.includes('categorical') || lowercaseType.includes('category')) {
-    return 'categorical';
-  }
-  if (lowercaseType.includes('list') || lowercaseType.includes('array')) {
-    return 'unknown';
-  }
-  if (lowercaseType.includes('bool')) {
-    return 'boolean';
-  }
-  if (lowercaseType.includes('int') && !lowercaseType.includes('interval')) {
-    return 'integer';
-  }
-  if (lowercaseType.includes('float') || lowercaseType.includes('double')) {
-    return 'float';
-  }
-  if (lowercaseType.includes('decimal') || lowercaseType.includes('numeric')) {
-    return 'float';
-  }
-  if (lowercaseType.includes('json') || lowercaseType.includes('struct') || lowercaseType.includes('map')) {
-    return 'struct';
-  }
-
-  if (lowercaseType.includes('unknown')) {
-    return 'unknown';
-  }
-
   return 'string';
 };
 
-/**
- * Extracts type information from a schema entry object
- * @param entry - Schema entry from backend (string, object with js_type/type/dtype fields)
- * @returns Type string if found, undefined otherwise
- * @internal
- */
 const extractTypeFromSchemaEntry = (entry: unknown): string | undefined => {
   if (!entry) return undefined;
   if (typeof entry === 'string') return entry;
-  if (typeof entry === 'object' && entry !== null) {
+  if (typeof entry === 'object') {
     const e = entry as Record<string, unknown>;
     return (e.js_type as string) || (e.type as string) || (e.dtype as string);
   }
@@ -105,19 +71,16 @@ const extractTypeFromSchemaEntry = (entry: unknown): string | undefined => {
 };
 
 /**
- * Extracts column names and data types from a workspace node object.
- * Handles multiple schema formats from backend (schema array, dtypes object, columns array).
- * 
- * @param node - Workspace node object containing schema/dtypes/columns metadata
- * @returns Array of ColumnInfo objects with name and normalized dataType
- * 
- * @example
- * ```ts
- * const columns = getColumnsWithTypesFromNode(nodeData);
- * // [{ name: 'id', dataType: 'integer' }, { name: 'text', dataType: 'string' }]
- * ```
+ * Extract an ordered `ColumnInfo[]` from a workspace-node-ish object,
+ * merging whichever metadata shape the backend returned:
+ * - `schema`: array of `{name, js_type|type|dtype}` OR object keyed by column.
+ * - `dtypes`: object keyed by column.
+ * - `columns`: plain string[] (types fall back to `'string'`).
+ *
+ * If multiple sources disagree we keep the earliest non-`string` answer,
+ * because the generic `columns` list is the weakest evidence.
  */
-export const getColumnsWithTypesFromNode = (node: unknown): ColumnInfo[] => {
+export const mapColumnsToInfo = (node: unknown): ColumnInfo[] => {
   if (!node) return [];
 
   const n = node as Record<string, unknown>;
@@ -169,10 +132,12 @@ export const getColumnsWithTypesFromNode = (node: unknown): ColumnInfo[] => {
   return columnOrder.map((name) => ({ name, dataType: typeMap.get(name) || 'string' }));
 };
 
+/**
+ * Narrow `columns` to entries whose `dataType` appears in `allowedTypes`.
+ * If `allowedTypes` is empty the list is returned as-is (no-op filter).
+ */
 export const filterColumnsByType = (columns: ColumnInfo[], allowedTypes: string[]): ColumnInfo[] => {
   if (!allowedTypes.length) return columns;
   const allowed = new Set(allowedTypes.map((t) => t.toLowerCase()));
   return columns.filter((column) => allowed.has(column.dataType.toLowerCase()));
 };
-
-export const mapColumnsToInfo = (node: unknown): ColumnInfo[] => getColumnsWithTypesFromNode(node);

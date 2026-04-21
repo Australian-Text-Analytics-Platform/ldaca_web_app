@@ -1,25 +1,17 @@
 /**
- * Enhanced TypeScript types for the ATAP Web App
- * Provides type safety and better development experience
+ * API response/request types shared across hooks and feature modules.
+ *
+ * Scope:
+ * - Workspace listing and graph shapes consumed by multiple features.
+ * - Generic node-data pagination used by the data-view table.
+ *
+ * Not in scope:
+ * - Per-operation request/response types live with their feature
+ *   (e.g. `features/preprocessing/types`) or the API client.
  */
 
-export type ApiNodeShape = [number | null, number | null];
+// ---------- Workspace listing ----------
 
-// API Response Types
-export interface ApiResponse<T = unknown> {
-  state: 'running' | 'successful' | 'failed' | 'cancelled';
-  data?: T;
-  message?: string;
-  error?: string;
-}
-
-export interface ApiError {
-  message: string;
-  code?: string;
-  details?: unknown;
-}
-
-// Workspace Types
 export interface WorkspaceInfo {
   id: string;
   name: string;
@@ -32,27 +24,7 @@ export interface WorkspaceInfo {
   workspace_size_Byte?: number;
 }
 
-export interface WorkspaceListResponse {
-  workspaces: WorkspaceInfo[];
-}
-
-export interface CreateWorkspaceRequest {
-  name: string;
-  description?: string;
-}
-
-// Node Types
-export interface NodeInfo {
-  id: string;
-  name: string;
-  data_type: string;
-  shape: ApiNodeShape;
-  columns: string[];
-  schema: Record<string, string>;
-  operation?: string;
-  created_at?: string;
-  parent_ids?: string[];
-}
+// ---------- Node data (paginated table view) ----------
 
 export interface NodeDataPagination {
   page: number;
@@ -72,7 +44,8 @@ export interface NodeDataResponse {
   [key: string]: unknown;
 }
 
-// Graph Types
+// ---------- Workspace graph ----------
+
 export interface GraphNode {
   id: string;
   name: string;
@@ -89,159 +62,4 @@ export interface GraphEdge {
 export interface WorkspaceGraphResponse {
   nodes: GraphNode[];
   edges: GraphEdge[];
-}
-
-// Operation Types
-export interface FilterCondition {
-  column: string;
-  operator: string;
-  value: string | number | boolean | null;
-  negate?: boolean;
-  regex?: boolean;
-  id?: string;
-  dataType?: string;
-}
-
-export interface FilterRequest {
-  conditions: FilterCondition[];
-  logic?: string;
-  new_node_name?: string;
-}
-
-export interface JoinRequest {
-  left_node_id: string;
-  right_node_id: string;
-  join_type: 'inner' | 'left' | 'right' | 'full' | 'semi' | 'anti' | 'cross';
-  left_columns: string[];
-  right_columns: string[];
-  description?: string;
-}
-
-export interface RenameRequest {
-  new_name: string;
-}
-
-export interface CastRequest {
-  column: string;
-  target_type: string;
-  datetime_format?: string;
-}
-
-export interface SliceRequest {
-  mode?: 'slice' | 'random_sample';
-  offset?: number;
-  length?: number;
-  sample_size?: number;
-  random_seed?: number;
-  description?: string;
-}
-
-export interface ConcordanceRequest {
-  column: string;
-  search_word: string;
-  num_left_tokens?: number;
-  num_right_tokens?: number;
-  regex?: boolean;
-  case_sensitive?: boolean;
-  sort_by?: string;
-}
-
-// File Types
-export interface FileInfo {
-  name: string;
-  size: number;
-  type: string;
-  last_modified: string;
-}
-
-export interface FileListResponse {
-  files: FileInfo[];
-}
-
-export interface UploadProgress {
-  loaded: number;
-  total: number;
-  percent: number;
-}
-
-// Auth Types  
-export interface User {
-  id: string;
-  email: string;
-  name: string;
-  picture?: string;
-}
-
-export interface AuthResponse {
-  access_token: string;
-  user: User;
-  expires_in?: number;
-}
-
-// Query Types for React Query
-export interface QueryOptions {
-  enabled?: boolean;
-  staleTime?: number;
-  refetchOnWindowFocus?: boolean;
-  retry?: boolean | number;
-}
-
-export interface MutationOptions<TData = unknown, TError = ApiError, TVariables = unknown> {
-  onSuccess?: (data: TData, variables: TVariables) => void;
-  onError?: (error: TError, variables: TVariables) => void;
-  onSettled?: (data: TData | undefined, error: TError | null, variables: TVariables) => void;
-}
-
-// Error Types
-export interface ErrorInfo {
-  message: string;
-  stack?: string;
-  componentStack?: string;
-}
-
-export interface ErrorBoundaryState {
-  hasError: boolean;
-  error?: Error;
-  errorInfo?: ErrorInfo;
-}
-
-// Loading States
-export type LoadingState = 'idle' | 'loading' | 'successful' | 'failed' | 'cancelled';
-
-export interface OperationState {
-  state: LoadingState;
-  error?: string;
-  data?: unknown;
-}
-
-// Utility Types
-export type RequiredBy<T, K extends keyof T> = T & Required<Pick<T, K>>;
-export type OptionalBy<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
-
-// Generic API operation result
-export interface OperationResult<T = unknown> {
-  state: 'running' | 'successful' | 'failed' | 'cancelled';
-  data?: T;
-  error?: string;
-  timestamp: number;
-}
-
-// Hook return types
-export interface UseQueryResult<T> {
-  data: T | undefined;
-  isLoading: boolean;
-  isError: boolean;
-  error: ApiError | null;
-  refetch: () => void;
-}
-
-export interface UseMutationResult<TData, TVariables> {
-  mutate: (variables: TVariables) => void;
-  mutateAsync: (variables: TVariables) => Promise<TData>;
-  isLoading: boolean;
-  isError: boolean;
-  isSuccess: boolean;
-  error: ApiError | null;
-  data: TData | undefined;
-  reset: () => void;
 }

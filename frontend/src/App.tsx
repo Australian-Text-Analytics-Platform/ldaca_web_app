@@ -55,8 +55,6 @@ const WorkspaceShell: React.FC = () => {
   })));
   const {
     phase,
-    loginWithGoogle,
-    logout,
     isAuthenticated,
     isMultiUserMode,
     isLoading: authLoading,
@@ -71,12 +69,6 @@ const WorkspaceShell: React.FC = () => {
   useEffect(() => {
     if (prefsHydrated) syncVisibleViews();
   }, [prefsHydrated, syncVisibleViews]);
-  if (import.meta.env.DEV) {
-    console.debug('[WorkspaceShell] auth phase', phase.status, {
-      isAuthenticated,
-      isMultiUserMode,
-    });
-  }
   const [laggingHintReady, setLaggingHintReady] = useState(false);
   const [refreshChipReady, setRefreshChipReady] = useState(false);
   const showLaggingHint = laggingHintReady && phase.status === 'bootstrapping';
@@ -201,14 +193,7 @@ const WorkspaceShell: React.FC = () => {
   // Reuses the same full-screen layout as BlockingScreen, but swaps the
   // spinner card for a Google sign-in card.
   if (shouldShowLoginCard) {
-    return (
-      <LoginScreen
-        onLogin={loginWithGoogle}
-        onLogout={logout}
-        isLoading={authLoading}
-        error={authError}
-      />
-    );
+    return <LoginScreen isLoading={authLoading} error={authError} />;
   }
 
   return (
@@ -440,13 +425,11 @@ const getBlockingCopy = (phase: AuthPhase, showLaggingHint: boolean): BlockingCo
 };
 
 type LoginScreenProps = {
-  onLogin: (idToken: string) => Promise<void>;
-  onLogout: () => void;
   isLoading?: boolean;
   error?: string | null;
 };
 
-const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onLogout, isLoading, error }) => {
+const LoginScreen: React.FC<LoginScreenProps> = ({ isLoading, error }) => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-blue-50 flex items-center justify-center px-4 py-10">
       <div className="w-full max-w-xl text-center space-y-6 bg-white/80 backdrop-blur rounded-2xl shadow-2xl border border-white/60 px-10 py-12">
@@ -466,8 +449,6 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onLogout, isLoading,
         <ErrorBoundary>
           <div className="flex justify-center pt-2">
             <GoogleLogin
-              onLogin={onLogin}
-              onLogout={onLogout}
               isLoading={isLoading}
               error={error}
             />

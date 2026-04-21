@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { QuotationEngineConfig } from '@/api/text';
 import { usePreferencesStore } from './preferencesStore';
 
+/** Controls the engine-config dialog visibility (Sidebar ↔ QuotationFeature). */
 interface QuotationEngineDialogState {
   isOpen: boolean;
   setOpen: (isOpen: boolean) => void;
@@ -25,73 +26,74 @@ interface QuotationEngineConfigState {
 }
 
 /**
- * Quotation engine config store — now delegates to the preferences store for
- * persistence. The old `ldaca.quotation.engine` localStorage key is kept for
- * one-time migration but all future writes go through preferencesStore.
+ * Quotation engine configuration facade.
+ *
+ * All persistence lives in `usePreferencesStore`; this store exists so that
+ * `QuotationFeature` can subscribe with a stable selector API. The `config`
+ * and `lastRemoteUrl` fields are kept in sync via `set` on each mutator so
+ * subscribers re-render as expected (zustand selectors need actual state
+ * writes — they don't observe the foreign store behind the getters).
  */
-export const useQuotationEngineConfigStore = create<QuotationEngineConfigState>()(
-  (set) => {
-    // Attempt one-time migration from old localStorage key
-    try {
-      const oldRaw = typeof window !== 'undefined'
-        ? window.localStorage.getItem('ldaca.quotation.engine')
-        : null;
-      if (oldRaw) {
-        const parsed = JSON.parse(oldRaw);
-        const oldConfig = parsed?.state?.config as QuotationEngineConfig | undefined;
-        const oldUrl = (parsed?.state?.lastRemoteUrl as string) ?? '';
-        if (oldConfig) {
-          const prefs = usePreferencesStore.getState();
-          prefs.setQuotationEngine(oldConfig);
-          if (oldUrl) prefs.setQuotationLastRemoteUrl(oldUrl);
-        }
-        window.localStorage.removeItem('ldaca.quotation.engine');
-      }
-    } catch {
-      // Ignore migration errors
+const migrateLegacyConfig = () => {
+  if (typeof window === 'undefined') return;
+  const oldRaw = window.localStorage.getItem('ldaca.quotation.engine');
+  if (!oldRaw) return;
+  // Narrow try/catch: legacy blob may be malformed JSON.
+  try {
+    const parsed = JSON.parse(oldRaw);
+    const oldConfig = parsed?.state?.config as QuotationEngineConfig | undefined;
+    const oldUrl = (parsed?.state?.lastRemoteUrl as string) ?? '';
+    if (oldConfig) {
+      const prefs = usePreferencesStore.getState();
+      prefs.setQuotationEngine(oldConfig);
+      if (oldUrl) prefs.setQuotationLastRemoteUrl(oldUrl);
     }
-
-    return {
-      get config() {
-        return usePreferencesStore.getState().quotationEngine;
-      },
-      get lastRemoteUrl() {
-        return usePreferencesStore.getState().quotationLastRemoteUrl;
-      },
-      setConfig: (config) => {
-        const prefs = usePreferencesStore.getState();
-        if (config.type === 'local') {
-          prefs.setQuotationEngine({ type: 'local' });
-        } else {
-          const rawUrl = config.url ?? prefs.quotationLastRemoteUrl ?? '';
-          const nextUrl = rawUrl.trim();
-          prefs.setQuotationEngine({ type: 'remote', url: nextUrl });
-          prefs.setQuotationLastRemoteUrl(nextUrl);
-        }
-        // Update local Zustand state so subscribers re-render
-        set({
-          config: usePreferencesStore.getState().quotationEngine,
-          lastRemoteUrl: usePreferencesStore.getState().quotationLastRemoteUrl,
-        });
-      },
-      updateRemoteUrl: (url) => {
-        const nextUrl = url.trim();
-        const prefs = usePreferencesStore.getState();
-        prefs.setQuotationLastRemoteUrl(nextUrl);
-        if (prefs.quotationEngine.type === 'remote') {
-          prefs.setQuotationEngine({ type: 'remote', url: nextUrl });
-        }
-        set({
-          config: usePreferencesStore.getState().quotationEngine,
-          lastRemoteUrl: nextUrl,
-        });
-      },
-      reset: () => {
-        const prefs = usePreferencesStore.getState();
-        prefs.setQuotationEngine({ type: 'local' });
-        prefs.setQuotationLastRemoteUrl('');
-        set({ config: { type: 'local' }, lastRemoteUrl: '' });
-      },
-    };
+  } catch {
+    /* legacy payload unreadable — discard */
   }
-);
+  window.localStorage.removeItem('ldaca.quotation.engine');
+};
+
+export const useQuotationEngineConfigStore = create<QuotationEngineConfigState>((set) => {
+  migrateLegacyConfig();
+  const prefs = usePreferencesStore.getState();
+
+  const syncFromPrefs = () => {
+    const p = usePreferencesStore.getState();
+    set({ config: p.quotationEngine, lastRemoteUrl: p.quotationLastRemoteUrl });
+  };
+
+  return {
+    config: prefs.quotationEngine,
+    lastRemoteUrl: prefs.quotationLastRemoteUrl,
+
+    setConfig: (config) => {
+      const p = usePreferencesStore.getState();
+      if (config.type === 'local') {
+        p.setQuotationEngine({ type: 'local' });
+      } else {
+        const nextUrl = (config.url ?? p.quotationLastRemoteUrl ?? '').trim();
+        p.setQuotationEngine({ type: 'remote', url: nextUrl });
+        p.setQuotationLastRemoteUrl(nextUrl);
+      }
+      syncFromPrefs();
+    },
+
+    updateRemoteUrl: (url) => {
+      const nextUrl = url.trim();
+      const p = usePreferencesStore.getState();
+      p.setQuotationLastRemoteUrl(nextUrl);
+      if (p.quotationEngine.type === 'remote') {
+        p.setQuotationEngine({ type: 'remote', url: nextUrl });
+      }
+      syncFromPrefs();
+    },
+
+    reset: () => {
+      const p = usePreferencesStore.getState();
+      p.setQuotationEngine({ type: 'local' });
+      p.setQuotationLastRemoteUrl('');
+      syncFromPrefs();
+    },
+  };
+});
