@@ -43,7 +43,8 @@
       "signingIdentity": "-"
     },
     "resources": [
-      "backend-runtime"
+      "backend-src",
+      "uv-bin"
     ],
     "copyright": "Copyright © 2025 Language Data Commons of Australia (LDaCA)",
     "category": "Education",

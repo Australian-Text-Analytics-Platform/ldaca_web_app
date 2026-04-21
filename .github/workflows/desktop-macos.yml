@@ -48,7 +48,9 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.toml', 'frontend/src-tauri/Cargo.lock', 'polars-text/Cargo.toml', 'polars-text/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.toml',
+            'frontend/src-tauri/Cargo.lock', 'polars-text/Cargo.toml',
+            'polars-text/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
 
@@ -56,7 +58,9 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ~/.rustup
-          key: ${{ runner.os }}-rustup-${{ hashFiles('Cargo.toml', 'frontend/src-tauri/Cargo.lock', 'polars-text/Cargo.toml', 'polars-text/Cargo.lock') }}
+          key: ${{ runner.os }}-rustup-${{ hashFiles('Cargo.toml',
+            'frontend/src-tauri/Cargo.lock', 'polars-text/Cargo.toml',
+            'polars-text/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-rustup-
 
@@ -69,7 +73,8 @@ jobs:
           path: |
             ~/.cache/uv
             ~/.local/share/uv
-          key: ${{ runner.os }}-uv-${{ hashFiles('backend/uv.lock', 'backend/pyproject.toml') }}
+          key: ${{ runner.os }}-uv-${{ hashFiles('backend/uv.lock',
+            'backend/pyproject.toml') }}
           restore-keys: |
             ${{ runner.os }}-uv-
 
@@ -77,37 +82,36 @@ jobs:
         shell: bash
         run: npm ci
 
-      - name: Package backend runtime
+      - name: Build frontend and stage backend source
         shell: bash
-        run: uv run --no-project --python 3.14 python scripts/package_backend_runtime.py --clean --python-version 3.14
+        run: npm run deploy_frontend_to_backend
 
-      - name: Stage backend runtime for Tauri
+      - name: Package backend bundle (uv + source)
         shell: bash
-        working-directory: frontend
-        run: npm run stage:backend-runtime
+        run: uv run --no-project --python 3.14 python scripts/package_backend_runtime.py
+          --clean
 
       - name: Build Tauri desktop application
         shell: bash
         working-directory: frontend
         run: npx tauri build --bundles app,dmg
 
-      - name: Validate bundled backend runtime
+      - name: Validate bundle contents
         shell: bash
         working-directory: frontend
         run: |
           set -Eeuo pipefail
           repo_root="$(cd .. && pwd -P)"
           app_path="$repo_root/target/release/bundle/macos/LDaCA Text Analytics.app"
-          runtime_path="$app_path/Contents/Resources/backend-runtime"
+          resources="$app_path/Contents/Resources"
 
-          test -d "$runtime_path"
-          test -f "$runtime_path/runtime-manifest.json"
-          test -f "$runtime_path/python/lib/libpython3.14.dylib"
+          test -f "$resources/uv-bin/uv"
+          test -f "$resources/backend-src/pyproject.toml"
+          test -f "$resources/backend-src/uv.lock"
+          test -d "$resources/backend-src/backend/src/ldaca_web_app"
+          test -f "$resources/backend-src/backend/src/ldaca_web_app/resources/frontend/build.tar.gz"
 
-          # Ensure embedded Python can initialize stdlib and import bundled packages.
-          "$runtime_path/python/bin/python3" -c "import encodings, ldaca_web_app, polars_text, sys; print(sys.version)"
-
-          echo "Bundled runtime validation succeeded: $runtime_path"
+          echo "Bundle validation succeeded: $resources"
 
       - name: Label DMG output for Apple Silicon
         id: label-dmg

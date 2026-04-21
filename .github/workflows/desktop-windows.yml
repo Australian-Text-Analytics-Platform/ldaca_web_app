@@ -49,7 +49,9 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.toml', 'frontend/src-tauri/Cargo.lock', 'polars-text/Cargo.toml', 'polars-text/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.toml',
+            'frontend/src-tauri/Cargo.lock', 'polars-text/Cargo.toml',
+            'polars-text/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
 
@@ -61,7 +63,8 @@ jobs:
         with:
           path: |
             ~/AppData/Local/uv
-          key: ${{ runner.os }}-uv-${{ hashFiles('backend/uv.lock', 'backend/pyproject.toml') }}
+          key: ${{ runner.os }}-uv-${{ hashFiles('backend/uv.lock',
+            'backend/pyproject.toml') }}
           restore-keys: |
             ${{ runner.os }}-uv-
 
@@ -71,19 +74,18 @@ jobs:
           Set-StrictMode -Version Latest
           npm ci
 
-      - name: Package backend runtime
+      - name: Build frontend and stage backend source
+        shell: pwsh
+        run: |
+          Set-StrictMode -Version Latest
+          npm run deploy_frontend_to_backend
+
+      - name: Package backend bundle (uv + source)
         shell: pwsh
         run: |
           Set-StrictMode -Version Latest
           [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-          uv run --no-project --python 3.14 python scripts/package_backend_runtime.py --clean --python-version 3.14
-
-      - name: Stage backend runtime for Tauri
-        shell: pwsh
-        working-directory: frontend
-        run: |
-          Set-StrictMode -Version Latest
-          node scripts/stage-backend-runtime.mjs
+          uv run --no-project --python 3.14 python scripts/package_backend_runtime.py --clean
 
       - name: Build Tauri desktop application
         shell: pwsh
@@ -93,19 +95,23 @@ jobs:
           [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
           npx tauri build
 
-      - name: Validate bundled backend runtime
+      - name: Validate bundle contents
         shell: pwsh
         run: |
           Set-StrictMode -Version Latest
-          $runtimeDir = "target\release\backend-runtime"
-          $pythonExe = Join-Path $runtimeDir "python\Scripts\python.exe"
-
-          if (-not (Test-Path (Join-Path $runtimeDir "runtime-manifest.json"))) {
-            Write-Error "runtime-manifest.json missing from bundled runtime"
+          $staged = "frontend\src-tauri"
+          if (-not (Test-Path (Join-Path $staged "uv-bin\uv.exe"))) {
+            Write-Error "uv.exe missing from bundle staging"
             exit 1
           }
-
-          & $pythonExe -c "import encodings, ldaca_web_app, polars_text, sys; print(sys.version)"
+          if (-not (Test-Path (Join-Path $staged "backend-src\pyproject.toml"))) {
+            Write-Error "backend-src/pyproject.toml missing"
+            exit 1
+          }
+          if (-not (Test-Path (Join-Path $staged "backend-src\backend\src\ldaca_web_app"))) {
+            Write-Error "backend source tree missing"
+            exit 1
+          }
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v7

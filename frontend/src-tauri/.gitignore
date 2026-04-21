@@ -5,6 +5,10 @@ target/
 gen/
 WixTools/
 
+# Staged bundle payloads (produced by scripts/package_backend_runtime.py)
+backend-src/
+uv-bin/
+
 # macOS bundle artifacts
 *.app
 *.dmg

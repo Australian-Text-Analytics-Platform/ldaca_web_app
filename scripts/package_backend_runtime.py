@@ -1,77 +1,100 @@
 #!/usr/bin/env python3
-"""Package the LDaCA backend into a relocatable runtime for Tauri."""
+"""Stage the LDaCA backend project and a `uv` binary into the Tauri bundle.
+
+The desktop shell no longer ships a pre-built Python runtime. Instead it
+ships:
+
+  * ``src-tauri/backend-src/`` – a clean copy of the root ``pyproject.toml``,
+    ``uv.lock`` and the ``backend/`` source tree (the baked-in frontend
+    archive included).
+  * ``src-tauri/uv-bin/uv[.exe]`` – a pinned ``uv`` release binary downloaded
+    at build time for the host platform.
+
+At runtime the Rust launcher invokes ``uv run`` with ``UV_PROJECT_ENVIRONMENT``
+pointed at a writable directory inside ``app_data_dir`` so the Python
+environment materialises on first launch and is reused thereafter.
+
+Only the build host's platform is targeted – ``tauri build`` always produces
+a bundle for the host. The script exits on the first error.
+"""
 
 from __future__ import annotations
 
 import argparse
-import json
+import io
 import os
+import platform
 import shutil
 import stat
 import subprocess
 import sys
+import tarfile
 import time
-from datetime import datetime, timezone
+import urllib.request
+import zipfile
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent
 
+# The bundle drops everything under ``frontend/src-tauri/`` so Tauri's
+# ``bundle.resources`` glob can include it from a stable, src-tauri-relative
+# location. The staging code cleans these before copying.
+SRC_TAURI = PROJECT_ROOT / "frontend" / "src-tauri"
+BACKEND_SRC_DST = SRC_TAURI / "backend-src"
+UV_BIN_DST = SRC_TAURI / "uv-bin"
+
+# Pin a known-good uv release; bump as needed. Overridable via --uv-version.
+# Must be recent enough to know how to download the Python version that the
+# backend's `requires-python` asks for (currently 3.14).
+DEFAULT_UV_VERSION = "0.11.7"
+
+# Top-level directory names excluded when copying ``backend/``. Anything not
+# required at runtime is skipped to keep the bundle small.
+_BACKEND_EXCLUDED_DIRS = {
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".venv",
+    "venv",
+    "env",
+    "node_modules",
+    "tests",
+    "docs",
+    ".git",
+    ".idea",
+    ".vscode",
+    "build",  # the *extracted* frontend build dir – the tarball is what we ship
+    "dist",  # local wheel/sdist artefacts from prior `uv build` runs
+}
+_BACKEND_EXCLUDED_SUFFIXES = (".pyc", ".pyo")
+_BACKEND_EXCLUDED_NAMES = {".DS_Store", ".gitignore"}
+
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Package the LDaCA backend runtime for inclusion in the desktop bundle."
-    )
+    parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--clean",
         action="store_true",
-        help="Remove the existing dist directory before packaging",
+        help="Remove existing bundle staging dirs before writing",
     )
     parser.add_argument(
-        "--output",
-        type=str,
-        default=str(PROJECT_ROOT / "dist-tauri" / "backend-runtime"),
-        help="Custom output directory for the runtime (default: dist-tauri/backend-runtime)",
-    )
-    parser.add_argument(
-        "--python-version",
-        type=str,
-        default="3.14",
-        help="Python version to vendor inside the runtime",
+        "--uv-version",
+        default=os.environ.get("LDACA_UV_VERSION", DEFAULT_UV_VERSION),
+        help=f"uv release to download (default: {DEFAULT_UV_VERSION})",
     )
     return parser.parse_args()
 
 
-def run(
-    cmd: list[str],
-    *,
-    cwd: Path | None = None,
-    capture_output: bool = False,
-    extra_env: dict[str, str] | None = None,
-) -> subprocess.CompletedProcess:
-    display_cmd = " ".join(cmd)
-    print(f"$ {display_cmd}")
-    env = os.environ.copy()
-    if extra_env:
-        env.update(extra_env)
-    return subprocess.run(
-        cmd,
-        cwd=cwd,
-        check=True,
-        capture_output=capture_output,
-        text=True,
-        env=env,
-    )
-
-
-def ensure_uv_is_available() -> None:
-    if shutil.which("uv") is None:
-        raise RuntimeError("The 'uv' CLI is required but was not found in PATH")
+# ---------------------------------------------------------------------------
+# Filesystem helpers
+# ---------------------------------------------------------------------------
 
 
 def _handle_remove_error(func: object, path: str, excinfo: BaseException) -> None:
     """Best-effort fixups for read-only files during recursive deletion."""
-    _ = func  # unused but part of shutil callback contract
+    _ = func
     _ = excinfo
     target = Path(path)
     try:
@@ -81,19 +104,13 @@ def _handle_remove_error(func: object, path: str, excinfo: BaseException) -> Non
         else:
             os.remove(target)
     except Exception:
-        # Let the outer retry/fallback logic decide what to do next.
         pass
 
 
 def remove_tree_with_retries(
     path: Path, *, retries: int = 5, base_delay_seconds: float = 0.25
 ) -> None:
-    """Remove a directory tree robustly, especially on Windows.
-
-    Windows can intermittently throw errors like WinError 145 (directory not
-    empty) during deep deletions due to delayed file handle release. We retry
-    and then fall back to `rmdir /s /q` when needed.
-    """
+    """Remove a directory tree robustly (Windows file-handle races, etc.)."""
     if not path.exists():
         return
 
@@ -110,7 +127,6 @@ def remove_tree_with_retries(
                 time.sleep(base_delay_seconds * attempt)
                 continue
 
-    # Final Windows-specific fallback.
     if os.name == "nt" and path.exists():
         subprocess.run(
             ["cmd", "/d", "/s", "/c", "rmdir", "/s", "/q", str(path)],
@@ -123,214 +139,184 @@ def remove_tree_with_retries(
 
     if last_error is not None:
         raise last_error
-
     raise RuntimeError(f"Failed to remove directory: {path}")
 
 
-def remove_externally_managed_markers(root: Path) -> None:
-    for marker in root.rglob("EXTERNALLY-MANAGED"):
-        marker.unlink()
+# ---------------------------------------------------------------------------
+# Copy the project source tree
+# ---------------------------------------------------------------------------
 
 
-def create_uv_packaging_env(managed_install_dir: Path) -> dict[str, str]:
-    """Create a uv environment tuned for relocatable runtime packaging."""
-    return {
-        "UV_LINK_MODE": "copy",
-        "UV_PYTHON_INSTALL_DIR": str(managed_install_dir),
-        "UV_PYTHON_PREFER_MANAGED": "1",
-        "UV_PYTHON_DOWNLOADS": "automatic",
-        "UV_VENV_CLEAR": "1",
-    }
+def _ignore_backend_entries(dirpath: str, names: list[str]) -> list[str]:
+    ignored: list[str] = []
+    for name in names:
+        if name in _BACKEND_EXCLUDED_DIRS or name in _BACKEND_EXCLUDED_NAMES:
+            ignored.append(name)
+        elif name.endswith(_BACKEND_EXCLUDED_SUFFIXES):
+            ignored.append(name)
+    return ignored
 
 
-def find_runtime_python(runtime_root: Path, runtime_python_dir: Path) -> Path:
-    """Locate the preferred Python executable in packaged runtime.
+def stage_backend_source(dst: Path) -> None:
+    """Populate *dst* with the project files needed for ``uv sync`` at launch.
 
-    Prefer managed-python's real interpreter first for relocatability.
-    Fall back to venv launchers across platforms if needed.
+    Copies the workspace-level ``pyproject.toml`` and ``uv.lock`` plus the
+    ``backend/`` tree. The frontend archive at
+    ``backend/src/ldaca_web_app/resources/frontend/build.tar.gz`` must exist;
+    the upstream npm script builds the frontend and drops the archive in
+    place before this step.
     """
-    managed_python_dir = runtime_root / "managed-python"
-    managed_candidates = [
-        *managed_python_dir.glob("cpython-*/python.exe"),
-        *managed_python_dir.glob("cpython-*/bin/python3"),
-    ]
-    candidates = [
-        *managed_candidates,
-        runtime_python_dir / "bin" / "python3",
-        runtime_python_dir / "bin" / "python",
-        runtime_python_dir / "Scripts" / "python.exe",
-        runtime_python_dir / "python.exe",
-    ]
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate
-    raise RuntimeError(
-        f"Unable to locate python executable inside {runtime_python_dir}"
+    remove_tree_with_retries(dst)
+    dst.mkdir(parents=True, exist_ok=True)
+
+    for leaf in ("pyproject.toml", "uv.lock"):
+        src = PROJECT_ROOT / leaf
+        if not src.is_file():
+            raise RuntimeError(f"Missing required file: {src}")
+        shutil.copy2(src, dst / leaf)
+
+    backend_src = PROJECT_ROOT / "backend"
+    if not backend_src.is_dir():
+        raise RuntimeError(f"Missing backend source: {backend_src}")
+
+    frontend_archive = (
+        backend_src
+        / "src"
+        / "ldaca_web_app"
+        / "resources"
+        / "frontend"
+        / "build.tar.gz"
     )
-
-
-def assert_runtime_python_is_relocatable(python_bin: Path, output_dir: Path) -> None:
-    """Fail fast if runtime Python points outside the shipped runtime directory."""
-    if python_bin.is_symlink():
-        resolved = python_bin.resolve()
-        if not resolved.is_relative_to(output_dir):
-            raise RuntimeError(
-                "Runtime python symlink points outside bundled runtime. "
-                f"Resolved target: {resolved}, runtime root: {output_dir}"
-            )
-
-
-def ensure_venv_libpython(
-    *,
-    managed_install_dir: Path,
-    runtime_python_dir: Path,
-    python_version: str,
-) -> None:
-    """Copy libpython into the venv lib directory for relocatable execution.
-
-    On macOS the vendored CPython resolves `@rpath/libpythonX.Y.dylib` against
-    the virtualenv's `python/lib` directory.  On Linux a similar `.so` lookup
-    applies.  On Windows the DLL lives next to `python.exe` and is found via
-    the standard DLL search order, so no manual copy is needed.
-    """
-    if sys.platform == "win32":
-        print("[INFO] Skipping libpython copy (not required on Windows)")
-        return
-
-    major_minor = ".".join(python_version.split(".")[:2])
-    if sys.platform == "darwin":
-        libpython_name = f"libpython{major_minor}.dylib"
-    else:
-        libpython_name = f"libpython{major_minor}.so"
-
-    source = next(
-        managed_install_dir.glob(f"**/{libpython_name}"),
-        None,
-    )
-    if source is None:
+    if not frontend_archive.is_file():
         raise RuntimeError(
-            f"Could not locate {libpython_name} under managed python at {managed_install_dir}"
+            "Frontend archive missing at "
+            f"{frontend_archive}. Run "
+            "`npm run deploy_frontend_to_backend` before packaging."
         )
 
-    venv_lib_dir = runtime_python_dir / "lib"
-    venv_lib_dir.mkdir(parents=True, exist_ok=True)
-    target = venv_lib_dir / libpython_name
-    shutil.copy2(source, target)
-    print(f"[INFO] Copied {libpython_name} to {target}")
+    shutil.copytree(
+        backend_src,
+        dst / "backend",
+        ignore=_ignore_backend_entries,
+        dirs_exist_ok=False,
+    )
+    print(f"[INFO] Staged backend sources to {dst}")
 
 
-def sync_runtime_environment(
-    *, runtime_python_dir: Path, uv_packaging_env: dict[str, str]
-) -> None:
-    print("[INFO] Syncing backend runtime environment from uv.lock")
-    sync_env = dict(uv_packaging_env)
-    sync_env["UV_PROJECT_ENVIRONMENT"] = str(runtime_python_dir)
-    sync_env["VIRTUAL_ENV"] = str(runtime_python_dir)
-    run(
-        [
-            "uv",
-            "sync",
-            "--frozen",
-            "--no-dev",
-            "--no-editable",
-        ],
-        cwd=PROJECT_ROOT,
-        extra_env=sync_env,
+# ---------------------------------------------------------------------------
+# Download the uv binary
+# ---------------------------------------------------------------------------
+
+
+def _uv_target_triple() -> str:
+    """Return the uv release target triple for the host platform.
+
+    Mirrors the naming convention used by https://github.com/astral-sh/uv
+    release assets.
+    """
+    system = platform.system()
+    machine = platform.machine().lower()
+
+    if system == "Darwin":
+        arch = "aarch64" if machine in {"arm64", "aarch64"} else "x86_64"
+        return f"{arch}-apple-darwin"
+    if system == "Windows":
+        arch = "aarch64" if machine in {"arm64", "aarch64"} else "x86_64"
+        return f"{arch}-pc-windows-msvc"
+    if system == "Linux":
+        if machine in {"arm64", "aarch64"}:
+            return "aarch64-unknown-linux-gnu"
+        if machine in {"x86_64", "amd64"}:
+            return "x86_64-unknown-linux-gnu"
+    raise RuntimeError(f"Unsupported host platform: {system} / {machine}")
+
+
+def _uv_archive_name(triple: str) -> str:
+    return (
+        f"uv-{triple}.zip" if triple.endswith("windows-msvc") else f"uv-{triple}.tar.gz"
     )
 
 
-def write_runtime_manifest(
-    *,
-    output_dir: Path,
-    python_bin: Path,
-    python_version: str,
-) -> None:
-    """Write a small manifest for debugging shipped runtime contents."""
-    try:
-        git_sha = run(
-            ["git", "rev-parse", "HEAD"], cwd=PROJECT_ROOT, capture_output=True
-        ).stdout.strip()
-    except Exception:
-        git_sha = "unknown"
+def stage_uv_binary(dst: Path, version: str) -> None:
+    """Download the pinned uv release for the host platform into *dst*.
 
-    manifest = {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-        "python_version": python_version,
-        "python_executable": str(python_bin),
-        "git_sha": git_sha,
-        "install_method": "uv-sync",
-    }
-    manifest_path = output_dir / "runtime-manifest.json"
-    manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
-    print(f"[INFO] Wrote runtime manifest to {manifest_path}")
+    The binary lands at ``dst/uv`` (``dst/uv.exe`` on Windows) with the
+    executable bit set on POSIX. Any previous staged binary is replaced.
+    """
+    remove_tree_with_retries(dst)
+    dst.mkdir(parents=True, exist_ok=True)
+
+    triple = _uv_target_triple()
+    archive_name = _uv_archive_name(triple)
+    url = f"https://github.com/astral-sh/uv/releases/download/{version}/{archive_name}"
+    print(f"[INFO] Downloading uv {version} for {triple}")
+    print(f"       {url}")
+
+    with urllib.request.urlopen(url) as response:  # noqa: S310 - trusted GitHub release
+        payload = response.read()
+
+    is_windows = triple.endswith("windows-msvc")
+    target_name = "uv.exe" if is_windows else "uv"
+    target_path = dst / target_name
+
+    if is_windows:
+        with zipfile.ZipFile(io.BytesIO(payload)) as zf:
+            member = next(
+                (m for m in zf.namelist() if m.endswith("uv.exe")),
+                None,
+            )
+            if member is None:
+                raise RuntimeError(f"uv.exe not found inside {archive_name}")
+            with zf.open(member) as src_file, target_path.open("wb") as dst_file:
+                shutil.copyfileobj(src_file, dst_file)
+    else:
+        with tarfile.open(fileobj=io.BytesIO(payload), mode="r:gz") as tf:
+            member = next(
+                (
+                    m
+                    for m in tf.getmembers()
+                    if m.name.endswith("/uv") or m.name == "uv"
+                ),
+                None,
+            )
+            if member is None:
+                raise RuntimeError(f"uv binary not found inside {archive_name}")
+            extracted = tf.extractfile(member)
+            if extracted is None:
+                raise RuntimeError(
+                    f"Could not extract {member.name} from {archive_name}"
+                )
+            with target_path.open("wb") as dst_file:
+                shutil.copyfileobj(extracted, dst_file)
+        target_path.chmod(
+            target_path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
+        )
+
+    print(f"[INFO] Installed uv binary at {target_path}")
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
 
 
 def main() -> None:
     args = parse_args()
-    ensure_uv_is_available()
+    print("[INFO] Packaging LDaCA backend bundle")
+    print(f"       Backend src -> {BACKEND_SRC_DST}")
+    print(f"       uv binary   -> {UV_BIN_DST}")
+    print(f"       uv version  -> {args.uv_version}\n")
 
-    output_dir = Path(args.output).expanduser().resolve()
-    dist_root = output_dir.parent
-    managed_python_dir = output_dir / "managed-python"
-    uv_packaging_env = create_uv_packaging_env(managed_python_dir)
+    if args.clean:
+        for target in (BACKEND_SRC_DST, UV_BIN_DST):
+            if target.exists():
+                print(f"[INFO] Cleaning {target}")
+                remove_tree_with_retries(target)
 
-    print("[INFO] Packaging backend runtime")
-    print(f"   Output dir:     {output_dir}")
-    print(f"   Python version: {args.python_version}\n")
+    stage_backend_source(BACKEND_SRC_DST)
+    stage_uv_binary(UV_BIN_DST, args.uv_version)
 
-    if args.clean and dist_root.exists():
-        print(f"[INFO] Removing previous dist at {dist_root}")
-        remove_tree_with_retries(dist_root)
-
-    for d in (output_dir, dist_root):
-        d.mkdir(parents=True, exist_ok=True)
-
-    print("[INFO] Setting up Python runtime via uv venv...")
-    run(
-        ["uv", "python", "install", args.python_version],
-        extra_env=uv_packaging_env,
-    )
-
-    runtime_python_dir = output_dir / "python"
-    if runtime_python_dir.exists():
-        remove_tree_with_retries(runtime_python_dir)
-
-    run(
-        [
-            "uv",
-            "venv",
-            str(runtime_python_dir),
-            "--python",
-            args.python_version,
-        ],
-        extra_env=uv_packaging_env,
-    )
-
-    remove_externally_managed_markers(runtime_python_dir)
-
-    python_bin = find_runtime_python(output_dir, runtime_python_dir)
-    assert_runtime_python_is_relocatable(python_bin, output_dir)
-    ensure_venv_libpython(
-        managed_install_dir=managed_python_dir,
-        runtime_python_dir=runtime_python_dir,
-        python_version=args.python_version,
-    )
-
-    sync_runtime_environment(
-        runtime_python_dir=runtime_python_dir,
-        uv_packaging_env=uv_packaging_env,
-    )
-
-    write_runtime_manifest(
-        output_dir=output_dir,
-        python_bin=python_bin,
-        python_version=args.python_version,
-    )
-
-    print("[SUCCESS] Backend runtime created")
-    print(f"   Runtime folder: {output_dir}")
-    print(f"   Python entry:   {python_bin}")
-    print("   Install mode:   uv sync --no-editable")
+    print("\n[SUCCESS] Bundle staging complete")
 
 
 if __name__ == "__main__":

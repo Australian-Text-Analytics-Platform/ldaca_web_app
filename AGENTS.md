@@ -42,7 +42,7 @@ These were validated in this workspace and are the fastest reliable entry points
 - Prefer `uv run ...` inside Python package directories.
 - Whenever you modify a Python project in this repo, run `uvx ty check` and `uv run pytest` from each affected Python package directory and make sure both commands pass before considering the work complete.
 - Do not run backend tests from repo root; run them from `backend/`.
-- If you touch desktop packaging, inspect `scripts/package_backend_runtime.py` and `frontend/scripts/stage-backend-runtime.mjs` before changing anything.
+- If you touch desktop packaging, inspect `scripts/package_backend_runtime.py` before changing anything. The packaged `.app` ships only `uv` + the backend source tree; the Python environment is materialised into the user's OS-provided app-data directory on first launch.
 - Expect backend data under `~/Documents/ldaca` unless `DATA_ROOT` overrides it.
 - Some `polars-text` features download Hugging Face assets on first use; avoid treating that as an unexpected network regression.
 
