@@ -38,8 +38,8 @@ export const getOperatorsForType = (dataType: string) => {
   switch (dataType) {
     case 'string':
       return [
-        { value: 'eq', label: 'equals' },
         { value: 'contains', label: 'contains' },
+        { value: 'eq', label: 'equals' },
         { value: 'startswith', label: 'starts with' },
         { value: 'endswith', label: 'ends with' },
         { value: 'is_null', label: 'is null' },

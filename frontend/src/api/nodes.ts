@@ -31,6 +31,7 @@ export interface FilterCondition {
   value: unknown;
   negate?: boolean;
   regex?: boolean;
+  case_sensitive?: boolean;
 }
 export interface FilterRequest { conditions: FilterCondition[]; logic?: string; new_node_name?: string; }
 export interface SliceRequest {

@@ -451,14 +451,14 @@ wheels = [
 
 [[package]]
 name = "docworkspace"
-version = "0.2.2"
+version = "0.2.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "polars-text" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d4/55/66c09285801ebe44b759438b9655c15cd4a24e470c2642be517cb3e51a8e/docworkspace-0.2.2.tar.gz", hash = "sha256:7a446507f8e75bb375f1739047e175a2471869914495a9515e25a4edf7ddac4d", size = 28949, upload-time = "2026-04-07T23:49:29.915Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/4b/cd/79c6b08bc5b45be12acc9e9a558337eb19da1fc891db4acb03f997749ef3/docworkspace-0.2.4.tar.gz", hash = "sha256:7aa91fcdb53d306c50c58fa298fad4faf69d3c76e5f55ec4f9e33331e3c760e7", size = 30991, upload-time = "2026-04-21T14:52:24.239Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/37/06/d7233c1f39f4a8a67caf04e7245561a3970d54f366dcec0ada0e632714ca/docworkspace-0.2.2-py3-none-any.whl", hash = "sha256:e989d369ceb81461b5c53c1fc91e4f31bf6eb523b647287f4db661d8faff09c2", size = 16201, upload-time = "2026-04-07T23:49:28.742Z" },
+    { url = "https://files.pythonhosted.org/packages/62/1e/7986e3d55f535533d71a7af325b4a8ef3f48793d6cebac7344330a0b7e9c/docworkspace-0.2.4-py3-none-any.whl", hash = "sha256:a9ced4d5367d58508cc3887945178326a5badfe4a7b3182abaf767a16a54d64c", size = 17108, upload-time = "2026-04-21T14:52:22.96Z" },
 ]
 
 [[package]]
@@ -892,7 +892,7 @@ dependencies = [
 
 [[package]]
 name = "ldaca-web-app"
-version = "0.1.21"
+version = "0.1.23"
 source = { directory = "backend" }
 dependencies = [
     { name = "aiosqlite" },
@@ -915,7 +915,7 @@ dependencies = [
 requires-dist = [
     { name = "aiosqlite", specifier = ">=0.21.0" },
     { name = "bertopic", specifier = ">=0.17.3" },
-    { name = "docworkspace", specifier = ">=0.2.2" },
+    { name = "docworkspace", specifier = ">=0.2.4" },
     { name = "fastapi", extras = ["standard"], specifier = ">=0.135.0" },
     { name = "fastapi-users", extras = ["sqlalchemy"], specifier = ">=14.0.1" },
     { name = "fastexcel", specifier = ">=0.18.0" },

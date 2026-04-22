@@ -195,8 +195,7 @@ describe('DataPreprocessingFeature replace tab', () => {
     expect(screen.getByText('Sample rows')).toBeInTheDocument();
     expect(screen.getByLabelText('Offset')).toBeInTheDocument();
 
-    screen.getByRole('combobox', { name: 'Sampling method' }).focus();
-    await user.keyboard('{ArrowDown}{ArrowDown}{Enter}');
+    await user.click(screen.getByRole('tab', { name: 'Random Sample' }));
 
     expect(screen.queryByLabelText('Offset')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Fraction / Count')).toBeInTheDocument();
@@ -239,9 +238,7 @@ describe('DataPreprocessingFeature replace tab', () => {
 
     const samplePanel = screen.getByRole('tabpanel', { name: 'Sample' });
 
-    const [samplingMethodSelect] = within(samplePanel).getAllByRole('combobox');
-    samplingMethodSelect.focus();
-    await user.keyboard('{ArrowDown}{ArrowDown}{Enter}');
+    await user.click(within(samplePanel).getByRole('tab', { name: 'Random Sample' }));
 
     fireEvent.change(within(samplePanel).getByPlaceholderText('e.g. 0.4 for 40% or 100 for 100 rows'), { target: { value: '0.4' } });
     fireEvent.change(screen.getByLabelText('Random seed'), { target: { value: '7' } });
@@ -273,7 +270,7 @@ describe('DataPreprocessingFeature replace tab', () => {
 
     const nameInput = within(filterPanel).getByLabelText('New data block name');
     expect(nameInput).toHaveValue('');
-    expect(nameInput).toHaveAttribute('placeholder', 'Corpus_filtered_by_Body_eq_candidate');
+    expect(nameInput).toHaveAttribute('placeholder', 'Corpus_filtered_by_Body_contains_candidate');
 
     fireEvent.change(nameInput, { target: { value: 'custom_filter_name' } });
     fireEvent.change(valueInput, { target: { value: 'election' } });
@@ -292,7 +289,7 @@ describe('DataPreprocessingFeature replace tab', () => {
       expect(payload.conditions).toMatchObject([
         {
           column: 'Body',
-          operator: 'eq',
+          operator: 'contains',
           value: 'election',
         },
       ]);
