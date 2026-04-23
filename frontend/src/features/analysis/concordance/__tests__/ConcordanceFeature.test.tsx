@@ -25,6 +25,10 @@ vi.mock('@/components/help/HelpIcon', () => ({
   default: () => <span data-testid="help-icon" />,
 }));
 
+vi.mock('@/components/help/InfoIcon', () => ({
+  default: () => <span data-testid="info-icon" />,
+}));
+
 vi.mock('@/components/tabs/AnalysisTaskBanner', () => ({
   default: () => null,
 }));

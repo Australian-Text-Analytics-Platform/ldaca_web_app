@@ -9,6 +9,10 @@ vi.mock('@/components/help/HelpIcon', () => ({
   default: () => <span data-testid="help-icon" />,
 }));
 
+vi.mock('@/components/help/InfoIcon', () => ({
+  default: () => <span data-testid="info-icon" />,
+}));
+
 vi.mock('@visx/wordcloud', () => ({
   Wordcloud: ({ children, words }: { children: (cloudWords: Array<Record<string, unknown>>) => React.ReactNode; words: Array<Record<string, unknown>> }) => (
     <g data-testid="mock-wordcloud">

@@ -46,6 +46,11 @@ export const TokenFrequencyParameterPanel = ({
   return (
     <AnalysisCardLayout
       title="Token Frequency Analysis"
+      info={{
+        targetKey: 'token-frequency.overview',
+        label: 'About Token Frequency Analysis',
+        tooltip: 'Learn what token frequency analysis is and how it can help you.',
+      }}
       help={{
         targetKey: 'analysis.token-frequency.parameters',
         label: 'Token frequency parameters',

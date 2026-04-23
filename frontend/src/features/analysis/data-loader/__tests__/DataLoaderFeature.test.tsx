@@ -153,6 +153,10 @@ vi.mock('@/components/help/HelpIcon', () => ({
   default: () => null,
 }));
 
+vi.mock('@/components/help/InfoIcon', () => ({
+  default: () => null,
+}));
+
 vi.mock('@/api/workspaces', () => ({
   workspacesApi: {
     uploadZip: vi.fn(),

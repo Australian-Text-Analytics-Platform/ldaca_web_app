@@ -16,6 +16,7 @@ import { Button } from '../../../components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Play, Loader2, Trash2, Link as LinkIcon } from 'lucide-react';
 import HelpIcon from '../../../components/help/HelpIcon';
+import InfoIcon from '../../../components/help/InfoIcon';
 import {
   Table,
   TableBody,
@@ -1310,6 +1311,11 @@ const ConcordanceFeature: React.FC = () => {
             <div>
               <CardTitle className="flex items-center gap-2">
                 Concordance Search
+                <InfoIcon
+                  targetKey="concordance.overview"
+                  label="About Concordance Search"
+                  tooltip="Learn what concordance search is and how it can help you."
+                />
                 <HelpIcon
                   targetKey="analysis.concordance.parameters"
                   label="Concordance parameters"

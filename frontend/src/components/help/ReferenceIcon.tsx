@@ -1,11 +1,12 @@
 import React from 'react';
-import { BookMarked } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useUIStore } from '@/stores';
 import { getReferenceTarget } from '@/tutorials/referenceRegistry';
+
+const MARK_REF_ICON = `${import.meta.env.BASE_URL}references/assets/mark_ref.png`;
 
 export interface ReferenceIconProps {
   targetKey: string;
@@ -35,11 +36,11 @@ const ReferenceIcon: React.FC<ReferenceIconProps> = ({ targetKey, label = 'View 
           type="button"
           variant="ghost"
           size="icon"
-          className={className ?? 'h-6 w-6 text-emerald-600'}
+          className={className ?? 'h-6 w-6'}
           aria-label={ariaLabel}
           onClick={handleClick}
         >
-          <BookMarked className="h-4 w-4" />
+          <img src={MARK_REF_ICON} alt="" className="h-4 w-4" />
         </Button>
       </TooltipTrigger>
       <TooltipContent side="top">{tooltipText}</TooltipContent>

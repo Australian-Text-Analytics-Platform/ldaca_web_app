@@ -48,6 +48,7 @@ import {
   DropdownMenuTrigger,
 } from '../../../components/ui/dropdown-menu';
 import HelpIcon from '../../../components/help/HelpIcon';
+import InfoIcon from '../../../components/help/InfoIcon';
 
 const README_FILENAME = 'README.md';
 const FILE_DRAG_MIME_TYPE = 'application/x-ldaca-file-path';
@@ -838,6 +839,11 @@ export const DataLoaderFeature: React.FC = () => {
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-2">
           <h1 className="text-2xl font-semibold text-foreground">Data Loader</h1>
+          <InfoIcon
+            targetKey="data-loader.overview"
+            label="About the Data Loader"
+            tooltip="Learn what the Data Loader is and how it helps you get started."
+          />
           <HelpIcon
             targetKey="data-loader.tab"
             label="Data loader overview"

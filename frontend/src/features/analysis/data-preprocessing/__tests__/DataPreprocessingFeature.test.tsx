@@ -82,6 +82,10 @@ vi.mock('@/components/help/HelpIcon', () => ({
   default: () => null,
 }));
 
+vi.mock('@/components/help/InfoIcon', () => ({
+  default: () => null,
+}));
+
 describe('DataPreprocessingFeature replace tab', () => {
   beforeEach(() => {
     vi.clearAllMocks();

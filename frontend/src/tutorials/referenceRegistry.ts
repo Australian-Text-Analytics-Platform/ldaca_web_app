@@ -5,12 +5,11 @@ export type ReferenceTarget = {
 };
 
 const registry: Record<string, ReferenceTarget> = {
-  // Add reference entries here following the pattern:
-  // 'domain.feature.item': {
-  //   file: 'references/some-file.md',
-  //   anchor: 'ref-some-anchor',
-  //   label: 'Human-readable label',
-  // },
+  'general.platform': {
+    file: 'references/general.md',
+    anchor: 'ref-general-platform',
+    label: 'Cite LDaCA Text Analytics',
+  },
 };
 
 export const getReferenceTarget = (key: string): ReferenceTarget | null => registry[key] ?? null;

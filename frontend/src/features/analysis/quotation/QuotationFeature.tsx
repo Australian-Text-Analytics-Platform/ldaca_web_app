@@ -26,6 +26,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../../../components/ui/dialog';
 import { Badge } from '../../../components/ui/badge';
 import HelpIcon from '../../../components/help/HelpIcon';
+import InfoIcon from '../../../components/help/InfoIcon';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -1061,6 +1062,11 @@ const QuotationFeature: React.FC = () => {
               <div>
                 <CardTitle className="flex items-center gap-2">
                   Quotation Extraction
+                  <InfoIcon
+                    targetKey="quotation.overview"
+                    label="About Quotation Extraction"
+                    tooltip="Learn what quotation extraction is and how it can help you."
+                  />
                   <HelpIcon
                     targetKey="analysis.quotation.parameters"
                     label="Quotation parameters"

@@ -15,6 +15,7 @@ import { Button } from '../../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Input } from '../../../components/ui/input';
 import HelpIcon from '../../../components/help/HelpIcon';
+import InfoIcon from '../../../components/help/InfoIcon';
 import AnalysisTaskBanner from '../../../components/tabs/AnalysisTaskBanner';
 import {
   Select,
@@ -452,6 +453,11 @@ const SequentialAnalysisFeature = () => {
             <div>
               <CardTitle className="flex items-center gap-2">
                 Sequential Analysis
+                <InfoIcon
+                  targetKey="sequential-analysis.overview"
+                  label="About Sequential Analysis"
+                  tooltip="Learn what sequential analysis is and how it can help you."
+                />
                 <HelpIcon
                   targetKey="analysis.sequential-analysis.parameters"
                   label="Sequential analysis parameters"

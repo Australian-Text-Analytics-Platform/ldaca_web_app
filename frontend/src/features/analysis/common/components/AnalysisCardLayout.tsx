@@ -1,5 +1,6 @@
 import React from 'react';
 import HelpIcon from '@/components/help/HelpIcon';
+import InfoIcon from '@/components/help/InfoIcon';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, Play, Trash2 } from 'lucide-react';
@@ -12,6 +13,7 @@ type HelpConfig = {
 
 type AnalysisCardLayoutProps = {
   title: React.ReactNode;
+  info?: HelpConfig;
   help?: HelpConfig;
   tone?: 'default' | 'error';
   headerActions?: React.ReactNode;
@@ -35,6 +37,7 @@ type AnalysisCardLayoutProps = {
 
 export function AnalysisCardLayout({
   title,
+  info,
   help,
   tone = 'default',
   headerActions,
@@ -54,6 +57,13 @@ export function AnalysisCardLayout({
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <CardTitle className="flex items-center gap-2">
             {title}
+            {info ? (
+              <InfoIcon
+                targetKey={info.targetKey}
+                label={info.label}
+                tooltip={info.tooltip}
+              />
+            ) : null}
             {help ? (
               <HelpIcon
                 targetKey={help.targetKey}

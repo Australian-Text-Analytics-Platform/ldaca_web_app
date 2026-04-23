@@ -18,6 +18,7 @@ import {
 } from '../../../components/ui/select';
 import { toast } from 'sonner';
 import HelpIcon from '../../../components/help/HelpIcon';
+import InfoIcon from '../../../components/help/InfoIcon';
 
 type DownloadStatus = 'idle' | 'downloading';
 
@@ -149,6 +150,11 @@ const ExportFeature: React.FC = () => {
         <CardHeader className="space-y-1">
           <CardTitle className="flex items-center gap-2">
             Export Data Blocks
+            <InfoIcon
+              targetKey="export.overview"
+              label="About Exporting Data"
+              tooltip="Learn what exporting does and how it can help you."
+            />
             <HelpIcon
               targetKey="analysis.export.parameters"
               label="Export parameters"
