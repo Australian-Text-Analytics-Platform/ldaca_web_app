@@ -62,6 +62,7 @@ interface UIState {
     tutorialModal: boolean;
     warningModal: boolean;
     infoModal: boolean;
+    referenceModal: boolean;
   };
 
   tutorialTarget?: {
@@ -77,6 +78,12 @@ interface UIState {
   } | null;
 
   infoTarget?: {
+    file: string;
+    anchor: string;
+    label?: string;
+  } | null;
+
+  referenceTarget?: {
     file: string;
     anchor: string;
     label?: string;
@@ -124,6 +131,9 @@ interface UIActions {
   openInfoModal: () => void;
   closeInfoModal: () => void;
   openInfoTarget: (target: { file: string; anchor: string; label?: string }) => void;
+  openReferenceModal: () => void;
+  closeReferenceModal: () => void;
+  openReferenceTarget: (target: { file: string; anchor: string; label?: string }) => void;
   closeAllModals: () => void;
 }
 
@@ -151,10 +161,12 @@ export const useUIStore = create<UIStore>()(
         tutorialModal: false,
         warningModal: false,
         infoModal: false,
+        referenceModal: false,
       },
       tutorialTarget: null,
       warningTarget: null,
       infoTarget: null,
+      referenceTarget: null,
 
       // View management
       setCurrentView: (view) => set((state) => {
@@ -322,6 +334,20 @@ export const useUIStore = create<UIStore>()(
       closeInfoModal: () => set((state) => {
         state.modals.infoModal = false;
         state.infoTarget = null;
+      }),
+
+      openReferenceModal: () => set((state) => {
+        state.modals.referenceModal = true;
+      }),
+
+      openReferenceTarget: (target) => set((state) => {
+        state.referenceTarget = target;
+        state.modals.referenceModal = true;
+      }),
+
+      closeReferenceModal: () => set((state) => {
+        state.modals.referenceModal = false;
+        state.referenceTarget = null;
       }),
       
       closeAllModals: () => set((state) => {

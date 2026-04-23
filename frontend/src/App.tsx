@@ -49,6 +49,9 @@ const WorkspaceShell: React.FC = () => {
     infoModal,
     infoTarget,
     closeInfoModal,
+    referenceModal,
+    referenceTarget,
+    closeReferenceModal,
   } = useUIStore(useShallow((state) => ({
     currentView: state.currentView,
     closeFeedbackModal: state.closeFeedbackModal,
@@ -62,6 +65,9 @@ const WorkspaceShell: React.FC = () => {
     infoModal: state.modals.infoModal,
     infoTarget: state.infoTarget,
     closeInfoModal: state.closeInfoModal,
+    referenceModal: state.modals.referenceModal,
+    referenceTarget: state.referenceTarget,
+    closeReferenceModal: state.closeReferenceModal,
   })));
   const {
     phase,
@@ -256,6 +262,18 @@ const WorkspaceShell: React.FC = () => {
                 <div className="flex-1 overflow-y-auto">
                   <Suspense fallback={<div className="p-8 flex items-center justify-center h-full"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div></div>}>
                     <DocumentView docType="information" onClose={closeInfoModal} target={infoTarget} />
+                  </Suspense>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            {/* Reference Modal */}
+            <Dialog open={referenceModal} onOpenChange={(open) => !open && closeReferenceModal()}>
+              <DialogContent className="max-w-5xl h-[85vh] flex flex-col p-0 gap-0 overflow-hidden">
+                <DialogTitle className="sr-only">Reference</DialogTitle>
+                <div className="flex-1 overflow-y-auto">
+                  <Suspense fallback={<div className="p-8 flex items-center justify-center h-full"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div></div>}>
+                    <DocumentView docType="reference" onClose={closeReferenceModal} target={referenceTarget} />
                   </Suspense>
                 </div>
               </DialogContent>

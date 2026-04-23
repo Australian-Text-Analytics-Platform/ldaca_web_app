@@ -14,12 +14,13 @@ export type DocumentTarget = {
   label?: string;
 };
 
-export type DocumentType = 'tutorial' | 'warning' | 'information';
+export type DocumentType = 'tutorial' | 'warning' | 'information' | 'reference';
 
 const DOC_CONFIG: Record<DocumentType, { title: string; defaultFile: string }> = {
   tutorial: { title: 'LDaCA Tutorial', defaultFile: 'tutorials/index.md' },
   warning: { title: 'LDaCA Warnings', defaultFile: 'warnings/index.md' },
   information: { title: 'LDaCA Information', defaultFile: 'information/index.md' },
+  reference: { title: 'LDaCA References', defaultFile: 'references/index.md' },
 };
 
 const normalizePath = (input: string): string => {
