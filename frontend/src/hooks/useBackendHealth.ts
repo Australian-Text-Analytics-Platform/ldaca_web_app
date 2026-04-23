@@ -2,78 +2,58 @@ import { useEffect, useState } from 'react';
 import { getApiBase } from '../api/env';
 
 /**
- * Polls the backend /health endpoint until it responds successfully.
- * Returns { ready, error } where:
- *  - ready: boolean indicating backend is reachable & healthy
- *  - error: last error message (not fatal; polling continues)
+ * Polls `GET /health` until the backend responds successfully.
  *
- * Poll strategy: fast attempts first (0.5s * 6) then back off (1s, 2s, 4s...) up to max 5s interval.
- * Stops polling once ready.
+ * In Tauri desktop builds the backend URL is injected at runtime (either on
+ * `window.__BACKEND_URL__` or via the `get_backend_url` command). In the web
+ * build we derive it from `getApiBase()` so dev proxies work unchanged.
+ *
+ * Returns `{ ready, error }`. `ready` flips once the server answers 2xx with
+ * `{ status: 'healthy' | 'operational' }`; `error` surfaces the most recent
+ * failure reason but polling continues until `ready` is true.
+ *
+ * Backoff: six fast attempts (500 ms) then exponential up to 5 s.
  */
+
+const normalizeToHealthUrl = (backendUrl: string) => {
+  const trimmed = backendUrl.replace(/\/$/, '');
+  return trimmed.endsWith('/api')
+    ? trimmed.replace(/\/api$/, '/health')
+    : `${trimmed}/health`;
+};
+
+const resolveHealthUrl = async (): Promise<string> => {
+  if (typeof window !== 'undefined') {
+    if (window.__BACKEND_URL__) {
+      return `${window.__BACKEND_URL__.replace(/\/$/, '')}/health`;
+    }
+    if ('__TAURI_INTERNALS__' in window) {
+      const { invoke } = await import('@tauri-apps/api/core');
+      const backendUrl = await invoke<string>('get_backend_url');
+      if (backendUrl) {
+        const normalized = backendUrl.replace(/\/$/, '');
+        window.__BACKEND_URL__ = normalized;
+        return `${normalized}/health`;
+      }
+    }
+  }
+  return normalizeToHealthUrl(getApiBase());
+};
+
 export const useBackendHealth = () => {
-  const [ready, setReady] = useState<boolean>(false);
+  const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [healthUrl, setHealthUrl] = useState<string | null>(null);
 
-  console.warn('[Health Check] Hook initialized, window.__BACKEND_URL__:', 
-    typeof window !== 'undefined' ? window.__BACKEND_URL__ : 'N/A');
-
   useEffect(() => {
     let cancelled = false;
-
-    const resolveHealthUrl = async () => {
-      try {
-        if (typeof window !== 'undefined') {
-          if (window.__BACKEND_URL__) {
-            const normalizedBackend = window.__BACKEND_URL__.replace(/\/$/, '');
-            const healthEndpoint = `${normalizedBackend}/health`;
-            console.warn('[Health Check] Using Tauri injected URL:', healthEndpoint);
-            if (!cancelled) {
-              setHealthUrl(healthEndpoint);
-            }
-            return;
-          }
-
-          if ('__TAURI_INTERNALS__' in window) {
-            try {
-              const { invoke } = await import('@tauri-apps/api/core');
-              const backendUrl = await invoke<string>('get_backend_url');
-              if (backendUrl && !cancelled) {
-                const normalizedBackend = backendUrl.replace(/\/$/, '');
-                const healthEndpoint = `${normalizedBackend}/health`;
-                console.warn('[Health Check] Using Tauri invoke URL:', healthEndpoint);
-                window.__BACKEND_URL__ = normalizedBackend;
-                setHealthUrl(healthEndpoint);
-                return;
-              }
-            } catch (tauriErr) {
-              console.error('Failed to resolve backend URL via Tauri invoke', tauriErr);
-            }
-          }
-        }
-
-        const base = getApiBase();
-        const normalizedBase = base.replace(/\/$/, '');
-        const resolved = normalizedBase.endsWith('/api')
-          ? normalizedBase.replace(/\/api$/, '/health')
-          : `${normalizedBase}/health`;
-        console.warn('[Health Check] Using fallback URL:', resolved);
-        if (!cancelled) {
-          setHealthUrl(resolved);
-        }
-      } catch (err) {
+    resolveHealthUrl()
+      .then((url) => { if (!cancelled) setHealthUrl(url); })
+      .catch((err) => {
         console.error('Failed to resolve backend health URL', err);
-        if (!cancelled) {
-          setHealthUrl('/health');
-        }
-      }
-    };
-
-    resolveHealthUrl();
-
-    return () => {
-      cancelled = true;
-    };
+        if (!cancelled) setHealthUrl('/health');
+      });
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
@@ -83,43 +63,41 @@ export const useBackendHealth = () => {
     let attempt = 0;
     let timeoutId: number | null = null;
 
-    const poll = async () => {
-      attempt += 1;
-      try {
-        const resp = await fetch(healthUrl, { cache: 'no-store' });
-        if (resp.ok) {
-          let healthy = true;
-          let responseData = null;
-          try {
-            responseData = await resp.json();
-            healthy = Boolean(
-              responseData && (responseData.status === 'healthy' || responseData.status === 'operational')
-            );
-          } catch {
-            healthy = true; // Treat a 2xx with no JSON as success
-          }
-
-          if (healthy) {
-            console.warn('[Health Check] ✓ Backend is healthy!', { healthUrl, response: responseData });
-            if (!cancelled) {
-              setReady(true);
-              setError(null);
-            }
-            return;
-          }
-        }
-        throw new Error(`HTTP ${resp.status}`);
-      } catch (err: unknown) {
-        if (!cancelled) {
-          const message = err instanceof Error ? err.message : 'Backend not reachable';
-          setError(message);
-        }
-      }
+    const scheduleNext = () => {
       if (cancelled) return;
       const nextDelay = attempt <= 6
         ? 500
         : Math.min(5000, 1000 * 2 ** Math.min(5, attempt - 6));
       timeoutId = window.setTimeout(poll, nextDelay);
+    };
+
+    const poll = async () => {
+      attempt += 1;
+      try {
+        const resp = await fetch(healthUrl, { cache: 'no-store' });
+        if (resp.ok) {
+          // Accept `{ status: 'healthy' | 'operational' }`, but also treat a
+          // 2xx response with no JSON body as healthy — older deployments
+          // return a plain text "OK".
+          let healthy = true;
+          try {
+            const body = await resp.json();
+            healthy = Boolean(body && (body.status === 'healthy' || body.status === 'operational'));
+          } catch {
+            /* non-JSON body treated as healthy */
+          }
+          if (healthy) {
+            if (!cancelled) { setReady(true); setError(null); }
+            return;
+          }
+        }
+        throw new Error(`HTTP ${resp.status}`);
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Backend not reachable');
+        }
+        scheduleNext();
+      }
     };
 
     poll();

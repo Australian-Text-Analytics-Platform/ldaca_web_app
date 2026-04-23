@@ -47,7 +47,7 @@ export const ReplaceSubTab: React.FC<ReplaceSubTabProps> = (props) => {
   } = useReplaceSubTab(props);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <Card>
         <CardHeader className="space-y-0 pb-4">
           <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
@@ -65,7 +65,7 @@ export const ReplaceSubTab: React.FC<ReplaceSubTabProps> = (props) => {
             )}
           </div>
         </CardHeader>
-        <CardContent className="space-y-6 pt-0">
+        <CardContent className="space-y-4 pt-0">
           <NodeSelectionPanel
             selectedNodes={effectiveNodes}
             nodeColumnSelections={activeNodeId ? [{ nodeId: activeNodeId, column: selectedColumn }] : []}

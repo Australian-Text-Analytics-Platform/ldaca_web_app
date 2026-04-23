@@ -157,27 +157,12 @@ export function WorkspaceTable({
   const [columnToDelete, setColumnToDelete] = useState<string | null>(null);
   const { detailPayload, detailOpen, setDetailOpen, openDetail: openRowDetail } = useRowDetailDialog();
 
-  const debugEnabled = (() => {
-    if (typeof window === 'undefined') {
-      return false;
-    }
-    try {
-      return window.localStorage.getItem('debugDataTable') === '1';
-    } catch (error) {
-      console.debug('WorkspaceTable: unable to read debug flag', error);
-      return false;
-    }
-  })();
-
   // Identity stability: used in useEffect dependency array
   const applySchema = useCallback((schema: unknown) => {
-      const mapping = extractColumnTypes(schema as NodeSchemaResponse | null);
-      if (debugEnabled) {
-        console.debug('WorkspaceTable: loaded column types', mapping);
-      }
-      setColumnTypes(mapping);
-      return mapping;
-    }, [debugEnabled]);
+    const mapping = extractColumnTypes(schema as NodeSchemaResponse | null);
+    setColumnTypes(mapping);
+    return mapping;
+  }, []);
 
   useEffect(() => {
     if (!workspaceId || !nodeId || !onRefreshSchema) {
@@ -202,14 +187,7 @@ export function WorkspaceTable({
     };
   }, [workspaceId, nodeId, onRefreshSchema, applySchema]);
 
-  useEffect(() => {
-    if (!debugEnabled) {
-      return;
-    }
-    console.debug('WorkspaceTable: data received', { rowCount: data.length, loading });
-  }, [data, loading, debugEnabled]);
-
-  const sanitizedData = (Array.isArray(data) ? data : []);
+  const sanitizedData = Array.isArray(data) ? data : [];
 
   const columns = (() => {
     const firstRow = sanitizedData.find((row) => row && typeof row === 'object');
@@ -435,7 +413,7 @@ export function WorkspaceTable({
         header: ({ column: columnInstance }) => {
           const isPinnedLeft = columnInstance.getIsPinned() === 'left';
           return (
-            <div className="flex min-w-0 items-center gap-1.5">
+            <div className="flex min-w-0 items-center gap-1">
               <button
                 type="button"
                 onClick={() => columnInstance.pin(isPinnedLeft ? false : 'left')}
@@ -486,7 +464,7 @@ export function WorkspaceTable({
                     size="sm"
                     disabled={isColumnBusy || !onCast}
                     className={cn(
-                      'h-7 min-w-[104px] justify-between gap-2 px-2 text-xs font-medium',
+                      'h-7 w-fit justify-between gap-1 px-1.5 text-xs font-medium',
                       isColumnBusy && 'cursor-progress opacity-80'
                     )}
                     aria-label={`Change data type for column ${column}`}
@@ -594,15 +572,13 @@ export function WorkspaceTable({
           );
         },
         meta: {
-          headerClassName: 'whitespace-nowrap border-r border-border/70 px-4 py-3 text-left',
-          headerMinWidth: 250,
+          headerClassName: 'whitespace-nowrap border-r border-border/70 px-2 py-2 text-left',
           headerMaxWidth: isWideColumn
             ? isCollapsedColumn
               ? COLLAPSED_COLUMN_MAX_WIDTH
               : EXPANDED_COLUMN_MAX_WIDTH
             : undefined,
-          cellClassName: 'whitespace-nowrap border-r border-border/60 px-4 py-3 text-sm text-foreground',
-          cellMinWidth: 200,
+          cellClassName: 'whitespace-nowrap border-r border-border/60 px-2 py-1.5 text-sm text-foreground',
           cellMaxWidth: isWideColumn
             ? isCollapsedColumn
               ? COLLAPSED_COLUMN_MAX_WIDTH
@@ -649,7 +625,7 @@ export function WorkspaceTable({
     data: sanitizedData,
     columns: columnDefs,
     getCoreRowModel: getCoreRowModel(),
-    debugTable: debugEnabled,
+    debugTable: false,
     state: {
       columnPinning,
     },
@@ -676,9 +652,9 @@ export function WorkspaceTable({
         <ScrollArea
           type="always"
           scrollbars="both"
-          className="flex-1 rounded-t-lg border border-border shadow-sm bg-white"
+          className="flex-1 bg-white"
         >
-          <Table disableContainer>
+          <Table disableContainer className="w-max table-auto">
             <TableHeader className="sticky top-0 z-20 bg-muted">
               {tableInstance.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id}>
@@ -689,7 +665,7 @@ export function WorkspaceTable({
                         key={header.id}
                         className={cn(
                           meta?.headerClassName,
-                          'last:border-r-0',
+                          'h-8 px-1 py-1 last:border-r-0',
                           header.column.getIsPinned()
                             ? 'bg-muted shadow-sm'
                             : 'bg-muted'
@@ -724,7 +700,7 @@ export function WorkspaceTable({
               {tableRows.map((row) => (
                 <TableRow
                   key={row.id}
-                  className="cursor-pointer transition-colors duration-150 hover:bg-muted/40"
+                  className="cursor-pointer transition-colors duration-150 hover:bg-muted/40 [&>td]:px-1 [&>td]:py-1"
                   onClick={() => {
                     const detailTextColumn =
                       documentColumn

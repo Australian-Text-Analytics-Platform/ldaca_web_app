@@ -43,6 +43,7 @@ export const serializeConditionsForRequest = (conditions: FilterConditionWithId[
 
     if (condition.negate !== undefined) payload.negate = Boolean(condition.negate);
     if (condition.regex !== undefined) payload.regex = Boolean(condition.regex);
+    if (condition.caseSensitive !== undefined) payload.case_sensitive = Boolean(condition.caseSensitive);
 
     return payload;
   });

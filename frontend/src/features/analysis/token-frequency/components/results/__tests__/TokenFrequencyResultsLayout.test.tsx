@@ -57,10 +57,10 @@ const baseSingleSectionProps = {
 
 const buildStatistic = (overrides: Partial<TokenFrequencyStatisticsEntry> = {}): TokenFrequencyStatisticsEntry => ({
   token: overrides.token ?? 'alpha',
-  freq_corpus_0: overrides.freq_corpus_0 ?? 18,
-  percent_corpus_0: overrides.percent_corpus_0 ?? 0.6,
-  freq_corpus_1: overrides.freq_corpus_1 ?? 12,
-  percent_corpus_1: overrides.percent_corpus_1 ?? 0.4,
+  freq_baseline: overrides.freq_baseline ?? 18,
+  percent_baseline: overrides.percent_baseline ?? 0.6,
+  freq_study: overrides.freq_study ?? 12,
+  percent_study: overrides.percent_study ?? 0.4,
   log_likelihood_llv: overrides.log_likelihood_llv ?? 3.1,
   percent_diff: overrides.percent_diff ?? 0.2,
   bayes_factor_bic: overrides.bayes_factor_bic ?? 1.4,

@@ -164,7 +164,8 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     operator: 'eq',
     value: '',
     negate: false,
-    regex: true,
+    regex: false,
+    caseSensitive: false,
   }]);
   const [logic, setLogic] = useState<'and' | 'or'>('and');
   const [newNodeName, setNewNodeName] = useState('');
@@ -460,7 +461,8 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
       value: defaultValue,
       dataType: firstColumn ? firstColumn.dataType : 'string',
       negate: false,
-      regex: defaultOperator === 'contains',
+      regex: false,
+      caseSensitive: false,
     };
     setConditions([...conditions, newCondition]);
   };
@@ -494,7 +496,8 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
           const nextOperator = getDefaultOperatorForType(columnInfo.dataType);
           updated.operator = nextOperator;
           updated.value = nextOperator === 'in' ? [] : '';
-          updated.regex = nextOperator === 'contains';
+          updated.regex = false;
+          updated.caseSensitive = false;
 
           if (columnInfo.dataType === 'categorical' || columnInfo.dataType === 'list_string') {
             nextCategoricalColumnToLoad = columnInfo.name;
@@ -587,15 +590,31 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
       </label>
 
       {condition.dataType === 'string' && condition.operator === 'contains' && (
-        <label className="flex items-center gap-1.5">
-          <Checkbox
-            id={`regex-${condition.id}`}
-            checked={Boolean(condition.regex ?? true)}
-            onCheckedChange={(checked) => handleConditionChange(condition.id, 'regex', checked === true)}
-            disabled={rowDisabled}
-          />
-          <span>regex</span>
-        </label>
+        <>
+          <label className="flex items-center gap-1.5">
+            <Checkbox
+              id={`regex-${condition.id}`}
+              checked={Boolean(condition.regex)}
+              onCheckedChange={(checked) => {
+                const nextRegex = checked === true;
+                setConditions((prev) => prev.map((c) =>
+                  c.id !== condition.id ? c : { ...c, regex: nextRegex, caseSensitive: nextRegex ? false : c.caseSensitive }
+                ));
+              }}
+              disabled={rowDisabled}
+            />
+            <span>regex</span>
+          </label>
+          <label className="flex items-center gap-1.5">
+            <Checkbox
+              id={`case-sensitive-${condition.id}`}
+              checked={Boolean(condition.caseSensitive)}
+              onCheckedChange={(checked) => handleConditionChange(condition.id, 'caseSensitive', checked === true)}
+              disabled={rowDisabled || Boolean(condition.regex)}
+            />
+            <span>case sensitive</span>
+          </label>
+        </>
       )}
     </div>
   );

@@ -87,6 +87,7 @@ const TokenFrequencyFeature = () => {
 
   const [results, resultRef, setResultSafely, setResults] = useSafeResult<TokenFrequencyResponse>();
   const [lastCompareNodeIds, setLastCompareNodeIds] = useState<string[]>([]);
+  const [baselineNodeId, setBaselineNodeId] = useState<string | null>(null);
   const [statsSortColumn, setStatsSortColumn] = useState<string>('log_likelihood_llv');
   const [statsSortDirection, setStatsSortDirection] = useState<'asc' | 'desc'>('desc');
   const [statsPage, setStatsPage] = useState<number>(1);
@@ -96,6 +97,17 @@ const TokenFrequencyFeature = () => {
   const panelNodeIds = takeMostRecent(panelSelectedNodes, 2)
     .map((node, idx) => getNodeIdentifier(node, idx) || activeNodeIds[idx])
     .filter((id): id is string => Boolean(id));
+
+  const effectiveBaselineNodeId = baselineNodeId && panelNodeIds.includes(baselineNodeId)
+    ? baselineNodeId
+    : panelNodeIds[0] ?? null;
+
+  const orderedPanelNodeIds = (() => {
+    if (panelNodeIds.length !== 2 || !effectiveBaselineNodeId) return panelNodeIds;
+    const studyId = panelNodeIds.find((id) => id !== effectiveBaselineNodeId);
+    if (!studyId) return panelNodeIds;
+    return [effectiveBaselineNodeId, studyId];
+  })();
 
   const { nodeColors, handleColorChange, defaultPalette } = useNodeColorManagement({
     activeNodeIds: takeMostRecent(panelNodeIds, 2),
@@ -202,6 +214,7 @@ const TokenFrequencyFeature = () => {
     effectiveTokenLimit,
     applyTokenLimitState,
     applyStopSetFromText,
+    sortStopWords,
     handleTokenLimitInputChange,
     handleTokenLimitBlur,
     handleFillDefaultStopWords,
@@ -232,7 +245,7 @@ const TokenFrequencyFeature = () => {
   const { handleAnalyze, handleTokenClick, handleTokenRightClick } = useTokenFrequencyTaskFlow({
     state: {
       currentWorkspaceId,
-      panelNodeIds,
+      panelNodeIds: orderedPanelNodeIds,
       panelSelectedNodes,
       effectiveNodeColumnSelections,
       stopWords,
@@ -315,8 +328,34 @@ const TokenFrequencyFeature = () => {
     setDownloadDialogOpen(true);
   };
 
+  const renameStatisticsKeysForExport = (rows: unknown[]): unknown[] => {
+    if (analysisNodeIds.length !== 2) return rows;
+    const baselineName = computeDisplayName(analysisNodeIds[0], 'baseline');
+    const studyName = computeDisplayName(analysisNodeIds[1], 'study');
+    const keyMap: Record<string, string> = {
+      freq_baseline: `OB_${baselineName}`,
+      freq_study: `OS_${studyName}`,
+      percent_baseline: `%B_${baselineName}`,
+      percent_study: `%S_${studyName}`,
+      expected_baseline: `E_${baselineName}`,
+      expected_study: `E_${studyName}`,
+      baseline_total: `Total_${baselineName}`,
+      study_total: `Total_${studyName}`,
+    };
+    return rows.map((row) => {
+      if (!row || typeof row !== 'object') return row;
+      const source = row as Record<string, unknown>;
+      const renamed: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(source)) {
+        renamed[keyMap[key] ?? key] = value;
+      }
+      return renamed;
+    });
+  };
+
   const handleDownloadFrequencyCsv = (label: string, rows: unknown[]) => {
-    pendingDownloadRef.current = { mode: 'frequencies', label, rows };
+    const exportRows = label === 'token-keyness' ? renameStatisticsKeysForExport(rows) : rows;
+    pendingDownloadRef.current = { mode: 'frequencies', label, rows: exportRows };
     setDownloadDialogMode('frequencies');
     setDownloadDialogOpen(true);
   };
@@ -429,7 +468,7 @@ const TokenFrequencyFeature = () => {
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <TokenFrequencyParameterPanel
         panelSelectedNodes={panelSelectedNodes}
         effectiveNodeColumnSelections={effectiveNodeColumnSelections}
@@ -448,6 +487,9 @@ const TokenFrequencyFeature = () => {
         appliedStopCount={appliedStopSet.size}
         hasResults={Boolean(results)}
         runLabel={actionState.runLabel}
+        baselineNodeId={effectiveBaselineNodeId}
+        onBaselineNodeChange={setBaselineNodeId}
+        computeDisplayName={computeDisplayName}
       />
 
       <TokenFrequencyResultsPanel
@@ -459,6 +501,7 @@ const TokenFrequencyFeature = () => {
         onStopWordsApply={handleApplyStopWords}
         isLoadingStopWords={isLoadingStopWords}
         onFillDefaultStopWords={handleFillDefaultStopWords}
+        onSortStopWords={sortStopWords}
         tokenLimitInput={tokenLimitInput}
         onTokenLimitInputChange={handleTokenLimitInputChange}
         onTokenLimitBlur={handleTokenLimitBlur}

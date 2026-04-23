@@ -32,4 +32,26 @@ describe('AnalysisPagination', () => {
     expect(screen.getByText('Documents per page')).toBeInTheDocument();
     expect(screen.getByText('(Found 3 instances in 2 documents).')).toBeInTheDocument();
   });
+
+  it('wraps trailing actions into their own flex container', () => {
+    render(
+      <AnalysisPagination {...baseProps}>
+        <button type="button">Add to Workspace</button>
+      </AnalysisPagination>,
+    );
+
+    const wrapper = screen.getByText((_, element) => {
+      if (!(element instanceof HTMLDivElement)) {
+        return false;
+      }
+
+      return (
+        element.textContent === 'Add to Workspace'
+        && element.classList.contains('flex')
+        && element.classList.contains('items-center')
+      );
+    });
+    expect(wrapper).toHaveClass('flex');
+    expect(wrapper).toHaveClass('items-center');
+  });
 });

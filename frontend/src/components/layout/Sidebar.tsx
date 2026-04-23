@@ -350,36 +350,34 @@ const Sidebar: React.FC = () => {
   };
 
   return (
-    <SidebarRoot>
+    <SidebarRoot
+      className="md:p-2! md:pr-1! **:data-[sidebar=sidebar]:rounded-xl **:data-[sidebar=sidebar]:border **:data-[sidebar=sidebar]:border-border/60 **:data-[sidebar=sidebar]:shadow-sm **:data-[sidebar=sidebar]:overflow-hidden"
+    >
       <SidebarHeader className="border-b border-border/40 px-3 py-2">
-        <div className="flex items-start gap-2">
-          <div className="flex min-w-0 flex-1 flex-col items-start gap-2 w-full">
-            <div className="flex items-center gap-2 w-full">
-              <SidebarTrigger className="md:hidden" />
-              <img src={logo} alt="LDaCA Logo" className="w-full h-auto object-contain" />
-            </div>
-            <div className="flex min-w-0 flex-col leading-tight w-full">
+        <div className="flex min-w-0 flex-col gap-2 w-full">
+          <div className="flex items-center gap-2 w-full">
+            <SidebarTrigger className="md:hidden" />
+            <img src={logo} alt="LDaCA Logo" className="w-full h-auto object-contain" />
+          </div>
               <div className="flex items-center w-full">
-                <p className="text-xl font-semibold flex-1">Text Analytics</p>
+            <p className="text-xl font-semibold flex-1">Text Analytics</p>
                 <InfoIcon targetKey="general.overview" label="About this platform" className="h-5 w-5 text-blue-500" />
                 <ReferenceIcon targetKey="general.platform" label="Cite this platform" className="h-5 w-5 text-emerald-600" />
               </div>
-              {isMultiUserMode && (
-                <p className="text-[11px] text-muted-foreground truncate" title={user?.name ?? 'Guest'}>
-                  Welcome, {user?.name ?? 'Guest'}
-                </p>
-              )}
-            </div>
-          </div>
           {isMultiUserMode && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-xs text-red-600 hover:text-red-700 shrink-0"
-              onClick={logout}
-            >
-              Logout
-            </Button>
+            <div className="flex items-center justify-between w-full">
+              <p className="text-[11px] text-muted-foreground truncate" title={user?.name ?? 'Guest'}>
+                Welcome, {user?.name ?? 'Guest'}
+              </p>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs text-red-600 hover:text-red-700 shrink-0 h-auto py-0 px-1"
+                onClick={logout}
+              >
+                Logout
+              </Button>
+            </div>
           )}
         </div>
       </SidebarHeader>
@@ -404,58 +402,47 @@ const Sidebar: React.FC = () => {
                       onMouseDown={(event) => handleResizeStart(previousKey, key, event)}
                     />
                   ) : null}
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    className="flex w-full items-center justify-between border-b border-border/40 bg-muted/40 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
-                    onClick={() => toggleSection(key)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault();
-                        toggleSection(key);
-                      }
-                    }}
-                    aria-expanded={!isCollapsed}
-                  >
-                    <span className="flex items-center gap-1">
-                      {title}
-                      <span
-                        onClick={(event) => event.stopPropagation()}
-                        onKeyDown={(event) => event.stopPropagation()}
-                      >
-                        <HelpIcon
-                          targetKey={SECTION_HELP_KEYS[key]}
-                          label={title}
-                          className="h-5 w-5 text-muted-foreground"
-                        />
+                  <div className="flex items-center border-b border-border/40 bg-muted/40">
+                    <button
+                      type="button"
+                      className="flex min-w-0 flex-1 items-center justify-between px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                      onClick={() => toggleSection(key)}
+                      aria-expanded={!isCollapsed}
+                    >
+                      <span className="flex items-center gap-1">
+                        {title}
                       </span>
-                    </span>
-                    <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                      {key === 'nodes' && (
-                        <span className="font-medium text-foreground/80">{nodeCount}</span>
-                      )}
-                      {key === 'tasks' && (
-                        <Circle
-                          data-testid="tasks-connection-indicator"
-                          className={cn('h-3 w-3', {
-                            'text-green-500 fill-green-500': isConnected,
-                            'text-amber-500 fill-amber-500 animate-pulse': isConnecting,
-                            'text-muted-foreground fill-muted-foreground':
-                              !isConnected && !isConnecting && !connectionError,
-                            'text-red-500 fill-red-500': !!connectionError,
-                          })}
-                        />
-                      )}
-                      <ChevronDown
-                        className={cn(
-                          'h-3 w-3 transition-transform',
-                          isCollapsed ? '-rotate-90' : 'rotate-0'
+                      <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                        {key === 'nodes' && (
+                          <span className="font-medium text-foreground/80">{nodeCount}</span>
                         )}
-                      />
-                    </div>
-                  </div>
-                  {key === 'views' && (
-                    <div className="absolute right-7 top-1/2 -translate-y-1/2">
+                        {key === 'tasks' && (
+                          <Circle
+                            data-testid="tasks-connection-indicator"
+                            className={cn('h-3 w-3', {
+                              'text-green-500 fill-green-500': isConnected,
+                              'text-amber-500 fill-amber-500 animate-pulse': isConnecting,
+                              'text-muted-foreground fill-muted-foreground':
+                                !isConnected && !isConnecting && !connectionError,
+                              'text-red-500 fill-red-500': !!connectionError,
+                            })}
+                          />
+                        )}
+                        <ChevronDown
+                          className={cn(
+                            'h-3 w-3 transition-transform',
+                            isCollapsed ? '-rotate-90' : 'rotate-0'
+                          )}
+                        />
+                      </div>
+                    </button>
+                    <HelpIcon
+                      targetKey={SECTION_HELP_KEYS[key]}
+                      label={title}
+                      className="h-5 w-5 shrink-0 text-muted-foreground"
+                    />
+                    {key === 'views' && (
+                      <div className="pr-1.5">
                       <DropdownMenu>
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -466,10 +453,6 @@ const Sidebar: React.FC = () => {
                                 size="icon"
                                 className="h-6 w-6 text-muted-foreground"
                                 aria-label="Edit visible views"
-                                onClick={(event) => {
-                                  event.preventDefault();
-                                  event.stopPropagation();
-                                }}
                               >
                                 <Pencil className="h-3.5 w-3.5" />
                               </Button>
@@ -497,8 +480,9 @@ const Sidebar: React.FC = () => {
                           })}
                         </DropdownMenuContent>
                       </DropdownMenu>
-                    </div>
-                  )}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div
                   className={cn(
@@ -541,36 +525,38 @@ const Sidebar: React.FC = () => {
       </SidebarContent>
 
       <SidebarFooter className="space-y-2 px-3 py-2">
-        <div
-          className="rounded-md border border-border/60 bg-muted/30 px-3 py-2"
-          data-testid="sidebar-data-directory"
-        >
-          <div className="flex items-start gap-3">
-            <div className="min-w-0 flex-1">
-              <p className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-foreground">
-                Working directory
-                <HelpIcon targetKey="ui.working-directory" label="Working Directory" className="h-4 w-4 text-muted-foreground" />
-              </p>
-              <p className="mt-0.5 text-[11px] leading-tight text-muted-foreground break-all">
-                {dataFolder || 'Not configured'}
-              </p>
+        {!isMultiUserMode && (
+          <div
+            className="rounded-md border border-border/60 bg-muted/30 px-3 py-2"
+            data-testid="sidebar-data-directory"
+          >
+            <div className="flex items-start gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-foreground">
+                  Working directory
+                  <HelpIcon targetKey="ui.working-directory" label="Working Directory" className="h-4 w-4 text-muted-foreground" />
+                </p>
+                <p className="mt-0.5 text-[11px] leading-tight text-muted-foreground break-all">
+                  {dataFolder || 'Not configured'}
+                </p>
+              </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 shrink-0 text-muted-foreground"
+                    aria-label="Change working directory"
+                    onClick={handleEditDataFolder}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Change working directory</TooltipContent>
+              </Tooltip>
             </div>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 shrink-0 text-muted-foreground"
-                  aria-label="Change working directory"
-                  onClick={handleEditDataFolder}
-                >
-                  <Pencil className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="top">Change working directory</TooltipContent>
-            </Tooltip>
           </div>
-        </div>
+        )}
         <div className="flex items-center gap-2">
           <div className="flex flex-1 gap-2">
             <Button
@@ -590,15 +576,16 @@ const Sidebar: React.FC = () => {
               <span>Feedback</span>
             </Button>
           </div>
-          <HelpIcon targetKey="ui.help-feedback" label="Help and Feedback" className="h-5 w-5 text-muted-foreground" />
         </div>
       </SidebarFooter>
 
       <SidebarRail />
-      <DataFolderDialog
-        open={isDataFolderDialogOpen}
-        onOpenChange={setIsDataFolderDialogOpen}
-      />
+      {!isMultiUserMode && (
+        <DataFolderDialog
+          open={isDataFolderDialogOpen}
+          onOpenChange={setIsDataFolderDialogOpen}
+        />
+      )}
     </SidebarRoot>
   );
 };

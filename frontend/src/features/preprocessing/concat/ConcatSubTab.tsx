@@ -27,7 +27,7 @@ export const ConcatSubTab: React.FC<ConcatSubTabProps> = (props) => {
   } = useConcatSubTab(props);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <Card>
         <CardHeader className="space-y-0 pb-4">
           <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
@@ -49,7 +49,7 @@ export const ConcatSubTab: React.FC<ConcatSubTabProps> = (props) => {
             )}
           </div>
         </CardHeader>
-        <CardContent className="space-y-6 pt-0">
+        <CardContent className="space-y-4 pt-0">
           <p className="text-sm text-muted-foreground">
             Multi-select data blocks in the workspace (Shift/⌘-click) to stack them vertically. We′ll align schemas and preserve column order.
           </p>

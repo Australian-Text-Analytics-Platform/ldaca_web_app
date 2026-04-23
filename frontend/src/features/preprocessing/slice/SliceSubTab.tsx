@@ -8,7 +8,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../../../c
 import { Checkbox } from '../../../components/ui/checkbox';
 import { Input } from '../../../components/ui/input';
 import { Label } from '../../../components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../components/ui/tabs';
 import { Tag } from '../../../components/ui/tag';
 import { PreviewTable } from '../components/PreviewTable';
 import { getNodeDocumentColumn } from '../utils/nodeMetadata';
@@ -32,7 +32,7 @@ export const SliceSubTab: React.FC<SliceSubTabProps> = (props) => {
   } = useSliceSubTab(props);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <Card>
         <CardHeader className="space-y-0 pb-4">
           <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
@@ -55,7 +55,7 @@ export const SliceSubTab: React.FC<SliceSubTabProps> = (props) => {
             )}
           </div>
         </CardHeader>
-        <CardContent className="space-y-6 pt-0">
+        <CardContent className="space-y-4 pt-0">
           <NodeSelectionPanel
             selectedNodes={selectionPanel.selectedNodes}
             nodeColumnSelections={selectionPanel.nodeColumnSelections}
@@ -80,100 +80,96 @@ export const SliceSubTab: React.FC<SliceSubTabProps> = (props) => {
             }
           />
 
-          <div className="space-y-2">
-            <Label htmlFor="sampling-mode">Sampling method</Label>
-            <Select value={form.mode} onValueChange={(value) => form.setMode(value as 'slice' | 'random_sample')}>
-              <SelectTrigger id="sampling-mode" disabled={!hasSelection} className="sm:max-w-xs">
-                <SelectValue placeholder="Select sampling method" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="slice">Slice</SelectItem>
-                <SelectItem value="random_sample">Random Sample</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <Tabs value={form.mode} onValueChange={(value) => form.setMode(value as 'slice' | 'random_sample')}>
+            <TabsList>
+              <TabsTrigger value="slice" disabled={!hasSelection}>Slice</TabsTrigger>
+              <TabsTrigger value="random_sample" disabled={!hasSelection}>Random Sample</TabsTrigger>
+            </TabsList>
 
-          {form.mode === 'slice' ? (
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="slice-offset">Offset</Label>
-                  <HelpIcon targetKey="preprocessing.slice.offset" label="Slice offset" />
-                </div>
-                <Input
-                  id="slice-offset"
-                  type="number"
-                  min={0}
-                  value={form.offsetInput}
-                  onChange={(event) => form.setOffsetInput(event.target.value)}
-                  disabled={!hasSelection}
-                />
-                <p className="text-xs text-muted-foreground">Zero-based index of the first row to include.</p>
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="slice-length">Length</Label>
-                  <HelpIcon targetKey="preprocessing.slice.length" label="Slice length" />
-                </div>
-                <Input
-                  id="slice-length"
-                  type="number"
-                  min={0}
-                  value={form.lengthInput}
-                  onChange={(event) => form.setLengthInput(event.target.value)}
-                  disabled={!hasSelection}
-                  placeholder="Number of rows to include"
-                />
-                <p className="text-xs text-muted-foreground">Number of rows to include from the offset.</p>
-              </div>
-            </div>
-          ) : (
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="sample-fraction">Fraction / Count</Label>
-                <Input
-                  id="sample-fraction"
-                  type="number"
-                  min={0}
-                  step="any"
-                  value={form.sampleSizeInput}
-                  onChange={(event) => form.setSampleSizeInput(event.target.value)}
-                  disabled={!hasSelection}
-                  placeholder="e.g. 0.4 for 40% or 100 for 100 rows"
-                />
-                <p className="text-xs text-muted-foreground">Fraction (0–1) for proportional sampling, or an integer ≥ 1 for an absolute row count.</p>
-                {form.sampleSizeHint && (
-                  <p className="text-xs text-destructive">{form.sampleSizeHint}</p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="sample-random-seed">Random seed</Label>
-                <div className="flex items-center gap-2">
+            <TabsContent value="slice" className="mt-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="slice-offset">Offset</Label>
+                    <HelpIcon targetKey="preprocessing.slice.offset" label="Slice offset" />
+                  </div>
                   <Input
-                    id="sample-random-seed"
+                    id="slice-offset"
                     type="number"
                     min={0}
-                    step="1"
-                    value={form.randomSeedInput}
-                    onChange={(event) => form.setRandomSeedInput(event.target.value)}
-                    disabled={!hasSelection || form.noRandomSeed}
-                    placeholder={form.noRandomSeed ? 'No seed' : 'Seed'}
-                    className="w-28"
-                  />
-                  <Checkbox
-                    id="no-random-seed"
-                    checked={form.noRandomSeed}
-                    onCheckedChange={(checked) => form.setNoRandomSeed(checked === true)}
+                    value={form.offsetInput}
+                    onChange={(event) => form.setOffsetInput(event.target.value)}
                     disabled={!hasSelection}
                   />
-                  <Label htmlFor="no-random-seed" className="text-sm font-normal text-muted-foreground whitespace-nowrap">
-                    No Random Seed
-                  </Label>
+                  <p className="text-xs text-muted-foreground">Zero-based index of the first row to include.</p>
                 </div>
-                <p className="text-xs text-muted-foreground">Use a seed to reproduce the same sampled rows.</p>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="slice-length">Length</Label>
+                    <HelpIcon targetKey="preprocessing.slice.length" label="Slice length" />
+                  </div>
+                  <Input
+                    id="slice-length"
+                    type="number"
+                    min={0}
+                    value={form.lengthInput}
+                    onChange={(event) => form.setLengthInput(event.target.value)}
+                    disabled={!hasSelection}
+                    placeholder="Number of rows to include"
+                  />
+                  <p className="text-xs text-muted-foreground">Number of rows to include from the offset.</p>
+                </div>
               </div>
-            </div>
-          )}
+            </TabsContent>
+
+            <TabsContent value="random_sample" className="mt-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="sample-fraction">Fraction / Count</Label>
+                  <Input
+                    id="sample-fraction"
+                    type="number"
+                    min={0}
+                    step="any"
+                    value={form.sampleSizeInput}
+                    onChange={(event) => form.setSampleSizeInput(event.target.value)}
+                    disabled={!hasSelection}
+                    placeholder="e.g. 0.4 for 40% or 100 for 100 rows"
+                  />
+                  <p className="text-xs text-muted-foreground">Fraction (0–1) for proportional sampling, or an integer ≥ 1 for an absolute row count.</p>
+                  {form.sampleSizeHint && (
+                    <p className="text-xs text-destructive">{form.sampleSizeHint}</p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="sample-random-seed">Random seed</Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id="sample-random-seed"
+                      type="number"
+                      min={0}
+                      step="1"
+                      value={form.randomSeedInput}
+                      onChange={(event) => form.setRandomSeedInput(event.target.value)}
+                      disabled={!hasSelection || form.noRandomSeed}
+                      placeholder={form.noRandomSeed ? 'No seed' : 'Seed'}
+                      className="w-28"
+                    />
+                    <Checkbox
+                      id="no-random-seed"
+                      checked={form.noRandomSeed}
+                      onCheckedChange={(checked) => form.setNoRandomSeed(checked === true)}
+                      disabled={!hasSelection}
+                    />
+                    <Label htmlFor="no-random-seed" className="text-sm font-normal text-muted-foreground whitespace-nowrap">
+                      No Random Seed
+                    </Label>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Use a seed to reproduce the same sampled rows.</p>
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
 
           <div className="space-y-2">
             <div className="flex items-center gap-2">

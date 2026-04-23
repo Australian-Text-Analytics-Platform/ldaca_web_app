@@ -61,10 +61,10 @@ export const maxBy = <T,>(items: T[], selector: (item: T) => number, fallback: n
 
 export const STATS_SORT_ACCESSORS: Record<string, (stat: TokenFrequencyStatisticsEntry) => unknown> = {
   token: (stat) => stat.token,
-  freq_corpus_0: (stat) => stat.freq_corpus_0,
-  percent_corpus_0: (stat) => stat.percent_corpus_0,
-  freq_corpus_1: (stat) => stat.freq_corpus_1,
-  percent_corpus_1: (stat) => stat.percent_corpus_1,
+  freq_baseline: (stat) => stat.freq_baseline,
+  percent_baseline: (stat) => stat.percent_baseline,
+  freq_study: (stat) => stat.freq_study,
+  percent_study: (stat) => stat.percent_study,
   log_likelihood_llv: (stat) => stat.log_likelihood_llv,
   percent_diff: (stat) => stat.percent_diff,
   bayes_factor_bic: (stat) => stat.bayes_factor_bic,

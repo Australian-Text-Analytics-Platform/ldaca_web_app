@@ -1,6 +1,0 @@
-[workspace]
-members = [
-    "polars-text",
-    "frontend/src-tauri",
-]
-resolver = "2"

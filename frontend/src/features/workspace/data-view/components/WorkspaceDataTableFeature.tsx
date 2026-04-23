@@ -8,7 +8,7 @@ import { useWorkspaceDataTable } from '../hooks/useWorkspaceDataTable';
 export type WorkspaceDataTableFeatureProps = Record<string, never>;
 
 const LoadingState = () => (
-  <div className="space-y-6 p-6">
+  <div className="space-y-4 p-6">
     <div className="flex items-center gap-2 text-sm text-muted-foreground">
       <Loader2 className="h-4 w-4 animate-spin" />
       <span>Loading data block…</span>

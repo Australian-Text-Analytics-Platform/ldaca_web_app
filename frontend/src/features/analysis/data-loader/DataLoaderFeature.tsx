@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Loader2, FolderPlus, Upload, Trash2, Eye, Download as DownloadIcon, Plus, RefreshCcw, LogOut, Quote, ChevronRightIcon, FileIcon, FolderIcon, MoreHorizontal } from 'lucide-react';
+import { Loader2, FolderPlus, Upload, Trash2, Eye, Download as DownloadIcon, Plus, RefreshCcw, LogOut, Quote, ChevronRightIcon, FileIcon, FolderIcon, MoreHorizontal, Star } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useQueryClient } from '@tanstack/react-query';
@@ -12,6 +12,7 @@ import { queryKeys } from '../../../lib/queryKeys';
 import { filesApi } from '../../../api/files';
 import { workspacesApi } from '../../../api/workspaces';
 import { useAnalysisStore, type TaskItem } from '../../../stores/analysisStore';
+import { usePreferencesStore } from '../../../stores/preferencesStore';
 import { type FileTreeDirectory, type FileTreeFile, type FileTreeNode } from '../../../types';
 import { AddFilePanel, FilePreviewPanel } from '../../../components/panels';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
@@ -208,7 +209,14 @@ export const DataLoaderFeature: React.FC = () => {
     return () => observer.disconnect();
   }, []);
 
+  const { favoriteWorkspaces, toggleFavorite, isFavorite } = usePreferencesStore();
+
   const sortedWorkspaces = [...workspaces].sort((a, b) => {
+    const aId = getWorkspaceId(a) ?? '';
+    const bId = getWorkspaceId(b) ?? '';
+    const aFav = favoriteWorkspaces.includes(aId) ? 1 : 0;
+    const bFav = favoriteWorkspaces.includes(bId) ? 1 : 0;
+    if (aFav !== bFav) return bFav - aFav;
     const aTime = Date.parse(String(a?.modified_at || a?.updated_at || a?.created_at || ''));
     const bTime = Date.parse(String(b?.modified_at || b?.updated_at || b?.created_at || ''));
     return (bTime || 0) - (aTime || 0);
@@ -835,7 +843,7 @@ export const DataLoaderFeature: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-2">
           <h1 className="text-2xl font-semibold text-foreground">Data Loader</h1>
@@ -852,7 +860,7 @@ export const DataLoaderFeature: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2">
         <Card ref={activeCardRef} data-testid={currentWorkspace ? 'active-workspace-card' : 'create-workspace-card'}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -1035,6 +1043,17 @@ export const DataLoaderFeature: React.FC = () => {
                     >
                       <div>
                         <div className="flex items-center gap-1 font-medium text-foreground">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-6 w-6 shrink-0"
+                            aria-label={isFavorite(workspaceId) ? 'Remove from favorites' : 'Add to favorites'}
+                            onClick={() => toggleFavorite(workspaceId)}
+                          >
+                            <Star
+                              className={`h-4 w-4 ${isFavorite(workspaceId) ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`}
+                            />
+                          </Button>
                           <span>{workspace.name || workspaceId}</span>
                           <DropdownMenu modal={false}>
                             <DropdownMenuTrigger asChild>

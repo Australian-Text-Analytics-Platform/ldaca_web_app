@@ -4,42 +4,49 @@ import { filesApi } from '../api/files';
 import { type FileTreeNode } from '../types';
 import { queryKeys } from '../lib/queryKeys';
 
+/**
+ * Hook returning the file-tree state plus file upload/delete/download actions.
+ *
+ * The file list is cached per auth-header signature so switching users (or
+ * clearing the token) doesn't surface the previous user's files. Each mutation
+ * invalidates `queryKeys.files` and returns a `boolean` success so callers can
+ * trigger toast-style UI without needing to catch promises.
+ */
 interface UseFilesProps {
   authHeaders?: Record<string, string>;
-  enabled?: boolean; // allow caller to defer initial fetch until ready (e.g., after auth)
+  /** Defer the initial fetch until auth has been resolved. */
+  enabled?: boolean;
 }
 
 export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {}) => {
   const queryClient = useQueryClient();
-  const normalizedHeaders = authHeaders ?? {};
-  const headerSignature = JSON.stringify(normalizedHeaders);
+  // The header signature ensures the query cache key changes when auth does;
+  // otherwise a logged-out user would briefly see the prior user's tree.
+  const headerSignature = JSON.stringify(authHeaders);
+
   const filesQuery = useQuery<FileTreeNode[]>({
     queryKey: [...queryKeys.files, headerSignature],
-    queryFn: () => filesApi.list(normalizedHeaders),
+    queryFn: () => filesApi.list(authHeaders),
     enabled,
     staleTime: 2 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
 
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
+
+  const invalidateFiles = () => queryClient.invalidateQueries({ queryKey: queryKeys.files });
+
   const uploadMutation = useMutation({
-    mutationFn: (file: File) => filesApi.upload(file, normalizedHeaders),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.files });
-    },
-  });
-  const deleteMutation = useMutation({
-    mutationFn: (filename: string) => filesApi.delete(filename, normalizedHeaders),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.files });
-    },
+    mutationFn: (file: File) => filesApi.upload(file, authHeaders),
+    onSuccess: invalidateFiles,
   });
 
-  const fileTree = filesQuery.data ?? [];
-  const refetchFiles = async () => {
-    const result = await filesQuery.refetch();
-    return result.data ?? null;
-  };
+  const deleteMutation = useMutation({
+    mutationFn: (filename: string) => filesApi.delete(filename, authHeaders),
+    onSuccess: invalidateFiles,
+  });
+
+  const refetchFiles = async () => (await filesQuery.refetch()).data ?? null;
 
   const handleUploadFile = async (file: File) => {
     try {
@@ -56,9 +63,7 @@ export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {
     try {
       await deleteMutation.mutateAsync(filename);
       await refetchFiles();
-      if (selectedFile === filename) {
-        setSelectedFile(null);
-      }
+      if (selectedFile === filename) setSelectedFile(null);
       return true;
     } catch (error) {
       console.error('Failed to delete file:', error);
@@ -68,14 +73,14 @@ export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {
 
   const handleDownloadFile = async (filename: string) => {
     try {
-      const blob = await filesApi.download(filename, normalizedHeaders);
+      const blob = await filesApi.download(filename, authHeaders);
       const url = window.URL.createObjectURL(new Blob([blob]));
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', filename);
       document.body.appendChild(link);
       link.click();
-      link.parentNode?.removeChild(link);
+      link.remove();
       window.URL.revokeObjectURL(url);
       return true;
     } catch (error) {
@@ -85,10 +90,10 @@ export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {
   };
 
   return {
-    fileTree,
+    fileTree: filesQuery.data ?? [],
     selectedFile,
     setSelectedFile,
-  loadingFiles: filesQuery.isLoading || filesQuery.isFetching,
+    loadingFiles: filesQuery.isLoading || filesQuery.isFetching,
     uploading: uploadMutation.isPending,
     handleUploadFile,
     handleDeleteFile,

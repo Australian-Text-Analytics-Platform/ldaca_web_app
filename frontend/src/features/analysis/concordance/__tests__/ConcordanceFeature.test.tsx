@@ -99,6 +99,7 @@ vi.mock('@/hooks/useWorkspaceData', () => ({
 vi.mock('@/hooks/useWorkspaceActions', () => ({
   useWorkspaceActions: () => ({
     detachConcordance: vi.fn(),
+    materializeConcordance: vi.fn(),
     selectNodes: vi.fn(),
   }),
 }));
@@ -133,6 +134,9 @@ vi.mock('@/api/text', () => ({
 
 vi.mock('@/hooks/analysisTaskUtils', () => ({
   pruneTasksById: vi.fn((tasks) => tasks),
+  getTaskTypeCandidates: (taskType: string) => [taskType],
+  normalizeTaskDedupeKey: (taskId: string | null, state: string | null) =>
+    taskId && state ? `${taskId}:${state}` : null,
 }));
 
 vi.mock('../components/ConcordanceDetachDialog', () => ({
@@ -161,6 +165,7 @@ vi.mock('../hooks/useConcordanceTaskFlow', () => ({
     handlePageChange: vi.fn(),
     persistResultPreferences: vi.fn(),
     handleDetach: vi.fn(),
+    handleMaterialize: vi.fn(),
   };
   },
 }));

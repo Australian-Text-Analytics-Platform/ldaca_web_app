@@ -46,7 +46,7 @@ export const JoinSubTab: React.FC<JoinSubTabProps> = (props) => {
   ) : null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <Card>
         <CardHeader className="space-y-1 pb-4">
           <CardTitle className="flex items-center gap-2">
@@ -58,7 +58,7 @@ export const JoinSubTab: React.FC<JoinSubTabProps> = (props) => {
             />
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-6 pt-0">
+        <CardContent className="space-y-4 pt-0">
           <p className="text-sm text-muted-foreground">
             Select up to two data blocks in the workspace (Shift/⌘-click) to configure a join. Column pickers will appear below
             for the current selection.

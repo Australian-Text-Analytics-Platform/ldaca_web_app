@@ -29,6 +29,7 @@ type TokenFrequencyResultsPanelProps = {
   onStopWordsApply: () => void;
   isLoadingStopWords: boolean;
   onFillDefaultStopWords: () => void;
+  onSortStopWords: () => void;
 
   tokenLimitInput: string;
   onTokenLimitInputChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
@@ -80,6 +81,7 @@ export const TokenFrequencyResultsPanel = ({
   onStopWordsApply,
   isLoadingStopWords,
   onFillDefaultStopWords,
+  onSortStopWords,
   tokenLimitInput,
   onTokenLimitInputChange,
   onTokenLimitBlur,
@@ -146,7 +148,7 @@ export const TokenFrequencyResultsPanel = ({
       ) : null}
 
       {isSuccessfulState && results ? (
-        <div className="space-y-6">
+        <div className="space-y-4">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-4">
               <div className="flex items-center justify-between gap-2">
@@ -185,6 +187,15 @@ export const TokenFrequencyResultsPanel = ({
                   disabled={isLoadingStopWords}
                 >
                   Fill Default
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={onSortStopWords}
+                  disabled={isLoadingStopWords || !stopWords.trim()}
+                >
+                  Sort
                 </Button>
                 <HelpIcon
                   targetKey="analysis.token-frequency.stop-words"

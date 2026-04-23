@@ -4,8 +4,10 @@ import {
   textApi,
   type ConcordanceRequest,
   type ConcordanceDetachRequest,
+  type ConcordanceMaterializeRequest,
   type QuotationRequest,
   type QuotationDetachRequest,
+  type QuotationMaterializeRequest,
   type ConcordanceAnalysisRequest,
 } from '../api/text';
 import { queryKeys } from '../lib/queryKeys';
@@ -149,6 +151,24 @@ export const useWorkspaceInternal = () => {
     },
   });
 
+  const materializeConcordanceMutation = useMutation({
+    mutationFn: ({
+      nodeId,
+      request,
+    }: {
+      nodeId: string;
+      request: ConcordanceMaterializeRequest;
+    }) => textApi.concordanceMaterialize(nodeId, request, authHeaders),
+    onMutate: () => startOperation('materializeConcordance'),
+    onSuccess: () => {
+      endOperation('materializeConcordance');
+    },
+    onError: (error: Error) => {
+      setOperationError('materializeConcordance', error.message);
+      endOperation('materializeConcordance');
+    },
+  });
+
   const quotationMutation = useMutation({
     mutationFn: ({
       nodeId,
@@ -187,6 +207,24 @@ export const useWorkspaceInternal = () => {
     },
   });
 
+  const materializeQuotationMutation = useMutation({
+    mutationFn: ({
+      nodeId,
+      request,
+    }: {
+      nodeId: string;
+      request: QuotationMaterializeRequest;
+    }) => textApi.quotationMaterialize(nodeId, request, authHeaders),
+    onMutate: () => startOperation('materializeQuotation'),
+    onSuccess: () => {
+      endOperation('materializeQuotation');
+    },
+    onError: (error: Error) => {
+      setOperationError('materializeQuotation', error.message);
+      endOperation('materializeQuotation');
+    },
+  });
+
   const selectionActions = ({
     selectNode,
     selectNodes: setSelectedNodes,
@@ -206,6 +244,11 @@ export const useWorkspaceInternal = () => {
         nodeId,
         request,
       }),
+    materializeConcordance: (nodeId: string, request: ConcordanceMaterializeRequest) =>
+      materializeConcordanceMutation.mutateAsync({
+        nodeId,
+        request,
+      }),
     quotationSearch: (nodeId: string, request: QuotationRequest) =>
       quotationMutation.mutateAsync({
         nodeId,
@@ -214,6 +257,11 @@ export const useWorkspaceInternal = () => {
     detachQuotation: (nodeId: string, request: QuotationDetachRequest) =>
       detachQuotationMutation.mutateAsync({
         workspaceId: ensureWorkspaceSelected(),
+        nodeId,
+        request,
+      }),
+    materializeQuotation: (nodeId: string, request: QuotationMaterializeRequest) =>
+      materializeQuotationMutation.mutateAsync({
         nodeId,
         request,
       }),

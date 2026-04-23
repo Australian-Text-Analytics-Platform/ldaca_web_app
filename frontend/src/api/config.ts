@@ -3,6 +3,7 @@ import { httpRequest } from './http';
 export interface ConfigResponse {
   data_root: string;
   multi_user_mode: boolean;
+  google_client_id?: string;
 }
 
 export interface UpdateConfigRequest {

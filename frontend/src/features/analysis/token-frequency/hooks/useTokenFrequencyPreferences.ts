@@ -209,8 +209,19 @@ export const useTokenFrequencyPreferences = ({
       .split(',')
       .map((word) => word.trim().toLowerCase())
       .filter(Boolean);
-    words.sort((a, b) => a.localeCompare(b));
     setStopWords(words.join(', '));
+    setAppliedStopSet(new Set(words));
+    void saveStopWordsToBackend(words);
+  };
+
+  const sortStopWords = () => {
+    const words = stopWords
+      .split(',')
+      .map((word) => word.trim().toLowerCase())
+      .filter(Boolean);
+    words.sort((a, b) => a.localeCompare(b));
+    const sorted = words.join(', ');
+    setStopWords(sorted);
     setAppliedStopSet(new Set(words));
     void saveStopWordsToBackend(words);
   };
@@ -277,6 +288,7 @@ export const useTokenFrequencyPreferences = ({
     effectiveTokenLimit,
     applyTokenLimitState,
     applyStopSetFromText,
+    sortStopWords,
     handleTokenLimitInputChange,
     handleTokenLimitBlur,
     handleFillDefaultStopWords,

@@ -109,7 +109,7 @@ describe('CustomNode', () => {
   });
 
   it('keeps settings and delete controls visible in the zoomed-out node view', async () => {
-    mockZoom = 0.6;
+    mockZoom = 0.59;
     const user = userEvent.setup();
     const onDelete = vi.fn();
     const onRename = vi.fn();

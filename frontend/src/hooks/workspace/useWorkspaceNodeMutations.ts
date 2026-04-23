@@ -343,38 +343,29 @@ export const useWorkspaceNodeMutations = ({
       };
       return nodesApi.join(request, authHeaders);
     },
-    onMutate: async () => {
+    onMutate: () => {
       startOperation('joinNodes');
-      let previousNodeIds: string[] = [];
-      try {
-        if (currentWorkspaceId) {
-          const previousGraph = queryClient.getQueryData<WorkspaceGraphResponse>(queryKeys.workspaceGraph(currentWorkspaceId));
-          previousNodeIds = (previousGraph?.nodes || []).map((node) => node.id);
-        }
-      } catch {
-        // ignore snapshot errors
-      }
+      const previousGraph = currentWorkspaceId
+        ? queryClient.getQueryData<WorkspaceGraphResponse>(queryKeys.workspaceGraph(currentWorkspaceId))
+        : undefined;
+      const previousNodeIds = (previousGraph?.nodes || []).map((node) => node.id);
       clearSelection();
       return { previousNodeIds };
     },
     onSuccess: async (createdNode: Record<string, unknown>, _vars, context) => {
-      try {
-        let newId = (createdNode?.node_id as string | undefined) || (createdNode?.id as string | undefined);
-        if (!newId && currentWorkspaceId) {
-          await queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
-          const freshGraph = queryClient.getQueryData<WorkspaceGraphResponse>(queryKeys.workspaceGraph(currentWorkspaceId));
-          if (freshGraph?.nodes) {
-            const prevIds: string[] = context?.previousNodeIds || [];
-            const diff = freshGraph.nodes.map((node) => node.id).filter((id: string) => !prevIds.includes(id));
-            if (diff.length === 1) newId = diff[0];
-          }
+      let newId = (createdNode?.node_id as string | undefined) || (createdNode?.id as string | undefined);
+      if (!newId && currentWorkspaceId) {
+        await queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
+        const freshGraph = queryClient.getQueryData<WorkspaceGraphResponse>(queryKeys.workspaceGraph(currentWorkspaceId));
+        if (freshGraph?.nodes) {
+          const prevIds = context?.previousNodeIds || [];
+          const diff = freshGraph.nodes.map((node) => node.id).filter((id) => !prevIds.includes(id));
+          if (diff.length === 1) newId = diff[0];
         }
-        if (newId) {
-          setSelectedNodes([newId]);
-        } else {
-          clearSelection();
-        }
-      } catch {
+      }
+      if (newId) {
+        setSelectedNodes([newId]);
+      } else {
         clearSelection();
       }
       if (currentWorkspaceId) {
@@ -391,38 +382,29 @@ export const useWorkspaceNodeMutations = ({
   const concatNodesMutation = useMutation({
     mutationFn: ({ nodeIds, newNodeName }: { nodeIds: string[]; newNodeName?: string }) =>
       nodesApi.concat({ node_ids: nodeIds, new_node_name: newNodeName }, authHeaders),
-    onMutate: async () => {
+    onMutate: () => {
       startOperation('concatNodes');
-      let previousNodeIds: string[] = [];
-      try {
-        if (currentWorkspaceId) {
-          const previousGraph = queryClient.getQueryData<WorkspaceGraphResponse>(queryKeys.workspaceGraph(currentWorkspaceId));
-          previousNodeIds = (previousGraph?.nodes || []).map((node) => node.id);
-        }
-      } catch {
-        // ignore snapshot errors
-      }
+      const previousGraph = currentWorkspaceId
+        ? queryClient.getQueryData<WorkspaceGraphResponse>(queryKeys.workspaceGraph(currentWorkspaceId))
+        : undefined;
+      const previousNodeIds = (previousGraph?.nodes || []).map((node) => node.id);
       clearSelection();
       return { previousNodeIds };
     },
     onSuccess: async (createdNode: Record<string, unknown>, _vars, context) => {
-      try {
-        let newId = (createdNode?.node_id as string | undefined) || (createdNode?.id as string | undefined);
-        if (!newId && currentWorkspaceId) {
-          await queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
-          const freshGraph = queryClient.getQueryData<WorkspaceGraphResponse>(queryKeys.workspaceGraph(currentWorkspaceId));
-          if (freshGraph?.nodes) {
-            const prevIds: string[] = context?.previousNodeIds || [];
-            const diff = freshGraph.nodes.map((node) => node.id).filter((id: string) => !prevIds.includes(id));
-            if (diff.length === 1) newId = diff[0];
-          }
+      let newId = (createdNode?.node_id as string | undefined) || (createdNode?.id as string | undefined);
+      if (!newId && currentWorkspaceId) {
+        await queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
+        const freshGraph = queryClient.getQueryData<WorkspaceGraphResponse>(queryKeys.workspaceGraph(currentWorkspaceId));
+        if (freshGraph?.nodes) {
+          const prevIds = context?.previousNodeIds || [];
+          const diff = freshGraph.nodes.map((node) => node.id).filter((id) => !prevIds.includes(id));
+          if (diff.length === 1) newId = diff[0];
         }
-        if (newId) {
-          setSelectedNodes([newId]);
-        } else {
-          clearSelection();
-        }
-      } catch {
+      }
+      if (newId) {
+        setSelectedNodes([newId]);
+      } else {
         clearSelection();
       }
       if (currentWorkspaceId) {

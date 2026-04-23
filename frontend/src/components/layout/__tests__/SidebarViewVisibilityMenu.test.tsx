@@ -6,6 +6,14 @@ import Sidebar from '../Sidebar';
 import { SidebarProvider } from '../../ui/sidebar';
 import { DEFAULT_VISIBLE_VIEWS, useUIStore } from '../../../stores/uiStore';
 
+const authState = {
+  getAuthHeaders: () => ({}),
+  user: { name: 'Test User' },
+  logout: vi.fn(),
+  dataFolder: '/tmp/workdir',
+  isMultiUserMode: false,
+};
+
 vi.mock('@/hooks/useWorkspaceData', () => ({
   useWorkspaceData: () => ({
     workspaceGraph: { nodes: [] },
@@ -34,13 +42,7 @@ vi.mock('@/hooks/useWorkspaceTaskStream', () => ({
 }));
 
 vi.mock('@/hooks/useAuth', () => ({
-  useAuth: () => ({
-    getAuthHeaders: () => ({}),
-    user: { name: 'Test User' },
-    logout: vi.fn(),
-    dataFolder: '/tmp/workdir',
-    isMultiUserMode: false,
-  }),
+  useAuth: () => authState,
 }));
 
 vi.mock('@/stores/analysisStore', () => ({
@@ -66,6 +68,10 @@ const renderSidebar = () =>
 
 describe('Sidebar view visibility menu', () => {
   beforeEach(() => {
+    authState.isMultiUserMode = false;
+    authState.dataFolder = '/tmp/workdir';
+    authState.logout = vi.fn();
+
     Object.defineProperty(window, 'matchMedia', {
       writable: true,
       value: vi.fn().mockImplementation((query: string) => ({
@@ -85,16 +91,9 @@ describe('Sidebar view visibility menu', () => {
       ...state,
       currentView: 'data-loader',
       sidebarCollapsed: false,
-      isGlobalLoading: false,
       loadingOperations: new Set(),
-      globalError: null,
       operationErrors: new Map(),
       modals: {
-        joinModal: false,
-        filterModal: false,
-        documentColumnModal: false,
-        renameModal: false,
-        deleteConfirmModal: false,
         feedbackModal: false,
         tutorialModal: false,
       },
@@ -135,5 +134,21 @@ describe('Sidebar view visibility menu', () => {
     expect(screen.getByRole('menuitemcheckbox', { name: 'Data Preprocessing' })).toBeInTheDocument();
     await user.keyboard('{Escape}');
     expect(screen.getAllByRole('button', { name: 'Data Loader' }).length).toBeGreaterThan(0);
+  });
+
+  it('hides the working directory card in multi-user mode', () => {
+    authState.isMultiUserMode = true;
+
+    renderSidebar();
+
+    expect(screen.queryByTestId('sidebar-data-directory')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Change working directory')).not.toBeInTheDocument();
+  });
+
+  it('shows the working directory card in single-user mode', () => {
+    renderSidebar();
+
+    expect(screen.getByTestId('sidebar-data-directory')).toBeInTheDocument();
+    expect(screen.getByText('/tmp/workdir')).toBeInTheDocument();
   });
 });

@@ -45,7 +45,7 @@
     "resources": [
       "backend-runtime"
     ],
-    "copyright": "Copyright © 2025 Australian Text Analytics Platform",
+    "copyright": "Copyright © 2025 Language Data Commons of Australia (LDaCA)",
     "category": "Education",
     "shortDescription": "Text analytics and visualization platform",
     "longDescription": "LDaCA Text Analytics provides comprehensive tools for text analysis, including concordance, frequency analysis, topic modeling, and timeline visualization."

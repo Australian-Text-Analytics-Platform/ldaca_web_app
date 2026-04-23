@@ -28,7 +28,7 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
   } = useAggregateSubTab(props);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <Card>
         <CardHeader className="space-y-1">
           <CardTitle className="flex items-center gap-2">
@@ -41,7 +41,7 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
             />
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-4">
           <NodeSelectionPanel
             selectedNodes={nodeSelection.effectiveNodes}
             nodeColumnSelections={nodeSelection.nodeColumnSelections}

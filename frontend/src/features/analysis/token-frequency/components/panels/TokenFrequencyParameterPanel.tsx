@@ -3,6 +3,8 @@ import { ANALYSIS_LOCKED_MESSAGE } from '@/components/tabs/AnalysisLockedNotice'
 import type { NodeColumnSelection } from '@/hooks/useAutoNodeColumns';
 import { AnalysisCardLayout } from '../../../common/components/AnalysisCardLayout';
 import type { WorkspaceNodeLike, NodeColumnSource } from '../../../common/nodeSelectionTypes';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 
 type TokenFrequencyParameterPanelProps = {
   panelSelectedNodes: WorkspaceNodeLike[];
@@ -22,6 +24,9 @@ type TokenFrequencyParameterPanelProps = {
   appliedStopCount: number;
   hasResults: boolean;
   runLabel?: string;
+  baselineNodeId: string | null;
+  onBaselineNodeChange: (nodeId: string) => void;
+  computeDisplayName: (nodeId: string) => string;
 };
 
 export const TokenFrequencyParameterPanel = ({
@@ -42,7 +47,13 @@ export const TokenFrequencyParameterPanel = ({
   appliedStopCount,
   hasResults,
   runLabel,
+  baselineNodeId,
+  onBaselineNodeChange,
+  computeDisplayName,
 }: TokenFrequencyParameterPanelProps) => {
+  const hasTwoNodes = panelSelectedNodes.length === 2;
+  const nodeIds = panelSelectedNodes.map((n) => String(n.id)).filter(Boolean);
+
   return (
     <AnalysisCardLayout
       title="Token Frequency Analysis"
@@ -91,6 +102,28 @@ export const TokenFrequencyParameterPanel = ({
         originalCount={displayNodeCount}
         lockedMessage={ANALYSIS_LOCKED_MESSAGE}
       />
+
+      {hasTwoNodes && (
+        <div className="flex items-center gap-3 pt-2">
+          <Label htmlFor="baseline-node" className="text-sm font-medium whitespace-nowrap">Baseline</Label>
+          <Select
+            value={baselineNodeId ?? nodeIds[0]}
+            onValueChange={onBaselineNodeChange}
+            disabled={isLocked}
+          >
+            <SelectTrigger id="baseline-node" className="h-8 w-64">
+              <SelectValue placeholder="Select baseline node" />
+            </SelectTrigger>
+            <SelectContent>
+              {nodeIds.map((id) => (
+                <SelectItem key={id} value={id}>
+                  {computeDisplayName(id)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
     </AnalysisCardLayout>
   );
 };

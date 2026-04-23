@@ -2,12 +2,19 @@ import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import { enableMapSet } from 'immer';
+import { usePreferencesStore } from './preferencesStore';
 
+// Required once globally so Zustand's immer middleware can mutate the Set/Map
+// state below without throwing.
 enableMapSet();
 
 /**
- * UI Store - Handles all user interface state
- * Separated from business logic for better maintainability
+ * Global UI state: active view, sidebar layout, per-operation loading/error
+ * tracking, and the small set of modals that live outside their feature
+ * components.
+ *
+ * Business state (workspaces, nodes, selections, analysis tasks) belongs in
+ * the server cache or dedicated stores — this store is purely presentation.
  */
 
 export type ViewType =
@@ -33,31 +40,28 @@ export const ALL_VIEWS: ViewType[] = [
   'export',
 ];
 
+/** Views shown out of the box; AI Annotator is opt-in via preferences. */
 export const DEFAULT_VISIBLE_VIEWS: ViewType[] = ALL_VIEWS.filter(
-  (view) => view !== 'ai-annotator'
+  (view) => view !== 'ai-annotator',
 );
 
+interface TutorialTarget {
+  file: string;
+  anchor: string;
+  label?: string;
+}
+
 interface UIState {
-  // Current view and navigation
   currentView: ViewType;
   visibleViews: ViewType[];
   sidebarCollapsed: boolean;
-  
-  // Loading states - simplified and flattened
-  isGlobalLoading: boolean;
+
+  /** Set of in-flight operation ids. Read via `.size` / `.has` elsewhere. */
   loadingOperations: Set<string>;
-  
-  // Error states - simplified and flattened  
-  globalError: string | null;
+  /** Map of operation id → last error message. */
   operationErrors: Map<string, string>;
-  
-  // Modal visibility states
+
   modals: {
-    joinModal: boolean;
-    filterModal: boolean;
-    documentColumnModal: boolean;
-    renameModal: boolean;
-    deleteConfirmModal: boolean;
     feedbackModal: boolean;
     tutorialModal: boolean;
     warningModal: boolean;
@@ -91,35 +95,19 @@ interface UIState {
 }
 
 interface UIActions {
-  // View management
+  // Views / layout
   setCurrentView: (view: ViewType) => void;
   setViewVisibility: (view: ViewType, visible: boolean) => void;
+  syncVisibleViewsFromPreferences: () => void;
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
-  
-  // Loading management - simplified API
-  setGlobalLoading: (loading: boolean) => void;
+
+  // Operation tracking (used by workspace mutations to surface errors).
   startOperation: (operationId: string) => void;
   endOperation: (operationId: string) => void;
-  isOperationLoading: (operationId: string) => boolean;
-  
-  // Error management - simplified API
-  setGlobalError: (error: string | null) => void;
   setOperationError: (operationId: string, error: string) => void;
-  clearOperationError: (operationId: string) => void;
-  clearAllErrors: () => void;
-  
-  // Modal management - individual actions for clarity
-  openJoinModal: () => void;
-  closeJoinModal: () => void;
-  openFilterModal: () => void;
-  closeFilterModal: () => void;
-  openDocumentColumnModal: () => void;
-  closeDocumentColumnModal: () => void;
-  openRenameModal: () => void;
-  closeRenameModal: () => void;
-  openDeleteConfirmModal: () => void;
-  closeDeleteConfirmModal: () => void;
+
+  // Modals
   openFeedbackModal: () => void;
   closeFeedbackModal: () => void;
   openTutorialModal: () => void;
@@ -168,131 +156,65 @@ export const useUIStore = create<UIStore>()(
       infoTarget: null,
       referenceTarget: null,
 
-      // View management
-      setCurrentView: (view) => set((state) => {
-        if (state.currentView === view) {
-          return;
-        }
-        state.currentView = view;
-      }),
+        setCurrentView: (view) => set((state) => {
+          if (state.currentView !== view) state.currentView = view;
+        }),
 
-      setViewVisibility: (view, visible) => set((state) => {
-        const currentlyVisible = state.visibleViews.includes(view);
-        if (currentlyVisible === visible) {
-          return;
-        }
+        setViewVisibility: (view, visible) => set((state) => {
+          const currentlyVisible = state.visibleViews.includes(view);
+          if (currentlyVisible === visible) return;
 
-        if (visible) {
-          state.visibleViews = ALL_VIEWS.filter(
-            (candidate) => candidate === view || state.visibleViews.includes(candidate)
-          );
-          return;
-        }
+          if (visible) {
+            // Preserve canonical order from ALL_VIEWS when re-inserting.
+            state.visibleViews = ALL_VIEWS.filter(
+              (candidate) => candidate === view || state.visibleViews.includes(candidate),
+            );
+          } else {
+            // Never hide the last visible view — leaves the user nowhere to go.
+            if (state.visibleViews.length <= 1) return;
+            state.visibleViews = state.visibleViews.filter((c) => c !== view);
+            if (state.currentView === view) {
+              state.currentView = state.visibleViews[0] ?? 'data-loader';
+            }
+          }
 
-        if (state.visibleViews.length <= 1) {
-          return;
-        }
+          usePreferencesStore.getState().setViewHidden(view, !visible);
+        }),
 
-        state.visibleViews = state.visibleViews.filter((candidate) => candidate !== view);
+        syncVisibleViewsFromPreferences: () => set((state) => {
+          const hiddenViews = usePreferencesStore.getState().hiddenViews;
+          state.visibleViews = ALL_VIEWS.filter((v) => !hiddenViews.includes(v));
+          if (!state.visibleViews.includes(state.currentView)) {
+            state.currentView = state.visibleViews[0] ?? 'data-loader';
+          }
+        }),
 
-        if (state.currentView === view) {
-          state.currentView = state.visibleViews[0] ?? 'data-loader';
-        }
-      }),
-      
-      toggleSidebar: () => set((state) => {
-        state.sidebarCollapsed = !state.sidebarCollapsed;
-      }),
-      
-      setSidebarCollapsed: (collapsed) => set((state) => {
-        state.sidebarCollapsed = collapsed;
-      }),
+        toggleSidebar: () => set((state) => {
+          state.sidebarCollapsed = !state.sidebarCollapsed;
+        }),
 
-      // Loading management
-      setGlobalLoading: (loading) => set((state) => {
-        state.isGlobalLoading = loading;
-      }),
-      
-      startOperation: (operationId) => set((state) => {
-        state.loadingOperations.add(operationId);
-      }),
-      
-      endOperation: (operationId) => set((state) => {
-        state.loadingOperations.delete(operationId);
-        // Clear any associated errors when operation completes
-        state.operationErrors.delete(operationId);
-      }),
-      
-      isOperationLoading: (operationId) => get().loadingOperations.has(operationId),
+        setSidebarCollapsed: (collapsed) => set((state) => {
+          state.sidebarCollapsed = collapsed;
+        }),
 
-      // Error management
-      setGlobalError: (error) => set((state) => {
-        state.globalError = error;
-      }),
-      
-      setOperationError: (operationId, error) => set((state) => {
-        state.operationErrors.set(operationId, error);
-        // End the operation loading state when error occurs
-        state.loadingOperations.delete(operationId);
-      }),
-      
-      clearOperationError: (operationId) => set((state) => {
-        state.operationErrors.delete(operationId);
-      }),
-      
-      clearAllErrors: () => set((state) => {
-        state.globalError = null;
-        state.operationErrors.clear();
-      }),
+        startOperation: (operationId) => set((state) => {
+          state.loadingOperations.add(operationId);
+        }),
 
-      // Modal management
-      openJoinModal: () => set((state) => {
-        state.modals.joinModal = true;
-      }),
-      
-      closeJoinModal: () => set((state) => {
-        state.modals.joinModal = false;
-      }),
-      
-      openFilterModal: () => set((state) => {
-        state.modals.filterModal = true;
-      }),
-      
-      closeFilterModal: () => set((state) => {
-        state.modals.filterModal = false;
-      }),
-      
-      openDocumentColumnModal: () => set((state) => {
-        state.modals.documentColumnModal = true;
-      }),
-      
-      closeDocumentColumnModal: () => set((state) => {
-        state.modals.documentColumnModal = false;
-      }),
-      
-      openRenameModal: () => set((state) => {
-        state.modals.renameModal = true;
-      }),
-      
-      closeRenameModal: () => set((state) => {
-        state.modals.renameModal = false;
-      }),
-      
-      openDeleteConfirmModal: () => set((state) => {
-        state.modals.deleteConfirmModal = true;
-      }),
-      
-      closeDeleteConfirmModal: () => set((state) => {
-        state.modals.deleteConfirmModal = false;
-      }),
+        endOperation: (operationId) => set((state) => {
+          state.loadingOperations.delete(operationId);
+          // Clearing stale errors on success keeps UI surfaces consistent.
+          state.operationErrors.delete(operationId);
+        }),
 
-      openFeedbackModal: () => set((state) => {
-        state.modals.feedbackModal = true;
-      }),
+        setOperationError: (operationId, error) => set((state) => {
+          state.operationErrors.set(operationId, error);
+          // An error ends the operation from the UI's perspective.
+          state.loadingOperations.delete(operationId);
+        }),
 
-      closeFeedbackModal: () => set((state) => {
-        state.modals.feedbackModal = false;
-      }),
+        openFeedbackModal: () => set((state) => { state.modals.feedbackModal = true; }),
+        closeFeedbackModal: () => set((state) => { state.modals.feedbackModal = false; }),
 
       openTutorialModal: () => set((state) => {
         state.modals.tutorialModal = true;
@@ -361,8 +283,8 @@ export const useUIStore = create<UIStore>()(
         partialize: (state) => ({
           currentView: state.currentView,
         }),
-      }
+      },
     ),
-    { name: 'ui-store' }
-  )
+    { name: 'ui-store' },
+  ),
 );

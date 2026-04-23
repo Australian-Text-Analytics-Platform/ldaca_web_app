@@ -91,6 +91,32 @@ fn make_error(message: impl Into<String>) -> Box<dyn std::error::Error> {
     Box::new(io::Error::new(io::ErrorKind::Other, message.into()))
 }
 
+/// Strip the Windows extended-length path prefix (`\\?\`) from a path, if
+/// present. On non-Windows platforms this is a no-op.
+///
+/// Paths with the `\\?\` prefix bypass the Win32 path-normalization layer,
+/// which means forward slashes are no longer accepted as separators. Some
+/// Python libraries (notably Jinja2's template loaders used by pandas Styler)
+/// join directory and file names with `/` internally, producing mixed-separator
+/// paths like `\\?\C:\...\templates/html.tpl` that the kernel cannot resolve.
+/// Stripping the prefix gives Python ordinary drive-letter paths that behave
+/// identically to what a user would see in Explorer.
+fn strip_unc_prefix(path: &Path) -> PathBuf {
+    #[cfg(target_os = "windows")]
+    {
+        if let Some(s) = path.to_str() {
+            if let Some(rest) = s.strip_prefix(r"\\?\UNC\") {
+                // \\?\UNC\server\share -> \\server\share
+                return PathBuf::from(format!(r"\\{}", rest));
+            }
+            if let Some(rest) = s.strip_prefix(r"\\?\") {
+                return PathBuf::from(rest);
+            }
+        }
+    }
+    path.to_path_buf()
+}
+
 fn locate_backend_runtime(app: &AppHandle) -> Result<BackendRuntime, Box<dyn std::error::Error>> {
     if let Some(python_override) = path_from_env("LDACA_BACKEND_PYTHON") {
         let runtime_dir = path_from_env("LDACA_BACKEND_RUNTIME")
@@ -102,8 +128,8 @@ fn locate_backend_runtime(app: &AppHandle) -> Result<BackendRuntime, Box<dyn std
             })?;
 
         return Ok(BackendRuntime {
-            root: runtime_dir,
-            python: python_override,
+            root: strip_unc_prefix(&runtime_dir),
+            python: strip_unc_prefix(&python_override),
         });
     }
 
@@ -123,9 +149,16 @@ fn locate_backend_runtime(app: &AppHandle) -> Result<BackendRuntime, Box<dyn std
         ))
     })?;
 
+    // Strip any Windows extended-length `\\?\` prefix so paths forwarded to
+    // Python (PYTHONHOME, PYTHONPATH, LDACA_BACKEND_RUNTIME, current_dir, …)
+    // are ordinary drive-letter paths. Python libraries such as Jinja2's
+    // template loaders (used by pandas Styler for `.tpl` files) join paths
+    // with forward slashes internally; the `\\?\` prefix disables Win32 path
+    // normalization and rejects mixed separators, producing spurious
+    // "'html.tpl' not found in search path" errors otherwise.
     Ok(BackendRuntime {
-        root: runtime_dir,
-        python: python_path,
+        root: strip_unc_prefix(&runtime_dir),
+        python: strip_unc_prefix(&python_path),
     })
 }
 
@@ -504,12 +537,15 @@ fn spawn_backend_process(
     backend_port: u16,
     env_overrides: &HashMap<String, String>,
 ) -> io::Result<BackendProcessHandle> {
-    let mut command = Command::new(&runtime.python);
+    let runtime_root = &runtime.root;
+    let runtime_python = &runtime.python;
+
+    let mut command = Command::new(runtime_python);
     command
         .arg("-m")
         .arg("ldaca_web_app.cli")
         .arg("--backend")
-        .current_dir(&runtime.root)
+        .current_dir(runtime_root)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
@@ -517,15 +553,15 @@ fn spawn_backend_process(
     command.env("PYTHONUNBUFFERED", "1");
     command.env("BACKEND_PORT", backend_port.to_string());
     command.env("LDACA_BACKEND_PORT", backend_port.to_string());
-    command.env("LDACA_BACKEND_RUNTIME", runtime.root.as_os_str());
-    command.env("LDACA_BACKEND_PYTHON", runtime.python.as_os_str());
+    command.env("LDACA_BACKEND_RUNTIME", runtime_root.as_os_str());
+    command.env("LDACA_BACKEND_PYTHON", runtime_python.as_os_str());
 
     // Ensure packaged Python runtime is relocatable across machines.
     // `pyvenv.cfg` may contain build-machine absolute paths; use managed-python
     // as PYTHONHOME and venv site-packages as PYTHONPATH.
-    let managed_python_home = find_managed_python_home(&runtime.root);
+    let managed_python_home = find_managed_python_home(runtime_root);
 
-    let venv_site_packages = find_venv_site_packages(&runtime.root);
+    let venv_site_packages = find_venv_site_packages(runtime_root);
 
     if let Some(ref home) = managed_python_home {
         println!(

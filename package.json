@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "npm run dev -w frontend",
     "build": "npm run build -w frontend",
-    "build_and_copy_to_backend": "npm run build -w frontend && node scripts/copy-frontend-build-to-backend.mjs",
+    "deploy_frontend_to_backend": "npm run build -w frontend && node scripts/deploy-frontend-to-backend.mjs",
     "desktop:dev": "npm run desktop:dev -w frontend",
     "desktop:build:mac": "npm run desktop:build:mac -w frontend",
     "desktop:build:windows": "npm run desktop:build:windows -w frontend",

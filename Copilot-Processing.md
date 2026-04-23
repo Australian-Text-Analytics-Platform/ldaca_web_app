@@ -1,3 +1,19 @@
+# Backend Code Review & Refactor
+
+## User Request
+
+Review the whole backend manually. For each file:
+
+1. Organize / modularize / add comments to undocumented functions.
+2. Aggressively remove unnecessary try/except guardrails.
+3. Simplify overly complex functions; redesign awkward patterns.
+
+## Action Plan
+
+Review order: entry points → small modules → progressively larger. Track progress via todo list.
+
+## Log
+
 # Copilot Processing
 
 ## Request

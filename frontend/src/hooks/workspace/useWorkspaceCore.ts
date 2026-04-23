@@ -5,34 +5,6 @@ import { useSelectionStore } from '../../stores/selectionStore';
 import { useUIStore } from '../../stores/uiStore';
 import { type PaginationMap, type PaginationState, createDefaultPagination } from './types';
 
-const normalizeOperationErrors = (operationErrors: Map<string, string> | Record<string, string> | null | undefined) => {
-  if (!operationErrors) {
-    return {} as Record<string, string>;
-  }
-
-  if (operationErrors instanceof Map) {
-    const result: Record<string, string> = {};
-    operationErrors.forEach((value, key) => {
-      if (typeof value === 'string') {
-        result[key] = value;
-      }
-    });
-    return result;
-  }
-
-  if (typeof operationErrors === 'object') {
-    const entries = Object.entries(operationErrors as Record<string, string>);
-    return entries.reduce<Record<string, string>>((acc, [key, value]) => {
-      if (typeof value === 'string') {
-        acc[key] = value;
-      }
-      return acc;
-    }, {});
-  }
-
-  return {} as Record<string, string>;
-};
-
 const useSelectionSlice = () =>
   useSelectionStore(
     useShallow((state) => ({
@@ -56,11 +28,14 @@ const useUISlice = () =>
     }))
   );
 
+/**
+ * Core workspace wiring: bundles auth, current-workspace id, selection, and
+ * per-node pagination. Pagination is kept as local state (not in a store)
+ * because it's tightly coupled to `selectedNodeId` lifecycle and shouldn't
+ * persist across workspaces.
+ */
 export const useWorkspaceCore = () => {
   const { getAuthHeaders, isAuthenticated } = useAuth();
-  const selection = useSelectionSlice();
-  const ui = useUISlice();
-
   const {
     selectedNodeId,
     selectedNodeIds,
@@ -68,7 +43,8 @@ export const useWorkspaceCore = () => {
     setSelectedNodes,
     toggleNodeSelection,
     clearAllSelections,
-  } = selection;
+  } = useSelectionSlice();
+  const ui = useUISlice();
 
   const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string | null>(null);
   const [pagination, setPaginationState] = useState<PaginationMap>({});
@@ -77,74 +53,53 @@ export const useWorkspaceCore = () => {
     setPaginationState((prev) => {
       const existing = prev[nodeId] || createDefaultPagination();
       const next = updater(existing);
-      if (next === existing) {
-        return prev;
-      }
+      if (next === existing) return prev;
       return { ...prev, [nodeId]: next };
     });
   };
 
-  const updateCurrentPage = (nodeId: string, page: number) => {
+  const updateCurrentPage = (nodeId: string, page: number) =>
     updatePagination(nodeId, (existing) =>
       existing.currentPage === page ? existing : { ...existing, currentPage: page }
     );
-  };
 
-  const updatePageSize = (nodeId: string, pageSize: number) => {
-    updatePagination(nodeId, (existing) => {
-      if (existing.pageSize === pageSize && existing.currentPage === 1) {
-        return existing;
-      }
-      return { ...existing, pageSize, currentPage: 1 };
-    });
-  };
+  const updatePageSize = (nodeId: string, pageSize: number) =>
+    updatePagination(nodeId, (existing) =>
+      existing.pageSize === pageSize && existing.currentPage === 1
+        ? existing
+        : { ...existing, pageSize, currentPage: 1 }
+    );
 
-  const getPaginationForNode = (nodeId?: string | null) => {
-    if (!nodeId) {
-      return createDefaultPagination();
-    }
-    return pagination[nodeId] || createDefaultPagination();
-  };
+  const getPaginationForNode = (nodeId?: string | null) =>
+    (nodeId && pagination[nodeId]) || createDefaultPagination();
 
+  // Reset pagination + selection when the workspace changes. First render is
+  // skipped (previous ref starts as null) so we don't clobber the caller's
+  // freshly-chosen workspace.
   const previousWorkspaceIdRef = useRef<string | null>(null);
   /* eslint-disable react-hooks/set-state-in-effect -- Resetting selection/pagination on workspace change; guarded by ref comparison */
   useEffect(() => {
     const previous = previousWorkspaceIdRef.current;
-    if (previous !== currentWorkspaceId) {
-      if (previous !== null) {
-        clearAllSelections();
-      }
-      setPaginationState({});
-      previousWorkspaceIdRef.current = currentWorkspaceId;
-    }
+    if (previous === currentWorkspaceId) return;
+    if (previous !== null) clearAllSelections();
+    setPaginationState({});
+    previousWorkspaceIdRef.current = currentWorkspaceId;
   }, [clearAllSelections, currentWorkspaceId]);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
-  /* eslint-disable react-hooks/set-state-in-effect -- Initializing pagination for newly selected node; guarded to prevent infinite loop */
+  // Initialize pagination for newly selected nodes (lazy).
   useEffect(() => {
-    const nodeId = selectedNodeId;
-    if (nodeId && !pagination[nodeId]) {
-      setPaginationState((prev) => {
-        if (prev[nodeId]) {
-          return prev;
-        }
-        return {
-          ...prev,
-          [nodeId]: createDefaultPagination(),
-        };
-      });
-    }
+    if (!selectedNodeId || pagination[selectedNodeId]) return;
+    setPaginationState((prev) =>
+      prev[selectedNodeId] ? prev : { ...prev, [selectedNodeId]: createDefaultPagination() }
+    );
   }, [pagination, selectedNodeId]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const handlePageChange = (page: number) => {
-    if (!selectedNodeId) return;
-    updateCurrentPage(selectedNodeId, page);
+    if (selectedNodeId) updateCurrentPage(selectedNodeId, page);
   };
-
   const handlePageSizeChange = (pageSize: number) => {
-    if (!selectedNodeId) return;
-    updatePageSize(selectedNodeId, pageSize);
+    if (selectedNodeId) updatePageSize(selectedNodeId, pageSize);
   };
 
   const authHeaders = (() => {
@@ -153,25 +108,16 @@ export const useWorkspaceCore = () => {
     return headers.Authorization ? headers : {};
   })();
 
-  const loadingOperationCount = (() => {
-    if (ui.loadingOperations instanceof Set) {
-      return ui.loadingOperations.size;
-    }
-    return 0;
-  })();
-
-  const operationErrorsRecord = normalizeOperationErrors(ui.operationErrors);
+  const operationErrorsRecord: Record<string, string> = {};
+  ui.operationErrors.forEach((value, key) => { operationErrorsRecord[key] = value; });
 
   return {
-    // Auth
     authHeaders,
     isAuthenticated,
 
-    // Workspace identity
     currentWorkspaceId,
     setCurrentWorkspaceId,
 
-    // Selection
     selectedNodeId,
     selectedNodeIds,
     selectNode,
@@ -179,7 +125,6 @@ export const useWorkspaceCore = () => {
     toggleNodeSelection,
     clearSelection: clearAllSelections,
 
-    // Pagination
     pagination,
     getPaginationForNode,
     updateCurrentPage,
@@ -187,8 +132,7 @@ export const useWorkspaceCore = () => {
     handlePageChange,
     handlePageSizeChange,
 
-    // UI operations
-    loadingOperationCount,
+    loadingOperationCount: ui.loadingOperations.size,
     operationErrorsRecord,
     startOperation: ui.startOperation,
     endOperation: ui.endOperation,
