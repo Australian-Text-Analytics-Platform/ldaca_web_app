@@ -82,17 +82,17 @@ const formatNumber = (
 
 const STATISTICS_COLUMNS: StatisticsColumn[] = [
   { key: 'token', label: 'Token', className: 'font-medium' },
-  { key: 'freq_corpus_0', label: 'O1', className: 'tabular-nums' },
+  { key: 'freq_baseline', label: 'OB', className: 'tabular-nums' },
   {
-    key: 'percent_corpus_0',
-    label: '%1',
+    key: 'percent_baseline',
+    label: '%B',
     className: 'tabular-nums',
     render: (value) => formatNumber(value, { decimals: 2, suffix: '%' }),
   },
-  { key: 'freq_corpus_1', label: 'O2', className: 'tabular-nums' },
+  { key: 'freq_study', label: 'OS', className: 'tabular-nums' },
   {
-    key: 'percent_corpus_1',
-    label: '%2',
+    key: 'percent_study',
+    label: '%S',
     className: 'tabular-nums',
     render: (value) => formatNumber(value, { decimals: 2, suffix: '%' }),
   },
@@ -219,10 +219,10 @@ export const TokenFrequencyUnifiedTokenSection = ({
     .filter((s) => !appliedStopSet.has(String(s?.token ?? '').toLowerCase()))
     .map((s) => ({
       token: String(s?.token ?? ''),
-      o1: Number(s?.freq_corpus_0) || 0,
-      o2: Number(s?.freq_corpus_1) || 0,
-      p1: parseStatisticsNumericValue(s?.percent_corpus_0),
-      p2: parseStatisticsNumericValue(s?.percent_corpus_1),
+      o1: Number(s?.freq_baseline) || 0,
+      o2: Number(s?.freq_study) || 0,
+      p1: parseStatisticsNumericValue(s?.percent_baseline),
+      p2: parseStatisticsNumericValue(s?.percent_study),
       logratio: parseStatisticsNumericValue(s?.log_ratio),
     }))
     .map((s) => ({

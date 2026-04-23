@@ -141,10 +141,10 @@ export interface TokenFrequencyResponse {
   stop_words?: string[] | null;
   statistics?: Array<{
     token: string;
-    freq_corpus_0: number;
-    percent_corpus_0: StatisticsNumericValue;
-    freq_corpus_1: number;
-    percent_corpus_1: StatisticsNumericValue;
+    freq_baseline: number;
+    percent_baseline: StatisticsNumericValue;
+    freq_study: number;
+    percent_study: StatisticsNumericValue;
     log_likelihood_llv: StatisticsNumericValue;
     percent_diff: StatisticsNumericValue;
     bayes_factor_bic?: StatisticsNumericValue;

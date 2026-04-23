@@ -1085,7 +1085,7 @@ const ConcordanceFeature: React.FC = () => {
   const renderConcordanceTable = (
     nodeKey: string,
     nodeData: ConcordanceResultEntry,
-    context: { nodeId: string; paginationKey: string; requestNodeId: string; column: string }
+    context: { nodeId: string; paginationKey: string; requestNodeId: string; column: string; displayName?: string; nodeColor?: string }
   ) => {
     const { nodeId: actualNodeId, paginationKey, requestNodeId, column } = context;
     const effectiveNodeId = actualNodeId || requestNodeId;
@@ -1279,9 +1279,25 @@ const ConcordanceFeature: React.FC = () => {
     const isMaterializing = detachingKey ? Boolean(nodeMaterializing[detachingKey]) : false;
     const hasMaterializedPath = detachingKey ? Boolean(materializedPaths[detachingKey]) : false;
 
+    const showNodeIndicator = panelSelectedNodes.length > 1 && context.nodeColor;
+
     return (
       <div key={nodeKey} className="mb-6">
-        <div className="rounded-lg border border-border bg-card">
+        {showNodeIndicator && (
+          <div className="mb-2 flex items-center gap-2">
+            <span
+              className="inline-block h-3 w-3 shrink-0 rounded-full"
+              style={{ backgroundColor: context.nodeColor }}
+            />
+            <h3 className="text-sm font-medium text-foreground">
+              {context.displayName || nodeKey}
+            </h3>
+          </div>
+        )}
+        <div
+          className="rounded-lg border border-border bg-card"
+          style={showNodeIndicator ? { borderLeftWidth: '3px', borderLeftColor: context.nodeColor } : undefined}
+        >
           <AnalysisTableScrollArea maxHeightClass="max-h-100">
               <Table className={showDispersion ? 'w-full' : 'min-w-180'} disableContainer>
               <TableHeader className="bg-gray-50 sticky top-0 z-10">
@@ -1727,11 +1743,19 @@ const ConcordanceFeature: React.FC = () => {
                       const selection = effectiveNodeColumnSelections.find(sel => sel.nodeId === resolvedNodeId);
                       const column = selection?.column || '';
                       
+                      const nodeDisplayName = (node?.name || nodeName) as string;
+                      const nodeColor = sourceColorMap[nodeName.toLowerCase()]
+                        || sourceColorMap[(node?.id || '').toLowerCase()]
+                        || sourceColorMap[(node?.name || '').toLowerCase()]
+                        || defaultPalette[approxIndex % defaultPalette.length];
+
                       return renderConcordanceTable(nodeName, nodeData, {
                         nodeId: node?.id || '',
                         paginationKey,
                         requestNodeId,
                         column,
+                        displayName: nodeDisplayName,
+                        nodeColor,
                       });
                     })}
                   </div>
