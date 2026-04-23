@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Wand2 } from 'lucide-react';
-import type { NodeResultView, NormalizedNodeResult, TokenFrequencyStatisticsEntry } from '../../tokenFrequencyAdapters';
+import type { NodeResultView, NormalizedNodeResult } from '../../tokenFrequencyAdapters';
+
 import { TokenFrequencySingleTokenSection } from '../results/TokenFrequencySingleTokenSection';
 import { TokenFrequencyUnifiedTokenSection } from '../results/TokenFrequencyUnifiedTokenSection';
 
@@ -58,17 +59,6 @@ type TokenFrequencyResultsPanelProps = {
   unifiedCloudContainerRef: React.RefObject<HTMLDivElement | null>;
   registerWordCloudRef: (nodeKey: string, element: SVGSVGElement | null) => void;
 
-  statsSortColumn: string;
-  statsSortDirection: 'asc' | 'desc';
-  onToggleStatsSort: (column: string) => void;
-  sortedStatistics: TokenFrequencyStatisticsEntry[];
-  statsRowsPerPage: number;
-  statsPage: number;
-  onStatsPageChange: (page: number) => void;
-  onStatsRowsPerPageChange: (rows: number) => void;
-  statsTokenFilter: string;
-  onStatsTokenFilterChange: (value: string) => void;
-
   onDownloadFrequencyCsv: (label: string, rows: unknown[]) => void;
 };
 
@@ -103,16 +93,6 @@ export const TokenFrequencyResultsPanel = ({
   unifiedCloudHeight,
   unifiedCloudContainerRef,
   registerWordCloudRef,
-  statsSortColumn,
-  statsSortDirection,
-  onToggleStatsSort,
-  sortedStatistics,
-  statsRowsPerPage,
-  statsPage,
-  onStatsPageChange,
-  onStatsRowsPerPageChange,
-  statsTokenFilter,
-  onStatsTokenFilterChange,
   onDownloadFrequencyCsv,
 }: TokenFrequencyResultsPanelProps) => {
   const isRunningState = isRunning;
@@ -255,9 +235,6 @@ export const TokenFrequencyResultsPanel = ({
             lastCompareNodeIds={lastCompareNodeIds}
             statistics={results?.statistics}
             appliedStopSet={appliedStopSet}
-            statsSortColumn={statsSortColumn}
-            statsSortDirection={statsSortDirection}
-            onToggleStatsSort={onToggleStatsSort}
             effectiveTokenLimit={effectiveTokenLimit}
             defaultTokenLimit={defaultTokenLimit}
             computeDisplayName={computeDisplayName}
@@ -269,14 +246,7 @@ export const TokenFrequencyResultsPanel = ({
             unifiedCloudHeight={unifiedCloudHeight}
             unifiedCloudContainerRef={unifiedCloudContainerRef}
             registerWordCloudRef={registerWordCloudRef}
-            sortedStatistics={sortedStatistics}
-            statsRowsPerPage={statsRowsPerPage}
-            onStatsRowsPerPageChange={onStatsRowsPerPageChange}
-            statsPage={statsPage}
-            onStatsPageChange={onStatsPageChange}
             onDownloadFrequencyCsv={onDownloadFrequencyCsv}
-            statsTokenFilter={statsTokenFilter}
-            onStatsTokenFilterChange={onStatsTokenFilterChange}
           />
         </div>
       ) : null}

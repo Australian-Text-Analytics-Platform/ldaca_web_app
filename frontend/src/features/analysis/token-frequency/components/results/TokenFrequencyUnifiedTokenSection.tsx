@@ -1,12 +1,11 @@
 import type { NodeResultView, NormalizedNodeResult, TokenFrequencyStatisticsEntry } from '../../tokenFrequencyAdapters';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Download, Search, SortAsc, SortDesc } from 'lucide-react';
+import { Download } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import HelpIcon from '@/components/help/HelpIcon';
 import { Wordcloud } from '@visx/wordcloud';
 import { Text } from '@visx/text';
+import { TokenFrequencyStatisticsTable } from './TokenFrequencyStatisticsTable';
 
 type TokenFrequencyUnifiedTokenSectionProps = {
   normalizedNodeResults: NormalizedNodeResult[];
@@ -25,24 +24,7 @@ type TokenFrequencyUnifiedTokenSectionProps = {
   unifiedCloudHeight: number;
   unifiedCloudContainerRef: React.RefObject<HTMLDivElement | null>;
   registerWordCloudRef: (nodeKey: string, element: SVGSVGElement | null) => void;
-  sortedStatistics: TokenFrequencyStatisticsEntry[];
-  statsSortColumn: string;
-  statsSortDirection: 'asc' | 'desc';
-  onToggleStatsSort: (column: string) => void;
-  statsPage: number;
-  onStatsPageChange: (page: number) => void;
-  statsRowsPerPage: number;
-  onStatsRowsPerPageChange: (rows: number) => void;
   onDownloadFrequencyCsv: (label: string, rows: unknown[]) => void;
-  statsTokenFilter: string;
-  onStatsTokenFilterChange: (value: string) => void;
-};
-
-type StatisticsColumn = {
-  key: string;
-  label: string;
-  className?: string;
-  render?: (value: unknown, row: TokenFrequencyStatisticsEntry) => React.ReactNode;
 };
 
 const parseStatisticsNumericValue = (value: unknown): number => {
@@ -51,116 +33,6 @@ const parseStatisticsNumericValue = (value: unknown): number => {
   if (value === '-Inf') return Number.NEGATIVE_INFINITY;
   return Number(value);
 };
-
-const formatNumber = (
-  value: unknown,
-  options: {
-    decimals?: number;
-    suffix?: string;
-    multiplier?: number;
-    fallback?: string;
-  } = {}
-) => {
-  const {
-    decimals = 2,
-    suffix = '',
-    multiplier = 1,
-    fallback = 'N/A',
-  } = options;
-  if (value === '+Inf') {
-    return `+∞${suffix}`;
-  }
-  if (value === '-Inf') {
-    return `-∞${suffix}`;
-  }
-  const parsed = parseStatisticsNumericValue(value);
-  if (!Number.isFinite(parsed)) {
-    return fallback;
-  }
-  return `${(parsed * multiplier).toFixed(decimals)}${suffix}`;
-};
-
-const STATISTICS_COLUMNS: StatisticsColumn[] = [
-  { key: 'token', label: 'Token', className: 'font-medium' },
-  { key: 'freq_baseline', label: 'OB', className: 'tabular-nums' },
-  {
-    key: 'percent_baseline',
-    label: '%B',
-    className: 'tabular-nums',
-    render: (value) => formatNumber(value, { decimals: 2, suffix: '%' }),
-  },
-  { key: 'freq_study', label: 'OS', className: 'tabular-nums' },
-  {
-    key: 'percent_study',
-    label: '%S',
-    className: 'tabular-nums',
-    render: (value) => formatNumber(value, { decimals: 2, suffix: '%' }),
-  },
-  {
-    key: 'log_likelihood_llv',
-    label: 'LL',
-    className: 'tabular-nums',
-    render: (value) => formatNumber(value, { decimals: 2 }),
-  },
-  {
-    key: 'percent_diff',
-    label: '%DIFF',
-    className: 'tabular-nums',
-    render: (value) => formatNumber(value, { decimals: 2, suffix: '%', multiplier: 100 }),
-  },
-  {
-    key: 'bayes_factor_bic',
-    label: 'Bayes',
-    className: 'tabular-nums',
-    render: (value) => formatNumber(value, { decimals: 2 }),
-  },
-  {
-    key: 'effect_size_ell',
-    label: 'ELL',
-    className: 'tabular-nums',
-    render: (value) => formatNumber(value, { decimals: 4 }),
-  },
-  {
-    key: 'relative_risk',
-    label: 'RRisk',
-    className: 'tabular-nums',
-    render: (value) => formatNumber(value, { decimals: 2 }),
-  },
-  {
-    key: 'log_ratio',
-    label: 'LogRatio',
-    className: 'tabular-nums',
-    render: (value) => formatNumber(value, { decimals: 4 }),
-  },
-  {
-    key: 'odds_ratio',
-    label: 'OddsRatio',
-    className: 'tabular-nums',
-    render: (value) => formatNumber(value, { decimals: 2 }),
-  },
-  {
-    key: 'significance',
-    label: 'Significance',
-    render: (_value, row) => {
-      const significance = String(row?.significance ?? '');
-      const badgeClass =
-        significance === '****'
-          ? 'bg-red-100 text-red-800'
-          : significance === '***'
-            ? 'bg-orange-100 text-orange-800'
-            : significance === '**'
-              ? 'bg-yellow-100 text-yellow-800'
-              : significance === '*'
-                ? 'bg-green-100 text-green-800'
-                : 'bg-muted text-muted-foreground';
-      return (
-        <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${badgeClass}`}>
-          {significance || 'n.s.'}
-        </span>
-      );
-    },
-  },
-];
 
 export const TokenFrequencyUnifiedTokenSection = ({
   normalizedNodeResults,
@@ -179,30 +51,13 @@ export const TokenFrequencyUnifiedTokenSection = ({
   unifiedCloudHeight,
   unifiedCloudContainerRef,
   registerWordCloudRef,
-  sortedStatistics,
-  statsSortColumn,
-  statsSortDirection,
-  onToggleStatsSort,
-  statsPage,
-  onStatsPageChange,
-  statsRowsPerPage,
-  onStatsRowsPerPageChange,
   onDownloadFrequencyCsv,
-  statsTokenFilter,
-  onStatsTokenFilterChange,
 }: TokenFrequencyUnifiedTokenSectionProps) => {
   const hasMultipleNodes = normalizedNodeResults.length >= 2 || nodeDisplayResults.length >= 2 || lastCompareNodeIds.length >= 2;
 
   if (!hasMultipleNodes) {
     return null;
   }
-
-  const statisticsPageCount = Math.max(1, Math.ceil(sortedStatistics.length / statsRowsPerPage));
-  const safeStatsPage = Math.min(statsPage, statisticsPageCount);
-  const pagedStatistics = sortedStatistics.slice(
-    (safeStatsPage - 1) * statsRowsPerPage,
-    safeStatsPage * statsRowsPerPage
-  );
 
   const isComparative = normalizedNodeResults.length === 2 && lastCompareNodeIds.length === 2;
   const nodeAResult = (nodeDisplayResults[0] ?? normalizedNodeResults[0]) ?? null;
@@ -214,14 +69,14 @@ export const TokenFrequencyUnifiedTokenSection = ({
   const nodeAColor = getColorForNode(nodeAId || nodeAName, 0);
   const nodeBColor = getColorForNode(nodeBId || nodeBName, 1);
 
-  const statsSource = Array.isArray(statistics) && statistics.length > 0 ? statistics : sortedStatistics;
+  const statsSource = Array.isArray(statistics) && statistics.length > 0 ? statistics : [];
   const cloudStats = (Array.isArray(statsSource) ? statsSource : [])
     .filter((s) => !appliedStopSet.has(String(s?.token ?? '').toLowerCase()))
     .map((s) => ({
       token: String(s?.token ?? ''),
-      o1: Number(s?.freq_baseline) || 0,
+      o1: Number(s?.freq_reference) || 0,
       o2: Number(s?.freq_study) || 0,
-      p1: parseStatisticsNumericValue(s?.percent_baseline),
+      p1: parseStatisticsNumericValue(s?.percent_reference),
       p2: parseStatisticsNumericValue(s?.percent_study),
       logratio: parseStatisticsNumericValue(s?.log_ratio),
     }))
@@ -387,124 +242,12 @@ export const TokenFrequencyUnifiedTokenSection = ({
       </Card>
 
       {(Array.isArray(statistics) && statistics.length > 0) && (
-        <div className="space-y-3 rounded-lg border p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <h4 className="font-semibold">Statistics</h4>
-              <HelpIcon
-                targetKey="analysis.token-frequency.statistical-measures"
-                label="Statistics"
-                tooltip="Displays comparative token-level statistical measures for the selected data blocks."
-              />
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onDownloadFrequencyCsv('token-keyness', sortedStatistics)}
-            >
-              <Download className="mr-2 h-4 w-4" />
-              Frequencies
-            </Button>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Search className="h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Filter tokens (use * as wildcard, e.g. pre* or *ing)"
-              value={statsTokenFilter}
-              onChange={(event) => onStatsTokenFilterChange(event.target.value)}
-              className="h-8 max-w-sm"
-            />
-            {statsTokenFilter && (
-              <span className="text-xs text-muted-foreground">
-                {sortedStatistics.length} match{sortedStatistics.length !== 1 ? 'es' : ''}
-              </span>
-            )}
-          </div>
-
-          {sortedStatistics.length > 0 ? (
-            <>
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-300 border-collapse text-sm">
-              <thead>
-                <tr className="border-b text-left">
-                  {STATISTICS_COLUMNS.map((column) => {
-                    const isActive = statsSortColumn === column.key;
-                    return (
-                      <th key={column.key} className="px-2 py-2 whitespace-nowrap">
-                        <Button variant="ghost" size="sm" className="h-auto px-0" onClick={() => onToggleStatsSort(column.key)}>
-                          {column.label}
-                          {isActive ? (
-                            statsSortDirection === 'asc' ? <SortAsc className="ml-1 h-3.5 w-3.5" /> : <SortDesc className="ml-1 h-3.5 w-3.5" />
-                          ) : null}
-                        </Button>
-                      </th>
-                    );
-                  })}
-                </tr>
-              </thead>
-              <tbody>
-                {pagedStatistics.map((stat, idx) => (
-                  <tr key={`${stat.token}-${idx}`} className="border-b last:border-b-0">
-                    {STATISTICS_COLUMNS.map((column) => {
-                      const rawValue = (stat as Record<string, unknown>)?.[column.key];
-                      const content = column.render ? column.render(rawValue, stat) : String(rawValue ?? '');
-                      return (
-                        <td key={`${column.key}-${idx}`} className={`px-2 py-1 whitespace-nowrap ${column.className ?? ''}`}>
-                          {content}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2 text-sm">
-              <Label htmlFor="stats-rows-per-page" className="text-xs text-muted-foreground">Rows per page</Label>
-              <Input
-                id="stats-rows-per-page"
-                type="number"
-                min={5}
-                max={200}
-                value={statsRowsPerPage}
-                onChange={(event) => {
-                  const next = Number(event.target.value);
-                  if (Number.isFinite(next) && next >= 5 && next <= 200) {
-                    onStatsRowsPerPageChange(next);
-                  }
-                }}
-                className="h-8 w-20"
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" disabled={safeStatsPage <= 1} onClick={() => onStatsPageChange(1)}>
-                First
-              </Button>
-              <Button variant="outline" size="sm" disabled={safeStatsPage <= 1} onClick={() => onStatsPageChange(safeStatsPage - 1)}>
-                Previous
-              </Button>
-              <span className="text-xs text-muted-foreground">Page {safeStatsPage} / {statisticsPageCount}</span>
-              <Button variant="outline" size="sm" disabled={safeStatsPage >= statisticsPageCount} onClick={() => onStatsPageChange(safeStatsPage + 1)}>
-                Next
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={safeStatsPage >= statisticsPageCount}
-                onClick={() => onStatsPageChange(statisticsPageCount)}
-              >
-                Last
-              </Button>
-            </div>
-          </div>
-            </>
-          ) : (
-            <p className="text-sm text-muted-foreground">No tokens match the current filter.</p>
+        <TokenFrequencyStatisticsTable
+          statistics={statistics.filter(
+            (entry) => !appliedStopSet.has(String(entry?.token ?? '').toLowerCase()),
           )}
-        </div>
+          onDownloadFrequencyCsv={onDownloadFrequencyCsv}
+        />
       )}
     </div>
   );

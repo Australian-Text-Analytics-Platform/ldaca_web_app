@@ -53,8 +53,8 @@ const baseSingleSectionProps = {
 
 const buildStatistic = (overrides: Partial<TokenFrequencyStatisticsEntry> = {}): TokenFrequencyStatisticsEntry => ({
   token: overrides.token ?? 'alpha',
-  freq_baseline: overrides.freq_baseline ?? 18,
-  percent_baseline: overrides.percent_baseline ?? 0.6,
+  freq_reference: overrides.freq_reference ?? 18,
+  percent_reference: overrides.percent_reference ?? 0.6,
   freq_study: overrides.freq_study ?? 12,
   percent_study: overrides.percent_study ?? 0.4,
   log_likelihood_llv: overrides.log_likelihood_llv ?? 3.1,
@@ -84,17 +84,7 @@ const baseUnifiedSectionProps = {
   unifiedCloudHeight: 340,
   unifiedCloudContainerRef: { current: null },
   registerWordCloudRef: vi.fn(),
-  sortedStatistics: [] as TokenFrequencyStatisticsEntry[],
-  statsSortColumn: 'log_likelihood_llv',
-  statsSortDirection: 'desc' as const,
-  onToggleStatsSort: vi.fn(),
-  statsPage: 1,
-  onStatsPageChange: vi.fn(),
-  statsRowsPerPage: 25,
-  onStatsRowsPerPageChange: vi.fn(),
   onDownloadFrequencyCsv: vi.fn(),
-  statsTokenFilter: '',
-  onStatsTokenFilterChange: vi.fn(),
 };
 
 describe('Token frequency result layouts', () => {
@@ -157,7 +147,6 @@ describe('Token frequency result layouts', () => {
         nodeDisplayResults={[nodeA, nodeB]}
         lastCompareNodeIds={['node-a', 'node-b']}
         statistics={statistics}
-        sortedStatistics={statistics}
       />
     );
 

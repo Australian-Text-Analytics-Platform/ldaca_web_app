@@ -141,8 +141,8 @@ export interface TokenFrequencyResponse {
   stop_words?: string[] | null;
   statistics?: Array<{
     token: string;
-    freq_baseline: number;
-    percent_baseline: StatisticsNumericValue;
+    freq_reference: number;
+    percent_reference: StatisticsNumericValue;
     freq_study: number;
     percent_study: StatisticsNumericValue;
     log_likelihood_llv: StatisticsNumericValue;
