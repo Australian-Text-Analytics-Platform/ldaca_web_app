@@ -90,7 +90,7 @@ export const TokenFrequencyUnifiedTokenSection = ({
     }))
     .filter((s) => s.token.length > 0 && s.total > 10);
 
-  const sortedByRank = [...cloudStats].sort((a, b) => a.juxRank - b.juxRank);
+  const sortedByRank = cloudStats.toSorted((a, b) => a.juxRank - b.juxRank);
   const limitForCloudBase = typeof effectiveTokenLimit === 'number' ? effectiveTokenLimit : defaultTokenLimit;
   const cloudLimit = Math.max(0, limitForCloudBase * 2);
   const half = Math.floor(cloudLimit / 2);

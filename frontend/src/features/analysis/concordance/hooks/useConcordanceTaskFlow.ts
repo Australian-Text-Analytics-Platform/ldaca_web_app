@@ -185,7 +185,7 @@ export function useConcordanceTaskFlow({
       setCombinedPage(1);
     }
 
-    const firstNodeId = requestNodeIds[0];
+    const firstNodeId = requestNodeIds[0]!;
     const firstNodePagination = updatedPagination[firstNodeId];
     if (!firstNodePagination) return;
 

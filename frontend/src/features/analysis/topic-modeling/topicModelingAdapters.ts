@@ -11,11 +11,13 @@ export interface ZoomDomain {
 }
 
 export function interpolateColor(colorA: string, colorB: string, t: number): string {
-  const parse = (color: string) =>
-    color
+  const parse = (color: string): [number, number, number] => {
+    const parts = color
       .replace('#', '')
       .match(/.{2}/g)
       ?.map((value) => parseInt(value, 16)) ?? [0, 0, 0];
+    return [parts[0] ?? 0, parts[1] ?? 0, parts[2] ?? 0];
+  };
 
   const [r1, g1, b1] = parse(colorA);
   const [r2, g2, b2] = parse(colorB);

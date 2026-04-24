@@ -303,7 +303,7 @@ export const buildStopWordsExportFile = (stopWordsText: string, label: string): 
 export const downloadExportBundleAsZip = async (zipFilename: string, files: ExportedDownloadFile[]) => {
   if (files.length === 0) return;
   if (files.length === 1) {
-    downloadExportedFile(files[0]);
+    downloadExportedFile(files[0]!);
     return;
   }
 

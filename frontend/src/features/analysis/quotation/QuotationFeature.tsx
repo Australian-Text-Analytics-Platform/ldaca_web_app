@@ -190,7 +190,7 @@ const clipTextAroundSpans = (text: string, spans: HighlightSpan[], surroundingWo
 
   const findWordIndexBeforeOrAt = (pos: number) => {
     for (let i = 0; i < words.length; i++) {
-      const word = words[i];
+      const word = words[i]!;
       if (pos < word.start) {
         return Math.max(0, i - 1);
       }
@@ -203,7 +203,7 @@ const clipTextAroundSpans = (text: string, spans: HighlightSpan[], surroundingWo
 
   const findWordIndexAfterOrAt = (pos: number) => {
     for (let i = 0; i < words.length; i++) {
-      const word = words[i];
+      const word = words[i]!;
       if (pos <= word.end) {
         return i;
       }
@@ -697,8 +697,8 @@ const QuotationFeature: React.FC = () => {
 
       const segs: Array<{ start: number; end: number; types: string[] }> = [];
       for (let i = 0; i < points.length - 1; i++) {
-        const s = points[i];
-        const e = points[i + 1];
+        const s = points[i]!;
+        const e = points[i + 1]!;
         if (e <= s) continue;
         const covering = workingSpans.filter(sp => sp.start < e && sp.end > s).flatMap(sp => sp.types);
         segs.push({ start: s, end: e, types: Array.from(new Set(covering)) });

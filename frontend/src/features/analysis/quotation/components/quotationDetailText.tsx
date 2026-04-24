@@ -70,8 +70,8 @@ export const renderQuotationDetailText = (
 
   const segs: Array<{ start: number; end: number; types: string[] }> = [];
   for (let i = 0; i < points.length - 1; i++) {
-    const s = points[i];
-    const e = points[i + 1];
+    const s = points[i]!;
+    const e = points[i + 1]!;
     if (e <= s) continue;
     const covering = spans
       .filter((sp) => sp.start < e && sp.end > s)

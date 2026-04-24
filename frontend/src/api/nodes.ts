@@ -97,6 +97,36 @@ export interface ReplaceApplyResponse {
   message: string;
 }
 
+// ---------------------------------------------------------------------------
+// Polars Expression (unified endpoint) types
+// ---------------------------------------------------------------------------
+
+export type PolarsExpressionContext =
+  | 'filter'
+  | 'with_columns'
+  | 'select'
+  | 'sort'
+  | 'group_by_agg';
+
+export interface PolarsExpressionItem {
+  /** Parsed JSON object from polars expr.meta.serialize(format="json") */
+  expr: object;
+  /** Only used in sort context */
+  descending?: boolean;
+}
+
+export interface PolarsExpressionRequest {
+  context: PolarsExpressionContext;
+  expressions: PolarsExpressionItem[];
+  group_by_keys?: PolarsExpressionItem[];
+  new_node_name?: string;
+}
+
+export interface PolarsExpressionApplyResponse {
+  node_id: string;
+  node_name: string;
+}
+
 export interface NodeInfoResponse {
   id: string;
   name: string;
@@ -249,6 +279,24 @@ export const nodesApi = {
     headers: Record<string, string> = {}
   ) => httpRequest<ReplaceApplyResponse>(
     `/workspaces/nodes/${node}/replace`,
+    { method: 'POST', headers, body: req }
+  ),
+  polarsExpressionPreview: (
+    node: string,
+    req: PolarsExpressionRequest,
+    page = 1,
+    pageSize = 10,
+    headers: Record<string, string> = {}
+  ) => httpRequest<FilterPreviewResponse>(
+    `/workspaces/nodes/${node}/expression/preview`,
+    { method: 'POST', headers, params: { page, page_size: pageSize }, body: req }
+  ),
+  polarsExpressionApply: (
+    node: string,
+    req: PolarsExpressionRequest,
+    headers: Record<string, string> = {}
+  ) => httpRequest<PolarsExpressionApplyResponse>(
+    `/workspaces/nodes/${node}/expression/apply`,
     { method: 'POST', headers, body: req }
   ),
 };

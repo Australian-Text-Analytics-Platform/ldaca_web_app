@@ -162,7 +162,7 @@ vi.mock('@/api/workspaces', () => ({
 
 describe('DataLoaderFeature citation UI', () => {
   const getVisibleMatch = <T extends HTMLElement>(elements: T[]) => {
-    return elements.at(-1) ?? elements[0];
+    return elements.at(-1) ?? elements[0]!;
   };
 
   const renderWithProviders = (ui: React.ReactElement) => {
@@ -197,7 +197,7 @@ describe('DataLoaderFeature citation UI', () => {
     expect(citationButtons).toHaveLength(1);
     expect(screen.queryByText('README.md')).not.toBeInTheDocument();
 
-    await user.click(citationButtons[0]);
+    await user.click(citationButtons[0]!);
 
     await waitFor(() => {
       expect(mockRawFile).toHaveBeenCalledWith('sample_data/ADO/README.md', {});

@@ -23,7 +23,7 @@ export default defineConfig({
   plugins: [
     react(),
     babel({
-      presets: [reactCompilerPreset()],
+      presets: ['@babel/preset-typescript', reactCompilerPreset()],
     } as Parameters<typeof babel>[0]),
   ],
   resolve: {

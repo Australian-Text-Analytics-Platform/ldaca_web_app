@@ -210,7 +210,7 @@ export const DataLoaderFeature: React.FC = () => {
 
   const { favoriteWorkspaces, toggleFavorite, isFavorite } = usePreferencesStore();
 
-  const sortedWorkspaces = [...workspaces].sort((a, b) => {
+  const sortedWorkspaces = workspaces.toSorted((a, b) => {
     const aId = getWorkspaceId(a) ?? '';
     const bId = getWorkspaceId(b) ?? '';
     const aFav = favoriteWorkspaces.includes(aId) ? 1 : 0;

@@ -244,7 +244,7 @@ const ConcordanceFeature: React.FC = () => {
         node.node_id,
       ].map((val) => (typeof val === 'string' ? val : null)).filter(Boolean) as string[];
       const primaryId = candidateIds[0] ?? `node-${idx}`;
-      const assigned = nodeColors[primaryId] || defaultPalette[idx % defaultPalette.length];
+      const assigned = (nodeColors[primaryId] || defaultPalette[idx % defaultPalette.length])!;
       const variants = new Set<string>();
       [
         primaryId,
@@ -533,7 +533,7 @@ const ConcordanceFeature: React.FC = () => {
           const updated = { ...prev };
           Object.keys(updated).forEach((nodeId) => {
             updated[nodeId] = {
-              ...updated[nodeId],
+              ...updated[nodeId]!,
               pageSize: nextPageSize,
             };
           });
@@ -615,7 +615,7 @@ const ConcordanceFeature: React.FC = () => {
         setNodePagination(prev => {
           const updated = { ...prev };
           Object.keys(updated).forEach((key) => {
-            updated[key] = { ...updated[key], pageSize: 20, currentPage: 1 };
+            updated[key] = { ...updated[key]!, pageSize: 20, currentPage: 1 };
           });
           return updated;
         });
@@ -1395,7 +1395,7 @@ const ConcordanceFeature: React.FC = () => {
               const updated = { ...prev };
               Object.keys(updated).forEach((nid) => {
                 updated[nid] = {
-                  ...updated[nid],
+                  ...updated[nid]!,
                   pageSize: newSize,
                   currentPage: 1,
                 };

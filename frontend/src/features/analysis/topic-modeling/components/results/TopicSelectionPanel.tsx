@@ -49,7 +49,7 @@ export function TopicSelectionPanel({
   hoveredTopicId,
   setHoveredTopicId,
 }: Props) {
-  const sortedTopics = [...topics].sort(
+  const sortedTopics = topics.toSorted(
     (a, b) => (b.total_size ?? 0) - (a.total_size ?? 0),
   );
 

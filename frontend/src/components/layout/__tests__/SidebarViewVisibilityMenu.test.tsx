@@ -110,7 +110,7 @@ describe('Sidebar view visibility menu', () => {
     expect(screen.queryByRole('button', { name: 'AI Annotator' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Data Loader' })).toBeInTheDocument();
 
-    await user.click(screen.getAllByRole('button', { name: /edit visible views/i })[0]);
+    await user.click(screen.getAllByRole('button', { name: /edit visible views/i })[0]!);
 
     const aiAnnotatorToggle = screen.getByRole('menuitemcheckbox', { name: 'AI Annotator' });
     expect(aiAnnotatorToggle).not.toBeChecked();
@@ -128,7 +128,7 @@ describe('Sidebar view visibility menu', () => {
 
     renderSidebar();
 
-    await user.click(screen.getAllByRole('button', { name: /edit visible views/i })[0]);
+    await user.click(screen.getAllByRole('button', { name: /edit visible views/i })[0]!);
 
     expect(screen.queryByRole('menuitemcheckbox', { name: 'Data Loader' })).not.toBeInTheDocument();
     expect(screen.getByRole('menuitemcheckbox', { name: 'Data Preprocessing' })).toBeInTheDocument();

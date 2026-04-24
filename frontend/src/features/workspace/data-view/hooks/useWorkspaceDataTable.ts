@@ -215,7 +215,7 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
     if (next.length === 0) {
       handleSortingChange(undefined, undefined);
     } else {
-      handleSortingChange(next[0].id, next[0].desc);
+      handleSortingChange(next[0]!.id, next[0]!.desc);
     }
   };
 
@@ -223,7 +223,7 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
     if (next.length === 0) {
       handleFilterChange(undefined, undefined, undefined);
     } else {
-      const filter = next[0];
+      const filter = next[0]!;
       const parts = filter.value as { value: string; op: string };
       handleFilterChange(String(filter.id), parts.value, parts.op);
     }

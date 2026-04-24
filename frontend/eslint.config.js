@@ -56,6 +56,11 @@ export default tseslint.config([
       'no-var': 'error',
       'object-shorthand': ['error', 'always'],
 
+      // noUncheckedIndexedAccess (tsconfig) is the type-level safety net for
+      // array/object indexing — `!` assertions added at logically-guaranteed
+      // access sites are intentional and correct.
+      '@typescript-eslint/no-non-null-assertion': 'off',
+
       // React Refresh — warn-only; constant exports are fine (e.g. queryKeys)
       'react-refresh/only-export-components': [
         'warn',

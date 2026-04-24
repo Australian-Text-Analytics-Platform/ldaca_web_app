@@ -229,7 +229,7 @@ describe('DataPreprocessingFeature replace tab', () => {
     render(<DataPreprocessingFeature />);
 
     const [filterTab] = screen.getAllByRole('tab', { name: 'Filter' });
-    filterTab.focus();
+    filterTab!.focus();
     await user.keyboard('{ArrowRight}');
 
     await waitFor(() => {
@@ -262,7 +262,7 @@ describe('DataPreprocessingFeature replace tab', () => {
 
     const filterPanel = screen.getByRole('tabpanel', { name: 'Filter' });
     const [columnSelect] = within(filterPanel).getAllByRole('combobox');
-    columnSelect.focus();
+    columnSelect!.focus();
     await user.keyboard('{ArrowDown}{Enter}');
 
     const valueInput = await screen.findByPlaceholderText('Enter value');

@@ -7,6 +7,7 @@ import {
   type SliceRequest,
   type ExpressionTransformRequest,
   type ReplaceRequest,
+  type PolarsExpressionRequest,
 } from '../../api/nodes';
 import { queryKeys } from '../../lib/queryKeys';
 import { type NodeSchemaResponse } from '../../types';
@@ -621,6 +622,10 @@ export const useWorkspaceNodeMutations = ({
       replaceTextMutation.mutateAsync({ nodeId, request }),
     replaceTextPreview: (nodeId: string, request: ReplaceRequest, page = 1, pageSize = 10) =>
       nodesApi.replaceTextPreview(nodeId, request, page, pageSize, authHeaders),
+    polarsExpressionPreview: (nodeId: string, request: PolarsExpressionRequest, page = 1, pageSize = 10) =>
+      nodesApi.polarsExpressionPreview(nodeId, request, page, pageSize, authHeaders),
+    polarsExpressionApply: (nodeId: string, request: PolarsExpressionRequest) =>
+      nodesApi.polarsExpressionApply(nodeId, request, authHeaders),
     castColumn: (nodeId: string, column: string, targetType: string, format?: string) =>
       castNodeMutation.mutateAsync({ nodeId, column, targetType, format }),
     renameColumn: (nodeId: string, column: string, newName: string) =>

@@ -191,7 +191,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
 
   const limitedNodeId = (() => {
     if (!effectiveNodes.length) return null;
-    const first = effectiveNodes[0];
+    const first = effectiveNodes[0]!;
     return (
       first.id ||
       first.node_id ||
@@ -483,7 +483,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
         const currentIndex = prev.findIndex((token) => token.id === tokenId);
         if (currentIndex === -1) return prev;
         const next = [...prev];
-        const [item] = next.splice(currentIndex, 1);
+        const [item] = next.splice(currentIndex, 1) as [BasicToken];
         let targetIndex = clampIndex(index, next.length + 1);
         if (currentIndex < targetIndex) {
           targetIndex -= 1;
@@ -782,7 +782,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
 
   const nodeColumnSelections = (limitedNodeId ? [{ nodeId: limitedNodeId, column: '' }] : []);
 
-  const nodeColors = (limitedNodeId ? { [limitedNodeId]: DEFAULT_PALETTE[0] } : {});
+  const nodeColors = (limitedNodeId ? { [limitedNodeId]: DEFAULT_PALETTE[0]! } : {}) as Record<string, string>;
 
   return {
     activeNodeId,
