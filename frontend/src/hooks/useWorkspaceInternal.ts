@@ -33,6 +33,8 @@ export const useWorkspaceInternal = () => {
     getPaginationForNode,
     handlePageChange,
     handlePageSizeChange,
+    handleSortingChange,
+    handleFilterChange,
     loadingOperationCount,
     operationErrorsRecord,
     startOperation,
@@ -299,5 +301,8 @@ export const useWorkspaceInternal = () => {
     actions,
     handlePageChange,
     handlePageSizeChange,
+    handleSortingChange,
+    handleFilterChange,
+    getPaginationForNode,
   };
 };

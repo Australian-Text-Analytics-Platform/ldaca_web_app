@@ -21,14 +21,13 @@ const results = await eslint.lintFiles([
   'src/App.tsx',
   'src/components/CustomNode.tsx',
   'src/components/AnalysisPagination.tsx',
-  'src/features/workspace/data-view/components/TablePaginationControls.tsx',
 ]);
 let total = 0;
 for (const r of results) {
   for (const m of r.messages) {
     const fname = r.filePath.split('/').pop();
     const sev = m.severity === 2 ? 'error' : 'warning';
-    console.log(`${fname}:${m.line} ${sev} [${m.ruleId}] ${m.message.substring(0,120)}`);
+    console.log(`${fname}:${m.line} ${sev} [${m.ruleId}] ${m.message.substring(0, 120)}`);
     total++;
   }
 }

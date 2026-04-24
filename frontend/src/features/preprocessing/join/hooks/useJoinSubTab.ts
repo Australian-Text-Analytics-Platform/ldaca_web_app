@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 
 import { nodesApi } from '../../../../api/nodes';
+import { useAuth } from '../../../../hooks/useAuth';
 import type { NodeColumnSelection, WorkspaceNodeLike } from '../../../../components/NodeSelectionPanel';
 import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
 import type { JoinPreviewRequestPayload, JoinType, PreviewPagination, PreviewRow } from '../../types';
@@ -54,8 +55,7 @@ interface JoinPreviewConfig {
   readyMessage: string;
   page: number;
   pageSize: number;
-  onPreviousPage: () => void;
-  onNextPage: () => void;
+  onPageChange: (page: number) => void;
   onPageSizeChange: (size: number) => void;
 }
 
@@ -101,6 +101,7 @@ const describeSharedColumns = (count: number, columns: string[]): string => {
 
 export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
   const { selectedNodeIds, currentWorkspaceId, workspaceNodes, joinNodes, isLoading, onAlert } = props;
+  const { getAuthHeaders } = useAuth();
 
   const [joinLeftNodeId, setJoinLeftNodeId] = useState('');
   const [joinRightNodeId, setJoinRightNodeId] = useState('');
@@ -281,6 +282,7 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
       },
       page,
       pageSize,
+      getAuthHeaders(),
     );
 
     return {
@@ -314,18 +316,6 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
     }
     return [];
   })();
-
-  const handleJoinPreviewPrev = () => {
-    if (joinPreviewPagination?.has_prev && !joinPreviewLoading) {
-      setJoinPreviewPage(Math.max(1, joinPreviewPage - 1));
-    }
-  };
-
-  const handleJoinPreviewNext = () => {
-    if (joinPreviewPagination?.has_next && !joinPreviewLoading) {
-      setJoinPreviewPage(joinPreviewPage + 1);
-    }
-  };
 
   const handleJoinPreviewPageSizeChange = (size: number) => {
     setJoinPreviewPageSize(size);
@@ -418,8 +408,7 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
       readyMessage,
       page: joinPreviewPage,
       pageSize: joinPreviewPageSize,
-      onPreviousPage: handleJoinPreviewPrev,
-      onNextPage: handleJoinPreviewNext,
+      onPageChange: setJoinPreviewPage,
       onPageSizeChange: handleJoinPreviewPageSizeChange,
     },
     apply: {

@@ -228,8 +228,7 @@ export const SliceSubTab: React.FC<SliceSubTabProps> = (props) => {
         pageSize={preview.pageSize}
         documentColumn={getNodeDocumentColumn(props.selectedNode)}
         onPageSizeChange={preview.onPageSizeChange}
-        onPreviousPage={preview.onPreviousPage}
-        onNextPage={preview.onNextPage}
+        onPageChange={preview.onPageChange}
       />
     </div>
   );

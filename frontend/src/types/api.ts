@@ -41,6 +41,8 @@ export interface NodeDataResponse {
   pagination: NodeDataPagination;
   columns: string[];
   dtypes: Record<string, string>;
+  sorting?: { sort_by: string | null; descending: boolean };
+  filtering?: { column: string | null; value: string | null; op: string };
   [key: string]: unknown;
 }
 

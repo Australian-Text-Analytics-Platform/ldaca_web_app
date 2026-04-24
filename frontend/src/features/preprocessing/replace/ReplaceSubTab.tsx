@@ -218,8 +218,7 @@ export const ReplaceSubTab: React.FC<ReplaceSubTabProps> = (props) => {
         pageSize={preview.pageSize}
         documentColumn={getNodeDocumentColumn(effectiveNodes[0])}
         onPageSizeChange={preview.setPageSize}
-        onPreviousPage={preview.onPreviousPage}
-        onNextPage={preview.onNextPage}
+        onPageChange={preview.onPageChange}
       />
     </div>
   );

@@ -166,8 +166,7 @@ export const FilterSubTab: React.FC<FilterSubTabProps> = (props) => {
         pageSize={preview.pageSize}
         documentColumn={getNodeDocumentColumn(props.selectedNode)}
         onPageSizeChange={preview.onPageSizeChange}
-        onPreviousPage={preview.onPreviousPage}
-        onNextPage={preview.onNextPage}
+        onPageChange={preview.onPageChange}
       />
     </div>
   );

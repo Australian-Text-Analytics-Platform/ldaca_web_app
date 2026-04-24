@@ -8,6 +8,7 @@ import {
   type FilterPreviewResponse,
   type ExpressionTransformRequest,
 } from '../../../../api/nodes';
+import { useAuth } from '../../../../hooks/useAuth';
 import { mapColumnsToInfo } from '../../../../utils/columnTypes';
 import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
 import type { PreviewPagination, PreviewRow } from '../../types';
@@ -126,8 +127,7 @@ export interface PreviewConfig {
   page: number;
   pageSize: number;
   setPageSize: (size: number) => void;
-  onPreviousPage: () => void;
-  onNextPage: () => void;
+  onPageChange: (page: number) => void;
 }
 
 export interface ApplyConfig {
@@ -168,6 +168,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     computeColumn,
     refreshNodeSchema,
   } = props;
+  const { getAuthHeaders } = useAuth();
 
   const effectiveNodes = (() => {
     if (selectedNodes?.length) {
@@ -406,7 +407,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
         pagination: (response?.pagination as PreviewPagination) ?? null,
       };
     }
-    const response = await nodesApi.data(request.nodeId, page, pageSize);
+    const response = await nodesApi.data(request.nodeId, { page, pageSize }, getAuthHeaders());
     return {
       data: Array.isArray(response?.data) ? (response.data as PreviewRow[]) : [],
       columns: Array.isArray(response?.columns) ? response.columns : [],
@@ -431,20 +432,6 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     fetcher: previewFetcher,
     debounceMs: 100,
   });
-
-  const currentPreviewPage = previewPagination?.page ?? previewPage;
-
-  const handlePreviewPrev = () => {
-    if (previewPagination?.has_prev && !previewLoading) {
-      setPreviewPage(Math.max(1, currentPreviewPage - 1));
-    }
-  };
-
-  const handlePreviewNext = () => {
-    if (previewPagination?.has_next && !previewLoading) {
-      setPreviewPage(currentPreviewPage + 1);
-    }
-  };
 
   const clampIndex = (value: number, max: number) => {
     if (Number.isNaN(value)) return max;
@@ -871,8 +858,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       page: previewPage,
       pageSize: previewPageSize,
       setPageSize: setPreviewPageSize,
-      onPreviousPage: handlePreviewPrev,
-      onNextPage: handlePreviewNext,
+      onPageChange: setPreviewPage,
     },
     apply: {
       loading: applyLoading,

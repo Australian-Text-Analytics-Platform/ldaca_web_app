@@ -1,5 +1,6 @@
 import React, { useCallback, useState, useEffect, useRef } from 'react';
 import { nodesApi } from '../../../../api/nodes';
+import { useAuth } from '../../../../hooks/useAuth';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../../components/ui/select';
 import { Checkbox } from '../../../../components/ui/checkbox';
 import type { NodeColumnSelection, WorkspaceNodeLike } from '../../../../components/NodeSelectionPanel';
@@ -85,8 +86,7 @@ interface FilterPreviewConfig {
   readyMessage: string;
   page: number;
   pageSize: number;
-  onPreviousPage: () => void;
-  onNextPage: () => void;
+  onPageChange: (page: number) => void;
   onPageSizeChange: (size: number) => void;
 }
 
@@ -158,6 +158,7 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     isLoading,
     onAlert,
   } = props;
+  const { getAuthHeaders } = useAuth();
   const [conditions, setConditions] = useState<FilterConditionWithId[]>([{
     id: '1',
     column: '',
@@ -256,7 +257,7 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
       });
 
       try {
-        const response = await nodesApi.uniqueValues(selectedNodeId, column);
+        const response = await nodesApi.uniqueValues(selectedNodeId, column, getAuthHeaders());
         const rawValues: unknown[] = Array.isArray(response?.unique_values) ? response.unique_values : [];
         const includeNullOption = dataType === 'categorical';
         const hasNullFromResponse = includeNullOption && Boolean(response?.has_null);
@@ -309,7 +310,7 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
           },
         }));
       }
-    }, [getCategoricalKey, currentWorkspaceId, selectedNodeId]);
+    }, [getCategoricalKey, currentWorkspaceId, selectedNodeId, getAuthHeaders]);
 
   const filterDefaultPalette = ['#2563eb', '#dc2626', '#16a34a', '#f97316', '#d946ef', '#0ea5e9'];
 
@@ -402,7 +403,7 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
         pagination: response?.pagination ?? null,
       };
     }
-    const response = await nodesApi.data(request.nodeId, page, pageSize);
+    const response = await nodesApi.data(request.nodeId, { page, pageSize }, getAuthHeaders());
     return {
       data: Array.isArray(response?.data) ? (response.data as PreviewRow[]) : [],
       columns: Array.isArray(response?.columns) ? response.columns : [],
@@ -435,20 +436,6 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
   })();
 
   const currentPreviewPage = previewPagination?.page ?? previewPage;
-  const previewHasPrev = Boolean(previewPagination?.has_prev);
-  const previewHasNext = Boolean(previewPagination?.has_next);
-
-  const handlePreviewPrev = () => {
-    if (previewHasPrev && !previewLoading) {
-      setPreviewPage(Math.max(1, currentPreviewPage - 1));
-    }
-  };
-
-  const handlePreviewNext = () => {
-    if (previewHasNext && !previewLoading) {
-      setPreviewPage(currentPreviewPage + 1);
-    }
-  };
 
   const handleAddCondition = () => {
     const firstColumn = availableColumns[0];
@@ -635,7 +622,7 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     if (!selectedNodeId || !currentWorkspaceId) return;
     
     try {
-      const describeData = await nodesApi.describeColumn(selectedNodeId, column);
+      const describeData = await nodesApi.describeColumn(selectedNodeId, column, getAuthHeaders());
       
       setConditions(prev => prev.map(c => {
         if (c.id !== conditionId) return c;
@@ -677,7 +664,7 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
     if (!selectedNodeId || !currentWorkspaceId) return;
 
     try {
-      const describeData = await nodesApi.describeColumn(selectedNodeId, column);
+      const describeData = await nodesApi.describeColumn(selectedNodeId, column, getAuthHeaders());
 
       setConditions(prev => prev.map(c => {
         if (c.id !== conditionId) return c;
@@ -988,8 +975,7 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
       readyMessage: previewReadyMessage,
       page: currentPreviewPage,
       pageSize: previewPageSize,
-      onPreviousPage: handlePreviewPrev,
-      onNextPage: handlePreviewNext,
+      onPageChange: setPreviewPage,
       onPageSizeChange: setPreviewPageSize,
     },
     selectedNodesOriginalCount: selectedNodes.length,

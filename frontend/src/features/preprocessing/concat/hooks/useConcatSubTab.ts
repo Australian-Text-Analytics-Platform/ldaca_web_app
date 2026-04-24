@@ -65,8 +65,7 @@ interface ConcatPreviewConfig {
   readyMessage: string;
   page: number;
   pageSize: number;
-  onPreviousPage: () => void;
-  onNextPage: () => void;
+  onPageChange: (page: number) => void;
   onPageSizeChange: (size: number) => void;
 }
 
@@ -310,18 +309,6 @@ export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult
     return [];
   })();
 
-  const handleConcatPreviewPrev = () => {
-    if (concatPreviewPagination?.has_prev && !concatPreviewLoading) {
-      setConcatPreviewPage(Math.max(1, concatPreviewPage - 1));
-    }
-  };
-
-  const handleConcatPreviewNext = () => {
-    if (concatPreviewPagination?.has_next && !concatPreviewLoading) {
-      setConcatPreviewPage(concatPreviewPage + 1);
-    }
-  };
-
   const handleConcatPreviewPageSizeChange = (size: number) => {
     if (!Number.isNaN(size)) {
       setConcatPreviewPageSize(size);
@@ -400,8 +387,7 @@ export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult
       readyMessage,
       page: concatPreviewPage,
       pageSize: concatPreviewPageSize,
-      onPreviousPage: handleConcatPreviewPrev,
-      onNextPage: handleConcatPreviewNext,
+      onPageChange: setConcatPreviewPage,
       onPageSizeChange: handleConcatPreviewPageSizeChange,
     },
     apply: {

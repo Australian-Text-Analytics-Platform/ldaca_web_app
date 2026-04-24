@@ -62,17 +62,7 @@ describe('TokenFrequencyResultsPanel', () => {
         unifiedCloudHeight={400}
         unifiedCloudContainerRef={{ current: null }}
         registerWordCloudRef={vi.fn()}
-        statsSortColumn="token"
-        statsSortDirection="asc"
-        onToggleStatsSort={vi.fn()}
-        sortedStatistics={[]}
-        statsRowsPerPage={10}
-        statsPage={1}
-        onStatsPageChange={vi.fn()}
-        onStatsRowsPerPageChange={vi.fn()}
         onDownloadFrequencyCsv={vi.fn()}
-        statsTokenFilter=""
-        onStatsTokenFilterChange={vi.fn()}
       />
     );
 
