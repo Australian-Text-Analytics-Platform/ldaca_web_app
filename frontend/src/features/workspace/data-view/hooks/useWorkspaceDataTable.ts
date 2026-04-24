@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import type { SortingState, ColumnFiltersState } from '@tanstack/react-table';
 import { useWorkspaceActions } from '../../../../hooks/useWorkspaceActions';
 import { useWorkspaceData } from '../../../../hooks/useWorkspaceData';
 import { useWorkspaceSelection } from '../../../../hooks/useWorkspaceSelection';
@@ -6,6 +7,7 @@ import { useWorkspaceStatus } from '../../../../hooks/useWorkspaceStatus';
 import { nodesApi } from '../../../../api/nodes';
 import { useAuth } from '../../../../hooks/useAuth';
 import type { WorkspaceTableProps } from '../components/WorkspaceTable';
+import type { FilterOperator } from '../types';
 import { getNodeDocumentColumn } from '../utils/documentColumn';
 
 export interface WorkspaceDataTableHeaderInfo {
@@ -81,6 +83,9 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
     selectedNodeIds,
     handlePageChange,
     handlePageSizeChange,
+    handleSortingChange,
+    handleFilterChange,
+    getPaginationForNode,
   } = useWorkspaceSelection();
   const { getAuthHeaders } = useAuth();
   const {
@@ -192,6 +197,38 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
     onTabClose: handleTabClose,
   };
 
+  // ── Derive TanStack-compatible sorting / filtering state from per-node pagination ──
+  const paginationState = (() => {
+    if (!selectedNode?.id) return undefined;
+    return getPaginationForNode(selectedNode.id);
+  })();
+
+  const sorting: SortingState = paginationState?.sortBy
+    ? [{ id: paginationState.sortBy, desc: paginationState.descending ?? false }]
+    : [];
+
+  const columnFilters: ColumnFiltersState = paginationState?.filterColumn && paginationState.filterValue
+    ? [{ id: paginationState.filterColumn, value: { value: paginationState.filterValue, op: (paginationState.filterOp ?? 'contains') as FilterOperator } }]
+    : [];
+
+  const onSortingChange = (next: SortingState) => {
+    if (next.length === 0) {
+      handleSortingChange(undefined, undefined);
+    } else {
+      handleSortingChange(next[0].id, next[0].desc);
+    }
+  };
+
+  const onColumnFiltersChange = (next: ColumnFiltersState) => {
+    if (next.length === 0) {
+      handleFilterChange(undefined, undefined, undefined);
+    } else {
+      const filter = next[0];
+      const parts = filter.value as { value: string; op: string };
+      handleFilterChange(String(filter.id), parts.value, parts.op);
+    }
+  };
+
   const table: WorkspaceTableProps = {
     data: nodeData.data,
     loading: isLoading.nodeData,
@@ -219,6 +256,11 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
         }
       : undefined,
     pagination: nodeData.pagination,
+    rowCount: nodeData.pagination?.total_rows ?? 0,
+    sorting,
+    onSortingChange,
+    columnFilters,
+    onColumnFiltersChange,
     onPageChange: handlePageChange,
     onPageSizeChange: handlePageSizeChange,
   };

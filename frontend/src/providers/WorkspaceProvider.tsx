@@ -29,6 +29,9 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
       selectedNodeIds: ws.selectedNodeIds,
       handlePageChange: ws.handlePageChange,
       handlePageSizeChange: ws.handlePageSizeChange,
+      handleSortingChange: ws.handleSortingChange,
+      handleFilterChange: ws.handleFilterChange,
+      getPaginationForNode: ws.getPaginationForNode,
     },
     status: {
       isLoading: ws.isLoading,

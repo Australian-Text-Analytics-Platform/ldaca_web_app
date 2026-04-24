@@ -19,6 +19,9 @@ export type WorkspaceSelectionSlice = {
   selectedNodeIds: WorkspaceInternal['selectedNodeIds'];
   handlePageChange: WorkspaceInternal['handlePageChange'];
   handlePageSizeChange: WorkspaceInternal['handlePageSizeChange'];
+  handleSortingChange: WorkspaceInternal['handleSortingChange'];
+  handleFilterChange: WorkspaceInternal['handleFilterChange'];
+  getPaginationForNode: WorkspaceInternal['getPaginationForNode'];
 };
 
 export type WorkspaceStatusSlice = {

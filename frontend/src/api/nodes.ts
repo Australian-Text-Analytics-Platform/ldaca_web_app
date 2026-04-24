@@ -111,9 +111,34 @@ export interface NodeInfoResponse {
   can_redo?: boolean;
 }
 
+export interface NodeDataParams {
+  page?: number;
+  pageSize?: number;
+  sortBy?: string | null;
+  descending?: boolean;
+  filterColumn?: string | null;
+  filterValue?: string | null;
+  filterOp?: string;
+}
+
 export const nodesApi = {
   info: (node: string, headers: Record<string,string> = {}) => get<NodeInfoResponse>(`/workspaces/nodes/${node}`, headers),
-  data: (node: string, page = 0, pageSize = 20, headers: Record<string,string> = {}) => httpRequest<NodeDataResponse>(`/workspaces/nodes/${node}/data`, { method: 'GET', headers, params: { page, page_size: pageSize } }),
+  data: (node: string, params: NodeDataParams = {}, headers: Record<string,string> = {}) => {
+    const query: Record<string, unknown> = {
+      page: params.page ?? 1,
+      page_size: params.pageSize ?? 20,
+    };
+    if (params.sortBy) {
+      query.sort_by = params.sortBy;
+      query.descending = params.descending ?? false;
+    }
+    if (params.filterColumn && params.filterValue != null) {
+      query.filter_column = params.filterColumn;
+      query.filter_value = params.filterValue;
+      query.filter_op = params.filterOp ?? 'contains';
+    }
+    return httpRequest<NodeDataResponse>(`/workspaces/nodes/${node}/data`, { method: 'GET', headers, params: query });
+  },
   shape: (node: string, headers: Record<string,string> = {}) => get<Record<string, unknown>>(`/workspaces/nodes/${node}/shape`, headers),
   uniqueValues: (node: string, col: string, headers: Record<string,string> = {}) => get<ColumnUniqueValuesResponse>(`/workspaces/nodes/${node}/columns/${col}/unique`, headers),
   describeColumn: (node: string, col: string, headers: Record<string,string> = {}) => get<ColumnDescribeResponse>(`/workspaces/nodes/${node}/columns/${col}/describe`, headers),

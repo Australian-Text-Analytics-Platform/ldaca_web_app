@@ -54,8 +54,7 @@ interface JoinPreviewConfig {
   readyMessage: string;
   page: number;
   pageSize: number;
-  onPreviousPage: () => void;
-  onNextPage: () => void;
+  onPageChange: (page: number) => void;
   onPageSizeChange: (size: number) => void;
 }
 
@@ -315,18 +314,6 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
     return [];
   })();
 
-  const handleJoinPreviewPrev = () => {
-    if (joinPreviewPagination?.has_prev && !joinPreviewLoading) {
-      setJoinPreviewPage(Math.max(1, joinPreviewPage - 1));
-    }
-  };
-
-  const handleJoinPreviewNext = () => {
-    if (joinPreviewPagination?.has_next && !joinPreviewLoading) {
-      setJoinPreviewPage(joinPreviewPage + 1);
-    }
-  };
-
   const handleJoinPreviewPageSizeChange = (size: number) => {
     setJoinPreviewPageSize(size);
   };
@@ -418,8 +405,7 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
       readyMessage,
       page: joinPreviewPage,
       pageSize: joinPreviewPageSize,
-      onPreviousPage: handleJoinPreviewPrev,
-      onNextPage: handleJoinPreviewNext,
+      onPageChange: setJoinPreviewPage,
       onPageSizeChange: handleJoinPreviewPageSizeChange,
     },
     apply: {

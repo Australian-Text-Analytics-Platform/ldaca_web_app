@@ -85,8 +85,7 @@ interface FilterPreviewConfig {
   readyMessage: string;
   page: number;
   pageSize: number;
-  onPreviousPage: () => void;
-  onNextPage: () => void;
+  onPageChange: (page: number) => void;
   onPageSizeChange: (size: number) => void;
 }
 
@@ -402,7 +401,7 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
         pagination: response?.pagination ?? null,
       };
     }
-    const response = await nodesApi.data(request.nodeId, page, pageSize);
+    const response = await nodesApi.data(request.nodeId, { page, pageSize });
     return {
       data: Array.isArray(response?.data) ? (response.data as PreviewRow[]) : [],
       columns: Array.isArray(response?.columns) ? response.columns : [],
@@ -435,20 +434,6 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
   })();
 
   const currentPreviewPage = previewPagination?.page ?? previewPage;
-  const previewHasPrev = Boolean(previewPagination?.has_prev);
-  const previewHasNext = Boolean(previewPagination?.has_next);
-
-  const handlePreviewPrev = () => {
-    if (previewHasPrev && !previewLoading) {
-      setPreviewPage(Math.max(1, currentPreviewPage - 1));
-    }
-  };
-
-  const handlePreviewNext = () => {
-    if (previewHasNext && !previewLoading) {
-      setPreviewPage(currentPreviewPage + 1);
-    }
-  };
 
   const handleAddCondition = () => {
     const firstColumn = availableColumns[0];
@@ -988,8 +973,7 @@ export const useFilterSubTabSections = (props: FilterSubTabProps): UseFilterSubT
       readyMessage: previewReadyMessage,
       page: currentPreviewPage,
       pageSize: previewPageSize,
-      onPreviousPage: handlePreviewPrev,
-      onNextPage: handlePreviewNext,
+      onPageChange: setPreviewPage,
       onPageSizeChange: setPreviewPageSize,
     },
     selectedNodesOriginalCount: selectedNodes.length,

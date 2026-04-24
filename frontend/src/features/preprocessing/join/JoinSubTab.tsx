@@ -183,8 +183,7 @@ export const JoinSubTab: React.FC<JoinSubTabProps> = (props) => {
           page={preview.page}
           pageSize={preview.pageSize}
           onPageSizeChange={preview.onPageSizeChange}
-          onPreviousPage={preview.onPreviousPage}
-          onNextPage={preview.onNextPage}
+          onPageChange={preview.onPageChange}
           loadingBadge={previewBadge}
         />
       </div>

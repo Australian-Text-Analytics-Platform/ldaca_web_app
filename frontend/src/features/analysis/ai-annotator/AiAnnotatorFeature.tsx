@@ -609,7 +609,7 @@ const AiAnnotatorFeature: React.FC = () => {
   const loadReviewPage = async (nodeId: string, textCol: string, annotationCol: string, pg: number, pgSize: number) => {
     setIsReviewPaging(true);
     try {
-      const response = await nodesApi.data(nodeId, pg, pgSize, getAuthHeaders());
+      const response = await nodesApi.data(nodeId, { page: pg, pageSize: pgSize }, getAuthHeaders());
       const rows = (response as { data?: Array<Record<string, unknown>> })?.data ?? [];
       const columns = (response as { columns?: string[] })?.columns ?? [];
       const pagination = (response as { pagination?: AiAnnotationNodeResult['pagination'] })?.pagination;

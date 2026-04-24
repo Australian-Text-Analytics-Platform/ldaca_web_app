@@ -102,6 +102,27 @@ export const useWorkspaceCore = () => {
     if (selectedNodeId) updatePageSize(selectedNodeId, pageSize);
   };
 
+  const handleSortingChange = (sortBy: string | undefined, descending: boolean | undefined) => {
+    if (!selectedNodeId) return;
+    updatePagination(selectedNodeId, (existing) => ({
+      ...existing,
+      sortBy,
+      descending,
+      currentPage: 1,
+    }));
+  };
+
+  const handleFilterChange = (filterColumn: string | undefined, filterValue: string | undefined, filterOp: string | undefined) => {
+    if (!selectedNodeId) return;
+    updatePagination(selectedNodeId, (existing) => ({
+      ...existing,
+      filterColumn,
+      filterValue,
+      filterOp,
+      currentPage: 1,
+    }));
+  };
+
   const authHeaders = (() => {
     if (!isAuthenticated) return {};
     const headers = getAuthHeaders();
@@ -131,6 +152,8 @@ export const useWorkspaceCore = () => {
     updatePageSize,
     handlePageChange,
     handlePageSizeChange,
+    handleSortingChange,
+    handleFilterChange,
 
     loadingOperationCount: ui.loadingOperations.size,
     operationErrorsRecord,

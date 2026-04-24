@@ -336,8 +336,7 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
         pageSize={preview.pageSize}
         documentColumn={getNodeDocumentColumn(nodeSelection.effectiveNodes[0])}
         onPageSizeChange={preview.setPageSize}
-        onPreviousPage={preview.onPreviousPage}
-        onNextPage={preview.onNextPage}
+        onPageChange={preview.onPageChange}
       />
     </div>
   );

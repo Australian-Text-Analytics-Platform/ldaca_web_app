@@ -28,8 +28,7 @@ describe('PreviewTable', () => {
         pageSize={10}
         documentColumn="document"
         onPageSizeChange={() => {}}
-        onPreviousPage={() => {}}
-        onNextPage={() => {}}
+        onPageChange={() => {}}
       />,
     );
 

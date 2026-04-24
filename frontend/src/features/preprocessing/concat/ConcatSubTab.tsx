@@ -166,8 +166,7 @@ export const ConcatSubTab: React.FC<ConcatSubTabProps> = (props) => {
         page={preview.page}
         pageSize={preview.pageSize}
         onPageSizeChange={preview.onPageSizeChange}
-        onPreviousPage={preview.onPreviousPage}
-        onNextPage={preview.onNextPage}
+        onPageChange={preview.onPageChange}
         loadingBadge={preview.loading ? (
           <Tag tone="muted">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />

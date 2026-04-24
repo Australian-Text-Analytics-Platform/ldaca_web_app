@@ -18,13 +18,29 @@ export const queryKeys = {
   workspaceNodes: (workspaceId: string) =>
     ['workspaces', workspaceId, 'nodes'] as const,
 
-  /** Paginated node data. Passing only `page` keeps per-page caches distinct. */
-  nodeData: (workspaceId: string, nodeId: string, page?: number, pageSize?: number) =>
-    page !== undefined && pageSize !== undefined
-      ? (['workspaces', workspaceId, 'nodes', nodeId, 'data', page, pageSize] as const)
-      : page !== undefined
-        ? (['workspaces', workspaceId, 'nodes', nodeId, 'data', page] as const)
-        : (['workspaces', workspaceId, 'nodes', nodeId, 'data'] as const),
+  /** Paginated node data. Includes page, size, sort, and filter for distinct cache entries. */
+  nodeData: (
+    workspaceId: string,
+    nodeId: string,
+    page?: number,
+    pageSize?: number,
+    sortBy?: string | null,
+    descending?: boolean,
+    filterColumn?: string | null,
+    filterValue?: string | null,
+  ) => {
+    const base = ['workspaces', workspaceId, 'nodes', nodeId, 'data'] as const;
+    if (page === undefined || pageSize === undefined) return base;
+    return [
+      ...base,
+      page,
+      pageSize,
+      sortBy ?? null,
+      descending ?? false,
+      filterColumn ?? null,
+      filterValue ?? null,
+    ] as const;
+  },
 
   nodeSchema: (workspaceId: string, nodeId: string) =>
     ['workspaces', workspaceId, 'nodes', nodeId, 'schema'] as const,
