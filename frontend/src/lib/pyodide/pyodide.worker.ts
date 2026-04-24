@@ -14,23 +14,18 @@ interface PyodideInterface {
   loadPackage: (pkg: string | string[]) => Promise<void>;
 }
 
-interface PyodideProxy {
-  toJs: (opts?: { dict_converter?: typeof Object.fromEntries }) => unknown[];
-}
-
-// loadPyodide is injected into globalThis by importScripts(pyodide.js)
-function loadPyodide(opts: { indexURL: string }): Promise<PyodideInterface> {
-  return (globalThis as unknown as { loadPyodide: (opts: { indexURL: string }) => Promise<PyodideInterface> }).loadPyodide(opts);
+interface PyodideModule {
+  loadPyodide: (opts: { indexURL: string }) => Promise<PyodideInterface>;
 }
 
 type WorkerInMessage =
   | { id: string; type: 'init' }
-  | { id: string; type: 'serialize'; code: string };
+  | { id: string; type: 'validate'; code: string };
 
 type WorkerOutMessage =
   | { id: string; type: 'ready' }
   | { id: string; type: 'error'; message: string }
-  | { id: string; type: 'serialized'; expressions: object[] };
+  | { id: string; type: 'validated' };
 
 const PYODIDE_VERSION = '0.27.5';
 const PYODIDE_INDEX_URL = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`;
@@ -39,9 +34,7 @@ let pyodide: PyodideInterface | null = null;
 let initPromise: Promise<PyodideInterface> | null = null;
 
 async function initPyodide(): Promise<PyodideInterface> {
-  // Load the pyodide runtime script from CDN
-  self.importScripts(`${PYODIDE_INDEX_URL}pyodide.js`);
-
+  const { loadPyodide } = await (import(/* @vite-ignore */ `${PYODIDE_INDEX_URL}pyodide.mjs`) as Promise<PyodideModule>);
   pyodide = await loadPyodide({ indexURL: PYODIDE_INDEX_URL });
 
   // Install micropip then polars
@@ -61,23 +54,18 @@ function ensureInit(): Promise<PyodideInterface> {
   return initPromise;
 }
 
-const SERIALIZE_WRAPPER = (userCode: string) => `
-import polars as pl, json as _json
+const VALIDATE_WRAPPER = (userCode: string) => `
+import polars as pl
 
 # User code should assign to 'result': a pl.Expr or list[pl.Expr]
 ${userCode}
 
-def _serialize_expr(e):
-    return _json.loads(e.meta.serialize(format="json"))
-
 if isinstance(result, list):
-    _serialized = [_serialize_expr(e) for e in result]
-elif isinstance(result, pl.Expr):
-    _serialized = [_serialize_expr(result)]
-else:
-    raise TypeError(f"result must be pl.Expr or list[pl.Expr], got {type(result).__name__}")
-
-_serialized
+    for _e in result:
+        if not isinstance(_e, pl.Expr):
+            raise TypeError(f'Expected pl.Expr in list, got {type(_e).__name__}')
+elif not isinstance(result, pl.Expr):
+    raise TypeError(f'result must be pl.Expr or list[pl.Expr], got {type(result).__name__}')
 `;
 
 self.onmessage = async (event: MessageEvent<WorkerInMessage>) => {
@@ -99,15 +87,13 @@ self.onmessage = async (event: MessageEvent<WorkerInMessage>) => {
     return;
   }
 
-  if (msg.type === 'serialize') {
+  if (msg.type === 'validate') {
     try {
       await ensureInit();
-      const wrappedCode = SERIALIZE_WRAPPER(msg.code);
+      const wrappedCode = VALIDATE_WRAPPER(msg.code);
       const p = await ensureInit();
-      const pyResult = await p.runPythonAsync(wrappedCode);
-      // pyResult is a Python list; convert to JS array
-      const expressions = (pyResult as PyodideProxy).toJs({ dict_converter: Object.fromEntries });
-      const out: WorkerOutMessage = { id: msg.id, type: 'serialized', expressions: expressions as object[] };
+      await p.runPythonAsync(wrappedCode);
+      const out: WorkerOutMessage = { id: msg.id, type: 'validated' };
       self.postMessage(out);
     } catch (err) {
       const out: WorkerOutMessage = {

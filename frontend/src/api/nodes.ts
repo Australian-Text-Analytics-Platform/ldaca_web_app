@@ -109,8 +109,8 @@ export type PolarsExpressionContext =
   | 'group_by_agg';
 
 export interface PolarsExpressionItem {
-  /** Parsed JSON object from polars expr.meta.serialize(format="json") */
-  expr: object;
+  /** Python expression string, e.g. "pl.col('text').str.starts_with('RT')" */
+  code: string;
   /** Only used in sort context */
   descending?: boolean;
 }

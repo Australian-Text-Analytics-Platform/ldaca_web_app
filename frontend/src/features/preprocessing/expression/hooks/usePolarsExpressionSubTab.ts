@@ -1,8 +1,7 @@
 import { useState, useCallback } from 'react';
 
 import type { WorkspaceNodeLike } from '../../../../components/NodeSelectionPanel';
-import { type FilterPreviewResponse, type PolarsExpressionRequest, type PolarsExpressionApplyResponse, type PolarsExpressionContext, type PolarsExpressionItem } from '../../../../api/nodes';
-import { usePyodideExpression } from '../../../../lib/pyodide/usePyodideExpression';
+import { type FilterPreviewResponse, type PolarsExpressionRequest, type PolarsExpressionApplyResponse, type PolarsExpressionContext } from '../../../../api/nodes';
 import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
 import { takeMostRecent } from '../../../../utils/selectionUtils';
 
@@ -39,25 +38,8 @@ export interface PolarsExpressionSubTabProps {
 
 const DEFAULT_PALETTE = ['#2563eb'];
 
-function buildFilterCode(exprCode: string): string {
-  return `result = ${exprCode}`;
-}
-
-function buildListCode(codes: string[]): string {
-  const items = codes.map((c) => c.trim()).filter(Boolean);
-  if (items.length === 1) return `result = ${items[0]}`;
-  return `result = [\n  ${items.join(',\n  ')}\n]`;
-}
-
-function buildSortCode(items: SortExpressionItem[]): string {
-  const parts = items.map((it) => it.code.trim()).filter(Boolean);
-  if (parts.length === 1) return `result = ${parts[0]}`;
-  return `result = [\n  ${parts.join(',\n  ')}\n]`;
-}
-
 export function usePolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
   const { selectedNodes, onAlert, polarsExpressionPreview, polarsExpressionApply, refreshNodeSchema } = props;
-  const pyodide = usePyodideExpression();
 
   const effectiveNode = takeMostRecent(selectedNodes, 1)[0] ?? null;
   const nodeId = effectiveNode?.id ?? null;
@@ -79,60 +61,37 @@ export function usePolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
 
   const nodeColors = { [effectiveNode?.id ?? '']: DEFAULT_PALETTE[0]! };
 
-  // Build the Python code for the current context
-  const buildCode = useCallback((): string => {
-    switch (activeContext) {
-      case 'filter':
-        return buildFilterCode(filterCode);
-      case 'with_columns':
-        return buildListCode(withColumnsCodes);
-      case 'select':
-        return buildListCode(selectCodes);
-      case 'sort':
-        return buildSortCode(sortItems);
-      case 'group_by_agg': {
-        const all = [groupByState.keyCode, ...groupByState.aggCodes];
-        return buildListCode(all);
-      }
-    }
-  }, [activeContext, filterCode, withColumnsCodes, selectCodes, sortItems, groupByState]);
-
   const evalExpressions = useCallback(async () => {
     setEvalError(null);
     setSerializedRequest(null);
 
-    const code = buildCode();
     try {
-      const exprs = await pyodide.serialize(code);
-
+      // Build the request from raw code strings — backend validates via AST
       let request: PolarsExpressionRequest;
-
       if (activeContext === 'group_by_agg') {
-        // First expr is the key, rest are aggs
-        const [keyExpr, ...aggExprs] = exprs;
         request = {
           context: 'group_by_agg',
-          expressions: aggExprs.map((e) => ({ expr: e as object })),
-          group_by_keys: [{ expr: keyExpr as object }],
+          expressions: groupByState.aggCodes.filter(Boolean).map((c) => ({ code: c.trim() })),
+          group_by_keys: [{ code: groupByState.keyCode.trim() }],
         };
       } else if (activeContext === 'sort') {
-        const items: PolarsExpressionItem[] = exprs.map((e, i) => ({
-          expr: e as object,
-          descending: sortItems[i]?.descending ?? false,
-        }));
-        request = { context: 'sort', expressions: items };
-      } else {
         request = {
-          context: activeContext,
-          expressions: exprs.map((e) => ({ expr: e as object })),
+          context: 'sort',
+          expressions: sortItems.filter((it) => it.code.trim()).map((it) => ({ code: it.code.trim(), descending: it.descending })),
         };
+      } else if (activeContext === 'filter') {
+        request = { context: 'filter', expressions: [{ code: filterCode.trim() }] };
+      } else if (activeContext === 'with_columns') {
+        request = { context: 'with_columns', expressions: withColumnsCodes.filter(Boolean).map((c) => ({ code: c.trim() })) };
+      } else {
+        request = { context: 'select', expressions: selectCodes.filter(Boolean).map((c) => ({ code: c.trim() })) };
       }
 
       setSerializedRequest(request);
     } catch (err) {
       setEvalError(err instanceof Error ? err.message : String(err));
     }
-  }, [activeContext, buildCode, pyodide, sortItems]);
+  }, [activeContext, filterCode, groupByState, selectCodes, sortItems, withColumnsCodes]);
 
   // Preview
   const preview = usePreprocessingPreview({
@@ -162,7 +121,6 @@ export function usePolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
   }, [nodeId, serializedRequest, newNodeName, polarsExpressionApply, refreshNodeSchema, onAlert]);
 
   return {
-    pyodide,
     effectiveNode,
     nodeId,
     nodeColors,

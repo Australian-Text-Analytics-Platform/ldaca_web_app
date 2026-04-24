@@ -22,37 +22,17 @@ const CONTEXT_LABELS: Record<string, string> = {
   group_by_agg: 'Group By',
 };
 
-const PyodideStatusBadge: React.FC<{ status: string; error: string | null }> = ({ status, error }) => {
-  if (status === 'ready') return null;
-  if (status === 'loading') {
-    return (
-      <span className="flex items-center gap-1 rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-800">
-        <Loader2 className="h-3 w-3 animate-spin" />
-        Loading Pyodide…
-      </span>
-    );
-  }
-  if (status === 'error') {
-    return (
-      <span className="rounded bg-red-100 px-2 py-0.5 text-xs text-red-700">
-        Pyodide error: {error}
-      </span>
-    );
-  }
-  return null;
-};
-
 const CodeHint: React.FC<{ context: string }> = ({ context }) => {
   const hints: Record<string, string> = {
-    filter: 'Assign a boolean expression to `result`.\nExample: result = pl.col("age") > 18',
+    filter: 'A boolean Polars expression.\nExample: pl.col("age") > 18',
     with_columns:
-      'Assign one or a list of expressions to `result`. Each must have an alias.\nExample: result = pl.col("price").mul(0.9).alias("discounted_price")',
+      'One or more expressions. Each should have an alias.\nExample: pl.col("price").mul(0.9).alias("discounted_price")',
     select:
-      'Assign a list of expressions or column references to `result`.\nExample: result = [pl.col("id"), pl.col("name")]',
+      'A list of expressions or column references.\nExample: pl.col("id"), pl.col("name")',
     sort:
-      'Assign the sort key expression(s) to `result`. Set descending per item.\nExample: result = pl.col("date")',
+      'Sort key expression(s). Set descending per item.\nExample: pl.col("date")',
     group_by_agg:
-      'Assign [key_expr, agg_expr1, agg_expr2, ...] to `result`.\nThe first expression is the grouping key.\nExample: result = [pl.col("category"), pl.col("sales").sum().alias("total")]',
+      'Grouping key and aggregation expressions.\nExample key: pl.col("category")\nExample agg: pl.col("sales").sum().alias("total")',
   };
   return (
     <p className="rounded border border-border/40 bg-muted/50 p-2 font-mono text-[11px] text-muted-foreground whitespace-pre-wrap">
@@ -64,7 +44,6 @@ const CodeHint: React.FC<{ context: string }> = ({ context }) => {
 export const PolarsExpressionSubTab: React.FC<PolarsExpressionSubTabProps> = (props) => {
   const { isLoading } = props;
   const {
-    pyodide,
     effectiveNode,
     nodeColors,
     activeContext,
@@ -91,9 +70,8 @@ export const PolarsExpressionSubTab: React.FC<PolarsExpressionSubTabProps> = (pr
     preview,
   } = usePolarsExpressionSubTab(props);
 
-  const isReady = pyodide.status === 'ready';
   const hasNode = !!effectiveNode;
-  const canEval = isReady && hasNode;
+  const canEval = hasNode;
   const canApply = canEval && !!serializedRequest && !isApplying;
 
   return (
@@ -103,10 +81,9 @@ export const PolarsExpressionSubTab: React.FC<PolarsExpressionSubTabProps> = (pr
           <CardTitle className="flex items-center gap-2">
             <Code2 className="h-5 w-5" />
             Polars Expression
-            <PyodideStatusBadge status={pyodide.status} error={pyodide.initError} />
           </CardTitle>
           <p className="text-sm text-muted-foreground">
-            Write Polars expressions in Python. They are evaluated in-browser via Pyodide and sent to the backend.
+            Write Polars expressions in Python. They are validated and executed on the server.
           </p>
         </CardHeader>
 
@@ -347,7 +324,7 @@ export const PolarsExpressionSubTab: React.FC<PolarsExpressionSubTabProps> = (pr
               disabled={!canEval}
             >
               <Play className="mr-1.5 h-3.5 w-3.5" />
-              Evaluate in Pyodide
+              Preview
             </Button>
             {serializedRequest && !evalError && (
               <span className="text-xs text-green-700">

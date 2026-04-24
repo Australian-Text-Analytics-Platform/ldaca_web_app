@@ -2,30 +2,24 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 export type PyodideStatus = 'idle' | 'loading' | 'ready' | 'error';
 
-export interface SerializeResult {
-  expressions: object[];
-}
-
 let sharedWorker: Worker | null = null;
 let workerReady = false;
-const pendingCallbacks = new Map<string, (result: SerializeResult | Error) => void>();
+const pendingCallbacks = new Map<string, (err: Error | null) => void>();
 
 function getWorker(): Worker {
   if (!sharedWorker) {
-    sharedWorker = new Worker(new URL('./pyodide.worker.ts', import.meta.url), { type: 'classic' });
+    sharedWorker = new Worker(new URL('./pyodide.worker.ts', import.meta.url), { type: 'module' });
     sharedWorker.onmessage = (event) => {
-      const msg = event.data as { id: string; type: string; expressions?: object[]; message?: string };
+      const msg = event.data as { id: string; type: string; message?: string };
       const cb = pendingCallbacks.get(msg.id);
       if (!cb) return;
       pendingCallbacks.delete(msg.id);
 
       if (msg.type === 'error') {
         cb(new Error(msg.message ?? 'Unknown pyodide error'));
-      } else if (msg.type === 'serialized') {
-        cb({ expressions: msg.expressions ?? [] });
-      } else if (msg.type === 'ready') {
-        workerReady = true;
-        cb({ expressions: [] }); // init signal
+      } else {
+        // 'ready' and 'validated' are both success signals
+        cb(null);
       }
     };
   }
@@ -37,16 +31,13 @@ function nextId(): string {
   return `pyodide-${++idCounter}`;
 }
 
-function sendToWorker(type: string, payload: object = {}): Promise<{ id: string; type: string; expressions?: object[]; message?: string }> {
+function sendToWorker(type: string, payload: object = {}): Promise<void> {
   return new Promise((resolve, reject) => {
     const id = nextId();
     const worker = getWorker();
-    pendingCallbacks.set(id, (result) => {
-      if (result instanceof Error) {
-        reject(result);
-      } else {
-        resolve({ id, type: 'serialized', expressions: result.expressions });
-      }
+    pendingCallbacks.set(id, (err) => {
+      if (err) reject(err);
+      else resolve();
     });
     worker.postMessage({ id, type, ...payload });
   });
@@ -68,11 +59,12 @@ export function usePyodideExpression() {
     setStatus('loading');
     const id = nextId();
     const worker = getWorker();
-    pendingCallbacks.set(id, (result) => {
-      if (result instanceof Error) {
+    pendingCallbacks.set(id, (err) => {
+      if (err) {
         setStatus('error');
-        setInitError(result.message);
+        setInitError(err.message);
       } else {
+        workerReady = true;
         setStatus('ready');
       }
     });
@@ -85,16 +77,15 @@ export function usePyodideExpression() {
     init();
   }, [init]);
 
-  const serialize = useCallback(
-    async (code: string): Promise<object[]> => {
+  const validate = useCallback(
+    async (code: string): Promise<void> => {
       if (!workerReady) {
         throw new Error('Pyodide is not ready yet');
       }
-      const result = await sendToWorker('serialize', { code });
-      return result.expressions ?? [];
+      await sendToWorker('validate', { code });
     },
     [],
   );
 
-  return { status, initError, serialize };
+  return { status, initError, validate };
 }
