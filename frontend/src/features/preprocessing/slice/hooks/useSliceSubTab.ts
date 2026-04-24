@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { nodesApi, type SliceRequest as SliceRequestPayload, type FilterPreviewResponse } from '../../../../api/nodes';
+import { useAuth } from '../../../../hooks/useAuth';
 import type { NodeColumnSelection, WorkspaceNodeLike } from '../../../../components/NodeSelectionPanel';
 import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
 import type { PreviewPagination, PreviewRow } from '../../types';
@@ -152,6 +153,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
     isLoading,
     onAlert,
   } = props;
+  const { getAuthHeaders } = useAuth();
 
   const [mode, setMode] = useState<SamplingMode>('slice');
   const [offsetInput, setOffsetInput] = useState('0');
@@ -377,7 +379,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
         pagination: (response?.pagination as PreviewPagination) ?? null,
       };
     }
-    const response = await nodesApi.data(request.nodeId, { page, pageSize });
+    const response = await nodesApi.data(request.nodeId, { page, pageSize }, getAuthHeaders());
     return {
       data: Array.isArray(response?.data) ? (response.data as PreviewRow[]) : [],
       columns: Array.isArray(response?.columns) ? response.columns : [],

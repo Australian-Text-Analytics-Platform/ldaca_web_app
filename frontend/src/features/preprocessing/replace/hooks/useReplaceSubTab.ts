@@ -8,6 +8,7 @@ import {
   type ReplaceApplyResponse,
   type ReplaceRequest,
 } from '../../../../api/nodes';
+import { useAuth } from '../../../../hooks/useAuth';
 import { mapColumnsToInfo } from '../../../../utils/columnTypes';
 import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
 import type { PreviewPagination, PreviewRow } from '../../types';
@@ -50,6 +51,7 @@ export const useReplaceSubTab = (props: ReplaceSubTabProps) => {
     replaceText,
     refreshNodeSchema,
   } = props;
+  const { getAuthHeaders } = useAuth();
 
   const effectiveNodes = (() => {
     if (selectedNodes.length > 0) return takeMostRecent(selectedNodes, 1);
@@ -137,7 +139,7 @@ export const useReplaceSubTab = (props: ReplaceSubTabProps) => {
         pagination: (response?.pagination as PreviewPagination) ?? null,
       };
     }
-    const response = await nodesApi.data(request.nodeId, { page, pageSize });
+    const response = await nodesApi.data(request.nodeId, { page, pageSize }, getAuthHeaders());
     return {
       data: Array.isArray(response?.data) ? (response.data as PreviewRow[]) : [],
       columns: Array.isArray(response?.columns) ? response.columns : [],

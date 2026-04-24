@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 
 import { nodesApi } from '../../../../api/nodes';
+import { useAuth } from '../../../../hooks/useAuth';
 import type { NodeColumnSelection, WorkspaceNodeLike } from '../../../../components/NodeSelectionPanel';
 import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
 import type { JoinPreviewRequestPayload, JoinType, PreviewPagination, PreviewRow } from '../../types';
@@ -100,6 +101,7 @@ const describeSharedColumns = (count: number, columns: string[]): string => {
 
 export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
   const { selectedNodeIds, currentWorkspaceId, workspaceNodes, joinNodes, isLoading, onAlert } = props;
+  const { getAuthHeaders } = useAuth();
 
   const [joinLeftNodeId, setJoinLeftNodeId] = useState('');
   const [joinRightNodeId, setJoinRightNodeId] = useState('');
@@ -280,6 +282,7 @@ export const useJoinSubTab = (props: JoinSubTabProps): UseJoinSubTabResult => {
       },
       page,
       pageSize,
+      getAuthHeaders(),
     );
 
     return {

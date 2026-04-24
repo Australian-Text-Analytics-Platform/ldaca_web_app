@@ -8,6 +8,7 @@ import {
   type FilterPreviewResponse,
   type ExpressionTransformRequest,
 } from '../../../../api/nodes';
+import { useAuth } from '../../../../hooks/useAuth';
 import { mapColumnsToInfo } from '../../../../utils/columnTypes';
 import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
 import type { PreviewPagination, PreviewRow } from '../../types';
@@ -167,6 +168,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     computeColumn,
     refreshNodeSchema,
   } = props;
+  const { getAuthHeaders } = useAuth();
 
   const effectiveNodes = (() => {
     if (selectedNodes?.length) {
@@ -405,7 +407,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
         pagination: (response?.pagination as PreviewPagination) ?? null,
       };
     }
-    const response = await nodesApi.data(request.nodeId, { page, pageSize });
+    const response = await nodesApi.data(request.nodeId, { page, pageSize }, getAuthHeaders());
     return {
       data: Array.isArray(response?.data) ? (response.data as PreviewRow[]) : [],
       columns: Array.isArray(response?.columns) ? response.columns : [],
