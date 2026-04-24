@@ -65,6 +65,7 @@ import {
   CONCORDANCE_COLUMN_KEYS,
   CONCORDANCE_CORE_COLUMNS,
   CONCORDANCE_DISPERSION_COLUMN,
+  CONCORDANCE_FREQ_COLUMNS,
 } from '../generatedColumns';
 import {
   MetadataColumnSelector,
@@ -74,6 +75,8 @@ import { reconcileMetadataColumnSelection } from '../common/components/metadataC
 
 
 const CORE_COLS = [...CONCORDANCE_CORE_COLUMNS];
+const FREQ_COLS = [...CONCORDANCE_FREQ_COLUMNS];
+const ALL_CONC_COLS_SET = new Set<string>([...CORE_COLS, ...FREQ_COLS]);
 
 const dedupeColumns = (cols: string[]): string[] => {
   const seen = new Set<string>();
@@ -946,7 +949,7 @@ const ConcordanceFeature: React.FC = () => {
       record,
       textColumn: column,
       fullText,
-      excludeMetadataColumns: [...CORE_COLS, CONCORDANCE_COLUMN_KEYS.dispersion],
+      excludeMetadataColumns: [...ALL_CONC_COLS_SET, CONCORDANCE_COLUMN_KEYS.dispersion],
     });
   };
 
@@ -973,10 +976,18 @@ const ConcordanceFeature: React.FC = () => {
           label: 'L1 Word',
           value: String(record[CONCORDANCE_COLUMN_KEYS.leftToken] ?? ''),
         },
+        ...(record[CONCORDANCE_COLUMN_KEYS.leftTokenFreq] != null ? [{
+          label: 'L1 Freq',
+          value: String(record[CONCORDANCE_COLUMN_KEYS.leftTokenFreq]),
+        }] : []),
         {
           label: 'R1 Word',
           value: String(record[CONCORDANCE_COLUMN_KEYS.rightToken] ?? ''),
         },
+        ...(record[CONCORDANCE_COLUMN_KEYS.rightTokenFreq] != null ? [{
+          label: 'R1 Freq',
+          value: String(record[CONCORDANCE_COLUMN_KEYS.rightTokenFreq]),
+        }] : []),
       ],
       renderDocumentText: (text: string) =>
         highlightMatchInText(
@@ -1103,12 +1114,15 @@ const ConcordanceFeature: React.FC = () => {
       const combinedHasPrev = Boolean(nodeData.pagination?.has_prev);
       const combinedHasNext = Boolean(nodeData.pagination?.has_next);
       const metaCols = nodeData.metadata.metadata_columns;
+      const concCols = (nodeData.metadata.concordance_columns?.length
+        ? nodeData.metadata.concordance_columns.filter((c: string) => ALL_CONC_COLS_SET.has(c))
+        : CORE_COLS) as string[];
       const visibleMetaCols = (selectedMetadataColumns ?? []).filter((columnName) => metaCols.includes(columnName));
       const rawDisplayColumns = showDispersion
         ? (showMetadata ? [CONCORDANCE_DISPERSION_COLUMN, ...visibleMetaCols] : [CONCORDANCE_DISPERSION_COLUMN])
         : (showMetadata
-          ? [...CORE_COLS.filter(c => columns.includes(c)), ...visibleMetaCols]
-          : CORE_COLS.filter(c => columns.includes(c)));
+          ? [...concCols.filter(c => columns.includes(c)), ...visibleMetaCols]
+          : concCols.filter(c => columns.includes(c)));
       const displayColumns = dedupeColumns(rawDisplayColumns);
       const dispersionColumnStyle = getDispersionColumnStyle(showDispersion, showMetadata, resultsViewportWidth);
 
@@ -1257,12 +1271,15 @@ const ConcordanceFeature: React.FC = () => {
       : 0;
     const allCols = nodeData.columns;
     const metaCols = nodeData.metadata.metadata_columns;
+    const concCols = (nodeData.metadata.concordance_columns?.length
+      ? nodeData.metadata.concordance_columns.filter((c: string) => ALL_CONC_COLS_SET.has(c))
+      : CORE_COLS) as string[];
     const visibleMetaCols = (selectedMetadataColumns ?? []).filter((columnName) => metaCols.includes(columnName));
     const rawDisplayColumns = showDispersion
       ? (showMetadata ? [CONCORDANCE_DISPERSION_COLUMN, ...visibleMetaCols.filter(c => allCols.includes(c))] : [CONCORDANCE_DISPERSION_COLUMN])
       : (showMetadata
-        ? [...CORE_COLS.filter(c => allCols.includes(c)), ...visibleMetaCols.filter(c => allCols.includes(c))]
-        : CORE_COLS.filter(c => allCols.includes(c)));
+        ? [...concCols.filter(c => allCols.includes(c)), ...visibleMetaCols.filter(c => allCols.includes(c))]
+        : concCols.filter(c => allCols.includes(c)));
     const displayColumns = dedupeColumns(rawDisplayColumns);
     const tableColumns = displayColumns.length > 0 ? displayColumns : allCols;
     const sortableColumns = new Set(metaCols);
