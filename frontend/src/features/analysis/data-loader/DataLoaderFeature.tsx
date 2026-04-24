@@ -276,6 +276,14 @@ export const DataLoaderFeature: React.FC = () => {
     }
   };
 
+  const handleSetCurrentWorkspace = async (workspaceId: string | null) => {
+    try {
+      await workspaceActions.setCurrentWorkspace(workspaceId);
+    } catch (error) {
+      notify('error', (error as Error).message || 'Failed to update active workspace.');
+    }
+  };
+
   const handleUpdateWorkspaceDescription = async () => {
     try {
       await workspaceActions.updateWorkspaceDescription(descriptionValue.trim());
@@ -941,7 +949,9 @@ export const DataLoaderFeature: React.FC = () => {
                   <div className="flex items-center gap-1">
                     <Button
                       variant="outline"
-                      onClick={() => workspaceActions.setCurrentWorkspace(null)}
+                      onClick={() => {
+                        void handleSetCurrentWorkspace(null);
+                      }}
                       disabled={!hasWorkspaceSelected || workspaceBusy}
                     >
                       <LogOut className="mr-2 h-4 w-4" /> Unload
@@ -1082,7 +1092,9 @@ export const DataLoaderFeature: React.FC = () => {
                         <Button
                           size="sm"
                           variant={isActive ? 'outline' : 'secondary'}
-                          onClick={() => workspaceActions.setCurrentWorkspace(isActive ? null : workspaceId)}
+                          onClick={() => {
+                            void handleSetCurrentWorkspace(isActive ? null : workspaceId);
+                          }}
                         >
                           {isActive ? 'Unload' : 'Load'}
                         </Button>

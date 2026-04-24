@@ -1,4 +1,4 @@
-import { get, post, del, httpRequest } from './http';
+import { ApiError, get, post, del, httpRequest } from './http';
 import type { WorkspaceInfo, WorkspaceGraphResponse } from '../types/api';
 
 export const workspacesApi = {
@@ -67,12 +67,30 @@ export const workspacesApi = {
   current: {
     get: (headers: Record<string, string> = {}) =>
       get<{ id: string | null }>('/workspaces/current', headers).then(r => r.id),
-    set: (workspaceId: string | null, headers: Record<string, string> = {}) => {
+    set: async (workspaceId: string | null, headers: Record<string, string> = {}) => {
       const qs = workspaceId ? `?workspace_id=${encodeURIComponent(workspaceId)}` : '';
-      return httpRequest<Record<string, unknown>>(`/workspaces/current${qs}`, {
-        method: 'POST',
-        headers,
-      });
+      const setCurrentWorkspace = () =>
+        httpRequest<Record<string, unknown>>(`/workspaces/current${qs}`, {
+          method: 'POST',
+          headers,
+        });
+
+      try {
+        return await setCurrentWorkspace();
+      } catch (error) {
+        const shouldRefreshAndRetry =
+          workspaceId !== null &&
+          error instanceof ApiError &&
+          error.status === 404;
+
+        if (!shouldRefreshAndRetry) {
+          throw error;
+        }
+
+        // Some backend flows rebuild workspace-id path indexes on list fetch.
+        await get<WorkspaceInfo[]>('/workspaces/', headers);
+        return setCurrentWorkspace();
+      }
     },
   },
 };
