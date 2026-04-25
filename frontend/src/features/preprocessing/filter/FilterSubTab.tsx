@@ -1,5 +1,5 @@
 import React from 'react';
-import { Loader2 } from 'lucide-react';
+import { Filter, Loader2 } from 'lucide-react';
 import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Tag } from '../../../components/ui/tag';
@@ -34,7 +34,8 @@ export const FilterSubTab: React.FC<FilterSubTabProps> = (props) => {
           <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
-                Filter data
+                <Filter className="h-5 w-5" />
+                Filter Data
                 <HelpIcon
                   targetKey="preprocessing.filter.tab"
                   label="Filter sub-tab overview"

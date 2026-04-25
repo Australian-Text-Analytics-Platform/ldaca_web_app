@@ -1,5 +1,5 @@
 import React from 'react';
-import { Loader2 } from 'lucide-react';
+import { Layers, Loader2 } from 'lucide-react';
 
 import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
 import HelpIcon from '../../../components/help/HelpIcon';
@@ -33,7 +33,8 @@ export const ConcatSubTab: React.FC<ConcatSubTabProps> = (props) => {
           <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
-                Concatenate datasets
+                <Layers className="h-5 w-5" />
+                Concatenate Datasets
                 <HelpIcon
                   targetKey="preprocessing.concat.tab"
                   label="Concat sub-tab overview"

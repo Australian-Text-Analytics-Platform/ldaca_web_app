@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertCircle, Loader2 } from 'lucide-react';
+import { AlertCircle, Loader2, Shuffle } from 'lucide-react';
 
 import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
 import HelpIcon from '../../../components/help/HelpIcon';
@@ -37,7 +37,8 @@ export const SliceSubTab: React.FC<SliceSubTabProps> = (props) => {
           <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
-                Sample rows
+                <Shuffle className="h-5 w-5" />
+                Sample Rows
                 <HelpIcon
                   targetKey="preprocessing.slice.tab"
                   label="Sample sub-tab overview"

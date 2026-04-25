@@ -1,5 +1,5 @@
 import React from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Merge } from 'lucide-react';
 
 import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
 import HelpIcon from '../../../components/help/HelpIcon';
@@ -39,7 +39,8 @@ export const JoinSubTab: React.FC<JoinSubTabProps> = (props) => {
           <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
-                Configure join
+                <Merge className="h-5 w-5" />
+                Configure Join
                 <HelpIcon
                   targetKey="preprocessing.join.tab"
                   label="Join sub-tab overview"
