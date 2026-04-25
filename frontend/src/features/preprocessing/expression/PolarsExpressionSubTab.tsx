@@ -1,6 +1,7 @@
 import React from 'react';
 import { Code2, Loader2, Play, Plus, Trash2 } from 'lucide-react';
 
+import { CodeEditor } from '../../../components/CodeEditor';
 import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
 import { Button } from '../../../components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
@@ -8,7 +9,6 @@ import { Input } from '../../../components/ui/input';
 import { Checkbox } from '../../../components/ui/checkbox';
 import { Label } from '../../../components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../components/ui/tabs';
-import { Textarea } from '../../../components/ui/textarea';
 import { PreviewTable } from '../components/PreviewTable';
 import { usePolarsExpressionSubTab, type PolarsExpressionSubTabProps } from './hooks/usePolarsExpressionSubTab';
 
@@ -26,13 +26,13 @@ const CodeHint: React.FC<{ context: string }> = ({ context }) => {
   const hints: Record<string, string> = {
     filter: 'A boolean Polars expression.\nExample: pl.col("age") > 18',
     with_columns:
-      'One or more expressions. Each should have an alias.\nExample: pl.col("price").mul(0.9).alias("discounted_price")',
+      'One or more expressions per box (comma-separated).\nAlias syntax: pl.col("price").mul(0.9).alias("discounted")\nAssignment syntax: discounted = pl.col("price").mul(0.9)',
     select:
-      'A list of expressions or column references.\nExample: pl.col("id"), pl.col("name")',
+      'Column references or expressions. Comma-separate multiple in one box.\nExample: pl.col("id"), pl.col("name")\nAssignment: full_name = pl.col("first") + pl.col("last")',
     sort:
       'Sort key expression(s). Set descending per item.\nExample: pl.col("date")',
     group_by_agg:
-      'Grouping key and aggregation expressions.\nExample key: pl.col("category")\nExample agg: pl.col("sales").sum().alias("total")',
+      'Grouping key and aggregation expressions.\nExample key: pl.col("category")\nAssignment: total = pl.col("sales").sum()',
   };
   return (
     <p className="rounded border border-border/40 bg-muted/50 p-2 font-mono text-[11px] text-muted-foreground whitespace-pre-wrap">
@@ -120,12 +120,13 @@ export const PolarsExpressionSubTab: React.FC<PolarsExpressionSubTabProps> = (pr
             {/* Filter */}
             <TabsContent value="filter" className="space-y-2">
               <CodeHint context="filter" />
-              <Textarea
-                className="min-h-20 font-mono text-sm"
+              <CodeEditor
                 value={filterCode}
-                onChange={(e) => setFilterCode(e.target.value)}
+                onChange={setFilterCode}
+                onBlur={evalExpressions}
                 disabled={!hasNode}
-                placeholder="result = pl.col('column_name') > 0"
+                placeholder='pl.col("column_name") > 0'
+                minHeight="5rem"
               />
             </TabsContent>
 
@@ -134,16 +135,17 @@ export const PolarsExpressionSubTab: React.FC<PolarsExpressionSubTabProps> = (pr
               <CodeHint context="with_columns" />
               {withColumnsCodes.map((code, i) => (
                 <div key={i} className="flex gap-2">
-                  <Textarea
-                    className="min-h-15 flex-1 font-mono text-sm"
+                  <CodeEditor
+                    className="flex-1"
                     value={code}
-                    onChange={(e) => {
+                    onChange={(val) => {
                       const next = [...withColumnsCodes];
-                      next[i] = e.target.value;
+                      next[i] = val;
                       setWithColumnsCodes(next);
                     }}
+                    onBlur={evalExpressions}
                     disabled={!hasNode}
-                    placeholder='pl.col("a").alias("b")'
+                    placeholder='b = pl.col("a").cast(pl.Utf8)'
                   />
                   <Button
                     variant="ghost"
@@ -172,16 +174,17 @@ export const PolarsExpressionSubTab: React.FC<PolarsExpressionSubTabProps> = (pr
               <CodeHint context="select" />
               {selectCodes.map((code, i) => (
                 <div key={i} className="flex gap-2">
-                  <Textarea
-                    className="min-h-15 flex-1 font-mono text-sm"
+                  <CodeEditor
+                    className="flex-1"
                     value={code}
-                    onChange={(e) => {
+                    onChange={(val) => {
                       const next = [...selectCodes];
-                      next[i] = e.target.value;
+                      next[i] = val;
                       setSelectCodes(next);
                     }}
+                    onBlur={evalExpressions}
                     disabled={!hasNode}
-                    placeholder='pl.col("a")'
+                    placeholder='pl.col("a"), pl.col("b")'
                   />
                   <Button
                     variant="ghost"
@@ -210,14 +213,15 @@ export const PolarsExpressionSubTab: React.FC<PolarsExpressionSubTabProps> = (pr
               <CodeHint context="sort" />
               {sortItems.map((item, i) => (
                 <div key={i} className="flex items-start gap-2">
-                  <Textarea
-                    className="min-h-15 flex-1 font-mono text-sm"
+                  <CodeEditor
+                    className="flex-1"
                     value={item.code}
-                    onChange={(e) => {
+                    onChange={(val) => {
                       const next = [...sortItems];
-                      next[i] = { ...next[i]!, code: e.target.value };
+                      next[i] = { ...next[i]!, code: val };
                       setSortItems(next);
                     }}
+                    onBlur={evalExpressions}
                     disabled={!hasNode}
                     placeholder='pl.col("date")'
                   />
@@ -261,10 +265,10 @@ export const PolarsExpressionSubTab: React.FC<PolarsExpressionSubTabProps> = (pr
               <CodeHint context="group_by_agg" />
               <div className="space-y-1">
                 <Label className="text-xs font-medium">Grouping key expression</Label>
-                <Textarea
-                  className="min-h-15 font-mono text-sm"
+                <CodeEditor
                   value={groupByState.keyCode}
-                  onChange={(e) => setGroupByState({ ...groupByState, keyCode: e.target.value })}
+                  onChange={(val) => setGroupByState({ ...groupByState, keyCode: val })}
+                  onBlur={evalExpressions}
                   disabled={!hasNode}
                   placeholder='pl.col("category")'
                 />
@@ -273,16 +277,17 @@ export const PolarsExpressionSubTab: React.FC<PolarsExpressionSubTabProps> = (pr
                 <Label className="text-xs font-medium">Aggregation expressions</Label>
                 {groupByState.aggCodes.map((code, i) => (
                   <div key={i} className="flex gap-2">
-                    <Textarea
-                      className="min-h-15 flex-1 font-mono text-sm"
+                    <CodeEditor
+                      className="flex-1"
                       value={code}
-                      onChange={(e) => {
+                      onChange={(val) => {
                         const next = [...groupByState.aggCodes];
-                        next[i] = e.target.value;
+                        next[i] = val;
                         setGroupByState({ ...groupByState, aggCodes: next });
                       }}
+                      onBlur={evalExpressions}
                       disabled={!hasNode}
-                      placeholder='pl.col("value").sum().alias("total")'
+                      placeholder='total = pl.col("value").sum()'
                     />
                     <Button
                       variant="ghost"

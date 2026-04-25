@@ -49,11 +49,11 @@ export function usePolarsExpressionSubTab(props: PolarsExpressionSubTabProps) {
   const [isApplying, setIsApplying] = useState(false);
 
   // Per-context state
-  const [filterCode, setFilterCode] = useState('pl.col("column_name") > 0');
-  const [withColumnsCodes, setWithColumnsCodes] = useState(['pl.col("a").alias("b")']);
-  const [selectCodes, setSelectCodes] = useState(['pl.col("a"), pl.col("b")']);
-  const [sortItems, setSortItems] = useState<SortExpressionItem[]>([{ code: 'pl.col("a")', descending: false }]);
-  const [groupByState, setGroupByState] = useState<GroupByAggState>({ keyCode: 'pl.col("group_col")', aggCodes: ['pl.col("value").sum().alias("total")'] });
+  const [filterCode, setFilterCode] = useState('');
+  const [withColumnsCodes, setWithColumnsCodes] = useState(['']);
+  const [selectCodes, setSelectCodes] = useState(['']);
+  const [sortItems, setSortItems] = useState<SortExpressionItem[]>([{ code: '', descending: false }]);
+  const [groupByState, setGroupByState] = useState<GroupByAggState>({ keyCode: '', aggCodes: [''] });
 
   // Serialized expressions (after eval)
   const [serializedRequest, setSerializedRequest] = useState<PolarsExpressionRequest | null>(null);
