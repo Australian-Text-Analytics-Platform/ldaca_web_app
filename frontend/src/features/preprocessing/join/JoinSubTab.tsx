@@ -27,50 +27,35 @@ export const JoinSubTab: React.FC<JoinSubTabProps> = (props) => {
     joinNewNodeName,
     setJoinNewNodeName,
     joinNamePlaceholder,
-    joinStatusMessage,
     preview,
     apply,
     showActivityTag,
   } = useJoinSubTab(props);
 
-  const previewBadge = preview.loading ? (
-    <Tag tone="muted">
-      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-      Loading preview…
-    </Tag>
-  ) : showActivityTag ? (
-    <Tag tone="muted">
-      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-      Working…
-    </Tag>
-  ) : null;
-
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader className="space-y-1 pb-4">
-          <CardTitle className="flex items-center gap-2">
-            Configure join
-            <HelpIcon
-              targetKey="preprocessing.join.tab"
-              label="Join sub-tab overview"
-              tooltip="Combine up to two data blocks using matching columns."
-            />
-          </CardTitle>
+        <CardHeader className="space-y-0 pb-4">
+          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                Configure join
+                <HelpIcon
+                  targetKey="preprocessing.join.tab"
+                  label="Join sub-tab overview"
+                  tooltip="Combine up to two data blocks using matching columns."
+                />
+              </CardTitle>
+            </div>
+            {showActivityTag && (
+              <Tag tone="muted">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Joining…
+              </Tag>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="space-y-4 pt-0">
-          <p className="text-sm text-muted-foreground">
-            Select up to two data blocks in the workspace (Shift/⌘-click) to configure a join. Column pickers will appear below
-            for the current selection.
-            <span className="ml-2 inline-flex items-center">
-              <HelpIcon
-                targetKey="preprocessing.join.column"
-                label="Join column picker"
-                className="h-5 w-5 text-muted-foreground"
-              />
-            </span>
-          </p>
-
           <NodeSelectionPanel
             selectedNodes={selectionPanel.selectedNodes}
             nodeColumnSelections={selectionPanel.nodeColumnSelections}
@@ -123,38 +108,33 @@ export const JoinSubTab: React.FC<JoinSubTabProps> = (props) => {
                 <p className="text-xs text-muted-foreground">{currentJoinTypeInfo.description}</p>
               )}
             </div>
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Label htmlFor="join-new-node-name">New data block name</Label>
-                <HelpIcon targetKey="preprocessing.join.new-node-name" label="Join output name" />
-              </div>
-              <Input
-                id="join-new-node-name"
-                value={joinNewNodeName}
-                placeholder={joinNamePlaceholder}
-                onChange={(event) => setJoinNewNodeName(event.target.value)}
-                onKeyDown={(event) => acceptPlaceholderOnTab({ event, value: joinNewNodeName, setValue: setJoinNewNodeName })}
-                autoComplete="off"
-              />
-              <p className="text-xs text-muted-foreground">Leave blank to use the suggested name shown in gray.</p>
-            </div>
           </div>
         </CardContent>
-        <CardFooter className="flex flex-col gap-3 border-t pt-4 md:flex-row md:items-center md:justify-between">
-          <div className="text-sm text-muted-foreground">{joinStatusMessage}</div>
-          <div className="flex items-center gap-2">
-            <Button type="button" onClick={apply.run} disabled={apply.disabled}>
-              {apply.isBusy ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Joining…
-                </>
-              ) : (
-                'Add to Workspace'
-              )}
-            </Button>
-            <HelpIcon targetKey="preprocessing.common.apply-button" label="Apply action" />
+        <CardFooter className="flex items-center gap-3 border-t pt-4">
+          <div className="flex flex-1 items-center gap-2">
+            <Label htmlFor="join-new-node-name" className="shrink-0">New data block name</Label>
+            <HelpIcon targetKey="preprocessing.join.new-node-name" label="Join output name" />
+            <Input
+              id="join-new-node-name"
+              value={joinNewNodeName}
+              placeholder={joinNamePlaceholder}
+              onChange={(event) => setJoinNewNodeName(event.target.value)}
+              onKeyDown={(event) => acceptPlaceholderOnTab({ event, value: joinNewNodeName, setValue: setJoinNewNodeName })}
+              autoComplete="off"
+              className="min-w-0 flex-1"
+            />
           </div>
+          <Button type="button" onClick={apply.run} disabled={apply.disabled} className="shrink-0">
+            {apply.isBusy ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Joining…
+              </>
+            ) : (
+              'Add to Workspace'
+            )}
+          </Button>
+          <HelpIcon targetKey="preprocessing.common.apply-button" label="Apply action" />
         </CardFooter>
       </Card>
 
@@ -184,7 +164,6 @@ export const JoinSubTab: React.FC<JoinSubTabProps> = (props) => {
           pageSize={preview.pageSize}
           onPageSizeChange={preview.onPageSizeChange}
           onPageChange={preview.onPageChange}
-          loadingBadge={previewBadge}
         />
       </div>
     </div>

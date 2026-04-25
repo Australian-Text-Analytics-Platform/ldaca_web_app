@@ -205,6 +205,16 @@ const registry: Record<string, TutorialTarget> = {
     anchor: 'help-preprocessing-aggregate-column-name',
     label: 'Computed column name',
   },
+  'preprocessing.find.tab': {
+    file: 'tutorials/preprocessing.md',
+    anchor: 'help-preprocessing-find-replace',
+    label: 'Find sub-tab overview',
+  },
+  'preprocessing.expression.tab': {
+    file: 'tutorials/preprocessing.md',
+    anchor: 'help-preprocessing-expression-section',
+    label: 'Polars Expression sub-tab overview',
+  },
   'analysis.token-frequency.tab': {
     file: 'tutorials/token-frequency.md',
     anchor: 'help-token-frequency-section',

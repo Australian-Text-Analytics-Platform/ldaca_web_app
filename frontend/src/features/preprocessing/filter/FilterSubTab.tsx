@@ -18,7 +18,6 @@ export const FilterSubTab: React.FC<FilterSubTabProps> = (props) => {
     schemaState,
     conditionBuilder,
     newNodeInput,
-    summaryText,
     isFiltering,
     applyFilter,
     applyButtonDisabled,
@@ -115,14 +114,14 @@ export const FilterSubTab: React.FC<FilterSubTabProps> = (props) => {
             shouldHideOperatorSelect={conditionBuilder.shouldHideOperatorSelect}
             getOperatorOptions={conditionBuilder.getOperatorOptions}
           />
+        </CardContent>
 
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <label className="block text-sm font-medium text-muted-foreground" htmlFor="filter-new-node-name">
-                New data block name
-              </label>
-              <HelpIcon targetKey="preprocessing.filter.new-node-name" label="Filter output name" />
-            </div>
+        <CardFooter className="flex items-center gap-3 border-t border-border bg-muted/20 py-4">
+          <div className="flex flex-1 items-center gap-2">
+            <label className="shrink-0 text-sm font-medium text-muted-foreground" htmlFor="filter-new-node-name">
+              New data block name
+            </label>
+            <HelpIcon targetKey="preprocessing.filter.new-node-name" label="Filter output name" />
             <input
               id="filter-new-node-name"
               type="text"
@@ -131,19 +130,13 @@ export const FilterSubTab: React.FC<FilterSubTabProps> = (props) => {
               onKeyDown={(event) => acceptPlaceholderOnTab({ event, value: newNodeInput.value, setValue: newNodeInput.setValue })}
               placeholder={newNodeInput.placeholder}
               disabled={newNodeInput.disabled}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+              className="min-w-0 flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
             />
           </div>
-        </CardContent>
-
-        <CardFooter className="flex flex-col gap-3 border-t border-border bg-muted/20 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="text-sm text-muted-foreground">{summaryText}</div>
-          <div className="flex items-center gap-2">
-            <Button onClick={applyFilter} disabled={applyButtonDisabled} className="w-full sm:w-auto">
-              {isFiltering ? 'Adding to workspace…' : 'Add to Workspace'}
-            </Button>
-            <HelpIcon targetKey="preprocessing.common.apply-button" label="Apply action" />
-          </div>
+          <Button onClick={applyFilter} disabled={applyButtonDisabled} className="shrink-0">
+            {isFiltering ? 'Adding to workspace…' : 'Add to Workspace'}
+          </Button>
+          <HelpIcon targetKey="preprocessing.common.apply-button" label="Apply action" />
         </CardFooter>
       </Card>
 

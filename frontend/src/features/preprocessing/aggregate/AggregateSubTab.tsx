@@ -4,9 +4,10 @@ import { Calculator, Loader2, X } from 'lucide-react';
 import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
 import HelpIcon from '../../../components/help/HelpIcon';
 import { Button } from '../../../components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Input } from '../../../components/ui/input';
 import { Separator } from '../../../components/ui/separator';
+import { Tag } from '../../../components/ui/tag';
 import { cn } from '../../../lib/utils';
 import { PreviewTable } from '../components/PreviewTable';
 import { getNodeDocumentColumn } from '../utils/nodeMetadata';
@@ -29,16 +30,26 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader className="space-y-1">
-          <CardTitle className="flex items-center gap-2">
-            <Calculator className="h-5 w-5" />
-            Computed Column Builder
-            <HelpIcon
-              targetKey="preprocessing.aggregate.tab"
-              label="Aggregate sub-tab overview"
-              tooltip="Combine existing columns with Polars-style expressions. The result is added to the selected data block using with_columns."
-            />
-          </CardTitle>
+        <CardHeader className="space-y-0 pb-4">
+          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Calculator className="h-5 w-5" />
+                Computed Column Builder
+                <HelpIcon
+                  targetKey="preprocessing.aggregate.tab"
+                  label="Aggregate sub-tab overview"
+                  tooltip="Combine existing columns with Polars-style expressions. The result is added to the selected data block using with_columns."
+                />
+              </CardTitle>
+            </div>
+            {apply.loading && (
+              <Tag tone="muted">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Adding…
+              </Tag>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <NodeSelectionPanel
@@ -52,6 +63,7 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
             className="rounded-lg border border-border/60 bg-muted/40 pt-0"
             showColorPicker={false}
             showColumnPicker={false}
+            showHeaderLabel
             originalCount={nodeSelection.originalCount}
             disabled={isLoading.operations}
             showShape
@@ -251,60 +263,47 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
                 </Button>
               </div>
           </div>
-
-          <div className="space-y-4">
-            <label className="flex flex-col gap-2">
-              <span className="flex items-center gap-2 text-sm font-medium text-foreground">
-                New column name (optional)
-                <HelpIcon targetKey="preprocessing.aggregate.column-name" label="Computed column name" />
-              </span>
-              <Input
-                value={expression.columnName}
-                onChange={expression.onChange.columnName}
-                onBlur={expression.onColumnNameBlur}
-                onFocus={expression.onColumnNameFocus}
-                spellCheck={false}
-                autoCorrect="off"
-                autoCapitalize="none"
-                autoComplete="off"
-                placeholder="Defaults to the expression string"
-                disabled={!nodeSelection.effectiveNodes.length || isLoading.operations}
-              />
-            </label>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2">
-              <Button type="button" onClick={apply.handleApply} disabled={!apply.canApply}>
-                {apply.loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Adding…
-                  </>
-                ) : (
-                  'Add to Data Block'
-                )}
-              </Button>
-              <HelpIcon targetKey="preprocessing.common.apply-button" label="Apply action" />
-            </div>
-            {(preview.loading ||
-              expression.focused.expression ||
-              expression.focused.columnName ||
-              basicBuilder.editingTokenId !== null ||
-              basicBuilder.dragActive) && (
-              <span className="text-sm text-muted-foreground">
-                Preview updates after you finish editing tokens or exit the fields.
-              </span>
-            )}
-            {apply.currentMatchesApplied && !preview.loading && !preview.error && (
-              <span className="text-sm text-muted-foreground">Latest expression already applied.</span>
-            )}
-          </div>
         </CardContent>
+
+        <CardFooter className="flex items-center gap-3 border-t border-border bg-muted/20 py-4">
+          <div className="flex flex-1 items-center gap-2">
+            <span className="shrink-0 text-sm font-medium text-foreground">New column name</span>
+            <HelpIcon targetKey="preprocessing.aggregate.column-name" label="Computed column name" />
+            <Input
+              value={expression.columnName}
+              onChange={expression.onChange.columnName}
+              onBlur={expression.onColumnNameBlur}
+              onFocus={expression.onColumnNameFocus}
+              spellCheck={false}
+              autoCorrect="off"
+              autoCapitalize="none"
+              autoComplete="off"
+              placeholder="Defaults to the expression string"
+              disabled={!nodeSelection.effectiveNodes.length || isLoading.operations}
+              className="min-w-0 flex-1"
+            />
+          </div>
+          <Button type="button" onClick={apply.handleApply} disabled={!apply.canApply} className="shrink-0">
+            {apply.loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Adding…
+              </>
+            ) : (
+              'Add to Data Block'
+            )}
+          </Button>
+          <HelpIcon targetKey="preprocessing.common.apply-button" label="Apply action" />
+        </CardFooter>
       </Card>
 
       <PreviewTable
-        title="Preview"
+        title={
+          <span className="flex items-center gap-2">
+            Preview
+            <HelpIcon targetKey="preprocessing.common.preview" label="Preview table" />
+          </span>
+        }
         description="Shows the computed column appended. Preview refreshes after each apply."
         columns={preview.columns}
         data={preview.data}

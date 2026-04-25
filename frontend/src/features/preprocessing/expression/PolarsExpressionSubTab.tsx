@@ -3,12 +3,14 @@ import { Code2, Loader2, Play, Plus, Trash2 } from 'lucide-react';
 
 import { CodeEditor } from '../../../components/CodeEditor';
 import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
+import HelpIcon from '../../../components/help/HelpIcon';
 import { Button } from '../../../components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Input } from '../../../components/ui/input';
 import { Checkbox } from '../../../components/ui/checkbox';
 import { Label } from '../../../components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../components/ui/tabs';
+import { Tag } from '../../../components/ui/tag';
 import { PreviewTable } from '../components/PreviewTable';
 import { usePolarsExpressionSubTab, type PolarsExpressionSubTabProps } from './hooks/usePolarsExpressionSubTab';
 
@@ -77,14 +79,26 @@ export const PolarsExpressionSubTab: React.FC<PolarsExpressionSubTabProps> = (pr
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader className="space-y-1">
-          <CardTitle className="flex items-center gap-2">
-            <Code2 className="h-5 w-5" />
-            Polars Expression
-          </CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Write Polars expressions in Python. They are validated and executed on the server.
-          </p>
+        <CardHeader className="space-y-0 pb-4">
+          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Code2 className="h-5 w-5" />
+                Polars Expression
+                <HelpIcon
+                  targetKey="preprocessing.expression.tab"
+                  label="Polars Expression sub-tab overview"
+                  tooltip="Write Polars expressions in Python to transform data blocks."
+                />
+              </CardTitle>
+            </div>
+            {isApplying && (
+              <Tag tone="muted">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Adding…
+              </Tag>
+            )}
+          </div>
         </CardHeader>
 
         <CardContent className="space-y-4">
@@ -100,7 +114,15 @@ export const PolarsExpressionSubTab: React.FC<PolarsExpressionSubTabProps> = (pr
             className="rounded-lg border border-border/60 bg-muted/40"
             showColorPicker={false}
             showColumnPicker={false}
+            showHeaderLabel
             showShape
+            headerAddon={
+              <HelpIcon
+                targetKey="preprocessing.common.node-selection"
+                label="Selected data blocks"
+                className="h-4 w-4 text-muted-foreground"
+              />
+            }
           />
 
           {/* Context tabs */}
@@ -343,42 +365,52 @@ export const PolarsExpressionSubTab: React.FC<PolarsExpressionSubTabProps> = (pr
               {evalError}
             </div>
           )}
-
-          {/* Preview */}
-          <PreviewTable
-            title="Preview"
-            description="Result of expression applied to the selected data block"
-            columns={preview.columns}
-            data={preview.data}
-            pagination={preview.pagination}
-            loading={preview.loading}
-            error={preview.error}
-            ready={preview.ready}
-            readyMessage="Evaluate an expression to see a preview"
-            page={preview.page}
-            pageSize={preview.pageSize}
-            onPageSizeChange={preview.setPageSize}
-            onPageChange={preview.setPage}
-          />
         </CardContent>
 
-        <CardFooter className="flex flex-wrap items-center gap-3 border-t pt-4">
-          <Input
-            className="max-w-55"
-            placeholder="New block name (optional)"
-            value={newNodeName}
-            onChange={(e) => setNewNodeName(e.target.value)}
-            disabled={!canApply}
-          />
+        <CardFooter className="flex items-center gap-3 border-t pt-4">
+          <div className="flex flex-1 items-center gap-2">
+            <Label htmlFor="polars-new-node-name" className="shrink-0">New data block name</Label>
+            <Input
+              id="polars-new-node-name"
+              className="min-w-0 flex-1"
+              placeholder="New block name (optional)"
+              value={newNodeName}
+              onChange={(e) => setNewNodeName(e.target.value)}
+              disabled={!canApply}
+            />
+          </div>
           <Button
             onClick={applyExpression}
             disabled={!canApply || isLoading.operations}
+            className="shrink-0"
           >
             {isApplying && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
-            Apply
+            Add to Workspace
           </Button>
+          <HelpIcon targetKey="preprocessing.common.apply-button" label="Apply action" />
         </CardFooter>
       </Card>
+
+      <PreviewTable
+        title={
+          <span className="flex items-center gap-2">
+            Preview
+            <HelpIcon targetKey="preprocessing.common.preview" label="Preview table" />
+          </span>
+        }
+        description="Result of expression applied to the selected data block"
+        columns={preview.columns}
+        data={preview.data}
+        pagination={preview.pagination}
+        loading={preview.loading}
+        error={preview.error}
+        ready={preview.ready}
+        readyMessage="Evaluate an expression to see a preview"
+        page={preview.page}
+        pageSize={preview.pageSize}
+        onPageSizeChange={preview.setPageSize}
+        onPageChange={preview.setPage}
+      />
     </div>
   );
 };
