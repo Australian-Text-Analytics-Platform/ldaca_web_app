@@ -285,7 +285,7 @@ const WorkspaceShell: React.FC = () => {
                 )}
               </div>
             )}
-            <div className="flex h-screen w-full overflow-hidden">
+            <div className="flex h-dvh w-full overflow-hidden">
               <ErrorBoundary>
                 <Sidebar />
               </ErrorBoundary>
@@ -500,7 +500,7 @@ type LoginScreenProps = {
 
 const LoginScreen: React.FC<LoginScreenProps> = ({ isLoading, error }) => {
   return (
-    <div className="min-h-screen bg-linear-to-br from-slate-50 via-slate-100 to-blue-50 flex items-center justify-center px-4 py-10">
+    <div className="min-h-dvh bg-linear-to-br from-slate-50 via-slate-100 to-blue-50 flex items-center justify-center px-4 py-10">
       <div className="w-full max-w-xl text-center space-y-4 bg-white/80 backdrop-blur rounded-2xl shadow-2xl border border-white/60 px-10 py-12">
         <div className="flex justify-center">
           <img

@@ -87,7 +87,7 @@ export const OperationPopover: React.FC<OperationPopoverProps> = ({
                     onClick={() => handleSelect(op)}
                     className={cn(
                       'flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-sm',
-                      'hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground focus-visible:outline-none',
+                      'hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground focus-visible:outline-hidden',
                     )}
                   >
                     <span className="text-sm">{label}</span>
@@ -107,7 +107,7 @@ export const OperationPopover: React.FC<OperationPopoverProps> = ({
                       onClick={() => handleSelect(qualifiedMethod)}
                       className={cn(
                         'flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-sm',
-                        'hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground focus-visible:outline-none',
+                        'hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground focus-visible:outline-hidden',
                       )}
                     >
                       <span className="font-mono text-xs">.{qualifiedMethod}()</span>
@@ -117,7 +117,7 @@ export const OperationPopover: React.FC<OperationPopoverProps> = ({
                 });
                 return (
                   <Collapsible key={namespace} defaultOpen={false} className="mb-2 last:mb-0">
-                    <CollapsibleTrigger className="flex w-full items-center justify-between px-2 py-1 text-xs font-semibold text-muted-foreground hover:text-foreground focus-visible:outline-none [&[data-state=open]>svg]:rotate-180">
+                    <CollapsibleTrigger className="flex w-full items-center justify-between px-2 py-1 text-xs font-semibold text-muted-foreground hover:text-foreground focus-visible:outline-hidden [&[data-state=open]>svg]:rotate-180">
                       {label}
                       <ChevronDown className="size-3 transition-transform duration-200" />
                     </CollapsibleTrigger>

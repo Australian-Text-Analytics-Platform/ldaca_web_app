@@ -136,7 +136,7 @@ export function TopicSelectionPanel({
             value={topicSearchQuery}
             onChange={(e) => onTopicSearchQueryChange(e.target.value)}
             placeholder="Search representative words…"
-            className="h-8 w-full rounded-md border border-input bg-background pl-8 pr-3 text-xs placeholder:text-muted-foreground focus:border-ring focus:ring-1 focus:ring-ring focus:outline-none"
+            className="h-8 w-full rounded-md border border-input bg-background pl-8 pr-3 text-xs placeholder:text-muted-foreground focus:border-ring focus:ring-1 focus:ring-ring focus:outline-hidden"
           />
         </div>
         <div className="max-h-70 space-y-1 overflow-y-auto">

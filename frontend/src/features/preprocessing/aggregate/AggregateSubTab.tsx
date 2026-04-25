@@ -212,7 +212,7 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
                                     <button
                                       type="button"
                                       onClick={() => basicBuilder.removeOperation(token.id, idx)}
-                                      className="inline-flex size-3.5 items-center justify-center rounded-full hover:bg-background/20 focus-visible:outline-none"
+                                      className="inline-flex size-3.5 items-center justify-center rounded-full hover:bg-background/20 focus-visible:outline-hidden"
                                       aria-label={`Remove ${op}`}
                                       disabled={basicBuilder.disabled}
                                     >
@@ -223,7 +223,7 @@ export const AggregateSubTab: React.FC<AggregateSubTabProps> = (props) => {
                                 <button
                                   type="button"
                                   onClick={() => basicBuilder.removeToken(token.id)}
-                                  className="ml-1 inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-background/30 text-background/60 transition hover:border-background/60 hover:text-background focus-visible:outline-none group-hover:border-background/60 group-hover:text-background"
+                                  className="ml-1 inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-background/30 text-background/60 transition hover:border-background/60 hover:text-background focus-visible:outline-hidden group-hover:border-background/60 group-hover:text-background"
                                   aria-label="Remove token"
                                   disabled={basicBuilder.disabled}
                                   onMouseDown={(event) => event.stopPropagation()}

@@ -45,7 +45,7 @@ export const WorkspaceSelectionTabs = ({
             <button
               type="button"
               onClick={() => onTabClose(tab.id)}
-              className="ml-1 inline-flex h-5 w-5 items-center justify-center rounded-full text-muted-foreground/70 transition hover:bg-muted-foreground/10 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="ml-1 inline-flex h-5 w-5 items-center justify-center rounded-full text-muted-foreground/70 transition hover:bg-muted-foreground/10 hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
               aria-label={`Remove ${tab.label} from selection`}
             >
               <X className="h-3 w-3" />

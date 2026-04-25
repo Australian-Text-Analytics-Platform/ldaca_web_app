@@ -130,7 +130,7 @@ export const FilterSubTab: React.FC<FilterSubTabProps> = (props) => {
               onKeyDown={(event) => acceptPlaceholderOnTab({ event, value: newNodeInput.value, setValue: newNodeInput.setValue })}
               placeholder={newNodeInput.placeholder}
               disabled={newNodeInput.disabled}
-              className="min-w-0 flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+              className="min-w-0 flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
             />
           </div>
           <Button onClick={applyFilter} disabled={applyButtonDisabled} className="shrink-0">

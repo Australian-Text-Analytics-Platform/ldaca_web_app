@@ -175,7 +175,7 @@ export function ServerTablePagination<TData>({
         <select
           value={pageSize}
           onChange={(e) => table.setPageSize(Number(e.target.value))}
-          className="h-7 rounded-md border border-input bg-background px-2 py-0.5 text-xs text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          className="h-7 rounded-md border border-input bg-background px-2 py-0.5 text-xs text-foreground shadow-sm focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
         >
           {normalizedOptions.map((size) => (
             <option key={size} value={size}>{size}</option>

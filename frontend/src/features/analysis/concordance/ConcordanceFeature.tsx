@@ -1520,7 +1520,7 @@ const ConcordanceFeature: React.FC = () => {
                   value={searchWord}
                   onChange={(e) => setSearchWord(e.target.value)}
                   placeholder="Enter word or phrase to search for"
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
                 />
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -1532,7 +1532,7 @@ const ConcordanceFeature: React.FC = () => {
                     onChange={(e) => setNumLeftTokens(parseInt(e.target.value) || 10)}
                     min="1"
                     max="50"
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
                   />
                 </div>
                 <div className="space-y-2">
@@ -1543,7 +1543,7 @@ const ConcordanceFeature: React.FC = () => {
                     onChange={(e) => setNumRightTokens(parseInt(e.target.value) || 10)}
                     min="1"
                     max="50"
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
                   />
                 </div>
               </div>

@@ -136,7 +136,7 @@ export const TokenFrequencyParameterPanel = ({
                     className="sr-only"
                   />
                   <span
-                    className={`inline-block h-4 w-4 rounded-full ${isActive ? 'ring-2 ring-ring ring-offset-2 ring-offset-background' : ''}`}
+                    className={`inline-block h-4 w-4 rounded-full ${isActive ? 'ring-2 ring-ring outline outline-2 outline-background' : ''}`}
                     style={{ backgroundColor: option.color }}
                     aria-hidden="true"
                   />

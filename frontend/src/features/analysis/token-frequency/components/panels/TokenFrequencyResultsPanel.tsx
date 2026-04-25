@@ -147,7 +147,7 @@ export const TokenFrequencyResultsPanel = ({
                 onBlur={onStopWordsApply}
                 placeholder="the, and, of"
                 disabled={isLoadingStopWords}
-                className="w-full resize-y overflow-y-auto rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                className="w-full resize-y overflow-y-auto rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
               />
               <div className="flex items-center gap-2">
                 <Button

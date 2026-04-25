@@ -39,7 +39,7 @@ export const NodeColorPicker: React.FC<NodeColorPickerProps> = ({
         <button
           type="button"
           className={cn(
-            'h-6 w-6 aspect-square rounded-full ring-2 ring-border ring-offset-1 transition-shadow hover:ring-primary focus-visible:outline-none focus-visible:ring-primary shadow-sm',
+            'h-6 w-6 aspect-square rounded-full ring-2 ring-border outline outline-background transition-shadow hover:ring-primary focus-visible:outline-hidden focus-visible:ring-primary shadow-sm',
             triggerClassName
           )}
           style={{ backgroundColor: color }}
@@ -57,8 +57,8 @@ export const NodeColorPicker: React.FC<NodeColorPickerProps> = ({
               key={swatch}
               type="button"
               className={cn(
-                'h-5 w-5 rounded-full border border-white shadow-sm transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1',
-                swatch.toLowerCase() === color.toLowerCase() && 'ring-2 ring-primary ring-offset-1'
+                'h-5 w-5 rounded-full border border-white shadow-sm transition-transform hover:scale-105 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary',
+                swatch.toLowerCase() === color.toLowerCase() && 'ring-2 ring-primary'
               )}
               style={{ backgroundColor: swatch }}
               onClick={() => onChange(swatch)}
