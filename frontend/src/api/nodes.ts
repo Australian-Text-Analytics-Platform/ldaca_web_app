@@ -62,11 +62,7 @@ export interface FilterPreviewResponse {
 }
 export type JoinPreviewResponse = FilterPreviewResponse;
 
-export interface ExpressionTransformRequest {
-  expression: string;
-  new_column_name?: string | null;
-  preview_limit?: number;
-}
+
 
 export interface ReplaceRequest {
   source_column: string;
@@ -80,14 +76,7 @@ export interface ReplaceRequest {
   connector?: string;
 }
 
-export interface ExpressionApplyResponse {
-  state: 'successful';
-  node_id: string;
-  column_name: string;
-  expression: string;
-  dtype?: string | null;
-  message: string;
-}
+
 
 export interface ReplaceApplyResponse {
   state: 'successful';
@@ -96,6 +85,19 @@ export interface ReplaceApplyResponse {
   dtype?: string | null;
   message: string;
 }
+
+// ---------------------------------------------------------------------------
+// Column operations registry
+// ---------------------------------------------------------------------------
+
+export interface OperationInfo {
+  method: string;
+  label: string;
+}
+
+export type ColumnOperationsResponse = {
+  operations: Record<string, OperationInfo[]>;
+};
 
 // ---------------------------------------------------------------------------
 // Polars Expression (unified endpoint) types
@@ -245,23 +247,13 @@ export const nodesApi = {
     { method: 'POST', headers, params: { page, page_size: pageSize }, body: req }
   ),
   slice: (node: string, req: SliceRequest, headers: Record<string,string> = {}) => post<Record<string, unknown>>(`/workspaces/nodes/${node}/slice`, req, headers),
-  computeColumnPreview: (
+  columnOperations: (
     node: string,
-    req: ExpressionTransformRequest,
-    page = 1,
-    pageSize = 10,
+    column: string,
     headers: Record<string, string> = {}
-  ) => httpRequest<FilterPreviewResponse>(
-    `/workspaces/nodes/${node}/compute-column/preview`,
-    { method: 'POST', headers, params: { page, page_size: pageSize }, body: req }
-  ),
-  computeColumn: (
-    node: string,
-    req: ExpressionTransformRequest,
-    headers: Record<string, string> = {}
-  ) => httpRequest<ExpressionApplyResponse>(
-    `/workspaces/nodes/${node}/compute-column`,
-    { method: 'POST', headers, body: req }
+  ) => get<ColumnOperationsResponse>(
+    `/workspaces/nodes/${node}/columns/${encodeURIComponent(column)}/operations`,
+    headers
   ),
   replaceTextPreview: (
     node: string,

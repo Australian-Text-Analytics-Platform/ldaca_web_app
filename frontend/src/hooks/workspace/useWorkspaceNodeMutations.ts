@@ -5,7 +5,6 @@ import {
   nodesApi,
   type FilterRequest,
   type SliceRequest,
-  type ExpressionTransformRequest,
   type ReplaceRequest,
   type PolarsExpressionRequest,
 } from '../../api/nodes';
@@ -437,28 +436,6 @@ export const useWorkspaceNodeMutations = ({
     },
   });
 
-  const computeColumnMutation = useMutation({
-    mutationFn: ({ nodeId, request }: { nodeId: string; request: ExpressionTransformRequest }) =>
-      nodesApi.computeColumn(nodeId, request, authHeaders),
-    onMutate: () => {
-      startOperation('computeColumn');
-    },
-    onSuccess: (_response, variables) => {
-      if (currentWorkspaceId) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
-        if (variables?.nodeId) {
-          queryClient.invalidateQueries({ queryKey: queryKeys.nodeData(currentWorkspaceId, variables.nodeId) });
-          queryClient.invalidateQueries({ queryKey: queryKeys.nodeSchema(currentWorkspaceId, variables.nodeId) });
-        }
-      }
-      endOperation('computeColumn');
-    },
-    onError: (error: Error) => {
-      setOperationError('computeColumn', error.message);
-      endOperation('computeColumn');
-    },
-  });
-
   const replaceTextMutation = useMutation({
     mutationFn: ({ nodeId, request }: { nodeId: string; request: ReplaceRequest }) =>
       nodesApi.replaceText(nodeId, request, authHeaders),
@@ -614,10 +591,6 @@ export const useWorkspaceNodeMutations = ({
       sliceNodeMutation.mutateAsync({ nodeId, request }),
     slicePreview: (nodeId: string, request: SliceRequest, page = 1, pageSize = 10) =>
       nodesApi.slicePreview(nodeId, request, page, pageSize, authHeaders),
-    computeColumn: (nodeId: string, request: ExpressionTransformRequest) =>
-      computeColumnMutation.mutateAsync({ nodeId, request }),
-    computeColumnPreview: (nodeId: string, request: ExpressionTransformRequest, page = 1, pageSize = 10) =>
-      nodesApi.computeColumnPreview(nodeId, request, page, pageSize, authHeaders),
     replaceText: (nodeId: string, request: ReplaceRequest) =>
       replaceTextMutation.mutateAsync({ nodeId, request }),
     replaceTextPreview: (nodeId: string, request: ReplaceRequest, page = 1, pageSize = 10) =>

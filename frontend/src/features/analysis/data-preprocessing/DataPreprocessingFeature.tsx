@@ -26,8 +26,6 @@ const DataPreprocessingFeature: React.FC = () => {
     concatPreview,
     sliceNode,
     slicePreview,
-    computeColumn,
-    computeColumnPreview,
     replaceText,
     replaceTextPreview,
     refreshNodeSchema,
@@ -142,8 +140,8 @@ const DataPreprocessingFeature: React.FC = () => {
             workspaceNodes={workspaceNodes}
             isLoading={isLoading}
             onAlert={handleAlert}
-            computeColumnPreview={computeColumnPreview}
-            computeColumn={computeColumn}
+            polarsExpressionPreview={polarsExpressionPreview}
+            polarsExpressionApply={polarsExpressionApply}
             refreshNodeSchema={refreshNodeSchema}
           />
         </TabsContent>
