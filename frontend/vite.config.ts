@@ -23,6 +23,7 @@ export default defineConfig({
   plugins: [
     react(),
     babel({
+      include: /\.[tj]sx?$/,
       presets: [reactCompilerPreset()],
     } as Parameters<typeof babel>[0]),
   ],

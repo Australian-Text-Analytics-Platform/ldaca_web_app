@@ -278,7 +278,7 @@ export const sortStatistics = (
   const columnKey = statsSortColumn || 'log_likelihood_llv';
   const direction = statsSortDirection === 'asc' ? 1 : -1;
 
-  return [...filteredStatistics].sort((a, b) => {
+  return filteredStatistics.toSorted((a, b) => {
     if (columnKey === 'significance') {
       const rank = (stat: TokenFrequencyStatisticsEntry) => (stat.significance || '').length;
       const va = rank(a);

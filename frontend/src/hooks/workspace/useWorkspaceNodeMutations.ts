@@ -5,8 +5,8 @@ import {
   nodesApi,
   type FilterRequest,
   type SliceRequest,
-  type ExpressionTransformRequest,
   type ReplaceRequest,
+  type PolarsExpressionRequest,
 } from '../../api/nodes';
 import { queryKeys } from '../../lib/queryKeys';
 import { type NodeSchemaResponse } from '../../types';
@@ -436,28 +436,6 @@ export const useWorkspaceNodeMutations = ({
     },
   });
 
-  const computeColumnMutation = useMutation({
-    mutationFn: ({ nodeId, request }: { nodeId: string; request: ExpressionTransformRequest }) =>
-      nodesApi.computeColumn(nodeId, request, authHeaders),
-    onMutate: () => {
-      startOperation('computeColumn');
-    },
-    onSuccess: (_response, variables) => {
-      if (currentWorkspaceId) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.workspaceGraph(currentWorkspaceId) });
-        if (variables?.nodeId) {
-          queryClient.invalidateQueries({ queryKey: queryKeys.nodeData(currentWorkspaceId, variables.nodeId) });
-          queryClient.invalidateQueries({ queryKey: queryKeys.nodeSchema(currentWorkspaceId, variables.nodeId) });
-        }
-      }
-      endOperation('computeColumn');
-    },
-    onError: (error: Error) => {
-      setOperationError('computeColumn', error.message);
-      endOperation('computeColumn');
-    },
-  });
-
   const replaceTextMutation = useMutation({
     mutationFn: ({ nodeId, request }: { nodeId: string; request: ReplaceRequest }) =>
       nodesApi.replaceText(nodeId, request, authHeaders),
@@ -613,14 +591,14 @@ export const useWorkspaceNodeMutations = ({
       sliceNodeMutation.mutateAsync({ nodeId, request }),
     slicePreview: (nodeId: string, request: SliceRequest, page = 1, pageSize = 10) =>
       nodesApi.slicePreview(nodeId, request, page, pageSize, authHeaders),
-    computeColumn: (nodeId: string, request: ExpressionTransformRequest) =>
-      computeColumnMutation.mutateAsync({ nodeId, request }),
-    computeColumnPreview: (nodeId: string, request: ExpressionTransformRequest, page = 1, pageSize = 10) =>
-      nodesApi.computeColumnPreview(nodeId, request, page, pageSize, authHeaders),
     replaceText: (nodeId: string, request: ReplaceRequest) =>
       replaceTextMutation.mutateAsync({ nodeId, request }),
     replaceTextPreview: (nodeId: string, request: ReplaceRequest, page = 1, pageSize = 10) =>
       nodesApi.replaceTextPreview(nodeId, request, page, pageSize, authHeaders),
+    polarsExpressionPreview: (nodeId: string, request: PolarsExpressionRequest, page = 1, pageSize = 10) =>
+      nodesApi.polarsExpressionPreview(nodeId, request, page, pageSize, authHeaders),
+    polarsExpressionApply: (nodeId: string, request: PolarsExpressionRequest) =>
+      nodesApi.polarsExpressionApply(nodeId, request, authHeaders),
     castColumn: (nodeId: string, column: string, targetType: string, format?: string) =>
       castNodeMutation.mutateAsync({ nodeId, column, targetType, format }),
     renameColumn: (nodeId: string, column: string, newName: string) =>

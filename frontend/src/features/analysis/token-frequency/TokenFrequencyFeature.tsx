@@ -192,7 +192,7 @@ const TokenFrequencyFeature = () => {
   const effectiveNodeColumnSelections = isLocked ? activeNodeColumnSelections : nodeColumnSelections;
 
   const getColorForNode = (nodeId: string, index = 0) => {
-    return nodeColors[nodeId] ?? defaultPalette[index % defaultPalette.length];
+    return nodeColors[nodeId] ?? defaultPalette[index % defaultPalette.length] ?? '#000000';
   };
 
   const backendTokenLimit = deriveBackendTokenLimit(results);
@@ -321,8 +321,8 @@ const TokenFrequencyFeature = () => {
 
   const renameStatisticsKeysForExport = (rows: unknown[]): unknown[] => {
     if (analysisNodeIds.length !== 2) return rows;
-    const referenceName = computeDisplayName(analysisNodeIds[0], 'reference');
-    const studyName = computeDisplayName(analysisNodeIds[1], 'study');
+    const referenceName = computeDisplayName(analysisNodeIds[0]!, 'reference');
+    const studyName = computeDisplayName(analysisNodeIds[1]!, 'study');
     const keyMap: Record<string, string> = {
       freq_reference: `OR_${referenceName}`,
       freq_study: `OS_${studyName}`,

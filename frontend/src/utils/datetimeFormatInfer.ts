@@ -7,7 +7,7 @@ export function inferDatetimeFormat(samples: string[], opts: { requireTime?: boo
   if (!nonEmpty.length) return null;
 
   // Choose the sample with the most content (likely has time / tz info)
-  const candidate = [...nonEmpty].sort((a, b) => b.length - a.length)[0].trim();
+  const candidate = nonEmpty.toSorted((a, b) => b.length - a.length)[0]!.trim();
 
   let format = candidate;
 
@@ -30,7 +30,7 @@ export function inferDatetimeFormat(samples: string[], opts: { requireTime?: boo
   // Month and day: attempt to respect separators - replace first 2-digit group after %Y separator with %m then next with %d
   const dateSepMatch = format.match(/%Y([-/.])/);
   if (dateSepMatch) {
-    const sep = dateSepMatch[1];
+    const sep = dateSepMatch[1]!;
     const esc = escapeSep(sep);
     if (!hasMonthToken()) {
       format = format.replace(new RegExp(`%Y${esc}(\\d{2})`), `%Y${sep}%m`);

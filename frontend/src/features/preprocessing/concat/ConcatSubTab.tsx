@@ -1,5 +1,5 @@
 import React from 'react';
-import { Loader2 } from 'lucide-react';
+import { Layers, Loader2 } from 'lucide-react';
 
 import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
 import HelpIcon from '../../../components/help/HelpIcon';
@@ -33,7 +33,8 @@ export const ConcatSubTab: React.FC<ConcatSubTabProps> = (props) => {
           <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
-                Concatenate datasets
+                <Layers className="h-5 w-5" />
+                Concatenate Datasets
                 <HelpIcon
                   targetKey="preprocessing.concat.tab"
                   label="Concat sub-tab overview"
@@ -50,10 +51,6 @@ export const ConcatSubTab: React.FC<ConcatSubTabProps> = (props) => {
           </div>
         </CardHeader>
         <CardContent className="space-y-4 pt-0">
-          <p className="text-sm text-muted-foreground">
-            Multi-select data blocks in the workspace (Shift/⌘-click) to stack them vertically. We′ll align schemas and preserve column order.
-          </p>
-
           <NodeSelectionPanel
             selectedNodes={selectionPanel.selectedNodes}
             nodeColumnSelections={selectionPanel.nodeColumnSelections}
@@ -104,47 +101,40 @@ export const ConcatSubTab: React.FC<ConcatSubTabProps> = (props) => {
             </div>
           )}
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Label htmlFor="concat-new-node-name">New data block name</Label>
-                <HelpIcon targetKey="preprocessing.concat.new-node-name" label="Concat output name" />
-              </div>
-              <Input
-                id="concat-new-node-name"
-                value={form.value}
-                placeholder={form.placeholder}
-                onChange={(event) => form.setValue(event.target.value)}
-                onKeyDown={(event) => acceptPlaceholderOnTab({ event, value: form.value, setValue: form.setValue })}
-              />
-              <p className="text-xs text-muted-foreground">Leave blank to use the suggested name shown in gray.</p>
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Label>Schema status</Label>
+              <HelpIcon targetKey="preprocessing.concat.schema-status" label="Schema status" />
             </div>
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Label>Schema status</Label>
-                <HelpIcon targetKey="preprocessing.concat.schema-status" label="Schema status" />
-              </div>
-              <div className="rounded-md border border-muted-foreground/40 bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-                {statusMessage}
-              </div>
+            <div className="rounded-md border border-muted-foreground/40 bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+              {statusMessage}
             </div>
           </div>
         </CardContent>
-        <CardFooter className="flex flex-col gap-3 border-t pt-4 md:flex-row md:items-center md:justify-between">
-          <div className="text-sm text-muted-foreground">{statusMessage}</div>
-          <div className="flex items-center gap-2">
-            <Button type="button" onClick={() => void apply.run()} disabled={apply.disabled}>
-              {apply.isBusy ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Concatenating…
-                </>
-              ) : (
-                'Add to Workspace'
-              )}
-            </Button>
-            <HelpIcon targetKey="preprocessing.common.apply-button" label="Apply action" />
+        <CardFooter className="flex items-center gap-3 border-t pt-4">
+          <div className="flex flex-1 items-center gap-2">
+            <Label htmlFor="concat-new-node-name" className="shrink-0">New data block name</Label>
+            <HelpIcon targetKey="preprocessing.concat.new-node-name" label="Concat output name" />
+            <Input
+              id="concat-new-node-name"
+              value={form.value}
+              placeholder={form.placeholder}
+              onChange={(event) => form.setValue(event.target.value)}
+              onKeyDown={(event) => acceptPlaceholderOnTab({ event, value: form.value, setValue: form.setValue })}
+              className="min-w-0 flex-1"
+            />
           </div>
+          <Button type="button" onClick={() => void apply.run()} disabled={apply.disabled} className="shrink-0">
+            {apply.isBusy ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Concatenating…
+              </>
+            ) : (
+              'Add to Workspace'
+            )}
+          </Button>
+          <HelpIcon targetKey="preprocessing.common.apply-button" label="Apply action" />
         </CardFooter>
       </Card>
 
@@ -167,12 +157,6 @@ export const ConcatSubTab: React.FC<ConcatSubTabProps> = (props) => {
         pageSize={preview.pageSize}
         onPageSizeChange={preview.onPageSizeChange}
         onPageChange={preview.onPageChange}
-        loadingBadge={preview.loading ? (
-          <Tag tone="muted">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            Loading preview…
-          </Tag>
-        ) : null}
       />
     </div>
   );

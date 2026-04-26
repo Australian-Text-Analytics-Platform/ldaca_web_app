@@ -8,6 +8,16 @@ export const CONCORDANCE_CORE_COLUMNS = [
   'CONC_r1',
 ] as const;
 
+export const CONCORDANCE_FREQ_COLUMNS = [
+  'CONC_l1_freq',
+  'CONC_r1_freq',
+] as const;
+
+export const CONCORDANCE_MATERIALIZED_COLUMNS = [
+  ...CONCORDANCE_CORE_COLUMNS,
+  ...CONCORDANCE_FREQ_COLUMNS,
+] as const;
+
 export const CONCORDANCE_DISPERSION_COLUMN = 'CONC_dispersion' as const;
 
 export const CONCORDANCE_COLUMN_KEYS = {
@@ -18,6 +28,8 @@ export const CONCORDANCE_COLUMN_KEYS = {
   endIdx: 'CONC_end_idx',
   leftToken: 'CONC_l1',
   rightToken: 'CONC_r1',
+  leftTokenFreq: 'CONC_l1_freq',
+  rightTokenFreq: 'CONC_r1_freq',
   dispersion: CONCORDANCE_DISPERSION_COLUMN,
 } as const;
 

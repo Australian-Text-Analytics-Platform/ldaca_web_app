@@ -184,7 +184,7 @@ const TutorialView: React.FC<{ onClose?: () => void; target?: TutorialTarget | n
   }, []);
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-slate-50 to-blue-50">
+    <div className="min-h-dvh bg-linear-to-br from-slate-50 to-blue-50">
       <header className="bg-card border-b border-border px-6 py-4 pr-12">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">

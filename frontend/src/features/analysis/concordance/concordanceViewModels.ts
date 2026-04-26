@@ -31,7 +31,7 @@ export function buildDispersionRows(groups: ConcordanceGroupedRow[]): Concordanc
       return [];
     }
 
-    const firstHit = group[0];
+    const firstHit = group[0]!;
     const metadataEntries = Object.entries(firstHit).filter(([key]) => !CORE_COLUMN_SET.has(key));
     return [
       {

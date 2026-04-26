@@ -56,7 +56,7 @@ const SidebarTasksSection: React.FC<SidebarTasksSectionProps> = ({
         })
     : [];
 
-  const statusMeta = (status?: string) => STATUS_META[status ?? ''] ?? STATUS_META.default;
+  const statusMeta = (status?: string) => STATUS_META[status ?? ''] ?? STATUS_META['default']!;
 
   const connectionLabel = connectionError
     ? connectionError

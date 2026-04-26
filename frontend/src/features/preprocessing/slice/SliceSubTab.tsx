@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertCircle, Loader2 } from 'lucide-react';
+import { AlertCircle, Loader2, Shuffle } from 'lucide-react';
 
 import NodeSelectionPanel from '../../../components/NodeSelectionPanel';
 import HelpIcon from '../../../components/help/HelpIcon';
@@ -21,7 +21,6 @@ export const SliceSubTab: React.FC<SliceSubTabProps> = (props) => {
   const {
     selectionPanel,
     form,
-    summaries,
     inlineError,
     hasSelection,
     isBusy,
@@ -38,7 +37,8 @@ export const SliceSubTab: React.FC<SliceSubTabProps> = (props) => {
           <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
-                Sample rows
+                <Shuffle className="h-5 w-5" />
+                Sample Rows
                 <HelpIcon
                   targetKey="preprocessing.slice.tab"
                   label="Sample sub-tab overview"
@@ -170,12 +170,11 @@ export const SliceSubTab: React.FC<SliceSubTabProps> = (props) => {
               </div>
             </TabsContent>
           </Tabs>
-
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Label htmlFor="slice-new-node-name">New data block name</Label>
-              <HelpIcon targetKey="preprocessing.slice.new-node-name" label="Sample output name" />
-            </div>
+        </CardContent>
+        <CardFooter className="flex items-center gap-3 border-t border-border bg-muted/20 py-4">
+          <div className="flex flex-1 items-center gap-2">
+            <Label htmlFor="slice-new-node-name" className="shrink-0">New data block name</Label>
+            <HelpIcon targetKey="preprocessing.slice.new-node-name" label="Sample output name" />
             <Input
               id="slice-new-node-name"
               type="text"
@@ -184,28 +183,19 @@ export const SliceSubTab: React.FC<SliceSubTabProps> = (props) => {
               onKeyDown={(event) => acceptPlaceholderOnTab({ event, value: form.newNodeName, setValue: form.setNewNodeName })}
               placeholder={form.newNodeNamePlaceholder}
               disabled={!hasSelection}
+              className="min-w-0 flex-1"
             />
           </div>
-        </CardContent>
-        <CardFooter className="flex flex-col gap-3 border-t border-border bg-muted/20 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="text-sm text-muted-foreground">
-            <p>{summaries.range}</p>
-            <p>{summaries.lastResult}</p>
-          </div>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            {inlineError && (
-              <div className="flex items-center gap-2 text-sm text-destructive">
-                <AlertCircle className="h-4 w-4" />
-                <span>{inlineError}</span>
-              </div>
-            )}
-            <div className="flex items-center gap-2">
-              <Button onClick={applySlice} disabled={applyDisabled} className="w-full sm:w-auto">
-                {isBusy ? 'Adding to workspace…' : 'Add to Workspace'}
-              </Button>
-              <HelpIcon targetKey="preprocessing.common.apply-button" label="Apply action" />
+          {inlineError && (
+            <div className="flex items-center gap-2 text-sm text-destructive">
+              <AlertCircle className="h-4 w-4" />
+              <span>{inlineError}</span>
             </div>
-          </div>
+          )}
+          <Button onClick={applySlice} disabled={applyDisabled} className="shrink-0">
+            {isBusy ? 'Adding to workspace…' : 'Add to Workspace'}
+          </Button>
+          <HelpIcon targetKey="preprocessing.common.apply-button" label="Apply action" />
         </CardFooter>
       </Card>
 

@@ -194,7 +194,7 @@ export const useReplaceSubTab = (props: ReplaceSubTabProps) => {
   const nodeColumnSelections: NodeColumnSelection[] = activeNodeId
     ? [{ nodeId: activeNodeId, column: selectedColumn }]
     : [];
-  const nodeColors = activeNodeId ? { [activeNodeId]: DEFAULT_PALETTE[0] } : {};
+  const nodeColors = activeNodeId ? { [activeNodeId]: DEFAULT_PALETTE[0]! } : {};
 
   const previewReadyMessage = !hasSelection
     ? 'Select a data block to configure a find operation.'

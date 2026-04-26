@@ -11,8 +11,8 @@ const mockSliceNode = vi.fn();
 const mockSlicePreview = vi.fn();
 const mockFilterNode = vi.fn();
 const mockFilterPreview = vi.fn();
-const mockComputeColumnPreview = vi.fn();
-const mockComputeColumn = vi.fn();
+const mockPolarsExpressionPreview = vi.fn();
+const mockPolarsExpressionApply = vi.fn();
 const mockReplacePreview = vi.fn();
 const mockReplaceText = vi.fn();
 const mockRefreshNodeSchema = vi.fn();
@@ -60,11 +60,11 @@ vi.mock('@/hooks/useWorkspaceActions', () => ({
     concatPreview: vi.fn(),
     sliceNode: mockSliceNode,
     slicePreview: mockSlicePreview,
-    computeColumn: mockComputeColumn,
-    computeColumnPreview: mockComputeColumnPreview,
     replaceText: mockReplaceText,
     replaceTextPreview: mockReplacePreview,
     refreshNodeSchema: mockRefreshNodeSchema,
+    polarsExpressionPreview: mockPolarsExpressionPreview,
+    polarsExpressionApply: mockPolarsExpressionApply,
   }),
 }));
 
@@ -233,7 +233,7 @@ describe('DataPreprocessingFeature replace tab', () => {
     render(<DataPreprocessingFeature />);
 
     const [filterTab] = screen.getAllByRole('tab', { name: 'Filter' });
-    filterTab.focus();
+    filterTab!.focus();
     await user.keyboard('{ArrowRight}');
 
     await waitFor(() => {
@@ -266,7 +266,7 @@ describe('DataPreprocessingFeature replace tab', () => {
 
     const filterPanel = screen.getByRole('tabpanel', { name: 'Filter' });
     const [columnSelect] = within(filterPanel).getAllByRole('combobox');
-    columnSelect.focus();
+    columnSelect!.focus();
     await user.keyboard('{ArrowDown}{Enter}');
 
     const valueInput = await screen.findByPlaceholderText('Enter value');

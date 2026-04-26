@@ -4,12 +4,12 @@ import type { WorkspaceNodeLike } from '../../../../components/NodeSelectionPane
 import { takeMostRecent } from '../../../../utils/selectionUtils';
 import {
   nodesApi,
-  type ExpressionApplyResponse,
   type FilterPreviewResponse,
-  type ExpressionTransformRequest,
+  type PolarsExpressionRequest,
+  type PolarsExpressionApplyResponse,
 } from '../../../../api/nodes';
 import { useAuth } from '../../../../hooks/useAuth';
-import { mapColumnsToInfo } from '../../../../utils/columnTypes';
+import { mapColumnsToInfo, type ColumnInfo } from '../../../../utils/columnTypes';
 import { usePreprocessingPreview } from '../../hooks/usePreprocessingPreview';
 import type { PreviewPagination, PreviewRow } from '../../types';
 
@@ -30,13 +30,13 @@ const normalizeSmartCharacters = (input: string): string =>
   input.replace(/[\u201C\u201D\u201E\u201F\u2018\u2019\u201A\u201B]/g, (char) => SMART_CHAR_MAP[char] ?? char);
 
 export type BasicToken =
-  | { id: string; kind: 'column'; column: string }
+  | { id: string; kind: 'column'; column: string; dtype: string; operations: string[] }
   | { id: string; kind: 'custom'; value: string };
 
 export type DropIndicator = { tokenId: string; position: 'before' | 'after' };
 
 export type DragPayload =
-  | { source: 'palette'; kind: 'column'; column: string }
+  | { source: 'palette'; kind: 'column'; column: string; dtype: string }
   | { source: 'palette'; kind: 'custom' }
   | { source: 'existing'; id: string };
 
@@ -50,8 +50,8 @@ export interface AggregateSubTabProps {
     operations: boolean;
   };
   onAlert: (message: string) => void;
-  computeColumnPreview: (nodeId: string, request: ExpressionTransformRequest, page?: number, pageSize?: number) => Promise<FilterPreviewResponse>;
-  computeColumn: (nodeId: string, request: ExpressionTransformRequest) => Promise<ExpressionApplyResponse>;
+  polarsExpressionPreview: (nodeId: string, request: PolarsExpressionRequest, page?: number, pageSize?: number) => Promise<FilterPreviewResponse>;
+  polarsExpressionApply: (nodeId: string, request: PolarsExpressionRequest) => Promise<PolarsExpressionApplyResponse>;
   refreshNodeSchema: (nodeId: string) => Promise<unknown>;
 }
 
@@ -64,8 +64,6 @@ export interface NodeSelectionConfig {
 }
 
 export interface ExpressionConfig {
-  mode: 'basic' | 'advanced';
-  setMode: (mode: 'basic' | 'advanced') => void;
   expression: string;
   setExpression: (value: string) => void;
   columnName: string;
@@ -79,7 +77,6 @@ export interface ExpressionConfig {
   onColumnNameFocus: () => void;
   onColumnNameBlur: () => void;
   onChange: {
-    expression: (event: React.ChangeEvent<HTMLTextAreaElement>) => void;
     columnName: (event: React.ChangeEvent<HTMLInputElement>) => void;
   };
 }
@@ -92,11 +89,13 @@ export interface BasicBuilderConfig {
   editingTokenId: string | null;
   customDraft: string;
   expressionPreview: string;
-  availableColumns: string[];
-  addColumnToken: (column: string, index?: number) => void;
+  availableColumns: ColumnInfo[];
+  addColumnToken: (column: string, dtype: string, index?: number) => void;
   addCustomToken: (index?: number) => void;
   removeToken: (tokenId: string) => void;
   moveToken: (tokenId: string, index: number) => void;
+  addOperation: (tokenId: string, operation: string) => void;
+  removeOperation: (tokenId: string, index: number) => void;
   startEditingCustom: (tokenId: string) => void;
   finishCustomEdit: (commit: boolean) => void;
   clearBuilder: () => void;
@@ -104,7 +103,7 @@ export interface BasicBuilderConfig {
   handlers: {
     customDraftChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
     customInputKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => void;
-    columnDragStart: (event: React.DragEvent<HTMLButtonElement>, column: string) => void;
+    columnDragStart: (event: React.DragEvent<HTMLButtonElement>, column: string, dtype: string) => void;
     customDragStart: (event: React.DragEvent<HTMLButtonElement>) => void;
     existingTokenDragStart: (event: React.DragEvent<HTMLDivElement>, tokenId: string) => void;
     existingTokenDragEnd: () => void;
@@ -164,8 +163,8 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     workspaceNodes,
     isLoading,
     onAlert,
-    computeColumnPreview,
-    computeColumn,
+    polarsExpressionPreview,
+    polarsExpressionApply,
     refreshNodeSchema,
   } = props;
   const { getAuthHeaders } = useAuth();
@@ -191,7 +190,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
 
   const limitedNodeId = (() => {
     if (!effectiveNodes.length) return null;
-    const first = effectiveNodes[0];
+    const first = effectiveNodes[0]!;
     return (
       first.id ||
       first.node_id ||
@@ -205,7 +204,6 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
   const [lastAppliedExpression, setLastAppliedExpression] = useState<string | null>(null);
   const [expressionFocused, setExpressionFocused] = useState(false);
   const [columnNameFocused, setColumnNameFocused] = useState(false);
-  const [expressionMode, setExpressionMode] = useState<'basic' | 'advanced'>('basic');
   const [basicTokens, setBasicTokens] = useState<BasicToken[]>([]);
   const [dropIndicator, setDropIndicator] = useState<DropIndicator | null>(null);
   const [basicDragActive, setBasicDragActive] = useState(false);
@@ -239,14 +237,6 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     latestColumnNameRef.current = columnName;
   }, [columnName]);
 
-  useEffect(() => {
-    if (expressionMode === 'advanced') {
-      setEditingTokenId(null);
-      setDropIndicator(null);
-      setBasicDragActive(false);
-    }
-  }, [expressionMode]);
-
   const workspaceNodeMap = (() => {
     const map = new Map<string, WorkspaceNodeLike>();
     workspaceNodes.forEach((node, idx) => {
@@ -271,48 +261,45 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
   const canApply = hasSelection && trimmedExpression.length > 0 && !applyLoading && !isLoading.operations;
   const basicDisabled = !hasSelection || isLoading.operations;
 
-  const availableColumns = (() => {
-    if (!effectiveSelectedNodes.length) return [] as string[];
+  const availableColumns: ColumnInfo[] = (() => {
+    if (!effectiveSelectedNodes.length) return [];
     const [node] = effectiveSelectedNodes;
-    return mapColumnsToInfo(node)
-      .map((info) => info.name)
-      .filter((name): name is string => typeof name === 'string' && name.length > 0);
+    return mapColumnsToInfo(node).filter(
+      (info) => typeof info.name === 'string' && info.name.length > 0,
+    );
   })();
-
-  const formatColumnName = (name: string) => {
-    if (!name) return '';
-    const safe = name.replace(/"/g, '\\"');
-    if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
-      return name;
-    }
-    return `"${safe}"`;
-  };
 
   const escapeLiteralValue = (value: string) => value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 
-  const formatCustomToken = (rawValue: string) => {
-      if (!rawValue.length) {
-        return '""';
+  const tokenToPolars = (token: BasicToken): string => {
+    if (token.kind === 'column') {
+      const safe = token.column.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+      let expr = `pl.col("${safe}")`;
+      for (const op of token.operations) {
+        expr += `.${op}()`;
       }
-      const trimmed = rawValue.trim();
-      if (
-        (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
-        (trimmed.startsWith("'") && trimmed.endsWith("'"))
-      ) {
-        return trimmed;
-      }
-      return `"${escapeLiteralValue(rawValue)}"`;
-    };
+      return expr;
+    }
+    // custom token → pl.lit(...)
+    const raw = token.value;
+    if (!raw.length) return 'pl.lit("")';
+    const trimmed = raw.trim();
+    // If it looks like an already-quoted string, respect it
+    if (
+      (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+      (trimmed.startsWith("'") && trimmed.endsWith("'"))
+    ) {
+      return `pl.lit(${trimmed})`;
+    }
+    // Numeric literals
+    if (/^-?\d+(\.\d+)?$/.test(trimmed)) {
+      return `pl.lit(${trimmed})`;
+    }
+    return `pl.lit("${escapeLiteralValue(raw)}")`;
+  };
 
   const tokensToExpression = (tokens: BasicToken[]) =>
-      tokens
-        .map((token) => {
-          if (token.kind === 'column') {
-            return formatColumnName(token.column);
-          }
-          return formatCustomToken(token.value);
-        })
-        .join(' + ');
+      tokens.map(tokenToPolars).join(' + ');
 
   const setExpressionAndMarkDirty = (nextExpression: string) => {
     const normalizedExpression = normalizeSmartCharacters(nextExpression);
@@ -334,12 +321,18 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       });
     };
 
-  const buildRequest = (): ExpressionTransformRequest => {
+  const buildRequest = (): PolarsExpressionRequest => {
     const expressionValue = latestExpressionRef.current.trim();
     const columnValue = latestColumnNameRef.current.trim();
-    const payload: ExpressionTransformRequest = { expression: expressionValue };
-    if (columnValue.length > 0) payload.new_column_name = columnValue;
-    return payload;
+    let code = expressionValue;
+    if (columnValue.length > 0) {
+      const safeName = columnValue.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+      code = `(${code}).alias("${safeName}")`;
+    }
+    return {
+      context: 'with_columns',
+      expressions: [{ code }],
+    };
   };
 
   const commitExpression = () => {
@@ -372,14 +365,21 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
 
   interface AggregatePreviewRequest {
     nodeId: string;
-    payload: ExpressionTransformRequest | null;
+    payload: PolarsExpressionRequest | null;
   }
 
   const aggregatePreviewRequest: AggregatePreviewRequest | null = (() => {
     if (!hasSelection || !activeNodeId) return null;
     if (committedExpression.length === 0) return { nodeId: activeNodeId, payload: null };
-    const payload: ExpressionTransformRequest = { expression: committedExpression };
-    if (committedColumnName.length > 0) payload.new_column_name = committedColumnName;
+    let code = committedExpression;
+    if (committedColumnName.length > 0) {
+      const safeName = committedColumnName.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+      code = `(${code}).alias("${safeName}")`;
+    }
+    const payload: PolarsExpressionRequest = {
+      context: 'with_columns',
+      expressions: [{ code }],
+    };
     return { nodeId: activeNodeId, payload };
   })();
 
@@ -400,7 +400,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     signal: AbortSignal;
   }) => {
     if (request.payload) {
-      const response = await computeColumnPreview(request.nodeId, request.payload, page, pageSize);
+      const response = await polarsExpressionPreview(request.nodeId, request.payload, page, pageSize);
       return {
         data: Array.isArray(response?.data) ? (response.data as PreviewRow[]) : [],
         columns: Array.isArray(response?.columns) ? response.columns : [],
@@ -440,12 +440,12 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     return value;
   };
 
-  const addColumnToken = (column: string, index?: number) => {
+  const addColumnToken = (column: string, dtype: string, index?: number) => {
       if (basicDisabled || !column) return;
       applyBasicTokenUpdate((prev) => {
         const next = [...prev];
         const insertIndex = clampIndex(index ?? next.length, next.length);
-        next.splice(insertIndex, 0, { id: createTokenId(), kind: 'column', column });
+        next.splice(insertIndex, 0, { id: createTokenId(), kind: 'column', column, dtype, operations: [] });
         return next;
       });
       scheduleCommit();
@@ -483,7 +483,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
         const currentIndex = prev.findIndex((token) => token.id === tokenId);
         if (currentIndex === -1) return prev;
         const next = [...prev];
-        const [item] = next.splice(currentIndex, 1);
+        const [item] = next.splice(currentIndex, 1) as [BasicToken];
         let targetIndex = clampIndex(index, next.length + 1);
         if (currentIndex < targetIndex) {
           targetIndex -= 1;
@@ -496,6 +496,34 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       });
       scheduleCommit();
     };
+
+  const addOperation = (tokenId: string, operation: string) => {
+    if (basicDisabled) return;
+    applyBasicTokenUpdate((prev) =>
+      prev.map((token) => {
+        if (token.id === tokenId && token.kind === 'column') {
+          return { ...token, operations: [...token.operations, operation] };
+        }
+        return token;
+      }),
+    );
+    scheduleCommit();
+  };
+
+  const removeOperation = (tokenId: string, index: number) => {
+    if (basicDisabled) return;
+    applyBasicTokenUpdate((prev) =>
+      prev.map((token) => {
+        if (token.id === tokenId && token.kind === 'column') {
+          const next = [...token.operations];
+          next.splice(index, 1);
+          return { ...token, operations: next };
+        }
+        return token;
+      }),
+    );
+    scheduleCommit();
+  };
 
   const startEditingCustomToken = (tokenId: string) => {
       if (basicDisabled) return;
@@ -593,14 +621,14 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     }
   };
 
-  const handleColumnDragStart = (event: React.DragEvent<HTMLButtonElement>, column: string) => {
+  const handleColumnDragStart = (event: React.DragEvent<HTMLButtonElement>, column: string, dtype: string) => {
       if (basicDisabled) {
         event.preventDefault();
         return;
       }
       const dt = event.dataTransfer;
       if (!dt) return;
-      const payload: DragPayload = { source: 'palette', kind: 'column', column };
+      const payload: DragPayload = { source: 'palette', kind: 'column', column, dtype };
       lastDragPayloadRef.current = payload;
       setDragPayload(dt, payload, column);
       dt.effectAllowed = 'copy';
@@ -695,7 +723,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
 
       if (payload.source === 'palette') {
         if (payload.kind === 'column') {
-          addColumnToken(payload.column, insertIndex);
+          addColumnToken(payload.column, payload.dtype, insertIndex);
         } else if (payload.kind === 'custom') {
           addCustomToken(insertIndex);
         }
@@ -715,9 +743,9 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
     setApplyLoading(true);
     try {
       const payload = buildRequest();
-      const response = await computeColumn(activeNodeId, payload);
-      setLastAppliedExpression(response.expression);
-      onAlert(response.message || `Added column ${response.column_name}`);
+      const response = await polarsExpressionApply(activeNodeId, payload);
+      setLastAppliedExpression(currentExpression);
+      onAlert(`Applied expression to ${response.node_name}`);
       void refreshNodeSchema(activeNodeId);
       commitExpression();
       refreshPreview();
@@ -727,16 +755,6 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       setApplyLoading(false);
     }
   };
-
-  const handleExpressionChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
-      const next = event.target.value;
-      setExpressionAndMarkDirty(next);
-      setBasicTokens([]);
-      setEditingTokenId(null);
-      setDropIndicator(null);
-      setBasicDragActive(false);
-      setCustomDraft('');
-    };
 
   const handleColumnNameChange = (event: React.ChangeEvent<HTMLInputElement>) => {
       const next = normalizeSmartCharacters(event.target.value);
@@ -782,7 +800,7 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
 
   const nodeColumnSelections = (limitedNodeId ? [{ nodeId: limitedNodeId, column: '' }] : []);
 
-  const nodeColors = (limitedNodeId ? { [limitedNodeId]: DEFAULT_PALETTE[0] } : {});
+  const nodeColors = (limitedNodeId ? { [limitedNodeId]: DEFAULT_PALETTE[0]! } : {}) as Record<string, string>;
 
   return {
     activeNodeId,
@@ -795,8 +813,6 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       originalCount: selectedNodes?.length ?? 0,
     },
     expression: {
-      mode: expressionMode,
-      setMode: setExpressionMode,
       expression,
       setExpression: setExpressionAndMarkDirty,
       columnName,
@@ -810,7 +826,6 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       onColumnNameFocus: handleColumnFocus,
       onColumnNameBlur: handleColumnBlur,
       onChange: {
-        expression: handleExpressionChange,
         columnName: handleColumnNameChange,
       },
     },
@@ -827,6 +842,8 @@ export const useAggregateSubTab = (props: AggregateSubTabProps): UseAggregateSub
       addCustomToken,
       removeToken: removeBasicToken,
       moveToken: moveBasicToken,
+      addOperation,
+      removeOperation,
       startEditingCustom: startEditingCustomToken,
       finishCustomEdit,
       clearBuilder: clearBasicBuilder,

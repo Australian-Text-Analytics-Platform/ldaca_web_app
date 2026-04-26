@@ -99,7 +99,7 @@ const buildConcatNodeSummaries = (nodes: WorkspaceNodeLike[]): ConcatNodeSummary
     const rawDtypes = extractNodeDtypes(node);
 
     const uniqueColumns = Array.from(new Set(columns.map((name) => String(name))));
-    const normalizedColumns = [...uniqueColumns].sort((a, b) => a.localeCompare(b));
+    const normalizedColumns = uniqueColumns.toSorted((a, b) => a.localeCompare(b));
     const normalizedDtypes = normalizedColumns.reduce<Record<string, string>>((acc, column) => {
       const dtype = rawDtypes[column];
       acc[column] = dtype ? dtype.toString().toLowerCase() : '';
@@ -138,7 +138,7 @@ const analyzeSchema = (summaries: ConcatNodeSummary[]): ConcatSchemaAnalysis => 
     return result;
   }
 
-  const base = summaries[0];
+  const base = summaries[0]!;
   if (!base.normalizedColumns.length) {
     result.issues = `${base.displayName || base.nodeId} has no columns to align.`;
     return result;
@@ -349,7 +349,7 @@ export const useConcatSubTab = (props: ConcatSubTabProps): UseConcatSubTabResult
     selectedNodes: concatSelectedNodes,
     nodeColumnSelections: concatNodeIds.map((nodeId) => ({ nodeId, column: '' })),
     nodeColors: concatNodeIds.reduce<Record<string, string>>((acc, nodeId, index) => {
-      acc[nodeId] = DEFAULT_CONCAT_PALETTE[index % DEFAULT_CONCAT_PALETTE.length];
+      acc[nodeId] = DEFAULT_CONCAT_PALETTE[index % DEFAULT_CONCAT_PALETTE.length]!;
       return acc;
     }, {}),
     defaultPalette: DEFAULT_CONCAT_PALETTE,

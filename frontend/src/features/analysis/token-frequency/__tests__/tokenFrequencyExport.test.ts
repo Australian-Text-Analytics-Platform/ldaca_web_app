@@ -97,7 +97,7 @@ describe('tokenFrequencyExport', () => {
       'markdown'
     );
 
-    const markdown = await capturedBlobs[0].text();
+    const markdown = await capturedBlobs[0]!.text();
 
     expect(markdown).toContain(
       '| token | freq_corpus_0 | percent_corpus_0 | significance | freq_corpus_1 | note |'
@@ -145,7 +145,7 @@ describe('tokenFrequencyExport', () => {
     expect(link).toBeInTheDocument();
     expect(clickMock).toHaveBeenCalledTimes(1);
 
-    const zipBlob = createObjectURLMock.mock.calls[0][0] as Blob;
+    const zipBlob = createObjectURLMock.mock.calls[0]![0] as Blob;
     const zip = await JSZip.loadAsync(zipBlob);
 
     expect(Object.keys(zip.files).sort()).toEqual([

@@ -45,7 +45,7 @@ export function useNodeColorManagement(
     });
     activeNodeIds.forEach((id, index) => {
       if (!merged[id]) {
-        merged[id] = palette[index % palette.length];
+        merged[id] = palette[index % palette.length]!;
       }
     });
     return merged;

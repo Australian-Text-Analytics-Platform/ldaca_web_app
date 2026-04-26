@@ -366,7 +366,7 @@ const AiAnnotatorFeature: React.FC = () => {
       setAvailableModels(models);
       const modelIds = models.map((m) => m.id);
       if (models.length > 0 && (!model.trim() || !modelIds.includes(model))) {
-        setModel(models[0].id);
+        setModel(models[0]!.id);
       }
       setStatusMessage(response?.message ?? 'Model catalog loaded.');
     } catch (error) {

@@ -138,7 +138,7 @@ export const useAutoNodeColumns = ({
         // Return prev reference when structurally equal to avoid unnecessary re-renders
         if (
           updated.length === prev.length &&
-          updated.every((sel, i) => sel.nodeId === prev[i].nodeId && sel.column === prev[i].column)
+          updated.every((sel, i) => sel.nodeId === prev[i]!.nodeId && sel.column === prev[i]!.column)
         ) {
           return prev;
         }
@@ -200,7 +200,7 @@ export const useAutoNodeColumns = ({
     setSelectionsState((prev) => {
       const prevMap = new Map(prev.map((s) => [s.nodeId, s.column]));
       const nextSelections = ids.map((nodeId, idx) => {
-        const node = nodes[idx];
+        const node = nodes[idx]!;
         const columnInfos = deriveColumnInfosLocal(node);
         const columns = columnInfos.map((col) => col.name);
         let column = prevMap.get(nodeId) || '';

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Calculator, Code2, Filter, Layers, Merge, Search, Shuffle } from 'lucide-react';
 import { useWorkspaceSelection } from '../../../hooks/useWorkspaceSelection';
 import { useWorkspaceData } from '../../../hooks/useWorkspaceData';
 import { useWorkspaceActions } from '../../../hooks/useWorkspaceActions';
@@ -12,8 +13,9 @@ import { SliceSubTab } from '../../preprocessing/slice/SliceSubTab';
 import { AggregateSubTab } from '../../preprocessing/aggregate/AggregateSubTab';
 import { ReplaceSubTab } from '../../preprocessing/replace/ReplaceSubTab';
 import InfoIcon from '../../../components/help/InfoIcon';
+import { PolarsExpressionSubTab } from '../../preprocessing/expression/PolarsExpressionSubTab';
 
-type DataPrepSubtab = 'filter' | 'slice' | 'join' | 'concat' | 'find' | 'aggregate';
+type DataPrepSubtab = 'filter' | 'slice' | 'join' | 'concat' | 'find' | 'aggregate' | 'expression';
 
 const DataPreprocessingFeature: React.FC = () => {
   const { selectedNodeId, selectedNode, selectedNodes, selectedNodeIds } = useWorkspaceSelection();
@@ -26,11 +28,11 @@ const DataPreprocessingFeature: React.FC = () => {
     concatPreview,
     sliceNode,
     slicePreview,
-    computeColumn,
-    computeColumnPreview,
     replaceText,
     replaceTextPreview,
     refreshNodeSchema,
+    polarsExpressionPreview,
+    polarsExpressionApply,
   } = useWorkspaceActions();
   const { isLoading } = useWorkspaceStatus();
 
@@ -67,12 +69,13 @@ const DataPreprocessingFeature: React.FC = () => {
         className="space-y-4"
       >
         <TabsList aria-label="Data preprocessing sub-views" className="flex flex-wrap gap-2">
-          <TabsTrigger value="filter">Filter</TabsTrigger>
-          <TabsTrigger value="slice">Sample</TabsTrigger>
-          <TabsTrigger value="join">Join</TabsTrigger>
-          <TabsTrigger value="concat">Stack</TabsTrigger>
-          <TabsTrigger value="find">Find</TabsTrigger>
-          <TabsTrigger value="aggregate">Create</TabsTrigger>
+          <TabsTrigger value="filter"><Filter className="mr-1.5 h-4 w-4" />Filter</TabsTrigger>
+          <TabsTrigger value="slice"><Shuffle className="mr-1.5 h-4 w-4" />Sample</TabsTrigger>
+          <TabsTrigger value="join"><Merge className="mr-1.5 h-4 w-4" />Join</TabsTrigger>
+          <TabsTrigger value="concat"><Layers className="mr-1.5 h-4 w-4" />Stack</TabsTrigger>
+          <TabsTrigger value="find"><Search className="mr-1.5 h-4 w-4" />Find</TabsTrigger>
+          <TabsTrigger value="aggregate"><Calculator className="mr-1.5 h-4 w-4" />Create</TabsTrigger>
+          <TabsTrigger value="expression"><Code2 className="mr-1.5 h-4 w-4" />Polars Expression</TabsTrigger>
         </TabsList>
 
         <TabsContent value="filter" className="space-y-4">
@@ -146,8 +149,21 @@ const DataPreprocessingFeature: React.FC = () => {
             workspaceNodes={workspaceNodes}
             isLoading={isLoading}
             onAlert={handleAlert}
-            computeColumnPreview={computeColumnPreview}
-            computeColumn={computeColumn}
+            polarsExpressionPreview={polarsExpressionPreview}
+            polarsExpressionApply={polarsExpressionApply}
+            refreshNodeSchema={refreshNodeSchema}
+          />
+        </TabsContent>
+
+        <TabsContent value="expression" className="space-y-4">
+          <PolarsExpressionSubTab
+            selectedNodeId={selectedNodeId}
+            selectedNodes={selectedNodes}
+            workspaceNodes={workspaceNodes}
+            isLoading={isLoading}
+            onAlert={handleAlert}
+            polarsExpressionPreview={polarsExpressionPreview}
+            polarsExpressionApply={polarsExpressionApply}
             refreshNodeSchema={refreshNodeSchema}
           />
         </TabsContent>

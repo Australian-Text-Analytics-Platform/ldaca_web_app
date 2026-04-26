@@ -122,7 +122,7 @@ const SidebarNodesSection: React.FC<SidebarNodesSectionProps> = ({
                       event.stopPropagation();
                       void handleCopy(copyNameValue, node.id, 'name');
                     }}
-                    className="flex flex-1 min-w-0 items-center gap-2 bg-transparent text-left text-sm font-medium text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    className="flex flex-1 min-w-0 items-center gap-2 bg-transparent text-left text-sm font-medium text-foreground transition-colors hover:text-primary focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
                     title={displayName}
                   >
                     <span className="flex-1 min-w-0 truncate">{displayName}</span>
@@ -156,7 +156,7 @@ const SidebarNodesSection: React.FC<SidebarNodesSectionProps> = ({
                       event.stopPropagation();
                       void handleCopy(node.id, node.id, 'id');
                     }}
-                    className="flex min-w-0 max-w-full items-center gap-1 text-left text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    className="flex min-w-0 max-w-full items-center gap-1 text-left text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
                     title="Copy data block ID"
                   >
                     <span className="text-[10px] uppercase tracking-wide text-muted-foreground/80 shrink-0">ID</span>

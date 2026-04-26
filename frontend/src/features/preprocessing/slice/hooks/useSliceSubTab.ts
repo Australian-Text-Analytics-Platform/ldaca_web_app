@@ -218,7 +218,7 @@ export const useSliceSubTab = (props: SliceSubTabProps): UseSliceSubTabResult =>
 
   const sliceNodeSelections: NodeColumnSelection[] = selectedNodeId ? [{ nodeId: selectedNodeId, column: '' }] : [];
 
-  const sliceNodeColors = selectedNodeId ? { [selectedNodeId]: DEFAULT_PALETTE[0] } : {};
+  const sliceNodeColors = selectedNodeId ? { [selectedNodeId]: DEFAULT_PALETTE[0]! } : {};
 
   const hasSelection = Boolean(selectedNodeId);
 

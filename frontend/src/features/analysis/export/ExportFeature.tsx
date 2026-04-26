@@ -91,7 +91,7 @@ const ExportFeature: React.FC = () => {
       const ext = multiple ? 'zip' : getDownloadExtension(format);
       const filename = multiple
         ? `${buildTimestampFragment()}_${toSafeArchiveLabel(currentWorkspace?.name || currentWorkspaceId || 'workspace')}.zip`
-        : `${toDisplay(selectedNodes[0]).name || nodeIds[0]}.${ext}`;
+        : `${toDisplay(selectedNodes[0]!).name || nodeIds[0]}.${ext}`;
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;

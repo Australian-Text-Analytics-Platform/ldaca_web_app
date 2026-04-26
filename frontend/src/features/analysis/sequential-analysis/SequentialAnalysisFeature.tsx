@@ -351,7 +351,7 @@ const SequentialAnalysisFeature = () => {
       return;
     }
 
-    const desired = timeColumnOptions.includes(timeColumn) ? timeColumn : timeColumnOptions[0];
+    const desired = timeColumnOptions.includes(timeColumn) ? timeColumn : timeColumnOptions[0]!;
     if (desired !== timeColumn) {
       setTimeColumn(desired);
     }

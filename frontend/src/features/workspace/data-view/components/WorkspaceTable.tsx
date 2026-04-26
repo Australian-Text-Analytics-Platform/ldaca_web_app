@@ -392,7 +392,7 @@ export function WorkspaceTable({
               type="button"
               onClick={() => colInst.pin(isPinnedLeft ? false : 'left')}
               className={cn(
-                'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-transparent text-muted-foreground transition-colors hover:bg-muted-foreground/10 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-transparent text-muted-foreground transition-colors hover:bg-muted-foreground/10 hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring',
                 isPinnedLeft && 'text-primary',
               )}
               aria-pressed={isPinnedLeft}
@@ -409,7 +409,7 @@ export function WorkspaceTable({
                 {canRename ? (
                   <button
                     type="button"
-                    className="block max-w-[160px] truncate text-left text-xs font-medium text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    className="block max-w-[160px] truncate text-left text-xs font-medium text-foreground transition-colors hover:text-primary focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
                     onClick={() => { if (!isColumnBusy) setRenamingColumn(column); }}
                     disabled={isColumnBusy}
                     title={column}

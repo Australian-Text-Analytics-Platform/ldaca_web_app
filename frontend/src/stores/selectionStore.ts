@@ -44,7 +44,7 @@ export const useSelectionStore = create<SelectionStore>()(
 
       setSelectedNodes: (nodeIds) => set((state) => {
         state.selectedNodeIds = nodeIds;
-        state.selectedNodeId = nodeIds.length > 0 ? nodeIds[nodeIds.length - 1] : null;
+        state.selectedNodeId = nodeIds.length > 0 ? nodeIds[nodeIds.length - 1]! : null;
       }),
 
       toggleNodeSelection: (nodeId) => set((state) => {

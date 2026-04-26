@@ -265,11 +265,11 @@ describe('ConcordanceFeature', () => {
   it('clears previous results before rerunning when clicking Update', () => {
     const { unmount } = render(<ConcordanceFeature />);
 
-    fireEvent.change(screen.getAllByPlaceholderText('Enter word or phrase to search for')[0], {
+    fireEvent.change(screen.getAllByPlaceholderText('Enter word or phrase to search for')[0]!, {
       target: { value: 'new value' },
     });
 
-    fireEvent.click(screen.getAllByRole('button', { name: /update/i })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: /update/i })[0]!);
 
     return waitFor(() => {
       expect(clearResultsMock).toHaveBeenCalledTimes(1);
@@ -280,11 +280,11 @@ describe('ConcordanceFeature', () => {
   it('passes the locked-update flag when clicking Update', () => {
     const { unmount } = render(<ConcordanceFeature />);
 
-    fireEvent.change(screen.getAllByPlaceholderText('Enter word or phrase to search for')[0], {
+    fireEvent.change(screen.getAllByPlaceholderText('Enter word or phrase to search for')[0]!, {
       target: { value: 'new value' },
     });
 
-    fireEvent.click(screen.getAllByRole('button', { name: /update/i })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: /update/i })[0]!);
 
     return waitFor(() => {
       expect(handleSearchMock).toHaveBeenCalledWith(true, undefined, undefined, undefined, undefined, true);

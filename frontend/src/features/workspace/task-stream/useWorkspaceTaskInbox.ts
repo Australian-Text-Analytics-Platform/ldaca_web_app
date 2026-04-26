@@ -35,7 +35,7 @@ const normalizeTimestamp = (value: unknown): number => {
 };
 
 const sortTasksByTime = (tasks: TaskItem[] = []) =>
-  [...tasks].sort((a, b) => {
+  tasks.toSorted((a, b) => {
     const tb = normalizeTimestamp(
       (b as InternalTask)?.__event_timestamp ?? b?.finished_at ?? b?.started_at ?? b?.created_at ?? 0
     );
