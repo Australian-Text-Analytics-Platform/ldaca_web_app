@@ -3,9 +3,10 @@
 <h2 id="info-token-frequency-overview">About Token Frequency Analysis</h2>
 
 Token Frequency
-What is this?
+- What is this?
 This tool retrieves each token (~word) in your text / text collection. It creates a word cloud visualisation as well as a frequency list (= a list of each word and the raw/absolute frequency with which it occurs). You can download both to your Downloads folder.
-What do I need to know before using this?
+
+- What do I need to know before using this?
 Your textual data should be consistently encoded (UTF8) and should not contain any xml tags. If necessary, you can use the Data Preprocessing to remove any content within angle brackets. Search for this regex pattern *'<[^>]+>'* in the ‘document’ text column of your collection and replace with empty string.
 
 The word cloud currently displays the top 25 tokens by default. Because of known limitations of such visualisations and critiques of how they represent frequency, it is recommended to use the frequency list for analysis rather than relying on the word cloud visualisation.
