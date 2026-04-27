@@ -587,11 +587,11 @@ const ConcordanceFeature: React.FC = () => {
       });
 
       if (state !== 'successful') {
-        toast.error(`Materialize ${state}`);
+        toast.error(`Process All ${state}`);
         continue;
       }
 
-      toast.success('Materialize complete.');
+      toast.success('Process All complete.');
 
       // Refetch parent concordance task request to learn the newly-persisted
       // materialized_paths map; then reset page_size to 20 and refetch results
@@ -1440,11 +1440,11 @@ const ConcordanceFeature: React.FC = () => {
             title="Cache all occurrence rows to disk so subsequent pagination and Add-to-Workspace reuse them"
           >
             {isMaterializing ? (
-              <><Loader2 className="mr-2 h-3 w-3 animate-spin" />Materializing...</>
+              <><Loader2 className="mr-2 h-3 w-3 animate-spin" />Processing...</>
             ) : hasMaterializedPath ? (
-              <>Materialized</>
+              <>Processed</>
             ) : (
-              <>Materialize</>
+              <>Process All</>
             )}
           </Button>
           {/* Detach button */}

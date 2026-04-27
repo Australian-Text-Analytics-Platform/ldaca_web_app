@@ -1455,12 +1455,12 @@ const QuotationFeature: React.FC = () => {
                         {nodeMaterializing[nodeId] ? (
                           <>
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Materializing…
+                            Processing…
                           </>
                         ) : materializedPaths[nodeId] ? (
-                          <>Materialized</>
+                          <>Processed</>
                         ) : (
-                          <>Materialize</>
+                          <>Process All</>
                         )}
                       </Button>
                       <Button
