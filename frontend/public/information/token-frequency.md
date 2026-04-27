@@ -35,5 +35,5 @@ Keywords: link to LDACA site? https://www.atap.edu.au/text-analysis/methods/
 Yes, there is a legacy notebook for keywords analysis. You can access this here: https://github.com/Australian-Text-Analytics-Platform/keywords-analysis 
 
 - Where can I get help?
-Please use the embedded feedback button at the bottom left of the interface to reach out to the developer team.
+Please use the embedded feedback button at the bottom left of the interface to get in touch with the developer team in the Sydney Informatics Hub.
 
