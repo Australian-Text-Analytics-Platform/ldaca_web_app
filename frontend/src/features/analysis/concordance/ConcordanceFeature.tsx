@@ -281,6 +281,7 @@ const ConcordanceFeature: React.FC = () => {
   const [nodeMaterializing, setNodeMaterializing] = useState<Record<string, boolean>>({});
   const [materializeTaskIds, setMaterializeTaskIds] = useState<Record<string, string>>({});
   const [materializedPaths, setMaterializedPaths] = useState<Record<string, string>>({});
+  const [materializeSummaries, setMaterializeSummaries] = useState<Record<string, { recordCount: number; uniqueDocuments: number; totalDocuments: number }>>({});
   
   // Detach dialog state
   const [detachDialogOpen, setDetachDialogOpen] = useState(false);
@@ -359,6 +360,18 @@ const ConcordanceFeature: React.FC = () => {
       if (paths && typeof paths === 'object') {
         setMaterializedPaths(prev => ({ ...prev, ...paths }));
       }
+      const summaries = reqObj.materialize_summaries as Record<string, Record<string, unknown>> | undefined;
+      if (summaries && typeof summaries === 'object') {
+        const parsed: Record<string, { recordCount: number; uniqueDocuments: number; totalDocuments: number }> = {};
+        for (const [nid, s] of Object.entries(summaries)) {
+          parsed[nid] = {
+            recordCount: Number(s.record_count) || 0,
+            uniqueDocuments: Number(s.unique_documents_with_hits) || 0,
+            totalDocuments: Number(s.total_source_documents) || 0,
+          };
+        }
+        setMaterializeSummaries(prev => ({ ...prev, ...parsed }));
+      }
       try {
         await restoreAnalysisLockFromRequest({
           workspaceId: currentWorkspaceId,
@@ -373,6 +386,7 @@ const ConcordanceFeature: React.FC = () => {
       setResults(null);
       setNodePagination({});
       setCombinedPage(1);
+      setMaterializeSummaries({});
       if (options?.preserveLocalState) {
         return;
       }
@@ -607,6 +621,18 @@ const ConcordanceFeature: React.FC = () => {
             const paths = (reqObj.materialized_paths as Record<string, string> | undefined) ?? undefined;
             if (paths && typeof paths === 'object') {
               setMaterializedPaths(prev => ({ ...prev, ...paths }));
+            }
+            const summaries = reqObj.materialize_summaries as Record<string, Record<string, unknown>> | undefined;
+            if (summaries && typeof summaries === 'object') {
+              const parsed: Record<string, { recordCount: number; uniqueDocuments: number; totalDocuments: number }> = {};
+              for (const [nid, s] of Object.entries(summaries)) {
+                parsed[nid] = {
+                  recordCount: Number(s.record_count) || 0,
+                  uniqueDocuments: Number(s.unique_documents_with_hits) || 0,
+                  totalDocuments: Number(s.total_source_documents) || 0,
+                };
+              }
+              setMaterializeSummaries(prev => ({ ...prev, ...parsed }));
             }
           }
         } catch (error) {
@@ -1255,7 +1281,17 @@ const ConcordanceFeature: React.FC = () => {
               hasPrev={combinedHasPrev}
               totalPages={nodeData.pagination?.total_source_pages}
               onPageChange={(newPage) => setCombinedPage(newPage)}
-              pageSizeSummary={nodeData.materialized ? undefined : <GroupedResultsPageSizeSummary groups={nodeData.data} totalProcessed={nodeData.pagination?.page_size} />}
+              pageSizeSummary={nodeData.materialized
+                ? (Object.keys(materializeSummaries).length > 0
+                  ? <GroupedResultsPageSizeSummary
+                      groups={[]}
+                      totalInstances={Object.values(materializeSummaries).reduce((sum, s) => sum + s.recordCount, 0)}
+                      totalDocuments={Object.values(materializeSummaries).reduce((sum, s) => sum + s.uniqueDocuments, 0)}
+                      totalProcessed={Object.values(materializeSummaries).reduce((sum, s) => sum + s.totalDocuments, 0)}
+                    />
+                  : undefined)
+                : <GroupedResultsPageSizeSummary groups={nodeData.data} totalProcessed={nodeData.pagination?.page_size} />
+              }
               loading={combinedLoading}
             />
           </div>
@@ -1385,7 +1421,15 @@ const ConcordanceFeature: React.FC = () => {
           hasPrev={hasPrev}
           totalPages={nodeData.pagination?.total_source_pages}
           onPageChange={(newPage) => handlePageChange(newPage, paginationKey, requestNodeId)}
-          pageSizeSummary={nodeData.materialized ? undefined : <GroupedResultsPageSizeSummary groups={nodeData.data} totalProcessed={nodeData.pagination?.page_size} />}
+          pageSizeSummary={nodeData.materialized && detachNodeId && materializeSummaries[detachNodeId]
+            ? <GroupedResultsPageSizeSummary
+                groups={[]}
+                totalInstances={materializeSummaries[detachNodeId].recordCount}
+                totalDocuments={materializeSummaries[detachNodeId].uniqueDocuments}
+                totalProcessed={materializeSummaries[detachNodeId].totalDocuments}
+              />
+            : (nodeData.materialized ? undefined : <GroupedResultsPageSizeSummary groups={nodeData.data} totalProcessed={nodeData.pagination?.page_size} />)
+          }
           loading={nodeIsLoading}
         >
           {/* Materialize button */}

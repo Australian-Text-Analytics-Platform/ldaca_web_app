@@ -472,6 +472,14 @@ const QuotationFeature: React.FC = () => {
       if (typeof matPath === 'string' && matPath) {
         setMaterializedPaths(prev => ({ ...prev, [nodeId]: matPath }));
       }
+      const matSummary = requestData.materialize_summary as Record<string, unknown> | undefined;
+      if (matSummary) {
+        setMaterializeSummary({
+          recordCount: Number(matSummary.record_count) || 0,
+          uniqueDocuments: Number(matSummary.unique_documents_with_hits) || 0,
+          totalDocuments: Number(matSummary.total_source_documents) || 0,
+        });
+      }
       try {
         await restoreAnalysisLockFromRequest({
           workspaceId: currentWorkspaceId,
@@ -492,6 +500,7 @@ const QuotationFeature: React.FC = () => {
       setHasLoaded(false);
       setResultsByNode({});
       setNodeState({});
+      setMaterializeSummary(null);
       resetAnalysisSelectionAfterClear({ unlockSelection });
     },
   });
@@ -570,6 +579,7 @@ const QuotationFeature: React.FC = () => {
   const [nodeMaterializing, setNodeMaterializing] = useState<Record<string, boolean>>({});
   const [materializeTaskIds, setMaterializeTaskIds] = useState<Record<string, string>>({});
   const [materializedPaths, setMaterializedPaths] = useState<Record<string, string>>({});
+  const [materializeSummary, setMaterializeSummary] = useState<{ recordCount: number; uniqueDocuments: number; totalDocuments: number } | null>(null);
   const [detachDialogOpen, setDetachDialogOpen] = useState(false);
   const [pendingDetachNodeId, setPendingDetachNodeId] = useState<string | null>(null);
   const [detachNodeOptions, setDetachNodeOptions] = useState<QuotationDetachNodeOption[]>([]);
@@ -920,6 +930,14 @@ const QuotationFeature: React.FC = () => {
               : null;
             if (path) {
               setMaterializedPaths((prev) => ({ ...prev, [nodeId]: path }));
+            }
+            const summary = reqObj.materialize_summary as Record<string, unknown> | undefined;
+            if (summary) {
+              setMaterializeSummary({
+                recordCount: Number(summary.record_count) || 0,
+                uniqueDocuments: Number(summary.unique_documents_with_hits) || 0,
+                totalDocuments: Number(summary.total_source_documents) || 0,
+              });
             }
           }
         } catch (error) {
@@ -1455,7 +1473,10 @@ const QuotationFeature: React.FC = () => {
                       hasPrev={resultState?.pagination?.has_prev ?? ((resultState?.pagination?.page ?? 1) > 1)}
                       totalPages={resultState?.pagination?.total_source_pages}
                       onPageChange={(newPage) => handlePageChange(newPage)}
-                      pageSizeSummary={<GroupedResultsPageSizeSummary groups={resultState?.groupedRows ?? []} totalProcessed={resultState?.pagination?.page_size} />}
+                      pageSizeSummary={materializedPaths[nodeId] && materializeSummary
+                        ? <GroupedResultsPageSizeSummary groups={[]} totalInstances={materializeSummary.recordCount} totalDocuments={materializeSummary.uniqueDocuments} totalProcessed={materializeSummary.totalDocuments} />
+                        : <GroupedResultsPageSizeSummary groups={resultState?.groupedRows ?? []} totalProcessed={resultState?.pagination?.page_size} />
+                      }
                     >
                       <Button
                         type="button"
