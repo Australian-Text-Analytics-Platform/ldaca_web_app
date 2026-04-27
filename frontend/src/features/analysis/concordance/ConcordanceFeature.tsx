@@ -191,7 +191,6 @@ const ConcordanceFeature: React.FC = () => {
   });
   const [viewMode, setViewMode] = useState<'separated'|'combined'>('separated');
   const [combinedPage, setCombinedPage] = useState(1);
-  const [combinedPageSize] = useState(20);
   const [combinedLoading, setCombinedLoading] = useState(false);
 
   useEffect(() => {
@@ -443,7 +442,6 @@ const ConcordanceFeature: React.FC = () => {
       nodePagination,
       viewMode,
       combinedPage,
-      combinedPageSize,
       numLeftTokens,
       numRightTokens,
       regex,
@@ -525,10 +523,20 @@ const ConcordanceFeature: React.FC = () => {
     }
   }, [viewMode, results]);
 
+  // Track whether initial preference hydration from server results has been
+  // applied.  After the first sync we stop overwriting globalPageSize from
+  // response data to avoid a feedback loop: user changes page size → response
+  // arrives with old page_size → effect overwrites user's choice → new request
+  // fires → oscillation.
+  const prefsSyncedRef = useRef(false);
   useEffect(() => {
     if (!results) {
+      prefsSyncedRef.current = false;
       return;
     }
+    // Only sync preferences on the first result load (hydration).
+    if (prefsSyncedRef.current) return;
+    prefsSyncedRef.current = true;
 
     const analysisParams = results?.analysis_params ?? {};
     const preferenceSource = results?.preferences ?? (analysisParams as Record<string, unknown>)?.preferences as Record<string, unknown> | undefined ?? {};
@@ -887,7 +895,7 @@ const ConcordanceFeature: React.FC = () => {
         const prevScrollY = window.scrollY;
 
         setCombinedLoading(true);
-        updateStoredResult({ combined: true, page: combinedPage, page_size: combinedPageSize }).finally(() => {
+        updateStoredResult({ combined: true, page: combinedPage, page_size: globalPageSize }).finally(() => {
           setCombinedLoading(false);
           requestAnimationFrame(() => {
             requestAnimationFrame(() => {
@@ -945,13 +953,13 @@ const ConcordanceFeature: React.FC = () => {
       results?.metadata?.task_id ??
       (results?.metadata as Record<string, unknown> | undefined)?.taskId ??
       '';
-    const key = `${taskId}|${combinedPage}|${combinedPageSize}`;
+    const key = `${taskId}|${combinedPage}|${globalPageSize}`;
     if (lastCombinedQueryRef.current === key) {
       return;
     }
     lastCombinedQueryRef.current = key;
-    void updateStoredResult({ combined: true, page: combinedPage, page_size: combinedPageSize });
-  }, [viewMode, results, combinedPage, combinedPageSize, updateStoredResult]);
+    void updateStoredResult({ combined: true, page: combinedPage, page_size: globalPageSize });
+  }, [viewMode, results, combinedPage, globalPageSize, updateStoredResult]);
 
 
   const handleRowClick = (
@@ -1276,7 +1284,7 @@ const ConcordanceFeature: React.FC = () => {
             </AnalysisTableScrollArea>
             <AnalysisPagination
               page={combinedPage}
-              pageSize={combinedPageSize}
+              pageSize={globalPageSize}
               hasNext={combinedHasNext}
               hasPrev={combinedHasPrev}
               totalPages={nodeData.pagination?.total_source_pages}
@@ -1548,8 +1556,8 @@ const ConcordanceFeature: React.FC = () => {
                   <input
                     type="number"
                     value={numLeftTokens}
-                    onChange={(e) => setNumLeftTokens(parseInt(e.target.value) || 10)}
-                    min="1"
+                    onChange={(e) => setNumLeftTokens(parseInt(e.target.value) || 0)}
+                    min="0"
                     max="50"
                     className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
                   />
@@ -1559,8 +1567,8 @@ const ConcordanceFeature: React.FC = () => {
                   <input
                     type="number"
                     value={numRightTokens}
-                    onChange={(e) => setNumRightTokens(parseInt(e.target.value) || 10)}
-                    min="1"
+                    onChange={(e) => setNumRightTokens(parseInt(e.target.value) || 0)}
+                    min="0"
                     max="50"
                     className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
                   />

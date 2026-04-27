@@ -24,7 +24,6 @@ interface ConcordanceState {
   nodePagination: PaginationState;
   viewMode: 'separated' | 'combined';
   combinedPage: number;
-  combinedPageSize: number;
   numLeftTokens: number;
   numRightTokens: number;
   regex: boolean;
@@ -73,7 +72,6 @@ export function useConcordanceTaskFlow({
     nodePagination,
     viewMode,
     combinedPage,
-    combinedPageSize,
     numLeftTokens,
     numRightTokens,
     regex,
@@ -340,7 +338,7 @@ export function useConcordanceTaskFlow({
       const fetchParams: Record<string, unknown> = { combined: viewMode === 'combined' };
       if (viewMode === 'combined') {
         fetchParams.page = combinedPage;
-        fetchParams.page_size = partial.pageSize ?? combinedPageSize;
+        fetchParams.page_size = partial.pageSize ?? globalPageSize;
       } else {
         fetchParams.page = 1;
         fetchParams.page_size = partial.pageSize ?? globalPageSize;
