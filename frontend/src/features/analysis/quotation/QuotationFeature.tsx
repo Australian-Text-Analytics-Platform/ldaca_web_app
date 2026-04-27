@@ -99,7 +99,7 @@ interface QuotationResultState {
   column: string;
 }
 
-const DEFAULT_PAGE_SIZE = 100;
+const DEFAULT_PAGE_SIZE = 50;
 const DEFAULT_CONTEXT_LENGTH = 5;
 const MAX_CONTEXT_LENGTH = 2000;
 
@@ -1194,7 +1194,7 @@ const QuotationFeature: React.FC = () => {
               allowedDataTypes={['string']}
               lockedMessage={ANALYSIS_LOCKED_MESSAGE}
             />
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <Button
                 type="button"
                 className="w-full sm:w-auto"
@@ -1241,6 +1241,27 @@ const QuotationFeature: React.FC = () => {
                   )}
                 </Button>
                 <HelpIcon targetKey="analysis.quotation.clear-results" label="Clear results" />
+              </div>
+              <div className="ml-auto flex items-center gap-2">
+                <span className="whitespace-nowrap text-sm text-muted-foreground">Documents per batch</span>
+                <Select
+                  value={String(
+                    nodeState[displayedNodes[0] ? getNodeIdentifier(displayedNodes[0], 0) : '']?.pageSize
+                    ?? DEFAULT_PAGE_SIZE
+                  )}
+                  onValueChange={(val) => handlePageSizeChange(Number(val))}
+                >
+                  <SelectTrigger className="h-9 w-20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent align="start">
+                    {[10, 20, 50, 100, 200, 400, 800].map((size) => (
+                      <SelectItem key={size} value={String(size)}>
+                        {size}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </CardContent>
