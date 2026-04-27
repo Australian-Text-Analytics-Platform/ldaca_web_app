@@ -12,7 +12,7 @@ Besides datatime data, the user can also choose to use any numeric data as the X
 
 
 - What do I need to know before using this?
-Your textual data should be consistently encoded (UTF8) and should not contain any xml tags. If necessary, you can use the Data Preprocessing to remove any content within angle brackets. Search for this regex pattern <[^>]+> in the ‘document’ text column of your collection and replace with nothing.
+Your textual data should be consistently encoded (UTF8) and should not contain any xml tags. If necessary, you can use the Data Preprocessing to remove any content within angle brackets. Search for this regex pattern <[^>]+> in the ‘document’ text column of your collection and replace with empty string.
 
 You need to make sure that the column that includes the date is correctly classified in the Data Loader (not as string, but as datetime, integer or float). You can auto-convert this in the Data Loader. For additional metadata (e.g. gender, age, political party) it is a good idea to have these metadata converted in the Data Loader as categorical.
 

@@ -6,7 +6,7 @@
 A concordance is a display of every single instance of a search term in your text / text collection, together with words on the left and on the right. This shows you how the words are used in your data and is useful for qualitative analysis and identifying patterns (by sorting what occurs to the left and right).
 
 - What do I need to know before using this?
-Your textual data should be consistently encoded (UTF8) and should not contain any xml tags. If necessary, you can use the Data Preprocessing to remove any content within angle brackets. Search for this regex pattern <[^>]+> in the ‘document’ text column of your collection and replace with nothing.
+Your textual data should be consistently encoded (UTF8) and should not contain any xml tags. If necessary, you can use the Data Preprocessing to remove any content within angle brackets. Search for this regex pattern <[^>]+> in the ‘document’ text column of your collection and replace with empty string.
 
 The default is to search for *whole words*. For example, a search for student will retrieve student but not students. If you untick the default, results will show all words that contain the search expression but which may include irrelevant results. You can use regular expressions to search for various word patterns, or combinations of words, e.g. *tax|budget|walfare* will search three words at one time. For more understanding to the Regular Expression, please refer to online tutorials like [RegexOne](https://regexone.com/), or ask any Gen-AI models to create the useful RegEx patterns for you.
 
