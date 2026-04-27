@@ -14,6 +14,7 @@ import { useAnalysisStore } from '../../../stores/analysisStore';
 import { useUIStore } from '../../../stores';
 import { Button } from '../../../components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
 import { Play, Loader2, Trash2, Plus } from 'lucide-react';
 import HelpIcon from '../../../components/help/HelpIcon';
 import InfoIcon from '../../../components/help/InfoIcon';
@@ -1254,8 +1255,7 @@ const ConcordanceFeature: React.FC = () => {
               hasPrev={combinedHasPrev}
               totalPages={nodeData.pagination?.total_source_pages}
               onPageChange={(newPage) => setCombinedPage(newPage)}
-              pageSizeLabel={nodeData.materialized ? 'Occurrences per page' : 'Documents per page'}
-              pageSizeSummary={nodeData.materialized ? undefined : <GroupedResultsPageSizeSummary groups={nodeData.data} />}
+              pageSizeSummary={nodeData.materialized ? undefined : <GroupedResultsPageSizeSummary groups={nodeData.data} totalProcessed={nodeData.pagination?.page_size} />}
               loading={combinedLoading}
             />
           </div>
@@ -1385,38 +1385,7 @@ const ConcordanceFeature: React.FC = () => {
           hasPrev={hasPrev}
           totalPages={nodeData.pagination?.total_source_pages}
           onPageChange={(newPage) => handlePageChange(newPage, paginationKey, requestNodeId)}
-          onPageSizeChange={(newSize) => {
-            const previousPageSize = globalPageSize;
-            const previousPagination = Object.fromEntries(
-              Object.entries(nodePagination).map(([key, value]) => [key, { ...value }])
-            ) as typeof nodePagination;
-
-            setGlobalPageSize(newSize);
-            setNodePagination((prev) => {
-              const updated = { ...prev };
-              Object.keys(updated).forEach((nid) => {
-                updated[nid] = {
-                  ...updated[nid]!,
-                  pageSize: newSize,
-                  currentPage: 1,
-                };
-              });
-              return updated;
-            });
-
-            void (async () => {
-              try {
-                await persistResultPreferences({ pageSize: newSize });
-              } catch (error) {
-                console.error('Failed to persist concordance page size preference', error);
-                setGlobalPageSize(previousPageSize);
-                setNodePagination(previousPagination);
-              }
-            })();
-          }}
-          pageSizeLabel={nodeData.materialized ? 'Occurrences per page' : 'Documents per page'}
-          pageSizeSummary={nodeData.materialized ? undefined : <GroupedResultsPageSizeSummary groups={nodeData.data} />}
-          pageSizeOptions={[10, 20, 50, 100, 200, 400, 800]}
+          pageSizeSummary={nodeData.materialized ? undefined : <GroupedResultsPageSizeSummary groups={nodeData.data} totalProcessed={nodeData.pagination?.page_size} />}
           loading={nodeIsLoading}
         >
           {/* Materialize button */}
@@ -1627,6 +1596,35 @@ const ConcordanceFeature: React.FC = () => {
               Clear Results
             </Button>
             <HelpIcon targetKey="analysis.concordance.clear-results" label="Clear results" />
+          </div>
+          <div className="ml-auto flex items-center gap-2">
+            <span className="whitespace-nowrap text-sm text-muted-foreground">Documents per batch</span>
+            <Select
+              value={String(globalPageSize)}
+              onValueChange={(val) => {
+                const newSize = Number(val);
+                setGlobalPageSize(newSize);
+                setNodePagination((prev) => {
+                  const updated = { ...prev };
+                  Object.keys(updated).forEach((nid) => {
+                    updated[nid] = { ...updated[nid]!, pageSize: newSize, currentPage: 1 };
+                  });
+                  return updated;
+                });
+                void persistResultPreferences({ pageSize: newSize });
+              }}
+            >
+              <SelectTrigger className="h-9 w-20">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent align="start">
+                {[10, 20, 50, 100, 200, 400, 800].map((size) => (
+                  <SelectItem key={size} value={String(size)}>
+                    {size}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </CardFooter>
       </Card>

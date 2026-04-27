@@ -1455,10 +1455,7 @@ const QuotationFeature: React.FC = () => {
                       hasPrev={resultState?.pagination?.has_prev ?? ((resultState?.pagination?.page ?? 1) > 1)}
                       totalPages={resultState?.pagination?.total_source_pages}
                       onPageChange={(newPage) => handlePageChange(newPage)}
-                      onPageSizeChange={(newSize) => handlePageSizeChange(newSize)}
-                      pageSizeLabel="Documents per page"
-                      pageSizeSummary={<GroupedResultsPageSizeSummary groups={resultState?.groupedRows ?? []} />}
-                      pageSizeOptions={[10, 20, 50, 100, 200, 400, 800]}
+                      pageSizeSummary={<GroupedResultsPageSizeSummary groups={resultState?.groupedRows ?? []} totalProcessed={resultState?.pagination?.page_size} />}
                     >
                       <Button
                         type="button"

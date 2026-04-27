@@ -600,8 +600,8 @@ describe('ConcordanceFeature', () => {
 
     render(<ConcordanceFeature />);
 
-    expect(screen.getAllByText('Documents per page').length).toBeGreaterThan(0);
-    expect(screen.getByText('(Found 2 instances in 1 document).')).toBeInTheDocument();
+    expect(screen.getAllByText('Documents per batch').length).toBeGreaterThan(0);
+    expect(screen.getByText('(Found 2 instances in 1 document after processing 20 documents).')).toBeInTheDocument();
   });
 
   it('hides the proportional-width control until Dispersion View is enabled', () => {
