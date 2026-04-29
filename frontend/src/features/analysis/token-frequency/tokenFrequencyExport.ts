@@ -1,4 +1,5 @@
 import JSZip from 'jszip';
+import { saveBlob } from '../../../lib/download';
 
 const toSafeExportFilename = (label: string, suffix: string, extension: string) => {
   const base = (label || 'token-frequency')
@@ -65,6 +66,9 @@ const scheduleDownloadCleanup = (link: HTMLAnchorElement, urlToRevoke?: string) 
   }, 0);
 };
 
+// Used for already-rendered href values (e.g. canvas data URLs). Always uses
+// the synchronous anchor click — the browser handles progress UI, and the
+// existing tests assert the anchor is created in the DOM.
 const triggerFileDownload = (href: string, filename: string, urlToRevoke?: string) => {
   if (typeof document === 'undefined') return;
 
@@ -82,8 +86,9 @@ const triggerFileDownload = (href: string, filename: string, urlToRevoke?: strin
 };
 
 const triggerBlobDownload = (blob: Blob, filename: string) => {
-  const url = URL.createObjectURL(blob);
-  triggerFileDownload(url, filename, url);
+  // saveBlob handles Tauri (write to Downloads + toast) and browser (anchor)
+  // paths. Fire-and-forget: callers historically had no async semantics.
+  void saveBlob(blob, filename);
 };
 
 const downloadExportedFile = (file: ExportedDownloadFile, overrideFilename?: string) => {

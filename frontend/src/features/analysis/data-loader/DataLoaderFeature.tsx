@@ -11,6 +11,7 @@ import { useFiles } from '../../../hooks/useFiles';
 import { queryKeys } from '../../../lib/queryKeys';
 import { filesApi } from '../../../api/files';
 import { workspacesApi } from '../../../api/workspaces';
+import { saveBlob } from '../../../lib/download';
 import { useAnalysisStore, type TaskItem } from '../../../stores/analysisStore';
 import { usePreferencesStore } from '../../../stores/preferencesStore';
 import { type FileTreeDirectory, type FileTreeFile, type FileTreeNode } from '../../../types';
@@ -437,14 +438,8 @@ export const DataLoaderFeature: React.FC = () => {
         (async () => {
           try {
             const blob = await workspacesApi.downloadTaskArtifact(taskId, authHeaders);
-            const objectUrl = URL.createObjectURL(blob);
-            const anchor = document.createElement('a');
-            anchor.href = objectUrl;
-            anchor.download = `${(workspaceName || workspaceId).replace(/[^a-zA-Z0-9._-]+/g, '_')}.zip`;
-            document.body.appendChild(anchor);
-            anchor.click();
-            document.body.removeChild(anchor);
-            URL.revokeObjectURL(objectUrl);
+            const filename = `${(workspaceName || workspaceId).replace(/[^a-zA-Z0-9._-]+/g, '_')}.zip`;
+            await saveBlob(blob, filename);
             notify('success', `Downloaded workspace "${workspaceName || workspaceId}".`);
           } catch (err) {
             notify('error', (err as Error).message || 'Failed to download workspace ZIP.');

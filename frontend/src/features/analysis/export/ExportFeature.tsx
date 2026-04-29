@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from '../../../components/ui/select';
 import { toast } from 'sonner';
+import { saveBlob } from '../../../lib/download';
 import HelpIcon from '../../../components/help/HelpIcon';
 import InfoIcon from '../../../components/help/InfoIcon';
 
@@ -92,16 +93,7 @@ const ExportFeature: React.FC = () => {
       const filename = multiple
         ? `${buildTimestampFragment()}_${toSafeArchiveLabel(currentWorkspace?.name || currentWorkspaceId || 'workspace')}.zip`
         : `${toDisplay(selectedNodes[0]!).name || nodeIds[0]}.${ext}`;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(() => {
-        URL.revokeObjectURL(url);
-        a.remove();
-      }, 0);
+      await saveBlob(blob, filename);
     } catch (e) {
       console.error(e);
       toast.error('Failed to export data blocks');
@@ -126,16 +118,7 @@ const ExportFeature: React.FC = () => {
       const blob = await resp.blob();
       const ext = getDownloadExtension(format);
       const filename = `${name || id}.${ext}`;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(() => {
-        URL.revokeObjectURL(url);
-        a.remove();
-      }, 0);
+      await saveBlob(blob, filename);
     } catch (e) {
       console.error(e);
       toast.error('Failed to download data block');
