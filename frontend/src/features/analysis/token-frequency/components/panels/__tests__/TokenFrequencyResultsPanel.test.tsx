@@ -44,6 +44,7 @@ describe('TokenFrequencyResultsPanel', () => {
         tokenLimitInput="25"
         onTokenLimitInputChange={vi.fn()}
         onTokenLimitBlur={vi.fn()}
+        applyCloudTokenLimit={vi.fn()}
         tokenLimitError={null}
         isApplyingTokenLimit={false}
         appliedStopCount={0}
@@ -70,7 +71,7 @@ describe('TokenFrequencyResultsPanel', () => {
     expect(screen.getByRole('button', { name: 'Fill Default' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Sort' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'About default stop words' })).toBeInTheDocument();
-    expect(screen.getByText('Currently displaying top 25 tokens per table (default: 25).')).toBeInTheDocument();
+    expect(screen.getByText('Cloud display limit (10–100)')).toBeInTheDocument();
     expect(screen.queryByText('Bundled default stop words')).not.toBeInTheDocument();
     expect(
       screen.queryByText(/Fill Default loads the bundled English stop-word list shipped with the app/i)

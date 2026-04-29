@@ -166,8 +166,9 @@ export const TokenFrequencyUnifiedTokenSection = ({
       <Card className={view === 'cloud' ? undefined : 'hidden'}>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <CardTitle className="text-base font-semibold">Unified Word Cloud</CardTitle>
+            <div className="flex items-baseline gap-2">
+              <CardTitle className="text-base font-semibold">Juxtorpus</CardTitle>
+              <span className="text-xs text-muted-foreground">- based on keyword analysis.</span>
               <HelpIcon
                 targetKey="analysis.token-frequency.unified-word-cloud"
                 label="Unified word cloud"

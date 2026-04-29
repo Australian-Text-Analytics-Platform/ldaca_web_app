@@ -28,6 +28,12 @@ type TokenFrequencySingleTokenSectionProps = {
    * string means "no filter". Cloud rendering is unaffected.
    */
   tokenFilter?: string;
+  /**
+   * Maximum number of rows to show in the list view per node. The cloud view
+   * continues to use the cloud-side display limit (`displayRows`). When
+   * undefined, falls back to the cloud-side limit (`displayRows`).
+   */
+  listLimit?: number;
 };
 
 const VISIBLE_BAR_ROWS = 10;
@@ -45,6 +51,7 @@ export const TokenFrequencySingleTokenSection = ({
   registerWordCloudRef,
   view = 'cloud',
   tokenFilter = '',
+  listLimit,
 }: TokenFrequencySingleTokenSectionProps) => {
   // Refs for each per-node list scroll container, used to synchronise vertical
   // scrolling across the side-by-side list view. We keep refs on the
@@ -77,8 +84,8 @@ export const TokenFrequencySingleTokenSection = ({
     : 'grid grid-cols-1 gap-4 xl:grid-cols-2';
 
   // Width (in ch) of the rank gutter inside each list card. Sized to the
-  // largest *original* list length across cards so ranks don't shift when
-  // filtering.
+  // largest *original* list length (after stop-word filtering, capped by the
+  // list display limit) across cards so ranks don't shift when filtering.
   const tokenFilterTrimmed = tokenFilter.trim();
   const tokenFilterRegex = tokenFilterTrimmed ? wildcardToRegExp(tokenFilterTrimmed) : null;
   const matchesTokenFilter = (token: string): boolean => {
@@ -88,9 +95,14 @@ export const TokenFrequencySingleTokenSection = ({
     }
     return tokenFilterRegex.test(token);
   };
+  const listSliceCapForGutter = typeof listLimit === 'number' && Number.isFinite(listLimit) && listLimit > 0
+    ? Math.floor(listLimit)
+    : Number.POSITIVE_INFINITY;
   const maxRowCount = nodeDisplayResults.reduce((acc, item) => {
-    const rows = Array.isArray(item.displayRows) ? item.displayRows : [];
-    return Math.max(acc, rows.length);
+    const filtered = Array.isArray(item.filteredRows) ? item.filteredRows : [];
+    const listed = Math.min(filtered.length, listSliceCapForGutter);
+    const fallback = Array.isArray(item.displayRows) ? item.displayRows.length : 0;
+    return Math.max(acc, listed > 0 ? listed : fallback);
   }, 0);
   const rankWidthCh = Math.max(2, String(maxRowCount).length + 1);
 
@@ -100,10 +112,17 @@ export const TokenFrequencySingleTokenSection = ({
         const nodeKey = result.nodeId || result.displayName || `node-${index}`;
         const color = getColorForNode(result.nodeId || result.displayName, index);
         const displayRows = Array.isArray(result.displayRows) ? result.displayRows : [];
-        // List view applies the wildcard filter; cloud view stays unaffected.
-        // Preserve each row's original 1-based rank so filtering doesn't
-        // renumber rows.
-        const filteredListRows: Array<{ row: typeof displayRows[number]; rank: number }> = displayRows
+        // List view uses its own (typically larger) cap on the full
+        // stop-word-filtered list, so it can show more rows than the cloud.
+        // Falls back to the cloud cap when no list limit is provided.
+        const filteredRowsAll = Array.isArray(result.filteredRows) ? result.filteredRows : displayRows;
+        const listSliceCap = typeof listLimit === 'number' && Number.isFinite(listLimit) && listLimit > 0
+          ? Math.floor(listLimit)
+          : displayRows.length;
+        const listSourceRows = filteredRowsAll.slice(0, listSliceCap);
+        // Then apply the wildcard filter for list view; cloud view stays unaffected.
+        // Preserve each row's original 1-based rank so filtering doesn't renumber rows.
+        const filteredListRows: Array<{ row: typeof listSourceRows[number]; rank: number }> = listSourceRows
           .map((row, rowIndex) => ({ row, rank: rowIndex + 1 }))
           .filter(({ row }) => matchesTokenFilter(String(row?.token ?? '')));
         const maxFrequency = Math.max(1, ...displayRows.map((row) => Number(row.frequency) || 0));

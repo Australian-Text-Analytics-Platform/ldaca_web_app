@@ -38,6 +38,9 @@ type TokenFrequencyResultsPanelProps = {
   tokenLimitInput: string;
   onTokenLimitInputChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onTokenLimitBlur: () => void;
+  /** Programmatic apply of cloud-side token limit (used when the list-side
+   *  limit changes and needs to mirror to the cloud limit). */
+  applyCloudTokenLimit: (value: number) => Promise<void> | void;
   tokenLimitError: string | null;
   isApplyingTokenLimit: boolean;
 
@@ -78,6 +81,7 @@ export const TokenFrequencyResultsPanel = ({
   tokenLimitInput,
   onTokenLimitInputChange,
   onTokenLimitBlur,
+  applyCloudTokenLimit,
   tokenLimitError,
   isApplyingTokenLimit,
   appliedStopCount,
@@ -106,6 +110,80 @@ export const TokenFrequencyResultsPanel = ({
   // three list-view cards (left list, right list, and the statistics table)
   // simultaneously.
   const [listTokenFilter, setListTokenFilter] = React.useState<string>('');
+
+  // Maximum vocabulary across all node results (full filtered list, ignoring
+  // the cloud display limit). Used to cap the List display limit. Falls back
+  // to 10 so the input always has a sensible upper bound.
+  const globalMaxVocab = React.useMemo(() => {
+    let max = 0;
+    for (const node of nodeDisplayResults) {
+      const filtered = Array.isArray(node.filteredRows) ? node.filteredRows.length : 0;
+      const raw = Array.isArray(node.rows) ? node.rows.length : 0;
+      if (filtered > max) max = filtered;
+      if (raw > max) max = raw;
+    }
+    return Math.max(max, 10);
+  }, [nodeDisplayResults]);
+
+  // List display limit is UI-only (not persisted to the backend). Cloud
+  // display limit is the existing backend-persisted value
+  // (`effectiveTokenLimit`). Sync rule: changes mirror across both, with the
+  // cloud limit capped at 100. So setting list to 150 → list = 150, cloud = 100.
+  // Setting cloud to 50 → both = 50.
+  const [listLimit, setListLimit] = React.useState<number>(0);
+  const [listLimitInput, setListLimitInput] = React.useState<string>('');
+  const [listLimitError, setListLimitError] = React.useState<string | null>(null);
+  // Mirror the cloud limit into the list limit whenever the cloud limit
+  // changes, *unless* the user has explicitly pushed the list above 100
+  // (the cloud cap). Once list > 100 the two values diverge by design.
+  React.useEffect(() => {
+    if (!Number.isFinite(effectiveTokenLimit) || effectiveTokenLimit <= 0) return;
+    setListLimit((prev) => {
+      if (prev > 100) return prev;
+      return effectiveTokenLimit;
+    });
+    setListLimitInput((prev) => {
+      const prevNum = Number.parseInt(prev, 10);
+      if (Number.isFinite(prevNum) && prevNum > 100) return prev;
+      return String(effectiveTokenLimit);
+    });
+  }, [effectiveTokenLimit]);
+
+  const handleListLimitInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setListLimitInput(event.target.value);
+    if (listLimitError) setListLimitError(null);
+  };
+
+  const handleApplyListLimit = () => {
+    const parsed = Number.parseInt(listLimitInput, 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      setListLimitError('Enter a whole number greater than zero.');
+      return;
+    }
+    const clamped = Math.max(10, Math.min(parsed, globalMaxVocab));
+    setListLimit(clamped);
+    setListLimitInput(String(clamped));
+    setListLimitError(null);
+    // Mirror to cloud, capped at 100. Skip the call if it's already that value.
+    const cloudTarget = Math.min(clamped, 100);
+    if (cloudTarget !== effectiveTokenLimit) {
+      void applyCloudTokenLimit(cloudTarget);
+    }
+  };
+
+  // Wrap cloud apply so that applying the cloud value also mirrors it down
+  // to the list limit (cloud is always ≤ 100, so the two stay in lockstep
+  // whenever the user touches the cloud input).
+  const handleApplyCloudLimit = () => {
+    const parsed = Number.parseInt(tokenLimitInput, 10);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      const cloudClamped = Math.max(10, Math.min(parsed, 100));
+      setListLimit(cloudClamped);
+      setListLimitInput(String(cloudClamped));
+      setListLimitError(null);
+    }
+    onTokenLimitBlur();
+  };
 
   if (!isRunningState && !results) {
     return null;
@@ -194,36 +272,76 @@ export const TokenFrequencyResultsPanel = ({
               </div>
             </div>
 
-            <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-4">
-              <div className="flex items-center justify-between gap-2">
-                <Label htmlFor="token-limit">Token display limit</Label>
-                <HelpIcon
-                  targetKey="analysis.token-frequency.token-limit"
-                  label="Token display limit"
-                  tooltip="Limits how many top tokens are shown per table after the analysis has finished."
-                />
+            <div className="space-y-4 rounded-lg border border-border/60 bg-muted/20 p-4">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <Label htmlFor="token-limit">Cloud display limit (10–100)</Label>
+                  <HelpIcon
+                    targetKey="analysis.token-frequency.token-limit"
+                    label="Cloud display limit"
+                    tooltip="Maximum number of tokens shown in the word cloud (10–100). Setting this also updates the list display limit to the same value."
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="token-limit"
+                    type="number"
+                    min={10}
+                    max={100}
+                    value={tokenLimitInput}
+                    onChange={onTokenLimitInputChange}
+                    onBlur={handleApplyCloudLimit}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault();
+                        handleApplyCloudLimit();
+                      }
+                    }}
+                  />
+                  <Button type="button" variant="outline" size="sm" onClick={handleApplyCloudLimit} disabled={isApplyingTokenLimit}>
+                    <Wand2 className="mr-1 h-3.5 w-3.5" />
+                    Apply
+                  </Button>
+                </div>
+                {tokenLimitError ? (
+                  <p className="text-xs text-destructive">{tokenLimitError}</p>
+                ) : null}
               </div>
-              <div className="flex items-center gap-2">
-                <Input
-                  id="token-limit"
-                  type="number"
-                  min={1}
-                  value={tokenLimitInput}
-                  onChange={onTokenLimitInputChange}
-                  onBlur={onTokenLimitBlur}
-                />
-                <Button type="button" variant="outline" size="sm" onClick={onTokenLimitBlur} disabled={isApplyingTokenLimit}>
-                  <Wand2 className="mr-1 h-3.5 w-3.5" />
-                  Apply
-                </Button>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <Label htmlFor="list-limit">List display limit (10 – {globalMaxVocab})</Label>
+                  <HelpIcon
+                    targetKey="analysis.token-frequency.list-limit"
+                    label="List display limit"
+                    tooltip="Maximum number of tokens shown in the list view (10–vocabulary size). Values up to 100 stay in sync with the cloud display limit; larger values keep the cloud capped at 100."
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="list-limit"
+                    type="number"
+                    min={10}
+                    max={globalMaxVocab}
+                    value={listLimitInput}
+                    onChange={handleListLimitInputChange}
+                    onBlur={handleApplyListLimit}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault();
+                        handleApplyListLimit();
+                      }
+                    }}
+                  />
+                  <Button type="button" variant="outline" size="sm" onClick={handleApplyListLimit}>
+                    <Wand2 className="mr-1 h-3.5 w-3.5" />
+                    Apply
+                  </Button>
+                </div>
+                {listLimitError ? (
+                  <p className="text-xs text-destructive">{listLimitError}</p>
+                ) : null}
               </div>
-              {tokenLimitError ? (
-                <p className="text-xs text-destructive">{tokenLimitError}</p>
-              ) : (
-                <p className="text-xs text-muted-foreground">
-                  Currently displaying top {effectiveTokenLimit} tokens per table (default: {defaultTokenLimit}).
-                </p>
-              )}
             </div>
           </div>
 
@@ -248,6 +366,7 @@ export const TokenFrequencyResultsPanel = ({
             registerWordCloudRef={registerWordCloudRef}
             view={resultsView}
             tokenFilter={listTokenFilter}
+            listLimit={listLimit}
           />
 
           {resultsView === 'list' ? (
