@@ -213,6 +213,7 @@ const TokenFrequencyFeature = () => {
     sortStopWords,
     handleTokenLimitInputChange,
     handleTokenLimitBlur,
+    applyTokenLimit,
     handleFillDefaultStopWords,
     resetPreferenceUiState,
   } = useTokenFrequencyPreferences({
@@ -484,6 +485,7 @@ const TokenFrequencyFeature = () => {
         tokenLimitInput={tokenLimitInput}
         onTokenLimitInputChange={handleTokenLimitInputChange}
         onTokenLimitBlur={handleTokenLimitBlur}
+        applyCloudTokenLimit={applyTokenLimit}
         tokenLimitError={tokenLimitError}
         isApplyingTokenLimit={isApplyingTokenLimit}
         appliedStopCount={appliedStopSet.size}

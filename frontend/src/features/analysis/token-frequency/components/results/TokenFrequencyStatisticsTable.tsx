@@ -1,4 +1,4 @@
-import { startTransition, useDeferredValue, useMemo, useState } from 'react';
+import { startTransition, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import {
   createColumnHelper,
   flexRender,
@@ -10,7 +10,7 @@ import {
   type FilterFn,
   type SortingState,
 } from '@tanstack/react-table';
-import { ArrowDown, ArrowUp, ArrowUpDown, Download, Search } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -39,6 +39,12 @@ export type EnhancedStatisticsRow = TokenFrequencyStatisticsEntry & {
 type Props = {
   statistics: TokenFrequencyStatisticsEntry[];
   onDownloadFrequencyCsv: (label: string, rows: unknown[]) => void;
+  /**
+   * Optional controlled wildcard filter. When provided, the table is
+   * filtered by this value and the internal search box is not rendered
+   * (the filter UI lives in the parent panel for the list view).
+   */
+  tokenFilter?: string;
 };
 
 const parseStatisticsNumericValue = (value: unknown): number => {
@@ -213,14 +219,22 @@ const enhanceRows = (statistics: TokenFrequencyStatisticsEntry[]): EnhancedStati
     };
   });
 
-export const TokenFrequencyStatisticsTable = ({ statistics, onDownloadFrequencyCsv }: Props) => {
+export const TokenFrequencyStatisticsTable = ({
+  statistics,
+  onDownloadFrequencyCsv,
+  tokenFilter: tokenFilterProp,
+}: Props) => {
   const data = useMemo(() => enhanceRows(statistics), [statistics]);
   const columns = useMemo(() => buildColumns(), []);
 
   const [sorting, setSorting] = useState<SortingState>([{ id: 'log_likelihood_llv', desc: true }]);
-  const [tokenFilter, setTokenFilter] = useState<string>('');
+  const tokenFilter = tokenFilterProp ?? '';
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
   const deferredTokenFilter = useDeferredValue(tokenFilter);
+  // Reset to first page whenever the (parent-controlled) filter changes.
+  useEffect(() => {
+    setPagination((prev) => (prev.pageIndex === 0 ? prev : { ...prev, pageIndex: 0 }));
+  }, [tokenFilter]);
   const columnFilters = useMemo(
     () => (deferredTokenFilter.trim() ? [{ id: 'token', value: deferredTokenFilter }] : []),
     [deferredTokenFilter],
@@ -266,29 +280,22 @@ export const TokenFrequencyStatisticsTable = ({ statistics, onDownloadFrequencyC
             tooltip="Displays comparative token-level statistical measures for the selected data blocks."
           />
         </div>
-        <Button variant="outline" size="sm" onClick={handleDownload}>
-          <Download className="mr-2 h-4 w-4" />
-          Frequencies
+        <Button
+          variant="outline"
+          size="sm"
+          aria-label="Download frequencies"
+          title="Download frequencies"
+          onClick={handleDownload}
+        >
+          <Download className="h-4 w-4" />
         </Button>
       </div>
 
-      <div className="flex items-center gap-2">
-        <Search className="h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Filter tokens (use * as wildcard, e.g. pre* or *ing)"
-          value={tokenFilter}
-          onChange={(event) => {
-            setTokenFilter(event.target.value);
-            table.setPageIndex(0);
-          }}
-          className="h-8 max-w-sm"
-        />
-        {tokenFilter && (
-          <span className="text-xs text-muted-foreground">
-            {filteredCount} match{filteredCount !== 1 ? 'es' : ''} of {totalCount}
-          </span>
-        )}
-      </div>
+      {tokenFilter ? (
+        <p className="text-xs text-muted-foreground">
+          {filteredCount} match{filteredCount !== 1 ? 'es' : ''} of {totalCount}
+        </p>
+      ) : null}
 
       {totalCount > 0 ? (
         <>

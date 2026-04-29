@@ -138,7 +138,7 @@ describe('Token frequency result layouts', () => {
   it('shows the unified card only when two node results are available', () => {
     const { rerender } = render(<TokenFrequencyUnifiedTokenSection {...baseUnifiedSectionProps} />);
 
-    expect(screen.queryByText('Unified Word Cloud')).not.toBeInTheDocument();
+    expect(screen.queryByText('Juxtorpus')).not.toBeInTheDocument();
 
     const nodeA = buildNodeResult({ nodeId: 'node-a', displayName: 'Node A' });
     const nodeB = buildNodeResult({ nodeId: 'node-b', displayName: 'Node B' });
@@ -154,6 +154,6 @@ describe('Token frequency result layouts', () => {
       />
     );
 
-    expect(screen.getByText('Unified Word Cloud')).toBeInTheDocument();
+    expect(screen.getByText('Juxtorpus')).toBeInTheDocument();
   });
 });

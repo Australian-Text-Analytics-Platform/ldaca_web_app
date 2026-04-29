@@ -25,6 +25,16 @@ type TokenFrequencyUnifiedTokenSectionProps = {
   unifiedCloudContainerRef: React.RefObject<HTMLDivElement | null>;
   registerWordCloudRef: (nodeKey: string, element: SVGSVGElement | null) => void;
   onDownloadFrequencyCsv: (label: string, rows: unknown[]) => void;
+  /**
+   * Active sub-view from the parent results panel. Defaults to 'cloud' for
+   * backward compatibility.
+   */
+  view?: 'cloud' | 'list';
+  /**
+   * Optional wildcard filter (lifted to the parent panel) applied to the
+   * statistics table when in list view. Cloud rendering is unaffected.
+   */
+  tokenFilter?: string;
 };
 
 const parseStatisticsNumericValue = (value: unknown): number => {
@@ -52,6 +62,8 @@ export const TokenFrequencyUnifiedTokenSection = ({
   unifiedCloudContainerRef,
   registerWordCloudRef,
   onDownloadFrequencyCsv,
+  view = 'cloud',
+  tokenFilter = '',
 }: TokenFrequencyUnifiedTokenSectionProps) => {
   const hasMultipleNodes = normalizedNodeResults.length >= 2 || nodeDisplayResults.length >= 2 || lastCompareNodeIds.length >= 2;
 
@@ -151,20 +163,26 @@ export const TokenFrequencyUnifiedTokenSection = ({
 
   return (
     <div className="space-y-3">
-      <Card>
+      <Card className={view === 'cloud' ? undefined : 'hidden'}>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <CardTitle className="text-base font-semibold">Unified Word Cloud</CardTitle>
+            <div className="flex items-baseline gap-2">
+              <CardTitle className="text-base font-semibold">Juxtorpus</CardTitle>
+              <span className="text-xs text-muted-foreground">- based on keyword analysis.</span>
               <HelpIcon
                 targetKey="analysis.token-frequency.unified-word-cloud"
                 label="Unified word cloud"
                 tooltip="Shows a combined comparative word cloud for the selected data block pair."
               />
             </div>
-            <Button variant="outline" size="sm" onClick={() => onDownloadWordCloud('unified', 'Unified Word Cloud')}>
-              <Download className="mr-2 h-4 w-4" />
-              Word Cloud
+            <Button
+              variant="outline"
+              size="sm"
+              aria-label="Download word cloud"
+              title="Download word cloud"
+              onClick={() => onDownloadWordCloud('unified', 'Unified Word Cloud')}
+            >
+              <Download className="h-4 w-4" />
             </Button>
           </div>
         </CardHeader>
@@ -242,12 +260,15 @@ export const TokenFrequencyUnifiedTokenSection = ({
       </Card>
 
       {(Array.isArray(statistics) && statistics.length > 0) && (
-        <TokenFrequencyStatisticsTable
-          statistics={statistics.filter(
-            (entry) => !appliedStopSet.has(String(entry?.token ?? '').toLowerCase()),
-          )}
-          onDownloadFrequencyCsv={onDownloadFrequencyCsv}
-        />
+        <div className={view === 'list' ? undefined : 'hidden'}>
+          <TokenFrequencyStatisticsTable
+            statistics={statistics.filter(
+              (entry) => !appliedStopSet.has(String(entry?.token ?? '').toLowerCase()),
+            )}
+            onDownloadFrequencyCsv={onDownloadFrequencyCsv}
+            tokenFilter={tokenFilter}
+          />
+        </div>
       )}
     </div>
   );
