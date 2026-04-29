@@ -892,7 +892,11 @@ dependencies = [
 
 [[package]]
 name = "ldaca-web-app"
+<<<<<<< HEAD
 version = "0.1.28"
+=======
+version = "0.1.29"
+>>>>>>> tutorial_revision
 source = { directory = "backend" }
 dependencies = [
     { name = "aiosqlite" },
