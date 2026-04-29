@@ -43,7 +43,6 @@ import type {
   SidebarWorkspaceNode,
 } from '@/components/layout/sidebar/types';
 import {
-  BarChart3,
   BookOpen,
   Bot,
   Circle,
@@ -51,6 +50,7 @@ import {
   FileText,
   Filter,
   FolderOpen,
+  Hash,
   type LucideIcon,
   MessageSquare,
   Puzzle,
@@ -86,10 +86,10 @@ const MIN_SECTION_HEIGHT = 120;
 
 const NAV_ITEMS: NavItem[] = [
   { id: 'data-loader', label: 'Data Loader', icon: FolderOpen },
-  { id: 'filter', label: 'Data Preprocessing', icon: Filter },
-  { id: 'token-frequency', label: 'Token Frequency', icon: TrendingUp },
+  { id: 'filter', label: 'Preprocessing', icon: Filter },
+  { id: 'token-frequency', label: 'Frequency', icon: Hash },
   { id: 'concordance', label: 'Concordance', icon: FileText },
-  { id: 'analysis', label: 'Sequential Analysis', icon: BarChart3 },
+  { id: 'analysis', label: 'Trends', icon: TrendingUp },
   { id: 'topic-modeling', label: 'Topic Modeling', icon: Puzzle },
   { id: 'quotation', label: 'Quotation', icon: Quote },
   { id: 'ai-annotator', label: 'AI Annotator', icon: Bot },
@@ -349,6 +349,14 @@ const Sidebar: React.FC = () => {
     }
   };
 
+  // Auto-fade dismissal: remove from the local UI list only. We must NOT call
+  // the backend clear API here, because the analysis task record may still be
+  // required by an open feature dialog (e.g. Topic Modelling "Add to
+  // Workspace" detach), which looks up the task by id when the user confirms.
+  const handleAutoDismissTask = (task: SidebarTaskRecord) => {
+    setTasks((prev) => prev.filter((item) => item.task_id !== task.task_id));
+  };
+
   return (
     <SidebarRoot
       className="md:p-2! md:pr-1! **:data-[sidebar=sidebar]:rounded-xl **:data-[sidebar=sidebar]:border **:data-[sidebar=sidebar]:border-border/60 **:data-[sidebar=sidebar]:shadow-sm **:data-[sidebar=sidebar]:overflow-hidden"
@@ -512,6 +520,7 @@ const Sidebar: React.FC = () => {
                             connectionError={connectionError}
                             onReconnect={reconnectTaskStream}
                             onClearTask={handleClearTask}
+                            onAutoDismissTask={handleAutoDismissTask}
                           />
                         )}
                       </div>

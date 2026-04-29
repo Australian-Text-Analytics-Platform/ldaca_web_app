@@ -23,6 +23,13 @@ type SidebarTasksSectionProps = {
   connectionError: string | null;
   onReconnect: () => void;
   onClearTask: (task: SidebarTaskRecord) => void;
+  /**
+   * Called by the auto-fade timer for successful tasks. Should only remove the
+   * task from the local UI list without invoking the backend clear API,
+   * because the backing analysis task may still be needed by an open dialog
+   * (e.g. Topic Modelling "Add to Workspace" detach flow).
+   */
+  onAutoDismissTask?: (task: SidebarTaskRecord) => void;
 };
 
 // Auto-fade timing for successfully completed tasks. The task remains fully
@@ -50,6 +57,7 @@ const SidebarTasksSection: React.FC<SidebarTasksSectionProps> = ({
   connectionError,
   onReconnect,
   onClearTask,
+  onAutoDismissTask,
 }) => {
   const sortedTasks = Array.isArray(tasks)
     ? tasks
@@ -71,6 +79,10 @@ const SidebarTasksSection: React.FC<SidebarTasksSectionProps> = ({
   React.useEffect(() => {
     onClearTaskRef.current = onClearTask;
   }, [onClearTask]);
+  const onAutoDismissTaskRef = React.useRef(onAutoDismissTask);
+  React.useEffect(() => {
+    onAutoDismissTaskRef.current = onAutoDismissTask;
+  }, [onAutoDismissTask]);
 
   React.useEffect(() => {
     const visibleSuccessful = new Map<string, SidebarTaskRecord>();
@@ -102,7 +114,11 @@ const SidebarTasksSection: React.FC<SidebarTasksSectionProps> = ({
           return next;
         });
         try {
-          onClearTaskRef.current(task);
+          // Auto-fade should only dismiss from the UI; do NOT call the backend
+          // clear API, because an open analysis dialog (e.g. Topic Modelling
+          // detach) may still need the task record on the server.
+          const dismiss = onAutoDismissTaskRef.current ?? onClearTaskRef.current;
+          dismiss(task);
         } catch (error) {
           console.error('SidebarTasksSection: auto-clear failed', error);
         }

@@ -21,7 +21,9 @@ The Stop-words and number of words to be displayed can be adjusted after the run
 
 ![Stop words screenshot](tutorials/assets/token_frequency/stop_words.png)
 
-The stopwords are words the user choose to ignore (like “the”, “and”, or domain-specific filler) from the result. User can input a list of words (separated by space, case insentive), fill the default set of stopwords by **Fill Default** clicking the button [source](), or add specific words by right clicking the unwanted words in the wordcloud or frequency list visual. 
+The stopwords are words the user choose to ignore (like “the”, “and”, or domain-specific filler) from the result. User can input a list of words (separated by space, case insentive), fill the default set of stopwords by **Fill Default** clicking the button, or add specific words by right clicking the unwanted words in the wordcloud or frequency list visual.
+
+The default stopwords are an arbitrary list of words, which can be found in the GitHub repo at this [link](https://github.com/Australian-Text-Analytics-Platform/ldaca_web_app_backend/tree/main/src/ldaca_web_app/resources). The default stopwords are sorted alphabetically, and additional user added words are inserted at the start of this list, so these can be easily found and removed.
 
 **Q: Why remove stopwords?**
 High-frequency filler terms can hide the meaningful terms you want to study.

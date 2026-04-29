@@ -37,6 +37,7 @@ The design, development, and maintenance of the LDaCA webApp have been led and s
 
 Their contributions span software engineering, research infrastructure development, data processing pipelines, user interface design, and research translation.
 
+Version 0.1.31.
 ---
 
 ## Testing, Feedback, and Community Contributions

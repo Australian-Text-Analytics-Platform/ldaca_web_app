@@ -16,9 +16,7 @@ The output differs depending on how a ‘token’ is defined. For example, wheth
 > - **Lowercases** text (uncased model);
 > - **Punctuation** is split into separate tokens (e.g., "don't" → "don", "'", "t");
 > - **Hyphenated words** like "high-school" are split (e.g., "high", "-", "school");
-> - **Contractions** like "you're" are split at the apostrophe
-> - Uses **WordPiece** subword tokenization (subword pieces prefixed with ##);
-> - Special tokens ([CLS], [SEP], [PAD], [UNK], [MASK]) are filtered out.
+> - **Contractions** like "you're" are split at the apostrophe.
 
 The frequency list that you can download includes the raw/absolute frequencies for each token (word). When comparing token frequency across different text collections yourself, you need to normalise the raw/absolute frequencies if the text collections have different sizes (for example, you can calculate a frequency per 100,000 words using Excel). Alternatively, if you select two data blocks (two text collections) within the Token Frequency tool, you can use the tool to identify the key words in a text collection by using in-built statistical measures (this is commonly called keywords analysis in corpus linguistics). Key words are words that are (statistically speaking) unusual in their frequency in the *study* text collection, through comparison to the *reference* text collection. You can only create a list of key words when you compare two text collections.
 
