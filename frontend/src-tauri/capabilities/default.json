@@ -17,7 +17,10 @@
     "core:webview:allow-set-webview-zoom",
     "core:webview:allow-print",
     "opener:default",
+    "opener:allow-reveal-item-in-dir",
     "dialog:default",
-    "dialog:allow-open"
+    "dialog:allow-open",
+    "fs:allow-download-write-recursive",
+    "fs:allow-download-meta-recursive"
   ]
 }

@@ -11,6 +11,7 @@ import { useFiles } from '../../../hooks/useFiles';
 import { queryKeys } from '../../../lib/queryKeys';
 import { filesApi } from '../../../api/files';
 import { workspacesApi } from '../../../api/workspaces';
+import { saveBlob } from '../../../lib/download';
 import { useAnalysisStore, type TaskItem } from '../../../stores/analysisStore';
 import { usePreferencesStore } from '../../../stores/preferencesStore';
 import { type FileTreeDirectory, type FileTreeFile, type FileTreeNode } from '../../../types';
@@ -169,9 +170,60 @@ export const DataLoaderFeature: React.FC = () => {
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const workspaceZipInputRef = useRef<HTMLInputElement | null>(null);
-  const activeCardRef = useRef<HTMLDivElement | null>(null);
-  const [activeCardHeight, setActiveCardHeight] = useState<number | null>(null);
+  const splitContainerRef = useRef<HTMLDivElement | null>(null);
+  const splitDraggingRef = useRef(false);
+  const [topRatio, setTopRatio] = useState(0.5);
   const hasWorkspaceSelected = Boolean(currentWorkspaceId);
+
+  const clampRatio = (value: number) => Math.min(0.85, Math.max(0.15, value));
+
+  const handleSplitterPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    splitDraggingRef.current = true;
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      // ignore pointer capture errors
+    }
+  };
+
+  const handleSplitterPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!splitDraggingRef.current) return;
+    const container = splitContainerRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    if (rect.height <= 0) return;
+    const offset = event.clientY - rect.top;
+    setTopRatio(clampRatio(offset / rect.height));
+  };
+
+  const handleSplitterPointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+    splitDraggingRef.current = false;
+    try {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    } catch {
+      // ignore pointer capture errors
+    }
+  };
+
+  const handleSplitterKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      setTopRatio((prev) => clampRatio(prev - 0.05));
+    } else if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      setTopRatio((prev) => clampRatio(prev + 0.05));
+    } else if (event.key === 'Home') {
+      event.preventDefault();
+      setTopRatio(0.15);
+    } else if (event.key === 'End') {
+      event.preventDefault();
+      setTopRatio(0.85);
+    } else if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      setTopRatio(0.5);
+    }
+  };
 
   const notify = (type: 'success' | 'error' | 'info', message: string) => {
     const duration = type === 'error' ? 6000 : 3500;
@@ -193,21 +245,6 @@ export const DataLoaderFeature: React.FC = () => {
     }
     setDescriptionValue(active?.description || '');
   }, [currentWorkspaceId, workspaces]);
-
-  useEffect(() => {
-    const element = activeCardRef.current;
-    if (!element || typeof ResizeObserver === 'undefined') {
-      return;
-    }
-    const observer = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (!entry) return;
-      const nextHeight = Math.round(entry.contentRect.height);
-      setActiveCardHeight((prev) => (prev === nextHeight ? prev : nextHeight));
-    });
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, []);
 
   const { favoriteWorkspaces, toggleFavorite, isFavorite } = usePreferencesStore();
 
@@ -401,14 +438,8 @@ export const DataLoaderFeature: React.FC = () => {
         (async () => {
           try {
             const blob = await workspacesApi.downloadTaskArtifact(taskId, authHeaders);
-            const objectUrl = URL.createObjectURL(blob);
-            const anchor = document.createElement('a');
-            anchor.href = objectUrl;
-            anchor.download = `${(workspaceName || workspaceId).replace(/[^a-zA-Z0-9._-]+/g, '_')}.zip`;
-            document.body.appendChild(anchor);
-            anchor.click();
-            document.body.removeChild(anchor);
-            URL.revokeObjectURL(objectUrl);
+            const filename = `${(workspaceName || workspaceId).replace(/[^a-zA-Z0-9._-]+/g, '_')}.zip`;
+            await saveBlob(blob, filename);
             notify('success', `Downloaded workspace "${workspaceName || workspaceId}".`);
           } catch (err) {
             notify('error', (err as Error).message || 'Failed to download workspace ZIP.');
@@ -851,7 +882,7 @@ export const DataLoaderFeature: React.FC = () => {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="flex h-[calc(100vh-9rem)] min-h-[640px] flex-col gap-4">
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-2">
           <h1 className="text-2xl font-semibold text-foreground">Data Loader</h1>
@@ -868,27 +899,36 @@ export const DataLoaderFeature: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card ref={activeCardRef} data-testid={currentWorkspace ? 'active-workspace-card' : 'create-workspace-card'}>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              {currentWorkspace ? 'Active workspace' : 'Create workspace'}
-              {currentWorkspace ? (
-                <HelpIcon
-                  targetKey="data-loader.active-workspace.section"
-                  label="Active workspace overview"
-                  tooltip="Choose or rename the workspace where new data blocks will be added. Save regularly to persist your progress."
-                />
-              ) : (
-                <HelpIcon
-                  targetKey="data-loader.create-workspace.name"
-                  label="Create workspace overview"
-                  tooltip="Create a new workspace before uploading files or adding data blocks. Add an optional description if you want to capture its purpose."
-                />
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+      <div ref={splitContainerRef} className="flex min-h-0 flex-1 flex-col">
+        <div
+          className="min-h-0 overflow-hidden"
+          style={{ flexBasis: `${topRatio * 100}%` }}
+        >
+          <div className="grid h-full min-h-0 gap-4 lg:grid-cols-2">
+            <Card
+              data-testid={currentWorkspace ? 'active-workspace-card' : 'create-workspace-card'}
+              className="flex h-full flex-col overflow-hidden"
+            >
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  {currentWorkspace ? 'Active workspace' : 'Create workspace'}
+                  {currentWorkspace ? (
+                    <HelpIcon
+                      targetKey="data-loader.active-workspace.section"
+                      label="Active workspace overview"
+                      tooltip="Choose or rename the workspace where new data blocks will be added. Save regularly to persist your progress."
+                    />
+                  ) : (
+                    <HelpIcon
+                      targetKey="data-loader.create-workspace.name"
+                      label="Create workspace overview"
+                      tooltip="Create a new workspace before uploading files or adding data blocks. Add an optional description if you want to capture its purpose."
+                    />
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="flex-1 min-h-0 overflow-y-auto space-y-4">
+
             {currentWorkspace ? (
               <>
                 <div className="rounded-md border border-border/60 bg-muted/30 px-4 py-3 text-sm">
@@ -985,8 +1025,7 @@ export const DataLoaderFeature: React.FC = () => {
         </Card>
 
         <Card
-          className="flex flex-col overflow-hidden"
-          style={activeCardHeight ? { height: activeCardHeight } : undefined}
+          className="flex h-full flex-col overflow-hidden"
         >
           <CardHeader>
             <div className="flex items-center justify-between gap-2">
@@ -1122,9 +1161,34 @@ export const DataLoaderFeature: React.FC = () => {
             )}
           </CardContent>
         </Card>
-      </div>
+          </div>
+        </div>
 
-      <Card>
+        <div
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label="Resize data loader sections"
+          aria-valuenow={Math.round(topRatio * 100)}
+          aria-valuemin={15}
+          aria-valuemax={85}
+          tabIndex={0}
+          onPointerDown={handleSplitterPointerDown}
+          onPointerMove={handleSplitterPointerMove}
+          onPointerUp={handleSplitterPointerUp}
+          onPointerCancel={handleSplitterPointerUp}
+          onKeyDown={handleSplitterKeyDown}
+          onDoubleClick={() => setTopRatio(0.5)}
+          className="my-1 flex h-2 shrink-0 cursor-row-resize items-center justify-center rounded-full bg-border transition-colors hover:bg-primary/40 focus-visible:bg-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          title="Drag to resize. Double-click to reset."
+        >
+          <div className="h-1 w-12 rounded-full bg-muted-foreground/40" />
+        </div>
+
+        <div
+          className="flex min-h-0 flex-col overflow-hidden"
+          style={{ flexBasis: `${(1 - topRatio) * 100}%` }}
+        >
+          <Card className="flex h-full flex-col overflow-hidden">
         <CardHeader>
           <div className="flex items-center justify-between gap-2">
             <CardTitle className="flex items-center gap-2">
@@ -1147,7 +1211,7 @@ export const DataLoaderFeature: React.FC = () => {
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="flex-1 min-h-0 overflow-y-auto space-y-4">
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-1">
               <Button onClick={openFilePicker} disabled={uploading || uploadingFiles}>
@@ -1247,6 +1311,8 @@ export const DataLoaderFeature: React.FC = () => {
           <div>Total files: {totalFileCount}</div>
         </div>
       </Card>
+        </div>
+      </div>
 
       <FilePreviewPanel filename={previewFile} open={Boolean(previewFile)} onClose={() => setPreviewFile(null)} />
       <AddFilePanel

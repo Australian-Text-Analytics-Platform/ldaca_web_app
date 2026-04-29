@@ -14,6 +14,7 @@ import { useAnalysisStore } from '../../../stores/analysisStore';
 import { useUIStore } from '../../../stores';
 import { Button } from '../../../components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
 import { Play, Loader2, Trash2, Plus } from 'lucide-react';
 import HelpIcon from '../../../components/help/HelpIcon';
 import InfoIcon from '../../../components/help/InfoIcon';
@@ -190,7 +191,6 @@ const ConcordanceFeature: React.FC = () => {
   });
   const [viewMode, setViewMode] = useState<'separated'|'combined'>('separated');
   const [combinedPage, setCombinedPage] = useState(1);
-  const [combinedPageSize] = useState(20);
   const [combinedLoading, setCombinedLoading] = useState(false);
 
   useEffect(() => {
@@ -280,6 +280,7 @@ const ConcordanceFeature: React.FC = () => {
   const [nodeMaterializing, setNodeMaterializing] = useState<Record<string, boolean>>({});
   const [materializeTaskIds, setMaterializeTaskIds] = useState<Record<string, string>>({});
   const [materializedPaths, setMaterializedPaths] = useState<Record<string, string>>({});
+  const [materializeSummaries, setMaterializeSummaries] = useState<Record<string, { recordCount: number; uniqueDocuments: number; totalDocuments: number }>>({});
   
   // Detach dialog state
   const [detachDialogOpen, setDetachDialogOpen] = useState(false);
@@ -358,6 +359,18 @@ const ConcordanceFeature: React.FC = () => {
       if (paths && typeof paths === 'object') {
         setMaterializedPaths(prev => ({ ...prev, ...paths }));
       }
+      const summaries = reqObj.materialize_summaries as Record<string, Record<string, unknown>> | undefined;
+      if (summaries && typeof summaries === 'object') {
+        const parsed: Record<string, { recordCount: number; uniqueDocuments: number; totalDocuments: number }> = {};
+        for (const [nid, s] of Object.entries(summaries)) {
+          parsed[nid] = {
+            recordCount: Number(s.record_count) || 0,
+            uniqueDocuments: Number(s.unique_documents_with_hits) || 0,
+            totalDocuments: Number(s.total_source_documents) || 0,
+          };
+        }
+        setMaterializeSummaries(prev => ({ ...prev, ...parsed }));
+      }
       try {
         await restoreAnalysisLockFromRequest({
           workspaceId: currentWorkspaceId,
@@ -372,6 +385,7 @@ const ConcordanceFeature: React.FC = () => {
       setResults(null);
       setNodePagination({});
       setCombinedPage(1);
+      setMaterializeSummaries({});
       if (options?.preserveLocalState) {
         return;
       }
@@ -428,7 +442,6 @@ const ConcordanceFeature: React.FC = () => {
       nodePagination,
       viewMode,
       combinedPage,
-      combinedPageSize,
       numLeftTokens,
       numRightTokens,
       regex,
@@ -510,10 +523,20 @@ const ConcordanceFeature: React.FC = () => {
     }
   }, [viewMode, results]);
 
+  // Track whether initial preference hydration from server results has been
+  // applied.  After the first sync we stop overwriting globalPageSize from
+  // response data to avoid a feedback loop: user changes page size → response
+  // arrives with old page_size → effect overwrites user's choice → new request
+  // fires → oscillation.
+  const prefsSyncedRef = useRef(false);
   useEffect(() => {
     if (!results) {
+      prefsSyncedRef.current = false;
       return;
     }
+    // Only sync preferences on the first result load (hydration).
+    if (prefsSyncedRef.current) return;
+    prefsSyncedRef.current = true;
 
     const analysisParams = results?.analysis_params ?? {};
     const preferenceSource = results?.preferences ?? (analysisParams as Record<string, unknown>)?.preferences as Record<string, unknown> | undefined ?? {};
@@ -587,11 +610,11 @@ const ConcordanceFeature: React.FC = () => {
       });
 
       if (state !== 'successful') {
-        toast.error(`Materialize ${state}`);
+        toast.error(`Process All ${state}`);
         continue;
       }
 
-      toast.success('Materialize complete.');
+      toast.success('Process All complete.');
 
       // Refetch parent concordance task request to learn the newly-persisted
       // materialized_paths map; then reset page_size to 20 and refetch results
@@ -606,6 +629,18 @@ const ConcordanceFeature: React.FC = () => {
             const paths = (reqObj.materialized_paths as Record<string, string> | undefined) ?? undefined;
             if (paths && typeof paths === 'object') {
               setMaterializedPaths(prev => ({ ...prev, ...paths }));
+            }
+            const summaries = reqObj.materialize_summaries as Record<string, Record<string, unknown>> | undefined;
+            if (summaries && typeof summaries === 'object') {
+              const parsed: Record<string, { recordCount: number; uniqueDocuments: number; totalDocuments: number }> = {};
+              for (const [nid, s] of Object.entries(summaries)) {
+                parsed[nid] = {
+                  recordCount: Number(s.record_count) || 0,
+                  uniqueDocuments: Number(s.unique_documents_with_hits) || 0,
+                  totalDocuments: Number(s.total_source_documents) || 0,
+                };
+              }
+              setMaterializeSummaries(prev => ({ ...prev, ...parsed }));
             }
           }
         } catch (error) {
@@ -860,7 +895,7 @@ const ConcordanceFeature: React.FC = () => {
         const prevScrollY = window.scrollY;
 
         setCombinedLoading(true);
-        updateStoredResult({ combined: true, page: combinedPage, page_size: combinedPageSize }).finally(() => {
+        updateStoredResult({ combined: true, page: combinedPage, page_size: globalPageSize }).finally(() => {
           setCombinedLoading(false);
           requestAnimationFrame(() => {
             requestAnimationFrame(() => {
@@ -918,13 +953,13 @@ const ConcordanceFeature: React.FC = () => {
       results?.metadata?.task_id ??
       (results?.metadata as Record<string, unknown> | undefined)?.taskId ??
       '';
-    const key = `${taskId}|${combinedPage}|${combinedPageSize}`;
+    const key = `${taskId}|${combinedPage}|${globalPageSize}`;
     if (lastCombinedQueryRef.current === key) {
       return;
     }
     lastCombinedQueryRef.current = key;
-    void updateStoredResult({ combined: true, page: combinedPage, page_size: combinedPageSize });
-  }, [viewMode, results, combinedPage, combinedPageSize, updateStoredResult]);
+    void updateStoredResult({ combined: true, page: combinedPage, page_size: globalPageSize });
+  }, [viewMode, results, combinedPage, globalPageSize, updateStoredResult]);
 
 
   const handleRowClick = (
@@ -1249,13 +1284,22 @@ const ConcordanceFeature: React.FC = () => {
             </AnalysisTableScrollArea>
             <AnalysisPagination
               page={combinedPage}
-              pageSize={combinedPageSize}
+              pageSize={globalPageSize}
               hasNext={combinedHasNext}
               hasPrev={combinedHasPrev}
               totalPages={nodeData.pagination?.total_source_pages}
               onPageChange={(newPage) => setCombinedPage(newPage)}
-              pageSizeLabel={nodeData.materialized ? 'Occurrences per page' : 'Documents per page'}
-              pageSizeSummary={nodeData.materialized ? undefined : <GroupedResultsPageSizeSummary groups={nodeData.data} />}
+              pageSizeSummary={nodeData.materialized
+                ? (Object.keys(materializeSummaries).length > 0
+                  ? <GroupedResultsPageSizeSummary
+                      groups={[]}
+                      totalInstances={Object.values(materializeSummaries).reduce((sum, s) => sum + s.recordCount, 0)}
+                      totalDocuments={Object.values(materializeSummaries).reduce((sum, s) => sum + s.uniqueDocuments, 0)}
+                      totalProcessed={Object.values(materializeSummaries).reduce((sum, s) => sum + s.totalDocuments, 0)}
+                    />
+                  : undefined)
+                : <GroupedResultsPageSizeSummary groups={nodeData.data} totalProcessed={nodeData.pagination?.page_size} />
+              }
               loading={combinedLoading}
             />
           </div>
@@ -1385,38 +1429,15 @@ const ConcordanceFeature: React.FC = () => {
           hasPrev={hasPrev}
           totalPages={nodeData.pagination?.total_source_pages}
           onPageChange={(newPage) => handlePageChange(newPage, paginationKey, requestNodeId)}
-          onPageSizeChange={(newSize) => {
-            const previousPageSize = globalPageSize;
-            const previousPagination = Object.fromEntries(
-              Object.entries(nodePagination).map(([key, value]) => [key, { ...value }])
-            ) as typeof nodePagination;
-
-            setGlobalPageSize(newSize);
-            setNodePagination((prev) => {
-              const updated = { ...prev };
-              Object.keys(updated).forEach((nid) => {
-                updated[nid] = {
-                  ...updated[nid]!,
-                  pageSize: newSize,
-                  currentPage: 1,
-                };
-              });
-              return updated;
-            });
-
-            void (async () => {
-              try {
-                await persistResultPreferences({ pageSize: newSize });
-              } catch (error) {
-                console.error('Failed to persist concordance page size preference', error);
-                setGlobalPageSize(previousPageSize);
-                setNodePagination(previousPagination);
-              }
-            })();
-          }}
-          pageSizeLabel={nodeData.materialized ? 'Occurrences per page' : 'Documents per page'}
-          pageSizeSummary={nodeData.materialized ? undefined : <GroupedResultsPageSizeSummary groups={nodeData.data} />}
-          pageSizeOptions={[10, 20, 50, 100, 200, 400, 800]}
+          pageSizeSummary={nodeData.materialized && detachNodeId && materializeSummaries[detachNodeId]
+            ? <GroupedResultsPageSizeSummary
+                groups={[]}
+                totalInstances={materializeSummaries[detachNodeId].recordCount}
+                totalDocuments={materializeSummaries[detachNodeId].uniqueDocuments}
+                totalProcessed={materializeSummaries[detachNodeId].totalDocuments}
+              />
+            : (nodeData.materialized ? undefined : <GroupedResultsPageSizeSummary groups={nodeData.data} totalProcessed={nodeData.pagination?.page_size} />)
+          }
           loading={nodeIsLoading}
         >
           {/* Materialize button */}
@@ -1440,11 +1461,11 @@ const ConcordanceFeature: React.FC = () => {
             title="Cache all occurrence rows to disk so subsequent pagination and Add-to-Workspace reuse them"
           >
             {isMaterializing ? (
-              <><Loader2 className="mr-2 h-3 w-3 animate-spin" />Materializing...</>
+              <><Loader2 className="mr-2 h-3 w-3 animate-spin" />Processing...</>
             ) : hasMaterializedPath ? (
-              <>Materialized</>
+              <>Processed</>
             ) : (
-              <>Materialize</>
+              <>Process All</>
             )}
           </Button>
           {/* Detach button */}
@@ -1535,8 +1556,8 @@ const ConcordanceFeature: React.FC = () => {
                   <input
                     type="number"
                     value={numLeftTokens}
-                    onChange={(e) => setNumLeftTokens(parseInt(e.target.value) || 10)}
-                    min="1"
+                    onChange={(e) => setNumLeftTokens(parseInt(e.target.value) || 0)}
+                    min="0"
                     max="50"
                     className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
                   />
@@ -1546,8 +1567,8 @@ const ConcordanceFeature: React.FC = () => {
                   <input
                     type="number"
                     value={numRightTokens}
-                    onChange={(e) => setNumRightTokens(parseInt(e.target.value) || 10)}
-                    min="1"
+                    onChange={(e) => setNumRightTokens(parseInt(e.target.value) || 0)}
+                    min="0"
                     max="50"
                     className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
                   />
@@ -1627,6 +1648,35 @@ const ConcordanceFeature: React.FC = () => {
               Clear Results
             </Button>
             <HelpIcon targetKey="analysis.concordance.clear-results" label="Clear results" />
+          </div>
+          <div className="ml-auto flex items-center gap-2">
+            <span className="whitespace-nowrap text-sm text-muted-foreground">Documents per batch</span>
+            <Select
+              value={String(globalPageSize)}
+              onValueChange={(val) => {
+                const newSize = Number(val);
+                setGlobalPageSize(newSize);
+                setNodePagination((prev) => {
+                  const updated = { ...prev };
+                  Object.keys(updated).forEach((nid) => {
+                    updated[nid] = { ...updated[nid]!, pageSize: newSize, currentPage: 1 };
+                  });
+                  return updated;
+                });
+                void persistResultPreferences({ pageSize: newSize });
+              }}
+            >
+              <SelectTrigger className="h-9 w-20">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent align="start">
+                {[10, 20, 50, 100, 200, 400, 800].map((size) => (
+                  <SelectItem key={size} value={String(size)}>
+                    {size}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </CardFooter>
       </Card>
