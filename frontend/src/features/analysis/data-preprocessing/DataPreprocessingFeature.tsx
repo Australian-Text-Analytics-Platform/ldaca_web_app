@@ -50,7 +50,7 @@ const DataPreprocessingFeature: React.FC = () => {
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-semibold text-foreground">Data Preprocessing</h1>
+            <h1 className="font-semibold leading-none tracking-tight text-foreground">Data Preprocessing</h1>
             <InfoIcon
               targetKey="preprocessing.overview"
               label="About Data Preprocessing"
