@@ -52,6 +52,18 @@ const browserDownload = (blob: Blob, filename: string) => {
   }
 };
 
+/**
+ * Reduce a path-like filename to its basename. The backend may return paths
+ * with slashes (e.g. `sample_data/ADO/reddit/reddit_comments.csv`); browsers
+ * strip these for `<a download>`, but Tauri's `writeFile` would interpret
+ * them as nested directories under Downloads (which don't exist) and fail.
+ */
+const toBasename = (filename: string): string => {
+  const trimmed = filename.replace(/[/\\]+$/, '');
+  const idx = Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('\\'));
+  return idx >= 0 ? trimmed.slice(idx + 1) : trimmed;
+};
+
 const tauriDownload = async (blob: Blob, filename: string) => {
   // Dynamic imports keep these out of browser bundles.
   const [{ writeFile, exists, BaseDirectory }, { downloadDir, join }, opener] =
@@ -62,7 +74,7 @@ const tauriDownload = async (blob: Blob, filename: string) => {
     ]);
 
   const finalName = await resolveUniqueFilename(
-    filename,
+    toBasename(filename),
     exists as (p: string, o: { baseDir: number }) => Promise<boolean>,
     BaseDirectory.Download,
   );
@@ -100,7 +112,7 @@ export const saveBlob = async (
   try {
     const { fullPath, opener } = await tauriDownload(blob, filename);
     if (!silent) {
-      toast.success(`Saved ${filename} to your Downloads folder`, {
+      toast.success(`Saved ${toBasename(filename)} to your Downloads folder`, {
         description: fullPath,
         action: {
           label: 'Show in folder',
@@ -115,7 +127,7 @@ export const saveBlob = async (
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     if (!silent) {
-      toast.error(`Failed to download ${filename}`, { description: message });
+      toast.error(`Failed to download ${toBasename(filename)}`, { description: message });
     }
     throw error;
   }
