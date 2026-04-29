@@ -172,7 +172,7 @@ export const DataLoaderFeature: React.FC = () => {
   const workspaceZipInputRef = useRef<HTMLInputElement | null>(null);
   const splitContainerRef = useRef<HTMLDivElement | null>(null);
   const splitDraggingRef = useRef(false);
-  const [topRatio, setTopRatio] = useState(0.5);
+  const [topRatio, setTopRatio] = useState(0.4);
   const hasWorkspaceSelected = Boolean(currentWorkspaceId);
 
   const clampRatio = (value: number) => Math.min(0.85, Math.max(0.15, value));

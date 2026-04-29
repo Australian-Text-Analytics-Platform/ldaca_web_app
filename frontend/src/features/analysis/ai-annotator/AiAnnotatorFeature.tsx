@@ -925,6 +925,11 @@ const AiAnnotatorFeature: React.FC = () => {
           runLabel: isReviewLoading ? 'Reviewing' : 'Review',
         }}
       >
+        <p className="mb-4 text-sm font-medium text-red-600 dark:text-red-400">
+          This tool is under development and not ready to be used. In order to use GenAI assisted coding,
+          you will need to have a valid API key from a commercial provider, or deploy a local GenAI model
+          and setup the endpoint correctly.
+        </p>
         <Tabs value={panelTab} onValueChange={(value) => setPanelTab(value as 'ai-annotation' | 'review')}>
           <TabsList className="mb-4">
             <TabsTrigger value="ai-annotation">AI Annotation</TabsTrigger>
