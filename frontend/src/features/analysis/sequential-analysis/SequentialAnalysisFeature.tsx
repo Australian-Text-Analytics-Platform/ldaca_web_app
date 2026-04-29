@@ -15,6 +15,7 @@ import { Button } from '../../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Input } from '../../../components/ui/input';
 import HelpIcon from '../../../components/help/HelpIcon';
+import InfoIcon from '../../../components/help/InfoIcon';
 import AnalysisTaskBanner from '../../../components/tabs/AnalysisTaskBanner';
 import {
   Select,
@@ -23,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../../../components/ui/select';
+import { Checkbox } from '../../../components/ui/checkbox';
 import { Loader2, Play, Plus, Trash2 } from 'lucide-react';
 import { normalizeTypeName } from '../../../utils/columnTypes';
 import {
@@ -97,6 +99,7 @@ const SequentialAnalysisFeature = () => {
   const [groupByColumns, setGroupByColumns] = useState<string[]>([]);
   const [frequency, setFrequency] = useState<SequentialFrequency>('daily');
   const [chartType, setChartType] = useState<ChartTypeOption>('line');
+  const [caseSensitive, setCaseSensitive] = useState(true);
   const [numericOriginInput, setNumericOriginInput] = useState<string>('');
   const [numericIntervalInput, setNumericIntervalInput] = useState<string>('1');
   
@@ -124,6 +127,7 @@ const SequentialAnalysisFeature = () => {
     columnType: 'datetime' | 'numeric';
     numericOrigin: number | null;
     numericInterval: number | null;
+    caseSensitive: boolean;
   } | null>(null);
 
   const {
@@ -174,8 +178,7 @@ const SequentialAnalysisFeature = () => {
                 frequency: hydratedParams.frequency,
                 column_type: hydratedParams.columnType,
                 numeric_origin: hydratedParams.numericOrigin,
-                numeric_interval: hydratedParams.numericInterval,
-              }
+                numeric_interval: hydratedParams.numericInterval,                case_sensitive: hydratedParams.caseSensitive,              }
             : {}),
         },
       };
@@ -215,6 +218,8 @@ const SequentialAnalysisFeature = () => {
       const reqFrequency = typeof req.frequency === 'string' ? (req.frequency as SequentialFrequency) : undefined;
       const lockedFrequency = reqFrequency && validFrequencies.includes(reqFrequency) ? reqFrequency : frequency;
       setFrequency(lockedFrequency);
+      const reqCaseSensitive = typeof req.case_sensitive === 'boolean' ? req.case_sensitive : true;
+      setCaseSensitive(reqCaseSensitive);
       hydratedParamsRef.current = {
         timeColumn: reqTimeColumn,
         groupByColumns: normalizedGroups.length ? [...normalizedGroups] : [],
@@ -222,6 +227,7 @@ const SequentialAnalysisFeature = () => {
         columnType: reqColumnType,
         numericOrigin: lockedNumericOrigin,
         numericInterval: lockedNumericInterval,
+        caseSensitive: reqCaseSensitive,
       };
       if (nodeIdStr && currentWorkspaceId) {
         try {
@@ -253,6 +259,7 @@ const SequentialAnalysisFeature = () => {
       resetAnalysisSelectionAfterClear({ unlockSelection });
       setLockedSchema(null);
       setChartType('line');
+      setCaseSensitive(true);
       setNumericOriginInput('');
       setNumericIntervalInput('1');
     },
@@ -298,6 +305,7 @@ const SequentialAnalysisFeature = () => {
       column_type: derivedColumnType,
       numeric_origin: derivedColumnType === 'numeric' ? numericOriginValue : null,
       numeric_interval: derivedColumnType === 'numeric' ? numericIntervalValue : null,
+      case_sensitive: caseSensitive,
     },
     getServerParams: (request) => {
       const serverColumnType = typeof request.column_type === 'string' ? request.column_type : 'datetime';
@@ -305,12 +313,14 @@ const SequentialAnalysisFeature = () => {
       const serverNumericOrigin = request.numeric_origin == null ? null : Number(request.numeric_origin);
       const serverNumericInterval = request.numeric_interval == null ? null : Number(request.numeric_interval);
 
+      const serverCaseSensitive = typeof request.case_sensitive === 'boolean' ? request.case_sensitive : true;
       return {
         frequency: serverFrequency,
         group_by_columns: normalizeUnknownStringArray(request.group_by_columns),
         column_type: serverColumnType,
         numeric_origin: serverColumnType === 'numeric' ? serverNumericOrigin : null,
         numeric_interval: serverColumnType === 'numeric' ? serverNumericInterval : null,
+        case_sensitive: serverCaseSensitive,
       };
     },
   });
@@ -400,6 +410,7 @@ const SequentialAnalysisFeature = () => {
       numericOriginValue,
       numericIntervalValue,
       numericOriginInput,
+      caseSensitive,
       results,
     },
     actions: {
@@ -452,6 +463,11 @@ const SequentialAnalysisFeature = () => {
             <div>
               <CardTitle className="flex items-center gap-2">
                 Sequential Analysis
+                <InfoIcon
+                  targetKey="sequential-analysis.overview"
+                  label="About Sequential Analysis"
+                  tooltip="Learn what sequential analysis is and how it can help you."
+                />
                 <HelpIcon
                   targetKey="analysis.sequential-analysis.parameters"
                   label="Sequential analysis parameters"
@@ -606,6 +622,22 @@ const SequentialAnalysisFeature = () => {
                 </Button>
               </div>
             ))}
+
+            {groupByColumns.length > 0 && (
+              <div className="flex items-center space-x-2 mt-2">
+                <Checkbox
+                  id="case-sensitive"
+                  checked={caseSensitive}
+                  onCheckedChange={(checked) => setCaseSensitive(checked === true)}
+                />
+                <label
+                  htmlFor="case-sensitive"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  Case sensitive
+                </label>
+              </div>
+            )}
           </div>
         </div>
 

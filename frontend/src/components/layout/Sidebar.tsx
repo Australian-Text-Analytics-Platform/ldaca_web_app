@@ -36,6 +36,8 @@ import { DataFolderDialog } from '@/components/dialogs/DataFolderDialog';
 import SidebarNodesSection from '@/components/layout/sidebar/SidebarNodesSection';
 import SidebarTasksSection from '@/components/layout/sidebar/SidebarTasksSection';
 import HelpIcon from '@/components/help/HelpIcon';
+import InfoIcon from '@/components/help/InfoIcon';
+import ReferenceIcon from '@/components/help/ReferenceIcon';
 import type {
   SidebarTaskRecord,
   SidebarWorkspaceNode,
@@ -357,7 +359,11 @@ const Sidebar: React.FC = () => {
             <SidebarTrigger className="md:hidden" />
             <img src={logo} alt="LDaCA Logo" className="w-full h-auto object-contain" />
           </div>
-          <p className="text-xl font-semibold w-full">Text Analytics</p>
+              <div className="flex items-center w-full">
+            <p className="text-xl font-semibold flex-1">Text Analytics</p>
+                <InfoIcon targetKey="general.overview" label="About this platform" className="h-5 w-5 text-blue-500" />
+                <ReferenceIcon targetKey="general.platform" label="Cite this platform" className="h-5 w-5 text-emerald-600" />
+              </div>
           {isMultiUserMode && (
             <div className="flex items-center justify-between w-full">
               <p className="text-[11px] text-muted-foreground truncate" title={user?.name ?? 'Guest'}>

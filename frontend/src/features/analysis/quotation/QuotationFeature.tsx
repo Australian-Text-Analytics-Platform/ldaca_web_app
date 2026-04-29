@@ -26,6 +26,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../../../components/ui/dialog';
 import { Badge } from '../../../components/ui/badge';
 import HelpIcon from '../../../components/help/HelpIcon';
+import InfoIcon from '../../../components/help/InfoIcon';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -98,7 +99,7 @@ interface QuotationResultState {
   column: string;
 }
 
-const DEFAULT_PAGE_SIZE = 100;
+const DEFAULT_PAGE_SIZE = 50;
 const DEFAULT_CONTEXT_LENGTH = 5;
 const MAX_CONTEXT_LENGTH = 2000;
 
@@ -471,6 +472,14 @@ const QuotationFeature: React.FC = () => {
       if (typeof matPath === 'string' && matPath) {
         setMaterializedPaths(prev => ({ ...prev, [nodeId]: matPath }));
       }
+      const matSummary = requestData.materialize_summary as Record<string, unknown> | undefined;
+      if (matSummary) {
+        setMaterializeSummary({
+          recordCount: Number(matSummary.record_count) || 0,
+          uniqueDocuments: Number(matSummary.unique_documents_with_hits) || 0,
+          totalDocuments: Number(matSummary.total_source_documents) || 0,
+        });
+      }
       try {
         await restoreAnalysisLockFromRequest({
           workspaceId: currentWorkspaceId,
@@ -491,6 +500,7 @@ const QuotationFeature: React.FC = () => {
       setHasLoaded(false);
       setResultsByNode({});
       setNodeState({});
+      setMaterializeSummary(null);
       resetAnalysisSelectionAfterClear({ unlockSelection });
     },
   });
@@ -569,6 +579,7 @@ const QuotationFeature: React.FC = () => {
   const [nodeMaterializing, setNodeMaterializing] = useState<Record<string, boolean>>({});
   const [materializeTaskIds, setMaterializeTaskIds] = useState<Record<string, string>>({});
   const [materializedPaths, setMaterializedPaths] = useState<Record<string, string>>({});
+  const [materializeSummary, setMaterializeSummary] = useState<{ recordCount: number; uniqueDocuments: number; totalDocuments: number } | null>(null);
   const [detachDialogOpen, setDetachDialogOpen] = useState(false);
   const [pendingDetachNodeId, setPendingDetachNodeId] = useState<string | null>(null);
   const [detachNodeOptions, setDetachNodeOptions] = useState<QuotationDetachNodeOption[]>([]);
@@ -920,6 +931,14 @@ const QuotationFeature: React.FC = () => {
             if (path) {
               setMaterializedPaths((prev) => ({ ...prev, [nodeId]: path }));
             }
+            const summary = reqObj.materialize_summary as Record<string, unknown> | undefined;
+            if (summary) {
+              setMaterializeSummary({
+                recordCount: Number(summary.record_count) || 0,
+                uniqueDocuments: Number(summary.unique_documents_with_hits) || 0,
+                totalDocuments: Number(summary.total_source_documents) || 0,
+              });
+            }
           }
         } catch (error) {
           console.warn('Failed to refresh quotation task request after materialize', error);
@@ -1143,6 +1162,11 @@ const QuotationFeature: React.FC = () => {
               <div>
                 <CardTitle className="flex items-center gap-2">
                   Quotation Extraction
+                  <InfoIcon
+                    targetKey="quotation.overview"
+                    label="About Quotation Extraction"
+                    tooltip="Learn what quotation extraction is and how it can help you."
+                  />
                   <HelpIcon
                     targetKey="analysis.quotation.parameters"
                     label="Quotation parameters"
@@ -1188,7 +1212,7 @@ const QuotationFeature: React.FC = () => {
               allowedDataTypes={['string']}
               lockedMessage={ANALYSIS_LOCKED_MESSAGE}
             />
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <Button
                 type="button"
                 className="w-full sm:w-auto"
@@ -1235,6 +1259,27 @@ const QuotationFeature: React.FC = () => {
                   )}
                 </Button>
                 <HelpIcon targetKey="analysis.quotation.clear-results" label="Clear results" />
+              </div>
+              <div className="ml-auto flex items-center gap-2">
+                <span className="whitespace-nowrap text-sm text-muted-foreground">Documents per batch</span>
+                <Select
+                  value={String(
+                    nodeState[displayedNodes[0] ? getNodeIdentifier(displayedNodes[0], 0) : '']?.pageSize
+                    ?? DEFAULT_PAGE_SIZE
+                  )}
+                  onValueChange={(val) => handlePageSizeChange(Number(val))}
+                >
+                  <SelectTrigger className="h-9 w-20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent align="start">
+                    {[10, 20, 50, 100, 200, 400, 800].map((size) => (
+                      <SelectItem key={size} value={String(size)}>
+                        {size}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </CardContent>
@@ -1428,10 +1473,10 @@ const QuotationFeature: React.FC = () => {
                       hasPrev={resultState?.pagination?.has_prev ?? ((resultState?.pagination?.page ?? 1) > 1)}
                       totalPages={resultState?.pagination?.total_source_pages}
                       onPageChange={(newPage) => handlePageChange(newPage)}
-                      onPageSizeChange={(newSize) => handlePageSizeChange(newSize)}
-                      pageSizeLabel="Documents per page"
-                      pageSizeSummary={<GroupedResultsPageSizeSummary groups={resultState?.groupedRows ?? []} />}
-                      pageSizeOptions={[10, 20, 50, 100, 200, 400, 800]}
+                      pageSizeSummary={materializedPaths[nodeId] && materializeSummary
+                        ? <GroupedResultsPageSizeSummary groups={[]} totalInstances={materializeSummary.recordCount} totalDocuments={materializeSummary.uniqueDocuments} totalProcessed={materializeSummary.totalDocuments} />
+                        : <GroupedResultsPageSizeSummary groups={resultState?.groupedRows ?? []} totalProcessed={resultState?.pagination?.page_size} />
+                      }
                     >
                       <Button
                         type="button"
@@ -1449,12 +1494,12 @@ const QuotationFeature: React.FC = () => {
                         {nodeMaterializing[nodeId] ? (
                           <>
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Materializing…
+                            Processing…
                           </>
                         ) : materializedPaths[nodeId] ? (
-                          <>Materialized</>
+                          <>Processed</>
                         ) : (
-                          <>Materialize</>
+                          <>Process All</>
                         )}
                       </Button>
                       <Button

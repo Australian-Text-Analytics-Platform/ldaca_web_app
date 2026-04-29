@@ -115,6 +115,7 @@ export interface SequentialAnalysisRequest {
   column_type?: 'datetime' | 'numeric';
   numeric_origin?: number | null;
   numeric_interval?: number | null;
+  case_sensitive?: boolean;
 }
 
 export interface TokenFrequencyRequest {

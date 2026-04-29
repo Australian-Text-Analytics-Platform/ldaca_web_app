@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { filesApi } from '../api/files';
+import { saveBlob } from '../lib/download';
 import { type FileTreeNode } from '../types';
 import { queryKeys } from '../lib/queryKeys';
 
@@ -74,14 +75,7 @@ export const useFiles = ({ authHeaders = {}, enabled = true }: UseFilesProps = {
   const handleDownloadFile = async (filename: string) => {
     try {
       const blob = await filesApi.download(filename, authHeaders);
-      const url = window.URL.createObjectURL(new Blob([blob]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', filename);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
+      await saveBlob(new Blob([blob]), filename);
       return true;
     } catch (error) {
       console.error('Failed to download file:', error);

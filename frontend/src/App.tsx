@@ -19,6 +19,7 @@ import { Dialog, DialogContent, DialogTitle } from './components/ui/dialog';
 
 // Lazy load components for code splitting
 const TutorialView = lazy(() => import('./components/TutorialView'));
+const DocumentView = lazy(() => import('./components/DocumentView'));
 const FeedbackPanel = lazy(() => import('./components/panels/FeedbackPanel'));
 const WorkspaceView = lazy(() => import('./components/layout/WorkspaceView'));
 const DataLoaderFeature = lazy(() => import('./features/analysis/data-loader/DataLoaderFeature'));
@@ -46,6 +47,15 @@ const WorkspaceShell: React.FC = () => {
     tutorialModal,
     tutorialTarget,
     closeTutorialModal,
+    warningModal,
+    warningTarget,
+    closeWarningModal,
+    infoModal,
+    infoTarget,
+    closeInfoModal,
+    referenceModal,
+    referenceTarget,
+    closeReferenceModal,
   } = useUIStore(useShallow((state) => ({
     currentView: state.currentView,
     closeFeedbackModal: state.closeFeedbackModal,
@@ -53,6 +63,15 @@ const WorkspaceShell: React.FC = () => {
     tutorialModal: state.modals.tutorialModal,
     tutorialTarget: state.tutorialTarget,
     closeTutorialModal: state.closeTutorialModal,
+    warningModal: state.modals.warningModal,
+    warningTarget: state.warningTarget,
+    closeWarningModal: state.closeWarningModal,
+    infoModal: state.modals.infoModal,
+    infoTarget: state.infoTarget,
+    closeInfoModal: state.closeInfoModal,
+    referenceModal: state.modals.referenceModal,
+    referenceTarget: state.referenceTarget,
+    closeReferenceModal: state.closeReferenceModal,
   })));
   const {
     phase,
@@ -253,6 +272,42 @@ const WorkspaceShell: React.FC = () => {
                 <div className="flex-1 overflow-y-auto">
                   <Suspense fallback={<div className="p-8 flex items-center justify-center h-full"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>}>
                     <TutorialView onClose={closeTutorialModal} target={tutorialTarget} />
+                  </Suspense>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            {/* Warning Modal */}
+            <Dialog open={warningModal} onOpenChange={(open) => !open && closeWarningModal()}>
+              <DialogContent className="max-w-5xl h-[85vh] flex flex-col p-0 gap-0 overflow-hidden">
+                <DialogTitle className="sr-only">Warning</DialogTitle>
+                <div className="flex-1 overflow-y-auto">
+                  <Suspense fallback={<div className="p-8 flex items-center justify-center h-full"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500"></div></div>}>
+                    <DocumentView docType="warning" onClose={closeWarningModal} target={warningTarget} />
+                  </Suspense>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            {/* Information Modal */}
+            <Dialog open={infoModal} onOpenChange={(open) => !open && closeInfoModal()}>
+              <DialogContent className="max-w-5xl h-[85vh] flex flex-col p-0 gap-0 overflow-hidden">
+                <DialogTitle className="sr-only">Information</DialogTitle>
+                <div className="flex-1 overflow-y-auto">
+                  <Suspense fallback={<div className="p-8 flex items-center justify-center h-full"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div></div>}>
+                    <DocumentView docType="information" onClose={closeInfoModal} target={infoTarget} />
+                  </Suspense>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            {/* Reference Modal */}
+            <Dialog open={referenceModal} onOpenChange={(open) => !open && closeReferenceModal()}>
+              <DialogContent className="max-w-5xl h-[85vh] flex flex-col p-0 gap-0 overflow-hidden">
+                <DialogTitle className="sr-only">Reference</DialogTitle>
+                <div className="flex-1 overflow-y-auto">
+                  <Suspense fallback={<div className="p-8 flex items-center justify-center h-full"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div></div>}>
+                    <DocumentView docType="reference" onClose={closeReferenceModal} target={referenceTarget} />
                   </Suspense>
                 </div>
               </DialogContent>

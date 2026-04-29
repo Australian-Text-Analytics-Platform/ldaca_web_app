@@ -62,9 +62,13 @@ export function getApiBase(options: ApiEnvOptions = {}): string {
   const { origin, hostname, port } = loc;
   const backendPort = getBackendPort();
 
-  // 5. Local dev: localhost/127.0.0.1/tauri.localhost → backend at configured port
-  const isLoopback = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === 'tauri.localhost';
-  if (isLoopback) {
+  // 5. Local dev: localhost/127.0.0.1/tauri.localhost/private IPs → backend at configured port
+  const isLocalDev =
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname === 'tauri.localhost' ||
+    /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(hostname);
+  if (isLocalDev) {
     if (port === backendPort) return `${origin}/api`;
     if (hostname === 'tauri.localhost') {
       return `http://127.0.0.1:${backendPort}/api`;

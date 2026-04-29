@@ -64,8 +64,34 @@ interface UIState {
   modals: {
     feedbackModal: boolean;
     tutorialModal: boolean;
+    warningModal: boolean;
+    infoModal: boolean;
+    referenceModal: boolean;
   };
-  tutorialTarget: TutorialTarget | null;
+
+  tutorialTarget?: {
+    file: string;
+    anchor: string;
+    label?: string;
+  } | null;
+
+  warningTarget?: {
+    file: string;
+    anchor: string;
+    label?: string;
+  } | null;
+
+  infoTarget?: {
+    file: string;
+    anchor: string;
+    label?: string;
+  } | null;
+
+  referenceTarget?: {
+    file: string;
+    anchor: string;
+    label?: string;
+  } | null;
 }
 
 interface UIActions {
@@ -86,7 +112,17 @@ interface UIActions {
   closeFeedbackModal: () => void;
   openTutorialModal: () => void;
   closeTutorialModal: () => void;
-  openTutorialTarget: (target: TutorialTarget) => void;
+  openTutorialTarget: (target: { file: string; anchor: string; label?: string }) => void;
+  openWarningModal: () => void;
+  closeWarningModal: () => void;
+  openWarningTarget: (target: { file: string; anchor: string; label?: string }) => void;
+  openInfoModal: () => void;
+  closeInfoModal: () => void;
+  openInfoTarget: (target: { file: string; anchor: string; label?: string }) => void;
+  openReferenceModal: () => void;
+  closeReferenceModal: () => void;
+  openReferenceTarget: (target: { file: string; anchor: string; label?: string }) => void;
+  closeAllModals: () => void;
 }
 
 type UIStore = UIState & UIActions;
@@ -94,17 +130,31 @@ type UIStore = UIState & UIActions;
 export const useUIStore = create<UIStore>()(
   devtools(
     persist(
-      immer((set) => ({
-        currentView: 'data-loader',
-        visibleViews: [...DEFAULT_VISIBLE_VIEWS],
-        sidebarCollapsed: false,
-        loadingOperations: new Set(),
-        operationErrors: new Map(),
-        modals: {
-          feedbackModal: false,
-          tutorialModal: false,
-        },
-        tutorialTarget: null,
+      immer((set, get) => ({
+      // Initial state
+      currentView: 'data-loader',
+      visibleViews: [...DEFAULT_VISIBLE_VIEWS],
+      sidebarCollapsed: false,
+      isGlobalLoading: false,
+      loadingOperations: new Set(),
+      globalError: null,
+      operationErrors: new Map(),
+      modals: {
+        joinModal: false,
+        filterModal: false,
+        documentColumnModal: false,
+        renameModal: false,
+        deleteConfirmModal: false,
+        feedbackModal: false,
+        tutorialModal: false,
+        warningModal: false,
+        infoModal: false,
+        referenceModal: false,
+      },
+      tutorialTarget: null,
+      warningTarget: null,
+      infoTarget: null,
+      referenceTarget: null,
 
         setCurrentView: (view) => set((state) => {
           if (state.currentView !== view) state.currentView = view;
@@ -166,17 +216,68 @@ export const useUIStore = create<UIStore>()(
         openFeedbackModal: () => set((state) => { state.modals.feedbackModal = true; }),
         closeFeedbackModal: () => set((state) => { state.modals.feedbackModal = false; }),
 
-        openTutorialModal: () => set((state) => { state.modals.tutorialModal = true; }),
-        closeTutorialModal: () => set((state) => {
-          state.modals.tutorialModal = false;
-          state.tutorialTarget = null;
-        }),
+      openTutorialModal: () => set((state) => {
+        state.modals.tutorialModal = true;
+      }),
 
-        openTutorialTarget: (target) => set((state) => {
-          state.tutorialTarget = target;
-          state.modals.tutorialModal = true;
-        }),
-      })),
+      openTutorialTarget: (target) => set((state) => {
+        state.tutorialTarget = target;
+        state.modals.tutorialModal = true;
+      }),
+
+      closeTutorialModal: () => set((state) => {
+        state.modals.tutorialModal = false;
+        state.tutorialTarget = null;
+      }),
+
+      openWarningModal: () => set((state) => {
+        state.modals.warningModal = true;
+      }),
+
+      openWarningTarget: (target) => set((state) => {
+        state.warningTarget = target;
+        state.modals.warningModal = true;
+      }),
+
+      closeWarningModal: () => set((state) => {
+        state.modals.warningModal = false;
+        state.warningTarget = null;
+      }),
+
+      openInfoModal: () => set((state) => {
+        state.modals.infoModal = true;
+      }),
+
+      openInfoTarget: (target) => set((state) => {
+        state.infoTarget = target;
+        state.modals.infoModal = true;
+      }),
+
+      closeInfoModal: () => set((state) => {
+        state.modals.infoModal = false;
+        state.infoTarget = null;
+      }),
+
+      openReferenceModal: () => set((state) => {
+        state.modals.referenceModal = true;
+      }),
+
+      openReferenceTarget: (target) => set((state) => {
+        state.referenceTarget = target;
+        state.modals.referenceModal = true;
+      }),
+
+      closeReferenceModal: () => set((state) => {
+        state.modals.referenceModal = false;
+        state.referenceTarget = null;
+      }),
+      
+      closeAllModals: () => set((state) => {
+        (Object.keys(state.modals) as Array<keyof typeof state.modals>).forEach(key => {
+          state.modals[key] = false;
+        });
+      }),
+    })),
       {
         name: 'ldaca-ui-store',
         partialize: (state) => ({

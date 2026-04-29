@@ -8,6 +8,10 @@ vi.mock('@/components/help/HelpIcon', () => ({
   default: ({ label }: { label?: string }) => <button type="button">{label ?? 'Help'}</button>,
 }));
 
+vi.mock('@/components/help/InfoIcon', () => ({
+  default: () => null,
+}));
+
 vi.mock('@/features/analysis/common/components/AnalysisCardLayout', () => ({
   AnalysisCardLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));

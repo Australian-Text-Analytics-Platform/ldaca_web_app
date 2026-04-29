@@ -874,6 +874,11 @@ const AiAnnotatorFeature: React.FC = () => {
 
       <AnalysisCardLayout
         title="AI Annotation and Review"
+        info={{
+          targetKey: 'ai-annotator.overview',
+          label: 'About AI Annotation and Review',
+          tooltip: 'Learn what AI annotation is and how it can help you.',
+        }}
         actions={panelTab === 'ai-annotation' ? {
           onRun: handleRun,
           onClear: handleClear,

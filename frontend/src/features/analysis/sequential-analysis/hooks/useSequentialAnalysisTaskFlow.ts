@@ -50,6 +50,7 @@ interface SequentialAnalysisState {
   numericOriginValue: number | null;
   numericIntervalValue: number | null;
   numericOriginInput: string;
+  caseSensitive: boolean;
   results: Record<string, unknown> | null;
 }
 
@@ -89,6 +90,7 @@ export function useSequentialAnalysisTaskFlow({
     numericOriginValue,
     numericIntervalValue,
     numericOriginInput,
+    caseSensitive,
     results,
   },
   actions: {
@@ -146,6 +148,7 @@ export function useSequentialAnalysisTaskFlow({
       column_type: derivedColumnType,
       numeric_origin: derivedColumnType === 'numeric' ? numericOriginValue : undefined,
       numeric_interval: derivedColumnType === 'numeric' ? numericIntervalValue : undefined,
+      case_sensitive: caseSensitive,
     };
 
     try {
@@ -167,6 +170,7 @@ export function useSequentialAnalysisTaskFlow({
           column_type: derivedColumnType,
           numeric_origin: numericOriginValue,
           numeric_interval: numericIntervalValue,
+          case_sensitive: caseSensitive,
         },
       };
       const resolvedChartType = isChartTypeOption((enrichedResult as Record<string, unknown>)?.chart_type)

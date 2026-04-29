@@ -11,7 +11,7 @@ import { textApi } from '../../../../api/text';
 import { getNodeIdentifier, restoreAnalysisLockFromRequest, extractAndSetTaskId } from '../../common';
 import type { NodeColumnSelection, NodePaginationState, WorkspaceNodeLike } from '../../common';
 
-const DEFAULT_PAGE_SIZE = 100;
+const DEFAULT_PAGE_SIZE = 50;
 
 type EngineRequestPayload = { type: 'local' } | { type: 'remote'; url: string };
 

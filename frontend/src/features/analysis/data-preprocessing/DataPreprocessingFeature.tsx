@@ -12,6 +12,7 @@ import { ConcatSubTab } from '../../preprocessing/concat/ConcatSubTab';
 import { SliceSubTab } from '../../preprocessing/slice/SliceSubTab';
 import { AggregateSubTab } from '../../preprocessing/aggregate/AggregateSubTab';
 import { ReplaceSubTab } from '../../preprocessing/replace/ReplaceSubTab';
+import InfoIcon from '../../../components/help/InfoIcon';
 import { PolarsExpressionSubTab } from '../../preprocessing/expression/PolarsExpressionSubTab';
 
 type DataPrepSubtab = 'filter' | 'slice' | 'join' | 'concat' | 'find' | 'aggregate' | 'expression';
@@ -48,7 +49,14 @@ const DataPreprocessingFeature: React.FC = () => {
     <div className="space-y-4">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-foreground">Data Preprocessing</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-semibold text-foreground">Data Preprocessing</h1>
+            <InfoIcon
+              targetKey="preprocessing.overview"
+              label="About Data Preprocessing"
+              tooltip="Learn what data preprocessing is and how it can help you."
+            />
+          </div>
           <p className="text-sm text-muted-foreground">
             Prepare your dataset with filtering, sampling, join, stack, find, and create tools.
           </p>

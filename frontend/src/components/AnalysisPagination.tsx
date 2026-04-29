@@ -302,11 +302,11 @@ export const AnalysisPagination = ({
                 </SelectGroup>
               </SelectContent>
             </Select>
-            {pageSizeSummary ? (
-              <span className="text-sm text-muted-foreground">{pageSizeSummary}</span>
-            ) : null}
           </>
         )}
+        {pageSizeSummary ? (
+          <span className="text-sm text-muted-foreground">{pageSizeSummary}</span>
+        ) : null}
       </div>
 
       {/* Center: Pagination buttons */}
