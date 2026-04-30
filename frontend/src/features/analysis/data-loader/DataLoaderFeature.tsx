@@ -14,6 +14,7 @@ import { workspacesApi } from '../../../api/workspaces';
 import { saveBlob } from '../../../lib/download';
 import { useAnalysisStore, type TaskItem } from '../../../stores/analysisStore';
 import { usePreferencesStore } from '../../../stores/preferencesStore';
+import { useUIStore } from '../../../stores/uiStore';
 import { type FileTreeDirectory, type FileTreeFile, type FileTreeNode } from '../../../types';
 import { AddFilePanel, FilePreviewPanel } from '../../../components/panels';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
@@ -639,6 +640,8 @@ export const DataLoaderFeature: React.FC = () => {
     setUploadingFiles(true);
     let uploadedCount = 0;
     const failedFiles: string[] = [];
+    const setLastUploadedFilePath = useUIStore.getState().setLastUploadedFilePath;
+    let lastSuccess: string | null = null;
 
     try {
       for (const file of selectedFiles) {
@@ -646,12 +649,20 @@ export const DataLoaderFeature: React.FC = () => {
           const success = await handleUploadFile(file);
           if (success) {
             uploadedCount += 1;
+            lastSuccess = file.name;
           } else {
             failedFiles.push(file.name);
           }
         } catch {
           failedFiles.push(file.name);
         }
+      }
+
+      if (lastSuccess) {
+        // Server stores uploads at the data-folder root, so the visible path
+        // matches the file's basename. Used by the contextual hints system
+        // to highlight the matching file row's "Add" button.
+        setLastUploadedFilePath(lastSuccess);
       }
 
       if (failedFiles.length === 0) {
@@ -726,6 +737,12 @@ export const DataLoaderFeature: React.FC = () => {
     try {
       await workspaceActions.createNodeFromFile(addFileName, selectedSheet ?? undefined);
       notify('success', `${addFileName} added to workspace.`);
+      // The file has been added — clear the "new upload" hint state so the
+      // contextual hint stops pointing at this row.
+      const lastUploaded = useUIStore.getState().lastUploadedFilePath;
+      if (lastUploaded && (lastUploaded === addFileName || addFileName.endsWith(`/${lastUploaded}`))) {
+        useUIStore.getState().setLastUploadedFilePath(null);
+      }
     } catch (error) {
       notify('error', (error as Error).message || 'Failed to add file to workspace.');
     } finally {
@@ -778,6 +795,7 @@ export const DataLoaderFeature: React.FC = () => {
             variant="ghost"
             className="h-7 px-2"
             disabled={!hasWorkspaceSelected}
+            data-hint-id="data-loader.file-row.add"
             onClick={() => {
               if (!hasWorkspaceSelected) {
                 setWorkspaceAlertOpen(true);
@@ -907,6 +925,7 @@ export const DataLoaderFeature: React.FC = () => {
           <div className="grid h-full min-h-0 gap-4 lg:grid-cols-2">
             <Card
               data-testid={currentWorkspace ? 'active-workspace-card' : 'create-workspace-card'}
+              data-hint-id="workspace.create-or-load"
               className="flex h-full flex-col overflow-hidden"
             >
               <CardHeader>

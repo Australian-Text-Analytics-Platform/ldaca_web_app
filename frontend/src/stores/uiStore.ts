@@ -86,6 +86,19 @@ interface UIState {
     anchor: string;
     label?: string;
   } | null;
+
+  /**
+   * Path of the most recently uploaded file. Used by the contextual hints
+   * system to highlight the matching file row's "Add" button after upload.
+   * Cleared once the file has been added to the workspace or the user dismisses.
+   */
+  lastUploadedFilePath: string | null;
+
+  /**
+   * Hints the user dismissed for this session only (won't persist across
+   * reloads). Permanent dismissals live in `hintsStore`.
+   */
+  sessionDismissedHints: Set<string>;
 }
 
 interface UIActions {
@@ -117,6 +130,10 @@ interface UIActions {
   closeReferenceModal: () => void;
   openReferenceTarget: (target: { file: string; anchor: string; label?: string }) => void;
   closeAllModals: () => void;
+
+  // Hints
+  setLastUploadedFilePath: (path: string | null) => void;
+  sessionDismissHint: (id: string) => void;
 }
 
 type UIStore = UIState & UIActions;
@@ -149,6 +166,8 @@ export const useUIStore = create<UIStore>()(
       warningTarget: null,
       infoTarget: null,
       referenceTarget: null,
+      lastUploadedFilePath: null,
+      sessionDismissedHints: new Set<string>(),
 
         setCurrentView: (view) => set((state) => {
           if (state.currentView !== view) state.currentView = view;
@@ -270,6 +289,14 @@ export const useUIStore = create<UIStore>()(
         (Object.keys(state.modals) as Array<keyof typeof state.modals>).forEach(key => {
           state.modals[key] = false;
         });
+      }),
+
+      setLastUploadedFilePath: (path) => set((state) => {
+        state.lastUploadedFilePath = path;
+      }),
+
+      sessionDismissHint: (id) => set((state) => {
+        state.sessionDismissedHints.add(id);
       }),
     })),
       {

@@ -297,6 +297,7 @@ const Sidebar: React.FC = () => {
           <SidebarMenuItem key={id}>
             <SidebarMenuButton
               isActive={currentView === id}
+              data-hint-id={id === 'data-loader' ? 'sidebar.data-loader' : undefined}
               onClick={() => {
                 if (isDisabled) return;
                 setCurrentView(id);
