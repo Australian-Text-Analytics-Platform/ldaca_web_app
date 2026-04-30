@@ -22,6 +22,7 @@ const TutorialView = lazy(() => import('./components/TutorialView'));
 const DocumentView = lazy(() => import('./components/DocumentView'));
 const FeedbackPanel = lazy(() => import('./components/panels/FeedbackPanel'));
 const WorkspaceView = lazy(() => import('./components/layout/WorkspaceView'));
+const HintsController = lazy(() => import('./features/hints/HintsController'));
 const DataLoaderFeature = lazy(() => import('./features/analysis/data-loader/DataLoaderFeature'));
 const DataPreprocessingFeature = lazy(() => import('./features/analysis/data-preprocessing/DataPreprocessingFeature'));
 const ConcordanceFeature = lazy(() => import('./features/analysis/concordance/ConcordanceFeature'));
@@ -362,6 +363,10 @@ const WorkspaceShell: React.FC = () => {
               <SidebarInset className="flex h-full flex-1 flex-col overflow-hidden bg-transparent md:m-0! md:ml-0! md:rounded-none! md:shadow-none!">
                 <Suspense fallback={null}>
                   <FeedbackPanel open={feedbackOpen} onClose={closeFeedbackModal} />
+                </Suspense>
+
+                <Suspense fallback={null}>
+                  <HintsController />
                 </Suspense>
 
                 <header className="border-b border-border/40 bg-white px-4 py-3 md:hidden">
