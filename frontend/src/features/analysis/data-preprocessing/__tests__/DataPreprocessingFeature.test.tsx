@@ -196,7 +196,7 @@ describe('DataPreprocessingFeature replace tab', () => {
       expect(screen.getByRole('tab', { name: 'Sample' })).toHaveAttribute('aria-selected', 'true');
     });
 
-    expect(screen.getByText('Sample rows')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Slice' })).toBeInTheDocument();
     expect(screen.getByLabelText('Offset')).toBeInTheDocument();
 
     await user.click(screen.getByRole('tab', { name: 'Random Sample' }));
